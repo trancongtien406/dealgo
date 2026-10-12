@@ -1,0 +1,587 @@
+---
+description: "DealGo Flutter Senior Engineering Contract: SOLID, latest compatible stable dependencies and security-first upgrades, custom UI/motion, business state machines, hardening, testing and release."
+globs: mobile/lib/**/*.dart, mobile/test/**/*.dart, mobile/integration_test/**/*.dart, mobile/pubspec.yaml, mobile/pubspec.lock, mobile/analysis_options.yaml, mobile/l10n.yaml, mobile/lib/l10n/**/*.arb, mobile/assets/**, mobile/android/**, mobile/ios/**
+alwaysApply: false
+---
+
+# DEALGO — FLUTTER SENIOR ENGINEERING RULES
+
+> Version: 1.1 | Ngày rà soát: 2026-10-12 | Scope: `mobile/` | Ngôn ngữ: Tiếng Việt.
+> File này là **engineering contract cho AI coding agent**, không thay thế PRD/ADR/API contract, không xác nhận những tính năng chưa triển khai. Đọc toàn bộ các mục liên quan trước khi code.
+
+## 00. Mệnh lệnh, ưu tiên, định nghĩa hoàn thành
+
+- **MUST**: bắt buộc khi điều kiện liên quan hiện diện; **SHOULD**: mặc định ưu tiên, được phép khác khi có lý do; **MAY**: tùy chọn dựa trên nhu cầu đo được.
+- Thứ tự nguồn sự thật: yêu cầu task và acceptance criteria được xác nhận → tài liệu DealGo `CONFIRMED`/ADR `ACCEPTED` → API/backend contract → code + convention đã hoạt động → rules này → gợi ý package/blog. Không tự đảo ngược quyết định đã chốt.
+- Trước thay đổi MUST đọc `AGENTS.md` (nếu có), docs product/architecture/design liên quan, `pubspec.yaml`, `analysis_options.yaml`, `lib/` thực tế và test liên quan. **Không giả định file/folder/stack tồn tại** chỉ từ sơ đồ minh họa.
+- DealGo là **MỘT app Flutter** với Customer, Merchant, Driver; nghiệp vụ gồm đặt xe/ghép tài xế và báo giá, đồ ăn, giao hàng theo scope được duyệt. Không tự tạo ba app hoặc tách repo không có ADR.
+- **Server có thẩm quyền cuối cùng** về role, KYC, giá/quote, trạng thái chuyến/đơn, matching, inventory, thanh toán và quyền truy cập. Widget/router/cache/socket/push chỉ phản ánh hoặc gợi ý trạng thái.
+- Nếu thiếu API key/service account/payment provider: MUST code đầy đủ theo contract có interface, fake/mock adapter hoặc sandbox config, test an toàn, tài liệu điểm cấu hình; **không** chặn toàn bộ implementation, không giả lập production thành công, không hardcode secret.
+- Không tự triển khai native module, framework, package hoặc abstraction chỉ để “chuẩn Senior”; giải pháp phải có consumer, lợi ích hoặc rủi ro thực sự.
+- Không tự commit/push/deploy, thay đổi signing, secret production, trả tiền dịch vụ hoặc sửa backend production nếu không được giao. Được tạo/chỉnh sửa code, test, config mẫu trong scope.
+- Các quyết định kiến trúc còn mở phải tự chọn phương án ít rủi ro, tương thích codebase, ghi `ASSUMPTION/PROPOSAL` trong bàn giao; không dừng task chỉ vì thiếu lựa chọn không trọng yếu.
+- **Không đạt Done** nếu code chỉ `analyze` sạch nhưng luồng nghiệp vụ, UX trạng thái, native integration hoặc release build áp dụng chưa được kiểm chứng.
+
+## 01. SDK, dependencies, cập nhật phiên bản và supply-chain security
+
+### 01.1. Chính sách mặc định: LATEST COMPATIBLE STABLE — SECURITY FIRST
+
+- **MUST dùng phiên bản stable mới nhất *thực sự tương thích* của mỗi dependency trực tiếp đang thêm, sử dụng hoặc nâng cấp**, bao gồm phiên bản **MAJOR** mới. Tương thích nghĩa là solver giải được trên Flutter/Dart SDK hiện có, toàn bộ dependency graph không xung đột, Android/iOS platforms được hỗ trợ, API có thể migrate và **đã vượt qua verification liên quan**. Không được đánh đồng “cùng hỗ trợ SDK” với “toàn bộ dependency graph + native runtime tương thích”.
+- **MUST tự xem xét và thực hiện major upgrade khi phiên bản mới resolvable**, không giữ 1.x chỉ vì 2.x là breaking change. Agent có trách nhiệm đọc migration guide, sửa code, generated files/config hợp lệ và regression test, thay vì chọn bản cũ cho nhanh. Không bắt người dùng tự sửa lỗi migration thuộc task được giao.
+- **MUST ưu tiên bản stable đã sửa lỗ hổng bảo mật đã biết**, kể cả cần đổi major, migrate API hoặc thay package. Security fixes, data-loss và critical bug fixes phải được xử lý trước feature convenience; không gọi “latest” là an toàn nếu upstream có advisory hoặc supply-chain risk.
+- **MUST phân biệt package upgrade với SDK/toolchain upgrade**. Flutter stable, Dart, AGP, Gradle, Kotlin, Java, Xcode, iOS/Android target SDK có release/compatibility matrix riêng. Giữ toolchain hiện tại trong task thông thường, nhưng kiểm tra bản vá bảo mật và **đề xuất/thực hiện upgrade trong task nâng cấp hoặc khi cần khắc phục rủi ro nghiêm trọng**, kèm migration + build matrix. Không upgrade toolchain bừa bãi chỉ để ép một dependency chưa thực sự cần thiết.
+- **MUST mặc định chọn stable**, không tự lấy beta/RC/nightly/pre-release hoặc package chỉ có git branch mới. Prerelease chỉ khi yêu cầu được duyệt, được đánh giá riêng về rủi ro, có pin commit/version và verified builds.
+- **MUST xem package mới nhất có được duy trì, được tin cậy và có phù hợp không**: chủ sở hữu/publisher, nguồn pub.dev/repository chính thức, changelog, license, platform support, deprecation/discontinued, sự cố bảo mật, ảnh hưởng native/build size. Bản số lớn nhất không vượt qua gate an toàn **không** tự động là lựa chọn đúng.
+- **MUST ưu tiên Dart/Flutter SDK built-ins khi đủ tính năng**, nhưng khi thư viện ngoài giải quyết đúng bài toán và đã được chấp thuận, dùng latest compatible stable thay vì viết lại hoặc cố tình ghim bản cũ.
+
+### 01.2. Quy trình agent bắt buộc khi thêm/sửa package và khi bảo trì dự án
+
+1. **Inventory**: đọc `mobile/pubspec.yaml`, `mobile/pubspec.lock`, `flutter --version`, `dart --version` (nếu khả dụng), plugin/platform matrix, lockfiles native và ADR; xác định direct, dev và transitive dependencies. Không giả định version SDK từ bộ nhớ AI.
+2. **Discover**: khi có CLI/network, chạy `flutter pub outdated --transitive` (hoặc `flutter pub outdated --json` khi cần báo cáo tự động); tra **pub.dev + changelog/migration guide chính thức + advisory** cho package liên quan. Dữ liệu cũ hoặc cached/offline KHÔNG đủ để khẳng định “mới nhất hiện nay”.
+3. **Interpret**: so sánh đúng các cột:
+   - `Current`: bản đang khóa trong `pubspec.lock`.
+   - `Upgradable`: bản cao nhất thỏa constraints đang ghi trong `pubspec.yaml`.
+   - `Resolvable`: bản cao nhất có thể giải trong **toàn dependency graph** nếu nới các constraints phù hợp trên SDK hiện tại.
+   - `Latest`: bản công bố mới nhất (stable theo chế độ mặc định), **có thể không tương thích**.
+4. **Decide**: mặc định chọn **latest stable resolvable** và chủ động nâng constraints nếu bản mới nằm ngoài `^major` cũ. Khi `Latest > Resolvable`, phải điều tra vì sao: SDK tối thiểu mới, Flutter SDK pin, conflict transitive, plugin native, package discontinued hoặc dependency khác lỗi thời; tìm đường nâng package chặn, thay package không còn duy trì, hoặc lên kế hoạch nâng SDK nếu phù hợp. KHÔNG báo “đã mới nhất” khi thực tế mới chỉ đạt `Upgradable` cũ.
+5. **Preview**: có thể chạy `flutter pub upgrade --major-versions --dry-run` để xem tác động trước khi đổi tất cả constraints; dùng `flutter pub add <package>` hoặc cập nhật `pubspec.yaml` có kiểm soát, sau đó `flutter pub upgrade <package>` / `flutter pub upgrade --major-versions` trong phạm vi đã chọn. Lệnh major-wide có thể nâng **nhiều package cùng lúc**; chọn batch kiểm soát theo feature/risk, không gây incidental changes không liên quan nếu không phải task dependency refresh.
+6. **Migrate**: đọc release notes/README/API docs của phiên bản đích, sửa imports, renamed/removed APIs, nullability, constructor params, code generators, Android manifest/Gradle, iOS pods/entitlements, native permission, ProGuard/R8 và platform interface khi liên quan. Không làm package downgrade chỉ để che compile error có thể migrate được.
+7. **Verify**: chạy `flutter pub get`, `flutter pub outdated` lần nữa, generator nếu có, `dart format`, `flutter analyze`, unit/widget tests, integration tests theo risk, native Android/iOS build và release smoke khi plugin/native/security thay đổi. Kiểm tra API behavior, regressions, role sessions, booking/payment và lockfile diffs. Không kết luận compatible chỉ vì pub solver chạy qua.
+8. **Evidence**: báo tên package, old → new, Stable/Resolvable/Latest, advisory/security status, breaking changes, migration thực hiện, command PASS/FAIL/SKIPPED, blocker với bằng chứng. Nếu bản cũ còn tồn tại, ghi rõ lý do, security impact, owner/fix path; không giấu outdated package.
+
+### 01.3. Quy tắc nâng MAJOR (ví dụ minh họa)
+
+- Ví dụ giả định DealGo dùng SDK X; package `sample_package` đang ở `1.0.0`, bản `2.0.0` stable hỗ trợ SDK X và toàn graph resolve được:
+  - **ĐÚNG**: nâng `sample_package: ^2.0.0` (hoặc constraint phù hợp), sửa API theo migration, cập nhật `pubspec.lock`, chạy tests/build, dùng 2.x nếu gates đạt.
+  - **SAI**: giữ `sample_package: ^1.0.0` chỉ vì `flutter pub get` không tự nâng major, vì 1.x đã chạy tốt, hay vì AI sợ breaking changes.
+- Lý do không thể dùng 2.x phải **có chứng cứ**, ví dụ: SDK dự án chưa đủ, package native xung đột, upstream regression đã tái hiện, dependency graph không resolve, API backend không thể đáp ứng hoặc test critical thất bại chưa sửa được. Chỉ cùng hỗ trợ Dart X **chưa đủ** nếu `package_b` đang khóa `sample_package <2.0.0`.
+- Nếu không thể nâng vì blocker: MUST đề xuất/thử migration path (nâng `package_b`, replace unmaintained package, compatible adapter, scheduled SDK migration), không lén bỏ qua. Nếu bản cũ **có advisory nghiêm trọng áp dụng được** và chưa có mitigation, **không được đánh dấu release-ready**.
+
+### 01.4. Security advisories, supply chain và dependency exceptions
+
+- MUST kiểm tra security advisories được `pub get`/solver báo và các nguồn đáng tin (pub.dev package, GitHub Security Advisories/GHSA, OSV khi phù hợp); phân biệt vulnerability bị ảnh hưởng thực tế với advisory không liên quan theo threat model. Đánh giá cả **transitive dependencies** và native Android/iOS libraries.
+- Khi có lỗ hổng `Critical/High` **áp dụng được** trong code shipped/runtime: MUST ưu tiên nâng tới phiên bản đã vá hoặc thay dependency; nếu chưa khắc phục, release gate **FAIL/BLOCKED** cho đến khi có biện pháp giảm thiểu đủ mạnh và chấp thuận rủi ro rõ ràng. Không lạm dụng `ignored_advisories` để làm log sạch.
+- Không tự thêm `ignored_advisories`, `dependency_overrides`, fork/git source hoặc disable warning để né solver/security. Chỉ dùng như biện pháp ngoại lệ có lý do, rủi ro, thời hạn hết hạn, người chịu trách nhiệm và test chứng minh; override không chứng minh runtime compatibility.
+- Không sử dụng package đã discontinued/abandoned có rủi ro chưa xử lý nếu tồn tại lựa chọn được bảo trì phù hợp. Nếu package phát hành bản mới với dấu hiệu nguồn đáng ngờ, provenance bất thường hoặc API nguy hiểm, STOP việc tự nhận là an toàn và ghi nhận risk, xác minh upstream trước khi nâng.
+- MUST commit `pubspec.lock` cho **Flutter application** để pin exact direct/transitive versions; `pubspec.yaml` dùng range hợp lý (thường caret) chứ không dùng `any` để đuổi bản mới. CI production SHOULD dùng `flutter pub get --enforce-lockfile` (nếu CLI hỗ trợ) để không âm thầm thay lockfile/hash, thay vì `pub upgrade` không kiểm soát ngay trong release pipeline.
+- Không trực tiếp sửa cache `.pub-cache`, `.dart_tool/`, plugin registrant hoặc generated source; không đưa signing secret, private token, service-account hay build credentials vào dependencies/config.
+
+### 01.5. Tần suất và phạm vi kiểm tra để vừa mới vừa ổn định
+
+- **Khi tạo dự án/add package/new feature dùng package**: MUST tra stable latest hiện tại, dùng bản resolvable mới nhất kể cả major; không chép version từ AI examples hay code dự án khác.
+- **Khi sửa một feature đang dùng package**: MUST kiểm tra outdated/advisory của các dependency liên quan; SHOULD tự nâng và migrate package đã lỗi thời khi có thể verify mà không làm lạc scope; nếu fix security thì nâng là bắt buộc khi có bản vá phù hợp.
+- **Khi dependency-refresh sprint, trước major release hoặc khi được giao audit toàn dự án**: MUST quét **mọi** direct/dev/transitive dependency, nâng các stable resolvable gồm major theo batch, sửa code đến khi qua CI, lập danh sách blocker có evidence; không giữ dependency cũ vì “thay nhiều file”.
+- **Trong CI/release**: MUST build đúng lockfile đã review; SHOULD thêm job định kỳ kiểm tra dependency advisories và outdated packages qua tooling đã được cấu hình. Không để việc truy vấn internet trong build release tự thay đổi phiên bản.
+- **Khi không thể truy cập mạng/pub.dev**: chỉ đánh giá từ metadata có thật; ghi `LATEST_NOT_VERIFIED`, không khẳng định bản cũ là mới nhất. Hoàn thiện code trong phạm vi có thể, không tự suy đoán version.
+
+### 01.6. Release gates cho package/SDK updates
+
+- `PASS` khi: dependency graph giải được; version lựa chọn có bằng chứng về latest stable resolvable; advisory relevant đã xử lý/đánh giá; migration hoàn tất; analyze, tests, native builds tương ứng đạt; lockfile cập nhật đúng.
+- `FAIL` khi: không resolve; compilation/runtime regression; breaking native integration chưa sửa; vulnerability nghiêm trọng còn khả năng bị khai thác mà chưa được xử lý/chấp thuận rủi ro; release artifact chạy sai critical flow.
+- `SKIPPED/NOT_VERIFIED` khi: không có Xcode/device/network/test environment, report rõ thứ chưa xác minh. Không trình bày `pub get` PASS như toàn bộ app đã production-ready.
+- Cập nhật bản SDK/toolchain là quyết định khác với việc cập nhật package: đánh giá **Flutter stable, Gradle/AGP/Kotlin/Java, NDK, Xcode, iOS deployment/Android target SDK** cùng migration guides, release toolchain matrix và plugin compatibility.
+
+## 02. Kiến trúc tổng thể, module boundary, luồng phụ thuộc
+
+- Mặc định **feature-first, modular monolith** trong một Flutter app: phần theo nghiệp vụ nằm trong `features/`; reusable app infrastructure trong `core/`; UI building blocks thật sự dùng chung trong `shared/` hoặc `design_system/`.
+- Ưu tiên kiến trúc **Presentation → Domain/Application → Data implementation → External services**; mũi tên import hướng vào contract ổn định, không làm domain import concrete infrastructure.
+- Với feature nghiệp vụ phức tạp (Ride, Quote, Order, Payment, Driver Tracking), SHOULD tách `presentation`, `domain`, `data`; feature trình bày đơn giản có thể thu gọn, không tạo mọi layer/file rỗng.
+- Domain MUST không import Flutter widget, Dio, database plugin, generated JSON DTO, platform channel hoặc package implementation; domain chứa entity, value object, policy, state transition, repository ports và use case **có nghiệp vụ thực**.
+- Application/use-case SHOULD orchestration các bước, kiểm tra preconditions, điều phối repositories và policies; không implement layout hoặc biết `BuildContext`.
+- Data layer sở hữu remote/local datasource, response DTO, serialization, adapter/mapper và implementation repository; bắt lỗi transport rồi map sang `Failure` ổn định.
+- Presentation sở hữu pages, composition widgets, state holder, navigation intent và visual effects; không phát REST call hoặc query database trực tiếp trong `build()`/`onPressed` vượt qua boundary.
+- Không import trực tiếp `features/other_feature/data/**` hay `presentation/**`; giao tiếp liên feature qua public contract, domain port, shared application coordinator có owner xác định hoặc event có schema rõ.
+- Không biến `core/` thành `utils.dart`/`services.dart` hỗn tạp. Chỉ đưa vào core khi có ≥2 consumer khác feature hoặc là cross-cutting concern (logging, networking, session, config, telemetry).
+- Tên folder/class theo intent và bounded context; một feature sở hữu một business invariant. Ride không tự tính Payment; Payment không tự quyết định Driver matching.
+- Luồng dữ liệu ưu tiên đơn hướng: UI intent → state holder → use case/repository → server → state projection → UI. Side effect được điều phối ở listener/effect boundary.
+- Repository là nguồn dữ liệu thống nhất trong phạm vi **client** và có thể expose stream/snapshot; điều này không thay thế quyền quyết định của backend cho giao dịch.
+
+### 02.1. Tham chiếu cấu trúc (không ép tạo mọi file)
+
+```text
+mobile/
+  lib/
+    app/                         # bootstrap, App, router, providers, lifecycle
+    core/
+      config/                    # typed environment/config + validation
+      di/                        # composition root và scopes
+      network/                   # client, interceptor, error map, retry policy
+      auth/                      # session boundary / role context
+      security/                  # secure storage / attestation adapters
+      realtime/                  # transport + reconnect/reconcile
+      observability/             # telemetry / redaction / crash reporting
+      platform/                  # plugin/platform interfaces
+    design_system/
+      tokens/                    # colors, type, spacing, radius, elevation, motion
+      components/                # custom DealGo UI components
+      feedback/                  # skeleton, empty, error, snackbar, dialogs
+    shared/                      # CHỈ những domain-neutral building blocks
+    features/
+      identity/
+      role_switcher/
+      ride/
+      ride_quotes/
+      food/
+      delivery/
+      merchant/
+      driver/
+      location/
+      payment/
+      notifications/
+      profile/
+      # feature có nghiệp vụ sẽ áp dụng:
+      <feature>/
+        domain/{entities,value_objects,repositories,use_cases,policies}/
+        data/{dto,mappers,datasources,repositories}/
+        presentation/{pages,widgets,bloc}/
+    l10n/
+  test/
+  integration_test/
+  assets/
+  android/
+  ios/
+```
+
+- Tạo module theo AC, không tự sinh hàng chục empty folders. `ride_quotes` có thể là sub-feature của `ride` nếu ADR xác định ownership tại đó.
+- File barrel `export` SHOULD dùng có kiểm soát; không export private implementation để tạo circular import hoặc namespace collisions.
+- Không làm domain entity `extends` DTO/API model hoặc ngược lại mặc định; tách DTO ↔ domain bằng mapper ở boundary khi shape/validation có khác biệt. `sealed class`, record, extension type/value object dùng khi thực sự giúp biểu đạt invariant.
+
+## 03. SOLID — tiêu chuẩn hành vi có thể kiểm chứng
+
+- **S — Single Responsibility**: mỗi class/module có một nguyên nhân chính để thay đổi. `RidePage` không đồng thời fetch API, tính giá, lưu storage và điều hướng. `RideRepository` không tự vẽ Snackbar.
+- **O — Open/Closed**: biến thể thực tế (payment provider, quote policy, location source) mở rộng qua strategy/port khi có ≥2 biến thể hoặc change risk; không tạo hierarchy giả định cho mọi service.
+- **L — Liskov Substitution**: concrete implementation giữ đúng nullability, contract error, latency/cancellation semantics; fake repository trong test phản ánh contract thật; subclass không thắt chặt tiền điều kiện bất hợp lý.
+- **I — Interface Segregation**: expose contract hẹp theo consumer (`ObserveRide`, `SubmitQuote` khi có nhu cầu); không ép toàn app phụ thuộc `SuperRepository` hàng chục method. Không tạo interface cho pure helper chỉ có một impl không cần isolation.
+- **D — Dependency Inversion**: business chính phụ thuộc abstraction ổn định tại external boundary; inject qua constructor, đăng ký concrete ở composition root; không gọi global service locator sâu trong domain/UI.
+- **DRY**: gom trùng **quy tắc/kiến thức** chứ không gom mọi widget nhìn giống nhau thành generic component khổng lồ; tránh premature abstraction.
+- **KISS/YAGNI**: ưu tiên solution nhỏ, testable, không overengineering vì dự đoán tương lai.
+- **Composition > inheritance** cho widget, adapter và hành vi; inheritance chỉ khi quan hệ is-a, LSP và framework đòi hỏi.
+- Tách query khỏi command khi giúp rõ side effect (CQS); không giấu thao tác ghi trong `getX()` hoặc `build()`.
+- Pure function cho tính toán deterministic (Money, formatting rules, filters); inject clock/ID generator tại boundary khi cần test thời gian/unique IDs.
+- Không chuyển mọi method thành `UseCase.execute()` ceremony; use case nên tồn tại khi có invariant, orchestration, reuse hoặc transaction intent rõ.
+
+### 03.1. Patterns: dùng đúng mục đích
+
+| Vấn đề | Pattern mặc định | Chống lạm dụng |
+| --- | --- | --- |
+| HTTP/local persistence | Repository + Adapter | Không wrap 3 lớp chỉ để return y nguyên |
+| Điều phối nghiệp vụ nhiều bước | Application service / Use case | Không nhét UI context vào use case |
+| Biến thể dịch vụ thực | Strategy + DI | Không tạo factory cho một concrete class |
+| Điều hướng/hiệu ứng một lần | Listener / Effect channel | Không side effect trong `build()` |
+| Ride/Order/Quote transitions | Explicit state machine | Không dùng nhiều bool mâu thuẫn |
+| Realtime | Stream + reconciler | Không tin event stream là truth tuyệt đối |
+| Nhiều gateway SDK | Facade / Adapter | Không phụ thuộc DTO SDK tại domain |
+| Tính năng liên feature | Coordinator có owner | Không dùng event bus global không schema |
+
+### 03.2. Ví dụ dependency direction (minh họa, KHÔNG giả định API DealGo đã có)
+
+```dart
+// domain/ports/ride_repository.dart — domain không biết Dio, JSON, Bloc
+abstract interface class RideRepository {
+  Future<RideSnapshot> getCurrentRide();
+  Future<RideSnapshot> submitRide(
+    RideDraft draft, {
+    required String idempotencyKey,
+  });
+}
+
+// domain/use_cases/submit_ride.dart — use case giữ intention rõ ràng
+final class SubmitRide {
+  const SubmitRide(this._repository);
+  final RideRepository _repository;
+
+  Future<RideSnapshot> call(
+    RideDraft draft, {
+    required String idempotencyKey,
+  }) => _repository.submitRide(draft, idempotencyKey: idempotencyKey);
+}
+
+// data/repositories/ride_repository_impl.dart — DTO/transport tại data
+final class RideRepositoryImpl implements RideRepository {
+  const RideRepositoryImpl(this._api);
+  final RideApi _api;
+
+  @override
+  Future<RideSnapshot> submitRide(
+    RideDraft draft, {
+    required String idempotencyKey,
+  }) async {
+    final dto = await _api.submitRide(
+      RideRequestDto.fromDomain(draft),
+      idempotencyKey: idempotencyKey,
+    );
+    return dto.toDomain();
+  }
+
+  @override
+  Future<RideSnapshot> getCurrentRide() async =>
+      (await _api.getCurrentRide()).toDomain();
+}
+```
+
+- Ví dụ minh họa dependency direction, **không copy vào production nếu API/model chưa tồn tại**. Không tự tạo `RideApi` hoặc class thừa chỉ để bắt chước mẫu. Nơi implement error/result mapper, cancellation và refresh theo contract dự án.
+- Business primitive nên encode thành value object (`Money`, `RideId`, `QuoteId`, `TimeWindow`) khi cần ngăn nhầm lẫn tham số, giữ logic validation tại constructor/factory có test.
+- AI agent MUST kiểm tra external SDK semantics trước khi truyền params: constructor default, `required`/nullable, lifecycle ownership, callbacks và platform behavior; không đoán tên tham số rồi chỉ sửa đến khi analyzer hết báo lỗi.
+
+## 04. Dart language, API có sẵn và clean code
+
+- **MUST ưu tiên Dart core/Flutter SDK trước third-party hoặc custom implementation**. Tra cứu API hiện có và version tương thích trước khi viết helper mới. Ví dụ: `Future.wait`, `Stream`, `Duration`, `DateTime`, `Uri`, `RegExp`, `Iterable`, `Map`, `Set`, `collection if/for`, records, pattern matching, null safety.
+- Dùng `enum`/`sealed class`/`switch` exhaustive cho state machine; parse enum unknown từ API an toàn, không cast không kiểm soát.
+- `final` cho giá trị không gán lại, `const` cho compile-time const phù hợp; immutable domain/state, defensive copying khi expose collections mutable.
+- **API idiomatic**: `isEmpty/isNotEmpty` thay `length == 0`, `map/where/firstWhere/any/every` khi dễ hiểu, `toList()` khi cần list, `Set` cho membership repeated, `Map` cho keyed lookup repeated.
+- Dùng named parameters `{required ...}` cho tham số cùng type/dễ nhầm; tránh hàm có >4–5 tham số độc lập bằng request/value object nếu giúp rõ nghĩa. Không biến mọi hàm thành class request một trường.
+- Mỗi public method quan trọng định nghĩa rõ precondition, postcondition, failure, nullability và cancellation; không nuốt exception hoặc return `null` cho mọi lỗi.
+- Dùng `async/await` rõ luồng; không `async void` ngoài callback có hợp đồng như vậy. Không tạo unawaited future nếu không có owner xử lý lỗi và lifecycle; dùng API `unawaited()` có chú thích lý do khi cần.
+- `try/catch` ở nơi có thể **xử lý/mapping**; giữ stack trace `Error.throwWithStackTrace`/`rethrow` theo mục đích; không bắt `catch (_) {}` im lặng.
+- Prefer typed DTO `fromJson/toJson`/generator đã chọn; không parse dynamic JSON sâu trong widget; validate input untrusted và unknown fields.
+- Format/compare currency và locale bằng giải pháp thích hợp; không tự xây formatter ngày tiền khi `intl`/l10n đã đáp ứng.
+- Dùng tear-off thay lambda forwarding vô nghĩa; dùng `copyWith`/immutable state đúng; không xây deep-copy JSON thủ công khi model generator giải quyết tốt.
+- Giữ function ngắn theo ý nghĩa, không có hạn dòng cứng. Extract khi logic có tên độc lập, nhiều nhánh, cần test hoặc reuse; tránh chia hàm vụn chỉ để giảm line count.
+- Không viết magic strings, URL paths, status codes, dimension/timeouts rải rác; dùng typed constants/config và enums có scope phù hợp.
+- Phân biệt exception lập trình (bug) và failure kỳ vọng (timeout, validation, business conflict). Không giấu bug sau thông báo “Có lỗi xảy ra” rồi coi thành công.
+- Không sử dụng `!`, `late`, `dynamic`, unchecked cast một cách tùy tiện; mỗi ngoại lệ phải dựa trên invariant đã kiểm tra.
+- Tránh comment mô tả lại code, bình luận tiếng Việt/ngôn ngữ repo cho **lý do, invariant, workaround, tham chiếu issue**. Không spam TODO giả hoặc comment mọi dòng.
+- Import, naming, formatting tuân theo `analysis_options.yaml`, `dart format`, Effective Dart. Không suppress toàn file chỉ để sạch lint.
+
+## 05. Dependency injection, scopes, resources
+
+- Composition root tại `app/` hoặc `core/di/`: cấu hình dependencies một lần theo **scope**: singleton app-wide, session-scoped, role-scoped, feature/route-scoped và transient.
+- Inject contract qua constructor; không instantiate Dio, repositories, secure storage, socket, platform plugin trực tiếp trong page/Bloc.
+- Nếu repo đã chuẩn hóa `get_it` + `injectable` thì làm theo; nếu chưa, dùng DI có sẵn và ghi lựa chọn khi implement. Không tự ép package khác.
+- Session/logout/account switch MUST invalidate role-sensitive subscriptions, pending requests, account-scoped caches và state; không để stale data user cũ.
+- State holder sở hữu stream/subscription/controller nào thì hủy `close/dispose/cancel` tài nguyên đó; caller không dispose object thuộc ancestor/container khác.
+- Unit test MUST có cách thay thế implementation bằng fake và reset DI/test isolation; không để singleton cross-test contamination.
+- Cycle dependency là lỗi thiết kế cần loại bỏ; nếu A phụ thuộc B và B phụ thuộc A, tách shared contract/coordinator chứ không inject muộn để che cycle.
+
+## 06. State management: Bloc/Cubit và server state
+
+- Theo stack repo xác nhận; Bloc/Cubit phù hợp cho Ride/Quote/Order/Driver tracking nhưng **không bắt buộc** cho toggle/UI local rất nhỏ. `ValueNotifier`, `setState`, `AnimatedBuilder` có thể tốt hơn tại local scope.
+- State immutable, value equality; `Equatable` so sánh **giá trị theo props**, không phải reference identity. Không giữ danh sách mutable rồi mutate in-place khiến state không emit/rebuild.
+- Tách **domain lifecycle** (server-driven) khỏi **presentation state** (`isSheetExpanded`, `selectedTab`, text field). Không để UI optimistic tự biến thành booking/payment truth.
+- Mỗi async action phải có pending/success/empty/error/denied/cancelled khi thích hợp; tránh bool cluster `isLoading`, `isSuccess`, `isFailed` cùng true.
+- Khai báo rõ concurrency semantics cho event: `droppable` chống double tap, `restartable` cho search, `sequential` cho queue có thứ tự, `concurrent` khi độc lập; chỉ dùng transformer khi package và event semantics có thật.
+- Debounce/throttle cho search, map camera, text input và action tần suất cao; không dùng debounce cho payment submit nếu làm mất bảo đảm delivery.
+- Khi request đến muộn: cancel bằng `CancelToken` hoặc so requestId/revision/sequence để ignore stale result; test latest-wins vs first-wins theo nghiệp vụ.
+- Không navigate/show snackbars/log analytics trong `build`. Đặt trong listener/effect handler phù hợp; guard one-shot events khi rebuild/resubscribe.
+- Scope BlocProvider đúng ownership (app/session/route/widget), không đưa mọi Cubit vào `main.dart` và không tạo lại Bloc mỗi lần rebuild.
+- `BlocSelector`, `context.select`, `buildWhen`, `RepaintBoundary` chỉ dùng theo dependency thực và profiling; không chia nhỏ mọi widget vô lý.
+
+## 07. Business state machine: Ride, Quote, Food, Delivery
+
+- Mỗi workflow có typed trạng thái, actor được phép, action, precondition, transition và terminal states; dựa trên **tài liệu/contract thực tế**, không tự đặt tên API/status trùng với backend.
+- Định nghĩa tối thiểu các khái niệm: `draft`, `submitted`, `matching`, `quoted`, `accepted`, `in_progress`, `completed`, `cancelled`, `expired`, `failed` **là ví dụ**, không phải enum bắt buộc; implement theo backend thật.
+- Đối với bid/negotiation: quote có ID, amount, expiration, revision, owner; client không tự công nhận quote trúng. Khi khách chọn, server quyết định atomically ai thắng; báo giá còn lại phải cập nhật qua reconcile.
+- Tránh double booking/order: disable CTA trong pending chỉ là UX, **backend idempotency + unique constraint/transaction** mới là bảo đảm. Không tự cho phép nhiều chuyến active nếu business rule cấm.
+- Nếu timeout sau POST chưa biết server đã xử lý hay chưa: hiển thị trạng thái “đang xác minh”, query trạng thái bằng identifier/idempotency key trước khi gửi lại.
+- Repeated notification/socket event không được lặp effect thanh toán/chuyển màn hình. Khi event revision thấp hơn state hiện có: bỏ qua; khi gap không thể xác minh: fetch snapshot.
+- Các state transitions nhạy cảm phải có unit tests: duplicate command, concurrent accept, cancelled/expired offer, late driver event, reconnect, offline partial success.
+- Luồng Food phải tính đến pricing snapshot, stock, merchant acceptance, driver assignment, cancellation/refund và order status theo contract. Không định giá cuối cùng trên UI.
+- UI phải cho biết ai đang chờ hành động, trạng thái pending/success/conflict và đường hồi phục; không dùng animation “thành công” khi server chưa xác nhận.
+
+## 08. Networking, contracts, authentication, observability
+
+- Một HTTP client theo môi trường/base URL; Dio khi project đã chọn. Cấu hình TLS, connect/send/receive timeout, auth, headers, parser, cancellation và error mapping tập trung.
+- Auth header chỉ đến trusted base URLs; không chuyển token đến redirect/cross-domain hoặc request third-party theo mặc định.
+- Refresh 401: single-flight, queue an toàn, giới hạn số lần, skip refresh endpoint, lưu/rotate credentials đúng thứ tự; lỗi refresh phải logout/reset session nhất quán.
+- `401` là authentication; `403` authorization; `409/412` conflict/precondition; `422` business validation; `429` throttling; `5xx` transient/server error theo backend. Không gộp thành một lỗi không phân biệt.
+- Map error backend thành typed `Failure`/result có field public-safe, errorCode, trace/reference ID, retryable classification; giữ diagnostics nhạy cảm trong telemetry được redact, không hiển thị raw backend stack/body.
+- Logging DEBUG: method, endpoint sanitized, status, duration, request ID, error category; redact token, cookie, password, phone, email, address chính xác, tọa độ cá nhân, KYC, payment payload, query và nested JSON; truncate kích thước/log sampling.
+- Distributed tracing dùng chuẩn backend đã thống nhất (`traceparent`/W3C Trace Context khi có), không tự sinh header tên `traceId` ngẫu hứng.
+- API contract được quản lý bằng source thật: OpenAPI/schema/fixtures, nullable/missing fields, date-time format, pagination, versioning, unknown enum, backward compatibility. Không sửa DTO cho “analyze pass” nhưng làm lệch server.
+- Không retry vô hạn. GET/idempotent operation có thể retry transient bằng backoff + jitter, honor `Retry-After`, max attempts; request tạo giao dịch chỉ retry khi server hỗ trợ idempotency **theo contract**.
+- `connectivity_plus` (nếu có) chỉ làm tín hiệu UX; không chứng minh network reachable. Không chặn cứng mọi call bằng pre-flight dựa vào Wi-Fi status; xử lý actual failure.
+- Cache có ownership, TTL, stale indicator, invalidation, scope user/role và privacy; payment/quote/trip live không nhận cache là final truth.
+- Nếu thiếu backend endpoint, implement adapter theo contract có fake ở dev/test, nêu rõ BLOCKED_INTEGRATION; không fake dữ liệu như live production.
+
+## 09. Realtime, lifecycle & đồng bộ trạng thái
+
+- Dùng transport phù hợp backend (WebSocket/SSE/polling/FCM). UI không biết transport cụ thể; có `RealtimeGateway` hoặc adapter tại boundary khi cần.
+- Reconnect có bounded exponential backoff+jitter, authentication refresh, resubscription, dedup eventId, revision/sequence checking, gap recovery và snapshot reconcile.
+- Socket/push **không bảo đảm delivery đúng một lần hoặc đúng thứ tự**; thiết kế dữ liệu/side effect chịu được duplicate, out-of-order và missed events.
+- Khi app resume/cold-start/reconnect, fetch lại active ride/order/driver status cần thiết trước khi cho phép action nhạy cảm.
+- Không chạy polling, socket, animation, GPS vô hạn ngoài nhu cầu lifecycle; có unsubscribe/cancel khi role chuyển hoặc screen không còn owner.
+- Phân biệt widget state (ephemeral), restorable draft (tùy chính sách), transaction state của backend; xử lý process death sau payment redirect/location permission.
+- Không rely solely on push để hoàn tất order/ride; push mở màn hình phù hợp rồi fetch trạng thái cuối.
+
+## 10. Security model — giảm reverse engineering, KHÔNG tuyên bố không thể đọc
+
+- **Threat model bắt buộc** trước thay đổi nhạy cảm: attacker có thể giải nén APK/IPA, xem resources/strings, proxy traffic trên thiết bị kiểm soát, hook runtime, giả client và gửi API trực tiếp. Không dựa vào UI guard, obfuscation hoặc secret trong app để bảo vệ business rules.
+- Backend MUST kiểm tra authentication + authorization **tại mỗi endpoint**, ownership/IDOR, role, KYC, driver eligibility, rate limit, anti-abuse, pricing, quota và transaction invariants; app chỉ render trạng thái được phép.
+- Không nhúng vào binary: private API keys, signing secret, payment secret, service-account JSON, HMAC shared secret, DB credentials, encryption master key. `--dart-define`, env file build-time, Base64 và obfuscation **không làm bí mật an toàn**.
+- Public/mobile-restricted keys (ví dụ maps) phải hạn chế theo platform app identity/signing/API usage và quota, giám sát sử dụng; mọi server credential chỉ nằm backend.
+- Token/refresh credential lưu Keychain/Android Keystore qua vetted secure-storage adapter; tránh `shared_preferences`/plain SQLite/file; áp dụng token TTL, refresh rotation, revoke/logout, error recovery.
+- Phân loại dữ liệu: PUBLIC / INTERNAL / SENSITIVE / HIGHLY_SENSITIVE. KYC photo, CCCD, vị trí, payment identifiers, access logs, push payload, cache ảnh riêng tư theo retention và encryption đã duyệt. Không cache sensitive content tùy tiện.
+- HTTPS production bắt buộc, cleartext bị chặn ở release; debug emulator HTTP exception chỉ trong debug flavor cụ thể, test để không leak sang staging/prod.
+- Certificate pinning **không mặc định bắt buộc**; chỉ dùng nếu threat model và vận hành đáp ứng backup pins, key rotation, expiry, recovery. Pinning không chặn mọi hook/root.
+- Khi phù hợp theo threat model, Android Play Integrity và iOS App Attest có server challenge, server verification, replay protection, risk-based policy và fallback cho thiết bị không hỗ trợ; không chỉ gọi API attestation ở client rồi tin boolean.
+- Root/jailbreak/debugger/tamper detection là defense-in-depth có false positives/bypass; phản ứng theo risk policy, không khóa người dùng hợp lệ vô lý. Không tuyên bố anti-debug tuyệt đối.
+- Enforce signed release, hardening native, Android R8/resource shrinking khi tương thích và có mapping; Flutter release `--obfuscate --split-debug-info=...` để đổi tên Dart symbols; giữ symbols theo version/ABI an toàn ngoài repo public.
+- Obfuscation **không mã hóa asset, strings, endpoint URLs, protocol hoặc logic**, không thay server-side enforcement; không yêu cầu xóa mọi ký hiệu cần cho crash symbolication.
+- Bảo vệ CI secrets và signing keys ở secret store, least-privilege, không commit; rotate key khi leak. Cấm paste keys/PII vào AI prompt/log/screenshot/PR.
+- Biometric chỉ là local user verification theo use case, không thay backend auth; xử lý thiết bị không hỗ trợ và biometric enrollment change theo OS/contract.
+- Screenshot/screen recording protection, clipboard wipe, backup exclusion, secure text fields, KYC capture redaction áp dụng **theo phân loại rủi ro**, không bật bừa gây hỏng UX hoặc accessibility.
+- Test security bằng threat checklist: extracted APK strings, debug logs, release cleartext, token storage, role switching, IDOR requests, unauthorized API, stale account cache; xử lý ở server khi client không có thẩm quyền.
+
+## 11. UI architecture — DealGo Design System, không dùng giao diện mặc định
+
+- **MUST custom visual presentation theo DealGo**: button, text field, segmented control, tabs, navigation bar, card, chip, dialog, sheet, toast/snackbar, list item, stepper, price badge, offer card, status banner và map overlay phải thống nhất design tokens/components khi được dùng ở sản phẩm.
+- **Không được để vẻ ngoài Material/Cupertino mặc định chưa tùy biến** ở màn hình production. Tuy nhiên **ĐƯỢC và NÊN dùng widget nền tảng Flutter bên dưới** (`Scaffold`, `Theme`, `TextField`, `TextFormField`, `InkWell`, `Focus`, `Semantics`, `Navigator`, `Sliver`, `Animated*`, Material/Cupertino primitives) để giữ keyboard, gestures, accessibility, routing và platform adaptation.
+- Tránh tự vẽ mọi control bằng `CustomPainter` nếu SDK widget + theme/style giải quyết được. Custom appearance ≠ viết lại semantics, pointer handling, focus, text editing, scroll physics, form validation.
+- Dùng design system được chốt làm truth: palette, semantic colors, typography, spacing scale, radius, elevation, border, icon set, motion tokens, layout grid, light/dark variants. Không tự đoán brand hex/asset/font khi chưa có design spec.
+- Theme hỗ trợ: `ThemeData`/`ColorScheme` theo API SDK đang chạy, `ThemeExtension` cho brand tokens, centralized `TextTheme`, custom `DealGo*` reusable components.
+- Component API phải có typed params, sensible defaults, accessible labels và variants (`primary/secondary/ghost/danger`, sizes, loading, disabled, pressed, focused, selected, error). Tránh 12 boolean flag tạo combination vô nghĩa; dùng enum/config khi cần.
+- Định nghĩa `DealGoButton`, `DealGoTextField`, `DealGoCard`, `DealGoBottomSheet`, `DealGoDialog`, `DealGoStatusBadge`, `DealGoSkeleton`, `DealGoEmptyState`, `DealGoErrorState` **khi có consumer**, ưu tiên reuse trong feature khác.
+- Một màn hình có hierarchy rõ: header/action, primary task, support content, sticky CTA có điều kiện, trạng thái trống/lỗi/loading/retry/offline. Không dồn mọi control vào một screen vì backend trả nhiều field.
+- Mọi action quan trọng có disabled/pending/error/success/confirmation phù hợp; destructive action hoặc irreversible transaction phải có confirmation/undo theo business impact. Không confirm dialog cho thao tác nhỏ vô hại.
+- Thiết kế responsive theo constraints thực (`LayoutBuilder`, `MediaQuery.sizeOf`, `SafeArea`, `Sliver`, `Expanded`, `Flexible`), keyboard Insets, notch, foldable/tablet, orientation. Không hardcode chiều cao bằng tỷ lệ màn hình gây overflow.
+- Layout DealGo map-centric: map phía sau, overlay/sheet tương tác, CTA tránh che route marker/system UI, sheet drag gesture không xung đột pan map; kiểm tra hit testing và gesture arena.
+- Theo thiết kế trước đó, screen có thể kết hợp list/detail với PageView/animated sheet, nhưng **không áp dụng kiểu UI này cho mọi feature**; giữ nội dung và focus khi chuyển trạng thái theo UX spec.
+- Form: dùng `Form`, `TextFormField`, `TextEditingController`, `FocusNode`, `TextInputAction`, `AutofillGroup`, inputFormatters phù hợp; validate domain + server, tránh mất data khi bàn phím mở/close, không tự viết text editing control mới.
+- Icons phải thống nhất family, optical size, stroke; kiểm tra license và SVG/image asset. Emoji không thay icon production trừ yêu cầu thiết kế.
+- User-visible text qua l10n/ARB; hỗ trợ plural/placeholder và string dài. Không viết hardcode tiếng Việt ở business widget trừ prototype được phép.
+
+## 12. Flutter widget/API ưu tiên tái sử dụng (trước khi custom implementation)
+
+- **Layout:** `SafeArea`, `Padding`, `Align`, `Center`, `Row`, `Column`, `Stack`, `Positioned`, `Expanded`, `Flexible`, `Spacer`, `Wrap`, `ConstrainedBox`, `AspectRatio`, `FittedBox`, `LayoutBuilder`, `CustomScrollView`, `SliverAppBar`, `SliverList`, `SliverGrid`, `SliverFillRemaining`.
+- **Lists/lazy:** `ListView.builder`, `ListView.separated`, `GridView.builder`, slivers, `PageView`, `RefreshIndicator`, `Dismissible`, `ReorderableListView`, `ScrollController`, `NotificationListener` khi phù hợp; dùng pagination/virtualization cho danh sách dài.
+- **Interaction:** `GestureDetector`, `InkWell`, `InkResponse`, `FocusableActionDetector`, `Shortcuts`, `Actions`, `Focus`, `AbsorbPointer`, `IgnorePointer`, `Semantics`, `Tooltip`, `Hero` theo yêu cầu.
+- **Forms:** `Form`, `TextFormField`, `TextEditingController`, `InputDecoration` styled, `FocusTraversalGroup`, `AutofillGroup`, `ValueListenableBuilder`, `TextInputFormatter`, `SelectableText` khi cần.
+- **Reactive:** `StreamBuilder`, `FutureBuilder` cho **local/simple** async stream đã có owner; nghiệp vụ nhiều bước SHOULD qua state holder/repository để tránh fetch lại do rebuild.
+- **Theming:** `Theme`, `ThemeData`, `ColorScheme`, `TextTheme`, `ThemeExtension`, `MediaQuery`, `Directionality`, `DefaultTextStyle`; custom appearances qua composition/style.
+- **Visual:** `DecoratedBox`, `ClipRRect`, `ShaderMask`, `Gradient`, `Opacity` khi hợp lý, `BackdropFilter` chỉ khi cần và đã đo, `CustomPaint` cho visualization không thể tạo hiệu quả bằng widgets chuẩn.
+- **Platform:** `WidgetsBindingObserver`/`AppLifecycleListener` tùy SDK; `RestorationMixin`/restorable APIs nếu yêu cầu phục hồi; platform plugins phải có adapters kiểm thử được.
+- **Animation:** `AnimatedContainer`, `AnimatedPadding`, `AnimatedAlign`, `AnimatedOpacity`, `AnimatedSize`, `AnimatedSwitcher`, `AnimatedCrossFade`, `TweenAnimationBuilder`, `AnimatedBuilder`, `SlideTransition`, `FadeTransition`, `ScaleTransition`, `SizeTransition`, `RotationTransition`, `Hero`, `AnimationController`, `CurvedAnimation`, `TweenSequence`.
+- Ưu tiên **implicit animation trước explicit controller** khi chỉ tween 1–2 property; controller khi cần phối hợp timeline, staggered animation, interruption, reverse, drag-linked motion hoặc imperative choreography.
+- Không thêm `shimmer`, animation library, icon package, routing framework hoặc caching package nếu SDK/components hiện tại đã đủ nhu cầu và benchmark không chứng minh lợi ích.
+- Mỗi PR đổi UI phải nêu rõ đã tận dụng widget API nào và vì sao custom behavior thực sự cần.
+
+## 13. Motion/animation UX — ngữ cảnh, không phải trang trí
+
+- **MUST có motion spec** cho UI state transition mới quan trọng: trigger, from→to, duration, easing/curve, interrupt/reverse, reduce-motion fallback, success/error behavior. Không phải mọi widget đều cần animation.
+- Motion phải truyền đạt **spatial relationship, hierarchy, feedback, progress hoặc continuity**; không thêm chuyển động vô nghĩa làm chậm thao tác hoặc gây phân tâm khi lái xe.
+- Animation timing là **design tokens có thể điều chỉnh**, không phải hardcoded absolute law. Điểm khởi đầu đề xuất (cần test trên thiết bị): microfeedback khoảng 100–180ms; state/collapse 180–300ms; page/sheet 250–400ms; skeleton chỉ khi cần. Không ép số cho hệ thống OS/user reduced motion.
+- Buttons: pressed/hover/focus/disabled/loading/success/error có feedback; ripple/highlight/scale nhỏ khi phù hợp, không bounce mạnh với payment hoặc nguy cơ bấm trùng.
+- Cards/list: entrance nhẹ nếu có ý nghĩa, skeleton hoặc placeholder giữ đúng dimensions, insert/remove qua `AnimatedList`/`SliverAnimatedList`/`AnimatedSwitcher` khi dữ liệu đổi; tránh animate 100 item đồng thời.
+- Tabs/filters/segment: active indicator + content transition đồng bộ, giữ scroll/selection state, tránh snap khó hiểu.
+- Bottom sheet/ride offer: expand-collapse mượt, drag theo gesture, snap điểm có chủ đích, backdrop dim/blur tiết chế, tương tác maps không tranh gesture.
+- Navigation: page transitions có continuity, `Hero` chỉ khi source/target có shared content thực; khi deep link trực tiếp không được cần Hero source để render.
+- Success/error: chỉ success sau server ACK hoặc trạng thái được reconcile; subtle icon/check/haptic khi có device support. Failure có recovery CTA rõ; animation không che nội dung hoặc trì hoãn cảnh báo.
+- Realtime quote: highlight đúng quote mới/changed, animation reveal/removal giúp phân biệt, không reset toàn list khiến người dùng bấm nhầm; đảm bảo update không tự chọn tài xế.
+- Ride progress/map: animate marker trên dữ liệu có timestamp/freshness, nội suy giới hạn để tránh teleport; không giả GPS chính xác hoặc hiển thị vị trí stale như live.
+- Food order status: timeline/progress animation phản ánh server state; không tự tăng progress theo local timer.
+- Haptic feedback chỉ khi meaningful, không lạm dụng; tôn trọng iOS/Android capabilities và accessibility preferences.
+- Đọc reduce motion từ SDK phù hợp (`MediaQuery.disableAnimationsOf`/accessibility features **nếu có trong SDK đã pin**) rồi giảm/tắt transform/parallax/infinite shimmer; luôn giữ nội dung hiểu được không cần animation.
+- Controller nào được tạo ở widget scope phải dispose đúng; `TickerMode`/visibility control cho animations ngoài màn hình; giới hạn re-layout animations tốn CPU/GPU.
+- Widget animation tests: states, interruption, reverse, tap during transition, screen reader, reduced-motion, golden snapshot ổn định; frame-budget bằng profile mode.
+
+### 13.1. Ma trận motion gợi ý theo khu vực giao diện DealGo
+
+| UI / sự kiện | Motion phù hợp | Bắt buộc kiểm tra |
+| --- | --- | --- |
+| Tìm tài xế | Progress/skeleton tinh tế, copy tiến trình | Cancel, offline, timeout, không fake match |
+| Báo giá mới đến | Insert + subtle highlight, tránh nhảy list | No duplicate, ordering, focus/tap stability |
+| Khách chọn báo giá | CTA pending → server confirmed success | Không success trước atomic accept |
+| Kéo sheet trên bản đồ | Drag-linked transform + snap, clip có kiểm soát | Gesture arena, frame jank, keyboard |
+| Ride status thay đổi | AnimatedSwitcher/status stepper | Không lùi state vì event cũ |
+| Menu/merchant cập nhật món | Content crossfade/expand, số lượng feedback | Giá/stock từ backend, không mất quantity |
+| Driver nhận cuốc | Confirmation feedback + status banner | Không animate trong lúc cần tập trung lái |
+| Chuyển role | Context-preserving transition nhẹ | Clear role-scoped data & guards |
+| Trang cá nhân / tab | Indicator + shared-axis/fade phù hợp | State retention, back navigation |
+| KYC upload | Progress từng bước, trạng thái retry | Không cache ảnh giấy tờ lâu, không fake verify |
+| Error/empty/offline | Appearance nhẹ, CTA phục hồi rõ | Reduced motion, không looping gây khó chịu |
+
+- Các loại motion nêu trên là **design guidance**, không phải yêu cầu thêm animation vào mọi screen. Ưu tiên thiết kế trang chủ DealGo đã được chốt thay vì AI tự thay brand style.
+- Với interaction gesture-linked, animation value nên được drive bởi `AnimationController`/`DraggableScrollableController` hay SDK API tương thích khi cần; không quản lý sheet bằng timer giả hoặc hardcode frame-by-frame.
+
+## 14. Accessibility, localization, theme
+
+- Touch target đủ lớn theo chuẩn platform và app design, contrast đủ, focus order hợp lý, screen-reader label/value/hint cho custom controls; không dùng màu là tín hiệu duy nhất.
+- Cung cấp semantics cho status quote, giá, CTA, marker quan trọng; tránh `Semantics` lặp gây đọc đôi; decorative elements nên exclude khỏi tree khi thích hợp.
+- Font scaling và large accessibility text không bị cắt business-critical CTA; hỗ trợ keyboard navigation, screen reader, orientation/bounds trong phạm vi device hỗ trợ.
+- Theme light/dark là phần hệ thống, sử dụng semantic color tokens (success/warning/error/onSurface) có contrast ở cả hai.
+- Locale-aware money, date, number, measurement; UI tiền VND theo business contract, không hardcode timezone/device locale cho deadline server.
+- Do not block access to critical actions during loading/animations; dialog/trap focus đúng, bottom sheet focus restore và keyboard safe handling.
+
+## 15. Location, mapping và driver background behavior
+
+- Phân biệt permission `denied`, `deniedForever`, approximate/precise, foreground/background, OS service off, last known position vs fresh location; không tự coi quyền đã cấp là GPS đang hoạt động.
+- GPS position model cần accuracy, timestamp, provider/freshness nếu có; stale marker/banner rõ; reject impossible/out-of-range coordinate ở client và validate trên backend.
+- Driver active-trip tracking phải có energy policy (adaptive sampling, distance filter, throttle, batching nếu phù hợp), lifecycle strategy và native background service/permission theo Android/iOS policy thật.
+- Không âm thầm bật background location hoặc thu vị trí khi không cần; trình bày consent, purpose, retention; chỉ gửi khi role/driver state hợp lệ theo contract.
+- Android foreground service/background start limitations, Android notification behavior, iOS background location entitlements phải được xác minh theo target SDK/review guidelines; plugin giải quyết một phần, không thay native test.
+- Map camera/controller dispose theo owner; hạn chế rebuild toàn map khi tick GPS, tách markers/layers, throttle geocoding/route calls để kiểm soát chi phí.
+- Test denial, permission revocation, OS kill, battery saver, lost GPS, app background/resume, fake location/risk policy, inaccurate location, no network, dual-SIM/network switching khi phù hợp.
+
+## 16. Money, time, inventory, payment & KYC
+
+- **Không dùng binary floating-point (`double`) để làm phép tính tài chính cần chính xác**. Dùng integer minor units hoặc decimal representation theo contract; xử lý VND rounding rõ ràng.
+- Price/fee/discount/tax/tip/commission đều được quote và xác nhận ở backend. Client chỉ hiển thị/giúp nhập; không phát hành số tiền cuối bằng phép tính widget độc lập.
+- Date/time ISO 8601 có timezone khi trao đổi server; UTC cho timestamp lưu/so sánh nếu backend contract quy định; UI convert locale; deadline/quote expiry dùng server time + drift handling.
+- Payment result phải lấy từ backend reconciliation (webhook/server verified), **không tin deeplink, callback SDK hoặc success screen** làm kết luận duy nhất.
+- Payment operations dùng idempotency/reconciliation: timeout-after-success, duplicate submit, app kill, delayed callback, refund, cancellation, partial failure được test.
+- Inventory live/merchant order acceptance không được lấy cache làm truth; action conflict có cách hiển thị cập nhật và yêu cầu chọn lại.
+- KYC: UI capture tối thiểu, tránh lưu lâu ở local, mã hóa/upload theo signed URL hoặc API contract, redact logs/screenshots, giới hạn quyền truy cập và lifecycle dữ liệu. Client-side KYC badge không phải authorization.
+
+## 17. Routing, deep links, role navigation
+
+- Router tập trung theo stack đã chọn; named/typed routes tránh rải string paths. Parse/validate IDs, URI, query, unknown routes; log sanitized khi deeplink lỗi.
+- Auth/role/KYC guards cập nhật theo session state, không tạo redirect loop; lưu intended destination chỉ khi hợp lệ với quyền mới.
+- Một app có Customer, Merchant, Driver shells hoặc nav graphs; role switch không tạo ba `MaterialApp` độc lập và không để stack route cũ lộ màn hình role khác.
+- Universal Links/App Links chỉ khai báo khi có nhu cầu; verify AASA/assetlinks, signing/team identity, scheme/host restrictions, cold/warm/terminated navigation và fallback web.
+- Deeplink from untrusted source không bypass server auth; không thực thi action irreversible trực tiếp từ URI.
+- Bottom navigation, nested routes và back stack phải restore đúng theo user journey; Android back gesture và iOS swipe-back được test khi có custom transition.
+
+### 17.1. Push notification và app lifecycle
+
+- Notification permission theo Android/iOS và SDK; xử lý denied, foreground, background, terminated, first launch và user preferences. Không xin quyền quá sớm nếu chưa có context.
+- Push payload chỉ chứa opaque entity ID/safe summary; KHÔNG đưa token, CCCD, địa chỉ chi tiết, dữ liệu thanh toán hoặc bí mật vào notification.
+- Mở notification phải xác thực session/role, validate deep link, gọi API lấy dữ liệu cập nhật; không tự kết luận booking/payment completed chỉ từ payload.
+- Dedupe click/open events, category grouping và notification channels theo OS/platform; giới hạn số thông báo, quiet hours theo sản phẩm, không spam Driver/Customer.
+- Background message handler không dùng `BuildContext` hoặc giả định app process còn sống; code platform-specific phải theo tài liệu plugin/OS đang chạy.
+- Android background restrictions, iOS APNs entitlements, token rotation, push delivery delays cần test; **push không thay thế socket/API reconciliation**.
+
+## 18. Lifecycle, memory, isolate, concurrency
+
+- `TextEditingController`, `FocusNode`, `ScrollController`, `AnimationController`, timers, subscriptions, cancel tokens, notifiers do owner tạo ra phải dispose/cancel; không dispose resource được truyền từ cha.
+- Không giữ `BuildContext` qua async gap nếu chưa kiểm tra `context.mounted`; tránh dùng context trong singleton/repository/long-lived closure.
+- `initState` dùng cho init sync/schedule once; không fetch data trong `build`, không gọi `setState` khi unmounted, không tạo request mới mỗi rebuild.
+- `FutureBuilder` future được cache/owned ngoài build; stream có policy subscribe/unsubscribe ổn định.
+- CPU-heavy parse/compress/crypto transforms có thể chuyển `Isolate.run`/`compute` khi đo thấy jank; async I/O bình thường **không cần isolate**. Xem overhead isolate và plugin restriction theo SDK.
+- Không debounce/cancel operation tài chính tùy tiện. Xử lý concurrency bằng idempotency, transaction intent và application state machine.
+- Restore app khi process death theo policy và server truth; không assume `dispose()` chạy khi OS kill app.
+
+## 19. Performance engineering & energy budget
+
+- Optimize bằng measurements ở **profile/release**, không lấy debug FPS làm evidence. Dùng Flutter DevTools Performance, CPU/Memory/Network, timeline, jank/raster diagnostics khi phù hợp.
+- Budget tham chiếu: 60Hz ~16.7ms mỗi frame; 120Hz ~8.3ms mỗi frame **tổng thời gian frame**. Không cam kết tất cả thiết bị đạt nếu chưa benchmark trên device matrix.
+- Giữ `build()` side-effect free, tránh tính toán nặng/reparse JSON/lấy cache trực tiếp, chia widget theo dependency thay đổi. `const` giúp reuse widget instance; không đồng nghĩa render engine bỏ toàn bộ repaint.
+- `ListView.builder`, slivers, pagination/infinite scroll có termination/cancellation cho list dài; tránh shrinkWrap + intrinsic layout + nested scroll không giới hạn trên hot paths.
+- Media ảnh có dimension/aspect ratio, error fallback; decode gần physical display size với DPR; disk cache chỉ khi freshness/privacy/invalidations cho phép, không mặc định cache mọi ảnh KYC.
+- `RepaintBoundary`, clip, blur/backdrop, shadow, gradients, saveLayer hay CustomPainter phải được đo; tránh lạm dụng blur full-screen dưới animated map.
+- Map/driver updates tiết chế refresh rates; optimize API/GPS/animation để tránh nóng máy, battery drain, bandwidth. Không emit state toàn trang mỗi giây vì clock tick không cần thiết.
+- App startup time, memory footprint, package size và crash-free sessions nên có metric trước/sau nếu task ảnh hưởng; không tối ưu suy đoán bằng code khó bảo trì.
+
+## 20. Error handling, UX recovery, resilience
+
+- State UX gồm `initial/loading/refreshing/empty/content/partial/error/offline/permission` theo nhu cầu; không fake content thành success.
+- Skeleton phải ổn định khung hình; shimmer tùy ngữ cảnh, tắt với reduced motion; không dùng skeleton để che API thất bại vô hạn.
+- Retry UI có timeout, feedback và giới hạn; hiển thị action khả thi (thử lại, kiểm tra kết nối, thay vị trí, liên hệ hỗ trợ) theo typed failure.
+- Với action quan trọng, conflict hoặc uncertain result được phân biệt với definitive failure. Không gợi ý tạo đơn mới khi server đang xác minh đơn cũ.
+- Snackbars/banners/dialog/toasts sử dụng app design system; tránh error storm và trùng overlay khi nhiều request fail đồng thời.
+- Empty state giải thích ý nghĩa + CTA phù hợp; không biến mọi empty list thành 404.
+
+## 21. Automated testing: coverage of behavior
+
+- **Unit**: domain policy, value objects, state transitions, money/time, serialization, validation, retry policy, permissions mapping; test happy/boundary/error/duplicate/out-of-order.
+- **Bloc/state**: emission sequence, cancellation semantics, concurrent taps, role switching, stale results, loading/error recovery. Fake external I/O; không mock chính logic đang test.
+- **Widget**: custom components variants, semantics, focus, disabled/loading, responsive layouts, dark/light, text scaling, keyboard, reduced motion, animation interruption.
+- **Golden**: khi UI brand-critical và pipeline có stable fonts/device sizing, review golden diffs; không dùng golden thay interaction tests.
+- **Integration**: auth/session, ride quotes, driver flow, merchant food orders, payment reconciliation, deep links, notification, location permissions và resume, sandbox/staging only.
+- **Native tests**: Android/iOS debug và release flows với plugin/permission/obfuscation nếu task tác động; test trên emulator/physical device có thể truy cập, báo chưa chạy khi chưa có.
+- Test mạng xấu: offline, slow, timeout-after-success, `401` storm, `429`, broken schema, duplicate realtime message, expiry, API backward compatibility.
+- `pumpAndSettle()` chỉ dùng nếu animation chắc chắn settle; repeating animation dùng `pump(Duration)` có kiểm soát hoặc disable animation trong harness.
+- Không coi `coverage >= 80%` là tiêu chuẩn duy nhất; critical business transitions cần cases độc lập chứng minh, coverage chỉ là tín hiệu phụ.
+- P0/P1 bug MUST có regression test tái hiện lỗi trừ trường hợp bất khả thi (phải ghi lý do và manual verification steps).
+- Unit/widget tests KHÔNG gọi API production, KHÔNG phụ thuộc thời gian thực/ngẫu nhiên không inject, KHÔNG chứa secret thật.
+
+### 21.1. DealGo critical acceptance test matrix
+
+| Scenario | Expectation |
+| --- | --- |
+| Double tap đặt xe / đơn ăn | Không tạo transaction trùng |
+| 2 quote accept gần đồng thời | Backend chỉ chọn winner hợp lệ |
+| Quote expired khi xác nhận | Conflict/reconcile, không xác nhận stale price |
+| Payment timeout sau server success | Query reconcile; không double-charge |
+| WebSocket duplicate/out-of-order | State không đi lùi, không lặp one-shot effect |
+| Reconnect từ offline | Resubscribe + authoritative snapshot |
+| App kill/resume giữa chuyến | Phục hồi active trip từ backend |
+| Driver GPS permission revoked | UI và tracking chuyển sang trạng thái an toàn |
+| Switch Customer ↔ Driver | Không rò cache/subscription/role screens |
+| Token refresh 401 đồng thời | Single-flight, bounded retry |
+| API thêm enum/field | Fallback parse an toàn, báo diagnostic |
+| Dark theme/large font | CTA truy cập được, không overflow |
+| Release obfuscated build | Main flows hoạt động, có symbols/mapping |
+
+## 22. CI/CD, environments, release safety
+
+- Môi trường `dev/staging/prod` theo flavor/dart-define/config đã chọn, typed và validate khi bootstrap. Không làm production build phụ thuộc localhost/emulator, cleartext exception hoặc mock payment.
+- Pipeline tối thiểu: dependency resolution/lockfile → formatter check → static analysis → unit/widget tests → codegen verification → integration smoke (nếu khả thi) → native build → artifact signing/release verification theo quyền.
+- `flutter analyze` sạch là necessary, not sufficient. `flutter test` phải có status thực. Chỉ chạy generator nếu repo có generator; đừng giả định `build_runner` luôn tồn tại.
+- R8/proguard keep rules điều chỉnh theo plugin reflection/JNI; giữ mapping và Dart `--split-debug-info` symbols/ABI theo commit/version an toàn, iOS dSYM; không upload secrets/symbols vào public.
+- Android signing/Play Integrity, iOS provisioning/App Attest và push entitlement kiểm tra ở build release; test build real nếu toolchain có; nếu không, ghi `NOT_VERIFIED`.
+- Không tự bật experimental rendering/AGP migration/OS permission chính sách mới trên prod ngoài scope. Android edge-to-edge, system navigation, iOS safe area kiểm tra theo target SDK.
+- Sentry/Crashlytics/OpenTelemetry chỉ khi đã chọn; redact dữ liệu và gắn app version, build, OS, role (không định danh nhạy cảm), request correlation khi contract hỗ trợ.
+- Feature flag/remote config/kill switch cho khả năng high-risk khi backend hỗ trợ; rollback có plan và tương thích app version cũ.
+
+### 22.1. Launcher, splash và brand assets
+
+- Production Android/iOS không dùng launcher icon, app display name hoặc splash Flutter mặc định. Dùng asset DealGo **đã chốt**; không tự sáng tác icon/logo thay brand handoff.
+- Android adaptive icon foreground/background/monochrome theo launcher/platform, iOS asset catalog AppIcon, splash light/dark và safe area phải kiểm tra trực tiếp.
+- Dùng `flutter_launcher_icons` / `flutter_native_splash` **nếu repo đã chọn**; chạy generator đúng config/version; không sửa generated resource thủ công rồi để lần sau bị ghi đè.
+- Khi thay branding, kiểm tra app metadata/package name/bundle ID và platform display name theo scope; không tự đổi applicationId/teamId/signing.
+
+### 22.2. Security hardening và release checklist có điều kiện
+
+- Áp dụng OWASP MASVS theo threat model, ưu tiên `MASVS-STORAGE`, `MASVS-AUTH`, `MASVS-NETWORK`, `MASVS-PLATFORM`, `MASVS-CODE`, `MASVS-PRIVACY`; `MASVS-RESILIENCE` là defense-in-depth, không phải chứng minh bất khả xâm phạm.
+- Không nhúng công thức chống fraud, mức thưởng, quyết định KYC, exact matching winners hay tính phí cuối cùng làm **quy tắc duy nhất ở client**; những phần này phải được server xác nhận để tránh giả mạo app.
+- Release smoke kiểm tra cấu hình HTTP cleartext, debugger flags, minification/obfuscation, native symbols, platform entitlements, signed build và verification endpoint thật theo quyền khả dụng.
+- Nếu attestation/certificate pinning chưa tích hợp backend, tạo interface + secure default behavior và đánh dấu `SERVER_INTEGRATION_REQUIRED`; không mock `valid=true` trong production hoặc block mọi thiết bị vô cớ.
+
+## 23. AI agent execution protocol — tự quyết nhưng có kiểm chứng
+
+1. **Inspect**: đọc AC, docs, ADR, relevant source/tests, API contract, SDK/package versions; với package liên quan chạy `flutter pub outdated` và kiểm tra security advisory; liệt kê invariants và boundaries ảnh hưởng.
+2. **Design**: xác định feature owner, data flow, SOLID boundaries, reuse Flutter built-ins, custom visual components, motion plan, security/privacy threats và failure scenarios.
+3. **Implement**: thay đổi nhỏ nhất đủ hoàn chỉnh, không phá conventions; **chủ động nâng package liên quan tới latest compatible stable, kể cả major, migrate API + tests theo mục 01**; thiếu external keys thì tạo env template + mock adapter/test thay vì chặn việc code.
+4. **Verify**: format/analyze/tests; nếu liên quan UI, tự kiểm tra themes/layout/animation/semantics; nếu native/security, build/release checks khi khả thi.
+5. **Review**: rà soát concurrency, regression, role/data leaks, dead code, comment spam, loading/error/empty states, bad retry, source of truth, test quality.
+6. **Report**: files changed, decisions, assumptions, commands actually run, PASS/FAIL/SKIPPED, known gaps, integration keys/config needed. Không nói “production-ready” nếu chưa có E2E/staging/security/release evidence.
+
+### 23.1. Những điều cấm tuyệt đối
+
+- KHÔNG copy nguyên giao diện Flutter Material mặc định làm màn hình production khi chưa tùy biến DealGo brand.
+- KHÔNG viết lại cơ chế có sẵn trong Dart/Flutter một cách vô nghĩa chỉ vì muốn “custom”.
+- KHÔNG biến `BuildContext` thành global/service singleton; không có side effect trong `build()`.
+- KHÔNG hardcode secret hoặc coi obfuscation là security boundary.
+- KHÔNG retry tự động POST thanh toán/booking không có idempotency/reconciliation.
+- KHÔNG bypass backend authorization bằng role local/route guard.
+- KHÔNG tạo “successful” UI cho booking/payment từ local optimistic state trước khi server xác nhận.
+- KHÔNG chặn task vì thiếu key khi có thể implement/test sandbox adapter an toàn.
+- KHÔNG giữ package major cũ chỉ vì ngại migration khi bản stable mới compatible và có thể verify; KHÔNG nâng ồ ạt ngoài scope hoặc đổi toàn architecture/toolchain mà không có kiểm tra/ADR; KHÔNG thêm package không có mục đích.
+- KHÔNG sửa generated code thủ công hoặc suppress lints/test để che bug.
+- KHÔNG tạo fake test evidence, đoán test pass, bỏ qua failure và tự kết luận DONE.
+
+## 24. Definition of Done (DoD)
+
+- [ ] AC thực hiện theo đúng role, nguồn dữ liệu, backend contract và UX spec của DealGo.
+- [ ] Architecture boundary/SOLID đúng; reuse built-ins và không có overengineering.
+- [ ] Custom DealGo design components consistent; light/dark, responsive, keyboard, semantics, dynamic type.
+- [ ] Motion/animation có ý nghĩa, interruptible, phù hợp performance và reduced motion.
+- [ ] Loading/empty/error/offline/permission/conflict/unknown-result được xử lý hợp lý.
+- [ ] Authentication, role guards, secure storage, request/log redaction và data ownership đúng.
+- [ ] Realtime/retry/idempotency/quote/payment states an toàn, server remains authority.
+- [ ] Dependency liên quan đã kiểm tra latest stable resolvable kể cả major, advisories và transitive/native risk; nếu có update thì migrate + test + lockfile đầy đủ; outdated exception có evidence.
+- [ ] Format/analyze/tests/build tương ứng đã chạy hoặc ghi lý do chưa thể chạy.
+- [ ] Regression tests cho bug/flow critical; không ảnh hưởng flows khác.
+- [ ] Handoff có evidence thực, assumptions, blockers, config cần tích hợp và risks còn lại.
+
+## 25. Official reference links — tra lại khi API/version thay đổi
+
+- Flutter package dependency management: https://docs.flutter.dev/packages-and-plugins/dependency-management
+- Flutter SDK/package upgrade: https://docs.flutter.dev/install/upgrade
+- Dart pub outdated columns: https://dart.dev/tools/pub/cmd/pub-outdated
+- Dart pub upgrade (major/dry-run): https://dart.dev/tools/pub/cmd/pub-upgrade
+- Dart pub security advisories: https://dart.dev/tools/pub/security-advisories
+- Dart dependency integrity/lockfile: https://dart.dev/tools/pub/dependencies
+- Flutter architecture: https://docs.flutter.dev/app-architecture/recommendations
+- Flutter architecture guide: https://docs.flutter.dev/app-architecture/guide
+- Flutter performance: https://docs.flutter.dev/perf/best-practices
+- Flutter implicit animation: https://docs.flutter.dev/ui/animations/implicit-animations
+- Flutter animation tutorial: https://docs.flutter.dev/ui/animations/tutorial
+- Flutter obfuscation: https://docs.flutter.dev/deployment/obfuscate
+- Dart Effective Dart: https://dart.dev/effective-dart
+- Flutter AGP9/built-in Kotlin: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin
+- Apple App Attest: https://developer.apple.com/documentation/devicecheck/establishing-your-app-s-integrity
+- Google Play Integrity: https://developer.android.com/google/play/integrity
+- OWASP MASVS: https://mas.owasp.org/MASVS/
+
+> **Cuối cùng:** sản phẩm tốt là **đúng nghiệp vụ, trực quan, có khả năng phục hồi, an toàn và có bằng chứng kiểm thử**. Không đánh đổi điều đó chỉ để đạt một mẫu kiến trúc hoặc animation cầu kỳ.
