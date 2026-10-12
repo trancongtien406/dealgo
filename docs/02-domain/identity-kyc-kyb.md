@@ -1,7 +1,7 @@
 ---
 doc_id: DG-DOM-003
 title: "DealGo — Identity, KYC & KYB / Định danh, xác minh và xét duyệt đối tác"
-version: "0.1.0"
+version: "0.2.0"
 status: "DRAFT"
 owner: "Product Owner / Security & Compliance Lead"
 reviewers:
@@ -42,10 +42,14 @@ related_requirements:
 related_decisions:
   - DEC-PROD-001
   - DEC-PROD-002
+  - DEC-PROD-006
+  - DEC-PROD-007
   - OPEN-001
   - OPEN-005
   - OPEN-006
   - OPEN-008
+  - OPEN-020
+  - OPEN-021
   - OPEN-013
   - OPEN-015
 ---
@@ -54,7 +58,7 @@ related_decisions:
 
 > **Trạng thái `DRAFT`, chưa được phê duyệt cho vận hành thương mại.** Tài liệu này xác định mô hình nghiệp vụ và yêu cầu kiểm soát đối với Identity, Customer, Driver và Merchant trong DealGo; không xác nhận DealGo có quyền truy cập CSDL dân cư, VNeID, API định danh nhà nước hoặc được phép tự động kết luận tính hợp lệ của giấy phép/giấy tờ. **Giấy tờ thật, dữ liệu khuôn mặt, số định danh, bí mật xác thực và dữ liệu người dùng không được đưa vào tài liệu, test fixture công khai hoặc nhật ký hệ thống.**
 >
-> **Phạm vi chắc chắn:** MVP bao gồm Ride hai bánh + Food; một ứng dụng Flutter hỗ trợ Customer / Merchant / Driver và Admin Web riêng. `OPEN-006` (mô hình pháp lý, loại giấy tờ/điều kiện hành nghề), `OPEN-008` (nhà cung cấp OTP/KYC/KYB) **vẫn mở**; chỉ có thiết kế/adapter/flow test được phép triển khai trước khi chốt các điều kiện kích hoạt production.
+> **Phạm vi chắc chắn:** MVP bao gồm Ride hai bánh + Food; một Flutter app ba role và Admin Web; đăng ký/xác thực có passkey, xác minh phone qua SMS, email verified; Admin được phân quyền bật/tắt method; chat và voice call trong app gắn Ride/Food. `OPEN-006/008/020/021` vẫn chặn giấy tờ, provider, recovery/retention và chi tiết production.
 
 ## 1. Mục tiêu, phạm vi và outcome
 
@@ -66,7 +70,7 @@ Mục tiêu: **biết người dùng đã xác thực ở mức nào, đã đư�
 - Operations: có hàng đợi review, kiểm chứng bằng chứng, phân công reviewer, phê duyệt/từ chối/yêu cầu bổ sung/đình chỉ, kháng nghị, audit.
 - Security/Legal/Privacy: xác định cơ sở xử lý dữ liệu, vòng đời dữ liệu nhạy cảm, quyền của chủ thể dữ liệu, điều kiện liên thông vendor và xử lý sự cố.
 
-**Ngoài phạm vi:** mã nguồn API/Prisma hoàn chỉnh; công thức chấm điểm eKYC; giá dịch vụ; hợp đồng thương mại; cam kết thời gian review; kết luận pháp lý theo từng loại mô hình vận tải; thiết kế OTP channel cụ thể (SMS/Zalo/other); xác thực hộ chiếu cho mọi quốc tịch; lưu trữ sinh trắc học mặc định.
+**Ngoài phạm vi:** mã nguồn API/Prisma hoàn chỉnh; công thức chấm điểm eKYC; giá dịch vụ; hợp đồng thương mại; cam kết review; kết luận pháp lý; vendor SMS/voice/WebRTC cụ thể; xác thực hộ chiếu mọi quốc tịch; sinh trắc học mặc định. Kênh đã chốt ở `DEC-PROD-006/007`; provider và policy chi tiết còn `OPEN-008/020/021`.
 
 ## 2. Nguồn chuẩn và phân loại quyết định
 
@@ -76,7 +80,10 @@ Mục tiêu: **biết người dùng đã xác thực ở mức nào, đã đư�
 | Mã yêu cầu Identity và Partner onboarding | PRD / FRS | `PROPOSED_P0` chi tiết chờ duyệt |
 | Ownership context và role grants | `domain-model.md`, `roles-and-permissions.md` | `DRAFT` |
 | Phân loại giấy tờ Driver/Merchant theo pháp luật, trách nhiệm các bên | `OPEN-006` | `BLOCKED` production |
-| OTP/eKYC/KYB provider, quyền gọi nguồn xác minh và chuyển dữ liệu | `OPEN-008` | `BLOCKED` live integration |
+| SMS/KYC/KYB/voice provider, quyền gọi nguồn xác minh và chuyển dữ liệu | `OPEN-008` | `BLOCKED` live integration |
+| Recovery, enrollment, method disable/restore, account lockout policy | `OPEN-020` | `BLOCKED` live policy |
+| Participant pairs/cửa sổ chat-call | `OPEN-014` | `BLOCKED` live policy |
+| Provider, retention, support access và privacy workflow | `OPEN-021` | `BLOCKED` live policy/provider |
 | Chuyển role khi đang có job, kiêm nhiệm | `OPEN-005` | `BLOCKED` policy concurrency |
 | Multi-store và người đại diện | `OPEN-013` | `BLOCKED` phần mở rộng |
 | Tài xế/nhà hàng được phục vụ vùng nào | `OPEN-001` | `BLOCKED` production region |
@@ -89,6 +96,9 @@ Mục tiêu: **biết người dùng đã xác thực ở mức nào, đã đư�
 | Thuật ngữ | Ý nghĩa trong DealGo | Không đồng nghĩa |
 |---|---|---|
 | `Account` | Identity tạo phiên đăng nhập, có ID ổn định. | Customer đã đủ điều kiện mua bán/lái xe. |
+| `PasskeyCredential` | Public-key credential reference/RP ID/state/revocation metadata; key pair được kiểm qua authenticator. | Server-stored private key. |
+| `AuthMethodPolicy` | Versioned controls cho enroll/auth/revoke theo method và scope. | UI feature flag thay authorization. |
+| `VerifiedEmail` | Email đã xác minh dùng làm contact/account identifier. | Email OTP độc lập để đăng nhập. |
 | `ContactVerification` | Xác minh quyền kiểm soát số điện thoại/email hoặc liên hệ. | Chứng minh danh tính pháp lý. |
 | `Authentication` | Chứng minh quyền đăng nhập tại thời điểm request. | KYC/KYB và role authorization. |
 | `IdentityProofing` | Quy trình gắn người đăng ký với danh tính được khai báo và bằng chứng. | Một kết quả OCR/đọc ảnh. |
@@ -185,12 +195,28 @@ flowchart TD
 
 | ID | Hành vi cần đặc tả | Điều kiện tối thiểu | Acceptance có thể kiểm thử |
 |---|---|---|---|
-| `IDN-CUS-001` | Tạo account bằng phương thức được duyệt. | `OPEN-008`; chưa chọn SMS/Zalo OTP vendor. | Một account hợp lệ nhận `accountId` duy nhất; duplicate intent không tạo hai account. |
-| `IDN-CUS-002` | Verify contact bằng challenge. | TTL/rate-limit theo security policy cấu hình. | OTP sai/hết hạn không verify; không lộ OTP trong log/analytics. |
+| `IDN-CUS-001` | Tạo Account, xác minh phone/email và liên kết passkey. | `DEC-PROD-006`; provider/flow detail `OPEN-008/020`. | Một account duy nhất; contact verification riêng; passkey challenge server validated. |
+| `IDN-CUS-002` | Verify phone bằng SMS challenge; verify email ownership. | SMS OTP one-time/expiry/rate-limit; email verification link không tạo email-OTP login. | Sai/hết hạn/replay không verify; không lộ secret trong log/analytics. |
 | `IDN-CUS-003` | Quản lý phiên và thu hồi session. | Backend kiểm token/lifecycle. | Revoke/disable chặn mutating request, cả refresh/realtime. |
 | `IDN-CUS-004` | Chuyển active role và xem role có sẵn. | Không tạo RoleGrant mới. | Đổi tab không cho phép hành động Driver chưa approved. |
 | `IDN-CUS-005` | Đề nghị xem/sửa/xóa dữ liệu theo quy định. | Luồng privacy case và legal holds. | Có receipt/ticket, xử lý theo policy không xóa bằng chứng còn phải giữ hợp pháp. |
-| `IDN-CUS-006` | Chống takeover khi đổi số điện thoại hoặc khôi phục tài khoản. | Re-auth/risk check trước khi thay trusted contact. | Đổi contact không được âm thầm khôi phục quyền partner bị đình chỉ. |
+| `IDN-CUS-006` | Chống takeover khi đổi contact, add/remove passkey hoặc recover account. | Re-auth/risk check, notify trusted channels; admin method actions có case/reason/audit. | Đổi contact không âm thầm restore quyền partner hoặc bỏ qua recovery guards. |
+
+### 7.1. Authentication methods & admin method controls
+
+| Method | Vai trò trong MVP | Invariants |
+|---|---|---|
+| Passkey | Phương thức đăng nhập ưu tiên; user có thể đăng ký nhiều passkey trên thiết bị/provider khác nhau. | Server tạo/verifies one-time challenge; kiểm RP ID/origin, signature, user/account binding và user verification theo policy. Private key không rời authenticator. |
+| Phone + SMS | Xác minh phone; SMS OTP là sign-in/recovery fallback được đánh dấu restricted, có expiry, one-time use, rate limit, anti-enumeration và risk checks. | SIM swap/recycled number risk; đổi số/recovery cần step-up và notification; không coi SMS là phishing-resistant. |
+| Email | Contact/account identifier đã verified; có thể dùng để nhận thông báo bảo mật và link xác minh địa chỉ. | Email OTP/link không là phương thức đăng nhập độc lập theo baseline; không cho email-only takeover/recovery. |
+
+**Enrollment/linking:** User tạo Account rồi chứng minh ít nhất một contact; có thể liên kết passkey và verified contacts sau khi re-auth. Không bắt buộc phải có cả SMS và email để tạo tài khoản nếu policy/flow được duyệt cho phép; bảng chính xác per-role là `OPEN-020`. Email dùng làm identifier không tự chứng minh người dùng sở hữu session.
+
+**Admin controls:** `SECURITY_ADMIN` được quản lý method policy platform-wide/per environment và disable method cụ thể của account khi có case/grounds; `OPS_CONFIG_MANAGER` chỉ quản lý rollout/global availability nếu được grant riêng. Mọi thao tác cần step-up, scope, reason, actor, timestamp, before/after/version và audit. Thay đổi global có preview blast radius + dual approval theo policy. Disable một method chặn enroll/sign-in mới; xóa credential, revoke sessions, account suspension là các action riêng.
+
+**Lockout guard:** Không cho tắt mọi phương thức đang khả dụng cho một account hoặc toàn hệ thống theo thao tác thường. Nếu sự cố buộc khóa tất cả, dùng emergency account lock/suspend có recovery/support path, thông báo người bị ảnh hưởng và incident record. Khi tắt một phương thức toàn hệ thống, giữ nguyên passkey/alternate paths; không xóa credential history.
+
+**Email/SMS caveat:** NIST SP 800-63B-4 không chấp nhận email làm out-of-band authenticator và coi PSTN/SMS là restricted; DealGo dùng passkey làm ưu tiên, SMS chỉ là fallback có đánh giá risk, email là verified contact/identifier. Cần rà soát assurance requirement khi chốt `OPEN-020`.
 
 **Không tự yêu cầu CCCD/selfie cho mọi Customer**: thu thập có điều kiện, mục đích phù hợp, tối thiểu hóa dữ liệu và xem xét rủi ro. KYC customer nâng cao chỉ khi có nhu cầu pháp lý/nghiệp vụ được phê duyệt.
 
@@ -686,6 +712,12 @@ Không triển khai `check → external API → grant role` ở ngoài transacti
 | `TC-IDN-008` | applicant appeals | authorized new review | track appeal without mutating old decision |
 | `TC-IDN-009` | admin suspends Driver | driver tries new assignment | assignment denied at commit |
 | `TC-IDN-010` | data subject submits request | support privacy flow | request tracked, review retention/legal hold |
+| `TC-IDN-037` | valid passkey registration/auth challenge | enroll/sign in | server validates one-time challenge, RP ID/origin/signature; no private key stored server-side |
+| `TC-IDN-038` | SMS OTP replay, expired, brute-force or recycled phone risk | verify/login/recovery | deny/rate-limit; no enumeration or secret logging |
+| `TC-IDN-039` | email is verified but no other authentication proof | attempt email-only sign-in/recovery | deny; email remains contact/identifier only |
+| `TC-IDN-040` | Admin disables active method | account signs in/enrolls/recover | method denied; alternate path retained; audit records scope and reason |
+| `TC-IDN-041` | Admin attempts to disable last auth path | ordinary method toggle | block or route to emergency lock/recovery with approvals |
+| `TC-IDN-042` | unauthorized Admin or stale policy version | toggle global/account method | deny/stale conflict; no config mutation |
 
 ## 26. Testing acceptance — Negative/security & recovery paths
 
@@ -809,6 +841,12 @@ Không triển khai `check → external API → grant role` ở ngoài transacti
 9. OWASP Authorization Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html
 10. OWASP Mobile Application Security Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Mobile_Application_Security_Cheat_Sheet.html
 11. OWASP Authorization / BOLA / BOPLA controls: https://devguide.owasp.org/en/04-design/02-web-app-checklist/07-access-controls/
+12. W3C Web Authentication Level 3 Recommendation: https://www.w3.org/TR/webauthn-3/
+13. NIST SP 800-63B-4 Authenticators (PSTN restricted; email OOB prohibited): https://pages.nist.gov/800-63-4/sp800-63b/authenticators/
+14. Google for Developers — server-side passkey authentication: https://developers.google.com/identity/passkeys/developer-guides/server-authentication
+15. Apple Developer — Supporting passkeys / associated domains: https://developer.apple.com/documentation/authenticationservices/supporting-passkeys
+16. Apple Developer — CallKit VoIP calling: https://developer.apple.com/documentation/callkit/voip-calling-with-callkit
+17. Android Developers — build a calling app with Telecom: https://developer.android.com/develop/connectivity/telecom/voip-app
 
 ### 31.3. DealGo internal canonical sources
 
@@ -832,13 +870,14 @@ Không triển khai `check → external API → grant role` ở ngoài transacti
 6. Không đưa dữ liệu thật vào test và example; không copy data nhạy cảm vào log, traces, AI prompt, bug report.
 7. Điểm bàn giao cho Backend: commands, aggregate/version, event, evidence reference, eligibility predicate, audit + recovery.
 8. Điểm bàn giao cho Flutter: UI/UX states, forms theo policy registry, masked status, upload failure/retry và role-scoped cache.
-9. Điểm bàn giao cho QA: 36 test cases có expected outcomes, policy fixtures tách sandbox/prod, concurrency và BOLA/BOPLA.
+9. Điểm bàn giao cho QA: 42 test cases có expected outcomes, policy fixtures tách sandbox/prod, concurrency và BOLA/BOPLA.
 10. Mọi implementation PR phải trỏ tới `FR-*`, `TC-IDN-*`, `OPEN-*` khi liên quan và báo rõ `READY`, `BLOCKED`, `TEST_ONLY`.
 
 ## 33. Changelog và phê duyệt
 
 | Version | Ngày | Thay đổi | Status |
 |---|---|---|---|
+| 0.2.0 | 2026-10-12 | Bổ sung passkey + phone SMS + verified email semantics, Admin method controls, recovery/lockout invariants và test; thêm chat/voice-call scope/security references. | DRAFT |
 | 0.1.0 | 2026-10-12 | Khởi tạo mô hình Identity, KYC/KYB, capability eligibility, lifecycle, evidence security, legal checkpoints, 36 QA scenarios và AI handoff. | DRAFT |
 
 | Vai trò | Người duyệt | Trạng thái |

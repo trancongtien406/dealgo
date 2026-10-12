@@ -1,14 +1,14 @@
 ---
 doc_id: DG-GOV-003
 title: "DealGo — Glossary / Từ điển thuật ngữ và ngôn ngữ nghiệp vụ"
-version: "0.1.0"
+version: "0.2.0"
 status: "DRAFT"
 owner: "Product Owner / Domain Lead"
 reviewers:
   - "Tech Lead"
   - "Mobile Lead / UI-UX"
   - "Operations / Finance"
-last_updated: "2026-10-11"
+last_updated: "2026-10-12"
 classification: "Internal"
 related_requirements: []
 related_decisions:
@@ -90,6 +90,9 @@ flowchart LR
 | **Admin** | Người dùng kênh quản trị web theo quyền. | Không mặc định là role thứ tư trong app Flutter; có thể có nhiều nhóm quyền vận hành. |
 | **User** | Định danh chủ thể người dùng trong Identity domain. | Không đồng nhất `User` với `Customer` hay với một hồ sơ Driver. |
 | **Account** | Tài khoản dùng để đăng nhập và quản lý phiên. | Không tự cho phép mọi role. |
+| **Passkey** | Public-key credential gắn với relying party, được tạo/xác thực qua authenticator của OS/browser. | Private key không nằm trên server; khác SMS/email OTP. |
+| **AuthMethodPolicy** | Cấu hình versioned enable/disable theo method và scope. | Permission grant hoặc xóa lịch sử credential. |
+| **VerifiedContact** | Phone/email đã chứng minh quyền kiểm soát cho mục đích contact/identifier. | Danh tính pháp lý hoặc mặc định là authenticator mạnh. |
 | **UserProfile** | Dữ liệu hiển thị/cá nhân hóa của người dùng. | Khác `KYCRecord` và hồ sơ đối tác. |
 | **Role** | Vai trò nghiệp vụ đã được hệ thống gán/cho phép. | Role không nhất thiết đang kích hoạt. |
 | **RoleEligibility** | Điều kiện một người được sử dụng một vai trò/dịch vụ. | Khác `ActiveRole`; có thể bị từ chối/tạm ngưng. |
@@ -332,6 +335,10 @@ flowchart LR
 | **DeepLink** | Liên kết mở trực tiếp nội dung/route của app. | Phải tái kiểm tra auth/role và resource ownership. |
 | **PushNotification** | Tin gửi qua hệ thống thông báo thiết bị. | Không bảo đảm đến đúng giờ hoặc được mở. |
 | **InAppNotification** | Thông báo trong ứng dụng có thể đọc lại. | Khác push transport. |
+| **ChatConversation** | Kênh tin nhắn gắn với Ride/Food transaction và participant được xác thực. | Inbox tự do giữa mọi account. |
+| **ChatMessage** | Nội dung text có author/time/context, được lưu theo retention policy. | Bằng chứng thanh toán hoặc bằng chứng đã đọc nếu chưa xác nhận. |
+| **CallSession** | Phiên gọi thoại VoIP được backend cấp quyền theo transaction participant. | Cuộc gọi PSTN hoặc bản ghi âm. |
+| **ContactWindow** | Khoảng thời gian/điều kiện user còn quyền chat/call liên quan một giao dịch. | Quyền liên lạc vô thời hạn. |
 | **Accessibility** | Khả năng sử dụng cho đa dạng người dùng/thiết bị. | Gồm semantics, contrast, touch target, text scaling. |
 | **HapticFeedback** | Phản hồi rung phù hợp ngữ cảnh thao tác. | Không thay thế text/status cho truy cập. |
 | **MotionDesign** | Quy tắc chuyển động/trạng thái/animation UI. | Giữ hỗ trợ reduced motion. |
@@ -625,6 +632,7 @@ term_change:
 
 | Ngày | Version | Trạng thái | Thay đổi |
 |---|---|---|---|
+| 2026-10-12 | 0.2.0 | `DRAFT` | Thêm thuật ngữ passkey/auth method, verified contact, chat conversation, call session và contact window. |
 | 2026-10-11 | 0.1.0 | `DRAFT` | Khởi tạo ngôn ngữ chung cho Identity/Ride/Food/Dispatch/Finance/Tech/UX/Ops, đối chiếu cặp dễ nhầm và các ví dụ chống implement sai. |
 
 | Vai trò | Người duyệt | Kết quả | Ngày |

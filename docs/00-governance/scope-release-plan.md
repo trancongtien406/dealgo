@@ -1,7 +1,7 @@
 ---
 doc_id: DG-GOV-002
 title: "DealGo — Scope & Release Plan / Phạm vi và kế hoạch phát hành"
-version: "0.1.0"
+version: "0.2.0"
 status: "DRAFT"
 owner: "Product Owner"
 reviewers:
@@ -9,7 +9,7 @@ reviewers:
   - "Operations / Customer Support"
   - "Finance"
   - "Legal / Compliance (trước pilot có giao dịch thật)"
-last_updated: "2026-10-11"
+last_updated: "2026-10-12"
 classification: "Internal"
 related_requirements: []
 related_decisions:
@@ -17,6 +17,9 @@ related_decisions:
   - DEC-PROD-002
   - DEC-PROD-003
   - DEC-PROD-004
+  - DEC-PROD-005
+  - DEC-PROD-006
+  - DEC-PROD-007
   - OPEN-001
   - OPEN-002
   - OPEN-003
@@ -68,7 +71,7 @@ Tài liệu trả lời các câu hỏi ở **cấp release**, không đi vào p
 | Mức | Định nghĩa trong DealGo | Ví dụ |
 |---|---|---|
 | **P0 — release-critical** | Thiếu thì không thể hoàn tất Ride/Food đúng và an toàn trong phạm vi pilot đã phê duyệt; hoặc vi phạm điều kiện bắt buộc về quyền, tiền, an toàn, tuân thủ. | Xác thực tài khoản, order state, dispatch atomic, đối soát giao dịch, admin can thiệp có audit. |
-| **P1 — experience/efficiency** | Cải thiện trải nghiệm, hiệu suất vận hành hoặc cạnh tranh; có thể phát hành sau nếu đường thay thế an toàn và được duyệt. | Lưu địa chỉ yêu thích, thống kê nâng cao, chat trong app, nhiều mẫu báo cáo. |
+| **P1 — experience/efficiency** | Cải thiện trải nghiệm, hiệu suất vận hành hoặc cạnh tranh; có thể phát hành sau nếu đường thay thế an toàn và được duyệt. | Lưu địa chỉ yêu thích, thống kê nâng cao, chat nhóm/tệp đính kèm, nhiều mẫu báo cáo. |
 | **P2 — expansion** | Mở rộng vertical, địa bàn, chương trình tăng trưởng hoặc tính năng phức tạp chưa cần cho hai luồng cơ bản. | Gọi ô tô, giao kiện độc lập, đặt lịch phức tạp, batching/loyalty nâng cao. |
 
 **Ngoại lệ:** một hạng mục P1 có thể trở thành **P0 cho khu vực/mô hình kinh doanh đã chọn** sau đánh giá pháp lý, an toàn hoặc điều kiện đối tác. Mọi lần nâng/hạ priority phải ghi decision ID; không tự diễn giải.
@@ -91,6 +94,8 @@ Tài liệu trả lời các câu hỏi ở **cấp release**, không đi vào p
 | `SCOPE-002` | **Food:** khách đặt món, Merchant thực hiện, Driver giao. | Customer + Merchant + Driver mobile | `CONFIRMED` |
 | `SCOPE-003` | **Một app Flutter** hỗ trợ ba vai trò; không tách thành ba app mặc định. | Mobile | `CONFIRMED` |
 | `SCOPE-004` | Tham chiếu Grab/GrabFood/ShopeeFood cho dịch vụ và inDrive cho thương lượng giá Ride. | Nghiên cứu | `CONFIRMED` |
+| `SCOPE-005` | Passkey, verified phone SMS và email; Admin method management có quyền. | Account/security | `CONFIRMED` (`DEC-PROD-006`) |
+| `SCOPE-006` | In-app transaction-scoped chat và voice call cho Ride/Food. | Communication | `CONFIRMED` (`DEC-PROD-007`) |
 
 **Admin Web:** `BASELINE` theo hồ sơ DealGo và Charter — năng lực admin tối thiểu được đề xuất P0 để vận hành an toàn; không mặc nhiên biến toàn bộ **37 trang** đã liệt kê trước đó thành P0. Tương tự, danh sách khoảng **165 màn mobile** trước đó là **inventory tham chiếu chưa phân pha**, không phải yêu cầu phải hoàn thành toàn bộ để được gọi là MVP. Con số màn hình cuối cùng phải xác thực ở `04-experience/screen-inventory.md`.
 
@@ -107,7 +112,7 @@ Tài liệu trả lời các câu hỏi ở **cấp release**, không đi vào p
 
 | Capability | P0 cần nghiệm thu ở mức nào? | Các phụ thuộc / điều kiện chặn |
 |---|---|---|
-| `CAP-CORE-01` Account & session | Đăng ký/đăng nhập, quản lý phiên, đăng xuất, khôi phục truy cập theo phương thức được duyệt. | Kênh OTP/định danh `OPEN-008`; abuse controls. |
+| `CAP-CORE-01` Account & session | Passkey, xác minh phone SMS + email, login/link/recovery, session/logout; admin method controls. | `DEC-PROD-006`; recovery/provider detail `OPEN-008/020`. |
 | `CAP-CORE-02` Multi-role & permission | Role eligibility, active role, navigation riêng, API object-level authorization, khóa role chưa duyệt. | `OPEN-005`; policy ở `02-domain/roles-and-permissions.md`. |
 | `CAP-CORE-03` Partner onboarding | Hồ sơ Driver/Merchant; xét duyệt, từ chối, yêu cầu bổ sung, gia hạn/thu hồi quyền theo điều kiện hợp lệ. | `OPEN-006`, `OPEN-008`, mô hình KYC/KYB. |
 | `CAP-CORE-04` Location foundation | Chọn/tìm địa chỉ, kiểm tra tọa độ/địa bàn, route/ETA ước tính và xử lý lỗi geocoding. | Maps vendor/quota `OPEN-008`, vùng `OPEN-001`. |
@@ -119,6 +124,7 @@ Tài liệu trả lời các câu hỏi ở **cấp release**, không đi vào p
 | `CAP-CORE-10` Security & privacy | Authentication/authorization, limit/rate, mã hóa/bảo vệ PII & giấy tờ, audit, secrets. | Legal privacy review, retention policy. |
 | `CAP-CORE-11` Support & exceptions | Trạng thái không thành công, liên hệ hỗ trợ, case triage, admin intervention được kiểm soát. | Quy tắc hủy/hoàn, trách nhiệm ops. |
 | `CAP-CORE-12` Operational readiness | Logs/metrics/traces, alerts, runbooks, backup/restore proof, feature flags và cơ chế rollback. | Mục tiêu `OPEN-007`, môi trường và trách nhiệm trực. |
+| `CAP-CORE-13` In-app communications | Chat văn bản + voice call audio theo Ride/Food context, participant authorization, không lộ số, fallback và support. | `DEC-PROD-007`; window/provider/retention `OPEN-014/021`. |
 
 **Không quyết định tại đây:** SMS hay Zalo OTP; provider maps/payment; Redis/Kafka; số giây timeout; có yêu cầu OTP xác nhận lên xe/giao món hay không; bản thương mại dùng COD hay online. Các quyết định này có tác động tới từng release gate.
 
@@ -197,7 +203,7 @@ Tài liệu trả lời các câu hỏi ở **cấp release**, không đi vào p
 |---|---|---|
 | `CAP-P1-01` Saved places, favorites & repeat order | Tăng tốc tác vụ lặp; không chặn giao dịch đầu tiên. |
 | `CAP-P1-02` Promotion management nâng cao | Tăng trưởng; cần tiền/giá minh bạch trước. |
-| `CAP-P1-03` In-app chat Customer–Driver/Merchant có kiểm soát | Cải thiện liên lạc; P0 vẫn cần kênh liên hệ/hỗ trợ phù hợp. Có thể nâng P0 theo safety review. |
+| `CAP-P1-03` Chat nhóm/attachments/format nâng cao | Chat text theo transaction đã chuyển P0; P1 chỉ mở rộng sau abuse, moderation, privacy và retention review. |
 | `CAP-P1-04` Ratings & reviews | Chất lượng nguồn cung; cần moderation/fraud trước khi phát hành. |
 | `CAP-P1-05` Merchant multi-staff / multi-branch | Mở rộng vận hành; role và data isolation phức tạp hơn. |
 | `CAP-P1-06` Driver performance & earnings analytics sâu | Nâng cao minh bạch/giữ chân đối tác; P0 vẫn cần lịch sử và đối soát. |
@@ -316,28 +322,30 @@ flowchart TD
 
 - [ ] CI/lint/test baseline chạy và cung cấp logs hoặc artifacts.
 - [ ] Có auth/role authorization boundary; tests từ chối truy cập trái quyền.
+- [ ] Passkey/SMS/email verification, Admin auth-method toggle và account recovery được kiểm thử; method cuối không bị tắt ngoài emergency flow.
 - [ ] Contracts chuẩn hóa lỗi, idempotency và correlation IDs ở luồng thay đổi trạng thái.
 - [ ] Có dữ liệu/migrations test, stubs/mock của vendor, cấu hình môi trường/secrets an toàn.
 - [ ] Có audit event tối thiểu và cơ chế quản lý schema changes.
 
 ### 12.3. G2 / R2 — Ride slice acceptance
 
-- [ ] Ride happy path: route/reference fare → khách đề xuất giá → driver accept/counter → khách chọn → agreement/assignment → pickup/start/end → financial record.
+- [ ] Ride happy path: route/reference fare → khách đề xuất giá → driver accept/counter → khách chọn → agreement/assignment → chat/call theo transaction → pickup/start/end → financial record.
 - [ ] Hai Driver nhận cùng job đồng thời → đúng **một** assignment được commit; có concurrency test.
 - [ ] Customer nhấn đặt lặp/retry → không tạo nhiều giao dịch trái ý định.
 - [ ] Driver offline/rejected/no-driver; Customer cancel; GPS mất/chậm; reconnect có kết quả đúng.
 - [ ] Role-specific information access đúng; không lộ trip của người khác.
-- [ ] Admin/support xem timeline, xử lý case trong phạm vi quyền và có audit.
+- [ ] Admin/support xem timeline, xử lý case trong phạm vi quyền và có audit; nội dung chat chỉ đọc theo case grant.
 - [ ] **Ride chưa hoàn thành toàn bộ MVP** nếu Food chưa qua G3/G4.
 
 ### 12.4. G3 / R3 — Food slice acceptance
 
-- [ ] Food happy path từ menu/cart → checkout → merchant confirm → prepare → dispatch → handoff → deliver → finance.
+- [ ] Food happy path từ menu/cart → checkout → merchant confirm → prepare → dispatch → chat/call đúng participant → handoff → deliver → finance.
 - [ ] Giá/món/giờ mở thay đổi trước confirm → hệ thống revalidate và trả trạng thái rõ.
 - [ ] Quán từ chối/hết món; khách hủy; không tài xế; giao không thành công; app kill/retry có kết quả/owner.
 - [ ] Merchant chỉ xem đơn của cửa hàng hợp lệ; driver chỉ xem job của mình.
 - [ ] Không có double deliver/paid/refund do event replay hoặc thao tác lặp.
 - [ ] Test Ride regression vẫn pass khi thêm Food.
+- [ ] Chat/call participant, contact window, microphone permission, no-number-exposure và support fallback được kiểm thử.
 
 ### 12.5. G4 / R4 — Integrated MVP ready for pilot assessment
 
@@ -489,7 +497,7 @@ flowchart TD
 | Proof pickup/delivery | OTP, ảnh, xác nhận người nhận hoặc phương án khác? | Fraud/dispute và UX. |
 | Driver background tracking | Quy trình xin quyền, thời điểm và fallback? | Release stores và vận hành. |
 | Merchant store ownership | Một chủ nhiều cửa hàng? Nhân viên có role riêng? | Tenant isolation và RBAC. |
-| Customer contact | Chat, masked call, support ticket hay kết hợp? | Trust/safety, privacy, P0/P1 boundary. |
+| Communication policy | Contact window sau hoàn tất, role pairs, provider, retention, access trong support case. | Trust/safety, privacy, ops, cost. |
 | Incident escalation | Giờ support, quy trình trợ giúp, cấp độ sự cố? | Go-live safety, staffing. |
 
 Không tạo ngày hoàn tất `TBD` giả. Khi owner có lịch phê duyệt thực tế, chuyển thành decision record có timestamp.
@@ -572,6 +580,7 @@ approvals:
 
 | Date | Version | Status | Changes |
 |---|---|---|---|
+| 2026-10-12 | 0.2.0 | `DRAFT` | Thêm P0 auth method controls và transaction-scoped chat/voice, update G2/G3 acceptance và dời advanced chat sang P1. |
 | 2026-10-11 | 0.1.0 | `DRAFT` | Khởi tạo capability scope P0/P1/P2, release train R0–R6+, dependency graph, G0–G5 evidence, risk, decisions và change control. |
 
 **Tài liệu tiếp theo theo thứ tự 69 docs:** `docs/00-governance/glossary.md` — từ điển chung để Customer, Merchant, Driver, booking, trip, order, offer, assignment, authorization/capture/refund và các trạng thái không bị dùng lẫn.

@@ -1,7 +1,7 @@
 ---
 document_id: DOC-DOM-002
 title: "DealGo — Roles, Permissions & Authorization Policy"
-version: 0.1.0
+version: "0.2.0"
 status: DRAFT
 language: vi-VN
 created_at: 2026-10-12
@@ -18,7 +18,7 @@ source_of_truth:
   - ../01-product/functional-requirements.md
   - ../01-product/use-case-catalog.md
   - ./domain-model.md
-related_decisions: [DEC-PROD-001, DEC-PROD-002, DEC-PROD-004, OPEN-005, OPEN-006, OPEN-008, OPEN-011, OPEN-012, OPEN-013, OPEN-014, OPEN-015, OPEN-016, OPEN-018]
+related_decisions: [DEC-PROD-001, DEC-PROD-002, DEC-PROD-004, DEC-PROD-006, DEC-PROD-007, OPEN-020, OPEN-021, OPEN-005, OPEN-006, OPEN-008, OPEN-011, OPEN-012, OPEN-013, OPEN-014, OPEN-015, OPEN-016, OPEN-018]
 related_requirements: [FR-CORE-001, FR-CORE-002, FR-CORE-003, FR-CORE-005, FR-CORE-010, FR-CORE-014, FR-CORE-015, FR-MER-001, FR-DRV-001, FR-DRV-002, FR-DRV-004, FR-DRV-008, FR-OPS-001, FR-OPS-002, FR-OPS-004, FR-OPS-006, FR-OPS-007, FR-OPS-008]
 next_documents: [identity-kyc-kyb.md, merchant-and-catalog-rules.md, trust-safety-and-fraud.md, ../07-security-legal/authentication-and-authorization.md, ../08-quality/critical-e2e-test-matrix.md]
 ---
@@ -27,7 +27,7 @@ next_documents: [identity-kyc-kyb.md, merchant-and-catalog-rules.md, trust-safet
 
 > **DRAFT — hợp đồng authorization đề xuất, không phải policy đã được phê duyệt.** Định hướng được xác nhận: **một ứng dụng Flutter có ba vai trò Customer / Merchant / Driver**, hỗ trợ **Ride hai bánh + Food** và Admin Web. Phân quyền phải bảo đảm `least privilege`, `deny by default`, `server-side authorization`, kiểm soát sở hữu từng đối tượng, thu hồi quyền và truy vết. **Không được suy ra** rằng một tài khoản được kiêm nhiệm mọi vai trò, một tài xế được nhận đồng thời Ride+Food, cửa hàng đã có nhân viên/đa chi nhánh, hoặc admin có thể tự thay đổi mọi thông tin.
 >
-> **Nguồn thẩm quyền:** `DEC-PROD-001..005` được xác nhận; `FR-*`, ma trận quyền và chính sách chi tiết ở đây là **PROPOSED_P0** hoặc **DESIGN_PROPOSAL**. `OPEN-005`, `OPEN-006`, `OPEN-008`, `OPEN-013` và các vấn đề có liên quan phải được chốt trước khi kích hoạt tác vụ production phụ thuộc chúng. Các hành động có tác động tiền thật, KYC thật hoặc thông tin cực nhạy cảm phải **fail closed** khi thiếu policy.
+> **Nguồn thẩm quyền:** `DEC-PROD-001..007` được xác nhận; `FR-*`, ma trận quyền và chính sách chi tiết ở đây là **PROPOSED_P0** hoặc **DESIGN_PROPOSAL**. `OPEN-005`, `OPEN-006`, `OPEN-008`, `OPEN-013` và các vấn đề có liên quan phải được chốt trước khi kích hoạt tác vụ production phụ thuộc chúng. Các hành động có tác động tiền thật, KYC thật hoặc thông tin cực nhạy cảm phải **fail closed** khi thiếu policy.
 
 ## 1. Mục đích và phạm vi
 
@@ -52,7 +52,7 @@ next_documents: [identity-kyc-kyb.md, merchant-and-catalog-rules.md, trust-safet
 | Nhân viên cửa hàng, đa cửa hàng | `OPEN-013` | Store-scoped grant sẵn sàng mở rộng; không coi staff/multi-store là P0 đã chốt. |
 | Proof giao/nhận | `OPEN-011` | Không cho driver/merchant tự giả trạng thái hoàn thành thiếu evidence. |
 | Vị trí nền, lưu/hiển thị location | `OPEN-012` | Location permission gắn active relationship và privacy policy. |
-| Kênh liên lạc | `OPEN-014` | Không lộ số điện thoại trực tiếp khi kênh chưa được quyết định. |
+| Kênh liên lạc | `DEC-PROD-007`; chi tiết `OPEN-014/021` | Chat/voice trong app theo transaction, không lộ số; no-recording baseline. |
 | Hỗ trợ khẩn cấp và escalation | `OPEN-015` | Chỉ thiết kế role+case permissions; chưa chốt on-call SLA. |
 | Bồi hoàn sau khi món đã làm | `OPEN-016` | Không grant quyền tự refund/bồi thường khi policy chưa chốt. |
 | Driver COD, đối soát | `OPEN-018` | Tách quyền đọc earnings khỏi quyền điều chỉnh tiền. |
@@ -238,6 +238,9 @@ Tên quyền dùng cú pháp minh họa: `<domain>.<resource>.<action>.<scope>`;
 | `delivery.task.deliver_complete` | D | D | C | C | Assigned driver, completion proof, state/order consistency. |
 | `support.case.create` | A | A | A | A | Reporter liên quan object; không arbitrary report mọi user. |
 | `support.case.read` | C | C | C | C | Reporter chỉ xem case của mình; Ops theo case assignment/scope. |
+| `communication.conversation.read` | C | C | C | C | Chỉ transaction participant; nội dung theo field/retention policy. |
+| `communication.message.send` | C | C | C | D | Chỉ participant còn trong contact window; chống spam/block state. |
+| `communication.call.start_join` | C | C | C | D | Participant đủ điều kiện; call token ngắn hạn; app không nhận phone number thô. |
 
 **Lưu ý role kiêm nhiệm:** hàng `C` ở Merchant/Driver cho action Customer chỉ có nghĩa một người **có thể** dùng ngữ cảnh Customer khi có grant thích hợp; không có nghĩa Merchant role tự sở hữu quyền Customer. Policy cụ thể nằm ở `OPEN-005`.
 
@@ -313,6 +316,9 @@ Trạng thái và tài liệu xét duyệt chính xác thuộc `identity-kyc-kyb
 | `finance.payout.approve` | D | D | D | D | C | D | D |
 | `ops.region.service_config.update` | D | D | D | D | D | C | C |
 | `security.session.revoke` | D | D | D | D | D | D | C |
+| `security.auth_method.policy.manage` | D | D | D | D | D | C | C | Global/environment policy; step-up, reason, blast-radius preview; dual control when configured. |
+| `security.auth_method.account.manage` | D | D | D | D | D | D | C | Per-account method revoke/disable with case, reason, recovery guard, notification, audit. |
+| `security.communication.content.read_case` | D | D | D | D | D | D | C | Exceptional case-scoped content access only; no standing inbox/audio access. |
 | `security.role_grant.manage` | D | D | D | D | D | D | C |
 | `security.audit.read_scoped` | D | D | D | C | C | D | C |
 | `security.kyc_document.read_restricted` | D | D | C | D | D | D | C |
@@ -725,7 +731,7 @@ Khi audit, mỗi capability phải có **positive** case + **negative** case + c
 | `OPEN-011` | Interface proof service, tests no-proof rejection | Xác nhận giao xong thiếu chứng cứ được duyệt | G3/G5 |
 | `OPEN-012` | Location projection/consent model | Bật background tracking/retention ngoài policy | G4/G5 |
 | `OPEN-013` | Store-scoped policy data model, tests multi-store | Staff delegation/multi-store role tự cấp quyền | G3/G4 |
-| `OPEN-014` | Contact channel adapters và masking | Công khai điện thoại/link chat ngoài consent/policy | G4/G5 |
+| `OPEN-014/021` | Participant pairs/contact window/provider/retention | Admin/support content scope và privacy review | G2/G3/G4/G5 |
 | `OPEN-015` | Support role, case audit, escalation route | Hứa hỗ trợ khẩn cấp mà không có quy trình vận hành | G5 |
 | `OPEN-016` | Financial authz hooks + maker/checker tests | Cho Ops tự quyết khoản bồi hoàn Food | G3/G5 |
 | `OPEN-018` | COD ledger permission boundaries và test data | Nhận/đối soát COD thật thiếu trách nhiệm đã duyệt | G5 |
@@ -750,7 +756,7 @@ Nếu một quyết định được chốt, cập nhật Governance registry **
 
 ### 25.1. Design review trước khi phê duyệt tài liệu
 
-- [ ] `DEC-PROD-001..005` được giữ nguyên; role taxonomy không thay cam kết ba role.
+- [ ] `DEC-PROD-001..007` được giữ nguyên; role taxonomy không thay cam kết ba role.
 - [ ] `OPEN-005/006/008/013` chưa bị tự đổi thành `RESOLVED`.
 - [ ] Mỗi action P0 có principal, permission, resource, scope, object state và eligibility.
 - [ ] Không có quyền override có thể tự cấp/quét sạch audit hoặc xem toàn bộ PII.
@@ -839,6 +845,7 @@ Các gate kế thừa `scope-release-plan.md`; chỉ khi có evidence và ngư�
 
 | Version | Date | Status | Change |
 |---|---|---|---|
+| `0.2.0` | `2026-10-12` | `DRAFT` | Thêm communication permissions, case-scoped content access và quyền Admin quản lý auth methods. |
 | `0.1.0` | 2026-10-12 | `DRAFT` | Lập ma trận vai trò/quyền, RBAC+ABAC+relation model, admin scope, Flutter multi-role, revocation, negative tests, decisions traceability. |
 
 | Owner role | Approval | Evidence |
@@ -850,3 +857,11 @@ Các gate kế thừa `scope-release-plan.md`; chỉ khi có evidence và ngư�
 | Legal/Compliance (KYC, data privacy, production) | `PENDING` | TBD |
 
 **Next doc:** `docs/02-domain/identity-kyc-kyb.md` — tài liệu số **14/69**.
+
+
+### Communication authorization invariants
+
+- Conversation/call participants are derived from authoritative Ride/Food transaction relationships, not client-supplied IDs. For example Customer↔assigned Driver for Ride/delivery; Customer↔Merchant for the corresponding Food order; additional pairs require explicit policy.
+- `communication.conversation.read/message.send/call.start_join` are distinct permissions. A support role does not automatically inherit message/call access. Admin content access is case-scoped, reasoned, time-limited and audited; no ability to listen to live calls.
+- Method-policy management and per-account method revocation are reserved for Security Admin/explicit Config Manager grants. Toggle rollout cannot grant authentication or object permissions. Disabling the last sign-in method routes through an explicit emergency recovery/lock workflow.
+- User block/report, contact window, after-completion support period and retention are governed by `OPEN-021`; until approved, use transaction scope, text/audio-only, no recording, no arbitrary contacts.

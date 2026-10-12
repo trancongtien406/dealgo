@@ -1,7 +1,7 @@
 ---
 document_id: DOC-DOM-001
 title: "DealGo — Domain Model & Bounded Contexts"
-version: 0.1.0
+version: "0.2.0"
 status: DRAFT
 language: vi-VN
 created_at: 2026-10-12
@@ -29,7 +29,7 @@ next_documents:
 
 # DealGo — Domain Model / Mô hình miền nghiệp vụ
 
-> **Trạng thái: `DRAFT / PROPOSED`.** Đây là **mô hình khái niệm và định hướng phân ranh giới**, không phải Prisma schema, tên bảng production, API contract hay kiến trúc triển khai đã phê duyệt. Các quyết định `DEC-PROD-001..005` đã được xác nhận theo Governance. Các chính sách liên quan `OPEN-001..019` vẫn là **chưa chốt**.
+> **Trạng thái: `DRAFT / PROPOSED`.** Đây là **mô hình khái niệm và định hướng phân ranh giới**, không phải Prisma schema, tên bảng production, API contract hay kiến trúc triển khai đã phê duyệt. Các quyết định `DEC-PROD-001..007` đã được xác nhận theo Governance. Các chính sách liên quan `OPEN-001..021` vẫn là **chưa chốt**.
 >
 > **Phạm vi đã chốt:** DealGo là **một ứng dụng Flutter ba vai trò Customer / Merchant / Driver**, có **Ride hai bánh có thương lượng giá** và **Food**, cùng **Admin Web**. Không tự bổ sung ô tô, chuyển phát hàng độc lập, ví điện tử, đa nhà hàng/giỏ hay microservices bắt buộc.
 
@@ -60,11 +60,11 @@ Nếu không có Domain Model, các tác nhân thường gọi nhiều đối t�
 
 | Loại nội dung | Cấp độ | Quy tắc thực thi |
 |---|---|---|
-| `DEC-PROD-001..005` | **CONFIRMED** | Ràng buộc thiết kế; mọi thay đổi cần Product Owner phê duyệt. |
+| `DEC-PROD-001..007` | **CONFIRMED** | Ràng buộc thiết kế; mọi thay đổi cần Product Owner phê duyệt. |
 | `BR-*` từ PRD | **Invariant đề xuất bắt buộc xác thực** | Xây guard và test; không thay bằng policy chưa được quyết định. |
 | `FR-*`, `UC-*` | **PROPOSED_P0** theo tài liệu chức năng | Map thành behavior; chỉ chốt hợp đồng sản xuất khi yêu cầu được phê duyệt. |
 | Bounded contexts/aggregates trong file này | **DESIGN_PROPOSAL** | Có thể sửa thông qua review và ADR; không tự chuyển trạng thái `APPROVED`. |
-| `OPEN-001..019` | **OPEN** | Không điền giả giá trị vào constants/config production. |
+| `OPEN-001..021` | **OPEN** | Không điền giả giá trị vào constants/config production. |
 | `ASM-*` | **UNKNOWN** | Cần điều tra và bằng chứng, không được coi là sự thật. |
 | Sơ đồ, status, TypeScript minh họa | **CONCEPTUAL** | Không tự sinh migration/API từ mô tả khi chưa xác nhận. |
 
@@ -75,6 +75,11 @@ Nếu không có Domain Model, các tác nhân thường gọi nhiều đối t�
 | Thuật ngữ | Ý nghĩa duy nhất | Không được nhầm với |
 |---|---|---|
 | `Account` | Danh tính đăng nhập của một người/chủ thể theo policy. | `CustomerProfile`, `DriverProfile`, `MerchantStaff`. |
+| `PasskeyCredential` | Credential public-key tham chiếu authenticator/RP ID, state, created/revoked timestamps. | Private key lưu server. |
+| `AuthMethodPolicy` | Version/scope cho enroll/auth method enable/disable và rollout. | Client-side feature flag là security enforcement. |
+| `ChatConversation` | Kênh trao đổi gắn Ride/Food transaction, participant set/version/contact window. | Conversation không liên quan transaction. |
+| `ChatMessage` | Text message của participant, server timestamp, moderation/report references. | Push notification payload. |
+| `CallSession` | Phiên audio VoIP có authorized participants, signaling state và expiry. | Số điện thoại/ghi âm. |
 | `RoleGrant` / `RoleMembership` | Quyền tham gia một vai trò với phạm vi và trạng thái. | `ActiveRole` đang hiển thị trên Flutter. |
 | `PartnerEligibility` | Kết quả xét điều kiện hoạt động (KYC/KYB/xe/giấy tờ). | Có nút chuyển vai trò trên UI. |
 | `MerchantStore` | Một cửa hàng cụ thể có lịch mở, địa điểm, menu và đơn. | Tài khoản chủ doanh nghiệp. |
@@ -129,7 +134,7 @@ Tra cứu các thuật ngữ và phân biệt tên gọi tại [`../00-governanc
 | **Supporting** | `Partner Compliance` | Driver/Merchant onboarding, KYC/KYB, giấy phép, eligibility. |
 | **Generic** | `Identity & Access` | Authentication, role grants, sessions, object authorization. |
 | **Generic** | `Geo & Routing` | Location observation, geofence, route/ETA provider abstractions. |
-| **Generic** | `Messaging & Notifications` | Push/in-app notifications; delivery not guaranteed. |
+| **Generic** | `Messaging & Communications` | Transaction-scoped chat/voice + notifications; delivery not guaranteed. |
 | **Generic** | `Reporting & Audit Read Models` | Projections, reporting và append-only audit evidence. |
 
 **14 bounded contexts ứng viên ≠ 14 microservices.** MVP có thể triển khai thành modular monolith với interface, module ownership, transactional boundaries và event contract rõ ràng. Quyết định triển khai thực tế cần ADR ở `05-architecture/*` và cân nhắc `OPEN-007`.
@@ -241,7 +246,10 @@ Dịch vụ miền chứa **quy tắc nghiệp vụ**, Application Service chỉ
 
 | Root (owner context) | Thành phần/VO quan trọng | Command chính | Invariant đồng bộ / policy |
 |---|---|---|---|
-| `Account` (Identity) | credential refs, verified contacts, sessions | Register, Verify, Disable | Không tự cấp role hoặc store owner nếu chưa kiểm tra. `P`. |
+| `Account` (Identity) | credential refs (passkey), verified phone/email, sessions, auth-method version | Register, Verify, EnrollPasskey, RevokeMethod, Recover | Không tự cấp role; không khóa method cuối ngoài recovery workflow. `P`. |
+| `AuthMethodPolicy` (Identity/Platform Config) | method, scope, enabled state, version, reason, approval refs | Enable, Disable, Rollout, Restore | Enforcement server-side; global and account method controls are distinct; dual-control per approved policy. `B: OPEN-020`. |
+| `ChatConversation` (Communications) | transactionRef, participant refs, contact window, status/version | Open, Close, BlockParticipant | Participants derive from owner context; no arbitrary inbox. `B: OPEN-021`. |
+| `CallSession` (Communications) | conversationRef, authorized participants, short-lived signaling grant, state, expiry | Start, Accept, Reject, End, Expire | Audio only; no recording/phone exposure by default; token expiry/revocation enforced. `B: OPEN-021`. |
 | `RoleMembership` (Identity) | role, scope, status, grants | RequestRole, Grant, Revoke | Authz độc lập với `activeRole` UI. `P`. |
 | `PartnerApplication` (Compliance) | applicant, document refs, review history | Submit, Review, Approve, Reject | Chỉ approved theo policy mới active, có audit. `B: OPEN-006/008`. |
 | `MerchantStore` (Merchant) | owner ref, address, availability, staff scopes | Open, Pause, UpdateHours | Store isolation và eligibility; chưa chốt multi-store `OPEN-013`. |
@@ -504,7 +512,7 @@ Mũi tên là **quan hệ nghiệp vụ khả dĩ**, không quyết định th�
 
 - Notification có `notificationId`, recipient scope, event source và status gửi; gửi thành công không bằng recipient nhận/đọc.
 - Realtime/socket/push delivery có thể lặp, mất hoặc đảo thứ tự. Client fetch authoritative state, áp dụng version để bỏ state cũ.
-- Định nghĩa masked call/in-app chat/support P0 còn `OPEN-014`.
+- Scope transaction-scoped chat/voice call P0 được xác nhận ở `DEC-PROD-007`; contact window, participants/provider/retention còn `OPEN-014/021`.
 
 ### 14.3. Trust & Support / Admin
 
@@ -576,6 +584,9 @@ Tên error code final dùng chung RFC 9457 ở API contract sau này, nhưng dom
 | `DispatchAssignmentConfirmed.v1` | Dispatch | Ride/Food & driver workload projections. | Trip đã bắt đầu. |
 | `DriverAssignmentRevoked.v1` | Dispatch | Ride/Food recovery, capacity release. | Original job bị hủy luôn. |
 | `PartnerEligibilityChanged.v1` | Compliance | Driver/Merchant ability, authorization cache invalidation. | In-flight job tự động được hủy. |
+| `AuthMethodPolicyChanged.v1` | Identity/Admin Config | Auth gateway/cache invalidation; notify affected users when appropriate. | Existing sessions are revoked unless explicit command/policy says so. |
+| `ChatMessageCreated.v1` | Communications | Participant realtime/inbox delivery. | Push delivery is not proof of read. |
+| `CallSessionStateChanged.v1` | Communications | Caller/receiver call UI, audit metadata. | Call connected or recorded without state/evidence. |
 | `PaymentConfirmed.v1` | Payments | Finance posting candidate, order finance projection. | Settlement completed. |
 | `RefundConfirmed.v1` | Payments | Journal reversal/adjustment per policy. | Mọi khoản bồi thường đã giải quyết. |
 | `LedgerJournalPosted.v1` | Finance | Settlement/reporting projection. | Payout đã gửi. |
@@ -853,7 +864,7 @@ Thiết kế chi tiết threat model, lawful basis, retention, KYC storage, perm
 3. [`../00-governance/decisions-and-assumptions.md`](../00-governance/decisions-and-assumptions.md) — 4 DEC, 18 OPEN.
 4. [`../00-governance/glossary.md`](../00-governance/glossary.md) — thuật ngữ.
 5. [`../01-product/product-requirements.md`](../01-product/product-requirements.md) — 12 BR invariants, ride/food service blueprint.
-6. [`../01-product/functional-requirements.md`](../01-product/functional-requirements.md) — 67 FR + acceptance.
+6. [`../01-product/functional-requirements.md`](../01-product/functional-requirements.md) — 71 FR + acceptance.
 7. [`../01-product/use-case-catalog.md`](../01-product/use-case-catalog.md) — use cases + failure paths.
 8. [`../01-product/non-functional-requirements.md`](../01-product/non-functional-requirements.md) — latency, consistency, location, availability.
 9. [`../00-governance/scope-release-plan.md`](../00-governance/scope-release-plan.md) — G0–G5 và P0/P1/P2.
@@ -889,6 +900,7 @@ Thiết kế chi tiết threat model, lawful basis, retention, KYC storage, perm
 
 | Ngày | Phiên bản | Trạng thái | Thay đổi |
 |---|---|---|---|
+| 2026-10-12 | 0.2.0 | DRAFT | Thêm AuthMethodPolicy, PasskeyCredential, ChatConversation, ChatMessage, CallSession và events; đồng bộ 71 FR. |
 | 2026-10-12 | 0.1.0 | DRAFT | Khởi tạo 14 bounded contexts, 21 aggregate candidates, context map, invariants/atomicity, domain/integration events, authority matrix, saga/recovery, FR/BR/OPEN traceability và tests. |
 
 | Vai trò | Người phê duyệt | Trạng thái |

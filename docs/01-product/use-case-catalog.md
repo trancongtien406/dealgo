@@ -1,9 +1,9 @@
 ---
 title: "DealGo — Use Case Catalog / Danh mục kịch bản sử dụng"
 document_id: "DOC-PRD-UC-001"
-version: "0.1.0"
+version: "0.2.0"
 status: "DRAFT"
-updated_at: "2026-10-11"
+updated_at: "2026-10-12"
 owner_role: "Product / Business Analysis"
 review_roles: ["Product Owner", "Tech Lead", "Mobile Lead", "Operations", "Finance", "Security/Legal", "QA"]
 product: "DealGo"
@@ -21,13 +21,13 @@ predecessors:
 
 # DealGo — Use Case Catalog / Danh mục kịch bản sử dụng
 
-> **Trạng thái: DRAFT — tài liệu thiết kế và kiểm thử, không phải thông báo đã phê duyệt chính sách kinh doanh.** Cấu hình thời gian, bán kính, số job, giá, trách nhiệm bồi hoàn, chứng cứ giao nhận, chính sách tracking và thanh toán hiện phụ thuộc các `OPEN-001..019` theo Governance. Ví dụ trong file dùng fixture môi trường kiểm thử, tuyệt đối không được suy diễn thành policy production.
+> **Trạng thái: DRAFT — tài liệu thiết kế và kiểm thử, không phải thông báo đã phê duyệt chính sách kinh doanh.** Cấu hình thời gian, bán kính, số job, giá, trách nhiệm bồi hoàn, chứng cứ giao nhận, chính sách tracking và thanh toán hiện phụ thuộc các `OPEN-001..021` theo Governance. Ví dụ trong file dùng fixture môi trường kiểm thử, tuyệt đối không được suy diễn thành policy production.
 
 ## 1. Mục tiêu, phạm vi và định nghĩa hoàn thành
 
 ### 1.1. Mục tiêu
 
-- Chuyển **67 yêu cầu chức năng `FR-*` trong PRD** thành danh mục hành vi quan sát được, và bổ sung **12 use case xuyên vai trò** để không bỏ lỡ điểm bàn giao Ride/Food.
+- Chuyển **71 yêu cầu chức năng `FR-*` trong PRD** thành danh mục hành vi quan sát được, và bổ sung **12 use case xuyên vai trò** để không bỏ lỡ điểm bàn giao Ride/Food.
 - Làm rõ actor, trigger, tiền/hậu điều kiện, các cam kết tối thiểu nếu thất bại, luồng chính, ngoại lệ, bằng chứng nghiệm thu và policy blocker.
 - Là **cầu nối** giữa PRD → quy tắc nghiệp vụ `BR-*` → workflow `WF-*` → UI `SCR-*` → API/event → kiểm thử `TC-*`, nhưng **không thay thế** những đặc tả chuyên trách.
 - Cung cấp bộ khung cho Product Owner, UX, QA, Backend, Flutter và AI Agent chia công việc thành vertical slice có thể kiểm chứng.
@@ -47,7 +47,7 @@ predecessors:
 
 ### 1.4. Sản phẩm bàn giao
 
-- 67 UC mức goal/subfunction bám PRD, 12 UC E2E xuyên role; có bảng truy vết kiểm tra tự động.
+- 71 UC mức goal/subfunction bám PRD, 12 UC E2E xuyên role; có bảng truy vết kiểm tra tự động.
 - Các use case rủi ro cao có đặc tả **fully dressed** chi tiết và ví dụ tình huống kiểm thử.
 - Chỉ mục policy blockers, ma trận release gate, tình huống lỗi, điều kiện để chi tiết hóa use case còn lại khi bắt đầu code.
 
@@ -139,12 +139,12 @@ Quy tắc: không dùng lại ID, không xóa âm thầm; tài liệu thay đổ
 
 Các bất biến trên là cách diễn giải và kiểm thử yêu cầu PRD; thay đổi chính sách phải qua Governance. Không lấy chúng làm định nghĩa chi tiết state machine thay cho tài liệu `03-workflows/*`.
 
-## 6. Ma trận danh mục 67 Use Cases bám `FR-*`
+## 6. Ma trận danh mục 71 Use Cases bám `FR-*`
 
 **Cách đọc:** mỗi dòng có một mục đích/thao tác rõ, kết quả chi tiết tra ở `FR-*` gốc. Cột `OPEN-*` nghĩa đặc tả/chính sách còn cần quyết định; không có `OPEN-*` **không chứng minh use case đã được APPROVED**. Các ID được lập song song FR để đảm bảo baseline coverage; khi triển khai, có thể nhóm nhiều UC trong một vertical slice, nhưng không xóa tính truy vết riêng.
 
 
-### 6.1. Shared Platform (15)
+### 6.1. Shared Platform (18)
 
 | Use Case | Mục tiêu người dùng / hệ thống | Actor chính | FR liên quan | Policy TBD |
 |---|---|---|---|---|
@@ -163,6 +163,9 @@ Các bất biến trên là cách diễn giải và kiểm thử yêu cầu PRD;
 | `UC-CORE-013` | Xem lịch sử và chi tiết giao dịch đúng trạng thái | Customer/Merchant/Driver | `FR-CORE-013` | `OPEN-002`, `OPEN-003` |
 | `UC-CORE-014` | Nhận thông báo liên quan đúng vai trò | All roles | `FR-CORE-014` | `OPEN-014` |
 | `UC-CORE-015` | Kiểm tra lịch sử thay đổi quan trọng | Authorized auditor | `FR-CORE-015` | `OPEN-006`, `OPEN-015` |
+| `UC-CORE-016` | Đăng ký/liên kết passkey, phone SMS, verified email và khôi phục truy cập | Account holder | `FR-CORE-016` | `OPEN-008/020` |
+| `UC-CORE-017` | Chat trong Ride/Food với participant đủ quyền | Customer/Driver/Merchant | `FR-CORE-017` | `OPEN-014/021` |
+| `UC-CORE-018` | Gọi thoại trong app theo Ride/Food transaction | Customer/Driver/Merchant | `FR-CORE-018` | `OPEN-021` |
 
 
 ### 6.2. Ride / Customer (12)
@@ -232,7 +235,7 @@ Các bất biến trên là cách diễn giải và kiểm thử yêu cầu PRD;
 | `UC-DRV-010` | Báo khách vắng, quán chưa sẵn hoặc không giao được | Driver | `FR-DRV-010` | `OPEN-011`, `OPEN-015`, `OPEN-016` |
 
 
-### 6.6. Admin / Operations (9)
+### 6.6. Admin / Operations (10)
 
 | Use Case | Mục tiêu người dùng / hệ thống | Actor chính | FR liên quan | Policy TBD |
 |---|---|---|---|---|
@@ -245,6 +248,7 @@ Các bất biến trên là cách diễn giải và kiểm thử yêu cầu PRD;
 | `UC-OPS-007` | Thiết lập vùng dịch vụ và cấu hình đối tác | Authorized operations | `FR-OPS-007` | `OPEN-001`, `OPEN-006` |
 | `UC-OPS-008` | Tra soát audit và phân loại bất thường | Security/Ops | `FR-OPS-008` | `OPEN-015` |
 | `UC-OPS-009` | Tạm dừng nhận giao dịch mới theo vùng/dịch vụ | Authorized ops | `FR-OPS-009` | `OPEN-001`, `OPEN-007` |
+| `UC-OPS-010` | Bật/tắt phương thức xác thực theo quyền và scope | Security Admin / authorized Config Manager | `FR-OPS-010` | `OPEN-020` |
 
 
 ## 7. Danh mục 12 Use Cases xuyên actor / E2E
@@ -802,7 +806,7 @@ Một hành động không được coi là `RECOVERY` nếu chỉ hiển thị 
 
 | Từ | Đến | Cách xác minh |
 |---|---|---|
-| `UC-*` | `FR-*` hiện có | Mỗi UC catalog có FR hợp lệ; `67/67 FR` được cover |
+| `UC-*` | `FR-*` hiện có | Mỗi UC catalog có FR hợp lệ; `71/71 FR` được cover |
 | `UC-*` | `OPEN-*` | Các blocker thuộc `OPEN-001..019`; thay đổi phải cập nhật cả hai |
 | `UC-*` | `BR-*` `[PLANNED]` | Thêm khi quy tắc đã được thiết kế/phê duyệt ở `02-domain/*` |
 | `UC-*` | `WF-*` `[PLANNED]` | Map state transitions ở `03-workflows/*` |
@@ -886,7 +890,7 @@ Khi scope thay đổi: mở issue và `DEC/OPEN` record → impact review → c�
 - `../00-governance/scope-release-plan.md` — release gates, P0 candidates.
 - `../00-governance/glossary.md` — thuật ngữ, không lẫn các entity.
 - `../00-governance/decisions-and-assumptions.md` — decisions và open issues source of truth.
-- `./product-requirements.md` — **nguồn 67 FR**, invariants và UAT cấp sản phẩm.
+- `./product-requirements.md` — **nguồn 71 FR**, invariants và UAT cấp sản phẩm.
 - `./competitor-benchmark.md` — bằng chứng luồng công khai; không đại diện logic nội bộ đối thủ.
 - `./personas-and-stakeholders.md` — 14 proto-personas, journey maps và research hypotheses.
 
@@ -903,7 +907,7 @@ Khi scope thay đổi: mở issue và `DEC/OPEN` record → impact review → c�
 
 ### 20.1. Checklist trước khi chuyển `IN_REVIEW`
 
-- [x] Danh mục có **67 UC** 1:1 với tất cả `67 FR` PRD, không bịa mã FR.
+- [x] Danh mục có **71 UC** 1:1 với tất cả `71 FR` PRD, không bịa mã FR.
 - [x] Có **12 UC xuyên vai trò**, đánh dấu rõ không phải FR mới.
 - [x] Cả Ride + Food, Merchant, Driver, Admin, Customer và Shared Platform đều được bao phủ.
 - [x] Có use case có precondition, minimal/success guarantee, happy/alternative/failure và acceptance.
@@ -930,6 +934,7 @@ Khi scope thay đổi: mở issue và `DEC/OPEN` record → impact review → c�
 
 | Ngày | Phiên bản | Thay đổi |
 |---|---|---|
+| 2026-10-12 | `0.2.0` | Bổ sung UC auth methods/admin controls/chat/voice; cập nhật baseline thành 71 FR-linked UCs, giữ 12 UC xuyên actor. |
 | 2026-10-11 | `0.1.0` | Tạo catalog 67 FR-linked + 12 cross-actor UCs; fully dressed high-risk flows, exception matrix, policy blockers, agent handoff và traceability. |
 
-**Tài liệu kế tiếp theo roadmap:** `docs/01-product/functional-requirements.md` (10/69) — tách 67 yêu cầu thành yêu cầu nguyên tử `shall`, các business constraints, acceptance và negative tests; giữ `FR-*` gốc, không tự thay đổi scope.
+**Tài liệu kế tiếp theo roadmap:** `docs/01-product/functional-requirements.md` (10/69) — tách 71 yêu cầu thành yêu cầu nguyên tử `shall`, các business constraints, acceptance và negative tests; giữ `FR-*` gốc, không tự thay đổi scope.

@@ -1,10 +1,10 @@
 ---
 doc_id: DG-GOV-000
 title: "DealGo — Hướng dẫn bộ tài liệu dự án"
-version: "0.1.0"
+version: "0.2.0"
 status: "ACTIVE"
 owner: "Product Owner / Tech Lead"
-last_updated: "2026-10-11"
+last_updated: "2026-10-12"
 classification: "Internal"
 ---
 
@@ -20,6 +20,7 @@ classification: "Internal"
 
 1. **Ride:** khách xem giá tham khảo, gửi giá đề xuất; tài xế chấp nhận hoặc đưa giá khác; khách chọn một đề nghị/tài xế trước khi hệ thống phân công và theo dõi chuyến.
 2. **Food:** khách chọn cửa hàng/nhà hàng và món ăn, đặt đơn, cửa hàng xử lý, tài xế nhận giao và khách theo dõi đến khi hoàn tất.
+3. **Account & communication:** hỗ trợ passkey, xác minh phone qua SMS, email đã xác minh; chat và gọi thoại trong ứng dụng gắn với Ride/Food.
 
 ### 1.1. Kênh và vai trò
 
@@ -58,6 +59,8 @@ Sơ đồ **chỉ thể hiện trách nhiệm nghiệp vụ**, không phải thi
 | `DEC-PROD-002` | **Một ứng dụng mobile** hỗ trợ Customer, Merchant và Driver. | `CONFIRMED` | Trao đổi sản phẩm với chủ dự án. |
 | `DEC-PROD-003` | Tham khảo Grab/GrabFood/ShopeeFood cho luồng Ride/Food, không sao chép giao diện hay logic nội bộ. | `CONFIRMED` | Định hướng nghiên cứu. |
 | `DEC-PROD-005` | Ride có thương lượng giá: khách đề xuất, tài xế chấp nhận/đưa giá khác, khách chọn trước khi assignment. | `CONFIRMED` | Yêu cầu chủ dự án; mức sàn/trần, vòng, timeout, phí thuộc `OPEN-003/019`. |
+| `DEC-PROD-006` | Đăng ký/xác thực passkey, phone SMS và email đã xác minh; Admin được phân quyền quản lý phương thức. | `CONFIRMED` | Email không là OTP đăng nhập độc lập; recovery/provider `OPEN-020`. |
+| `DEC-PROD-007` | Chat và gọi thoại trong app theo giao dịch Ride/Food. | `CONFIRMED` | Không lộ số cá nhân; no-recording/no-video baseline; policy/provider `OPEN-021`. |
 | `DEC-PROD-004` | Cần tài liệu đủ để triển khai thực tế, gồm UI/UX, domain, backend, mobile, kiểm thử, bảo mật, vận hành. | `CONFIRMED` | Định hướng bộ hồ sơ DealGo. |
 
 ### 2.2. Các quyết định cần xác nhận trước khi khóa đặc tả liên quan
@@ -417,4 +420,5 @@ Các bước trên có thể diễn ra song song có kiểm soát, miễn không
 
 | Ngày | Phiên bản | Nội dung |
 |---|---|---|
+| 2026-10-12 | 0.2.0 | Đồng bộ scope/auth passkey + phone SMS + email, chat/call P0, decision links và P1 boundary. |
 | 2026-10-11 | 0.1.0 | Khởi tạo entry point, kiểm kê 69 tài liệu, quy tắc source of truth, ID, review, DoR/DoD và hướng dẫn AI agent. |

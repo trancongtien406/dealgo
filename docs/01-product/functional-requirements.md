@@ -1,7 +1,7 @@
 ---
 doc_id: DG-SRS-FR-001
 title: "DealGo — Functional Requirements Specification (FRS / SRS-Functional)"
-version: "0.1.0"
+version: "0.2.0"
 status: "DRAFT"
 owner: "Product Owner / Business Analyst"
 reviewers:
@@ -12,7 +12,7 @@ reviewers:
   - "Operations"
   - "Finance"
   - "Security / Privacy"
-last_updated: "2026-10-11"
+last_updated: "2026-10-12"
 classification: "Internal"
 upstream_docs:
   - "../00-governance/decisions-and-assumptions.md"
@@ -32,12 +32,12 @@ downstream_planned:
 
 # DealGo — Functional Requirements Specification (FRS)
 
-> **Bản nháp kỹ thuật có kiểm soát.** File này chi tiết hóa **đúng 67 yêu cầu `FR-*` đã đăng ký trong PRD** và trỏ tới 67 `UC-*` tương ứng. Các điều kiện nghiệm thu trong đây là **đề xuất để kiểm thử**, không phải bằng chứng rằng tính năng đã được code hoặc policy đã được duyệt. Các định hướng sản phẩm `DEC-PROD-001..005` được xác nhận; mọi phụ thuộc `OPEN-*` phải tiếp tục xử lý theo Governance. `G2/G3/G4/G5` là release gates, **không phải ngày hẹn**.
+> **Bản nháp kỹ thuật có kiểm soát.** File này chi tiết hóa **71 yêu cầu `FR-*` đã đăng ký trong PRD** và trỏ tới 71 `UC-*` tương ứng. Các điều kiện nghiệm thu trong đây là **đề xuất để kiểm thử**, không phải bằng chứng rằng tính năng đã được code hoặc policy đã được duyệt. Các định hướng sản phẩm `DEC-PROD-001..007` được xác nhận; mọi phụ thuộc `OPEN-*` phải tiếp tục xử lý theo Governance. `G2/G3/G4/G5` là release gates, **không phải ngày hẹn**.
 
 ## 1. Purpose, scope, nguyên tắc nguồn sự thật
 
 - Chuyển PRD từ câu mô tả nhu cầu sang hành vi **có trigger, tiền điều kiện, output, negative path và acceptance có thể kiểm chứng**.
-- Giữ nguyên 6 nhóm: 15 CORE, 12 RIDE, 12 FOOD, 9 MER, 10 DRV, 9 OPS = **67 functional requirements**. Không tự thêm FR mới, đổi mã, hoặc mặc định các capability P1/P2 là P0.
+- Baseline hiện tại gồm 18 CORE, 12 RIDE, 12 FOOD, 9 MER, 10 DRV, 10 OPS = **71 functional requirements**. Không tự đổi mã; các FR 016–018 CORE và OPS-010 là change theo `DEC-PROD-006/007`.
 - Đối tượng: **Customer, Merchant, Driver trong một app Flutter**, và **Ops/Support/Finance/Admin trong Admin Web tách biệt**. Ride hai bánh và Food đều thuộc mục tiêu MVP.
 - Đây là **functional black-box requirements**, không áp đặt NestJS/Redis/Kafka/BLoC, endpoint, tên enum hay cấu trúc SQL. Contract cụ thể thuộc docs kiến trúc/data/API; không biến ví dụ thành yêu cầu production.
 - PRD là nguồn của ý nghĩa FR và mức ưu tiên; `use-case-catalog.md` là nguồn của UC; `decisions-and-assumptions.md` là nguồn duy nhất về trạng thái `OPEN/RESOLVED`.
@@ -104,7 +104,7 @@ Client/API phải phân biệt `initial`, `loading`, `success`, `empty`, `valida
 
 ## 4. Ma trận FR → UC → domain/release/điểm review
 
-**67 dòng sau có cùng ID và nội dung với PRD.** Chúng là `PROPOSED_P0` ở mức đặc tả; mức P0 của capability/phase được quản lý trong `scope-release-plan.md`.
+**71 dòng sau có cùng ID và nội dung với PRD.** Chúng là `PROPOSED_P0` ở mức đặc tả; mức P0 của capability/phase được quản lý trong `scope-release-plan.md`.
 ### 4.1. Shared Platform / Identity & Consistency
 | FR | UC nguồn | Gate(s) | Owner review |
 |---|---|---|---|
@@ -123,6 +123,9 @@ Client/API phải phân biệt `initial`, `loading`, `success`, `empty`, `valida
 | `FR-CORE-013` | `UC-CORE-013` | G1/G4 | Product + Tech + Security |
 | `FR-CORE-014` | `UC-CORE-014` | G1/G4 | Product + Tech + Security |
 | `FR-CORE-015` | `UC-CORE-015` | G1/G4 | Product + Tech + Security |
+| `FR-CORE-016` | `UC-CORE-016` | G1/G4 | Product + Tech + Security |
+| `FR-CORE-017` | `UC-CORE-017` | G2/G3/G4 | Product + Ops + Privacy + Tech |
+| `FR-CORE-018` | `UC-CORE-018` | G2/G3/G4 | Product + Ops + Privacy + Tech |
 
 ### 4.2. Customer Ride
 | FR | UC nguồn | Gate(s) | Owner review |
@@ -195,12 +198,13 @@ Client/API phải phân biệt `initial`, `loading`, `success`, `empty`, `valida
 | `FR-OPS-007` | `UC-OPS-007` | G4/G5 | Ops + Finance + Security |
 | `FR-OPS-008` | `UC-OPS-008` | G4/G5 | Ops + Finance + Security |
 | `FR-OPS-009` | `UC-OPS-009` | G4/G5 | Ops + Finance + Security |
+| `FR-OPS-010` | `UC-OPS-010` | G1/G4/G5 | Security + Tech + Product |
 
-## 5. Bộ 67 Functional Requirements có kiểm thử
+## 5. Bộ 71 Functional Requirements có kiểm thử
 
 > `Minimum acceptance (PRD)` được giữ nguyên ý nghĩa nguồn, còn ba `AC-FR-*` phía dưới là tiêu chí chi tiết hóa để review. Không dùng thuật ngữ "đã nghiệm thu" khi chưa có evidence test được lưu ở QA.
 
-### 5.1. Shared Platform / Identity & Consistency (15 yêu cầu)
+### 5.1. Shared Platform / Identity & Consistency (18 yêu cầu)
 
 #### `FR-CORE-001` — Account đăng nhập/đăng xuất, khôi phục quyền truy cập theo phương thức được duyệt.
 - **Nguồn:** `UC-CORE-001` · **Phạm vi:** `PROPOSED_P0` · **Phụ thuộc PRD:** `CAP-CORE-01`, `OPEN-008`.
@@ -381,6 +385,35 @@ Client/API phải phân biệt `initial`, `loading`, `success`, `empty`, `valida
 1. `AC-FR-CORE-015-01` — **Given** tiền điều kiện hợp lệ và dữ liệu đủ quyền; **When** actor thực hiện hành vi nêu trên; **Then** backend trả/lưu kết quả: ghi audit bất biến tương đối, truy xuất được lịch sử sửa/duyệt/hoàn/hủy.
 2. `AC-FR-CORE-015-02` — **Given** dữ liệu không hợp lệ, state sai hoặc không đủ quyền; **When** yêu cầu được gửi qua API, kể cả bỏ qua UI; **Then** hệ thống từ chối an toàn và không có side effect trái phép: thiếu quyền/reason bắt buộc không thay đổi domain object.
 3. `AC-FR-CORE-015-03` — **Given** ca cạnh tranh/offline/stale hoặc quyền không hợp lệ tương ứng; **When** lặp thử nghiệm theo tình huống; **Then** phải chứng minh rằng: không ghi token, OTP, CCCD đầy đủ hoặc raw payment data vào logs/audit thường.
+
+#### `FR-CORE-016` — Account đăng ký và quản lý nhiều phương thức xác thực an toàn.
+- **Nguồn:** `UC-CORE-016` · **Phạm vi:** `PROPOSED_P0` · **Phụ thuộc:** `DEC-PROD-006`, `OPEN-008/020`.
+- **Actor / trigger:** Account holder / đăng ký, liên kết, xác thực hoặc khôi phục truy cập.
+- **Yêu cầu:** Hỗ trợ passkey theo WebAuthn/platform credential; xác minh số phone bằng SMS; email được xác minh và gắn làm contact/account identifier. Phone SMS OTP có rate limit, expiry, one-time use và risk checks. Email verification không được biến thành email OTP đăng nhập độc lập. Người dùng có thể liên kết passkey và các contact methods vào cùng Account sau khi chứng minh quyền kiểm soát.
+- **Kết quả chấp nhận:** Server xác minh challenge/passkey assertion, RP ID/origin, account binding, proof freshness và trạng thái method; method bị admin disable không thể enroll/authenticate.
+- **Failure/Recovery:** OTP sai/hết hạn, replay, challenge reused, method disabled hoặc recovery risk cao không tạo session; hướng dẫn fallback/recovery mà không tiết lộ tài khoản.
+**Acceptance criteria:**
+1. `AC-FR-CORE-016-01` — Đăng ký với một hoặc nhiều method hợp lệ tạo một Account duy nhất; email/phone được lưu ở trạng thái verified riêng.
+2. `AC-FR-CORE-016-02` — Sai chữ ký/challenge/origin/RP ID, SMS OTP hết hạn/replay/rate limit hoặc method disabled đều bị từ chối server-side; không log secret.
+3. `AC-FR-CORE-016-03` — Đổi/mất phone hoặc passkey yêu cầu re-auth/risk-based recovery; admin không thể vô ý disable phương thức cuối cùng mà không mở recovery/lockout workflow có audit.
+
+#### `FR-CORE-017` — Participant trao đổi chat văn bản trong ngữ cảnh Ride/Food được cấp.
+- **Nguồn:** `UC-CORE-017` · **Phạm vi:** `PROPOSED_P0` · **Phụ thuộc:** `DEC-PROD-007`, `OPEN-014/021`.
+- **Actor / trigger:** Customer, Driver, Merchant / cần phối hợp về Ride hoặc Food order đang liên quan.
+- **Yêu cầu:** Tạo conversation gắn RideRequest/Trip hoặc FoodOrder/DeliveryTask và chỉ cho participant/role liên quan đọc, gửi; cập nhật sent/delivered/read theo năng lực thật. Nội dung text-only ở baseline; không mở inbox tìm user, không gửi tệp/ảnh/voice note ở P0. Quyền chat bị thu hồi khi quan hệ giao dịch hết hiệu lực, trừ case support được cấp riêng.
+- **Kết quả chấp nhận:** Message có server timestamp, author, context/version; realtime/push chỉ là tín hiệu, fetch sau reconnect phải lọc đúng quyền.
+**Acceptance criteria:**
+1. `AC-FR-CORE-017-01` — Participant của transaction hợp lệ gửi/nhận message đúng conversation và đồng bộ sau offline.
+2. `AC-FR-CORE-017-02` — User ngoài transaction, participant bị revoke, sửa conversation ID hoặc push/deep link giả không đọc được body/metadata.
+3. `AC-FR-CORE-017-03` — Nội dung chat không xuất hiện trong notification preview/log analytics mặc định; admin chỉ đọc nội dung khi permission + case/reason/audit cho phép.
+
+#### `FR-CORE-018` — Participant đủ điều kiện thực hiện gọi thoại trong ứng dụng.
+- **Nguồn:** `UC-CORE-018` · **Phạm vi:** `PROPOSED_P0` · **Phụ thuộc:** `DEC-PROD-007`, `OPEN-021`.
+- **Yêu cầu:** Voice-only VoIP giữa participant liên quan Ride/Food; người gọi chủ động bắt đầu, người nhận có thể từ chối; kiểm tra transaction relationship và call window ở backend; cấp credential/signaling token ngắn hạn. Không hiện số điện thoại cá nhân, không tự fallback sang PSTN, không ghi âm/video ở baseline. Xin microphone permission tại thời điểm người dùng gọi; permission denied/network failure phải có đường quay về chat/support.
+- **Acceptance:**
+1. `AC-FR-CORE-018-01` — Caller/receiver là participant đủ quyền; call session được tạo một lần, trạng thái ringing/accepted/rejected/ended/failed nhất quán.
+2. `AC-FR-CORE-018-02` — Token hết hạn, participant ngoài giao dịch, user bị block/disabled hoặc call window hết hạn không thể join call.
+3. `AC-FR-CORE-018-03` — Microphone permission denied, app backgrounded, mạng mất hoặc provider lỗi không làm app báo cuộc gọi đã kết nối; không có ghi âm ngầm hoặc lộ số.
 
 ### 5.2. Customer Ride (12 yêu cầu; FR-RIDE-002/003 bao gồm thương lượng giá)
 
@@ -906,7 +939,7 @@ Client/API phải phân biệt `initial`, `loading`, `success`, `empty`, `valida
 2. `AC-FR-DRV-010-02` — **Given** dữ liệu không hợp lệ, state sai hoặc không đủ quyền; **When** yêu cầu được gửi qua API, kể cả bỏ qua UI; **Then** hệ thống từ chối an toàn và không có side effect trái phép: không tự đổi paid/settled hoặc delivered thành success vì driver mở ticket.
 3. `AC-FR-DRV-010-03` — **Given** ca cạnh tranh/offline/stale hoặc quyền không hợp lệ tương ứng; **When** lặp thử nghiệm theo tình huống; **Then** phải chứng minh rằng: đơn khách vắng, quán chưa sẵn, không giao được phải có outcome/runbook tùy policy OPEN-015/016.
 
-### 5.6. Admin & Financial Operations (9 yêu cầu)
+### 5.6. Admin & Financial Operations (10 yêu cầu)
 
 #### `FR-OPS-001` — Nhân sự vận hành đăng nhập và được phân quyền theo chức năng.
 - **Nguồn:** `UC-OPS-001` · **Phạm vi:** `PROPOSED_P0` · **Phụ thuộc PRD:** `CAP-OPS-01`.
@@ -1015,6 +1048,15 @@ Client/API phải phân biệt `initial`, `loading`, `success`, `empty`, `valida
 1. `AC-FR-OPS-009-01` — **Given** tiền điều kiện hợp lệ và dữ liệu đủ quyền; **When** actor thực hiện hành vi nêu trên; **Then** backend trả/lưu kết quả: chặn job mới theo phạm vi và log lý do; giao dịch in-flight còn đường xử lý.
 2. `AC-FR-OPS-009-02` — **Given** dữ liệu không hợp lệ, state sai hoặc không đủ quyền; **When** yêu cầu được gửi qua API, kể cả bỏ qua UI; **Then** hệ thống từ chối an toàn và không có side effect trái phép: lệnh disable không xóa nhiệm vụ, không tự refund/cancel hàng loạt.
 3. `AC-FR-OPS-009-03` — **Given** ca cạnh tranh/offline/stale hoặc quyền không hợp lệ tương ứng; **When** lặp thử nghiệm theo tình huống; **Then** phải chứng minh rằng: gửi RideRequest/FoodOrder mới trong vùng suspended phải bị từ chối có mã lỗi rõ.
+
+#### `FR-OPS-010` — Admin được phân quyền quản lý trạng thái auth methods.
+- **Nguồn:** `UC-OPS-010` · **Phạm vi:** `PROPOSED_P0` · **Phụ thuộc:** `DEC-PROD-006`, `OPEN-020`.
+- **Actor / trigger:** Security Admin (và Config Manager nếu được cấp grant cụ thể) / xử lý outage hoặc rủi ro xác thực.
+- **Yêu cầu:** Bật/tắt enrollment và authentication theo method ở mức platform/environment; Security Admin được revoke một credential/contact method của account cụ thể sau xác minh grounds. Thay đổi toàn hệ thống phải có step-up, reason, preview blast radius và dual approval theo policy; account-level action có case reference/audit. Toggle một method không âm thầm xóa credential hay session; thu hồi session là command riêng. Không thể tắt mọi method cho mọi người dùng ngoài emergency lock/suspend có recovery path.
+- **Acceptance criteria:**
+1. `AC-FR-OPS-010-01` — Admin không có permission bị deny; admin được cấp có thể disable/enable đúng method/scope và tạo audit event có before/after/version/reason/actor.
+2. `AC-FR-OPS-010-02` — Disable method chặn enrollment/login mới theo cache/version guard; không xóa account, transaction, credential history hoặc tự logout mọi user.
+3. `AC-FR-OPS-010-03` — Disable method cuối của account/global scope bị chặn hoặc yêu cầu emergency workflow có dual approval, recovery/lockout communications và explicit session-revocation choice.
 
 ## 6. Ma trận hậu điều kiện và loại đối tượng (để ngăn gộp sai lifecycle)
 
@@ -1214,8 +1256,8 @@ Nguồn nghiên cứu chỉ xác nhận **phương pháp đặc tả**, không t
 
 ### 14.1. Kiểm tra cấu trúc bắt buộc
 
-- [x] Có chính xác 67 `FR-*` nguồn theo PRD và 67 `UC-*` tương ứng trong Use Case Catalog.
-- [x] Mỗi FR có 3 AC định danh duy nhất (201 AC), gồm positive/negative/edge.
+- [x] Có chính xác 71 `FR-*` nguồn theo PRD và 71 `UC-*` tương ứng trong Use Case Catalog.
+- [x] Mỗi FR có 3 AC định danh duy nhất (213 AC), gồm positive/negative/edge.
 - [x] Đánh dấu trạng thái `DRAFT`, `PROPOSED_P0` và liên kết chính sách còn mở.
 - [x] Không phát sinh `FR-*` mới ngoài PRD; không sửa bản gốc trong ZIP.
 - [ ] Product Owner/BA/Tech/QA duyệt toàn bộ acceptance và policy gates.
@@ -1234,6 +1276,7 @@ Nguồn nghiên cứu chỉ xác nhận **phương pháp đặc tả**, không t
 
 | Phiên bản | Ngày | Thay đổi |
 |---|---|---|
+| 0.2.0 | 2026-10-12 | Thêm 4 FR cho passkey/verified contacts, in-app chat/voice, admin auth-method controls; tăng baseline lên 71 FR / 213 AC. |
 | 0.1.0 | 2026-10-11 | Tạo FRS 67 FR / 201 AC, trace UC, failure cases, open-policy gates. |
 
 **Tiếp theo theo master index:** `docs/01-product/non-functional-requirements.md` (11/69), tập trung NFR, reliability, security, performance, realtime/latency, privacy, accessibility và giới hạn đo lường; không tự đặt SLO production khi `OPEN-007` chưa chốt.

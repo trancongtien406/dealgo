@@ -1,7 +1,7 @@
 ---
 doc_id: DG-PRD-001
 title: "DealGo — Product Requirements Document (PRD)"
-version: "0.1.0"
+version: "0.2.0"
 status: "DRAFT"
 owner: "Product Owner"
 reviewers:
@@ -11,13 +11,16 @@ reviewers:
   - "Operations"
   - "Finance"
   - "Security / Privacy / Legal"
-last_updated: "2026-10-11"
+last_updated: "2026-10-12"
 classification: "Internal"
 related_decisions:
   - DEC-PROD-001
   - DEC-PROD-002
   - DEC-PROD-003
   - DEC-PROD-004
+  - DEC-PROD-005
+  - DEC-PROD-006
+  - DEC-PROD-007
 related_requirements: []
 upstream_docs:
   - ../00-governance/README.md
@@ -31,7 +34,7 @@ upstream_docs:
 
 > **Trạng thái:** `DRAFT / v0.1.0`. Đây là PRD cấp sản phẩm, **chưa phải hợp đồng API, schema database, chính sách pháp lý hoặc điều kiện go-live được phê duyệt**. Hạng mục chỉ có trạng thái `PROPOSED_P0` khi phạm vi MVP tổng thể đã chốt nhưng chi tiết nghiệp vụ còn chờ duyệt. Không tự điền giá, phụ phí, tỷ lệ hoa hồng, timeout, bán kính, SLO hoặc provider.
 >
-> **Năm điểm đã xác nhận:** (1) MVP gồm **Ride hai bánh và Food**, (2) **một ứng dụng Flutter cho Customer / Merchant / Driver**, (3) Ride có thương lượng giá theo `DEC-PROD-005`, (4) học các luồng công khai của Grab/GrabFood/inDrive/ShopeeFood mà không sao chép hay đoán thuật toán nội bộ, (5) tài liệu phải đủ để triển khai, kiểm thử và vận hành. Nguồn: `DEC-PROD-001..005`.
+> **Bảy định hướng đã xác nhận:** MVP Ride hai bánh + Food; một app Flutter cho Customer/Merchant/Driver; Ride thương lượng giá; tham khảo luồng công khai mà không sao chép; docs đủ cho triển khai/QA/ops; đăng ký passkey + phone SMS + email verified và Admin method controls; chat + voice call trong app theo transaction. Nguồn: `DEC-PROD-001..007`.
 
 ## 1. Tóm tắt điều hành
 
@@ -142,6 +145,9 @@ DealGo là nền tảng dịch vụ địa phương có hai hành trình:
 | `DEC-PROD-002` | **Một app Flutter** có Customer, Merchant và Driver. |
 | `DEC-PROD-003` | Dùng tài liệu công khai của Grab/GrabFood/ShopeeFood để nghiên cứu *patterns*, không sao chép hoặc mặc định policy. |
 | `DEC-PROD-004` | Docs phải hỗ trợ coding/testing/operations; không chỉ có screen list. |
+| `DEC-PROD-005` | Ride có thương lượng giá trước assignment. |
+| `DEC-PROD-006` | Passkey + phone SMS + verified email; Admin quản lý bật/tắt method có kiểm soát. |
+| `DEC-PROD-007` | Chat và gọi thoại trong app theo transaction Ride/Food. |
 
 ### 5.2. Phân loại mức ưu tiên
 
@@ -157,7 +163,7 @@ DealGo là nền tảng dịch vụ địa phương có hai hành trình:
 
 | In scope ở mức mục tiêu MVP | Chưa tự đưa vào MVP |
 |---|---|
-| Customer đặt Ride hai bánh và Food; theo dõi, lịch sử, hỗ trợ | Ride ô tô, nhiều điểm, liên tỉnh, đặt hộ nhiều khách |
+| Customer đặt Ride hai bánh và Food; theo dõi, lịch sử, hỗ trợ; auth passkey/SMS/verified email; transaction-scoped chat/voice call | Ride ô tô, nhiều điểm, liên tỉnh, đặt hộ nhiều khách; chat tự do/video/ghi âm |
 | Driver đủ điều kiện nhận và thực hiện Ride/Food | Gom nhiều đơn, pooling, thuật toán điều phối phức tạp độc quyền |
 | Merchant được xét duyệt, mở/đóng, menu, nhận/chuẩn bị/bàn giao đơn | Marketplace bán hàng phi thực phẩm, livestream, loyalty phức tạp |
 | Multi-role trong cùng app, xét quyền server-side | Tự động cho phép hoạt động đồng thời nhiều job khi chưa có policy |
@@ -174,13 +180,13 @@ Bảng này giữ đồng bộ với `scope-release-plan.md` và **không thay �
 
 | Ưu tiên | Capability IDs | Ý nghĩa / điều kiện xem xét |
 |---|---|---|
-| `PROPOSED_P1` | `CAP-P1-01..04` | Địa chỉ yêu thích/đặt lại, marketing ưu đãi nâng cao, chat trong app có kiểm soát, rating/review. |
+| `PROPOSED_P1` | `CAP-P1-01..04` | Địa chỉ yêu thích/đặt lại, marketing ưu đãi nâng cao, rating/review; không gồm chat/call cốt lõi đã chuyển P0 theo `DEC-PROD-007`. |
 | `PROPOSED_P1` | `CAP-P1-05..07` | Multi-staff/multi-branch Merchant, phân tích hiệu suất Driver, chỉnh/sửa món hoặc partial adjustments theo policy. |
 | `PROPOSED_P1` | `CAP-P1-08..10` | Analytics/export nâng cao, lifecycle messaging, A/B experiments/personalization. |
 | `OUT_OF_SCOPE` (`P2`) | `CAP-P2-01..04` | Xe ô tô, giao kiện độc lập, đi chợ/vertical khác, pooling/batch/multi-stop. |
 | `OUT_OF_SCOPE` (`P2`) | `CAP-P2-05..09` | Đặt lịch phức tạp, ví/tín dụng, loyalty nhiều tầng, nhượng quyền, AI tự định giá. |
 
-**Ngoại lệ về ưu tiên:** kênh liên hệ cơ bản và an toàn P0 vẫn phải có phương án được duyệt dù chat nâng cao là P1. Nâng bất kỳ P1 lên P0 yêu cầu impact analysis và approval trước khi đổi release baseline.
+**Ưu tiên đã cập nhật:** chat văn bản và gọi thoại trong app theo giao dịch là P0 theo `DEC-PROD-007`; chat tự do, video call, ghi âm, tệp đính kèm và liên lạc ngoài ngữ cảnh chưa thuộc baseline.
 
 ## 6. Người dùng, kênh và quyền nghiệp vụ
 
@@ -291,11 +297,14 @@ Merchant closed, món hết khi checkout, giá đổi, merchant không phản h�
 | `FR-CORE-008` | Ghi nhận các nghĩa vụ tài chính/correction/refund/settlement theo chính sách. | Mọi tác động tiền có reference, state và audit; sai lệch không bị đánh dấu đã cân bằng. | `CAP-CORE-08`, `OPEN-002/003` |
 | `FR-CORE-009` | Trạng thái được đồng bộ qua foreground, background được phép và reconnect. | Sau reconnect, trạng thái được đọc lại từ backend; không tin thông báo cũ là trạng thái cuối. | `CAP-CORE-09`, `OPEN-012` |
 | `FR-CORE-010` | Người dùng chỉ truy cập data/operation của mình hoặc được ủy quyền. | Thay ID của order/trip/store/driver không vượt object-level authorization. | `CAP-CORE-10` |
-| `FR-CORE-011` | Có luồng báo lỗi/hỗ trợ/kháng nghị phù hợp từng role. | Ticket/case có ID, người xử lý và dấu vết; không yêu cầu khách liên hệ tài xế ngoài kênh bắt buộc chưa duyệt. | `CAP-CORE-11`, `OPEN-014/015` |
+| `FR-CORE-011` | Có luồng báo lỗi/hỗ trợ/kháng nghị phù hợp từng role. | Ticket/case có ID, người xử lý và dấu vết; không yêu cầu liên hệ ngoài app. | `CAP-CORE-11`, `OPEN-014/015` |
 | `FR-CORE-012` | Vận hành có thể phát hiện giao dịch kẹt/sai lệch và tạm dừng năng lực an toàn. | Có sự kiện đo và thao tác can thiệp audit; không cần dashboard BI phức tạp để có cảnh báo. | `CAP-CORE-12`, `OPEN-007` |
 | `FR-CORE-013` | Lịch sử và chi tiết giao dịch phản ánh nhất quán các trạng thái. | Receipt, estimated amount, paid amount, due amount, settled amount không bị đánh đồng. | `CAP-CORE-08/09` |
 | `FR-CORE-014` | Notification không tiết lộ dữ liệu nhạy cảm và chỉ đến actor liên quan. | Push/deep link không lộ order/trip nhạy cảm trên role không được phép. | `CAP-CORE-09/10`, `OPEN-014` |
 | `FR-CORE-015` | Hệ thống ghi nhận actor/time/reason cho thay đổi nhạy cảm. | Có audit chain đủ tra cứu sự cố mà không rò PII trong log ứng dụng công khai. | `CAP-CORE-10/11/12` |
+| `FR-CORE-016` | Đăng ký/liên kết passkey, xác minh phone SMS, email; account quản lý nhiều method, recovery an toàn. | Server xác minh passkey; SMS OTP rate-limited; email verified, không dùng email OTP để login độc lập. | `CAP-CORE-01`, `DEC-PROD-006`, `OPEN-020` |
+| `FR-CORE-017` | Chat văn bản với participant Ride/Food trong cửa sổ liên lạc được cấp. | Chỉ participant server-authorized đọc/gửi; message gắn đúng context; Admin đọc theo case/audit. | `CAP-CORE-13`, `DEC-PROD-007`, `OPEN-021` |
+| `FR-CORE-018` | Gọi thoại trong app giữa participant Ride/Food đủ điều kiện. | Call authorization ngắn hạn; không lộ số; microphone permission rõ; không ghi âm mặc định. | `CAP-CORE-13`, `DEC-PROD-007`, `OPEN-021` |
 
 ## 10. Danh sách yêu cầu P0 đề xuất — Ride / Customer
 
@@ -306,7 +315,7 @@ Merchant closed, món hết khi checkout, giá đổi, merchant không phản h�
 | `FR-RIDE-003` | Xác nhận gửi RideRequest. | Double tap/retry cùng intent không tạo hai RideRequest hợp lệ. | `CAP-RIDE-02`, `CAP-CORE-06` |
 | `FR-RIDE-004` | Theo dõi quá trình tìm tài xế; có trạng thái hết tài xế/hủy. | Searching không tồn tại vô hạn nếu policy yêu cầu timeout; UX giải thích kết quả. | `CAP-RIDE-03`, `OPEN-004` |
 | `FR-RIDE-005` | Xem driver/vehicle được phân công và trạng thái đến điểm đón. | Không lộ thông tin tài xế trước quyền phù hợp; không hiển thị assignment cũ. | `CAP-RIDE-04` |
-| `FR-RIDE-006` | Biết cách liên lạc/hỗ trợ tại điểm đón. | Kênh liên hệ đúng policy, không lộ PII ngoài phạm vi được duyệt. | `CAP-RIDE-04/08`, `OPEN-014` |
+| `FR-RIDE-006` | Chat/gọi thoại an toàn với tài xế liên quan trong contact window; biết fallback hỗ trợ. | Transaction participant authorization; không lộ số; voice call audio-only/no recording baseline. | `CAP-CORE-13`, `DEC-PROD-007`, `OPEN-014/021` |
 | `FR-RIDE-007` | Theo dõi chuyến từ bắt đầu đến hoàn tất. | Transition không hợp lệ bị từ chối, không skip trip stages. | `CAP-RIDE-05`, `OPEN-017` |
 | `FR-RIDE-008` | Yêu cầu hủy chuyến theo giai đoạn và biết hệ quả. | Nếu không được hủy/phát sinh phí phải phản hồi theo policy trước xác nhận cần thiết. | `CAP-RIDE-06`, `OPEN-003/017` |
 | `FR-RIDE-009` | Gặp tình huống không tìm thấy xe, tài xế rời chuyến, mất mạng. | Có trạng thái xử lý, recovery và đường hỗ trợ; không tự kết luận đã hủy nếu server chưa xác nhận. | `CAP-RIDE-06/08` |
@@ -327,7 +336,7 @@ Merchant closed, món hết khi checkout, giá đổi, merchant không phản h�
 | `FR-FOOD-007` | Theo dõi merchant nhận/từ chối và thời gian chuẩn bị có phân biệt estimate. | Khi bị từ chối/hết món, hiển thị lý do/đường xử lý, không giả vờ đơn đang được làm. | `CAP-FOOD-04/06/08`, `TBD: merchant accept/timeout` |
 | `FR-FOOD-008` | Theo dõi giao món và tài xế theo quyền. | Tracking stale/offline được hiển thị phù hợp; reconnect cập nhật từ backend. | `CAP-FOOD-08` |
 | `FR-FOOD-009` | Nhận thông báo kết quả giao hàng/không thành công. | Chỉ hiển thị `delivered` khi server đã chấp nhận proof/transition. | `CAP-FOOD-09`, `OPEN-011` |
-| `FR-FOOD-010` | Được yêu cầu hỗ trợ, hủy, refund/dispute trong tình huống được duyệt. | Mỗi yêu cầu có trạng thái và hệ quả tài chính có thể tra cứu. | `CAP-FOOD-10`, `OPEN-003/010/016` |
+| `FR-FOOD-010` | Chat/gọi thoại với Merchant/Driver liên quan và yêu cầu hỗ trợ, hủy, refund/dispute theo tình huống. | Mỗi yêu cầu có trạng thái và hệ quả tài chính có thể tra cứu. | `CAP-FOOD-10`, `OPEN-003/010/016` |
 | `FR-FOOD-011` | Xem chi tiết đơn, món, phí, receipt, lịch sử. | Phân biệt merchant accepted, courier assigned, delivered, payment settled. | `CAP-FOOD-12` |
 | `FR-FOOD-012` | Có thông điệp dễ hiểu khi không thể đặt/giao. | Không để trạng thái kẹt spinner; có retry an toàn hoặc hành động phù hợp. | `CAP-FOOD-10`, `CAP-CORE-11` |
 
@@ -373,6 +382,7 @@ Merchant closed, món hết khi checkout, giá đổi, merchant không phản h�
 | `FR-OPS-007` | Quản lý cấu hình vùng/dịch vụ/feature/merchant eligibility trong quyền duyệt. | Không cấu hình ngoài phạm vi được duyệt hoặc bỏ qua gate `OPEN-001`. | `CAP-OPS-07`, `OPEN-001/004` |
 | `FR-OPS-008` | Có audit trail và phân loại sự cố/anomaly. | Tra được ai/thời điểm/hành động/lý do; không lưu mật khẩu/token/CCCD đầy đủ trong log. | `CAP-OPS-08` |
 | `FR-OPS-009` | Tạm dừng tiếp nhận giao dịch mới theo vùng/service khi có sự cố nghiêm trọng. | Stop admission không phá dữ liệu giao dịch đã được tạo; xử lý in-flight theo runbook. | `CAP-OPS-07/08`, `OPEN-007` |
+| `FR-OPS-010` | Admin Security quản lý bật/tắt phương thức xác thực toàn hệ thống hoặc theo account. | Có scope, reason, step-up, audit và guard tránh khóa mọi phương thức ngoài emergency workflow. | `CAP-CORE-01`, `DEC-PROD-006`, `OPEN-020` |
 
 ## 15. Business invariants — các điều không được phá vỡ
 
@@ -662,7 +672,7 @@ Dưới đây là bảng nhóm **đầy đủ `OPEN-001..019`** đã được gh
 
 ### 24.1. PRD review checklist (để chuyển `DRAFT` → `IN_REVIEW`)
 
-- [ ] `DEC-PROD-001..005` không bị thay đổi ngầm.
+- [ ] `DEC-PROD-001..007` không bị thay đổi ngầm.
 - [ ] Cả Ride và Food đều có actor, happy path, alternative/failure và UAT case.
 - [ ] Multi-role và Admin Web có ranh giới quyền, không gộp admin vào app customer.
 - [ ] Mỗi `FR-*` có actor, observed outcome và link capability/dependency.
@@ -722,6 +732,7 @@ Chi tiết nguồn chuẩn và bộ bằng chứng ở `../00-governance/scope-r
 
 | Version | Date | Change | Status |
 |---|---|---|---|
+| `0.2.0` | `2026-10-12` | Xác nhận passkey/SMS/verified-email, Admin auth-method control và P0 chat/voice-call; chuyển advanced chat sang P1. | `DRAFT` |
 | `0.1.0` | `2026-10-11` | Khởi tạo PRD sản phẩm cho Ride+Food, multi-role Flutter, FR/BR/UAT baseline, edge cases, blockers và traceability. | `DRAFT` |
 
 ---

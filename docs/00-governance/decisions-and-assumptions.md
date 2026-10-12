@@ -1,14 +1,14 @@
 ---
 doc_id: DG-GOV-004
 title: "DealGo — Decisions, Assumptions & Open Issues / Sổ quyết định và giả định"
-version: "0.1.0"
+version: "0.3.0"
 status: "DRAFT"
 owner: "Product Owner / Tech Lead"
 reviewers:
   - "Business / Operations"
   - "Finance"
   - "Security / Legal / Compliance (đối với nội dung liên quan)"
-last_updated: "2026-10-11"
+last_updated: "2026-10-12"
 classification: "Internal"
 related_requirements: []
 related_decisions:
@@ -16,6 +16,9 @@ related_decisions:
   - DEC-PROD-002
   - DEC-PROD-003
   - DEC-PROD-004
+  - DEC-PROD-005
+  - DEC-PROD-006
+  - DEC-PROD-007
   - OPEN-001
   - OPEN-002
   - OPEN-003
@@ -24,6 +27,9 @@ related_decisions:
   - OPEN-006
   - OPEN-007
   - OPEN-008
+  - OPEN-019
+  - OPEN-020
+  - OPEN-021
 ---
 
 # DealGo — Decisions, Assumptions & Open Issues
@@ -83,7 +89,7 @@ Quản trị quyết định nhằm bảo đảm:
 
 | Registry | ID | Trạng thái chuẩn | Ghi chú |
 |---|---|---|---|
-| Product/Business decision | `DEC-<AREA>-NNN` | `PROPOSED`, `CONFIRMED`, `REJECTED`, `SUPERSEDED` | Giữ tương thích `DEC-PROD-001..005`. |
+| Product/Business decision | `DEC-<AREA>-NNN` | `PROPOSED`, `CONFIRMED`, `REJECTED`, `SUPERSEDED` | Giữ tương thích `DEC-PROD-001..007`. |
 | Architecture Decision Record | `ADR-NNN` | `PROPOSED`, `ACCEPTED`, `REJECTED`, `SUPERSEDED`, `DEPRECATED` | Dành cho thay đổi quan trọng/khó đảo ngược. |
 | Open question | `OPEN-NNN` | `OPEN`, `ANALYZING`, `AWAITING_APPROVAL`, `RESOLVED`, `CANCELLED` | Một ID chỉ cho một câu hỏi có scope rõ. |
 | Assumption | `ASM-NNN` | `UNVERIFIED`, `TESTING`, `VALIDATED`, `INVALIDATED`, `EXPIRED` | `VALIDATED` vẫn không tự sinh business decision. |
@@ -150,6 +156,8 @@ stateDiagram-v2
 | `DEC-PROD-003` | Tham khảo Grab, GrabFood, ShopeeFood để học flow. | `CONFIRMED` | Không sao chép UI, logic nội bộ; benchmark là evidence ngoài. | Định hướng nghiên cứu trong README/Charter. |
 | `DEC-PROD-004` | Cần docs đủ hỗ trợ xây dựng phần mềm thực tế, vận hành/QA/bảo mật. | `CONFIRMED` | Không chứng minh rằng 69 file đã được viết/duyệt. | Định hướng bộ hồ sơ trong README. |
 | `DEC-PROD-005` | Ride theo mô hình thương lượng giá: khách đưa giá đề xuất; tài xế có thể chấp nhận hoặc gửi giá khác; khách chọn một đề nghị/tài xế trước khi phân công. | `CONFIRMED` | Chỉ áp dụng Ride hai bánh. Không áp dụng mặc định cho giá món/Food; không chốt mức sàn/trần, số vòng, timeout, phí hay thanh toán. | Yêu cầu chủ dự án: DealGo là hệ thống kiểu inDrive, đặt xe có trả giá; chi tiết công khai inDrive dùng để đối chiếu quy trình. |
+| `DEC-PROD-006` | Đăng ký/xác thực hỗ trợ passkey, xác minh số điện thoại qua SMS và email đã xác minh; Admin được phân quyền quản lý bật/tắt phương thức theo chính sách an toàn. | `CONFIRMED` | SMS là phương thức hạn chế/fallback; email là contact và login identifier, không là email OTP đăng nhập độc lập. Không được khóa người dùng khỏi mọi đường khôi phục ngoài quy trình security. | Yêu cầu chủ dự án ngày 2026-10-12. Chi tiết enrollment/recovery/provider thuộc `OPEN-020`. |
+| `DEC-PROD-007` | MVP có chat trong ứng dụng và gọi thoại trong ứng dụng cho các bên liên quan đến Ride/Food. | `CONFIRMED` | Không lộ số điện thoại; chat/call có scope theo giao dịch; mặc định không ghi âm, không video, không chat/call tự do giữa người lạ. Provider, cửa sổ liên lạc và retention thuộc `OPEN-021`. | Yêu cầu chủ dự án ngày 2026-10-12.
 
 **Phân biệt baseline:** `Admin Web` đã thuộc kế hoạch và cần được phân tích để vận hành; số **37 trang admin** và khoảng **165 màn mobile** trước đây là *inventory tham chiếu*, **không** là 37/165 cam kết P0. Mọi nâng baseline thành cam kết release phải qua `scope-release-plan.md` và phê duyệt.
 
@@ -212,12 +220,15 @@ Các câu hỏi dưới đây đã được nêu như **chủ đề chưa chốt
 | `OPEN-011` | Bằng chứng pickup/delivery: xác nhận app, mã OTP, ảnh, chữ ký hay kết hợp? | Fraud, privacy, driver/merchant workflow | PO + Ops + Security | G2/G3/G5 |
 | `OPEN-012` | Driver tracking nền được xin quyền khi nào, lưu dữ liệu đến đâu, degrade ra sao? | iOS/Android permissions, tracking/ETA, privacy | Tech + Privacy/Ops | G4/G5 |
 | `OPEN-013` | Merchant có nhiều cửa hàng và nhân viên quản lý riêng ở release đầu không? | Tenancy, permissions, menu/order isolation | PO + Tech | G3/G4 |
-| `OPEN-014` | Kênh liên hệ Customer–Driver–Merchant–Support nào nằm trong P0? | Privacy, in-app chat vs masked call/support fallback | PO + Ops + Security | G4/G5 |
+| `OPEN-014` | Participant pairs nào được liên hệ trong từng trạng thái Ride/Food, và khi nào cửa sổ chat/call mở/đóng? | Privacy, safety, quyền truy cập trong/sau giao dịch | PO + Ride/Food Ops + Security + Privacy | G2/G3/G4; transaction-scoped chat/call đã confirmed, mapping/window cần chốt |
 | `OPEN-015` | Mức độ và thời gian trực hỗ trợ, an toàn chuyến xe, escalation khẩn cấp? | Safety runbook, incident staffing, legal | Ops + PO | G5 |
 | `OPEN-016` | Food đã bắt đầu làm món nhưng không có driver/hủy: ai chịu phí, hoàn/bồi hoàn? | Merchant loss, user refund, reconciliation | PO + Finance + Ops | G3/G5 |
 | `OPEN-017` | Ride xác nhận bắt đầu/kết thúc bằng thao tác nào, xử lý tranh chấp điểm đón/trả? | Trip evidence, anti-fraud, driver/customer dispute | PO + Ops | G2/G5 |
 | `OPEN-018` | Driver được phép thu hộ COD thế nào, hạn mức, ghi nợ và đối soát? | Ledger, payouts, fraud controls, safety | PO + Finance + Ops | G3/G5 nếu COD được chọn |
 | `OPEN-019` | Quy tắc thương lượng giá Ride: số vòng, thời hạn, giới hạn/khuyến nghị giá, cách xử lý không có đề nghị hoặc khách không chọn, thay đổi tuyến và phí ngoài giá đã thỏa thuận? | UX, pricing, matching fairness, abuse và tranh chấp | PO + Ride Ops + Finance + Tech | G2/G5; các tham số chưa duyệt phải cấu hình/test-only |
+| `OPEN-020` | Chi tiết enrollment/recovery/passkey lifecycle, SMS fallback, email verification/login identifier, bước xác thực tăng cường, chính sách admin disable toàn hệ thống/theo account và vendor? | Account security, lockout/recovery, abuse, deliverability, support | PO + Security + Tech + Privacy | G1/G4/G5; giữ alternative/recovery path, không bật provider thật khi chưa review |
+| `OPEN-021` | Chat/call provider và quality; unread/read; block/report; hỗ trợ, escalation, retention/xóa, privacy workflow và native mobile call handling? | UX, an toàn, chi phí, data retention, support | PO + Ride/Food Ops + Security + Privacy + Tech | G2/G3/G4/G5; text/audio-only và no-recording là baseline design |
+
 
 **Giới hạn phạm vi:** `OPEN-009` không có nghĩa multi-merchant thuộc MVP; `OPEN-018` không có nghĩa COD được chọn. Các nhóm chỉ xác định **quyết định bắt buộc nếu feature tương ứng được triển khai**. `DEC-PROD-005` chốt có thương lượng giá ở Ride; `OPEN-019` chỉ để chốt các giới hạn vận hành và điều khoản chi tiết, không được dùng để bỏ qua vòng thương lượng đã xác nhận.
 
@@ -512,8 +523,8 @@ Phân cấp này **tương thích** `BLOCKER-L0..L2` trong `scope-release-plan.m
 
 ## 18. Quality checklist cho file này
 
-- [x] Không đổi năm quyết định `DEC-PROD-001..005` đã xác nhận.
-- [x] Giữ tám vấn đề `OPEN-001..008` và ý nghĩa đã có trong README/Charter/Release Plan.
+- [x] Không đổi năm quyết định `DEC-PROD-001..007` đã xác nhận.
+- [x] Giữ nguyên ý nghĩa các vấn đề `OPEN-001..008`; bổ sung `OPEN-020/021` cho chi tiết authentication và communications.
 - [x] Gắn `OPEN-009..018` là câu hỏi mới **chưa chốt**, không phải tính năng đã cam kết.
 - [x] Gắn trạng thái `UNVERIFIED` cho mọi `ASM-*` thay vì tạo số liệu giả.
 - [x] Phân biệt `DEC-*` Product, `ADR-*` Architecture, `OPEN-*`, `ASM-*`, `CON-*`.
@@ -554,8 +565,9 @@ Phân cấp này **tương thích** `BLOCKER-L0..L2` trong `scope-release-plan.m
 
 | Date | Version | Status | Changes |
 |---|---|---|---|
+| 2026-10-12 | 0.3.0 | `DRAFT` | Bổ sung `DEC-PROD-006/007` cho passkey/SMS/email, admin controls, in-app chat/voice call; thêm `OPEN-020/021` cho recovery, provider, contact window và retention. |
 | 2026-10-12 | 0.2.0 | `DRAFT` | Bổ sung quyết định `DEC-PROD-005` về thương lượng giá Ride và `OPEN-019` cho các tham số/policy chưa chốt; ghi nhận ảnh hưởng tới pricing, Ride flow và tests. |
-| 2026-10-11 | 0.1.0 | `DRAFT` | Khởi tạo Decision Register `DEC-PROD-001..005`, Open Register `OPEN-001..019`, Assumptions `ASM-001..014`, Constraints `CON-001..005`, ma trận quyền, impact/gates, AI guardrails và templates ADR. |
+| 2026-10-11 | 0.1.0 | `DRAFT` | Khởi tạo Decision Register `DEC-PROD-001..007`, Open Register `OPEN-001..021`, Assumptions `ASM-001..014`, Constraints `CON-001..005`, ma trận quyền, impact/gates, AI guardrails và templates ADR. |
 
 ### 20.2. Approval record
 

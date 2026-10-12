@@ -1,14 +1,14 @@
 ---
 doc_id: DG-GOV-001
 title: "DealGo — Project Charter / Hiến chương dự án"
-version: "0.1.0"
+version: "0.2.0"
 status: "DRAFT"
 owner: "Product Owner"
 reviewers:
   - "Business / Operations"
   - "Tech Lead"
   - "Security & Compliance (khi có người phụ trách)"
-last_updated: "2026-10-11"
+last_updated: "2026-10-12"
 classification: "Internal"
 related_requirements: []
 related_decisions:
@@ -16,6 +16,9 @@ related_decisions:
   - DEC-PROD-002
   - DEC-PROD-003
   - DEC-PROD-004
+  - DEC-PROD-005
+  - DEC-PROD-006
+  - DEC-PROD-007
 ---
 
 # DealGo — Project Charter / Hiến chương dự án
@@ -38,6 +41,8 @@ DealGo muốn giải quyết nhu cầu kết nối đúng người — đúng d�
 | Thị trường mục tiêu | Việt Nam; khu vực triển khai đầu tiên chưa chọn | `PROPOSED` / `TBD` |
 | Dịch vụ Ride | Đặt xe hai bánh có thương lượng giá: khách đề xuất; tài xế chấp nhận/đưa giá khác; khách chọn trước assignment | `CONFIRMED` (`DEC-PROD-005`) |
 | Dịch vụ Food | Đặt món từ cửa hàng/nhà hàng, giao đến khách | `CONFIRMED` |
+| Đăng ký/xác thực | Passkey, xác minh phone bằng SMS và email đã xác minh; Admin được phân quyền bật/tắt phương thức | `CONFIRMED` (`DEC-PROD-006`) |
+| Liên lạc dịch vụ | Chat và gọi thoại trong app theo giao dịch Ride/Food; không lộ số cá nhân | `CONFIRMED` (`DEC-PROD-007`) |
 | Mobile app | Một ứng dụng Flutter hỗ trợ Customer, Merchant, Driver | `CONFIRMED` |
 | Kênh vận hành | Admin Web có phân quyền | `BASELINE` từ hồ sơ dự án |
 | Hình thức kinh doanh cụ thể | Pháp nhân, mô hình đối tác, biểu phí, thanh toán, hợp đồng | `TBD` |
@@ -52,7 +57,7 @@ DealGo muốn giải quyết nhu cầu kết nối đúng người — đúng d�
 
 | Nhóm | Vấn đề / nhu cầu giả định cần xác thực | Kết quả DealGo cần hướng đến |
 |---|---|---|
-| Customer — Ride | Cần đề xuất mức giá, biết tài xế chấp nhận/đề nghị lại và chọn rõ một tài xế | Gửi nhu cầu + giá, thương lượng, xác nhận giá cuối trước assignment, theo dõi/hoàn tất/hủy minh bạch |
+| Customer — Ride | Cần đề xuất mức giá, biết tài xế chấp nhận/đề nghị lại, chọn rõ một tài xế và liên hệ an toàn qua chat/cuộc gọi trong app | Gửi nhu cầu + giá, thương lượng, xác nhận giá cuối trước assignment, theo dõi/hoàn tất/hủy minh bạch |
 | Customer — Food | Cần tìm quán/món, hiểu tổng chi phí, biết quán có nhận và tài xế có giao không | Đặt món, nhận phản hồi, theo dõi chuẩn bị/giao và có cơ chế xử lý vấn đề |
 | Merchant | Cần kênh nhận đơn, kiểm soát menu/giờ mở, thực hiện đơn và biết khoản phải thu | Quản lý đơn và tình trạng cung ứng, nhìn được kết quả vận hành |
 | Driver | Cần thấy công việc phù hợp, điều kiện nhận, tiến trình và thu nhập rõ ràng | Có thể nhận, hoàn thành công việc và đối soát kết quả hợp lệ |
@@ -132,6 +137,8 @@ Các ngưỡng định lượng chỉ được điền sau khi có baseline, quy
 | `SCOPE-002` | Food — đặt món từ merchant và giao bởi driver | Có luồng customer ↔ merchant ↔ driver |
 | `SCOPE-003` | **Một** mobile Flutter có ba role | Customer / Merchant / Driver, không mặc định ba app |
 | `SCOPE-004` | Tham chiếu Grab/GrabFood/ShopeeFood cho Ride/Food và inDrive cho thương lượng Ride | Không sao chép tính năng/policy/thuật toán |
+| `SCOPE-005` | Account hỗ trợ passkey, xác minh phone qua SMS, email verified; Admin được phân quyền quản lý method | Email verified không là email OTP login độc lập; detail `OPEN-020` |
+| `SCOPE-006` | Chat văn bản và gọi thoại in-app gắn với Ride/Food transaction | Không lộ số, voice only/no-recording baseline; policy/provider `OPEN-021` |
 
 ### 5.2. Năng lực hỗ trợ cần có giải pháp — mức đề xuất
 
@@ -231,7 +238,7 @@ flowchart TD
 6. Chuyến kết thúc; hệ thống ghi nhận giá trị tài chính, lịch sử, thông báo liên quan.
 7. Nếu có lỗi/hủy: trạng thái, tiền, hỗ trợ và audit được xử lý theo quy tắc rõ ràng.
 
-**Chưa xác định tại Charter:** thời gian tìm, công thức giá, đặt lịch, OTP xác nhận lên xe, chính sách hủy, geofence, thanh toán.
+**Chưa xác định tại Charter:** thời gian tìm, công thức giá, đặt lịch, OTP xác nhận lên xe, chính sách hủy, geofence, thanh toán; chi tiết xác thực/recovery và cửa sổ/provider chat/call thuộc `OPEN-020/021`.
 
 ### 7.2. Food (Customer ↔ Merchant ↔ Driver)
 
@@ -427,7 +434,7 @@ Danh sách này là **release blocker category**, nội dung chứng cứ cụ t
 | Dependency | Để giải quyết | Quyết định phải có trước khi tích hợp production |
 |---|---|---|
 | Maps / geocoding / routing | Địa chỉ, route, distance, ETA | Nhà cung cấp, pricing, quotas, retention, licensing và fallback |
-| Auth / OTP (SMS hoặc Zalo nếu đáp ứng) | Xác minh phiên/người dùng | Chọn kênh, nhà cung cấp, rate limits, anti-abuse, quyền riêng tư |
+| Auth methods | Passkey, verified phone via SMS, and verified email are in scope; authorized Admins can enable/disable methods | Provider and detailed recovery/admin policy `OPEN-008/020` |
 | KYC/KYB & document handling | Xác minh đối tác và giấy tờ | Quy trình/thẩm quyền duyệt, nguồn xác minh, lưu giữ/hủy dữ liệu |
 | Payment Service Provider | Thu/hoàn tiền, xác thực giao dịch | Phương thức hợp lệ, merchant of record, webhooks, reconciliation, phí |
 | Push notification | Trạng thái, lời mời job, hỗ trợ | Fallback với offline/reconnect; không dùng push làm source-of-truth |
@@ -438,7 +445,7 @@ Các tên công nghệ cụ thể (NestJS, PostgreSQL, Redis, Kafka, FCM...) **�
 
 ## 16. Các quyết định cần chốt (decision backlog)
 
-Sử dụng **đúng mã `OPEN-001..008` trong README**, không tạo mã trùng với ý nghĩa khác.
+Sử dụng đúng registry `OPEN-001..021` trong Decisions & Assumptions; không tạo mã trùng ý nghĩa.
 
 | ID | Câu hỏi cần quyết định | Ảnh hưởng nếu chưa chốt | Đề xuất cách khóa |
 |---|---|---|---|
@@ -449,7 +456,9 @@ Sử dụng **đúng mã `OPEN-001..008` trong README**, không tạo mã trùng
 | `OPEN-005` | Chính sách đa vai trò và việc đồng thời nhận Ride/Food? | Role transitions, active job, quyền, thuật toán | Phê duyệt concurrency và role eligibility |
 | `OPEN-006` | Pháp nhân, mô hình vận tải, hợp đồng đối tác? | Commercial readiness, KYC, payout | Review chuyên môn theo mô hình và địa phương |
 | `OPEN-007` | Mục tiêu tải/SLO/ngân sách? | Kiến trúc, sizing, chi phí | Dự kiến demand + pilot targets có phê duyệt |
-| `OPEN-008` | Các đơn vị KYC/OTP/maps/payment? | Tích hợp và an toàn, vendor lock-in | Capability/chi phí/legal evaluation |
+| `OPEN-008` | Các đơn vị KYC/SMS/maps/payment/communications? | Tích hợp, an toàn và vendor lock-in | Capability/chi phí/legal evaluation |
+| `OPEN-020` | Chi tiết passkey, SMS fallback, email identifier, recovery và Admin method controls? | Account security, lockout, abuse, support | Security/Product review và policy được ghi nhận |
+| `OPEN-021` | Participant/window, retention, provider và support cho chat/call? | UX, privacy, safety, cost | Product/Ops/Security review và policy được ghi nhận |
 
 ### 16.1. Các câu hỏi bổ sung cần theo dõi, chưa cấp mã toàn cục
 
@@ -457,7 +466,7 @@ Sử dụng **đúng mã `OPEN-001..008` trong README**, không tạo mã trùng
 - Food chỉ cho phép một quán mỗi đơn hay đa quán?
 - Ride có điểm dừng trung gian hoặc đặt trước không?
 - Driver phải sử dụng Android, iOS hay cả hai; nền tảng nào hỗ trợ location background phù hợp?
-- Order delivery proof dùng OTP, ảnh hay xác nhận của khách?
+- Order delivery proof dùng OTP, ảnh hay xác nhận của khách? (tách biệt với SMS sign-in)
 - Chính sách refund khi món đã làm nhưng không tìm được Driver?
 - Ai chịu trách nhiệm hỗ trợ an toàn khách đang đi Ride?
 - Ai là chủ thể xuất hóa đơn/cung cấp chứng từ cho từng loại giao dịch?
@@ -491,7 +500,7 @@ Khi tạo `decisions-and-assumptions.md`, các câu hỏi này phải được �
 - [ ] Product Owner xác nhận rõ Ride **hai bánh** + Food cùng thuộc MVP.
 - [ ] Xác nhận một ứng dụng Flutter ba role và Admin Web (nếu có thay đổi so với baseline, phải ghi decision).
 - [ ] Xác nhận không có scope ngoài dự kiến bị ghi nhầm là `CONFIRMED`.
-- [ ] Có owner cho các critical decisions `OPEN-001..008`.
+- [ ] Có owner cho các critical decisions `OPEN-001..008`, `OPEN-020/021`.
 - [ ] Thống nhất success metrics về **định nghĩa** và kế hoạch thu thập trước khi điền target.
 - [ ] Xác định mô hình và trách nhiệm review legal/finance/ops trước go-live.
 - [ ] Không còn mâu thuẫn với `README.md`, đặc biệt nguồn canonical và mã quyết định.
@@ -523,6 +532,7 @@ Các nguồn khác về luật, quy định nền tảng và kỹ thuật cần 
 
 | Ngày | Phiên bản | Tình trạng | Nội dung |
 |---|---|---|---|
+| 2026-10-12 | 0.2.0 | `DRAFT` | Thêm auth passkey/SMS/email, Admin method control và chat/voice-call transaction scope. |
 | 2026-10-11 | 0.1.0 | `DRAFT` | Khởi tạo Charter: vision, objectives, roles, scope, outcomes, governance, release gates, metrics, risks, decisions và approval checklist. |
 
 **Tài liệu kế tiếp trong series:** `docs/00-governance/scope-release-plan.md` — chuyển ranh giới tổng quát ở Charter thành danh mục in-scope/out-of-scope và release gates có phụ thuộc, không tự gán ngày ra mắt.

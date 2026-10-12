@@ -1,7 +1,7 @@
 ---
 document_id: DOC-DOM-007
 title: "DealGo — Cancellation, Refund, Compensation & Disputes / Hủy, hoàn tiền, bồi hoàn và tranh chấp"
-version: 0.1.0
+version: "0.2.0"
 status: DRAFT
 language: vi-VN
 created_at: 2026-10-12
@@ -47,7 +47,7 @@ related_requirements: ["FR-CORE-007", "FR-CORE-008", "FR-CORE-010", "FR-CORE-012
 
 # DealGo — Cancellation, Refund, Compensation & Disputes
 
-> **DRAFT / DESIGN PROPOSAL — KHÔNG PHẢI CHÍNH SÁCH THƯƠNG MẠI ĐƯỢC DUYỆT.** `DEC-PROD-001..005` xác nhận phạm vi Ride hai bánh + Food + ba role trong một Flutter app; **chưa chốt** mức phí hủy, mức bồi hoàn, thời gian chờ, chính sách không nhận hàng, lúc thu tiền Food, phương thức COD hay quyền tài xế được thu hộ. Mọi ngưỡng, phần trăm và ví dụ tiền đều `TEST_ONLY`/`TBD`, phải được duyệt theo `OPEN-002/003/006/010/016/017/018/019` trước khi dùng production. Thương lượng giá Ride là pattern đã xác nhận (`DEC-PROD-005`); phí hủy và liability vẫn chưa chốt.
+> **DRAFT / DESIGN PROPOSAL — KHÔNG PHẢI CHÍNH SÁCH THƯƠNG MẠI ĐƯỢC DUYỆT.** `DEC-PROD-001..007` xác nhận Ride hai bánh + Food, ba role Flutter, auth methods và transaction-scoped chat/voice; **chưa chốt** mức phí hủy, mức bồi hoàn, thời gian chờ, chính sách không nhận hàng, lúc thu tiền Food, phương thức COD hay quyền tài xế được thu hộ. Mọi ngưỡng, phần trăm và ví dụ tiền đều `TEST_ONLY`/`TBD`, phải được duyệt theo `OPEN-002/003/006/010/016/017/018/019` trước khi dùng production. Thương lượng giá Ride là pattern đã xác nhận (`DEC-PROD-005`); phí hủy và liability vẫn chưa chốt.
 >
 > **An toàn tài chính:** `cancelled != refunded`; `refund_requested != refund_succeeded`; `order_canceled != delivery_task_canceled` cho mọi tình huống; `compensation_approved != payout_completed`. AI Agent **không** được gộp các trạng thái này.
 
@@ -141,7 +141,7 @@ Thứ tự ưu tiên khi có mâu thuẫn: `CONFIRMED` decision mới nhất →
 | `OPEN-017` | Proof Ride start/end, đón nhầm | Ride abort/dispute/no-show fee | Trip evidence + manual review |
 | `OPEN-018` | Thu hộ COD, giới hạn và công nợ | Refund khách COD, tài xế nợ quán/platform | Cash custody ledger TEST_ONLY |
 
-`DEC-PROD-001..005`: xác nhận scope/pattern sản phẩm, nhưng không thay thế phê duyệt fee/cancellation/payment policy.
+`DEC-PROD-001..007`: xác nhận scope/pattern sản phẩm, nhưng không thay thế phê duyệt fee/cancellation/payment policy.
 
 ## 7. Nguyên tắc/bất biến (`CAN-INV-*`)
 

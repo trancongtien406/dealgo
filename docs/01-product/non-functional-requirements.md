@@ -1,7 +1,7 @@
 ---
 doc_id: DG-SRS-NFR-001
 title: "DealGo — Non-Functional Requirements Specification (NFR / SRS-Quality)"
-version: "0.1.0"
+version: "0.2.0"
 status: "DRAFT"
 owner: "Product Owner / Tech Lead / SRE"
 reviewers:
@@ -10,7 +10,7 @@ reviewers:
   - "QA / Performance Engineering"
   - "Security / Privacy"
   - "Operations / Finance"
-last_updated: "2026-10-11"
+last_updated: "2026-10-12"
 classification: "Internal"
 upstream_docs:
   - "../00-governance/README.md"
@@ -42,7 +42,7 @@ related_decisions:
 
 > **Trạng thái `DRAFT` — KHÔNG PHẢI SLO/SLA ĐÃ CAM KẾT.** Các ngưỡng latency, throughput, concurrent users, tuổi dữ liệu GPS, crash-free, uptime, RTO, RPO, data retention, chi phí và cấu hình cảnh báo thuộc `OPEN-007` cùng các quyết định liên quan. Số liệu được ghi nhãn **CANDIDATE** chỉ là **điểm xuất phát cho lab benchmark**, không được coding agent tự đưa thành cấu hình production, cam kết đối tác hay điều kiện Go-live khi chưa được duyệt.
 >
-> **Phạm vi cố định:** DealGo MVP có **Ride hai bánh + Food**; **một ứng dụng Flutter** cho Customer, Merchant, Driver; **Admin Web** dành cho nội bộ. NFR này là lớp yêu cầu chất lượng *bao trùm* 67 `FR-*`; không bổ sung nghiệp vụ hoặc nhà cung cấp ngoài PRD.
+> **Phạm vi cố định:** DealGo MVP có **Ride hai bánh + Food**; **một ứng dụng Flutter** cho Customer, Merchant, Driver; **Admin Web** dành cho nội bộ. NFR này là lớp yêu cầu chất lượng *bao trùm* 71 `FR-*`; không bổ sung nghiệp vụ hoặc nhà cung cấp ngoài PRD.
 
 ## 1. Mục đích, giới hạn và nguồn sự thật
 
@@ -352,6 +352,8 @@ Nhịp GPS cụ thể, độ chính xác yêu cầu, chính sách bật chế đ
 | `NFR-SEC-013` | Sensitive actions có cơ chế step-up verification theo rủi ro được duyệt; chưa đủ evidence phải có review | Threat model + negative transaction test | G5 |
 | `NFR-SEC-014` | App chống rò rỉ thông tin qua clipboard, notifications, screenshots ở các màn hình có dữ liệu nhạy cảm theo risk policy | MASVS mobile assessment | G4–G5 |
 | `NFR-SEC-015` | Security incidents có detection, revocation, partner suspension và forensic trace phù hợp quyền | Incident response drill | G5 |
+| `NFR-SEC-016` | Passkey challenge one-time, RP ID/origin/signature/user binding verified server-side; SMS/email flows have anti-enumeration, expiry, rate limit and no secret logging; admin method changes require scoped grants/audit/lockout guard | WebAuthn negative tests, OTP abuse tests, admin permission/recovery test | G1/G4/G5 |
+| `NFR-SEC-017` | Chat/call authorization uses server-derived transaction participants; call grants are short-lived; admin content access requires case and audit; no recording or number disclosure by default | BOLA tests, stale call-token tests, privacy permission review | G2/G3/G4/G5 |
 
 ### 9.1. Security release blocking
 
@@ -384,6 +386,7 @@ Nhịp GPS cụ thể, độ chính xác yêu cầu, chính sách bật chế đ
 | `NFR-DATA-008` | Dữ liệu xóa/ẩn danh không phá các bản ghi cần thiết cho dispute, ledger, legal hold theo chính sách được duyệt | Deletion/legal hold rehearsal | G5 |
 | `NFR-DATA-009` | Clock/timezone lưu thống nhất, hiển thị địa phương hóa, server timestamps bảo toàn ordering và forensic analysis | Clock-skew tests + timestamp validation | G4 |
 | `NFR-DATA-010` | Batch export/analytics tạo snapshot nhất quán hoặc nêu rõ cutoff; không dùng dữ liệu cache như giá trị đối soát cuối | Export reconciliation test | G4–G5 |
+| `NFR-DATA-011` | Chat body, call metadata/signaling và authentication-method history have separate classification, minimization, access, retention and deletion rules; no audio recording at baseline | Data-flow inventory, access review, deletion/retention test | G4–G5 |
 
 ### 10.1. Data-classification proposal
 
@@ -509,7 +512,9 @@ Một SLO không chỉ có phần trăm: cần `owner`, `population`, `measureme
 | `NFR-TC-15` | Data seed 1k→1M orders / concurrent mixed load | Query cost, latency slope, pool/queue saturation có bằng chứng; không khẳng định capacity ngoài profile | `PERF-003/004/011` |
 | `NFR-TC-16` | Deploy API version mới khi app cũ vẫn chạy | Critical flows còn tương thích theo support-window đã chốt | `MOB-012`, `ENG-002/003` |
 | `NFR-TC-17` | Bật audit logs/telemetry và chạy KYC/pay flow | Không log raw tokens, CCCD, OTP hoặc payment secret | `SEC-010`, `DATA-007`, `OPS-009` |
-| `NFR-TC-18` | Incident simulate no-driver spike + financial mismatch | Có alert, người nhận, escalation, mitigation và audit evidence | `OPS-004/005/006` |
+| `NFR-TC-18` | Admin tắt SMS hoặc revoke passkey | User enroll/sign-in/recovery | Chỉ scope đã chọn bị ảnh hưởng; alternate/recovery path and audit are correct | `SEC-016`, `DATA-006` |
+| `NFR-TC-19` | User ngoài Ride/Food transaction gọi conversation/call ID | Read/send/join | Denied without content, participant metadata, or reusable call token | `SEC-001`, `SEC-017` |
+| `NFR-TC-20` | Incident simulate no-driver spike + financial mismatch | Có alert, người nhận, escalation, mitigation và audit evidence | `OPS-004/005/006` |
 
 Ghi `NFR-TC-*` là **scenario catalog**, không tuyên bố 18 scenario này đã chạy. `08-quality/contract-and-load-testing.md` phải chi tiết setup, fixture, pass/fail, expected telemetry và artifact location.
 
@@ -609,7 +614,7 @@ Bảng này chỉ **liên kết** các quyết định đã đăng ký; không m
 
 ### 19.1. Trước khi chuyển DRAFT → IN_REVIEW
 
-- [ ] Năm quyết định `DEC-PROD-001..005` được giữ nguyên.
+- [ ] Bảy quyết định `DEC-PROD-001..007` được giữ nguyên.
 - [ ] Không đưa app thứ hai/ba hay vertical mới thành MVP.
 - [ ] Các NFR có mã duy nhất; các bảng không mâu thuẫn với invariants và PRD.
 - [ ] Dùng chính xác `OPEN-*` và `G*` theo governance.
@@ -629,6 +634,13 @@ Bảng này chỉ **liên kết** các quyết định đã đăng ký; không m
 - [ ] RTO/RPO, backup/restore, SLI/error budget, alerting, vendor fallback và support window đủ rõ để kiểm chứng.
 - [ ] Các hợp đồng downstream triển khai và test đã liên kết bằng mã cụ thể.
 - [ ] Có record quyết định, ngày review lại, phiên bản thay đổi và người phê duyệt.
+
+### 19.3. Changelog
+
+| Version | Date | Change | Status |
+|---|---|---|---|
+| `0.2.0` | `2026-10-12` | Thêm NFR cho passkey/SMS, verified email, Admin method controls, chat/call authorization, privacy và retention. | `DRAFT` |
+| `0.1.0` | `2026-10-11` | Tạo NFR baseline cho performance, availability, security, privacy, operations và quality gates. | `DRAFT` |
 
 ## 20. Tham khảo chuẩn chính thức — kiểm tra ngày 11/10/2026
 

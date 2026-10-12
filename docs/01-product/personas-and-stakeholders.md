@@ -1,7 +1,7 @@
 ---
 doc_id: DG-PRD-003
 title: "DealGo — Personas & Stakeholders / Chân dung người dùng và các bên liên quan"
-version: "0.1.0"
+version: "0.2.0"
 status: "DRAFT"
 owner: "Product Owner / Product Research"
 reviewers:
@@ -10,7 +10,7 @@ reviewers:
   - "Tech Lead / Mobile / Backend"
   - "Operations / Customer Support"
   - "Finance / Risk / Privacy"
-last_updated: "2026-10-11"
+last_updated: "2026-10-12"
 classification: "Internal"
 research_status: "PROTO_PERSONAS_NOT_VALIDATED"
 related_decisions:
@@ -18,6 +18,9 @@ related_decisions:
   - DEC-PROD-002
   - DEC-PROD-003
   - DEC-PROD-004
+  - DEC-PROD-005
+  - DEC-PROD-006
+  - DEC-PROD-007
 related_requirements:
   - FR-CORE-002
   - FR-CORE-003
@@ -46,7 +49,7 @@ upstream_docs:
 
 > **Trạng thái:** `DRAFT`, phiên bản `0.1.0`, ngày 11/10/2026. **Tất cả persona dưới đây là `PROTO` — giả thuyết thiết kế**, được tổng hợp từ phạm vi DealGo, nghiên cứu thứ cấp và các tình huống nghiệp vụ; **chưa** có nghiên cứu định tính trực tiếp với người dùng DealGo. Mẫu nhân vật, hành vi, độ ưu tiên và pain point **không phải kết quả khảo sát, không phải số liệu thị trường**, không được dùng làm bằng chứng xác nhận product–market fit.
 >
-> **Phạm vi đã xác nhận:** `DEC-PROD-001`: MVP có Ride **xe hai bánh chở khách** + Food **đặt món giao tận nơi**. `DEC-PROD-002`: **một ứng dụng Flutter** cho Customer, Merchant, Driver; **Admin Web** là kênh nội bộ riêng. Năm quyết định `DEC-PROD-001..005` không được sửa bởi tài liệu này; `DEC-PROD-005` xác nhận thương lượng giá Ride.
+> **Phạm vi đã xác nhận:** `DEC-PROD-001`: MVP có Ride **xe hai bánh chở khách** + Food **đặt món giao tận nơi**. `DEC-PROD-002`: **một ứng dụng Flutter** cho Customer, Merchant, Driver; **Admin Web** là kênh nội bộ riêng. Bảy quyết định `DEC-PROD-001..007` không được sửa bởi tài liệu này; `DEC-PROD-005` xác nhận thương lượng giá Ride, `006` auth methods, `007` chat/call.
 >
 > **Nguồn chuẩn:** file này định nghĩa các **nhóm người dùng, nhu cầu và giả thuyết hành vi**. Quy tắc quyền, phí, số job, hủy/hoàn, bằng chứng giao hàng, SLA, pháp lý và release vẫn do Governance / Domain / Workflow / Contract docs và phê duyệt quyết định chi phối. Một persona **không tự tạo FR, business policy hoặc quyền truy cập**.
 
@@ -742,7 +745,7 @@ Mỗi `RQ-*` phải có kết luận `SUPPORTED` / `PARTIALLY_SUPPORTED` / `NOT_
 
 ### 21.1. Ready cho Discovery/Prototype
 
-- [x] Không thay đổi `DEC-PROD-001..005`.
+- [x] Không thay đổi `DEC-PROD-001..007`.
 - [x] Phân biệt Ride vs Food và Customer/Merchant/Driver vs Admin Web.
 - [x] Các persona được đánh dấu `PROTO`, không giả trích dẫn/định lượng.
 - [x] Có JTBD, friction, nhu cầu, trạng thái lỗi và mapping FR.

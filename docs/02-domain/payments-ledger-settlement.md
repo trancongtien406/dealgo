@@ -1,7 +1,7 @@
 ---
 document_id: DOC-DOM-006
 title: "DealGo — Payments, Double-Entry Ledger, Settlement & Payout / Thanh toán, sổ cái kép, đối soát và chi trả"
-version: 0.1.0
+version: "0.2.0"
 status: DRAFT
 language: vi-VN
 created_at: 2026-10-12
@@ -43,7 +43,7 @@ related_requirements: ["FR-CORE-007", "FR-CORE-008", "FR-CORE-010", "FR-CORE-012
 
 # DealGo — Payments, Ledger & Settlement
 
-> **DRAFT — bản thiết kế nghiệp vụ và hợp đồng tính đúng đắn, không phải quyết định thanh toán production.** Các định hướng `DEC-PROD-001..005` đã xác nhận. `OPEN-002` (kênh thu/đơn vị nhận tiền/COD), `OPEN-003` (phí và phân chia), `OPEN-010` (lúc authorize/capture), `OPEN-016` (tổn thất Food) và `OPEN-018` (thu hộ COD của tài xế) **chưa được phê duyệt**. Không tự mở luồng thu tiền thật, ví tích tiền, giữ hộ tiền hay payout thật khi chưa được Legal, Finance, PO và provider duyệt.
+> **DRAFT — bản thiết kế nghiệp vụ và hợp đồng tính đúng đắn, không phải quyết định thanh toán production.** Các định hướng `DEC-PROD-001..007` đã xác nhận. `OPEN-002` (kênh thu/đơn vị nhận tiền/COD), `OPEN-003` (phí và phân chia), `OPEN-010` (lúc authorize/capture), `OPEN-016` (tổn thất Food) và `OPEN-018` (thu hộ COD của tài xế) **chưa được phê duyệt**. Không tự mở luồng thu tiền thật, ví tích tiền, giữ hộ tiền hay payout thật khi chưa được Legal, Finance, PO và provider duyệt.
 >
 > **Phạm vi đã chốt:** DealGo MVP hỗ trợ Ride hai bánh + Food, một Flutter app cho Customer/Merchant/Driver và Admin Web. Ví dụ số tiền/bút toán đều gắn nhãn `TEST_ONLY`; không thể dùng làm chính sách thuế, kế toán, hóa đơn, chiết khấu hay hợp đồng đối tác.
 
