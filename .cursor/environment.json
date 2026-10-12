@@ -1,0 +1,5 @@
+{
+  "name": "DealGo",
+  "install": "bash .cursor/scripts/cloud-agent-install.sh",
+  "start": "bash .cursor/scripts/cloud-agent-start.sh"
+}

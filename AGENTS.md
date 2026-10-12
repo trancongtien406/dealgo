@@ -84,7 +84,10 @@ Hiện có scaffold:
 
 ## Cursor Cloud specific instructions
 
-- Flutter **3.47.7** (Dart 3.13.5) khớp `sdk: ^3.13.2` trong `mobile/pubspec.yaml`. SDK nằm ở `/opt/flutter`; `flutter` và `dart` có trên `PATH`.
-- Admin Web (`website/`) dùng cổng **3000**. API (`backend/`) dùng cổng **3001**. Cả hai scaffold mặc định cổng 3000, nên khi chạy cùng lúc phải đặt `PORT=3001` cho API. `GET /` trên API trả về `DealGo API`.
-- Mobile không có emulator trong môi trường này. Kiểm tra bằng `flutter analyze` và `flutter test` trong `mobile/`.
+- Không có `.fvmrc`. Flutter được ghim **3.47.7** (Dart 3.13.5) vì `mobile/pubspec.yaml` yêu cầu `sdk: ^3.13.2`. SDK ở `/opt/flutter`; `flutter` và `dart` có trên `PATH`.
+- Android SDK ở `/opt/android-sdk` (`ANDROID_HOME`). JDK 21 ở `/usr/lib/jvm/java-21-openjdk-amd64` (`JAVA_HOME`). AGP 9.1 cần JDK tối thiểu 17; app biên dịch `JavaVersion.VERSION_17`. Các gói đã cài: platform `android-36`, Build-Tools `36.0.0`, NDK `28.2.13676358`, Platform-Tools, Emulator, cmdline-tools `15859902`. Login shell đọc `/etc/profile.d/dealgo-android.sh`.
+- Kiểm tra mobile: `flutter doctor -v`, `flutter pub get`, `flutter analyze`, `flutter test` trong `mobile/`. APK debug: `flutter build apk --debug`. `mobile/android/gradle.properties` đặt heap Gradle `-Xmx8G`.
+- Nếu `/dev/kvm` có mặt, script cài thêm user vào group sở hữu thiết bị. `emulator -accel-check` chỉ có ý nghĩa khi thiết bị đó tồn tại. Không tự boot emulator.
+- `flutter doctor` có thể báo thiếu ninja và GTK cho Linux desktop. Android toolchain không dùng các gói đó.
+- Admin Web (`website/`) cổng **3000**. API (`backend/`) cổng **3001** vì cả hai scaffold mặc định cổng 3000. `GET /` trả về `DealGo API`.
 - Không có database hay secret. Cài dependency bằng `npm ci` trong `backend/` và `website/`.
