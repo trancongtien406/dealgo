@@ -1,0 +1,236 @@
+[
+  {
+    "file": "banner_danang_hero",
+    "category": "banners",
+    "width": 1200,
+    "height": 480,
+    "background": "illustrated",
+    "screens": "C001 / onboarding / promos",
+    "description": "Banner Đà Nẵng minh họa cầu Rồng, chừa vùng chữ phía trái"
+  },
+  {
+    "file": "banner_promo_gift",
+    "category": "banners",
+    "width": 1200,
+    "height": 280,
+    "background": "illustrated",
+    "screens": "C001 / C044 / M040",
+    "description": "Banner khuyến mãi/voucher, vùng chữ trống phía trái"
+  },
+  {
+    "file": "card_ride",
+    "category": "service_cards",
+    "width": 680,
+    "height": 360,
+    "background": "illustrated",
+    "screens": "C001 / C002 / C004",
+    "description": "Đặt xe (vùng chữ bên trái)"
+  },
+  {
+    "file": "card_food",
+    "category": "service_cards",
+    "width": 680,
+    "height": 360,
+    "background": "illustrated",
+    "screens": "C001 / C022 / C042",
+    "description": "Đồ ăn và thực phẩm (vùng chữ bên trái)"
+  },
+  {
+    "file": "card_delivery",
+    "category": "service_cards",
+    "width": 680,
+    "height": 360,
+    "background": "illustrated",
+    "screens": "C001 / D026 / D029",
+    "description": "Giao hàng (vùng chữ bên trái)"
+  },
+  {
+    "file": "card_shop",
+    "category": "service_cards",
+    "width": 680,
+    "height": 360,
+    "background": "illustrated",
+    "screens": "M001 / M013 / C025",
+    "description": "Cửa hàng (vùng chữ bên trái)"
+  },
+  {
+    "file": "vehicle_sedan",
+    "category": "vehicles",
+    "width": 520,
+    "height": 320,
+    "background": "transparent",
+    "screens": "C004 / C005 / C006",
+    "description": "Sedan 4 chỗ"
+  },
+  {
+    "file": "vehicle_7seat",
+    "category": "vehicles",
+    "width": 520,
+    "height": 320,
+    "background": "transparent",
+    "screens": "C004 / C008",
+    "description": "Xe 7 chỗ"
+  },
+  {
+    "file": "vehicle_motorbike",
+    "category": "vehicles",
+    "width": 520,
+    "height": 320,
+    "background": "transparent",
+    "screens": "C004 / D008",
+    "description": "Xe máy"
+  },
+  {
+    "file": "vehicle_delivery",
+    "category": "vehicles",
+    "width": 520,
+    "height": 320,
+    "background": "transparent",
+    "screens": "D016 / D026 / D029",
+    "description": "Tài xế giao đồ ăn"
+  },
+  {
+    "file": "role_customer",
+    "category": "role_illustrations",
+    "width": 500,
+    "height": 380,
+    "background": "transparent",
+    "screens": "S007 / S002 / C001",
+    "description": "Khách hàng, tuyến đường"
+  },
+  {
+    "file": "role_shop",
+    "category": "role_illustrations",
+    "width": 500,
+    "height": 380,
+    "background": "transparent",
+    "screens": "S007 / M001 / M013",
+    "description": "Shop, cửa hàng"
+  },
+  {
+    "file": "role_driver",
+    "category": "role_illustrations",
+    "width": 500,
+    "height": 380,
+    "background": "transparent",
+    "screens": "S007 / D001 / D016",
+    "description": "Tài xế, nhận chuyến"
+  },
+  {
+    "file": "role_food",
+    "category": "role_illustrations",
+    "width": 500,
+    "height": 380,
+    "background": "transparent",
+    "screens": "C022 / C032 / S002",
+    "description": "Đặt đồ ăn"
+  },
+  {
+    "file": "state_no_search",
+    "category": "states",
+    "width": 512,
+    "height": 512,
+    "background": "transparent",
+    "screens": "C023 / S015",
+    "description": "Không có kết quả"
+  },
+  {
+    "file": "state_no_orders",
+    "category": "states",
+    "width": 512,
+    "height": 512,
+    "background": "transparent",
+    "screens": "C043 / M015 / D033",
+    "description": "Chưa có đơn"
+  },
+  {
+    "file": "state_no_driver",
+    "category": "states",
+    "width": 512,
+    "height": 512,
+    "background": "transparent",
+    "screens": "C010 / D018",
+    "description": "Không tìm thấy tài xế"
+  },
+  {
+    "file": "state_offline",
+    "category": "states",
+    "width": 512,
+    "height": 512,
+    "background": "transparent",
+    "screens": "C028/offline / D016/offline",
+    "description": "Mất kết nối"
+  },
+  {
+    "file": "state_quote_expired",
+    "category": "states",
+    "width": 512,
+    "height": 512,
+    "background": "transparent",
+    "screens": "C007/expired",
+    "description": "Báo giá hết hạn"
+  },
+  {
+    "file": "state_payment_error",
+    "category": "states",
+    "width": 512,
+    "height": 512,
+    "background": "transparent",
+    "screens": "C028 / S017",
+    "description": "Thanh toán lỗi"
+  },
+  {
+    "file": "state_success",
+    "category": "states",
+    "width": 512,
+    "height": 512,
+    "background": "transparent",
+    "screens": "C032 / D030 / M011",
+    "description": "Thành công"
+  },
+  {
+    "file": "state_kyc_pending",
+    "category": "states",
+    "width": 512,
+    "height": 512,
+    "background": "transparent",
+    "screens": "M011 / D013",
+    "description": "Hồ sơ đang xét duyệt"
+  },
+  {
+    "file": "state_kyc_rejected",
+    "category": "states",
+    "width": 512,
+    "height": 512,
+    "background": "transparent",
+    "screens": "M012 / D014",
+    "description": "Hồ sơ yêu cầu bổ sung"
+  },
+  {
+    "file": "state_security",
+    "category": "states",
+    "width": 512,
+    "height": 512,
+    "background": "transparent",
+    "screens": "C014 / D044",
+    "description": "An toàn chuyến đi"
+  },
+  {
+    "file": "accent_promo_gift",
+    "category": "accent",
+    "width": 480,
+    "height": 340,
+    "background": "transparent",
+    "screens": "C044 / C045 / M040",
+    "description": "Minh họa quà tặng và ưu đãi"
+  },
+  {
+    "file": "accent_pickup_route",
+    "category": "accent",
+    "width": 480,
+    "height": 340,
+    "background": "transparent",
+    "screens": "C002 / C003 / D021",
+    "description": "Minh họa điểm đi và đến"
+  }
+]

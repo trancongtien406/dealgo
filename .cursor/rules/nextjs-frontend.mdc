@@ -1,0 +1,166 @@
+---
+description: Tiêu chuẩn Admin Web DealGo — Next.js 16, React 19 & Tailwind v4 trong website/.
+globs: website/app/**/*.ts, website/app/**/*.tsx, website/app/**/*.css, website/components/**/*.ts, website/components/**/*.tsx, website/lib/**/*.ts, website/lib/**/*.tsx, website/hooks/**/*.ts, website/hooks/**/*.tsx, website/store/**/*.ts, website/store/**/*.tsx, website/next.config.*, website/package.json, website/tsconfig.json, website/eslint.config.*
+alwaysApply: false
+---
+
+# Quy Tắc Phát Triển Frontend — DealGo Admin Web (Next.js 16, React 19 & Tailwind v4)
+
+Bạn là chuyên gia Frontend cho **Admin Web** DealGo (`website/`). Mobile Flutter không thuộc rule này.
+
+* Đọc `AGENTS.md` và docs governance trước khi thêm màn hình vận hành, phân quyền admin hoặc giả định API.
+* Tôn trọng phiên bản trong `website/package.json` / lockfile; không tự nâng major Next/React/Tailwind ngoài phạm vi task.
+* Admin Web là kênh nội bộ riêng — không mô hình hóa như role thứ tư trong app Flutter.
+* API contract lấy từ backend/docs đã xác nhận; không bịa endpoint, role hay enum.
+
+Khi viết hoặc sửa mã nguồn trong `website/`, tuân thủ các tiêu chuẩn kỹ thuật dưới đây.
+
+## 1. Nguyên Tắc Giao Diện, Icons và Tài Nguyên
+
+* **Cấm Tuyệt Đối Sử Dụng Emoji:** Không được sử dụng các biểu tượng cảm xúc (emoji) trong mã nguồn, giao diện người dùng (UI), các đoạn văn bản hiển thị hay các thông báo log hệ thống.
+
+* **Tối Ưu Hóa Icons và SVG:** Hạn chế tối đa việc cài đặt các thư viện biểu tượng cồng kềnh từ bên ngoài (nhu Lucide, FontAwesome). Hãy ưu tiên sử dụng trực tiếp mã SVG nội dòng (inline SVG) được tối ưu hóa hoặc sử dụng các thành phần icon dùng chung đã có sẵn trong dự án để giảm kích thước bundle.
+
+## 2. Tiêu Chuẩn Next.js 16 & React 19 (Server/Client Components)
+
+* **Async Request APIs Bắt Buộc:** Tất cả các API phụ thuộc vào request bao gồm `params`, `searchParams`, `cookies()`, và `headers()` đều là các Promise bất đồng bộ. Bắt buộc phải sử dụng `await` trước khi truy cập các thuộc tính của chúng.
+
+  * *Đúng:* `const { slug } = await props.params;`
+  * *Đúng:* `const cookieStore = await cookies(); const token = cookieStore.get('auth');`
+
+* **Selective Hydration & Streaming SSR:** Tận dụng tối đa kiến trúc App Router và Suspense để bọc các thành phần tải chậm hoặc các tác vụ xử lý dữ liệu nặng. Việc này cho phép Next.js truyền tải giao diện theo dạng luồng (Streaming) và kích hoạt khả năng Selective Hydration giúp trang web có thể tương tác được ngay lập tức tại các vùng đã tải xong.
+
+* **Tránh Hiện Tượng Tearing Trong Concurrent UI:** Khi đọc dữ liệu từ các nguồn nằm ngoài sự quản lý của React (External Stores như các biến toàn cục, API của trình duyệt), bắt buộc phải sử dụng hook `useSyncExternalStore` thay vì `useEffect` để ngăn ngừa hiện tượng xé hình giao diện (tearing) khi React chạy ở chế độ Concurrent Rendering với cơ chế cắt lát thời gian (Time Slicing).
+
+* **Phòng Ngừa Lỗi Đóng Băng Giá Trị Biến (Stale Closures):** Trong các callback bất đồng bộ hoặc các hiệu ứng phụ (`useEffect`), đảm bảo các biến phụ thuộc luôn được cập nhật mới nhất bằng cách sử dụng `useRef` hoặc tận dụng các hook quản lý form mới của React 19 như `useActionState` và `useFormStatus`.
+
+* **Chiến Lược SEO & Metadata:** Hàm `generateMetadata` bắt buộc phải là hàm bất đồng bộ (`async`) khi cần truy cập vào dữ liệu động từ API hoặc tham số đường dẫn (`params`).
+
+  * *Ví dụ:*
+
+    ```typescript
+    export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+      const { id } = await params;
+      const product = await getProduct(id);
+      return { title: product.name, description: product.summary };
+    }
+    ```
+
+## 3. Quản Lý Trạng Thể & Kiến Trúc Dữ Liệu
+
+* **Xử Lý Lỗi Race Conditions:** Khi người dùng thay đổi bộ lọc, phân trang hoặc chuyển hướng liên tục, phải hủy bỏ các API request cũ chưa kịp phản hồi bằng cách sử dụng `AbortController` để tránh việc ghi đè dữ liệu sai thứ tự.
+
+* **Cơ Chi Optimistic UI & Rollback:** Khi áp dụng kỹ thuật cập nhật dự đoán trước kết quả (Optimistic UI) để tạo cảm giác ứng dụng phản hồi ngay lập tức, bắt buộc phải thiết kế hàm khôi phục trạng thái cũ (rollback strategy) trong trường hợp API hoặc Server Action trả về kết quả thất bại.
+
+* **Cấu Trúc Dữ Liệu Bất Biến (Immutable Data):** Đảm bảo tính nhất quán của tham chiếu (referential equality) bằng cách sử dụng mô hình chia sẻ cấu trúc (structural sharing) khi cập nhật trạng thái. Chỉ tạo ra tham chiếu đối tượng mới cho các trường dữ liệu thực sự thay đổi để React tối ưu hóa thuật toán đối chiếu ảo (Virtual DOM Diffing) và Reconciliation.
+
+* **Hạn Chế Lạm Dụng Memoization:** Tránh sử dụng bừa bãi `useMemo` và `useCallback` đối với các tính toán đơn giản vì chi phí bộ nhớ cho việc lưu trữ mảng dependency đôi khi vượt quá lợi ích mang lại. Chỉ thực hiện lưu nhớ (memoize) khi truyền callback hoặc giá trị xuống các thành phần con được bọc bởi `React.memo`.
+
+## 4. Tối Ưu Hóa Trình Duyệt & Hiệu Năng Rendering (Critical Rendering Path)
+
+* **Phòng Chống Thảm Họa Layout Thrashing:** Tuyệt đối không viết xen kẽ các dòng code đọc thuộc tính hình học của DOM (như `getBoundingClientRect()`, `offsetWidth`) và các dòng code ghi trực tiếp vào DOM (thay đổi style) trong cùng một chu kỳ thực thi của Javascript. Hãy thực hiện toàn bộ thao tác đọc trước, sau đó mới tiến hành ghi.
+
+* **Tăng Tốc Phần Cứng Bằng GPU (GPU Acceleration):** Đối với các chuyển động (animations) và hiệu ứng chuyển cảnh (transitions), hãy sử dụng các thuộc tính CSS thuộc lớp Compositing (như `transform`, `opacity`, `filter`). Tránh thay đổi các thuộc tính kích hoạt lại bước Layout (như `width`, `height`, `top`, `left`) để giảm tải cho CPU của trình duyệt.
+
+* **Áp Dụng CSS Containment:** Đối với các khối UI nằm ngoài màn hình (off-screen) hoặc các danh sách dữ liệu dài, hãy sử dụng thuộc tính `content-visibility: auto` kết hợp với `contain-intrinsic-size` để giúp trình duyệt bỏ qua việc dựng hình (Paint) và tính toán bố cục (Layout) cho đến khi phần tử đó chuẩn bị lăn vào khung nhìn.
+
+* **Tailwind CSS v4 CSS-First:** Tuyệt đối không tạo file `tailwind.config.js`. Toàn bộ cấu hình hệ thống thiết kế (màu sắc, phông chữ, breakpoints) phải được khai báo trực tiếp trong tệp CSS chính (ví dụ: `app/globals.css`) thông qua chỉ thị `@theme`.
+
+  * *Ví dụ:*
+
+    ```css
+    @import "tailwindcss";
+    @theme {
+      --color-brand-primary: #0070f3;
+    }
+    ```
+
+## 5. Chiến Lược Phân Tách Mã Nguồn & Tải Tài Nguyên
+
+* **Dynamic Import & Code Splitting:** Sử dụng phương thức `next/dynamic` của Next.js để trì hoãn việc tải (lazy loading) các thư viện bên thứ ba nặng hoặc các component giao diện phức tạp (như biểu đồ, trình soạn thảo văn bản) chỉ khi người dùng kích hoạt chúng.
+
+* **Ưu Tiên Tải Tài Nguyên (Resource Prioritization):**
+  * Sử dụng `<link rel="preconnect">` cho các máy chủ API hoặc CDN chứa hình ảnh.
+  * Sử dụng `<link rel="preload">` cho các phông chữ hệ thống bắt buộc phải hiển thị ngay khi tải trang.
+  * Tận dụng cơ chế đoán trước hành vi (Speculative Prerendering) của Next.js 16 để tải trước tài nguyên của các liên kết nằm trong tầm mắt của người dùng.
+
+* **Xử Lý Streaming Fetch Response:** Đối với các phản hồi dữ liệu lớn hoặc thời gian thực (như kết quả tạo ra từ AI), sử dụng Streams API để đọc dữ liệu thô ngay khi nó được truyền về từ máy chủ, giúp tối ưu hóa chỉ số thời gian phản hồi đầu tiên (Time to First Byte - TTFB).
+
+## 6. Quản Lý Bộ Nhớ & Luồng Chạy Trình Duyệt
+
+* **Dọn Sẹp Rác Bộ Nhớ (Memory Leaks):** Khi đăng ký các sự kiện toàn cục (`window.addEventListener`) hoặc khởi tạo các bộ đếm thời gian (`setInterval`), bắt buộc phải thực hiện gỡ bỏ và xóa chúng trong hàm thu dọn (`cleanup function`) của `useEffect` để tránh rò rỉ bộ nhớ do các nút DOM bị cô lập (Detached DOM Nodes) không thể giải phóng.
+
+* **Sử Dụng Web Workers vs Service Workers:**
+  * Đẩy các tác vụ tính toán nặng nề (như mã hóa dữ liệu, giải nén file lớn) sang **Web Workers** chạy ngầm để tránh gây nghẽn luồng chính (Main Thread Starvation) khiến giao diện bị đơ giật.
+  * Sử dụng **Service Workers** để xây dựng chiến lược bộ nhớ đệm (caching) nâng cao phục vụ cho trải nghiệm ngoại tuyến (offline) và tối ưu mạng lưới.
+
+* **Kiểm Sát Vòng Lặp ResizeObserver:** Khi sử dụng `ResizeObserver`, tuyệt đối không thay đổi trực tiếp kích thước hoặc thuộc tính bố cục của chính phần tử đang được quan sát ngay bên trong hàm callback để tránh lỗi vượt quá giới hạn vòng lặp trình duyệt (`ResizeObserver loop limit exceeded`).
+
+## 7. Quy Chuẩn Bảo Mật Frontend (Security)
+
+* **Chống Tấn Công XSS, CSRF & DOM Clobbering:**
+  * Cấm sử dụng trực tiếp thuộc tính `dangerouslySetInnerHTML` trừ khi chuỗi dữ liệu đầu vào đã được lọc sạch tuyệt đối qua thư viện `isomorphic-dompurify`.
+  * Thiết lập chính sách bảo mật nội dung chặt chẽ (Content Security Policy - CSP) và sử dụng các kiểu dữ liệu an toàn (Trusted Types).
+  * Tránh định danh các phần tử DOM bằng các thuộc tính `id` hoặc `name` trùng lặp với các biến Javascript toàn cục để phòng chống lỗi DOM Clobbering.
+
+* **Bảo Mật Axios & Lưu Trữ Token:**
+  * Cấu hình instance Axios luôn bật thuộc tính `withCredentials: true` để đính kèm session cookies an toàn.
+  * Tuyệt đối không lưu trữ Access Token dài hạn hoặc Refresh Token trong `localStorage` hay `sessionStorage`. Toàn bộ token xác thực nhạy cảm phải được lưu trữ bên trong `HttpOnly Cookie` với cờ bảo mật nâng cao `SameSite=Strict` và `Secure`.
+
+* **Ngăn Chặn Prototype Pollution:** Khi thực hiện trộn (merge) hoặc sao chép sâu (deep clone) các đối tượng JSON từ các nguồn API không tin cậy, hãy loại bỏ hoặc lọc bỏ các thuộc tính nguy hiểm như `__proto__`, `constructor`, và `prototype`.
+
+* **Tự Động Ký Nhận Yêu Cầu Axios (Request Signing Interceptor):** Trong file cấu hình Axios Client (`lib/api/axios.ts`), tích hợp một request interceptor để tự động tạo chữ ký số cho mọi request ghi dữ liệu (POST, PUT, PATCH, DELETE):
+  * **Sinh tham số động:** Tạo một `timestamp` hiện tại (epoch time) và một chuỗi ngẫu nhiên độc nhất `nonce` (UUIDv4).
+  * **Tạo Signature:** Sử dụng thư viện mã hóa chuẩn (như `crypto-js/hmac-sha256`) kết hợp với Secret Key được lưu trữ an toàn trong các biến môi trường phía Server để băm chuỗi định dạng:
+    `rawString = method + "\n" + path + "\n" + timestamp + "\n" + nonce + "\n" + JSON.stringify(body)`
+  * **Gắn Headers:** Đính kèm các giá trị này vào HTTP Headers trước khi gửi đi:
+    * `X-Signature`: Chuỗi mã băm được tạo ra.
+    * `X-Timestamp`: Giá trị thời gian đã dùng để ký.
+    * `X-Nonce`: Chuỗi ngẫu nhiên độc nhất đã dùng để ký.
+    * `X-Client-Id`: Mã nhận diện client để server tra cứu khóa mật.
+
+## 8. Cấu Trúc Mã Nguồn Sạch & TypeScript Nghiêm Ngặt
+
+* **TypeScript Strict Mode:** Bật chế độ kiểm tra kiểu nghiêm ngặt nhất. Cấm tuyệt đối việc sử dụng kiểu dữ liệu `any`. Bắt buộc dùng `unknown` kết hợp với các hàm bảo vệ kiểu (Type Guards) để phân tích dữ liệu khi chưa biết rõ cấu trúc.
+
+* **Tổ Chức Thư Mục Dự Án:**
+  * `app/`: Chỉ chứa thông tin cấu hình route, layout, loading state, error boundaries và các file cấu hình SEO tĩnh.
+  * `components/ui/`: Chứa các thành phần giao diện gốc, độc lập, không mang tính logic nghiệp vụ (như nút bấm, hộp thoại, ô nhập liệu).
+  * `components/features/`: Chứa các thành phần phức tạp gắn liền với nghiệp vụ của từng tính năng cụ thể trong ứng dụng.
+  * `lib/`: Chứa cấu hình API Client (Axios), các SDK kết nối hoặc cấu hình tĩnh dùng chung.
+
+## 9. Hiển Thị & Tối Ưu Hóa Hình Ảnh (Image Optimization)
+
+* **Tuyệt Đối Không Dùng Thẻ `<img>` Thuần:** Ngoại trừ các trường hợp đặc biệt không thể tối ưu (như ảnh render từ dữ liệu dạng SVG động phức tạp), tất cả các hình ảnh bắt buộc phải sử dụng component `next/image`.
+
+* **Tối Ưu Hóa LCP (Largest Contentful Paint):** Bất kỳ hình ảnh nào xuất hiện ở màn hình đầu tiên (Above-The-Fold) như ảnh Banner, ảnh Hero, ảnh sản phẩm chính bắt buộc phải thêm thuộc tính `priority`. Thuộc tính này sẽ báo cho trình duyệt tải ảnh này với độ ưu tiên cao nhất thay vì chờ đợi render xong DOM.
+
+* **Cấu Hình Thuộc Tính `sizes`:** Để tránh việc trình duyệt tải ảnh có kích thước quá lớn cho màn hình điện thoại di động, bắt buộc phải khai báo thuộc tính `sizes` tương ứng với các breakpoints thiết kế.
+
+  * *Đúng:* `sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"`
+
+* **Tránh Lỗi Giật Khung Hình (CLS - Cumulative Layout Shift):**
+  * Đối với ảnh đã biết trước kích thước, bắt buộc phải truyền thuộc tính `width` và `height`.
+  * Đối với ảnh có tỷ lệ co giãn linh hoạt, hãy sử dụng thuộc tính `fill` kết hợp với class `object-cover` hoặc `object-contain` ở thẻ cha (thẻ cha bắt buộc phải có thuộc tính CSS `position: relative` hoặc `position: absolute`).
+
+* **Cơ Chế Placeholder Trải Nghiệm Người Dùng (UX):**
+  * Sử dụng thuộc tính `placeholder="blur"` kèm một mã `blurDataURL` tĩnh hoặc được tạo động từ phía Server để hiển thị ảnh mờ chất lượng thấp trong quá trình tải ảnh thực tế, giúp loại bỏ trạng thái trống màu trắng gây khó chịu cho người dùng.
+
+## 10. Tư Duy Thuật Toán Thay Vì Hardcode Trong Xử Lý UI & Tính Toán
+
+* **Tuyệt Đối Nghiêm Cấm Hardcode Logic & Giao Diện:** Không được viết thủ công các chuỗi điều kiện lặp lại (`if/else` hoặc `switch/case` quá dài), không hardcode các mảng giá trị cấu hình trực tiếp trong phần hiển thị JSX, và không tính toán thủ công các cấu trúc cây hoặc bộ lọc dữ liệu.
+
+* **Ứng Dụng Cấu Trúc Dữ Liệu Tối Ưu:** Sử dụng các cấu trúc dữ liệu nâng cao như `Map` hoặc `Set` để thực hiện tra cứu (lookup) trạng thái UI hoặc phân quyền với độ phức tạp thuật toán là $O(1)$, thay vì sử dụng vòng lặp `.find()` hoặc `.filter()` liên tục trên mảng có độ phức tạp $O(N)$.
+
+  * *Đúng (Tối ưu Lookup UI):*
+    ```typescript
+    const BADGE_CONFIG = new Map<Status, color: label: string string; { }>([
+      ['success', { color: 'bg-green-500', label: 'Hoàn thành' }],
+      ['pending', { color: 'bg-yellow-500', label: 'Đang xử lý' }],
+      ['failed', { color: 'bg-red-500', label: 'Thất bại' }]
+    ]);
+    
+    // Khi render chỉ cần: const config = BADGE_CONFIG.get(status);
+    ```
+
+* **Thuật Toán Xử Lý Dữ Liệu Động (Dynamic Data Processing):** Khi xử lý các cấu trúc dữ liệu phức tạp hiển thị trên UI (như menu đa cấp, biểu đồ hình cây danh mục, phân trang, bộ lọc đa điều kiện), bắt buộc phải viết các thuật toán đệ quy (recursion), thuật toán quy hoạch động ngắn hạn hoặc các hàm tính toán động dựa trên dữ liệu cấu hình (Configuration-driven UI).

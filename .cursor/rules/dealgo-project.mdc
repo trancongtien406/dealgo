@@ -1,0 +1,14 @@
+---
+description: "DealGo product constraints and authority order for all agents. Always apply before stack-specific rules."
+alwaysApply: true
+---
+
+# DealGo — Project Constraints
+
+- Đọc `AGENTS.md` và `docs/00-governance/README.md` trước khi thay đổi scope, API, role hoặc thanh toán.
+- **Đã xác nhận:** MVP = Ride + Food; **một** Flutter app (Customer / Merchant / Driver); Admin Web riêng ở `website/`; server là nguồn sự thật.
+- **Chưa khóa ADR:** Prisma/PostgreSQL/Redis/Kafka/Bloc/FCM/payment provider. Scaffold NestJS/Next/Flutter **không** đồng nghĩa đã phê duyệt toàn bộ stack quanh chúng.
+- `TBD` / `OPEN-*` / `ASM-*`: được đề xuất, **không** tự chốt thành business rule.
+- Phân công specialist theo nội dung task (xem `.cursor/rules/ai-coding-team.mdc`), không theo tên thư mục.
+- Ví dụ DealGo trong agent playbook là minh họa; contract thật lấy từ `docs/` + code đang có.
+- Không deploy production, không lộ secret, không phá dữ liệu chưa được phép.

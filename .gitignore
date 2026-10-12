@@ -1,0 +1,119 @@
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+Desktop.ini
+
+# IDE / editor
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.p12
+*.keystore
+credentials.json
+service-account*.json
+google-services.json
+GoogleService-Info.plist
+
+# Logs & diagnostics
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Build / coverage (Node)
+dist/
+build/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+
+# Next.js (website/)
+website/.next/
+website/out/
+website/.vercel/
+website/next-env.d.ts
+
+# NestJS (backend/)
+backend/dist/
+backend/.temp/
+backend/.tmp/
+
+# Flutter / Dart (mobile/)
+mobile/.dart_tool/
+mobile/.flutter-plugins-dependencies
+mobile/.pub-cache/
+mobile/.pub/
+mobile/build/
+mobile/coverage/
+mobile/**/doc/api/
+mobile/**/ios/Flutter/.last_build_id
+mobile/android/app/debug/
+mobile/android/app/profile/
+mobile/android/app/release/
+mobile/*.symbols
+mobile/app.*.map.json
+mobile/.widget_preview/
+
+# iOS / Xcode
+**/Pods/
+**/DerivedData/
+*.xcuserdata/
+*.xccheckout
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Android
+**/.gradle/
+**/local.properties
+**/captures/
+**/.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Misc tooling
+*.pid
+*.seed
+*.pid.lock
+.turbo/
+.cache/
+tmp/
+temp/
+.temp/
+.tmp/

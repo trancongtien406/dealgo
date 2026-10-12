@@ -1,0 +1,138 @@
+---
+description: Tiêu chuẩn Flutter/Dart cho DealGo mobile. Áp dụng khi làm việc trong mobile/ (Dart, test, pubspec, Android/iOS).
+globs: mobile/lib/**/*.dart, mobile/test/**/*.dart, mobile/pubspec.yaml, mobile/analysis_options.yaml, mobile/android/**/*.kt, mobile/android/**/*.kts, mobile/android/**/*.xml, mobile/android/**/*.properties, mobile/ios/**/*.swift, mobile/ios/**/*.m, mobile/ios/**/*.h, mobile/ios/**/*.plist, mobile/ios/**/*.xcconfig
+alwaysApply: false
+---
+
+# Quy Tắc Phát Triển Flutter — DealGo (Dart 3.x)
+
+## 0. Thứ Tự Ưu Tiên & Phạm Vi
+
+* Phạm vi mặc định: `mobile/`. Đọc `AGENTS.md`, `docs/00-governance/`, `pubspec.yaml`, `analysis_options.yaml` và code hiện có trước khi sửa.
+* DealGo: **một** app multi-role (Customer / Merchant / Driver). Không tự tách thành ba app. Server là nguồn sự thật; không dùng cache/push làm truth cho booking/payment.
+* Quyết định `CONFIRMED` / ADR `ACCEPTED` được ưu tiên hơn rule này. `mobile/` hiện là scaffold — **chưa** khóa Bloc, get_it, go_router hay Dio bằng ADR.
+* Không tự đổi state management, router, DI, HTTP client nếu chưa có lý do và sự chấp thuận rõ ràng; khi đề xuất stack, đánh dấu `PROPOSAL`.
+* Chỉ áp dụng hạ tầng phức tạp khi yêu cầu sản phẩm/threat model cần; không dựng abstraction, package hay service dự phòng không có consumer thực tế.
+
+## 1. Phiên Bản Flutter, Dart & Dependency
+
+* Trước khi thêm hoặc nâng package, chạy `flutter pub outdated` và kiểm tra tương thích với Flutter/Dart SDK của dự án.
+* Ưu tiên bản stable mới nhất mà dependency solver và SDK hiện tại hỗ trợ; không tự động nâng major chỉ vì có bản Latest.
+* Mọi lần nâng major phải đọc migration guide/changelog, cập nhật API bị breaking, chạy code generation nếu dự án có cấu hình, `flutter analyze` và test liên quan.
+* Package do Flutter SDK khóa phải theo constraint của SDK. Nếu giữ bản cũ vì compatibility, ghi rõ lý do trong phần bàn giao.
+* Không thêm package khi SDK/Dart hoặc code nhỏ, dễ kiểm thử đã giải quyết đủ nhu cầu.
+
+## 2. Kiến Trúc Feature-first & Phân Tầng
+
+* Với dự án mới hoặc dự án đã chọn Clean Architecture, dùng `lib/features/<feature>/{data,domain,presentation}`, `lib/core/` cho hạ tầng và `lib/shared/` cho thành phần thực sự dùng chung.
+* Domain là Dart thuần: không import `flutter/material.dart`, plugin nền tảng, DTO mạng hoặc implementation lưu trữ.
+* Data layer chứa datasource, DTO/model, mapper và repository implementation. Không để JSON parsing hoặc `DioException` rò vào domain/presentation.
+* Presentation chứa page/widget và state management; không gọi trực tiếp Dio/database từ widget.
+* Giữ Clean Architecture thực dụng: không tạo interface/use case/repository wrapper vô nghĩa cho logic cục bộ đơn giản.
+* Tôn trọng dependency direction và tránh circular dependency giữa features; giao tiếp qua contract/domain event rõ ràng khi cần.
+
+## 3. Dependency Injection
+
+* Dùng giải pháp DI mà dự án đã chọn (sau ADR hoặc convention đã có trong repo). Nếu đã chuẩn hóa `get_it` + `injectable`, đăng ký dependency tập trung và chạy generator theo cấu hình — **không** tự thêm nếu chưa được chọn.
+* Inject dependency qua constructor và contract ở external boundary; không tự tạo repository, API service hoặc storage implementation bên trong state holder/widget.
+* Không dùng service locator trực tiếp rải rác trong domain hoặc UI nếu dependency có thể truyền rõ ràng qua constructor.
+
+## 4. State Management & Immutable State
+
+* Theo state management đã có trong repo hoặc đã được ADR chấp thuận. Khi chưa chốt, ưu tiên giải pháp đơn giản nhất đủ cho AC; nếu đề xuất Bloc/Cubit (hoặc tương đương) cho state machine Ride/Food, ghi rõ `PROPOSAL` và không coi là bắt buộc toàn dự án.
+* State và domain value phải immutable, có value equality bằng `equatable`, generated equality hoặc giải pháp tương đương đang dùng.
+* Biểu diễn đầy đủ loading/success/empty/error và các transition hợp lệ; không dùng nhiều boolean có thể tạo trạng thái mâu thuẫn.
+* Không phát side effect trong `build()`. Navigation, snackbar, analytics và one-shot effect phải nằm ở listener/effect boundary phù hợp.
+* Giới hạn vùng rebuild bằng sub-widget, selector, `buildWhen`/`listenWhen` khi đo hoặc cấu trúc state cho thấy cần thiết.
+* Dùng `const` khi hợp lệ để giảm object allocation/rebuild work; không tuyên bố đây là tối ưu riêng của Impeller hoặc bảo đảm tránh repaint.
+
+## 5. Widget Lifecycle, Bộ Nhớ & Concurrency
+
+* Hủy `AnimationController`, `TextEditingController`, `ScrollController`, `FocusNode`, timer và subscription do widget sở hữu trong `dispose()`.
+* Không dispose tài nguyên mà widget không sở hữu. Kiểm tra `mounted`/`context.mounted` sau `await` trước khi dùng context hoặc set state.
+* Tránh giữ `BuildContext`, widget hoặc object lớn trong singleton/closure sống lâu.
+* Chỉ chuyển công việc sang `Isolate.run()`/`compute()` khi CPU-bound đủ lớn và đã cân nhắc chi phí serialize/copy; I/O async thông thường không cần isolate.
+* Hủy hoặc bỏ qua response cũ khi search/request bị thay thế để tránh race condition và state stale.
+
+## 6. API Client, Authentication & Error Model
+
+* Tập trung cấu hình Dio/HTTP client, `baseUrl`, timeout, header, authentication, refresh token và error mapping.
+* Refresh token phải single-flight/queued để nhiều lỗi 401 đồng thời không tạo refresh storm; retry request tối đa hữu hạn và tránh vòng lặp 401 vô tận.
+* Chuyển transport error thành failure/domain error có kiểu rõ ràng. Giữ `message`, `errorCode`, `traceId`, `path`, `timestamp` từ backend khi có.
+* Debug interceptor chỉ bật trong debug/profile phù hợp. Redact `Authorization`, cookie, token, password, secret, PII và giới hạn kích thước body trước khi log.
+* Không hiển thị raw stack trace hoặc nội dung backend nhạy cảm cho người dùng. Error UI nên có thông báo an toàn và reference/trace ID khi hỗ trợ vận hành.
+* Trace context phải theo contract observability của backend (ví dụ W3C `traceparent`); không tự sinh header `traceId` tùy ý nếu hệ thống chưa quy định.
+
+## 7. Offline & Network Resiliency
+
+* `connectivity_plus` chỉ phản ánh loại kết nối, không chứng minh Internet/API hoạt động. Dùng nó làm UX hint và vẫn xử lý timeout, DNS, TLS, 5xx cùng lỗi request thực tế.
+* Hiển thị offline/cached/stale state rõ ràng, không trình bày dữ liệu cache như dữ liệu realtime.
+* Chỉ cache dữ liệu được tài liệu cho phép; payment truth, inventory live và dữ liệu nhạy cảm không được coi cache local là source of truth.
+* GET/idempotent request có thể retry hữu hạn bằng exponential backoff + jitter khi lỗi transient.
+* Chỉ queue/retry POST/PUT/PATCH/DELETE khi backend hỗ trợ idempotency key hoặc cơ chế deduplication đã tài liệu hóa; mã hóa dữ liệu queue nhạy cảm và có expiry/cancel policy.
+
+## 8. Routing, Deeplink & Navigation Guard
+
+* Tập trung route trong router chuẩn của dự án; với `go_router`, ưu tiên typed route/code generation khi lợi ích type-safety đáng giá.
+* Không rải literal path trong UI; dùng route name/typed route/constant có ownership rõ ràng.
+* Auth redirect phải phản ứng với auth state mà không tạo redirect loop; giữ intended destination khi phù hợp.
+* Luôn có unknown/error route và parse/validate `pathParameters`/`queryParameters` trước khi dùng.
+* Chỉ cấu hình Universal Links/App Links khi sản phẩm yêu cầu, đồng thời kiểm tra `apple-app-site-association`, `assetlinks.json`, signing/team ID và fallback web.
+* Test cold start, warm start, foreground notification và deeplink không hợp lệ cho các route quan trọng.
+
+## 9. Ảnh, Rendering & Hiệu Năng
+
+* Cung cấp kích thước/aspect ratio ổn định, loading state và error fallback cho ảnh để tránh layout shift.
+* Decode ảnh gần kích thước hiển thị bằng `cacheWidth`/`cacheHeight` hoặc API tương đương khi biết kích thước vật lý; tính đến device pixel ratio.
+* Chỉ dùng `cached_network_image`/disk cache khi chính sách freshness, privacy, memory và invalidation đã rõ.
+* Shimmer là lựa chọn UX, không bắt buộc cho mọi ảnh; tôn trọng reduced motion và tránh animation liên tục gây tốn pin/GPU.
+* Đo bằng DevTools/profile build trước khi tuyên bố tối ưu. Không tối ưu suy đoán bằng cách làm code khó hiểu.
+* Tránh intrinsic layout/list không giới hạn; dùng lazy list/sliver và pagination cho tập dữ liệu lớn.
+
+## 10. Bảo Mật Mobile
+
+* Token, credential và dữ liệu xác thực nhạy cảm phải dùng Keychain/Keystore qua secure storage; không dùng `shared_preferences` cho secret.
+* Không hardcode secret. `dart-define`, obfuscation, Proguard/R8 và symbol stripping không biến secret phía client thành bí mật không thể trích xuất.
+* Request signing/HMAC chỉ triển khai theo threat model và backend contract. Secret dùng chung cố định trong app mobile không cung cấp trust boundary mạnh; ưu tiên token ngắn hạn, device-bound key/attestation khi thực sự cần.
+* Không log PII/secret; cấu hình backup, screenshot, clipboard, biometric và certificate pinning dựa trên phân loại dữ liệu/rủi ro, có kế hoạch rotation/recovery.
+* Release Android có R8/resource shrinking và symbol mapping phù hợp; release iOS lưu dSYM để crash symbolication. Không xóa artifact cần cho điều tra lỗi.
+* Mọi permission phải tối thiểu, có purpose string chính xác và UX giải thích trước khi hệ điều hành hỏi quyền.
+
+## 11. Localization, Theme, Accessibility & Dynamic UI
+
+* User-visible string phải qua l10n/ARB của dự án, trừ nội dung backend/user-generated. Không ghép câu theo cách phá ngữ pháp bản địa.
+* Dùng `ThemeData`, `ColorScheme`, text style, spacing/design tokens; không rải màu/kích thước magic trong widget.
+* Hỗ trợ dark/light theme, text scaling, safe area, keyboard, orientation và màn hình nhỏ/lớn theo phạm vi sản phẩm.
+* Thêm semantic label, focus order, contrast, touch target hợp lý và hỗ trợ screen reader cho control quan trọng.
+* Dùng `Map`/`Set` khi lookup lặp lại và dữ liệu đủ lớn/đường nóng; không thay `.firstWhere()` nhỏ bằng cấu trúc phức tạp nếu chưa có lợi ích thực.
+* Không hardcode business rules trong UI; lấy từ domain/config có kiểu và xử lý fallback cho giá trị API chưa biết.
+
+## 12. Testing & Quality Gates
+
+* Mỗi business logic mới hoặc sửa lỗi phải có unit test cho happy path, boundary và failure path. Shared widget quan trọng cần widget/golden test khi phù hợp.
+* Mock external I/O boundary, không mock chính logic domain đang kiểm thử; tuyệt đối không gọi API production trong unit/widget test.
+* Dùng `mocktail` nếu đó là chuẩn dự án; ưu tiên fake đơn giản khi dễ đọc và type-safe hơn mock sâu.
+* Không dùng `pumpAndSettle()` mù quáng vì repeating animation có thể khiến test treo; pump duration/frame xác định hoặc tắt animation trong test khi cần.
+* Coverage 80% là mục tiêu khi dự án/CI quy định, không được tuyên bố đạt nếu chưa đo. Ưu tiên coverage của critical business behavior hơn tỷ lệ tổng hình thức.
+* Sau thay đổi: chạy `dart format`, code generation nếu cấu hình, `flutter analyze`, test liên quan và full `flutter test` khi khả thi.
+* Với thay đổi native/plugin, kiểm tra build Android/iOS phù hợp; báo rõ platform không thể chạy và lý do.
+
+## 13. Code Clean & Dart Style
+
+* Tuân thủ `analysis_options.yaml`; không tắt lint toàn file để che lỗi nếu có thể sửa hoặc suppress hẹp kèm lý do.
+* Tránh `dynamic`/cast cưỡng ép khi có thể mô hình hóa type an toàn; xử lý exhaustive enum/sealed state và unknown value từ API.
+* Tên thể hiện intent, hàm ngắn có một trách nhiệm, comment giải thích “vì sao” thay vì lặp lại code.
+* Không dùng emoji trong identifier, comment kỹ thuật hoặc log hệ thống; nội dung UI chỉ dùng khi product/design yêu cầu.
+* Không sửa generated file thủ công. Bảo đảm generator deterministic và file cần commit tuân theo convention dự án.
+
+## 14. Branding, Launcher Icon & Splash
+
+* Dùng asset brand DealGo do dự án quy định; không giữ launcher icon/splash Flutter mặc định trong bản phát hành.
+* Khi đã có icon/splash chuẩn (ví dụ dưới `assets/brand/` hoặc `docs`/design handoff), sinh bằng `flutter_launcher_icons` / `flutter_native_splash` theo cấu hình dự án — không giả định đường dẫn của sản phẩm khác.
+* Khi đổi brand asset, chạy lại generator, kiểm tra Android adaptive icon/monochrome icon và iOS asset catalog trên thiết bị/simulator phù hợp.
+
+## 15. Bàn Giao & Bằng Chứng
+
+* Báo cáo file đã đổi, quyết định/assumption, command đã chạy, kết quả test, check bị bỏ qua và rủi ro còn lại.
+* Không tuyên bố hỗ trợ platform, hiệu năng, coverage, bảo mật hay tương thích nếu chưa có bằng chứng đo/test.
+* Không tự commit/push, thay đổi signing, secret, backend production hoặc dependency major ngoài phạm vi được giao.

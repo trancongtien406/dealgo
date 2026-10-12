@@ -1,0 +1,758 @@
+---
+description: Prevent noisy, redundant, prompt-derived, temporary, and misleading code comments. Comments must explain non-obvious engineering intent, not narrate the code or the AI's work.
+alwaysApply: true
+---
+
+# Code Comment Quality Rule
+
+## Purpose
+
+Keep source code clean, professional, maintainable, and free from AI-generated comment noise.
+
+Comments are part of the long-term codebase.
+
+Do not use comments as:
+- a development diary
+- a response to the user's prompt
+- an explanation of what the AI just changed
+- temporary reasoning
+- implementation narration
+- a replacement for clear naming or clean code
+
+The default behavior is:
+
+> Prefer self-explanatory code over comments.
+
+Only add a comment when the information cannot be clearly expressed through code structure, naming, types, tests, or documentation.
+
+---
+
+# 1. Never Write Prompt-Derived Comments
+
+Never insert comments that reference:
+
+- the user
+- the prompt
+- the current task
+- previous tasks
+- AI reasoning
+- implementation steps
+- conversations
+- requested changes
+- temporary instructions
+
+Forbidden examples:
+
+```ts
+// User asked to add pagination here
+
+// Added this because the prompt requested caching
+
+// Fix according to the previous requirement
+
+// We need to handle this case
+
+// Now check whether the user is logged in
+
+// This was changed in the latest task
+
+// Keep this for now
+
+// Temporary solution requested by user
+
+// AI generated logic
+
+// Step 1: validate user
+// Step 2: query database
+// Step 3: return result
+```
+
+These comments must never enter production source code.
+
+---
+
+# 2. Do Not Narrate Obvious Code
+
+Do not write comments that merely translate the code into English.
+
+Bad:
+
+```ts
+// Get user by ID
+const user = await userRepository.findById(userId);
+```
+
+Bad:
+
+```ts
+// Check if user exists
+if (!user) {
+  throw new NotFoundException();
+}
+```
+
+Bad:
+
+```ts
+// Increment retry count
+retryCount++;
+```
+
+Bad:
+
+```dart
+// Navigate to home page
+context.go('/home');
+```
+
+Bad:
+
+```ts
+// Loop through all products
+for (const product of products) {
+```
+
+The code already communicates this information.
+
+Delete such comments.
+
+---
+
+# 3. Comments Should Explain WHY, Not WHAT
+
+A useful comment normally explains one of these:
+
+- why an unusual solution is required
+- why an apparently simpler solution cannot be used
+- business rules that are not obvious from code
+- external-system constraints
+- compatibility issues
+- concurrency assumptions
+- security-sensitive reasoning
+- performance tradeoffs
+- algorithmic decisions
+- protocol quirks
+- data invariants
+- intentionally unusual behavior
+
+Good:
+
+```ts
+// Stripe may resend the same webhook multiple times.
+// The event ID is therefore used as the idempotency key.
+```
+
+Good:
+
+```ts
+// Keep this transaction at SERIALIZABLE isolation because two kiosks
+// may attempt to consume the same coupon concurrently.
+```
+
+Good:
+
+```ts
+// Canon cameras can briefly report BUSY immediately after capture,
+// so retry instead of treating the first BUSY response as a failure.
+```
+
+Good:
+
+```ts
+// Do not cache this result: membership discounts depend on the
+// customer's current birthday eligibility and may change during the day.
+```
+
+---
+
+# 4. Prefer Better Code Before Adding a Comment
+
+If a comment is needed because the code is difficult to understand, first attempt to improve:
+
+1. variable names
+2. function names
+3. type names
+4. class/module boundaries
+5. function extraction
+6. constants
+7. enums
+8. types/interfaces
+9. control flow
+10. test coverage
+
+Example:
+
+Avoid:
+
+```ts
+// Check whether subscription has expired
+if (s.e < Date.now()) {
+```
+
+Prefer:
+
+```ts
+if (subscription.isExpired()) {
+```
+
+Do not compensate for poor code clarity with comments.
+
+---
+
+# 5. Never Leave AI Reasoning in Source Code
+
+Internal reasoning must never become source comments.
+
+Forbidden:
+
+```ts
+// I think using Redis here is better
+
+// We could potentially optimize this later
+
+// Maybe this API returns null
+
+// Let's use a Map for faster lookup
+
+// I chose this implementation because...
+
+// The previous approach didn't work
+
+// This should probably be enough
+```
+
+Reasoning belongs in:
+
+- the chat response
+- ADRs
+- architecture documentation
+- pull-request descriptions
+- commit messages
+
+Not in production source code.
+
+---
+
+# 6. Avoid Change-History Comments
+
+Git already stores history.
+
+Do not write:
+
+```ts
+// Changed from Redis to PostgreSQL
+
+// Previously this used Promise.all
+
+// Fixed timeout bug
+
+// New implementation
+
+// Updated logic
+
+// Old code removed
+
+// Modified on 2026-10-01
+```
+
+When code changes, update the code and its relevant comments.
+
+Do not preserve historical narration inside the source.
+
+Use Git history when history matters.
+
+---
+
+# 7. Comments Must Remain Valid After Refactoring
+
+Before finishing a change, verify every nearby comment.
+
+Ask:
+
+- Does this comment still describe the current implementation?
+- Does the referenced variable/function still exist?
+- Is this constraint still true?
+- Did the refactor make the comment unnecessary?
+- Could the comment now mislead another engineer?
+
+A stale comment is worse than no comment.
+
+If uncertain, remove it or rewrite it based on verified behavior.
+
+---
+
+# 8. Avoid Commented-Out Code
+
+Never leave dead implementation as comments.
+
+Bad:
+
+```ts
+// const result = await oldService.fetchData();
+// return result;
+```
+
+Delete unused code.
+
+Git is the source of historical code.
+
+Exceptions require an explicit technical reason documented in the comment.
+
+---
+
+# 9. TODO / FIXME Rules
+
+Do not automatically generate TODO/FIXME comments.
+
+Never use TODO as a substitute for completing the requested task.
+
+Forbidden:
+
+```ts
+// TODO: implement validation
+
+// TODO: handle error later
+
+// FIXME: improve this
+
+// TODO: optimize
+```
+
+TODO/FIXME is allowed only when there is a real known follow-up that cannot reasonably be completed in the current change.
+
+It should contain enough context to be actionable.
+
+Prefer:
+
+```ts
+// TODO(PROJ-431): remove fallback after clients below v3.2 are no longer supported.
+```
+
+Avoid vague TODOs.
+
+---
+
+# 10. Temporary Debugging Comments Are Forbidden
+
+Do not leave:
+
+```ts
+// debug
+
+// test here
+
+// temporary
+
+// console.log for testing
+
+// remove later
+
+// hack
+
+// workaround for now
+```
+
+Temporary diagnostic code and comments must be removed before completing the task.
+
+If a workaround must remain, explain the actual technical constraint.
+
+Example:
+
+```ts
+// Workaround for Canon EDSDK 13.18: requesting the image immediately
+// after capture can return DEVICE_BUSY. Remove after the SDK issue is fixed.
+```
+
+---
+
+# 11. Avoid Excessive Section Comments
+
+Do not unnecessarily divide ordinary functions into sections.
+
+Avoid:
+
+```ts
+// ==============================
+// VALIDATE INPUT
+// ==============================
+
+// ==============================
+// FETCH USER
+// ==============================
+
+// ==============================
+// PROCESS PAYMENT
+// ==============================
+```
+
+If a function needs many section comments, it may be doing too much.
+
+Prefer extracting functions:
+
+```ts
+validateCheckoutInput();
+const customer = await loadCustomer();
+await processPayment();
+```
+
+Section comments are acceptable only for genuinely large declarative structures or files where they materially improve navigation.
+
+---
+
+# 12. Documentation Comments Have Different Rules
+
+JSDoc, DartDoc, docstrings, API docs, public library documentation, generated API schemas, and framework-required comments are allowed.
+
+But they must provide useful contract-level information.
+
+Avoid:
+
+```ts
+/**
+ * Gets a user.
+ */
+function getUser() {}
+```
+
+Prefer documentation when it communicates:
+
+- parameters with non-obvious semantics
+- return guarantees
+- errors/exceptions
+- side effects
+- invariants
+- lifecycle rules
+- concurrency behavior
+- API contracts
+- security constraints
+
+Example:
+
+```ts
+/**
+ * Atomically reserves a coupon for one checkout.
+ *
+ * Throws `CouponAlreadyUsedError` if another transaction consumed
+ * the coupon before this transaction acquired the row lock.
+ */
+async function reserveCoupon(...) {}
+```
+
+---
+
+# 13. Comments Must Not Duplicate Documentation
+
+Do not copy large pieces of:
+
+- README
+- requirements
+- PRD
+- API documentation
+- business specifications
+
+into source comments.
+
+Link to stable documentation when appropriate.
+
+Example:
+
+```ts
+// See ADR-014 for the decision to use the outbox pattern here.
+```
+
+Do not reproduce the entire ADR inside the source file.
+
+---
+
+# 14. Be Careful With Business Rules
+
+Non-obvious business rules should be documented when removing the comment would make the logic appear arbitrary.
+
+Good:
+
+```ts
+// Revenue is recognized when the photobooth session is completed,
+// not when the customer initially starts the session.
+```
+
+But prefer encoding rules into names whenever possible.
+
+Example:
+
+```ts
+const recognizedRevenue = completedSessionsRevenue;
+```
+
+Use both code and comments only when the rule still requires contextual explanation.
+
+---
+
+# 15. Security Comments
+
+Security-sensitive decisions may require comments because a future developer might otherwise "simplify" them incorrectly.
+
+Good:
+
+```ts
+// Compare hashes using a constant-time function to avoid timing attacks.
+```
+
+Good:
+
+```ts
+// Never trust storeId from the request body.
+// Authorization determines the effective store scope.
+```
+
+Do not expose:
+
+- secrets
+- credentials
+- tokens
+- internal security-sensitive details that should not be public
+- exploitable infrastructure information
+
+---
+
+# 16. Performance Comments
+
+Only document performance decisions when they are non-obvious and measured or architecturally important.
+
+Good:
+
+```ts
+// Query IDs first to avoid loading ~40 MB of product metadata into memory
+// during nightly reconciliation.
+```
+
+Avoid speculative comments:
+
+```ts
+// This should be faster
+
+// Optimized code
+
+// Better performance
+```
+
+Prefer benchmarks, metrics, or concrete reasoning.
+
+---
+
+# 17. Comments Must Be Concise
+
+Do not write essay-sized comments in normal implementation code.
+
+Prefer:
+
+```ts
+// Prevent duplicate processing when the payment provider retries webhooks.
+```
+
+Instead of:
+
+```ts
+// We need this check because sometimes the payment provider can send
+// multiple webhook requests when there are various network situations
+// and because that can happen we need to check whether the webhook has
+// already been processed before processing it again.
+```
+
+Long explanations belong in documentation or ADRs.
+
+---
+
+# 18. Respect Existing Codebase Style
+
+Before adding comments:
+
+1. inspect surrounding files
+2. follow the repository's documentation conventions
+3. preserve meaningful existing comments
+4. avoid introducing a different commenting style unnecessarily
+
+Do not mass-delete existing comments solely because they are verbose.
+
+Remove or rewrite them only when they are:
+
+- incorrect
+- redundant
+- stale
+- misleading
+- prompt-derived
+- obvious narration
+- dead-code comments
+
+---
+
+# 19. Do Not Explain Every Generated Function
+
+When generating new files, do not automatically place comments above:
+
+- every function
+- every variable
+- every class
+- every endpoint
+- every React component
+- every Flutter widget
+- every service
+- every repository method
+
+For example, avoid:
+
+```ts
+// User service
+export class UserService {
+
+  // Constructor
+  constructor(...) {}
+
+  // Get user
+  async getUser(...) {}
+
+  // Create user
+  async createUser(...) {}
+}
+```
+
+The declarations already communicate this.
+
+---
+
+# 20. Final Comment Cleanup Pass
+
+Before considering any coding task complete, perform a comment review on all modified files.
+
+For every added or modified comment, classify it as:
+
+A. Explains a non-obvious WHY  
+B. Documents a contract/invariant  
+C. Documents a real external constraint  
+D. Required public/API documentation  
+E. Redundant/noisy/stale/prompt-derived
+
+Keep A-D.
+
+Delete E.
+
+Also search modified code for suspicious phrases such as:
+
+```text
+TODO
+FIXME
+temporary
+for now
+user asked
+requested
+prompt
+previous
+changed
+updated
+new logic
+old logic
+we need
+we should
+now we
+AI
+generated
+step 1
+step 2
+hack
+debug
+test here
+remove later
+```
+
+Do not blindly delete matching comments.
+
+Review their meaning and remove them when they represent implementation noise rather than legitimate engineering context.
+
+---
+
+# 21. Refactoring Rule
+
+When refactoring existing code:
+
+Do not preserve a comment merely because it already exists.
+
+Treat code + comments as one unit.
+
+If the implementation changes:
+
+- update the comment
+- remove the comment
+- or refactor the code so the comment is unnecessary
+
+Never leave comments describing behavior that no longer exists.
+
+---
+
+# 22. Generated Code Rule
+
+For generated or scaffolded code:
+
+Do not add artificial commentary to make the file appear documented.
+
+Documentation quality is measured by useful information, not comment quantity.
+
+A file with zero comments is completely acceptable when the code is self-explanatory.
+
+---
+
+# 23. Decision Rule
+
+Before writing any comment, ask:
+
+> Would an experienced engineer understand something important from this comment that cannot be reasonably understood from the code itself?
+
+If NO:
+
+Do not add the comment.
+
+If YES:
+
+Ask:
+
+> Is this information likely to remain true and useful after future refactors?
+
+If NO:
+
+Do not add the comment or move the information to appropriate documentation.
+
+If YES:
+
+Add the shortest accurate comment that preserves the necessary context.
+
+---
+
+# 24. Agent Completion Requirement
+
+After implementing a task, never leave comments explaining the work that was performed.
+
+Explain implementation changes to the user in the final response instead.
+
+Source code contains engineering context.
+
+Chat contains task/change explanations.
+
+Git contains history.
+
+Documentation contains architecture and long-form decisions.
+
+Do not mix these responsibilities.
+
+---
+
+# Golden Rule
+
+> Comments explain hidden intent, constraints, invariants, and reasoning that the code cannot express clearly.
+
+They do not explain the prompt.
+
+They do not narrate the code.
+
+They do not document what the AI just did.
+
+They do not preserve development history.
+
+When in doubt, write clearer code and omit the comment.

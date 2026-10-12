@@ -1,0 +1,26 @@
+﻿variant_id,route_id,state,title,domain,severity,trigger,primary_action,secondary_action,next_event,safety_rule
+S004__otp_invalid,S004,otp_invalid,Xác minh OTP,auth,P0,otp.verify INVALID_CODE,Thử lại,Đổi số điện thoại,otp.verify,OTP phải kiểm chứng ở backend; không log mã.
+S004__resend_cooldown,S004,resend_cooldown,Xác minh OTP,auth,P0,otp.resend RATE_LIMITED,Tiếp tục nhập mã,Quay lại,cooldown.elapsed,Không tính thời gian từ đồng hồ máy thay server timestamp.
+S015__search_empty,S015,search_empty,Tìm địa điểm,maps,P1,places.search result=[],Chọn trên bản đồ,Tìm lại,map.pin.selected,Không tự gán địa chỉ đầu tiên khi rỗng.
+S016__location_denied,S016,location_denied,Chọn trên bản đồ,maps,P1,location.permission DENIED,Chọn điểm ghim,Mở cài đặt,pin.manual_selected,Nút mở cài đặt chỉ hiển thị sau tương tác thực tế.
+S017__payment_unavailable,S017,payment_unavailable,Phương thức thanh toán,payments,P0,PSP_UNAVAILABLE,Chọn tiền mặt,Thử lại,payment.method_changed,Không lưu thẻ thô hoặc gắn trạng thái PAID giả.
+C002__map_loading,C002,map_loading,Bản đồ đặt xe,ride,P1,map.loading,Nhập địa chỉ thủ công,,map.ready,Không cho xác nhận điểm đón khi tọa độ chưa hợp lệ.
+C007__offers_empty,C007,offers_empty,Tài xế chào giá,ride,P0,ride.offers=[] after search,Thay đổi đề xuất,Thử lại,offer.refresh,Không tạo booking khi chưa có tài xế hợp lệ.
+C007__quote_expired,C007,quote_expired,Danh sách báo giá,ride,P0,quote.status EXPIRED,Tìm báo giá mới,Thay đổi đề xuất,quote.refresh,Không tự chuyển giá sang báo giá mới.
+C007__quote_taken,C007,quote_taken,Danh sách báo giá,ride,P0,acceptQuote 409 QUOTE_TAKEN,Xem tài xế khác,Làm mới danh sách,offers.reloaded,Chặn hai assignment cùng nhận một tài xế.
+C009__fare_changed,C009,fare_changed,Xác nhận giá mới,ride,P0,quote.reprice v2,Đồng ý 45.000đ,Quay lại,quote.accept_v2,Không commit nếu thiếu consent quote v2.
+C010__matching_timeout,C010,matching_timeout,Đang tìm tài xế,ride,P0,dispatch.timeout,Tìm lại tài xế,Sửa hành trình,dispatch.new_attempt,Không giữ reservation hoặc tiền tạm thu trái trạng thái.
+C011__tracking_offline,C011,tracking_offline,Theo dõi tài xế,ride,P0,tracking.socket DISCONNECTED,Thử kết nối lại,Liên hệ tài xế,tracking.resume,Không hiển thị ETA giả.
+C028__checkout_offline,C028,checkout_offline,Thanh toán đơn hàng,food,P0,checkout NETWORK_UNAVAILABLE,Thử đặt lại,Quay về giỏ hàng,checkout.retry_with_idempotency,Không tạo đơn offline giả.
+C028__checkout_repriced,C028,checkout_repriced,Xác nhận lại giỏ hàng,food,P0,checkout PRICE_CHANGED,Đồng ý 155.000đ,Quay lại giỏ,checkout.accept_new_snapshot,Không charge/commit với giá mới khi chưa consent.
+C028__submitting,C028,submitting,Đang xác nhận đơn,food,P0,checkout.commit PENDING,,,checkout.resolve,Không gửi request khác key khi đang pending.
+C033__tracking_reconnect,C033,tracking_reconnect,Theo dõi đơn hàng,food,P0,order.stream DISCONNECTED,Tải lại trạng thái,Liên hệ hỗ trợ,order.snapshot_refresh,Không đảo ngược trạng thái DELIVERED về SHIPPING.
+M015__queue_empty,M015,queue_empty,Đơn hàng của Shop,shop,P1,orders=[]; fetch OK,Kiểm tra cài đặt nhận đơn,,new_order_arrives,Không hiển thị đơn của Shop khác.
+M015__queue_error,M015,queue_error,Đơn hàng của Shop,shop,P0,orders.fetch 5xx or offline,Thử tải lại,Xem đơn đã lưu,orders.fetch_retry,Trạng thái nhận đơn do backend quyết định.
+M016__accept_conflict,M016,accept_conflict,Xác nhận đơn Shop,shop,P0,merchant.accept_order 409 VERSION_CONFLICT,Xem trạng thái mới,Về danh sách đơn,order.snapshot_refresh,Không cho hai nhân viên cùng xác nhận/reject xung đột.
+M019__handoff_code_wrong,M019,handoff_code_wrong,Bàn giao cho tài xế,shop,P0,handoff.verify INVALID_CODE,Nhập lại mã,Liên hệ tài xế,handoff.verify,Xác minh mã ở backend; không hiển thị OTP thật.
+D016__driver_offline,D016,driver_offline,Tổng quan tài xế,driver,P0,driver.connectivity OFFLINE,Kết nối lại,Xem lịch sử,driver.sync,Không nhận job mới khi không thể xác nhận assignment.
+D016__ineligible_expired,D016,ineligible_expired,Tổng quan tài xế,driver,P0,driver.service_eligibility RIDE_DENIED,Cập nhật giấy phép,Xem điều kiện,kyc.resubmit_document,Backend kiểm tra giấy tờ còn hiệu lực theo loại dịch vụ.
+D018__job_taken,D018,job_taken,Yêu cầu gần tài xế,driver,P0,jobs.accept 409 ALREADY_ASSIGNED,Tìm việc khác,Làm mới,jobs.refresh,Chỉ một assignment hợp lệ cho mỗi công việc.
+D023__passenger_otp_wrong,D023,passenger_otp_wrong,Xác thực lên xe,driver,P0,ride.start INVALID_PICKUP_OTP,Nhập lại OTP,Hỗ trợ khẩn,otp.verify_pickup,OTP và tài xế/chuyến phải được kiểm tra cùng transaction.
+D030__cod_unconfirmed,D030,cod_unconfirmed,Hoàn tất giao hàng,driver,P0,delivery.finish pending response,Kiểm tra kết quả,Liên hệ hỗ trợ,delivery.refresh_by_idempotency,Không tăng thu nhập và COD hai lần.

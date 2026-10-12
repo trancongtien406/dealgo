@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "illustrativeOnly": true,
+  "merchant": {
+    "merchantId": "MERCHANT-DEMO-01",
+    "displayName": "Bún Bò Huế O Cô",
+    "caseId": "KYB-SHOP-DEMO-01",
+    "caseState": "REQUIRES_CHANGES",
+    "submissionVersion": 1,
+    "reasons": ["KYB-DOC-BLUR", "KYB-ADDR-MISMATCH"],
+    "acceptOrders": false
+  },
+  "driver": {
+    "driverId": "DRIVER-DEMO-01",
+    "displayName": "Trần Minh Anh",
+    "vehicle": "Honda Vision",
+    "vehiclePlate": "43H1-123.45",
+    "caseId": "KYC-DRV-DEMO-01",
+    "caseState": "REQUIRES_CHANGES",
+    "submissionVersion": 1,
+    "reasons": ["KYC-ID-BLUR", "KYC-LICENSE-EXPIRED"],
+    "capabilities": {
+      "RIDE_PASSENGER": {"enabled": false, "reasonCodes": ["KYC-LICENSE-EXPIRED"]},
+      "FOOD_DELIVERY": {"enabled": true, "reasonCodes": [], "policyAssumption": "sample configuration only, legal review required"}
+    }
+  },
+  "outcomes": {
+    "M011_REJECTED": "REJECTED",
+    "M012_RESUBMITTED": "RESUBMITTED",
+    "D015_BLOCKED": "RIDE_SUSPENDED",
+    "D015_RESTORED": "RIDE_APPROVED"
+  }
+}

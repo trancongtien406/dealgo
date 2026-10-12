@@ -1,0 +1,20 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "name": "DealGo Design Tokens (proposed v0.1)",
+  "status": "PROPOSED_NOT_APPROVED",
+  "colors": {
+    "brand": {"purple600": "#6D28D9", "purple700": "#5820B5", "purple100": "#F2EAFF", "green600": "#16A34A", "green100": "#E7F8EE"},
+    "semantic": {"warning": "#CA7A17", "error": "#D63354", "info": "#2463C8"},
+    "surface": {"canvas": "#FBFAFD", "card": "#FFFFFF", "subtle": "#F6F3FA"},
+    "text": {"primary": "#171B2C", "secondary": "#666B80"},
+    "border": {"default": "#E7E3EF"},
+    "gradient": {"primaryStart": "#6029CF", "primaryEnd": "#843BDA"}
+  },
+  "spacingDp": [4, 8, 12, 16, 20, 24, 32],
+  "radiusDp": {"input": 12, "button": 16, "card": 20, "pill": 999},
+  "dimensionsDp": {"pageGutter": 16, "minTapTarget": 48, "primaryButtonMinHeight": 52},
+  "typographySp": {"hero": 28, "pageTitle": 22, "sectionHeading": 18, "cardTitle": 16, "body": 15, "secondary": 13, "caption": 12, "button": 16, "moneyLarge": 28},
+  "qaBreakpointsLogicalDp": [360, 390, 430, 600],
+  "qaTextScale": [1.0, 1.3, 1.6],
+  "notes": "These are proposed consistency tokens inferred from static mockups. Review before making source of truth."
+}

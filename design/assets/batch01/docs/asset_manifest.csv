@@ -1,0 +1,27 @@
+﻿file,category,width,height,background,screens,description
+banner_danang_hero,banners,1200,480,illustrated,C001 / onboarding / promos,"Banner Đà Nẵng minh họa cầu Rồng, chừa vùng chữ phía trái"
+banner_promo_gift,banners,1200,280,illustrated,C001 / C044 / M040,"Banner khuyến mãi/voucher, vùng chữ trống phía trái"
+card_ride,service_cards,680,360,illustrated,C001 / C002 / C004,Đặt xe (vùng chữ bên trái)
+card_food,service_cards,680,360,illustrated,C001 / C022 / C042,Đồ ăn và thực phẩm (vùng chữ bên trái)
+card_delivery,service_cards,680,360,illustrated,C001 / D026 / D029,Giao hàng (vùng chữ bên trái)
+card_shop,service_cards,680,360,illustrated,M001 / M013 / C025,Cửa hàng (vùng chữ bên trái)
+vehicle_sedan,vehicles,520,320,transparent,C004 / C005 / C006,Sedan 4 chỗ
+vehicle_7seat,vehicles,520,320,transparent,C004 / C008,Xe 7 chỗ
+vehicle_motorbike,vehicles,520,320,transparent,C004 / D008,Xe máy
+vehicle_delivery,vehicles,520,320,transparent,D016 / D026 / D029,Tài xế giao đồ ăn
+role_customer,role_illustrations,500,380,transparent,S007 / S002 / C001,"Khách hàng, tuyến đường"
+role_shop,role_illustrations,500,380,transparent,S007 / M001 / M013,"Shop, cửa hàng"
+role_driver,role_illustrations,500,380,transparent,S007 / D001 / D016,"Tài xế, nhận chuyến"
+role_food,role_illustrations,500,380,transparent,C022 / C032 / S002,Đặt đồ ăn
+state_no_search,states,512,512,transparent,C023 / S015,Không có kết quả
+state_no_orders,states,512,512,transparent,C043 / M015 / D033,Chưa có đơn
+state_no_driver,states,512,512,transparent,C010 / D018,Không tìm thấy tài xế
+state_offline,states,512,512,transparent,C028/offline / D016/offline,Mất kết nối
+state_quote_expired,states,512,512,transparent,C007/expired,Báo giá hết hạn
+state_payment_error,states,512,512,transparent,C028 / S017,Thanh toán lỗi
+state_success,states,512,512,transparent,C032 / D030 / M011,Thành công
+state_kyc_pending,states,512,512,transparent,M011 / D013,Hồ sơ đang xét duyệt
+state_kyc_rejected,states,512,512,transparent,M012 / D014,Hồ sơ yêu cầu bổ sung
+state_security,states,512,512,transparent,C014 / D044,An toàn chuyến đi
+accent_promo_gift,accent,480,340,transparent,C044 / C045 / M040,Minh họa quà tặng và ưu đãi
+accent_pickup_route,accent,480,340,transparent,C002 / C003 / D021,Minh họa điểm đi và đến
