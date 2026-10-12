@@ -81,3 +81,10 @@ Hiện có scaffold:
 - Deploy production, force-push, migration phá dữ liệu, lộ secret
 - Coi cache/push/socket client là nguồn sự thật thay backend
 - Hardcode chính sách phí / hủy / thanh toán khi vẫn `OPEN-*`
+
+## Cursor Cloud specific instructions
+
+- Flutter **3.47.7** (Dart 3.13.5) khớp `sdk: ^3.13.2` trong `mobile/pubspec.yaml`. SDK nằm ở `/opt/flutter`; `flutter` và `dart` có trên `PATH`.
+- Admin Web (`website/`) dùng cổng **3000**. API (`backend/`) dùng cổng **3001**. Cả hai scaffold mặc định cổng 3000, nên khi chạy cùng lúc phải đặt `PORT=3001` cho API. `GET /` trên API trả về `DealGo API`.
+- Mobile không có emulator trong môi trường này. Kiểm tra bằng `flutter analyze` và `flutter test` trong `mobile/`.
+- Không có database hay secret. Cài dependency bằng `npm ci` trong `backend/` và `website/`.
