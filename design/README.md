@@ -8,4 +8,4 @@ Tài nguyên thiết kế và mockup — **không** phải mã production Flutte
 | `assets/batch01/` | Illustration / vector / PNG batch 01 |
 | `assets/batch02/` | PNG + WebP batch 02 (banner, food, store, vehicle…) |
 
-Bắt đầu với `mockups/README_FIRST.txt` và `mockups/audit/00_README.md`.
+Bắt đầu với `mockups/README_FIRST.txt`, `mockups/audit/00_README.md`, và xem ma trận liên kết đầy đủ 202 màn hình tại [`docs/DealGo_MD_File_List.md`](../docs/DealGo_MD_File_List.md).
