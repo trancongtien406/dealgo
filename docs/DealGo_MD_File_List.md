@@ -12,15 +12,15 @@
 | **Shop / Quán ăn** | Mobile | 44 | 44/44 (100%) | 26/44 | 4 variants (3 routes) | [`../design/mockups/screens/merchant/`](../design/mockups/screens/merchant/) |
 | **Shipper / Tài xế** | Mobile | 45 | 45/45 (100%) | 20/45 | 4 variants (4 routes) | [`../design/mockups/screens/driver/`](../design/mockups/screens/driver/) |
 | **Landing Page** | Web công khai | 13 | Kế hoạch UI Web | N/A | N/A | Kênh Web công khai |
-| **Admin Dashboard** | Web quản trị | 35 | Kế hoạch UI Web | N/A | N/A | [`../website/app/`](../website/app/) |
-| **Tổng cốt lõi** | **165 Mobile + 48 Web** | **213** | **165 Mobile PNG** | **96 HTML** | **25 variants** | **6 Golden Screens** |
+| **Admin Dashboard** | Web quản trị | 35 | 35/35 (100%) | N/A | N/A | [`../design/mockups/screens/admin/`](../design/mockups/screens/admin/) |
+| **Tổng cốt lõi** | **165 Mobile + 48 Web** | **213** | **200 PNG (165 Mobile + 35 Admin)** | **96 HTML (Mobile)** | **25 variants** | **6 Golden Screens Mobile** |
 | **Merchant Portal** | Web đối tác — giai đoạn sau | 10 | Kế hoạch sau MVP | N/A | N/A | Kênh Web đối tác |
 | **Tổng khi bổ sung Merchant Portal** | **213 + 10** | **223** | | | | |
 
 ### Định hướng triển khai
 
 - **Mobile (165 màn hình):** **165/165 màn hình ĐÃ CÓ MOCKUP THAM CHIẾU (100%)** tại `../design/mockups/screens/` (gồm các vai trò Khách hàng, Shop/Quán ăn và Shipper/Tài xế trong cùng một app Flutter).
-- **Web cốt lõi (48 trang):** 13 trang Landing Page giới thiệu DealGo và 35 trang Admin Dashboard vận hành hệ thống (Next.js 16 tại `../website/`).
+- **Web cốt lõi (48 trang):** 13 trang Landing Page giới thiệu DealGo và 35 trang Admin Dashboard vận hành hệ thống (Next.js 16 tại `../website/`, trong đó toàn bộ 35/35 trang Admin đã có mockup PNG độ phân giải 1600×1180 tại [`../design/mockups/screens/admin/`](../design/mockups/screens/admin/)).
 - **Merchant Portal (10 trang):** Dành cho cửa hàng/quán ăn trên Web ở giai đoạn sau; không gộp vào 213 màn hình cốt lõi ban đầu.
 - **Nguyên tắc phân định:** Landing Page giới thiệu dịch vụ, cách hoạt động, đối tác và ứng dụng; không triển khai luồng đặt xe/đồ ăn của app trên website.
 - **Responsive & UI States:** Responsive layouts, tab, modal, dialog, bottom sheet và các trạng thái loading/empty/error không cộng thành màn hình riêng. Biến thể lỗi/chờ được quản lý qua `DealGoScreenState`.
@@ -254,43 +254,43 @@
 
 > **Ghi chú Admin Dashboard:** Kênh vận hành nội bộ trên Next.js 16 (`../website/`), phục vụ nhân sự vận hành giám sát, duyệt hồ sơ KYC/KYB và xử lý sự cố.
 
-| Mã | Tên trang / Chức năng | Kênh triển khai | Trạng thái thiết kế (`design/`) | File MD dự kiến (`docs/screens/`) |
-|:---:|---|:---:|---|---|
-| **A001** | Đăng nhập quản trị | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A001-dang-nhap-quan-tri.md` |
-| **A002** | Quên và đặt lại mật khẩu | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A002-quen-va-dat-lai-mat-khau.md` |
-| **A003** | Dashboard tổng quan | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A003-dashboard-tong-quan.md` |
-| **A004** | Giám sát vận hành trực tiếp | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A004-giam-sat-van-hanh-truc-tiep.md` |
-| **A005** | Danh sách chuyến xe | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A005-danh-sach-chuyen-xe.md` |
-| **A006** | Chi tiết chuyến xe | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A006-chi-tiet-chuyen-xe.md` |
-| **A007** | Danh sách phiên trả giá | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A007-danh-sach-phien-tra-gia.md` |
-| **A008** | Chi tiết phiên trả giá | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A008-chi-tiet-phien-tra-gia.md` |
-| **A009** | Danh sách đơn đồ ăn | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A009-danh-sach-don-do-an.md` |
-| **A010** | Chi tiết đơn đồ ăn | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A010-chi-tiet-don-do-an.md` |
-| **A011** | Danh sách đơn giao hàng | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A011-danh-sach-don-giao-hang.md` |
-| **A012** | Chi tiết đơn giao hàng | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A012-chi-tiet-don-giao-hang.md` |
-| **A013** | Danh sách yêu cầu dịch vụ A/C | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A013-danh-sach-yeu-cau-dich-vu-a-c.md` |
-| **A014** | Chi tiết yêu cầu dịch vụ A/C | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A014-chi-tiet-yeu-cau-dich-vu-a-c.md` |
-| **A015** | Danh sách khách hàng | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A015-danh-sach-khach-hang.md` |
-| **A016** | Chi tiết khách hàng | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A016-chi-tiet-khach-hang.md` |
-| **A017** | Danh sách tài xế | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A017-danh-sach-tai-xe.md` |
-| **A018** | Chi tiết tài xế | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A018-chi-tiet-tai-xe.md` |
-| **A019** | Duyệt hồ sơ KYC tài xế | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A019-duyet-ho-so-kyc-tai-xe.md` |
-| **A020** | Danh sách cửa hàng | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A020-danh-sach-cua-hang.md` |
-| **A021** | Chi tiết cửa hàng | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A021-chi-tiet-cua-hang.md` |
-| **A022** | Duyệt hồ sơ cửa hàng | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A022-duyet-ho-so-cua-hang.md` |
-| **A023** | Kiểm duyệt sản phẩm và thực đơn | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A023-kiem-duyet-san-pham-va-thuc-don.md` |
-| **A024** | Danh sách giao dịch | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A024-danh-sach-giao-dich.md` |
-| **A025** | Đối soát và thanh toán đối tác | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A025-doi-soat-va-thanh-toan-doi-tac.md` |
-| **A026** | Xử lý hoàn tiền | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A026-xu-ly-hoan-tien.md` |
-| **A027** | Danh sách khiếu nại và tranh chấp | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A027-danh-sach-khieu-nai-va-tranh-chap.md` |
-| **A028** | Chi tiết xử lý khiếu nại & tranh chấp | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A028-chi-tiet-xu-ly-khieu-nai-tranh-chap.md` |
-| **A029** | Quản lý khuyến mãi | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A029-quan-ly-khuyen-mai.md` |
-| **A030** | Quản lý danh mục | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A030-quan-ly-danh-muc.md` |
-| **A031** | Thông báo và CMS | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A031-thong-bao-va-cms.md` |
-| **A032** | Thống kê và phân tích | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A032-thong-ke-va-phan-tich.md` |
-| **A033** | Khu vực hoạt động và quy tắc giá | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A033-khu-vuc-hoat-dong-va-quy-tac-gia.md` |
-| **A034** | Nhân sự và phân quyền | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A034-nhan-su-va-phan-quyen.md` |
-| **A035** | Cấu hình và nhật ký hệ thống | Web quản trị | Kế hoạch UI Web (Scaffold tại [`website/app/`](../website/app/)) | `A035-cau-hinh-va-nhat-ky-he-thong.md` |
+| Mã | Tên trang / Chức năng | Mockup PNG (`design/`) | Kích thước | Kênh triển khai | File MD dự kiến (`docs/screens/`) |
+|:---:|---|:---:|:---:|:---:|---|
+| **A001** | Đăng nhập quản trị | [`A001_dang_nhap_quan_tri.png`](../design/mockups/screens/admin/A001_dang_nhap_quan_tri.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A001-dang-nhap-quan-tri.md` |
+| **A002** | Quên và đặt lại mật khẩu | [`A002_quen_va_dat_lai_mat_khau.png`](../design/mockups/screens/admin/A002_quen_va_dat_lai_mat_khau.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A002-quen-va-dat-lai-mat-khau.md` |
+| **A003** | Dashboard tổng quan | [`A003_dashboard_tong_quan.png`](../design/mockups/screens/admin/A003_dashboard_tong_quan.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A003-dashboard-tong-quan.md` |
+| **A004** | Giám sát vận hành trực tiếp | [`A004_giam_sat_van_hanh_truc_tiep.png`](../design/mockups/screens/admin/A004_giam_sat_van_hanh_truc_tiep.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A004-giam-sat-van-hanh-truc-tiep.md` |
+| **A005** | Danh sách chuyến xe | [`A005_danh_sach_chuyen_xe.png`](../design/mockups/screens/admin/A005_danh_sach_chuyen_xe.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A005-danh-sach-chuyen-xe.md` |
+| **A006** | Chi tiết chuyến xe | [`A006_chi_tiet_chuyen_xe.png`](../design/mockups/screens/admin/A006_chi_tiet_chuyen_xe.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A006-chi-tiet-chuyen-xe.md` |
+| **A007** | Danh sách phiên trả giá | [`A007_danh_sach_phien_tra_gia.png`](../design/mockups/screens/admin/A007_danh_sach_phien_tra_gia.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A007-danh-sach-phien-tra-gia.md` |
+| **A008** | Chi tiết phiên trả giá | [`A008_chi_tiet_phien_tra_gia.png`](../design/mockups/screens/admin/A008_chi_tiet_phien_tra_gia.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A008-chi-tiet-phien-tra-gia.md` |
+| **A009** | Danh sách đơn đồ ăn | [`A009_danh_sach_don_do_an.png`](../design/mockups/screens/admin/A009_danh_sach_don_do_an.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A009-danh-sach-don-do-an.md` |
+| **A010** | Chi tiết đơn đồ ăn | [`A010_chi_tiet_don_do_an.png`](../design/mockups/screens/admin/A010_chi_tiet_don_do_an.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A010-chi-tiet-don-do-an.md` |
+| **A011** | Danh sách đơn giao hàng | [`A011_danh_sach_don_giao_hang.png`](../design/mockups/screens/admin/A011_danh_sach_don_giao_hang.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A011-danh-sach-don-giao-hang.md` |
+| **A012** | Chi tiết đơn giao hàng | [`A012_chi_tiet_don_giao_hang.png`](../design/mockups/screens/admin/A012_chi_tiet_don_giao_hang.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A012-chi-tiet-don-giao-hang.md` |
+| **A013** | Danh sách yêu cầu dịch vụ A/C | [`A013_danh_sach_yeu_cau_dich_vu_a_c.png`](../design/mockups/screens/admin/A013_danh_sach_yeu_cau_dich_vu_a_c.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A013-danh-sach-yeu-cau-dich-vu-a-c.md` |
+| **A014** | Chi tiết yêu cầu dịch vụ A/C | [`A014_chi_tiet_yeu_cau_dich_vu_a_c.png`](../design/mockups/screens/admin/A014_chi_tiet_yeu_cau_dich_vu_a_c.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A014-chi-tiet-yeu-cau-dich-vu-a-c.md` |
+| **A015** | Danh sách khách hàng | [`A015_danh_sach_khach_hang.png`](../design/mockups/screens/admin/A015_danh_sach_khach_hang.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A015-danh-sach-khach-hang.md` |
+| **A016** | Chi tiết khách hàng | [`A016_chi_tiet_khach_hang.png`](../design/mockups/screens/admin/A016_chi_tiet_khach_hang.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A016-chi-tiet-khach-hang.md` |
+| **A017** | Danh sách tài xế | [`A017_danh_sach_tai_xe.png`](../design/mockups/screens/admin/A017_danh_sach_tai_xe.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A017-danh-sach-tai-xe.md` |
+| **A018** | Chi tiết tài xế | [`A018_chi_tiet_tai_xe.png`](../design/mockups/screens/admin/A018_chi_tiet_tai_xe.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A018-chi-tiet-tai-xe.md` |
+| **A019** | Duyệt hồ sơ KYC tài xế | [`A019_duyet_ho_so_kyc_tai_xe.png`](../design/mockups/screens/admin/A019_duyet_ho_so_kyc_tai_xe.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A019-duyet-ho-so-kyc-tai-xe.md` |
+| **A020** | Danh sách cửa hàng | [`A020_danh_sach_cua_hang.png`](../design/mockups/screens/admin/A020_danh_sach_cua_hang.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A020-danh-sach-cua-hang.md` |
+| **A021** | Chi tiết cửa hàng | [`A021_chi_tiet_cua_hang.png`](../design/mockups/screens/admin/A021_chi_tiet_cua_hang.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A021-chi-tiet-cua-hang.md` |
+| **A022** | Duyệt hồ sơ cửa hàng | [`A022_duyet_ho_so_cua_hang.png`](../design/mockups/screens/admin/A022_duyet_ho_so_cua_hang.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A022-duyet-ho-so-cua-hang.md` |
+| **A023** | Kiểm duyệt sản phẩm và thực đơn | [`A023_kiem_duyet_san_pham_va_thuc_don.png`](../design/mockups/screens/admin/A023_kiem_duyet_san_pham_va_thuc_don.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A023-kiem-duyet-san-pham-va-thuc-don.md` |
+| **A024** | Danh sách giao dịch | [`A024_danh_sach_giao_dich.png`](../design/mockups/screens/admin/A024_danh_sach_giao_dich.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A024-danh-sach-giao-dich.md` |
+| **A025** | Đối soát và thanh toán đối tác | [`A025_doi_soat_va_thanh_toan_doi_tac.png`](../design/mockups/screens/admin/A025_doi_soat_va_thanh_toan_doi_tac.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A025-doi-soat-va-thanh-toan-doi-tac.md` |
+| **A026** | Xử lý hoàn tiền | [`A026_xu_ly_hoan_tien.png`](../design/mockups/screens/admin/A026_xu_ly_hoan_tien.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A026-xu-ly-hoan-tien.md` |
+| **A027** | Danh sách khiếu nại và tranh chấp | [`A027_danh_sach_khieu_nai_va_tranh_chap.png`](../design/mockups/screens/admin/A027_danh_sach_khieu_nai_va_tranh_chap.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A027-danh-sach-khieu-nai-va-tranh-chap.md` |
+| **A028** | Chi tiết xử lý khiếu nại & tranh chấp | [`A028_chi_tiet_xu_ly_khieu_nai_tranh_chap.png`](../design/mockups/screens/admin/A028_chi_tiet_xu_ly_khieu_nai_tranh_chap.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A028-chi-tiet-xu-ly-khieu-nai-tranh-chap.md` |
+| **A029** | Quản lý khuyến mãi | [`A029_quan_ly_khuyen_mai.png`](../design/mockups/screens/admin/A029_quan_ly_khuyen_mai.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A029-quan-ly-khuyen-mai.md` |
+| **A030** | Quản lý danh mục | [`A030_quan_ly_danh_muc.png`](../design/mockups/screens/admin/A030_quan_ly_danh_muc.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A030-quan-ly-danh-muc.md` |
+| **A031** | Thông báo và CMS | [`A031_thong_bao_va_cms.png`](../design/mockups/screens/admin/A031_thong_bao_va_cms.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A031-thong-bao-va-cms.md` |
+| **A032** | Thống kê và phân tích | [`A032_thong_ke_va_phan_tich.png`](../design/mockups/screens/admin/A032_thong_ke_va_phan_tich.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A032-thong-ke-va-phan-tich.md` |
+| **A033** | Khu vực hoạt động và quy tắc giá | [`A033_khu_vuc_hoat_dong_va_quy_tac_gia.png`](../design/mockups/screens/admin/A033_khu_vuc_hoat_dong_va_quy_tac_gia.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A033-khu-vuc-hoat-dong-va-quy-tac-gia.md` |
+| **A034** | Nhân sự và phân quyền | [`A034_nhan_su_va_phan_quyen.png`](../design/mockups/screens/admin/A034_nhan_su_va_phan_quyen.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A034-nhan-su-va-phan-quyen.md` |
+| **A035** | Cấu hình và nhật ký hệ thống | [`A035_cau_hinh_va_nhat_ky_he_thong.png`](../design/mockups/screens/admin/A035_cau_hinh_va_nhat_ky_he_thong.png) | 1600×1180 | Web quản trị (Scaffold tại [`website/app/`](../website/app/)) | `A035-cau-hinh-va-nhat-ky-he-thong.md` |
 
 ### Merchant Portal — 10 file (Web đối tác — giai đoạn sau)
 

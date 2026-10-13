@@ -1,6 +1,6 @@
 # DealGo — UI Consistency Audit & Flutter Handoff
 
-**Phạm vi:** 165 mockup mobile theo Screen Inventory v2.0 (28 S, 48 C, 44 M, 45 D). 37 màn Admin Web chưa nằm trong audit này. Ảnh là mockup tĩnh; việc có ảnh **không đồng nghĩa** màn hình đã được test hoặc implement.
+**Phạm vi:** 165 mockup mobile theo Screen Inventory v2.0 (28 S, 48 C, 44 M, 45 D). Bộ 35 màn Admin Web (A001–A035) được tổ chức và liên kết riêng tại [`../screens/admin/`](../screens/admin/) (gồm đầy đủ 35 mockup PNG desktop A001–A035). Ảnh là mockup tĩnh; việc có ảnh **không đồng nghĩa** màn hình đã được test hoặc implement.
 
 ## Kết quả đã đối soát
 
@@ -24,4 +24,4 @@
 
 **Ảnh trang chủ C001 là chuẩn nhận diện thương hiệu**, không dùng tỷ lệ pixel hay bố cục thiết bị trong ảnh như thông số production. `design_tokens.json` là **đề xuất chuẩn hóa**, cần duyệt trực quan trước khi code hàng loạt.
 
-**Chưa làm:** tự động nhận dạng chữ bằng OCR trên tất cả ảnh; kiểm thử tương tác Flutter thực tế; đối chiếu pháp lý từng yêu cầu dịch vụ; audit 37 màn Admin Web; nhận dạng pixel-perfect 165 màn có trạng thái responsive.
+**Chưa làm:** tự động nhận dạng chữ bằng OCR trên tất cả ảnh; kiểm thử tương tác Flutter thực tế; đối chiếu pháp lý từng yêu cầu dịch vụ; nhận dạng pixel-perfect 165 màn có trạng thái responsive. Màn Admin Web (A001–A035) đã được phân loại và kiểm kê độc lập tại `design/mockups/screens/admin/`.
