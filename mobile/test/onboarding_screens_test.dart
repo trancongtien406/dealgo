@@ -1,4 +1,5 @@
 import 'package:dealgo/core/design_system/components/dealgo_logo.dart';
+import 'package:dealgo/core/storage/onboarding_storage.dart';
 import 'package:dealgo/features/identity/presentation/pages/splash_page.dart';
 import 'package:dealgo/features/onboarding/presentation/pages/customer_onboarding_page.dart';
 import 'package:dealgo/l10n/app_localizations.dart';
@@ -51,8 +52,12 @@ void main() {
   group('S002 CustomerOnboardingPage', () {
     testWidgets('renders initial slide and allows advancing through steps', (tester) async {
       var completed = false;
+      final storage = MemoryOnboardingStorage();
       await tester.pumpWidget(
-        _wrap(CustomerOnboardingPage(onComplete: () => completed = true)),
+        _wrap(CustomerOnboardingPage(
+          onComplete: () => completed = true,
+          storage: storage,
+        )),
       );
       await tester.pumpAndSettle();
 
@@ -80,12 +85,17 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(completed, isTrue);
+      expect(await storage.hasSeenOnboarding(), isTrue);
     });
 
     testWidgets('tapping Bỏ qua triggers completion directly', (tester) async {
       var completed = false;
+      final storage = MemoryOnboardingStorage();
       await tester.pumpWidget(
-        _wrap(CustomerOnboardingPage(onComplete: () => completed = true)),
+        _wrap(CustomerOnboardingPage(
+          onComplete: () => completed = true,
+          storage: storage,
+        )),
       );
       await tester.pumpAndSettle();
 
@@ -93,6 +103,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(completed, isTrue);
+      expect(await storage.hasSeenOnboarding(), isTrue);
     });
   });
 }
