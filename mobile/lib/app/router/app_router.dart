@@ -66,6 +66,8 @@ import '../../features/identity/presentation/cubit/phone_auth_cubit.dart';
 import '../../features/identity/presentation/pages/phone_login_page.dart';
 import '../../features/identity/presentation/pages/splash_page.dart';
 import '../../features/onboarding/presentation/pages/customer_onboarding_page.dart';
+import '../../features/onboarding/presentation/pages/permissions_page.dart';
+import '../../features/onboarding/presentation/pages/profile_setup_page.dart';
 import '../../features/onboarding/presentation/pages/driver_kyc_pages.dart';
 import '../../features/onboarding/presentation/utils/driver_kyc_routes.dart';
 import '../../features/onboarding/presentation/pages/merchant_kyb_pages.dart';
@@ -138,6 +140,20 @@ GoRouter createAppRouter({
         pageBuilder: (context, state) => dealgoFadeSlidePage(
           key: state.pageKey,
           child: const CustomerOnboardingPage(),
+        ),
+      ),
+      GoRoute(
+        path: AuthRoutes.profileSetup,
+        pageBuilder: (context, state) => dealgoFadeSlidePage(
+          key: state.pageKey,
+          child: const ProfileSetupPage(),
+        ),
+      ),
+      GoRoute(
+        path: AuthRoutes.permissions,
+        pageBuilder: (context, state) => dealgoFadeSlidePage(
+          key: state.pageKey,
+          child: const PermissionsPage(),
         ),
       ),
       GoRoute(
