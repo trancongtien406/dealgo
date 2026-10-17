@@ -194,7 +194,7 @@ List<_RoleMode> _roleModes(AppLocalizations l10n) => [
     icon: Icons.person_outline,
     tint: DealGoColors.subtlePurple,
     iconColor: DealGoColors.primary,
-    imageAsset: 'assets/images/role_customer.png',
+    imageAsset: 'assets/images/role_customer_3d.png',
   ),
   _RoleMode(
     role: AppRole.merchant,
@@ -204,7 +204,7 @@ List<_RoleMode> _roleModes(AppLocalizations l10n) => [
     icon: Icons.storefront_outlined,
     tint: DealGoColors.greenSurface,
     iconColor: DealGoColors.brandGreen,
-    imageAsset: 'assets/images/role_shop.png',
+    imageAsset: 'assets/images/role_merchant_3d.png',
   ),
   _RoleMode(
     role: AppRole.driver,
@@ -214,7 +214,7 @@ List<_RoleMode> _roleModes(AppLocalizations l10n) => [
     icon: Icons.two_wheeler,
     tint: DealGoColors.amberSurface,
     iconColor: DealGoColors.amber,
-    imageAsset: 'assets/images/role_driver.png',
+    imageAsset: 'assets/images/role_driver_3d.png',
   ),
 ];
 
@@ -238,7 +238,7 @@ class _ModeCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(DealGoRadius.card),
         side: BorderSide(
           color: selected ? DealGoColors.primary : DealGoColors.border,
-          width: selected ? 1.6 : 1,
+          width: selected ? 2.0 : 1.0,
         ),
       ),
       clipBehavior: Clip.antiAlias,
@@ -251,27 +251,36 @@ class _ModeCard extends StatelessWidget {
             children: [
               Text(
                 mode.title,
-                style: textTheme.labelLarge?.copyWith(fontSize: 13),
+                style: textTheme.labelLarge?.copyWith(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? DealGoColors.primary : DealGoColors.textSecondary,
+                ),
               ),
               const SizedBox(height: DealGoSpacing.s12),
               Row(
                 children: [
-                  DecoratedBox(
+                  Container(
+                    width: 58,
+                    height: 58,
                     decoration: BoxDecoration(
                       color: mode.tint,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: SizedBox(
-                      width: 48,
-                      height: 48,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
-                        child: Image.asset(
-                          mode.imageAsset,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              Icon(mode.icon, color: mode.iconColor),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
                         ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.asset(
+                        mode.imageAsset,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            Icon(mode.icon, color: mode.iconColor, size: 28),
                       ),
                     ),
                   ),
@@ -280,9 +289,21 @@ class _ModeCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(mode.headline, style: textTheme.titleMedium),
+                        Text(
+                          mode.headline,
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
                         const SizedBox(height: DealGoSpacing.s4),
-                        Text(mode.detail, style: textTheme.bodySmall),
+                        Text(
+                          mode.detail,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: DealGoColors.textSecondary,
+                            height: 1.35,
+                          ),
+                        ),
                       ],
                     ),
                   ),

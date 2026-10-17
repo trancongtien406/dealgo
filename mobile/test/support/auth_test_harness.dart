@@ -45,6 +45,7 @@ Future<MemoryTokenStore> pumpSignedIn(
   FoodClient? foodClient,
   RideClient? rideClient,
   ChatClient? chatClient,
+  String? initialLocation,
 }) async {
   final store = MemoryTokenStore();
   await store.write(
@@ -60,6 +61,7 @@ Future<MemoryTokenStore> pumpSignedIn(
       foodClient: foodClient ?? FakeFoodClient(),
       rideClient: rideClient ?? FakeRideClient(),
       chatClient: chatClient,
+      initialLocation: initialLocation,
     ),
   );
   await tester.pumpAndSettle();

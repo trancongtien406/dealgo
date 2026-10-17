@@ -132,7 +132,7 @@ class AccountPage extends StatelessWidget {
                       trailing: canSwitchRole
                           ? const _LinkLabel('Đổi vai trò')
                           : null,
-                      onTap: canSwitchRole
+                      onTap: signedIn != null
                           ? () => context.push(AuthRoutes.roles)
                           : null,
                     ),

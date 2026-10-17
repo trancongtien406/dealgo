@@ -15,7 +15,9 @@ String? authRedirect(AuthState auth, Uri uri) {
   final path = uri.path;
   switch (auth) {
     case AuthRestoring():
-      if (path == AuthRoutes.splash || path == AuthRoutes.onboarding) {
+      if (path == AuthRoutes.splash ||
+          path == AuthRoutes.onboarding ||
+          path == AuthRoutes.roles) {
         return null;
       }
       return path == AuthRoutes.login ? null : AuthRoutes.login;
@@ -40,7 +42,9 @@ String? _signedOutRedirect(String path, Uri uri) {
 }
 
 String? _signedInRedirect(String path, List<AppRole> roles) {
-  const entry = '/customer';
+  final entry = roles.contains(AppRole.customer) || roles.isEmpty
+      ? AppRole.customer.homePath
+      : roles.first.homePath;
   if (path == AuthRoutes.splash ||
       path == AuthRoutes.login ||
       path == AuthRoutes.otp ||

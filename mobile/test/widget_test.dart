@@ -1,3 +1,4 @@
+import 'package:dealgo/features/identity/domain/auth_redirect.dart';
 import 'package:dealgo/features/shell/presentation/customer_tab_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,7 +10,11 @@ void main() {
   testWidgets('role picker shows active customer merchant and driver roles', (
     tester,
   ) async {
-    await pumpSignedIn(tester, profile: multiRoleProfile);
+    await pumpSignedIn(
+      tester,
+      profile: multiRoleProfile,
+      initialLocation: AuthRoutes.roles,
+    );
 
     expect(find.text('Trung tâm vai trò'), findsOneWidget);
     expect(find.text('Chế độ Khách hàng'), findsOneWidget);
@@ -20,7 +25,11 @@ void main() {
   testWidgets('tapping Khách hàng shows customer nav label Trang chủ', (
     tester,
   ) async {
-    await pumpSignedIn(tester, profile: multiRoleProfile);
+    await pumpSignedIn(
+      tester,
+      profile: multiRoleProfile,
+      initialLocation: AuthRoutes.roles,
+    );
 
     await tester.tap(find.text('Tiếp tục với Khách hàng'));
     await tester.pumpAndSettle();
@@ -37,7 +46,11 @@ void main() {
   });
 
   testWidgets('switching role replaces the previous shell nav', (tester) async {
-    await pumpSignedIn(tester, profile: multiRoleProfile);
+    await pumpSignedIn(
+      tester,
+      profile: multiRoleProfile,
+      initialLocation: AuthRoutes.roles,
+    );
 
     await tester.tap(find.text('Tiếp tục với Khách hàng'));
     await tester.pumpAndSettle();
@@ -60,6 +73,23 @@ void main() {
     expect(navLabel('Đặt'), findsNothing);
     expect(navLabel('Sản phẩm'), findsNothing);
   });
+
+  testWidgets(
+    'multi-role user automatically enters customer shell and skips role picker',
+    (tester) async {
+      await pumpSignedIn(tester, profile: multiRoleProfile);
+
+      // Skips role picker, lands directly in Customer shell
+      expect(find.byType(CustomerTabBar), findsOneWidget);
+      expect(navLabel('Trang chủ'), findsOneWidget);
+      expect(find.text('Trung tâm vai trò'), findsNothing);
+
+      // User can switch role from Account page
+      await tester.tap(navLabel('Tài khoản'));
+      await tester.pumpAndSettle();
+      expect(find.text('Đổi vai trò'), findsOneWidget);
+    },
+  );
 }
 
 Future<void> _switchRole(
