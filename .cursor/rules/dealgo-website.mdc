@@ -1,0 +1,173 @@
+---
+description: "DealGo website engineering rules for Next.js, React, TypeScript: clear ownership, reliable API/state, consistent approved UI, trust-boundary security, measured performance, SEO, i18n and production reliability."
+globs: website/**
+alwaysApply: false
+---
+
+# DealGo — Website Engineering Rules
+
+Áp dụng cho `website/` của DealGo. Đây là **coding rules**, không phải kế hoạch triển khai, tài liệu kiến trúc hay checklist cho mọi task. Giữ cách làm đơn giản, đồng nhất và có thể kiểm chứng. Không bắt buộc tạo đủ các thư mục/layer nêu trong ví dụ.
+
+## 1. Product & source of truth
+
+- Phân biệt **Landing Page** (public, marketing/SEO) với **Dashboard/Portal** (authenticated, quản trị/vận hành). Mỗi nhóm có layout, route và loading strategy phù hợp; vẫn dùng chung brand tokens và UI primitives đã chốt.
+- Các màn hình đã duyệt trong `/design` là chuẩn về visual, navigation, nội dung và tương tác. Không tự thay style, sidebar, header, active menu, icon hoặc nội dung cho tiện triển khai; đồng bộ với mobile khi cùng design language.
+- Tôn trọng API contract, role, permission, trạng thái chuyến/đơn/báo giá của backend DealGo. Không tự đặt tên field, status, transition hoặc quyết định nghiệp vụ khác server.
+- Khi thiếu design của màn mới, kế thừa layout/tokens/components có sẵn; không tuyên bố giống 100% reference nếu chưa có reference hoặc chưa đối chiếu runtime.
+
+## 2. Architecture & ownership
+
+- Ưu tiên **feature-first**: một feature sở hữu UI, hooks, types, API adapters và business presentation logic của nó. Code dùng chung thật sự mới đưa vào `components/`, `lib/` hoặc `shared/`.
+- `app/` sở hữu route, layout, metadata, error/loading boundaries và composition; không trở thành nơi chứa toàn bộ data fetching, mutation, business logic và components của feature.
+- Page/component chỉ render và phát ra user intent. Không nhồi API logic, domain enums, DTO mapping, fake data, large helper functions hay side effects vào cùng file `.tsx`.
+- Đặt API schemas/types theo contract chung; đặt business enum và mapper ở module domain/data liên quan. UI-only variants (tab, display mode) được ở presentation. Không tạo nhiều bản định nghĩa của cùng một business status.
+- Hook phục vụ dữ liệu/tương tác của feature đặt gần feature; hooks dùng chung mới đưa ra shared. Không tạo custom hook chỉ để bọc một dòng `useState`/`useQuery` không tăng giá trị.
+- Không import xuyên vào implementation nội bộ của feature khác; khi cần dùng chung, định nghĩa public API nhỏ hoặc chuyển ownership hợp lý. Tránh circular imports và god modules.
+- Đơn giản hóa theo thực tế: không ép `Repository → Service → UseCase → Hook` cho một GET đơn giản. Thêm layer khi có nghiệp vụ, tái sử dụng, nhiều data sources hoặc lợi ích test rõ ràng.
+
+**Cấu trúc tham khảo, chỉ tạo phần đang cần:**
+
+```text
+website/src/
+  app/                    # routes, layouts, loading/error boundaries
+  features/
+    rides/                # components, hooks, api, types theo nhu cầu
+    orders/
+    merchants/
+    drivers/
+  components/             # ui primitives + shared layouts
+  lib/
+    api/                  # configured client, API paths, errors
+    auth/                 # session access, guards/helpers
+    query/                # QueryClient config, shared query utilities
+  styles/                 # brand/design tokens (nếu cần)
+```
+
+## 3. HTTP, API & contracts
+
+- Dùng **một cấu hình HTTP thống nhất cho mỗi API origin/chính sách auth**. Reuse configured `fetch`/Axios client; không khởi tạo Axios instance hoặc lặp base URL, headers, auth, timeout, error mapping trong từng feature.
+- Quản lý API paths tại module dùng chung hoặc generated API client từ OpenAPI. Dynamic paths là hàm nhận tham số; không rải string URL trùng lặp trong `.tsx`/hooks.
+- Tách browser API client và server-only API access khi khác session/credential. Không chuyển server secrets hoặc privileged headers vào client bundle. Không gọi HTTP quay lại chính Route Handler của Next.js từ Server Component nếu có thể gọi server data layer trực tiếp.
+- Tập trung normalize lỗi (network, 401, 403, 404, 409, 422, 429, 5xx), serialization, pagination và request cancellation ở ranh giới phù hợp. Không biến lỗi API thành `{ data: [] }` giả thành công.
+- Dùng types từ API contract/schema khi có. Validate external input tại trust boundary; UI không được xem TypeScript type là runtime validation.
+- Với bảng lớn: sử dụng server pagination/filter/sort/search theo backend contract; không tải tất cả dữ liệu về trình duyệt để tự phân trang. URL query params là nguồn trạng thái chính cho filter/search/page cần deep-link/back-forward.
+- API write nhạy cảm (gán tài xế, chấp nhận quote, thay trạng thái đơn, hoàn tiền, v.v.) không retry mù quáng; tôn trọng idempotency, concurrency và quyền hạn phía backend.
+
+## 4. State management — không trộn trách nhiệm
+
+- **Server state**: ưu tiên Server Components/fetch có cache và revalidation đúng chiến lược Next.js cho trang server-driven; với dashboard tương tác và dữ liệu client-driven, thống nhất một giải pháp như **TanStack Query** (hoặc SWR nếu dự án đã dùng). Không tự viết thêm `useEffect + fetch + isLoading` cho mọi màn để thay query cache.
+- **Query keys** có cấu trúc ổn định, chứa đúng filter/pagination và user/tenant/role scope khi dữ liệu phụ thuộc các giá trị này. Đặt query key factory hoặc query options gần API của feature, không tự đặt key mới tại mỗi component.
+- Sau mutation, cập nhật cache từ response khi an toàn hoặc **invalidate đúng queries liên quan**; không mặc định `window.location.reload()`, `router.refresh()` hay refetch toàn bộ dashboard. Nếu dữ liệu được quản lý bởi Next.js server cache thì dùng revalidation đúng phiên bản/mô hình cache đang bật.
+- Cấu hình `staleTime`, refetch/retry/polling theo tính chất dữ liệu: danh mục ít đổi; đơn, chuyến và báo giá cần tươi hơn. Không gọi API sau mọi render, khi đổi tab không liên quan hoặc sau thao tác UI thuần.
+- Dùng SSR hydration khi kết hợp server-prefetch với client query để tránh request trùng lúc khởi tạo; bảo đảm QueryClient server/request isolation. Khi logout/chuyển account/tenant/role phải xóa hoặc phân vùng cache nhạy cảm và hủy subscriptions cũ.
+- **Shared client state** (session presentation, sidebar, theme, multi-step draft) dùng Context/Zustand khi nhiều vùng UI thật sự cần chia sẻ. Không copy server data từ TanStack Query sang Zustand/Context thành hai nguồn chân lý.
+- **URL state**: filter, sort, pagination, search và tab có yêu cầu share/deep-link. **Local UI state**: modal, dropdown, accordion, hover, form input ngắn; dùng `useState`/form library hiện có.
+- Realtime/polling: một subscription có owner, cleanup đúng, xử lý reconnect/out-of-order event; cập nhật hoặc invalidate cache và reconcile với backend. Không để socket event tự quyết định kết quả thanh toán, phân quyền hay chuyển trạng thái đơn.
+- Giữ loading/success/empty/error/forbidden và mutation pending rõ ràng; tránh loading flash và mất trạng thái bảng/filter không cần thiết.
+
+## 5. Next.js, React & TypeScript
+
+- Tôn trọng App Router và Next.js **đang cài**. Server Components là mặc định khi phù hợp; `'use client'` chỉ đặt tại boundary thật sự cần hooks/events/browser APIs. Không biến cả layout thành Client Component chỉ để render một nút.
+- Chọn một đường mutation nhất quán với hệ thống: Server Actions cho form/server-owned action phù hợp; Route Handlers/BFF khi cần HTTP endpoint, giữ credential server-side hoặc tích hợp backend độc lập. Không tái triển khai toàn bộ business logic NestJS trong Next.js.
+- Tuân thủ React Hooks rules, immutable state, stable list keys, cleanup effects. Không fetch trong render/client `useEffect` vô điều kiện hay sử dụng `useMemo`/`useCallback`/`React.memo` tràn lan không có ích.
+- TypeScript `strict`; hạn chế `any`, type assertions ép kiểu, `@ts-ignore` để né lỗi. Tách transport DTO khỏi view model khi chúng khác biệt; dữ liệu ngày giờ, tiền tệ, nullable và status phải theo API contract.
+- Thêm/sửa dependency theo stable compatible với lockfile/framework đã cài; đọc migration khi có breaking changes. Không tự nâng major Next.js, đổi framework/state library hoặc cài package mới ngoài phạm vi task chỉ vì mới hơn.
+
+## 6. Design system, UX & accessibility
+
+- Dùng một hệ thống semantic tokens (color, typography, spacing, radius, shadows, motion) và UI primitives dùng chung. Không hardcode style hoặc tạo button/modal/table biến thể tùy hứng nếu component chuẩn đã có.
+- Landing có shell marketing; Dashboard có shell điều hành. Trong cùng shell, sidebar, header, breadcrumbs, content widths, active route và responsive behavior phải nhất quán giữa các màn.
+- Giao diện phải khớp nội dung và trạng thái trong `/design` ở viewport tham chiếu, nhưng vẫn responsive và accessibility hợp lý. Không biến screenshot thành layout fixed-size gây overflow.
+- Form, data table, pagination, confirm dialog, toast, skeleton, empty state và error recovery phải phục vụ flow thực tế; không tạo hàng loạt UI component chưa dùng.
+- Dùng semantic HTML, keyboard/focus, labels, accessible errors; animation chỉ phục vụ feedback/chuyển ngữ cảnh và tôn trọng `prefers-reduced-motion`.
+- Nếu backend chưa có, phát triển UI hoàn chỉnh bằng fixture/mock adapter **cùng contract**, trong chế độ demo/test rõ ràng. Không nhúng mock vào production path hoặc báo rằng đã tích hợp backend thật.
+
+## 7. Security: secrets, XSS, SSRF, CSRF & injection
+
+- **Trust boundary**: mọi dữ liệu từ browser, URL, form, cookie, webhook và API bên ngoài đều là không tin cậy cho đến khi validate. TypeScript không thay thế runtime validation; client permission chỉ phục vụ UX, backend/Server Action/Route Handler phải kiểm tra authentication, authorization, role và resource ownership ở từng thao tác.
+- **Secrets**: chỉ giữ API secret, signing key, database credential và provider private key trong server environment/secret manager; không đặt vào `NEXT_PUBLIC_*`, Client Component, RSC props, HTML, source map công khai, log hoặc URL. Chỉ dùng `NEXT_PUBLIC_*` cho giá trị *thực sự public*. Dùng `server-only` tại module truy cập secrets hoặc privileged data; validate các env thiết yếu khi khởi động/chạy feature tương ứng.
+- **Session**: ưu tiên cơ chế auth đã chọn, sử dụng cookie `HttpOnly`, `Secure`, `SameSite` phù hợp với HTTPS và luồng xác thực; quản lý expiry, logout/revocation, rotation theo backend. Không giữ refresh token dài hạn trong localStorage; không forward cookie/access token tới third-party origin ngoài danh sách được tin cậy.
+- **XSS**: để React escape text theo mặc định; tránh `dangerouslySetInnerHTML`, `innerHTML`, HTML template hoặc URL/scheme động không tin cậy. Nếu cần render rich text/HTML, sanitize theo đúng HTML context bằng thư viện được bảo trì; validate `href`/`src` scheme và đích. Không dùng `eval`, dynamic code execution hoặc inline script tạo từ input người dùng.
+- **CSP và headers**: cấu hình Content Security Policy khả thi với Next.js/third-party scripts, ưu tiên chính sách hạn chế nguồn và nonce/hash khi phù hợp; thêm `frame-ancestors`, `X-Content-Type-Options`, `Referrer-Policy` và HTTPS/HSTS ở tầng triển khai thích hợp. CSP là phòng thủ bổ sung, không thay sanitization/encoding.
+- **SSRF**: server/BFF không `fetch` URL tùy ý từ người dùng. Với chức năng nhập ảnh/URL/webhook/preview, ưu tiên ID hoặc đích cố định; nếu bắt buộc URL động, kiểm soát scheme + host/port allowlist, DNS/IP đích khi kết nối, mạng nội bộ/loopback/link-local/metadata, redirects và giới hạn timeout/size. Bảo vệ cả DNS rebinding và URL redirect sang đích bị cấm.
+- **CSRF**: mutation sử dụng cookie/session cần cơ chế bảo vệ phù hợp (SameSite, kiểm tra `Origin`/`Host`, anti-CSRF token khi cần). Không coi CORS hoặc chỉ có `POST` là đủ. Server Actions có bảo vệ origin tích hợp nhưng vẫn cần xác thực, phân quyền và cấu hình proxy/allowed origins đúng thực tế.
+- **Injection & unsafe input**: với SQL/NoSQL/search/command dùng parameterized queries hoặc API typed an toàn ở backend; không nối input thành query, shell command, HTML, dynamic import path hay file path. Validate và allowlist sort fields, filter operators, pagination limits, filenames và redirect destinations; chống path traversal/open redirect.
+- **Public entry points**: Server Actions và Route Handlers đều có thể bị gọi trực tiếp; kiểm soát method, body size, content type, input schema, object access, rate limits khi có rủi ro. Upload kiểm tra type/size thực, đường lưu trữ, quyền truy cập; download không tiết lộ private file. Webhook kiểm tra signature/raw body và replay protection theo provider nếu website có xử lý webhook.
+- **Private data & caching**: dữ liệu tài xế, cửa hàng, KYC, đơn/chuyến và báo giá phải được giới hạn theo account/tenant/role. Không để private response vào public CDN/shared RSC cache hoặc query key thiếu scope; xóa/phân vùng cache và subscriptions khi đổi tài khoản/quyền. Trả lỗi an toàn, không lộ stack trace hoặc thông tin nhạy cảm.
+- Không tắt TLS verification, auth, TypeScript checking hoặc bảo vệ bảo mật chỉ để demo. Mock chỉ hoạt động tại môi trường kiểm thử/demo có cấu hình rõ, không tự fallback trong production.
+
+## 8. Performance — measure first, optimize the bottleneck
+
+- Trước **tối ưu đáng kể**, đo vấn đề thực bằng production build, browser profiler, network waterfall, Core Web Vitals/RUM hoặc backend traces tùy ngữ cảnh. Theo dõi **LCP, INP, CLS**, TTFB và kích thước JS/requests khi phù hợp; ưu tiên cải thiện vấn đề người dùng thực sự gặp phải, không tối ưu theo cảm giác.
+- Xác định bottleneck là server latency, database/backend, serialization, network payload, hydration/JS, rerender, ảnh, font hay third-party script trước khi chọn giải pháp. So sánh *trước/sau* đối với performance refactor; tránh tuyên bố nhanh hơn nếu không có số đo.
+- Landing ưu tiên tải nhanh nội dung và media quan trọng; dashboard ưu tiên tương tác ổn định, bảng lớn, tìm kiếm và cập nhật trạng thái. Không áp cùng một cache/streaming/preload policy cho mọi loại trang.
+- Chỉ thêm `memo`, `useMemo`, `useCallback`, virtualization, worker, lazy loading, debounce hoặc throttling khi workload/behavior chứng minh lợi ích; đừng biến code đơn giản thành tối ưu vi mô khó bảo trì.
+- Tránh giải pháp làm nhanh một chỉ số nhưng gây stale business data, lỗi accessibility, layout shift hoặc trải nghiệm tệ trên thiết bị yếu; đặc biệt các màn quote/ride/order đang hoạt động.
+
+## 9. Rendering & browser cost
+
+- Dùng Server Components cho phần đọc dữ liệu/render không cần tương tác trên client; tạo Client Components **đủ nhỏ** cho events, state, browser APIs hoặc thư viện client-only. Không chuyển root layout/dashboard shell sang client chỉ để xử lý một widget.
+- Giảm hydration và client work: render danh sách/bảng lớn có pagination hoặc virtualization khi cần; tránh context/provider lớn khiến cả cây render lại liên tục; dùng selectors hoặc tách state theo ownership.
+- Tránh waterfall giữa các dữ liệu độc lập; đặt `Suspense`, streaming, `loading.tsx` và error boundaries tại phần nội dung có thể tải riêng mà không gây giật bố cục. Không cố stream mọi thứ nếu làm phức tạp UX hoặc gây thêm requests.
+- Giữ server-render/client-render nhất quán: không đọc `window`, thời gian ngẫu nhiên hoặc timezone browser trong output SSR nếu gây hydration mismatch; không dùng `suppressHydrationWarning` để che lỗi hệ thống.
+- Animation chuyển đổi trạng thái nên ưu tiên CSS và các thuộc tính thân thiện với compositor khi thích hợp; không lạm dụng blur, shadow, animation liên tục hoặc thư viện motion nặng trên mọi màn. Tôn trọng `prefers-reduced-motion`.
+- `React.memo`, code splitting và virtualization không phải quy tắc mặc định. Chọn sau khi biết cost thực tế, trừ các trường hợp rõ ràng như thư viện bản đồ/editor rất lớn hoặc hàng nghìn row.
+
+## 10. Network & JavaScript
+
+- Reuse server data loader/client query cache có sẵn; tránh fetch trùng, polling dày, refetch sau mọi tab click và `router.refresh()` toàn trang cho mutation nhỏ. Fetch song song các request độc lập; request phụ thuộc thì tuần tự đúng logic.
+- Thiết kế cache/revalidation/invalidation theo độ mới cần thiết và quyền truy cập. Dữ liệu realtime cập nhật cache có kiểm soát, reconnect + reconcile; tránh socket và polling đồng thời trùng chức năng không có lý do.
+- Áp dụng pagination/cursor, filter server-side và giới hạn payload cho bảng vận hành; chỉ chọn field UI cần. Hỗ trợ abort/latest-wins cho search/filter nhanh và debounce input khi mang lại lợi ích.
+- Giảm client bundle bằng server/client boundary đúng, import theo module, dynamic import cho map/chart/editor hoặc phần thực sự nặng, loại bỏ dependency không dùng. Không đưa SDK server, toàn bộ icon collection hoặc utility server vào bundle trình duyệt.
+- Script analytics/chat/map bên thứ ba chỉ tải ở route cần thiết với loading strategy phù hợp (`next/script` nếu dùng); đánh giá chi phí network, main-thread và quyền riêng tư trước khi bổ sung.
+- Cấu hình timeout, cancellation, retry/backoff theo endpoint. GET có thể retry có giới hạn; mutation không replay khi thiếu idempotency hoặc khi chưa rõ server đã xử lý hay chưa. Phân biệt offline/timeout/429/5xx với lỗi nghiệp vụ.
+- Tránh tự lắp request dedup/cache layer mới nếu framework, TanStack Query hoặc BFF đã đáp ứng; tránh double caching gây dữ liệu cũ không thể kiểm soát.
+
+## 11. Images & assets
+
+- Dùng `next/image` cho ảnh nội dung cần tối ưu kích thước/lazy loading khi phù hợp; ngoại lệ hợp lý gồm icon SVG, canvas, image SDK đặc biệt hoặc ảnh không tương thích optimizer. Khai báo `width`/`height` hoặc `fill` + container có kích thước để hạn chế CLS; với responsive `fill` cần `sizes` chính xác.
+- Chỉ preload/ưu tiên ảnh **thực sự là LCP/hero**; ảnh bên dưới viewport để lazy load. Không đánh dấu tất cả hình là priority; chọn chất lượng/định dạng và kích thước phù hợp thiết bị.
+- Remote images dùng `images.remotePatterns` giới hạn chính xác nguồn/path được tin cậy; không mở wildcard bừa bãi hoặc dùng image optimizer làm proxy tùy ý. Với ảnh người dùng/merchant/driver, kiểm soát nguồn upload và quyền xem tại backend/storage.
+- Ảnh design phải đúng asset/brand của `/design`; không thay ảnh bằng placeholder ngẫu nhiên khi đã có reference. Mỗi ảnh có `alt` mang nghĩa hoặc `alt=""` nếu chỉ trang trí; không nhồi keyword vào alt.
+- Dùng font loading phù hợp (`next/font` khi hợp stack), tránh font weights không dùng và hạn chế layout shift; SVG/HTML từ bên ngoài phải được xem như dữ liệu không tin cậy.
+
+## 12. SEO, metadata & content
+
+- **Landing/public pages** cần HTML nội dung có thể truy cập, title/description riêng theo trang, canonical URL, open graph/social preview và heading/semantic markup đúng. Dùng Next.js Metadata API (`metadata`/`generateMetadata`) đúng App Router; metadata động phải lấy từ dữ liệu đã xác minh và không lộ thông tin riêng tư.
+- Đặt `robots.txt`, `sitemap.xml` cho các route public indexable, loại trừ route thử nghiệm/private/dashboard theo chiến lược rõ ràng. **Robots/noindex không phải cơ chế bảo mật**; private routes vẫn cần auth trên server.
+- Dùng `noindex` cho admin, dashboard, trang login, tìm kiếm nội bộ hoặc dữ liệu nhạy cảm khi phù hợp; đừng đưa các URL này vào sitemap. Kiểm tra status 404/redirect/canonical để tránh duplicate pages.
+- Nếu có đa ngôn ngữ trên public pages, metadata, canonical/hreflang/alternate links phải khớp locale và domain/route thực tế; không canonical mọi bản dịch về một ngôn ngữ nếu mỗi bản cần index riêng.
+- JSON-LD/structured data chỉ bổ sung khi phù hợp nội dung và schema thật; không tự tạo review, rating, price hoặc FAQ không tồn tại. Nội dung marketing chính xác với sản phẩm thực tế, không hứa tính năng/payment/coverage chưa có.
+- Không áp các thủ tục SEO cho dashboard private; tập trung a11y, usability, response time và dữ liệu đúng tại đây.
+
+## 13. Internationalization & data presentation
+
+- Khi DealGo hỗ trợ nhiều locale, dùng một cơ chế i18n rõ ràng cho message catalogs, locale resolution, routing và fallback; không hardcode hàng loạt câu tiếng Việt/Anh trộn lẫn trong component. Không cài thư viện i18n chỉ cho một trang đơn ngữ không có nhu cầu.
+- Không nối fragment để tạo câu dịch; hỗ trợ plural/select, tham số động và độ dài chữ khác nhau. `lang` của document, accessibility labels, form messages, validation errors và metadata phải theo locale đang dùng.
+- Locale **khác** timezone và currency. Dùng `Intl.NumberFormat`, `Intl.DateTimeFormat` theo locale thực tế; timezone cần lấy từ nghiệp vụ/user preference, không giả định giờ local server = giờ Việt Nam.
+- API gửi/nhận thời gian theo contract (ISO/offset/UTC khi đã quy định), phân biệt instant với ngày lịch/giờ hẹn. Thời gian đặt xe, giao hàng, lịch và ETA hiển thị đúng múi giờ; kiểm thử qua đổi ngày, DST ở locale có DST.
+- Tiền/giá/hoàn tiền không tính bằng floating point khi yêu cầu chính xác: dùng minor units hoặc decimal theo backend; định dạng tiền tệ, separators, rounding và currency code thống nhất. Không tự cộng/phân bổ phí client thành giao dịch authoritative.
+- Số điện thoại, địa chỉ, tọa độ, khoảng cách và units cần chuẩn hóa theo contract/vùng phục vụ, không suy ra đơn vị từ locale; map/location fields không lưu thành chuỗi hiển thị thay cho dữ liệu gốc.
+- UI responsive với long translations, Unicode, text scaling và keyboard/screen readers; không cắt dữ liệu quan trọng (trạng thái, giá, lỗi) thành dấu `…` thiếu đường xem đầy đủ.
+
+## 14. Reliability, observability & deployment
+
+- Mọi thao tác async quan trọng có loading/pending, lỗi có thể hiểu, retry phù hợp và đường khôi phục. Không nuốt exception hoặc trả success giả; lỗi cần phân biệt mạng, timeout, quyền, conflict, validation và server unavailable.
+- Error boundary/`error.tsx` và `not-found.tsx` bảo vệ các khu vực độc lập; fallback không tiết lộ private data hoặc gây vòng lặp retry. Form đang nhập cần hạn chế mất dữ liệu khi chuyển route, lỗi mạng hoặc revalidation.
+- Với mutation nhạy cảm (quote acceptance, assignment, order transitions, refunds), chống double submit, xử lý conflict/outdated revision và idempotency theo contract. Nếu kết quả request không rõ, truy vấn trạng thái authoritative thay vì gửi lại vô hạn hoặc hiển thị đã thành công.
+- Log server dạng structured với request/correlation ID hoặc `traceparent` theo backend contract, route, status, duration, error class; không log raw token, cookie, KYC, điện thoại/địa chỉ chi tiết, body nhạy cảm. Client errors/reporting phải được redacted tương tự.
+- Có monitoring cho runtime exceptions, network/API failure rate, p95/p99 latency, Core Web Vitals và nghiệp vụ quan trọng khi có hạ tầng phù hợp; dùng `instrumentation.ts`/OpenTelemetry/SDK đã được chọn, tránh tạo nhiều telemetry vendors cho cùng tín hiệu.
+- Tạo health/readiness checks **nếu** hệ thống được deploy tự quản lý và cần health probes; tránh endpoint hiển thị secrets, phiên bản thư viện nhạy cảm hoặc trạng thái nội bộ quá chi tiết ra public.
+- Deployment dùng lockfile đã kiểm chứng, env tách môi trường, secret management và HTTPS. Build/test theo scripts của repo; không disable lint/typecheck để release. Cấu hình cache/CDN theo user/role đúng, kiểm tra SSR, public asset, image optimizer và streaming trên hạ tầng đích.
+- Thay đổi lớn ảnh hưởng session, caching, API contract hoặc deploy config cần kế hoạch rollback tương xứng; kiểm tra smoke flows của landing/login/dashboard/đơn/chuyến theo phần bị tác động. Tránh giả định build PASS đồng nghĩa production ổn định.
+- Không tự deploy production hoặc thay dữ liệu live ngoài phạm vi yêu cầu; khi môi trường thiếu key hoặc telemetry provider, vẫn triển khai phần độc lập và báo chính xác những gì chưa thể kiểm chứng.
+
+## 15. Quality & agent behavior
+
+- Tập trung sửa đúng nguyên nhân và tái sử dụng thành phần có sẵn, không tạo abstraction, thư mục, package hoặc rewrite mới nếu không giúp yêu cầu hiện tại.
+- Khi refactor, giữ nguyên hành vi đúng và API/design contract; bổ sung test cho logic rủi ro, cache invalidation/mutation, access control và các flow quan trọng đã đụng tới.
+- Chạy các kiểm tra **liên quan tới thay đổi** theo scripts thực tế (`typecheck`, `lint`, test, build hoặc browser checks). Không nói PASS nếu chưa chạy; không tắt kiểm tra để che lỗi.
+- Không bắt lập báo cáo/gates/design matrix/ADR cho mỗi thay đổi nhỏ. Khi thay đổi lớn ảnh hưởng nhiều module hoặc contract, tự xác định phạm vi, lựa chọn giải pháp, thực hiện và tóm tắt những quyết định quan trọng.
+- Không tự chặn công việc để hỏi những lựa chọn kỹ thuật thông thường; khi thiếu key/backend, hoàn thiện phần khả thi, chỉ rõ điểm tích hợp còn thiếu. Không tự deploy production, ghi đè secrets hay thao tác dữ liệu thật ngoài yêu cầu.
+
+**Nguyên tắc cuối:** Correctness, đúng ownership, một nguồn dữ liệu rõ ràng, UI nhất quán và code ít phức tạp nhất đáp ứng yêu cầu. Rules mô tả điều cần giữ đúng; chi tiết implementation do kỹ sư/AI Agent chọn theo codebase.

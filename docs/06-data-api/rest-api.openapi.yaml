@@ -1,0 +1,1466 @@
+openapi: 3.0.3
+info:
+  title: DealGo API
+  version: 0.1.0
+  description: |
+    DealGo REST API for Ride + Food MVP.
+
+    Success responses are wrapped by the Nest response interceptor as:
+    `{ success: true, statusCode, message, data, requestId }`.
+
+    Errors use:
+    `{ success: false, statusCode, message, errorCode, timestamp, path, requestId }`.
+
+    Money fields are integer VND (no floats). Server is the source of truth for roles,
+    assignment, status transitions, and committed fares. Do not trust client role/price.
+
+    Ride cancel is allowed while NEGOTIATING or before IN_TRIP
+    (ASSIGNED / DRIVER_EN_ROUTE / DRIVER_ARRIVED). Food cancel is PLACED only.
+    COMPLETED / DELIVERED post a sandbox COD ledger journal (balanced, idempotent)
+    and optionally a PaymentIntent COD row (`SANDBOX_RECORDED`). VNPAY/MoMo create
+    redirect intent only (`PENDING_REDIRECT`); webhook stubs may mark `CAPTURED_STUB`
+    — not a claim of real settlement.
+
+    MapsPort (ADR-006): `MAPS_PROVIDER=mock|goong|google`; non-mock without API key is
+    unavailable (ride reference fare falls back to haversine). Fee formulas remain
+    TEST_ONLY env bounds — not approved `OPEN-003`.
+
+    KYC/KYB: customer submit via `/v1/me/partner-applications`; ops review via
+    `/v1/ops/partner-applications`. REJECTED → RoleGrant SUSPENDED; APPROVED → ACTIVE.
+    Outbox/workers + Socket.IO snapshot: no public HTTP routes for outbox; status events
+    written to `outbox_messages` in the same DB transaction as ride/food status updates;
+    relay marks processed then emits Socket.IO `snapshot` to rooms `ride:{id}` / `food:{id}`
+    (authz = REST participant rules) and push (mock or FCM HTTP v1 when keys set;
+    production refuses `PUSH_PROVIDER=mock`). Optional Redis Socket.IO adapter when
+    `REDIS_URL` is up. OTP throttling uses Redis storage when `REDIS_URL` is set; else memory.
+    Ops sandbox settlements: `GET /v1/ops/settlements` groups COD ledger journals by UTC day
+    (read-only heuristic; no real payout). Transaction chat + voice (DEC-PROD-007 / 1A):
+    `/v1/rides/{id}/messages`, `/v1/food/orders/{id}/messages`,
+    `POST .../voice-session` (participants; audio-only; TEST_ONLY `CONTACT_WINDOW_MINUTES`
+    — not OPEN-021). Production refuses `VOICE_PROVIDER=mock`.
+    Clients must GET on reconnect — see `docs/06-data-api/realtime-api-contract.md` (DRAFT).
+    Ride expiry runs via BullMQ or interval worker.
+
+    Driver open/ready lists accept optional lat/lng (`DRIVER_SEARCH_RADIUS_KM`);
+    without coords return a capped recent list. When `DriverPresence` exists and
+    `online=false`, open/ready lists return empty. Food ready radius prefers store
+    lat/lng when set. Ops intervene (CAP-OPS-05): `POST /v1/ops/rides|food-orders/{id}/cancel`
+    with `{ reason }` writes `OpsAuditLog` + outbox; optional `…/reassign` is TEST_ONLY.
+    Phone OTP endpoints are rate-limited.
+
+    Live Swagger UI is served at `/docs` when `NODE_ENV` is not `production`, or when
+    `SWAGGER_ENABLED=true`. This YAML is the checked-in contract seed for Flutter codegen.
+servers:
+  - url: http://localhost:3001
+    description: Local Nest API
+tags:
+  - name: health
+  - name: identity
+  - name: rides
+  - name: food
+  - name: chat
+  - name: voice
+  - name: payments
+  - name: ops
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    SuccessEnvelope:
+      type: object
+      required: [success, statusCode, message, data, requestId]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        statusCode:
+          type: integer
+        message:
+          type: string
+        data: {}
+        requestId:
+          type: string
+    ErrorEnvelope:
+      type: object
+      required: [success, statusCode, message, errorCode, timestamp, path, requestId]
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        statusCode:
+          type: integer
+        message:
+          type: string
+        errorCode:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        path:
+          type: string
+        requestId:
+          type: string
+    GeoPoint:
+      type: object
+      required: [lat, lng, label]
+      properties:
+        lat:
+          type: number
+        lng:
+          type: number
+        label:
+          type: string
+    RideStatus:
+      type: string
+      enum:
+        - NEGOTIATING
+        - ASSIGNED
+        - DRIVER_EN_ROUTE
+        - DRIVER_ARRIVED
+        - IN_TRIP
+        - COMPLETED
+        - CANCELLED
+        - EXPIRED
+    FoodOrderStatus:
+      type: string
+      enum:
+        - PLACED
+        - PREPARING
+        - READY
+        - ASSIGNED
+        - PICKED_UP
+        - DELIVERED
+        - FAILED
+        - CANCELLED
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Combined dependency health (not wrapped in success envelope)
+      responses:
+        '200':
+          description: ok or degraded
+  /health/live:
+    get:
+      tags: [health]
+      summary: Liveness — process up (no dependency checks)
+      responses:
+        '200':
+          description: '{ status: ok }'
+  /health/ready:
+    get:
+      tags: [health]
+      summary: Readiness — database required (503 when down); Redis optional degrade
+      responses:
+        '200':
+          description: ok or degraded (DB up)
+        '503':
+          description: not_ready (DB down)
+  /:
+    get:
+      tags: [health]
+      summary: Root ping (enveloped)
+      responses:
+        '200':
+          description: OK
+  /v1/auth/phone/challenges:
+    post:
+      tags: [identity]
+      summary: Start phone OTP challenge (rate limited)
+      responses:
+        '200':
+          description: Challenge created
+        '429':
+          description: Rate limited
+  /v1/auth/phone/challenges/{id}/verify:
+    post:
+      tags: [identity]
+      summary: Verify phone OTP and issue customer session (rate limited)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Session issued
+        '429':
+          description: Rate limited
+  /v1/auth/email/verifications:
+    post:
+      tags: [identity]
+      summary: Start email verification
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Verification started
+  /v1/auth/email/verifications/{id}/confirm:
+    post:
+      tags: [identity]
+      summary: Confirm email verification
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Confirmed
+  /v1/auth/passkeys/registration/options:
+    post:
+      tags: [identity]
+      summary: Passkey registration options
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Options
+  /v1/auth/passkeys/registration/verify:
+    post:
+      tags: [identity]
+      summary: Verify passkey registration
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Registered
+  /v1/auth/passkeys/authentication/options:
+    post:
+      tags: [identity]
+      summary: Passkey authentication options
+      responses:
+        '200':
+          description: Options
+  /v1/auth/passkeys/authentication/verify:
+    post:
+      tags: [identity]
+      summary: Verify passkey authentication
+      responses:
+        '200':
+          description: Session issued
+  /v1/auth/sessions/refresh:
+    post:
+      tags: [identity]
+      summary: Refresh customer/ops session
+      responses:
+        '200':
+          description: Rotated tokens
+  /v1/auth/sessions/revoke:
+    post:
+      tags: [identity]
+      summary: Revoke refresh session
+      responses:
+        '200':
+          description: Revoked
+  /v1/ops/sessions:
+    post:
+      tags: [identity]
+      summary: Ops email/password login
+      responses:
+        '200':
+          description: Ops session
+  /v1/me:
+    get:
+      tags: [identity]
+      summary: Current user profile and role grants
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Profile
+  /v1/me/presence:
+    post:
+      tags: [identity]
+      summary: Upsert driver presence (online/offline + optional lat/lng)
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [online]
+              properties:
+                online: { type: boolean }
+                lat: { type: number }
+                lng: { type: number }
+      responses:
+        '200':
+          description: Presence upserted
+        '403':
+          description: Active DRIVER role required
+    get:
+      tags: [identity]
+      summary: Get current driver presence if any
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Presence or null
+  /v1/me/role-grants:
+    get:
+      tags: [identity]
+      summary: List my role grants
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Grants
+    post:
+      tags: [identity]
+      summary: Request a role grant
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Grant created/updated
+  /v1/me/partner-applications:
+    get:
+      tags: [identity]
+      summary: List my KYC/KYB partner applications
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Applications
+    post:
+      tags: [identity]
+      summary: Submit KYC (DRIVER) or KYB (MERCHANT) application
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role, metadata]
+              properties:
+                role:
+                  type: string
+                  enum: [DRIVER, MERCHANT]
+                metadata:
+                  type: object
+                  additionalProperties: true
+                documents:
+                  type: array
+                  items:
+                    type: object
+                    required: [label]
+                    properties:
+                      label: { type: string }
+                      contentType: { type: string }
+                      contentBase64: { type: string }
+      responses:
+        '200':
+          description: Submitted application
+        '409':
+          description: Already submitted or approved
+  /v1/me/partner-applications/{role}:
+    get:
+      tags: [identity]
+      summary: Get my partner application for DRIVER or MERCHANT
+      security: [{ bearer: [] }]
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [DRIVER, MERCHANT]
+      responses:
+        '200':
+          description: Application
+        '404':
+          description: Not found
+  /v1/ops/partner-applications:
+    get:
+      tags: [ops]
+      summary: List partner applications (default status=SUBMITTED)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [DRAFT, SUBMITTED, APPROVED, REJECTED]
+      responses:
+        '200':
+          description: Queue
+  /v1/ops/partner-applications/{id}/approve:
+    post:
+      tags: [ops]
+      summary: Approve submitted KYC/KYB; sets RoleGrant ACTIVE
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Approved
+  /v1/ops/partner-applications/{id}/reject:
+    post:
+      tags: [ops]
+      summary: Reject submitted KYC/KYB; sets RoleGrant SUSPENDED
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Rejected
+  /v1/ops/role-grants/{id}/approve:
+    post:
+      tags: [identity]
+      summary: Approve a pending role grant
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Approved
+  /v1/ops/role-grants/{id}/reject:
+    post:
+      tags: [identity]
+      summary: Reject a pending role grant
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Rejected
+  /v1/rides:
+    get:
+      tags: [rides]
+      summary: Customer paginated ride history (actor-scoped)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        '200':
+          description: Page of rides owned by the customer
+    post:
+      tags: [rides]
+      summary: Create a negotiating ride (Idempotency-Key required)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 200
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pickup, dropoff, offeredFareVnd]
+              properties:
+                pickup:
+                  $ref: '#/components/schemas/GeoPoint'
+                dropoff:
+                  $ref: '#/components/schemas/GeoPoint'
+                offeredFareVnd:
+                  type: integer
+      responses:
+        '200':
+          description: Ride created or idempotent replay
+  /v1/rides/open:
+    get:
+      tags: [rides]
+      summary: List open negotiating rides for drivers (optional lat/lng radius filter)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: lat
+          in: query
+          schema: { type: number }
+        - name: lng
+          in: query
+          schema: { type: number }
+      responses:
+        '200':
+          description: >
+            Open rides within DRIVER_SEARCH_RADIUS_KM of driver when lat/lng provided;
+            otherwise a capped recent list (DISPATCH_FALLBACK_LIMIT). Requires ACTIVE DRIVER
+            (+ approved KYC unless PARTNER_ELIGIBILITY_BYPASS).
+  /v1/rides/{id}:
+    get:
+      tags: [rides]
+      summary: Get a ride by id
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Ride
+        '404':
+          description: Not found / not visible
+  /v1/rides/{id}/offers:
+    post:
+      tags: [rides]
+      summary: Driver offer or counter on a negotiating ride
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amountVnd]
+              properties:
+                amountVnd:
+                  type: integer
+      responses:
+        '200':
+          description: Offer recorded
+  /v1/rides/{id}/selection:
+    post:
+      tags: [rides]
+      summary: Customer selects an offer (Idempotency-Key required)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [offerId]
+              properties:
+                offerId:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Assigned
+  /v1/rides/{id}/en-route:
+    post:
+      tags: [rides]
+      summary: Assigned driver marks en route (ASSIGNED → DRIVER_EN_ROUTE)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: DRIVER_EN_ROUTE
+        '403':
+          description: Not assigned driver
+        '409':
+          description: Illegal transition
+  /v1/rides/{id}/arrived:
+    post:
+      tags: [rides]
+      summary: Assigned driver marks arrived (DRIVER_EN_ROUTE → DRIVER_ARRIVED)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: DRIVER_ARRIVED
+        '403':
+          description: Not assigned driver
+        '409':
+          description: Illegal transition
+  /v1/rides/{id}/start:
+    post:
+      tags: [rides]
+      summary: Assigned driver starts trip (DRIVER_ARRIVED → IN_TRIP)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: IN_TRIP
+        '403':
+          description: Not assigned driver
+        '409':
+          description: Illegal transition
+  /v1/rides/{id}/complete:
+    post:
+      tags: [rides]
+      summary: Assigned driver completes trip (IN_TRIP → COMPLETED); posts sandbox COD journal
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: COMPLETED
+        '403':
+          description: Not assigned driver
+        '409':
+          description: Illegal transition
+  /v1/rides/{id}/ledger:
+    get:
+      tags: [rides]
+      summary: Sandbox COD ledger journal for a ride (customer/assigned driver)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: POSTED balanced journal
+        '404':
+          description: Ride or journal not found
+  /v1/rides/{id}/cancel:
+    post:
+      tags: [rides]
+      summary: Customer cancel while NEGOTIATING or before IN_TRIP
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: CANCELLED
+        '409':
+          description: Not cancellable
+  /v1/food/stores:
+    get:
+      tags: [food]
+      summary: Browse food stores (page/search/category/geo/sort; sandbox may seed demo store)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: search
+          in: query
+          schema: { type: string, maxLength: 120 }
+          description: ILIKE store name
+        - name: category
+          in: query
+          schema: { type: string, maxLength: 64 }
+          description: Exact category match (case-insensitive)
+        - name: lat
+          in: query
+          schema: { type: number }
+        - name: lng
+          in: query
+          schema: { type: number }
+          description: With lat, filters by DRIVER_SEARCH_RADIUS_KM
+        - name: sort_by
+          in: query
+          schema: { type: string, enum: [name, createdAt, distance] }
+          description: distance requires lat+lng; else falls back to createdAt
+      responses:
+        '200':
+          description: PageResult of stores (items, page, limit, total)
+  /v1/food/stores/{id}:
+    get:
+      tags: [food]
+      summary: Get store catalog
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Store detail
+  /v1/food/merchant/catalog:
+    get:
+      tags: [food]
+      summary: Merchant-owned store catalog (creates empty store if none)
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Owned store + items
+        '403':
+          description: Active MERCHANT role required
+  /v1/food/merchant/store/location:
+    patch:
+      tags: [food]
+      summary: Set optional lat/lng for the merchant-owned store
+      security: [{ bearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lat, lng]
+              properties:
+                lat: { type: number }
+                lng: { type: number }
+      responses:
+        '200':
+          description: Store with updated coordinates
+        '403':
+          description: Active MERCHANT role required
+  /v1/food/merchant/items:
+    post:
+      tags: [food]
+      summary: Create catalog item on owned store
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Item created
+        '403':
+          description: Not store owner / role
+  /v1/food/merchant/items/{itemId}:
+    patch:
+      tags: [food]
+      summary: Update owned catalog item name/price
+      security: [{ bearer: [] }]
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Item updated
+        '403':
+          description: Other merchant / not owner
+  /v1/food/merchant/items/{itemId}/availability:
+    patch:
+      tags: [food]
+      summary: Set availability of owned catalog item
+      security: [{ bearer: [] }]
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Availability updated
+        '403':
+          description: Other merchant / not owner
+  /v1/food/orders:
+    get:
+      tags: [food]
+      summary: Customer paginated food order history (actor-scoped)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        '200':
+          description: Page of orders owned by the customer
+    post:
+      tags: [food]
+      summary: Place a food order (Idempotency-Key required)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order placed or replay
+  /v1/food/orders/ready:
+    get:
+      tags: [food]
+      summary: List ready orders for drivers (optional lat/lng radius from dropoff)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: lat
+          in: query
+          schema: { type: number }
+        - name: lng
+          in: query
+          schema: { type: number }
+      responses:
+        '200':
+          description: Ready orders (radius or capped fallback; DRIVER eligibility gate)
+  /v1/food/orders/queue:
+    get:
+      tags: [food]
+      summary: List open orders for the merchant store queue
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: Queue
+  /v1/food/orders/{id}:
+    get:
+      tags: [food]
+      summary: Get a food order by id
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order
+  /v1/food/orders/{id}/ledger:
+    get:
+      tags: [food]
+      summary: Sandbox COD ledger journal for an order (participants)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: POSTED balanced journal
+        '404':
+          description: Order or journal not found
+  /v1/food/orders/{id}/accept:
+    post:
+      tags: [food]
+      summary: Merchant accepts (PLACED → PREPARING)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: PREPARING
+  /v1/food/orders/{id}/ready:
+    post:
+      tags: [food]
+      summary: Merchant marks ready (PREPARING → READY)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: READY
+  /v1/food/orders/{id}/claim:
+    post:
+      tags: [food]
+      summary: Driver claims (READY → ASSIGNED)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: ASSIGNED
+  /v1/food/orders/{id}/pickup:
+    post:
+      tags: [food]
+      summary: Assigned driver pickup (ASSIGNED → PICKED_UP)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: PICKED_UP
+        '403':
+          description: Not assigned driver
+        '409':
+          description: Illegal transition
+  /v1/food/orders/{id}/deliver:
+    post:
+      tags: [food]
+      summary: Assigned driver deliver (PICKED_UP → DELIVERED); posts sandbox COD journal
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: DELIVERED
+        '403':
+          description: Not assigned driver
+        '409':
+          description: Illegal transition
+  /v1/food/orders/{id}/fail:
+    post:
+      tags: [food]
+      summary: Assigned driver fail (ASSIGNED|PICKED_UP → FAILED)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: FAILED
+        '403':
+          description: Not assigned driver
+        '409':
+          description: Illegal transition
+  /v1/food/orders/{id}/cancel:
+    post:
+      tags: [food]
+      summary: Customer cancel while PLACED only
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: CANCELLED
+        '409':
+          description: Not cancellable
+  /v1/rides/{id}/messages:
+    get:
+      tags: [chat]
+      summary: List transaction chat messages for a ride (participants only; text only)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Paginated messages (no phone fields)
+        '403':
+          description: Not a participant
+    post:
+      tags: [chat]
+      summary: Post a text chat message on a ride (participants only)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+      responses:
+        '200':
+          description: Message created
+        '400':
+          description: Invalid body
+        '403':
+          description: Not a participant
+  /v1/rides/{id}/voice-session:
+    post:
+      tags: [voice]
+      summary: Create audio-only in-app voice session for a ride (DEC-PROD-007; TEST_ONLY contact window)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Voice session (roomName, token, url, expiresAt, audioOnly)
+        '403':
+          description: Not a participant or contact window closed
+        '503':
+          description: Voice provider unavailable
+  /v1/food/orders/{id}/voice-session:
+    post:
+      tags: [voice]
+      summary: Create audio-only in-app voice session for a food order (DEC-PROD-007; TEST_ONLY contact window)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Voice session (roomName, token, url, expiresAt, audioOnly)
+        '403':
+          description: Not a participant or contact window closed
+        '503':
+          description: Voice provider unavailable
+  /v1/payments/webhooks/vnpay:
+    post:
+      tags: [payments]
+      summary: VNPAY IPN stub — verify SecureHash when keys set; idempotent by transaction id
+      responses:
+        '200':
+          description: Ack (RspCode); may mark CAPTURED_STUB — not real settlement
+        '400':
+          description: Invalid signature when secret configured
+  /v1/payments/webhooks/momo:
+    post:
+      tags: [payments]
+      summary: MoMo IPN stub — verify signature when keys set; idempotent by transId/orderId
+      responses:
+        '200':
+          description: Ack; may mark CAPTURED_STUB — not real settlement
+  /v1/food/orders/{id}/messages:
+    get:
+      tags: [chat]
+      summary: List transaction chat messages for a food order (participants only; text only)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Paginated messages (no phone fields)
+        '403':
+          description: Not a participant
+    post:
+      tags: [chat]
+      summary: Post a text chat message on a food order (participants only)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+      responses:
+        '200':
+          description: Message created
+        '403':
+          description: Not a participant
+  /v1/ops/exceptions:
+    get:
+      tags: [ops]
+      summary: Ops exception queue (stuck mid-lifecycle + recent FAILED/CANCELLED/EXPIRED)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Paginated exception items
+        '401':
+          description: Missing/invalid ops session
+        '403':
+          description: Not ops channel
+  /v1/ops/settlements:
+    get:
+      tags: [ops]
+      summary: Sandbox settlement stub (COD ledger journals grouped by UTC day; no payout)
+      security: [{ bearer: [] }]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Paginated sandbox settlement day batches
+        '401':
+          description: Missing/invalid ops session
+        '403':
+          description: Not ops channel
+  /v1/ops/rides:
+    get:
+      tags: [ops]
+      summary: Ops paginated ride list
+      security: [{ bearer: [] }]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Page of rides
+        '401':
+          description: Missing/invalid ops session
+        '403':
+          description: Not ops channel
+  /v1/ops/rides/{id}:
+    get:
+      tags: [ops]
+      summary: Ops ride detail
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Ride
+        '404':
+          description: Not found
+  /v1/ops/rides/{id}/ledger:
+    get:
+      tags: [ops]
+      summary: Ops sandbox COD ledger for a ride
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Journal
+  /v1/ops/rides/{id}/cancel:
+    post:
+      tags: [ops]
+      summary: Ops cancel ride (CAP-OPS-05); writes OpsAuditLog + outbox
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 3, maxLength: 500 }
+      responses:
+        '200':
+          description: Cancelled
+        '409':
+          description: Not cancellable (terminal)
+  /v1/ops/rides/{id}/reassign:
+    post:
+      tags: [ops]
+      summary: TEST_ONLY clear assignment back to NEGOTIATING when pre-trip
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 3, maxLength: 500 }
+      responses:
+        '200':
+          description: Reopened negotiating
+        '409':
+          description: Status does not allow reassign
+  /v1/ops/food-orders:
+    get:
+      tags: [ops]
+      summary: Ops paginated food order list
+      security: [{ bearer: [] }]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Page of food orders
+  /v1/ops/food-orders/{id}:
+    get:
+      tags: [ops]
+      summary: Ops food order detail
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order
+  /v1/ops/food-orders/{id}/ledger:
+    get:
+      tags: [ops]
+      summary: Ops sandbox COD ledger for a food order
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Journal
+  /v1/ops/food-orders/{id}/cancel:
+    post:
+      tags: [ops]
+      summary: Ops cancel food order (CAP-OPS-05); writes OpsAuditLog + outbox
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 3, maxLength: 500 }
+      responses:
+        '200':
+          description: Cancelled
+        '409':
+          description: Not cancellable (terminal)
+  /v1/ops/food-orders/{id}/reassign:
+    post:
+      tags: [ops]
+      summary: TEST_ONLY clear assignment back to READY when ASSIGNED
+      security: [{ bearer: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 3, maxLength: 500 }
+      responses:
+        '200':
+          description: Back to READY
+        '409':
+          description: Status does not allow reassign

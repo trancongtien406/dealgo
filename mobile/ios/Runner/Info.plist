@@ -49,6 +49,41 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>DealGo cần vị trí của bạn để đặt xe, giao đồ ăn và hiển thị tài xế gần bạn.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>DealGo dùng vị trí nền để theo dõi tài xế/shipper trong chuyến đi hoặc đơn giao hàng đang diễn ra, kể cả khi ứng dụng ở nền.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>DealGo cần máy ảnh để chụp giấy tờ KYC và ảnh xác minh đối tác.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>DealGo cần microphone để cuộc gọi thoại trong chuyến đi hoặc đơn hàng.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>DealGo cần truy cập thư viện ảnh để tải giấy tờ KYC và ảnh hỗ trợ.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>DealGo có thể lưu ảnh vào thư viện khi bạn xuất biên nhận hoặc tài liệu.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+		<string>location</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.trancongtien.dealgo</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>dealgo</string>
+			</array>
+		</dict>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

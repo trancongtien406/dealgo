@@ -1,0 +1,27 @@
+export type NestOpsGrantStatus = "PENDING" | "ACTIVE" | "SUSPENDED";
+
+export type NestOpsUserGrant = {
+  id: string;
+  role: string;
+  status: NestOpsGrantStatus;
+};
+
+/** Nest `OpsUserListItem` for CUSTOMER role directory. */
+export type NestOpsCustomer = {
+  id: string;
+  displayName: string;
+  phone: string | null;
+  phoneMasked?: string | null;
+  email: string | null;
+  phoneVerifiedAt: string | null;
+  emailVerifiedAt: string | null;
+  createdAt: string;
+  grants: NestOpsUserGrant[];
+};
+
+export type NestOpsCustomerPage = {
+  items: NestOpsCustomer[];
+  page: number;
+  limit: number;
+  total: number;
+};

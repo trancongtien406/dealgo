@@ -1,0 +1,169 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../core/design_system/components/dealgo_banner.dart';
+import '../../../../core/design_system/components/dealgo_chip.dart';
+import '../../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../../core/design_system/components/dealgo_secondary_button.dart';
+import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../utils/food_routes.dart';
+import '../widgets/food_widgets.dart';
+
+/// C035 — cancel food order reason picker (local/mock; soft-fail Nest).
+class FoodCancelPage extends StatefulWidget {
+  const FoodCancelPage({required this.orderId, super.key});
+
+  final String orderId;
+
+  @override
+  State<FoodCancelPage> createState() => _FoodCancelPageState();
+}
+
+class _FoodCancelPageState extends State<FoodCancelPage> {
+  String? _reasonId;
+  var _submitted = false;
+
+  List<_FoodCancelReason> _reasons(AppLocalizations l10n) {
+    return [
+      _FoodCancelReason(id: 'wrong_items', label: l10n.foodCancelReasonWrong),
+      _FoodCancelReason(id: 'too_long', label: l10n.foodCancelReasonWait),
+      _FoodCancelReason(id: 'address', label: l10n.foodCancelReasonAddress),
+      _FoodCancelReason(id: 'other', label: l10n.foodCancelReasonOther),
+    ];
+  }
+
+  void _back() {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    context.go(FoodRoutes.order(widget.orderId));
+  }
+
+  void _confirm() {
+    if (_reasonId == null) {
+      return;
+    }
+    setState(() => _submitted = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    final reasons = _reasons(l10n);
+
+    return Scaffold(
+      backgroundColor: DealGoColors.canvas,
+      body: SafeArea(
+        child: Column(
+          children: [
+            FoodScreenHeader(title: l10n.foodCancelTitle, onBack: _back),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  DealGoDimensions.pageGutter,
+                  DealGoSpacing.s8,
+                  DealGoDimensions.pageGutter,
+                  DealGoSpacing.s16,
+                ),
+                children: [
+                  DealGoBanner(
+                    tone: DealGoBannerTone.warning,
+                    message: l10n.foodCancelPolicyHint,
+                  ),
+                  const SizedBox(height: DealGoSpacing.s16),
+                  Text(l10n.foodCancelPickReason, style: textTheme.titleMedium),
+                  const SizedBox(height: DealGoSpacing.s12),
+                  for (final reason in reasons) ...[
+                    Material(
+                      color: DealGoColors.card,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(DealGoRadius.card),
+                        side: BorderSide(
+                          color: _reasonId == reason.id
+                              ? DealGoColors.primary
+                              : DealGoColors.border,
+                          width: _reasonId == reason.id ? 1.6 : 1,
+                        ),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        key: Key('food-cancel-reason-${reason.id}'),
+                        onTap: _submitted
+                            ? null
+                            : () => setState(() => _reasonId = reason.id),
+                        child: Padding(
+                          padding: const EdgeInsets.all(DealGoSpacing.s16),
+                          child: Row(
+                            children: [
+                              Expanded(child: Text(reason.label)),
+                              if (_reasonId == reason.id)
+                                const DealGoChip(
+                                  label: '✓',
+                                  tone: DealGoChipTone.brand,
+                                  selected: true,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: DealGoSpacing.s8),
+                  ],
+                  if (_submitted) ...[
+                    const SizedBox(height: DealGoSpacing.s12),
+                    DealGoBanner(
+                      tone: DealGoBannerTone.info,
+                      message: l10n.foodCancelSoftFail,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                DealGoDimensions.pageGutter,
+                DealGoSpacing.s8,
+                DealGoDimensions.pageGutter,
+                DealGoSpacing.s12,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (!_submitted)
+                    DealGoPrimaryButton(
+                      key: const Key('food-cancel-confirm'),
+                      label: l10n.foodCancelConfirm,
+                      enabled: _reasonId != null,
+                      onPressed: _confirm,
+                    )
+                  else
+                    DealGoPrimaryButton(
+                      key: const Key('food-cancel-done'),
+                      label: l10n.actionBack,
+                      onPressed: _back,
+                    ),
+                  const SizedBox(height: DealGoSpacing.s8),
+                  DealGoSecondaryButton(
+                    label: l10n.foodCancelKeep,
+                    enabled: !_submitted,
+                    onPressed: _back,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FoodCancelReason {
+  const _FoodCancelReason({required this.id, required this.label});
+
+  final String id;
+  final String label;
+}

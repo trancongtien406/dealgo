@@ -1,0 +1,89 @@
+import { mapNestStoreToListItem } from "@/features/stores/mappers";
+import type {
+  NestOpsStore,
+  NestOpsStorePage,
+} from "@/features/stores/nest-types";
+import type { StoreListItem } from "@/features/stores/types";
+import { apiFetch } from "@/lib/api/client";
+import type { PaginatedList } from "@/lib/api/pagination";
+import { apiPaths } from "@/lib/api/paths";
+
+export type FetchStoresParams = {
+  page?: number;
+  limit?: number;
+  q?: string;
+  sale?: string | null;
+  region?: string | null;
+  category?: string | null;
+  kyb?: string | null;
+};
+
+export async function fetchStores(
+  params: FetchStoresParams,
+): Promise<PaginatedList<StoreListItem>> {
+  return fetchStoresFromBff(params);
+}
+
+export async function fetchStoreByCode(
+  code: string,
+): Promise<StoreListItem | null> {
+  try {
+    const envelope = await apiFetch<{
+      success: boolean;
+      data: NestOpsStore;
+    }>(apiPaths.opsStore(code));
+    return mapNestStoreToListItem(envelope.data);
+  } catch (error) {
+    if (isNotFound(error)) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+async function fetchStoresFromBff(
+  params: FetchStoresParams,
+): Promise<PaginatedList<StoreListItem>> {
+  const page = Math.max(1, params.page ?? 1);
+  const limit = Math.max(1, Math.min(50, params.limit ?? 20));
+  const search = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  if (params.q?.trim()) {
+    search.set("q", params.q.trim());
+  }
+  if (params.sale && params.sale !== "ALL") {
+    search.set("sale", params.sale);
+  }
+  if (params.region && params.region !== "ALL") {
+    search.set("region", params.region);
+  }
+  if (params.category && params.category !== "ALL") {
+    search.set("category", params.category);
+  }
+  if (params.kyb && params.kyb !== "ALL") {
+    search.set("kyb", params.kyb);
+  }
+  const envelope = await apiFetch<{
+    success: boolean;
+    data: NestOpsStorePage;
+  }>(`${apiPaths.opsStores()}?${search.toString()}`);
+  const pageData = envelope.data;
+
+  return {
+    page: pageData.page,
+    limit: pageData.limit,
+    total: pageData.total,
+    items: pageData.items.map(mapNestStoreToListItem),
+  };
+}
+
+function isNotFound(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code: string }).code === "NOT_FOUND"
+  );
+}

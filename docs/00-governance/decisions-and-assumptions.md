@@ -157,20 +157,25 @@ stateDiagram-v2
 | `DEC-PROD-004` | Cần docs đủ hỗ trợ xây dựng phần mềm thực tế, vận hành/QA/bảo mật. | `CONFIRMED` | Không chứng minh rằng 69 file đã được viết/duyệt. | Định hướng bộ hồ sơ trong README. |
 | `DEC-PROD-005` | Ride theo mô hình thương lượng giá: khách đưa giá đề xuất; tài xế có thể chấp nhận hoặc gửi giá khác; khách chọn một đề nghị/tài xế trước khi phân công. | `CONFIRMED` | Chỉ áp dụng Ride hai bánh. Không áp dụng mặc định cho giá món/Food; không chốt mức sàn/trần, số vòng, timeout, phí hay thanh toán. | Yêu cầu chủ dự án: DealGo là hệ thống kiểu inDrive, đặt xe có trả giá; chi tiết công khai inDrive dùng để đối chiếu quy trình. |
 | `DEC-PROD-006` | Đăng ký/xác thực hỗ trợ passkey, xác minh số điện thoại qua SMS và email đã xác minh; Admin được phân quyền quản lý bật/tắt phương thức theo chính sách an toàn. | `CONFIRMED` | SMS là phương thức hạn chế/fallback; email là contact và login identifier, không là email OTP đăng nhập độc lập. Không được khóa người dùng khỏi mọi đường khôi phục ngoài quy trình security. | Yêu cầu chủ dự án ngày 2026-10-12. Chi tiết enrollment/recovery/provider thuộc `OPEN-020`. |
-| `DEC-PROD-007` | MVP có chat trong ứng dụng và gọi thoại trong ứng dụng cho các bên liên quan đến Ride/Food. | `CONFIRMED` | Không lộ số điện thoại; chat/call có scope theo giao dịch; mặc định không ghi âm, không video, không chat/call tự do giữa người lạ. Provider, cửa sổ liên lạc và retention thuộc `OPEN-021`. | Yêu cầu chủ dự án ngày 2026-10-12.
+| `DEC-PROD-007` | MVP có chat trong ứng dụng và gọi thoại trong ứng dụng cho các bên liên quan đến Ride/Food. | `CONFIRMED` | Không lộ số điện thoại; chat/call có scope theo giao dịch; mặc định không ghi âm, không video, không chat/call tự do giữa người lạ. Provider, cửa sổ liên lạc và retention thuộc `OPEN-021`. | Yêu cầu chủ dự án ngày 2026-10-12. **Reaffirmed 2026-10-14 (1A):** giữ chat + voice; không xóa DEC. |
+
 
 **Phân biệt baseline:** `Admin Web` đã thuộc kế hoạch và cần được phân tích để vận hành; số **37 trang admin** và khoảng **165 màn mobile** trước đây là *inventory tham chiếu*, **không** là 37/165 cam kết P0. Mọi nâng baseline thành cam kết release phải qua `scope-release-plan.md` và phê duyệt.
 
-### 5.1. Chưa có ADR kiến trúc được duyệt
+### 5.1. ADR kiến trúc
 
-| Mã | Trạng thái | Chủ đề cần ADR khi đi tới thiết kế |
+Các bản ghi dưới đây là `PROPOSED` ngày 2026-10-13 theo yêu cầu chủ dự án: chọn baseline để code, secret điền sau. Chúng **chưa** `ACCEPTED`. Placeholder `ADR-TBD-*` không còn dùng.
+
+| Mã | Trạng thái | Quyết định đề xuất |
 |---|---|---|
-| `ADR-TBD-ARCH` | **PLACEHOLDER, không phải ID đăng ký** | Modular monolith hay microservices; tiêu chí scale và migration. |
-| `ADR-TBD-DATA` | **PLACEHOLDER, không phải ID đăng ký** | Ranh giới dữ liệu, transaction/outbox, consistency. |
-| `ADR-TBD-RT` | **PLACEHOLDER, không phải ID đăng ký** | Realtime transport, event broker, retry, ordering. |
-| `ADR-TBD-MOBILE` | **PLACEHOLDER, không phải ID đăng ký** | Module/feature structure, state management, cross-role state isolation. |
+| `ADR-001` | `PROPOSED` | Modular monolith NestJS. |
+| `ADR-002` | `PROPOSED` | PostgreSQL 16 + Prisma; tiền là số nguyên VND. |
+| `ADR-003` | `PROPOSED` | Redis 7, BullMQ, Socket.IO; PostgreSQL vẫn là nguồn trạng thái. |
+| `ADR-004` | `PROPOSED` | Flutter: `go_router` + `flutter_bloc`. |
+| `ADR-005` | `PROPOSED` | Admin Web Next.js là BFF, cookie `HttpOnly`. |
+| `ADR-006` | `PROPOSED` | Adapter mock/sandbox cho maps, SMS, email, FCM, thanh toán, thoại, KYC storage. |
 
-Không biến `NestJS`, `PostgreSQL`, `Redis`, `Kafka`, `FCM`, `Bloc` hoặc `Provider` thành công nghệ đã phê duyệt chỉ vì phù hợp kinh nghiệm hoặc từng dùng trong dự án khác.
+Nguồn: `docs/05-architecture/adr/`. Vendor thương mại và chính sách giá vẫn là `OPEN-*`.
 
 ## 6. Open Decision Register — `OPEN-001..008` (kế thừa)
 

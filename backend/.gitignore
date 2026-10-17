@@ -1,6 +1,7 @@
 # compiled output
 /dist
 /node_modules
+/src/generated
 /build
 
 # TypeScript build cache
@@ -44,6 +45,12 @@ lerna-debug.log*
 .env.test.local
 .env.production.local
 .env.local
+
+# Firebase / Google service-account JSON (never commit)
+*firebase-adminsdk*.json
+*-firebase-adminsdk-*.json
+google-services.json
+service-account*.json
 
 # temp directory
 .temp

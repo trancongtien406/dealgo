@@ -1,0 +1,120 @@
+name: backend
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Unit suite uses memory repositories (NODE_ENV=test without DATABASE_URL).
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Prisma generate
+        run: npx prisma generate
+
+      - name: Test
+        run: npm test
+        env:
+          NODE_ENV: test
+          JWT_ACCESS_SECRET: ci-test-access-secret
+
+      - name: Build
+        run: npm run build
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: test
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: dealgo
+          POSTGRES_PASSWORD: dealgo_dev
+          POSTGRES_DB: dealgo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dealgo -d dealgo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      JWT_ACCESS_SECRET: ci-test-access-secret
+      DATABASE_URL: postgresql://dealgo:dealgo_dev@127.0.0.1:5432/dealgo?schema=public
+      REDIS_URL: redis://127.0.0.1:6379
+      SMS_PROVIDER: mock
+      PUSH_PROVIDER: mock
+      PARTNER_ELIGIBILITY_BYPASS: 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Prisma generate
+        run: npx prisma generate
+
+      - name: Migrate
+        run: npx prisma migrate deploy
+
+      # Memory HTTP suites override identity to Memory* while RideModule would
+      # pick Prisma when DATABASE_URL is set — keep those on the unit job.
+      # This job migrates and runs the Postgres concurrent select race + pure unit extras.
+      - name: Integration subset (Postgres race)
+        run: >-
+          npx vitest run
+          test/concurrency/driver-assignment.race.spec.ts
+          test/concurrency/food-claim.race.spec.ts
+          test/concurrency/payment-webhook.race.spec.ts
+          src/modules/communication/outbox/outbox-relay.service.spec.ts
+          src/integrations/push/push-sender.spec.ts
+          src/modules/operations/ops-exceptions.classify.spec.ts

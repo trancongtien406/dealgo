@@ -1,26 +1,140 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-brand: #6d28d9;
+  --color-canvas: #f8f8fd;
+  --color-border: #e7e3ef;
+  --color-ink: #171b2c;
+  --color-muted: #787c99;
+  --color-success: #16a34a;
+  --color-food: #f97316;
+  --color-delivery: #3b82f6;
+  --color-danger: #e11d48;
+}
+
+.dark,
+[data-theme="dark"] {
+  --color-brand: #a78bfa;
+  --color-canvas: #090b11;
+  --color-border: #1e2235;
+  --color-ink: #f0f2f8;
+  --color-muted: #8c93ad;
+  --color-success: #22c55e;
+  --color-food: #fb923c;
+  --color-delivery: #60a5fa;
+  --color-danger: #f43f5e;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-brand: var(--color-brand);
+  --color-canvas: var(--color-canvas);
+  --color-border: var(--color-border);
+  --color-ink: var(--color-ink);
+  --color-muted: var(--color-muted);
+  --color-success: var(--color-success);
+  --color-food: var(--color-food);
+  --color-delivery: var(--color-delivery);
+  --color-danger: var(--color-danger);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Surface backgrounds in dark mode */
+.dark body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  color-scheme: dark;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.dark .bg-white,
+[data-theme="dark"] .bg-white {
+  background-color: #121523 !important;
+}
+
+.dark .bg-white\/95,
+[data-theme="dark"] .bg-white\/95 {
+  background-color: rgba(18, 21, 35, 0.95) !important;
+}
+
+.dark .bg-white\/90,
+[data-theme="dark"] .bg-white\/90 {
+  background-color: rgba(18, 21, 35, 0.9) !important;
+}
+
+.dark .bg-white\/80,
+[data-theme="dark"] .bg-white\/80 {
+  background-color: rgba(18, 21, 35, 0.8) !important;
+}
+
+.dark .bg-white\/70,
+[data-theme="dark"] .bg-white\/70 {
+  background-color: rgba(18, 21, 35, 0.7) !important;
+}
+
+.dark .bg-white\/60,
+[data-theme="dark"] .bg-white\/60 {
+  background-color: rgba(18, 21, 35, 0.6) !important;
+}
+
+.dark .hover\:bg-canvas:hover,
+[data-theme="dark"] .hover\:bg-canvas:hover {
+  background-color: #1a1e32 !important;
+}
+
+.dark .bg-canvas\/40,
+[data-theme="dark"] .bg-canvas\/40 {
+  background-color: rgba(9, 11, 17, 0.6) !important;
+}
+
+.dark .bg-canvas\/60,
+[data-theme="dark"] .bg-canvas\/60 {
+  background-color: rgba(9, 11, 17, 0.8) !important;
+}
+
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark textarea,
+.dark select {
+  color-scheme: dark;
+}
+
+/* Custom scrollbars in dark mode */
+.dark ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.dark ::-webkit-scrollbar-track {
+  background: #090b11;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #252a40;
+  border-radius: 9999px;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #363d5c;
+}
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]):not([disabled]),
+[role="tab"]:not([aria-disabled="true"]):not([disabled]),
+[type="button"]:not(:disabled),
+[type="submit"]:not(:disabled),
+[type="reset"]:not(:disabled),
+summary,
+select:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled,
+[role="button"][aria-disabled="true"],
+[role="button"]:disabled,
+[role="tab"][aria-disabled="true"],
+[role="tab"]:disabled,
+[type="button"]:disabled,
+[type="submit"]:disabled,
+[type="reset"]:disabled {
+  cursor: not-allowed;
+}
+
+/* Ensure SVG icons align consistently with text and controls */
+svg {
+  vertical-align: middle;
 }

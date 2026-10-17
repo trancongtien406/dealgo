@@ -1,0 +1,931 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  runtime             = "nodejs"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  CUSTOMER
+  MERCHANT
+  DRIVER
+  OPS
+}
+
+enum RoleGrantStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+enum SessionChannel {
+  CUSTOMER
+  OPS
+}
+
+enum SessionRevokeReason {
+  USER
+  REUSE
+}
+
+enum PasskeyCeremonyKind {
+  REGISTRATION
+  AUTHENTICATION
+}
+
+model User {
+  id                 String              @id @default(uuid()) @db.Uuid
+  email              String?             @unique
+  phone              String?             @unique
+  displayName        String
+  phoneVerifiedAt    DateTime?
+  emailVerifiedAt    DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  roleGrants         RoleGrant[]
+  phoneChallenges    PhoneChallenge[]
+  emailVerifications EmailVerification[]
+  passkeys           Passkey[]
+  passkeyChallenges  PasskeyChallenge[]
+  sessions           Session[]
+  opsCredential      OpsCredential?
+  customerRides      Ride[]              @relation("CustomerRides")
+  assignedRides      Ride[]              @relation("AssignedRides")
+  driverOffers       RideOffer[]         @relation("DriverOffers")
+  rideSelections     RideSelection[]     @relation("CustomerRideSelections")
+  ownedStores        FoodStore[]
+  customerFoodOrders FoodOrder[]         @relation("CustomerFoodOrders")
+  assignedFoodOrders FoodOrder[]         @relation("AssignedFoodOrders")
+  partnerApplications PartnerApplication[] @relation("ApplicantPartnerApplications")
+  reviewedPartnerApplications PartnerApplication[] @relation("ReviewedPartnerApplications")
+  chatMessages       ChatMessage[]
+  driverPresence     DriverPresence?
+  opsAuditLogs       OpsAuditLog[]     @relation("OpsAuditActor")
+  authMethodPolicies AuthMethodPolicy[] @relation("AuthMethodPolicyActor")
+  pushDeviceTokens   PushDeviceToken[]
+  platformSettings   PlatformSetting[] @relation("PlatformSettingActor")
+  opsFaqCreated      OpsFaqEntry[]     @relation("OpsFaqCreatedBy")
+  opsFaqUpdated      OpsFaqEntry[]     @relation("OpsFaqUpdatedBy")
+
+  @@map("users")
+}
+
+// FCM device tokens for PushPort (ADR-006). Soft-register from mobile.
+model PushDeviceToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @db.VarChar(512)
+  platform  String   @db.VarChar(32) @default("unknown")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, token])
+  @@index([userId])
+  @@map("push_device_tokens")
+}
+
+enum PartnerApplicationRole {
+  DRIVER
+  MERCHANT
+}
+
+enum PartnerApplicationStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+// KYC (DRIVER) / KYB (MERCHANT). Mock storage keys live in documents jsonb;
+// no real S3 required when KYC_STORAGE_PROVIDER=mock.
+model PartnerApplication {
+  id          String                    @id @default(uuid()) @db.Uuid
+  userId      String                    @db.Uuid
+  user        User                      @relation("ApplicantPartnerApplications", fields: [userId], references: [id], onDelete: Cascade)
+  role        PartnerApplicationRole
+  status      PartnerApplicationStatus
+  metadata    Json                      @default("{}")
+  documents   Json                      @default("[]")
+  reason      String?                   @db.VarChar(500)
+  reviewedBy  String?                   @db.Uuid
+  reviewer    User?                     @relation("ReviewedPartnerApplications", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reviewedAt  DateTime?
+  submittedAt DateTime?
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+
+  @@unique([userId, role])
+  @@index([status, submittedAt])
+  @@map("partner_applications")
+}
+
+model RoleGrant {
+  id        String          @id @default(uuid()) @db.Uuid
+  userId    String          @db.Uuid
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role
+  status    RoleGrantStatus
+  createdAt DateTime        @default(now())
+
+  @@unique([userId, role])
+  @@index([userId])
+  @@index([role, status])
+  @@map("role_grants")
+}
+
+model PhoneChallenge {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @db.Uuid
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone        String
+  codeHash     String
+  expiresAt    DateTime
+  attemptCount Int       @default(0)
+  consumedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([userId])
+  @@map("phone_challenges")
+}
+
+model EmailVerification {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email      String
+  tokenHash  String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@map("email_verifications")
+}
+
+model Passkey {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialId String   @unique
+  publicKey    Bytes
+  counter      Int      @default(0)
+  transports   String[] @default([])
+  deviceType   String?
+  backedUp     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@map("passkeys")
+}
+
+model PasskeyChallenge {
+  id         String              @id @default(uuid()) @db.Uuid
+  userId     String              @db.Uuid
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind       PasskeyCeremonyKind
+  challenge  String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime            @default(now())
+
+  @@index([userId, kind])
+  @@map("passkey_challenges")
+}
+
+model Session {
+  id               String               @id @default(uuid()) @db.Uuid
+  userId           String               @db.Uuid
+  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  familyId         String               @db.Uuid
+  channel          SessionChannel
+  refreshTokenHash String               @unique
+  expiresAt        DateTime
+  rotatedAt        DateTime?
+  revokedAt        DateTime?
+  revokeReason     SessionRevokeReason?
+  createdAt        DateTime             @default(now())
+
+  @@index([familyId])
+  @@index([userId])
+  @@map("sessions")
+}
+
+model OpsCredential {
+  userId       String   @id @db.Uuid
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  passwordHash String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("ops_credentials")
+}
+
+enum RideStatus {
+  NEGOTIATING
+  ASSIGNED
+  DRIVER_EN_ROUTE
+  DRIVER_ARRIVED
+  IN_TRIP
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+enum RideOfferKind {
+  ACCEPT
+  COUNTER
+}
+
+enum RideOfferStatus {
+  PENDING
+  SELECTED
+  LOST
+}
+
+// Partial unique index rides_one_negotiating_per_customer is defined in SQL.
+model Ride {
+  id                 String           @id @default(uuid()) @db.Uuid
+  customerId         String           @db.Uuid
+  customer           User             @relation("CustomerRides", fields: [customerId], references: [id], onDelete: Restrict)
+  pickupLat          Float
+  pickupLng          Float
+  pickupLabel        String           @db.VarChar(160)
+  dropoffLat         Float
+  dropoffLng         Float
+  dropoffLabel       String           @db.VarChar(160)
+  serviceRegionCode  String?          @db.VarChar(8)
+  offeredFareVnd     Int
+  referenceFareVnd   Int
+  agreedFareVnd      Int?
+  status             RideStatus
+  assignedDriverId   String?          @db.Uuid
+  assignedDriver     User?            @relation("AssignedRides", fields: [assignedDriverId], references: [id], onDelete: Restrict)
+  selectedOfferId    String?          @unique @db.Uuid
+  selectedOffer      RideOffer?       @relation("SelectedOffer", fields: [selectedOfferId], references: [id], onDelete: Restrict)
+  expiresAt          DateTime
+  idempotencyKey     String           @db.VarChar(200)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  offers             RideOffer[]      @relation("RideOffers")
+  selections         RideSelection[]
+  chatThread         ChatThread?
+
+  @@unique([customerId, idempotencyKey])
+  @@index([customerId, status])
+  @@index([status, updatedAt])
+  @@index([status, updatedAt(sort: Desc)], map: "rides_status_updatedAt_desc_idx")
+  @@index([status, createdAt])
+  @@index([createdAt])
+  @@index([serviceRegionCode])
+  @@index([serviceRegionCode, status, updatedAt])
+  @@map("rides")
+}
+
+model RideOffer {
+  id              String          @id @default(uuid()) @db.Uuid
+  rideId          String          @db.Uuid
+  ride            Ride            @relation("RideOffers", fields: [rideId], references: [id], onDelete: Cascade)
+  driverId        String          @db.Uuid
+  driver          User            @relation("DriverOffers", fields: [driverId], references: [id], onDelete: Restrict)
+  amountVnd       Int
+  kind            RideOfferKind
+  status          RideOfferStatus
+  expiresAt       DateTime
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  selectedForRide Ride?           @relation("SelectedOffer")
+
+  @@unique([rideId, driverId])
+  @@map("ride_offers")
+}
+
+model RideSelection {
+  id             String   @id @default(uuid()) @db.Uuid
+  customerId     String   @db.Uuid
+  customer       User     @relation("CustomerRideSelections", fields: [customerId], references: [id], onDelete: Restrict)
+  idempotencyKey String   @db.VarChar(200)
+  rideId         String   @db.Uuid
+  ride           Ride     @relation(fields: [rideId], references: [id], onDelete: Restrict)
+  createdAt      DateTime @default(now())
+
+  @@unique([customerId, idempotencyKey])
+  @@map("ride_selections")
+}
+
+enum FoodOrderStatus {
+  PLACED
+  PREPARING
+  READY
+  ASSIGNED
+  PICKED_UP
+  DELIVERED
+  FAILED
+  CANCELLED
+}
+
+model FoodStore {
+  id                String     @id @default(uuid()) @db.Uuid
+  ownerId           String     @db.Uuid
+  owner             User       @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  name              String     @db.VarChar(120)
+  category          String?    @db.VarChar(64)
+  lat               Float?
+  lng               Float?
+  serviceRegionCode String?    @db.VarChar(8)
+  createdAt         DateTime   @default(now())
+  items             FoodItem[]
+  orders            FoodOrder[]
+
+  @@index([category])
+  @@index([lat, lng])
+  @@index([serviceRegionCode])
+  @@map("food_stores")
+}
+
+enum FoodItemModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model FoodItem {
+  id               String                   @id @default(uuid()) @db.Uuid
+  storeId          String                   @db.Uuid
+  store            FoodStore                @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name             String                   @db.VarChar(160)
+  priceVnd         Int
+  available        Boolean                  @default(true)
+  moderationStatus FoodItemModerationStatus @default(APPROVED)
+
+  @@index([storeId])
+  @@index([moderationStatus])
+  @@map("food_items")
+}
+
+// Partial unique index food_orders_one_open_per_customer is defined in SQL.
+model FoodOrder {
+  id                String          @id @default(uuid()) @db.Uuid
+  customerId        String          @db.Uuid
+  customer          User            @relation("CustomerFoodOrders", fields: [customerId], references: [id], onDelete: Restrict)
+  storeId           String          @db.Uuid
+  store             FoodStore       @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  status            FoodOrderStatus
+  deliveryFareVnd   Int
+  subtotalVnd       Int
+  totalVnd          Int
+  dropoffLat        Float
+  dropoffLng        Float
+  dropoffLabel      String          @db.VarChar(160)
+  serviceRegionCode String?         @db.VarChar(8)
+  assignedDriverId  String?         @db.Uuid
+  assignedDriver    User?           @relation("AssignedFoodOrders", fields: [assignedDriverId], references: [id], onDelete: Restrict)
+  idempotencyKey    String          @db.VarChar(200)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  lines             FoodOrderLine[]
+  chatThread        ChatThread?
+
+  @@unique([customerId, idempotencyKey])
+  @@index([storeId, status])
+  @@index([status, updatedAt])
+  @@index([status, updatedAt(sort: Desc)], map: "food_orders_status_updatedAt_desc_idx")
+  @@index([status, createdAt])
+  @@index([createdAt])
+  @@index([serviceRegionCode])
+  @@index([serviceRegionCode, status, updatedAt])
+  @@map("food_orders")
+}
+
+model FoodOrderLine {
+  id           String    @id @default(uuid()) @db.Uuid
+  orderId      String    @db.Uuid
+  order        FoodOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  itemId       String    @db.Uuid
+  name         String    @db.VarChar(160)
+  unitPriceVnd Int
+  quantity     Int
+
+  @@index([orderId])
+  @@map("food_order_lines")
+}
+
+enum LedgerAccountKind {
+  ASSET
+  LIABILITY
+}
+
+enum LedgerEntryDirection {
+  DEBIT
+  CREDIT
+}
+
+enum LedgerEntityType {
+  RIDE
+  FOOD_ORDER
+  DISPUTE
+}
+
+enum LedgerJournalEvent {
+  COD_OBLIGATION_POSTED
+  /// Sandbox-only refund reverse stub. Not a PSP settlement claim.
+  SANDBOX_REFUND_RECORDED
+}
+
+enum LedgerJournalStatus {
+  POSTED
+}
+
+model LedgerAccount {
+  id        String            @id @default(uuid()) @db.Uuid
+  code      String            @unique @db.VarChar(80)
+  name      String            @db.VarChar(160)
+  kind      LedgerAccountKind
+  createdAt DateTime          @default(now())
+  entries   LedgerEntry[]
+
+  @@map("ledger_accounts")
+}
+
+model LedgerJournal {
+  id         String              @id @default(uuid()) @db.Uuid
+  entityType LedgerEntityType
+  entityId   String              @db.Uuid
+  event      LedgerJournalEvent
+  status     LedgerJournalStatus @default(POSTED)
+  currency   String              @db.VarChar(3) @default("VND")
+  amountVnd  Int
+  postedAt   DateTime            @default(now())
+  entries    LedgerEntry[]
+
+  @@unique([entityType, entityId, event])
+  @@index([entityType, entityId])
+  @@map("ledger_journals")
+}
+
+model LedgerEntry {
+  id        String               @id @default(uuid()) @db.Uuid
+  journalId String               @db.Uuid
+  journal   LedgerJournal        @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  accountId String               @db.Uuid
+  account   LedgerAccount        @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  direction LedgerEntryDirection
+  amountVnd Int
+  createdAt DateTime             @default(now())
+
+  @@index([journalId])
+  @@index([accountId])
+  @@map("ledger_entries")
+}
+
+// Transaction-scoped text chat (DEC-PROD-007 stub). Exactly one of rideId/foodOrderId.
+model ChatThread {
+  id          String        @id @default(uuid()) @db.Uuid
+  rideId      String?       @unique @db.Uuid
+  ride        Ride?         @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  foodOrderId String?       @unique @db.Uuid
+  foodOrder   FoodOrder?    @relation(fields: [foodOrderId], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+  messages    ChatMessage[]
+
+  @@map("chat_threads")
+}
+
+model ChatMessage {
+  id           String     @id @default(uuid()) @db.Uuid
+  threadId     String     @db.Uuid
+  thread       ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderUserId String     @db.Uuid
+  sender       User       @relation(fields: [senderUserId], references: [id], onDelete: Restrict)
+  body         String     @db.VarChar(2000)
+  createdAt    DateTime   @default(now())
+
+  @@index([threadId, createdAt])
+  @@map("chat_messages")
+}
+
+// Transactional outbox skeleton (ADR-003). Relay fans out Socket.IO + push mock.
+model OutboxMessage {
+  id            String    @id @default(uuid()) @db.Uuid
+  eventKey      String    @unique @db.VarChar(200)
+  aggregateType String    @db.VarChar(64)
+  aggregateId   String    @db.Uuid
+  eventType     String    @db.VarChar(120)
+  payload       Json
+  createdAt     DateTime  @default(now())
+  processedAt   DateTime?
+  attempts      Int       @default(0)
+  lockedAt      DateTime?
+
+  @@index([processedAt, createdAt])
+  @@index([processedAt, lockedAt])
+  @@map("outbox_messages")
+}
+
+// Payment intent (ADR-006). Sandbox COD + redirect create-intent for VNPAY/MOMO.
+// Capture without verified webhook is never claimed as settled money.
+enum PaymentEntityType {
+  RIDE
+  FOOD_ORDER
+}
+
+enum PaymentMethod {
+  COD
+  VNPAY
+  MOMO
+}
+
+enum PaymentIntentStatus {
+  SANDBOX_RECORDED
+  CREATED
+  PENDING_REDIRECT
+  CAPTURED_STUB
+}
+
+model PaymentIntent {
+  id          String              @id @default(uuid()) @db.Uuid
+  entityType  PaymentEntityType
+  entityId    String              @db.Uuid
+  method      PaymentMethod
+  status      PaymentIntentStatus @default(SANDBOX_RECORDED)
+  amountVnd   Int
+  currency    String              @db.VarChar(3) @default("VND")
+  provider    String              @db.VarChar(32) @default("sandbox")
+  providerRef String?             @db.VarChar(120)
+  paymentUrl  String?             @db.VarChar(2000)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@unique([entityType, entityId, method])
+  @@index([entityType, entityId])
+  @@index([providerRef])
+  @@index([createdAt])
+  @@map("payment_intents")
+}
+
+// Idempotent PSP webhook receipts (provider event id).
+model PaymentWebhookEvent {
+  id              String   @id @default(uuid()) @db.Uuid
+  provider        String   @db.VarChar(32)
+  providerEventId String   @db.VarChar(160)
+  paymentIntentId String?  @db.Uuid
+  status          String   @db.VarChar(40)
+  createdAt       DateTime @default(now())
+
+  @@unique([provider, providerEventId])
+  @@index([createdAt])
+  @@map("payment_webhook_events")
+}
+
+// Optional audit for in-app voice sessions (DEC-PROD-007). Tokens are not stored.
+model VoiceSession {
+  id            String   @id @default(uuid()) @db.Uuid
+  aggregateType String   @db.VarChar(32)
+  aggregateId   String   @db.Uuid
+  userId        String   @db.Uuid
+  roomName      String   @db.VarChar(160)
+  provider      String   @db.VarChar(32)
+  createdAt     DateTime @default(now())
+  expiresAt     DateTime
+
+  @@index([aggregateType, aggregateId])
+  @@index([userId, createdAt])
+  @@map("voice_sessions")
+}
+
+// Driver online/offline + last known coords for dispatch filtering (ADR-003 presence).
+model DriverPresence {
+  userId            String   @id @db.Uuid
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  online            Boolean
+  lat               Float?
+  lng               Float?
+  serviceRegionCode String?  @db.VarChar(8)
+  updatedAt         DateTime @updatedAt
+
+  @@index([online, updatedAt])
+  @@index([serviceRegionCode])
+  @@map("driver_presence")
+}
+
+enum OpsAuditEntityType {
+  RIDE
+  FOOD_ORDER
+  AUTH_METHOD_POLICY
+  PLATFORM_SETTING
+  OPS_FAQ
+  NOTIFICATION_CAMPAIGN
+  CMS_CONTENT
+  DISPUTE
+  SERVICE_REGION
+}
+
+enum OpsAuditAction {
+  CANCEL
+  REASSIGN
+  AUTH_METHOD_UPDATE
+  SETTINGS_UPDATE
+  FAQ_UPDATE
+  NOTIFICATION_UPDATE
+  CMS_UPDATE
+  DISPUTE_RESOLVE
+  SERVICE_REGION_UPDATE
+}
+
+enum ServiceRegionStatus {
+  ACTIVE
+  PLANNED
+}
+
+// Admin-managed service zones (OPEN-001). `code` is the stable key stored in
+// rides/food_orders/food_stores/driver_presence.serviceRegionCode; bbox is a
+// coarse classifier, not a production geofence polygon. Rows are never deleted
+// (history references the code) — disable by setting status = PLANNED.
+model ServiceRegion {
+  id        String              @id @default(uuid()) @db.Uuid
+  code      String              @unique @db.VarChar(8)
+  label     String              @db.VarChar(80)
+  centerLat Float
+  centerLng Float
+  minLat    Float
+  maxLat    Float
+  minLng    Float
+  maxLng    Float
+  status    ServiceRegionStatus @default(PLANNED)
+  sortOrder Int                 @default(0)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@index([status, sortOrder])
+  @@map("service_regions")
+}
+
+enum PlatformSettingValueType {
+  string
+  number
+  json
+}
+
+// Admin-editable OPEN tunables (TEST_ONLY / PROPOSED). Secrets stay in env.
+model PlatformSetting {
+  id              String                   @id @default(uuid()) @db.Uuid
+  key             String                   @unique @db.VarChar(80)
+  value           String                   @db.Text
+  valueType       PlatformSettingValueType
+  updatedAt       DateTime                 @updatedAt
+  updatedByUserId String?                  @db.Uuid
+  updatedBy       User?                    @relation("PlatformSettingActor", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@map("platform_settings")
+}
+
+enum OpsFaqStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum OpsFaqCategory {
+  POLICY
+  OPS
+  PRODUCT
+  TECH
+}
+
+// Ops FAQ CMS for OPEN Q&A drafts (owner review). Only PUBLISHED for future public/help.
+model OpsFaqEntry {
+  id               String         @id @default(uuid()) @db.Uuid
+  openId           String?        @db.VarChar(16)
+  question         String         @db.VarChar(500)
+  suggestedAnswer  String         @db.Text
+  status           OpsFaqStatus   @default(DRAFT)
+  category         OpsFaqCategory
+  sortOrder        Int            @default(0)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  createdByUserId  String?        @db.Uuid
+  updatedByUserId  String?        @db.Uuid
+  createdBy        User?          @relation("OpsFaqCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedBy        User?          @relation("OpsFaqUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([status, sortOrder])
+  @@index([openId])
+  @@map("ops_faq_entries")
+}
+
+// Immutable ops intervention audit (CAP-OPS-05). Append-only.
+model OpsAuditLog {
+  id          String             @id @default(uuid()) @db.Uuid
+  actorUserId String             @db.Uuid
+  actor       User               @relation("OpsAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  action      OpsAuditAction
+  entityType  OpsAuditEntityType
+  entityId    String             @db.Uuid
+  reason      String             @db.VarChar(500)
+  metadata    Json               @default("{}")
+  createdAt   DateTime           @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@map("ops_audit_logs")
+}
+
+// Global auth method enable/disable (DEC-PROD-006 / FR-OPS-010). Defaults ENABLED — TEST_ONLY until OPEN-020.
+enum AuthMethod {
+  PASSKEY
+  PHONE_SMS
+  EMAIL_LOGIN_IDENTIFIER
+}
+
+model AuthMethodPolicy {
+  id              String     @id @default(uuid()) @db.Uuid
+  method          AuthMethod @unique
+  enabled         Boolean    @default(true)
+  updatedAt       DateTime   @updatedAt
+  updatedByUserId String?    @db.Uuid
+  updatedBy       User?      @relation("AuthMethodPolicyActor", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@map("auth_method_policies")
+}
+
+// ---- Notification campaigns + CMS content (Admin Web "Thông báo & CMS") ----
+enum NotificationChannel {
+  PUSH
+  SMS
+  EMAIL
+  IN_APP
+}
+
+enum NotificationAudience {
+  ALL
+  CUSTOMER
+  DRIVER
+  MERCHANT
+  STAFF
+}
+
+// DRAFT -> PENDING_APPROVAL -> (RUNNING | SENDING) -> SENT. CANCELLED from DRAFT/PENDING/RUNNING.
+// Actual fan-out (FCM/SMS/email) is a future worker; this table is the source of truth for state.
+enum NotificationCampaignStatus {
+  DRAFT
+  PENDING_APPROVAL
+  RUNNING
+  SENDING
+  SENT
+  CANCELLED
+}
+
+model NotificationCampaign {
+  id               String                     @id @default(uuid()) @db.Uuid
+  code             String                     @unique @db.VarChar(24)
+  title            String                     @db.VarChar(160)
+  body             String                     @db.Text
+  channels         NotificationChannel[]
+  audience         NotificationAudience
+  audienceNote     String?                    @db.VarChar(160)
+  status           NotificationCampaignStatus @default(DRAFT)
+  isAutomatic      Boolean                    @default(false)
+  scheduledAt      DateTime?
+  reachedCount     Int?
+  rejectionReason  String?                    @db.VarChar(500)
+  submittedAt      DateTime?
+  approvedAt       DateTime?
+  sentAt           DateTime?
+  cancelledAt      DateTime?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+  createdByUserId  String?                    @db.Uuid
+  updatedByUserId  String?                    @db.Uuid
+  approvedByUserId String?                    @db.Uuid
+
+  @@index([status, createdAt])
+  @@index([createdAt])
+  @@map("notification_campaigns")
+}
+
+enum CmsContentKind {
+  ARTICLE
+  BANNER
+  POLICY
+}
+
+enum CmsContentStatus {
+  DRAFT
+  IN_REVIEW
+  PUBLISHED
+}
+
+model CmsContent {
+  id              String           @id @default(uuid()) @db.Uuid
+  kind            CmsContentKind
+  title           String           @db.VarChar(200)
+  body            String           @db.Text
+  status          CmsContentStatus @default(DRAFT)
+  publishedAt     DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  createdByUserId String?          @db.Uuid
+  updatedByUserId String?          @db.Uuid
+
+  @@index([kind, status, createdAt])
+  @@map("cms_contents")
+}
+
+// ---- Ops disputes / refund requests (Admin Web whenếu nại) ----
+enum DisputeStatus {
+  OPEN
+  AWAITING_RESPONSE
+  INVESTIGATING
+  RESOLVED
+  PENDING
+}
+
+enum DisputePriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum DisputeVerifyStatus {
+  INVESTIGATING
+  RESOLVED
+  REJECTED
+  WAITING_MERCHANT
+}
+
+enum DisputeResolutionKind {
+  PARTIAL_REFUND
+  FULL_REFUND
+  REJECTED
+  EVIDENCE_REQUESTED
+}
+
+enum RefundRequestStatus {
+  PENDING
+  SANDBOX_RECORDED
+  REJECTED
+  CANCELLED
+}
+
+enum RefundRequestKind {
+  PARTIAL
+  FULL
+}
+
+model DisputeCase {
+  id              String               @id @default(uuid()) @db.Uuid
+  code            String               @unique @db.VarChar(32)
+  type            String               @db.VarChar(120)
+  priority        DisputePriority
+  status          DisputeStatus
+  verifyStatus    DisputeVerifyStatus  @default(INVESTIGATING)
+  orderCode       String               @db.VarChar(64)
+  orderEntityType PaymentEntityType?
+  orderEntityId   String?              @db.Uuid
+  paymentId       String               @db.VarChar(64)
+  refundCode      String               @db.VarChar(64)
+  assignee        String               @db.VarChar(120)
+  slaRemaining    String               @db.VarChar(32) @default("02:00:00")
+  reporterName    String               @db.VarChar(160)
+  summary         String               @db.Text
+  parties         Json                 @default("[]")
+  timeline        Json                 @default("[]")
+  messages        Json                 @default("[]")
+  checklist       Json                 @default("[]")
+  orderSnapshot   Json                 @default("{}")
+  resolution      DisputeResolutionKind?
+  openedAt        DateTime             @default(now())
+  resolvedAt      DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  refundRequests  RefundRequest[]
+
+  @@index([status, createdAt])
+  @@index([priority, createdAt])
+  @@index([createdAt])
+  @@map("dispute_cases")
+}
+
+model RefundRequest {
+  id              String              @id @default(uuid()) @db.Uuid
+  code            String              @unique @db.VarChar(32)
+  disputeId       String              @db.Uuid
+  dispute         DisputeCase         @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  kind            RefundRequestKind
+  status          RefundRequestStatus @default(PENDING)
+  amountVnd       Int
+  reason          String              @db.VarChar(500)
+  ledgerJournalId String?             @db.Uuid
+  createdByUserId String              @db.Uuid
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([disputeId, createdAt])
+  @@index([status, createdAt])
+  @@map("refund_requests")
+}

@@ -1,0 +1,166 @@
+---
+description: "DealGo NestJS backend rules: pragmatic modular architecture, secure API contracts, validated data, authorization, concurrency-safe transactions, realtime, measured performance and production reliability."
+globs: backend/**
+alwaysApply: false
+---
+
+# DealGo — NestJS Engineering Rules
+
+Áp dụng cho `backend/` của DealGo. Đây là **coding rules**, không phải quy trình triển khai, tài liệu nghiệp vụ hay checklist bắt buộc cho mọi task. Chỉ áp dụng các mục liên quan đến code đang sửa; ưu tiên correctness, an toàn dữ liệu, maintainability và giải pháp đơn giản. Không mặc định dự án đã dùng Prisma, Redis, Kafka, BullMQ, GraphQL hoặc một phiên bản NestJS cụ thể chỉ vì file này nhắc tới.
+
+## 1. Product, business authority & API source of truth
+
+- Backend là nguồn chân lý về principal/role, KYC, quyền sở hữu cửa hàng, phạm vi tài xế, báo giá được chọn, trạng thái chuyến/đơn, giá đã chốt, tồn kho và thanh toán. Không tin cờ `verified`, `role`, `price`, `driverId`, `merchantId` từ client nếu chưa xác thực theo ngữ cảnh.
+- Bảo toàn nghiệp vụ DealGo đã chốt: Customer–Driver thương lượng (A–C), Customer–Merchant–Driver (A–B–C), Ride/Quote/Food/Delivery theo contract thực tế. Không tự đặt status, transition, thời hạn, mức phí hoặc permission chưa được định nghĩa.
+- API contract/OpenAPI/backend schema đã thống nhất là nguồn chuẩn cho Flutter và Website. Thay đổi field, enum, nullability, status code, envelope hay pagination phải duy trì compatibility hoặc có migration/versioning phù hợp; không sửa API chỉ để frontend dễ code.
+- Khi chưa có provider/API key, hoàn thiện adapter, cấu hình mẫu, fake cho test/demo và hành vi báo chưa tích hợp. Production không được âm thầm fallback mock hoặc trả kết quả thanh toán/KYC giả thành công.
+
+## 2. Architecture, boundaries & SOLID thực dụng
+
+- Mặc định **modular monolith + feature-first**: `rides`, `quotes`, `orders`, `merchants`, `drivers`, `identity`... theo bounded context đang tồn tại. Mỗi invariant có một owner rõ; không tách microservices hoặc tạo mọi module ví dụ chỉ vì rules.
+- `Controller/Gateway/Consumer` sở hữu transport, parse/validation và chuyển request vào application; `Service/UseCase` xử lý orchestration và business rules; `Repository/DataSource` sở hữu persistence; `DTO/Presenter` định hình dữ liệu giao tiếp. Không nhồi SQL, HTTP calls, pricing hoặc nhiều side effects vào Controller.
+- Feature đơn giản có thể dùng `Controller → Service → ORM/Repository` nếu rõ trách nhiệm. Chỉ thêm `domain/`, `application/`, use case, port/adapter, factory, CQRS hoặc state machine riêng khi nghiệp vụ, transaction, reuse hay testing thực sự cần.
+- Business rules quan trọng nên là hàm/class có thể test độc lập; khi tách domain layer, domain không import Nest decorators, ORM SDK, HTTP DTO hoặc broker implementation. Không ép toàn bộ business logic thành framework-independent class nếu không mang lại lợi ích.
+- Code dùng chung thực sự đặt trong `common/`/`core/` (config, auth, logging, errors, HTTP, observability). Không đưa logic đặc thù Ride/Food/Driver vào `CommonService` hoặc một `utils.ts` khổng lồ.
+- Module chỉ export public provider/contract cần dùng. Không import private repository/entity implementation xuyên feature rồi tạo coupling; sử dụng exported facade/application service hoặc event khi cần. Tránh dependency cycle, hạn chế `forwardRef()` và circular barrel imports.
+- Áp dụng SRP, DI, DRY, KISS, YAGNI: không tạo `BaseRepository<T>` khổng lồ, interface cho từng class, mapper identity hay `UseCase.execute()` chỉ gọi lại một hàm. Refactor trùng lặp **business knowledge**, không trừu tượng hóa mọi dòng code giống nhau.
+
+**Cấu trúc tham khảo — không ép tạo đầy đủ:**
+
+```text
+backend/src/
+  main.ts
+  app.module.ts
+  config/                     # env/config có validation
+  common/                     # errors, auth, tracing, shared infrastructure
+  modules/
+    rides/
+      rides.module.ts
+      rides.controller.ts
+      rides.service.ts
+      dto/                    # request / response DTO
+      repositories/           # khi có persistence boundary cần thiết
+      domain/                 # tùy độ phức tạp nghiệp vụ
+    orders/
+    quotes/
+  integrations/               # adapters provider thực sự dùng chung
+backend/test/
+backend/prisma/ or backend/migrations/  # theo persistence thực tế
+```
+
+## 3. NestJS lifecycle, modules & dependency injection
+
+- Tuân thủ request lifecycle NestJS: middleware → guards → interceptors (trước) → pipes → controller/service → interceptors (sau), exception filters xử lý lỗi chưa được bắt. Dùng đúng extension point: Guards cho quyền truy cập, Pipes cho parsing/validation, Interceptors cho cross-cutting response/logging, Filters cho error translation.
+- Reuse providers thông qua Nest DI, cấu hình client/pool (DB, Redis, Kafka, outbound HTTP) tại module sở hữu, inject vào consumers. Không `new PrismaClient()`, `new Redis()`, `new Axios()` hoặc tạo connection pool trong mỗi request/feature.
+- Singleton/default scope là mặc định; `Scope.REQUEST`/`TRANSIENT` chỉ khi cần semantics riêng và đã hiểu tác động performance. Không đưa request-scoped logger/config/ORM vào toàn dependency tree nếu có thể dùng AsyncLocalStorage hoặc request context nhẹ.
+- Không dùng `@Global()` tràn lan để tránh import; scope và module exports phải rõ. Không che circular dependency bằng `ModuleRef.get()` hoặc `forwardRef()` khi có thể chỉnh ownership.
+- HTTP adapter Express/Fastify theo repo; không sử dụng API riêng của adapter khác mà không kiểm tra tương thích. Không đổi ESM/CJS, ORM hay platform adapter trong task thông thường.
+
+## 4. API design, DTO validation, serialization & errors
+
+- Endpoint theo resource/intent, method và HTTP semantics đúng (`200/201/202/204`, `400`, `401`, `403`, `404`, `409`, `422` nếu contract dùng, `429`, `5xx`). Không trả HTTP 200 với `success:false` cho mọi lỗi; không nuốt exception thành `[]`/`null` giả thành công.
+- Validation **runtime** tại boundary cho body, params, query, headers cần tin cậy: dùng `ValidationPipe`/`class-validator` hoặc Standard Schema pipe nếu phiên bản hỗ trợ. Chọn một chiến lược thống nhất; whitelist/forbid unknown fields, coerce có kiểm soát, validate nested DTO và giới hạn payload.
+- `PartialType`, `PickType`, mapped DTOs hoặc schema composition dùng khi thực sự phù hợp; không dùng trực tiếp DB entity làm request/response DTO, không trả password hash, OTP, private KYC hoặc internal metadata qua serialization.
+- Định nghĩa centralized error model/error codes cùng exception filter/mapper; response giữ envelope hiện hữu nếu đã chốt với mobile/web. Giữ `requestId`/`traceId` trong response theo contract, không lộ stack, SQL, provider raw error hoặc credentials.
+- OpenAPI là contract có thể dùng cho mobile/web; tài liệu hóa enum, nullability, validation, auth, status codes, errors, pagination, example và version. Khi có generated clients, tránh sửa generated code bằng tay và tránh 2 nguồn định nghĩa field khác nhau.
+- Giữ back-compat với client mobile chưa nâng cấp; deprecation/versioning có thời gian chuyển tiếp theo product policy. Không tự đổi path, tên field, response envelope, money/time units ngoài scope.
+
+## 5. Pagination, search, filtering & sorting
+
+- Dùng chuẩn query thống nhất cho toàn backend (ví dụ `page`, `limit`, `sort`, `order`, `search` hoặc cursor) **theo contract đã chốt**; định nghĩa DTO/helper dùng chung thật sự, giới hạn `limit` tối đa để chống unbounded queries.
+- Pagination, filter, search, sort được thực thi ở DB/search engine; không `findMany` toàn bộ rồi cắt mảng trong Node. Sort/filter column theo **allowlist**, tránh SQL injection và truy vấn đắt tiền không kiểm soát.
+- Offset pagination dùng cho admin list vừa phải; cursor/keyset khi volume lớn, infinite scroll hoặc dữ liệu biến động cao. Order phải deterministic (thường có tie-breaker unique); cursor có scope và validation phù hợp.
+- Response metadata nhất quán (`items`, `page`, `limit`, `total`, `hasNext` hoặc `nextCursor`) **theo API contract**, không tùy tiện trộn hai format. Count query có thể tốn chi phí; chỉ tính total nếu UX/contract cần.
+- Tránh N+1, chọn projection/select đúng field, indexes theo các predicate và order hay dùng. Test kết hợp filter + sort + pagination + permission để không rò rỉ dữ liệu hay lặp/mất bản ghi.
+
+## 6. Authentication, authorization, session & KYC
+
+- Tách **authentication** (ai gọi?) với **authorization** (được làm gì trên record này?). Guard kiểm principal và quyền cấp route; application policy còn kiểm resource ownership, tenant/store, KYC, role đang active, trạng thái tài nguyên và quyền cập nhật từng field.
+- Mặc định deny các tác vụ nhạy cảm. Không chỉ dùng `@Roles('admin')` để bỏ qua ownership; admin actions, WebSocket events, uploads và background commands cũng phải kiểm quyền ở nơi tương ứng.
+- JWT/session phải verify signature, thuật toán cho phép, issuer/audience/expiry theo policy; refresh rotation/revocation/reuse detection khi dùng refresh tokens. Không log hoặc lưu plaintext long-lived token; quyền bị thu hồi phải có chiến lược invalidation hợp lý.
+- OTP SMS/Email/Zalo và passkey dùng provider/standard đáng tin; OTP có TTL, single-use, attempt/resend limits, rate limits và chống enumeration. Hash password theo thuật toán password hashing chuyên dụng; không tự xây crypto scheme.
+- Cookie session: `HttpOnly`, `Secure`, `SameSite` phù hợp, HTTPS và CSRF defense cho state-changing requests. Bearer/mobile auth không tự động cần CSRF token, nhưng vẫn cần bảo vệ replay, token leakage và abuse.
+- KYC, vị trí tài xế, lịch sử đơn, thông tin cửa hàng và thanh toán phải scope theo principal/role/store. Thiết kế negative tests cho cross-account, cross-store, revoked role/KYC và IDOR/BOLA.
+
+## 7. Secrets, XSS, SSRF, CSRF, injection & abuse prevention
+
+- Mọi input từ web/mobile, URL, webhook, broker, third-party API, file upload đều không đáng tin cho đến khi validate. TypeScript interface không phải runtime validation. Cấm lấy body payload làm entity update trực tiếp (mass assignment).
+- Secrets chỉ trong env/secret manager; typed configuration và fail-fast cho biến production bắt buộc. Không đặt keys, credentials, OTP, token vào source, Docker image, log, URL, Swagger example hoặc response. `.env.example` chỉ chứa placeholder.
+- SQL injection/NoSQL injection: dùng ORM parameters/bindings; raw query chỉ khi cần, bind dữ liệu đúng API, allowlist dynamic identifiers/column/order. Không nối user input vào SQL, Mongo operators, shell commands, HTML, file paths hay dynamic imports.
+- XSS: API trả text/data an toàn; khi lưu hoặc trả rich HTML cần validation/sanitization đúng ngữ cảnh và content policy. Không cho untrusted active HTML/SVG trở thành public file chạy script; CSP/security headers tại tầng thích hợp không thay escape/sanitize ở frontend.
+- SSRF: outbound URL ưu tiên base URL/provider cố định. Nếu bắt buộc fetch URL do người dùng cung cấp, allowlist scheme/host/port, chống internal/loopback/link-local/metadata IP, DNS rebinding và redirect tới đích cấm; timeout, response size limit, không tự forward credentials.
+- CSRF: với cookie-authenticated browser actions, áp dụng origin/fetch-metadata/token defense phù hợp phiên bản và kiến trúc; CORS không phải CSRF protection. Chỉ dùng API CSRF/security headers tích hợp Nest khi phiên bản cài đặt hỗ trợ, nếu không dùng giải pháp tương thích.
+- CORS allowlist đúng nguồn website/admin, credential policy rõ; proxy trust chỉ đúng proxy tin cậy. TLS, HSTS/security headers, body limits, request timeout, upload quotas và MIME/magic-byte validation theo risk.
+- Rate limit theo IP + user/device/account khi cần, đặc biệt login, OTP, quote spam, booking, KYC, search và admin. Multi-instance cần storage phân tán khi rate limit phải có hiệu lực toàn cụm; tránh rate limiter memory-only tạo cảm giác an toàn giả.
+- Webhooks kiểm signature theo raw body, timestamp/nonce/event ID và dedup theo provider contract. Không dùng một shared client secret trong Flutter làm bằng chứng đáng tin phía server.
+
+## 8. Database, persistence & migrations
+
+- Dùng ORM/driver **đang có** (Prisma/TypeORM/Drizzle/Mongoose/SQL driver...), không tự thay stack vì rules. One ownership per DB client/pool; không tạo ORM instance mỗi request. Schema/migrations là nguồn chuẩn cho constraints vật lý.
+- Unique/FK/check constraints và indexes thực thi invariants nơi DB hỗ trợ. Tiền dùng minor units/decimal theo contract, tránh floating-point cho ledger; timestamps có timezone/UTC conventions rõ, currency/location units và nullable semantics nhất quán.
+- Không truy vấn thừa: projection, batched relation loading, prepared/parameterized statements, phù hợp connection pool và query limits. Không cache để che N+1 hoặc query plan tệ.
+- Migration được version hóa và test trên DB disposable/staging; production không `db push`, `reset`, `sync: true`, destructive schema change hay seed giả. Với dữ liệu lớn/rolling deploy, ưu tiên expand → backfill → switch → contract và plan phục hồi.
+- Dữ liệu nhạy cảm (KYC/payment/location) dùng least privilege, retention và encryption theo threat model; auditing ghi hành động quan trọng nhưng không ghi toàn bộ raw PII vào log.
+
+## 9. Transactions, concurrency & idempotency — DealGo critical
+
+- Invariants như **một winner cho job/quote**, không gán trùng tài xế, trừ tồn kho đúng, thanh toán một lần, ví/ledger balance phải được bảo vệ bằng DB atomicity/unique constraints/conditional updates/locking phù hợp, **không chỉ `find → if → update`**.
+- Transaction phải ngắn, đồng nhất transaction context trong mọi repository tham gia. Không gọi SMS/maps/payment/network hay publish WebSocket/Kafka trong transaction; thiết kế outbox khi DB write và event publish cần tính nhất quán.
+- Chọn isolation, optimistic version, unique index hoặc row lock theo invariant thực tế. Retry có giới hạn cho serialization/deadlock/transient DB errors khi hành động idempotent; không retry business conflict để ép thành công.
+- Booking, accept quote/assignment, payment/refund, voucher và webhook yêu cầu idempotency/dedup theo contract: key scoped principal+operation, request fingerprint, lưu bền và unique reservation; retry sau timeout không tạo side effect mới.
+- State transitions server-driven, có precondition/actor/version/expiry theo nghiệp vụ; xử lý requests đồng thời, stale snapshot, duplicate/out-of-order callbacks. Event/Push/Socket chỉ phản ánh kết quả đã commit, không trở thành nguồn sự thật mới.
+- Nếu vượt nhiều hệ thống không có distributed transaction, dùng durable state, reconciliation và compensation có chủ đích; không tuyên bố Kafka hay retry mang lại exactly-once processing tự động.
+
+## 10. Realtime, sockets, queues & Kafka (khi có)
+
+- WebSocket/SSE chỉ dùng cho realtime thực sự cần: client được authenticate, join room có authorization theo ride/order/store, quyền phải thu hồi được khi đổi role/KYC/logout. Không tin room/event name hoặc user ID client tự gửi.
+- Event có `eventId`, entity ID, revision/sequence, timestamp và schema version khi contract cần; consumer/client chống duplicate, out-of-order và reconcile snapshot sau reconnect. Multi-instance cần pub/sub/adapter phù hợp; in-memory map không thay distributed state.
+- Queue/BullMQ/Kafka chỉ thêm khi có job bất đồng bộ, retry, buffering, fan-out hoặc hệ thống đã chọn. Đặt timeout, bounded concurrency, max retries/backoff, dead-letter/poison handling; tránh job chạy vô hạn hoặc flood provider.
+- Outbox lưu cùng DB transaction khi cần bảo đảm event không bị mất sau commit. Consumer idempotent/inbox/dedup và commit/ack theo delivery semantics của broker; crash giữa side effect và ACK không tạo giao dịch lặp.
+- Kafka partition key theo ordering cần thiết (ví dụ aggregate/job ID), không bảo đảm global order. Không giả định exactly-once end-to-end chỉ nhờ broker; event versioning và replay/backfill strategy khi cần.
+- External provider (SMS/Zalo/maps/payment/push) có adapter ownership rõ, timeout, circuit/bulkhead khi phù hợp, rate/quotas và webhook verification; không nhân bản mỗi feature một HTTP client cùng credential/config.
+
+## 11. PERFORMANCE — measure first, optimize bottleneck
+
+- Đánh giá hiệu năng từ p50/p95/p99 latency, throughput, error rate, event-loop lag, heap/GC, DB query time/count, pool saturation, queue lag và external-call latency. Không kết luận bottleneck từ cảm giác hoặc số dòng code.
+- Ưu tiên sửa N+1/slow queries, missing indexes, full-table scans, excessive serialization, blocking CPU work, quá nhiều external calls, network waterfalls trước khi thêm Redis/microservices.
+- Tránh blocking CPU (`sync` filesystem/crypto, JSON payload khổng lồ) trên request path; tác vụ nặng chuyển worker/queue khi thực cần. Streams/pagination/chunking cho dữ liệu lớn; bounded concurrency để tránh cạn DB pool/socket.
+- Cache khi lợi ích đã xác định và có TTL, namespace, auth/tenant scope, invalidation, stale policy và stampede control. Không cache payment/wallet/KYC decision như truth tuyệt đối hoặc cho phép cross-user cache leak.
+- Chọn Fastify, Redis, query batching, compression, clustering, autoscaling hay event-driven architecture dựa trên benchmark và constraints thực tế; không thay framework theo một giả định hiệu năng.
+
+## 12. Reliability, observability & deployment
+
+- Structured logs với level, operation, sanitized route, status, duration, business error code, `requestId` và `traceId` khi tracing bật. Redact credentials, JWT, OTP, KYC, payment, phone/address/precise location và raw request/response payload nhạy cảm.
+- Phân biệt **request/correlation ID** (điều tra một request/flow) với W3C `traceparent`/trace ID (distributed tracing). Tạo/propagate theo trusted boundary và convention đã chọn, không bịa header tùy ý; không tin trace context từ nguồn ngoài như quyền xác thực.
+- Có metrics cho HTTP, DB, queue, provider errors, status-transition conflicts và tài nguyên hệ thống; OpenTelemetry hoặc stack hiện có khi cần theo dõi cross-service. Giới hạn sampling và không đưa PII vào span attributes.
+- Xử lý network/external failures: deadline/timeout, retry chỉ cho thao tác an toàn và có budget, exponential backoff+jitter, `429 Retry-After`, circuit breaker khi chứng minh cần. Không nuốt lỗi, retry vô hạn hoặc tự giả `success`.
+- `liveness` kiểm process; `readiness` phản ánh khả năng nhận traffic theo dependencies cần thiết, không làm health check gọi nhiều API tốn kém. Startup validate config; graceful shutdown dừng nhận traffic, đóng DB pools, sockets, consumers và drain jobs theo chính sách.
+- Deployment: lockfile reproducible, supported Node LTS, minimal non-root container, không bundling secrets, cấu hình proxy/TLS đúng, migration tương thích rolling deploy, health probes/rollback và môi trường tách biệt. Không tự deploy production, làm destructive migration hoặc rotate secrets khi không được giao.
+
+## 13. Testing & regression safety
+
+- Test đúng tầng: unit cho domain policy/state transitions; service tests cho orchestration/error; integration cho DB constraints/transactions/repositories; API contract/E2E cho validation, HTTP semantics, authz, error envelope và permission.
+- Các flow có rủi ro cao phải có **concurrent tests**: hai tài xế/báo giá cùng thắng, duplicate submit/payment/webhook, quote hết hạn đúng thời điểm confirm, KYC/role vừa bị thu hồi, stale updates. Fake chỉ kiểm tra contract giả định; DB concurrency cần test với DB thực/disposable.
+- Test pagination/filter/sort theo owner/store/role, SQL/NoSQL injection attempts, CSRF khi cookie auth, unauthorized socket rooms, cross-account resource IDs, rate limits khi áp dụng.
+- Không dùng mock thay thế integration evidence; không sửa tests để hợp thức hóa bug, không tắt lint/typecheck/security guard để build pass. Kiểm tra phần bị ảnh hưởng bằng lệnh sẵn có của repo, báo rõ cái gì chưa chạy.
+
+## 14. Dependency policy & Agent autonomy
+
+- Chọn phiên bản **stable, supported, compatible và đã vá lỗi bảo mật** cho dependency đang thêm/nâng cấp; kiểm tra Node/NestJS/TS/ORM/peer dependencies/ESM-CJS theo lockfile thực tế. Không tự nâng major framework, đổi ORM hoặc cài Kafka/Redis chỉ vì tài liệu hoặc rules khuyến nghị.
+- Khi task thực sự là dependency upgrade/security maintenance, chủ động đánh giá cả major release, migration guide, advisories, lockfile và regression tests. Không tự giữ bản cũ chỉ vì sợ breaking changes; cũng không nâng toàn repo trong task sửa API nhỏ.
+- Agent được quyền chọn kỹ thuật đơn giản nhất đáp ứng contract; không yêu cầu đọc toàn repo, tạo kiến trúc mẫu, sinh ADR/báo cáo dài, chạy toàn bộ release gates hay hỏi lại những lựa chọn thông thường trước mỗi thay đổi.
+- Giữ scope nhỏ, tận dụng code đã có và sửa tận gốc lỗi phát hiện. Test phần liên quan, báo thay đổi và giới hạn xác minh ngắn gọn; không nhận đã production-ready nếu chưa có kiểm chứng tương ứng.
+
+## Official references — dùng theo phiên bản dự án thực tế
+
+- NestJS: https://docs.nestjs.com/
+- Request lifecycle: https://docs.nestjs.com/faq/request-lifecycle
+- Modules, providers, scope: https://docs.nestjs.com/modules
+- Authentication/authorization: https://docs.nestjs.com/security/authentication
+- Validation & API contracts: https://docs.nestjs.com/techniques/validation
+- Rate limiting: https://docs.nestjs.com/security/rate-limiting
+- Kafka transport: https://docs.nestjs.com/microservices/kafka
+- Node.js release status: https://nodejs.org/en/about/previous-releases
+- OpenTelemetry: https://opentelemetry.io/docs/languages/js/
+
+**Nguyên tắc cuối:** Quy định trách nhiệm rõ, bảo toàn nghiệp vụ và an toàn giao dịch; để Agent tự lựa chọn implementation. Không thay thế kiến trúc thật bằng hàng trăm thủ tục trong prompt.

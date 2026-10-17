@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  aps-environment=development for local/TestFlight-dev builds.
+  For App Store / Production distribution, change the value to "production"
+  (or let Xcode Signing & Capabilities set it when Push Notifications is enabled
+  with a Distribution profile).
+-->
+<plist version="1.0">
+<dict>
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>

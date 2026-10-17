@@ -1,0 +1,1 @@
+export const OPS_FAQ_REPOSITORY = Symbol('OPS_FAQ_REPOSITORY');

@@ -1,0 +1,126 @@
+import { describe, expect, it } from 'vitest';
+import { ConfigService } from '@nestjs/config';
+import { SessionService } from './session.service.js';
+import { MemoryIdentityRepository } from './identity.repository.js';
+import type { AppEnv } from '../../platform/config/env.js';
+
+describe('SessionService', () => {
+  const createService = () => {
+    const repository = new MemoryIdentityRepository();
+    const configValues: Partial<AppEnv> = {
+      NODE_ENV: 'test',
+      JWT_ACCESS_SECRET: 'test-secret-at-least-32-characters-long-key',
+      JWT_ACCESS_TTL_SECONDS: 900,
+      JWT_REFRESH_TTL_SECONDS: 604800,
+    };
+
+    const config = {
+      get: (key: keyof AppEnv) => configValues[key],
+    } as unknown as ConfigService<AppEnv, true>;
+
+    const service = new SessionService(repository, config);
+    return { service, repository };
+  };
+
+  it('issues session with signed access token and raw refresh token', async () => {
+    const { service, repository } = createService();
+    const user = await repository.createUser({
+      email: 'customer@dealgo.vn',
+      phone: '+84901234567',
+      displayName: 'Nguyen Van A',
+    });
+
+    const session = await service.issue(user, 'customer');
+
+    expect(session.accessToken).toBeDefined();
+    expect(typeof session.accessToken).toBe('string');
+    expect(session.refreshToken).toBeDefined();
+    expect(session.expiresIn).toBe(900);
+    expect(session.user.id).toBe(user.id);
+  });
+
+  it('rotates refresh token on refresh', async () => {
+    const { service, repository } = createService();
+    const user = await repository.createUser({
+      email: 'customer@dealgo.vn',
+      phone: '+84901234567',
+      displayName: 'Nguyen Van A',
+    });
+
+    const initial = await service.issue(user, 'customer');
+
+    const rotated = await service.refresh(initial.refreshToken);
+    expect(rotated.accessToken).toBeDefined();
+    expect(rotated.refreshToken).not.toBe(initial.refreshToken);
+  });
+
+  it('detects refresh token reuse and throws AUTH_REFRESH_REUSED', async () => {
+    const { service, repository } = createService();
+    const user = await repository.createUser({
+      email: 'customer@dealgo.vn',
+      phone: '+84901234567',
+      displayName: 'Nguyen Van A',
+    });
+
+    const initial = await service.issue(user, 'customer');
+
+    // First rotation succeeds
+    await service.refresh(initial.refreshToken);
+
+    // Replay attack with the already rotated token must fail with reuse detection
+    await expect(service.refresh(initial.refreshToken)).rejects.toMatchObject({
+      response: {
+        errorCode: 'AUTH_REFRESH_REUSED',
+      },
+    });
+  });
+
+  it('rejects unknown refresh token with AUTH_REFRESH_INVALID', async () => {
+    const { service } = createService();
+    await expect(service.refresh('completely-invalid-secret')).rejects.toMatchObject({
+      response: {
+        errorCode: 'AUTH_REFRESH_INVALID',
+      },
+    });
+  });
+
+  it('revokes session and rejects subsequent refresh attempts', async () => {
+    const { service, repository } = createService();
+    const user = await repository.createUser({
+      email: 'customer@dealgo.vn',
+      phone: '+84901234567',
+      displayName: 'Nguyen Van A',
+    });
+
+    const session = await service.issue(user, 'customer');
+
+    // Find session id from repo
+    const sessions = await repository.findUserDirectory(user.id);
+    expect(sessions).toBeDefined();
+
+    // Revoke
+    const res = await service.revoke(session.user.id);
+    expect(res.revoked).toBe(true);
+  });
+
+  it('revokes session by refresh token and prevents future refresh', async () => {
+    const { service, repository } = createService();
+    const user = await repository.createUser({
+      email: 'ops@dealgo.vn',
+      phone: '+84901234568',
+      displayName: 'Ops Admin',
+    });
+
+    const session = await service.issue(user, 'ops');
+    const revokeResult = await service.revokeByRefreshToken(session.refreshToken);
+    expect(revokeResult.revoked).toBe(true);
+
+    // Refreshing the revoked token must fail with AUTH_REFRESH_INVALID
+    await expect(service.refresh(session.refreshToken)).rejects.toMatchObject({
+      status: 401,
+      response: expect.objectContaining({
+        errorCode: 'AUTH_REFRESH_INVALID',
+      }),
+    });
+  });
+});

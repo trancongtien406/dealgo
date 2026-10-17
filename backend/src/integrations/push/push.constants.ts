@@ -1,0 +1,21 @@
+export const PUSH_SENDER = Symbol('PUSH_SENDER');
+
+export const PUSH_NOTABLE_RIDE_STATUSES = new Set([
+  'ASSIGNED',
+  'DRIVER_EN_ROUTE',
+  'DRIVER_ARRIVED',
+  'IN_TRIP',
+  'COMPLETED',
+  'CANCELLED',
+  'EXPIRED',
+]);
+
+export const PUSH_NOTABLE_FOOD_STATUSES = new Set([
+  'PREPARING',
+  'READY',
+  'ASSIGNED',
+  'PICKED_UP',
+  'DELIVERED',
+  'FAILED',
+  'CANCELLED',
+]);

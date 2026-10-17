@@ -12,6 +12,7 @@ Keep source code clean, professional, maintainable, and free from AI-generated c
 Comments are part of the long-term codebase.
 
 Do not use comments as:
+
 - a development diary
 - a response to the user's prompt
 - an explanation of what the AI just changed

@@ -1,67 +1,50 @@
-import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
-void main() {
+import 'app/dealgo_app.dart';
+import 'core/config/app_env.dart';
+import 'core/mock/mock_seed.dart';
+import 'core/push/fcm_push.dart';
+import 'firebase_options.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await _initFirebaseSafely();
+
+  if (useMockData) {
+    if (kReleaseMode) {
+      throw StateError('USE_MOCK_DATA is not allowed in release builds');
+    }
+    final mocks = createSeededMockClients();
+    runApp(
+      DealGoApp(
+        identityClient: mocks.identity,
+        foodClient: mocks.food,
+        rideClient: mocks.ride,
+      ),
+    );
+    return;
+  }
   runApp(const DealGoApp());
 }
 
-class DealGoApp extends StatelessWidget {
-  const DealGoApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'DealGo',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF0B6E4F),
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-      ),
-      home: const DealGoHomePage(),
-    );
+/// Soft-fail Firebase + FCM bootstrap so missing keys never crash cold start.
+Future<void> _initFirebaseSafely() async {
+  if (useMockData) {
+    return;
   }
-}
-
-class DealGoHomePage extends StatelessWidget {
-  const DealGoHomePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'DealGo',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Ride & Food — một app cho Customer, Merchant và Driver.',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                'Scaffold đang sẵn sàng. Luồng nghiệp vụ sẽ nối theo docs/ và API backend.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+    await configureFcmMessaging();
+  } catch (error, stack) {
+    if (kDebugMode) {
+      debugPrint('Firebase init skipped: $error');
+      debugPrint('$stack');
+    }
   }
 }
