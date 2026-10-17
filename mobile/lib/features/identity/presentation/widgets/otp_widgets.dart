@@ -49,19 +49,48 @@ class _OtpHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        DealGoSpacing.s8,
-        DealGoSpacing.s8,
-        DealGoDimensions.pageGutter,
-        0,
+      padding: const EdgeInsets.symmetric(
+        horizontal: DealGoDimensions.pageGutter,
+        vertical: DealGoSpacing.s8,
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          AuthBackButton(onPressed: onBack),
-          const SizedBox(width: DealGoSpacing.s8),
-          Text(
-            AppLocalizations.of(context).otpTitle,
-            style: Theme.of(context).textTheme.titleMedium,
+          Row(
+            children: [
+              AuthBackButton(onPressed: onBack),
+              const SizedBox(width: DealGoSpacing.s8),
+              const Text.rich(
+                TextSpan(
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  ),
+                  children: [
+                    TextSpan(
+                      text: 'Deal',
+                      style: TextStyle(color: DealGoColors.primary),
+                    ),
+                    TextSpan(
+                      text: 'Go',
+                      style: TextStyle(color: DealGoColors.brandGreen),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          TextButton(
+            onPressed: onBack,
+            style: TextButton.styleFrom(
+              foregroundColor: DealGoColors.primary,
+              textStyle: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            child: const Text('Đổi số'),
           ),
         ],
       ),
@@ -121,11 +150,25 @@ class OtpEntryPane extends StatelessWidget {
             ),
             child: Column(
               children: [
-                const _LockMark(),
-                const SizedBox(height: DealGoSpacing.s20),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(DealGoRadius.card),
+                  child: Container(
+                    constraints: const BoxConstraints(maxHeight: 160),
+                    child: Image.asset(
+                      'assets/images/hero_otp_shield.png',
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const _LockMark(),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: DealGoSpacing.s16),
                 Text(
                   AppLocalizations.of(context).otpHeading,
-                  style: textTheme.titleLarge,
+                  style: textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: DealGoSpacing.s8),
@@ -702,24 +745,32 @@ class _OtpBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    return Container(
+      height: 56,
       decoration: BoxDecoration(
-        color: DealGoColors.card,
+        color: highlighted ? Colors.white : const Color(0xFFF9FAFB),
         borderRadius: BorderRadius.circular(DealGoRadius.input),
         border: Border.all(
           color: highlighted ? DealGoColors.primary : DealGoColors.border,
-          width: highlighted ? 1.6 : 1,
+          width: highlighted ? 2.0 : 1.2,
         ),
+        boxShadow: highlighted
+            ? [
+                BoxShadow(
+                  color: DealGoColors.primary.withValues(alpha: 0.12),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
       ),
-      child: SizedBox(
-        height: 56,
-        child: Center(
-          child: Text(
-            digit,
-            style: style?.copyWith(
-              color: DealGoColors.primary,
-              fontWeight: FontWeight.w700,
-            ),
+      child: Center(
+        child: Text(
+          digit,
+          style: (style ?? const TextStyle()).copyWith(
+            color: DealGoColors.primary,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),
