@@ -56,6 +56,13 @@ void main() {
   ) async {
     await pumpSignedIn(tester, profile: demoMultiRoleProfile);
 
+    // Multi-role session opens Customer shell directly; switch role via Account page
+    await tester.tap(navLabel('Tài khoản'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Đổi vai trò'));
+    await tester.tap(find.text('Đổi vai trò'));
+    await tester.pumpAndSettle();
+
     await tester.ensureVisible(find.text('Chế độ Tài xế'));
     await tester.tap(find.text('Chế độ Tài xế'));
     await tester.pumpAndSettle();

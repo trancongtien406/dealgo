@@ -187,9 +187,6 @@ class DealGoLogo extends StatelessWidget {
 class _DealGoLogoFallbackPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
     final textPainter = TextPainter(
       text: TextSpan(
         text: 'DG',

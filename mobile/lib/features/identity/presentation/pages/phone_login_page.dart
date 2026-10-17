@@ -10,8 +10,6 @@ import '../../../../core/design_system/components/dealgo_logo.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
-import '../../../../l10n/app_localizations.dart';
-import '../../domain/auth_redirect.dart';
 import '../../domain/entities/auth_state.dart';
 import '../../domain/phone_input.dart';
 import '../cubit/auth_cubit.dart';
@@ -59,8 +57,6 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
     if (restoring) {
       return const SessionRestoringPage();
     }
-
-    final textTheme = Theme.of(context).textTheme;
 
     return BlocConsumer<PhoneAuthCubit, PhoneAuthState>(
       listenWhen: (previous, next) =>

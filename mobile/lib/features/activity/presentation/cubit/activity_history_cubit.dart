@@ -41,11 +41,9 @@ final class ActivityHistoryFailure extends ActivityHistoryState {
 
 class ActivityHistoryCubit extends Cubit<ActivityHistoryState> {
   ActivityHistoryCubit({
-    required ListRideHistory listRideHistory,
-    required ListFoodHistory listFoodHistory,
-  }) : _listRideHistory = listRideHistory,
-       _listFoodHistory = listFoodHistory,
-       super(const ActivityHistoryInitial());
+    required this._listRideHistory,
+    required this._listFoodHistory,
+  }) : super(const ActivityHistoryInitial());
 
   final ListRideHistory _listRideHistory;
   final ListFoodHistory _listFoodHistory;

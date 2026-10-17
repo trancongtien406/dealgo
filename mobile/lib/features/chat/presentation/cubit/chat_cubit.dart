@@ -47,17 +47,13 @@ const Object _unset = Object();
 
 class ChatCubit extends Cubit<ChatState> {
   ChatCubit({
-    required ListRideChatMessages listRideChatMessages,
-    required SendRideChatMessage sendRideChatMessage,
-    required ListFoodOrderChatMessages listFoodOrderChatMessages,
-    required SendFoodOrderChatMessage sendFoodOrderChatMessage,
+    required this._listRideChatMessages,
+    required this._sendRideChatMessage,
+    required this._listFoodOrderChatMessages,
+    required this._sendFoodOrderChatMessage,
     required this.kind,
     required this.resourceId,
-  }) : _listRideChatMessages = listRideChatMessages,
-       _sendRideChatMessage = sendRideChatMessage,
-       _listFoodOrderChatMessages = listFoodOrderChatMessages,
-       _sendFoodOrderChatMessage = sendFoodOrderChatMessage,
-       super(const ChatState());
+  }) : super(const ChatState());
 
   final ListRideChatMessages _listRideChatMessages;
   final SendRideChatMessage _sendRideChatMessage;

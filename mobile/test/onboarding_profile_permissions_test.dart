@@ -1,4 +1,3 @@
-import 'package:dealgo/core/design_system/tokens/dealgo_tokens.dart';
 import 'package:dealgo/features/onboarding/presentation/pages/permissions_page.dart';
 import 'package:dealgo/features/onboarding/presentation/pages/profile_setup_page.dart';
 import 'package:flutter/material.dart';
