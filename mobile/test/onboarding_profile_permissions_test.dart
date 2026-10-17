@@ -15,7 +15,6 @@ void main() {
       );
 
       expect(find.text('Hoàn thiện hồ sơ'), findsOneWidget);
-      expect(find.text('Bỏ qua'), findsOneWidget);
       expect(find.text('Họ và tên *'), findsOneWidget);
       expect(find.byKey(const Key('name-field')), findsOneWidget);
       expect(find.text('Email (tuỳ chọn)'), findsOneWidget);

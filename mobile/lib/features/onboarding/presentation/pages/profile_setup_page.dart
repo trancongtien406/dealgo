@@ -108,19 +108,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                       color: DealGoColors.text,
                     ),
                   ),
-                  TextButton(
-                    onPressed: _onSkip,
-                    style: TextButton.styleFrom(
-                      foregroundColor: DealGoColors.textSecondary,
-                    ),
-                    child: const Text(
-                      'Bỏ qua',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
+                  const SizedBox(width: 48),
                 ],
               ),
             ),

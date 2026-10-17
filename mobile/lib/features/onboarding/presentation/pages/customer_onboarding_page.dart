@@ -103,28 +103,16 @@ class _CustomerOnboardingPageState extends State<CustomerOnboardingPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Top Bar: Logo DealGo & Skip Button
+            // Top Bar: Logo DealGo
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: DealGoDimensions.pageGutter,
                 vertical: DealGoSpacing.s8,
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const DealGoLogo.wordmark(size: 26),
-                  TextButton(
-                    key: const Key('onboarding-skip-btn'),
-                    onPressed: _finishOnboarding,
-                    style: TextButton.styleFrom(
-                      foregroundColor: DealGoColors.primary,
-                      textStyle: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    child: const Text('Bỏ qua'),
-                  ),
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: const [
+                  DealGoLogo.wordmark(size: 26),
                 ],
               ),
             ),
@@ -286,9 +274,7 @@ class _CustomerOnboardingPageState extends State<CustomerOnboardingPage> {
                       children: [
                         DealGoPrimaryButton(
                           key: const Key('onboarding-next-btn'),
-                          label: _currentIndex == _slides.length - 1
-                              ? 'Bắt đầu ngay'
-                              : 'Tiếp tục',
+                          label: 'Tiếp tục',
                           trailingIcon: Icons.arrow_forward_rounded,
                           onPressed: _nextPage,
                         ),

@@ -50,9 +50,9 @@ class _PermissionsPageState extends State<PermissionsPage> {
                 vertical: DealGoSpacing.s8,
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text.rich(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: const [
+                  Text.rich(
                     TextSpan(
                       style: TextStyle(
                         fontSize: 22,
@@ -69,19 +69,6 @@ class _PermissionsPageState extends State<PermissionsPage> {
                           style: TextStyle(color: DealGoColors.brandGreen),
                         ),
                       ],
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _finish,
-                    style: TextButton.styleFrom(
-                      foregroundColor: DealGoColors.textSecondary,
-                    ),
-                    child: const Text(
-                      'Bỏ qua',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
                     ),
                   ),
                 ],

@@ -62,7 +62,6 @@ void main() {
       await tester.pumpAndSettle();
 
       // Step 1 check
-      expect(find.text('Bỏ qua'), findsOneWidget);
       expect(find.text('Một ứng dụng,\nvạn trải nghiệm', findRichText: true), findsOneWidget);
       expect(find.text('Bước 1 trong 3'), findsOneWidget);
 
@@ -78,28 +77,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Bước 3 trong 3'), findsOneWidget);
-      expect(find.text('Bắt đầu ngay'), findsOneWidget);
+      expect(find.text('Tiếp tục'), findsOneWidget);
 
-      // Tap Finish
+      // Tap Finish on last step
       await tester.tap(find.byKey(const Key('onboarding-next-btn')));
-      await tester.pumpAndSettle();
-
-      expect(completed, isTrue);
-      expect(await storage.hasSeenOnboarding(), isTrue);
-    });
-
-    testWidgets('tapping Bỏ qua triggers completion directly', (tester) async {
-      var completed = false;
-      final storage = MemoryOnboardingStorage();
-      await tester.pumpWidget(
-        _wrap(CustomerOnboardingPage(
-          onComplete: () => completed = true,
-          storage: storage,
-        )),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Bỏ qua'));
       await tester.pumpAndSettle();
 
       expect(completed, isTrue);
