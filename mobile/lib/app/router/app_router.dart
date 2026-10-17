@@ -64,6 +64,7 @@ import '../../features/identity/presentation/cubit/auth_cubit.dart';
 import '../../features/identity/presentation/pages/otp_page.dart';
 import '../../features/identity/presentation/cubit/phone_auth_cubit.dart';
 import '../../features/identity/presentation/pages/phone_login_page.dart';
+import '../../features/identity/presentation/pages/splash_page.dart';
 import '../../features/onboarding/presentation/pages/customer_onboarding_page.dart';
 import '../../features/onboarding/presentation/pages/driver_kyc_pages.dart';
 import '../../features/onboarding/presentation/utils/driver_kyc_routes.dart';
@@ -82,7 +83,7 @@ import '../../features/shell/presentation/shell_tab_page.dart';
 GoRouter createAppRouter({
   required AuthCubit auth,
   required Listenable refreshListenable,
-  String initialLocation = AuthRoutes.onboarding,
+  String initialLocation = AuthRoutes.splash,
 }) {
   final rootNavigatorKey = GlobalKey<NavigatorState>();
   return GoRouter(
@@ -91,6 +92,13 @@ GoRouter createAppRouter({
     refreshListenable: refreshListenable,
     redirect: (context, state) => authRedirect(auth.state, state.uri),
     routes: [
+      GoRoute(
+        path: AuthRoutes.splash,
+        pageBuilder: (context, state) => dealgoFadeSlidePage(
+          key: state.pageKey,
+          child: const DealGoSplashScreen(),
+        ),
+      ),
       ShellRoute(
         builder: (context, state, child) {
           return BlocProvider(

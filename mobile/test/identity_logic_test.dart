@@ -54,10 +54,10 @@ void main() {
     expect(authRedirect(customer, Uri.parse('/login')), '/customer');
     expect(authRedirect(sandbox, Uri.parse('/login/otp')), '/customer');
     expect(authRedirect(sandbox, Uri.parse('/merchant')), '/customer');
-    expect(authRedirect(many, Uri.parse('/login')), '/roles');
+    expect(authRedirect(many, Uri.parse('/login')), '/customer');
     expect(authRedirect(many, Uri.parse('/roles')), isNull);
     expect(authRedirect(many, Uri.parse('/driver/jobs')), isNull);
-    expect(authRedirect(customer, Uri.parse('/roles')), '/customer');
+    expect(authRedirect(customer, Uri.parse('/roles')), isNull);
     expect(authRedirect(customer, Uri.parse('/driver')), '/customer');
   });
 

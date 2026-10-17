@@ -60,7 +60,7 @@ class _DealGoAppState extends State<DealGoApp> {
     _router = createAppRouter(
       auth: _deps.authCubit,
       refreshListenable: _refresh,
-      initialLocation: widget.initialLocation ?? AuthRoutes.onboarding,
+      initialLocation: widget.initialLocation ?? AuthRoutes.splash,
     );
     // Kept for future OS app_links / universal-link registration.
     _deepLinks = DeepLinkRouterHook()..attach(_router);
