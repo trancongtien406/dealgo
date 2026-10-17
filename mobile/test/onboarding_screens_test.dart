@@ -38,7 +38,7 @@ void main() {
 
   group('S001 DealGoSplashScreen', () {
     testWidgets('renders brand slogan and floating service highlights', (tester) async {
-      await tester.pumpWidget(_wrap(const DealGoSplashScreen()));
+      await tester.pumpWidget(_wrap(const DealGoSplashScreen(autoNavigate: false)));
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.text('Đi muôn nơi · Ăn vạn món'), findsOneWidget);

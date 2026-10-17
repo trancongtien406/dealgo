@@ -1,13 +1,30 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/components/dealgo_logo.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/storage/onboarding_storage.dart';
+import '../../../identity/domain/auth_redirect.dart';
+import '../../../identity/domain/entities/auth_state.dart';
+import '../../../identity/presentation/cubit/auth_cubit.dart';
 
 /// Full-screen Splash Screen corresponding to Mockup S001.
 /// Displays DealGo branding, Đà Nẵng hero visual, key service highlights,
-/// and an animated loading progress bar.
+/// an animated loading progress bar, and handles initial auto-navigation.
 class DealGoSplashScreen extends StatefulWidget {
-  const DealGoSplashScreen({super.key});
+  const DealGoSplashScreen({
+    super.key,
+    this.autoNavigate = true,
+    this.minDuration = const Duration(milliseconds: 1500),
+    this.storage,
+  });
+
+  final bool autoNavigate;
+  final Duration minDuration;
+  final OnboardingStorage? storage;
 
   @override
   State<DealGoSplashScreen> createState() => _DealGoSplashScreenState();
@@ -16,18 +33,58 @@ class DealGoSplashScreen extends StatefulWidget {
 class _DealGoSplashScreenState extends State<DealGoSplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
+  late final OnboardingStorage _storage;
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
+    _storage = widget.storage ?? SecureOnboardingStorage();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1800),
+      duration: const Duration(milliseconds: 1400),
     )..repeat();
+
+    if (widget.autoNavigate) {
+      _startBootstrapTimer();
+    }
+  }
+
+  void _startBootstrapTimer() {
+    _timer = Timer(widget.minDuration, () {
+      if (!mounted) return;
+      _proceed();
+    });
+  }
+
+  Future<void> _proceed() async {
+    if (!mounted) return;
+
+    // Check auth state if available in context
+    try {
+      final authCubit = context.read<AuthCubit>();
+      final state = authCubit.state;
+      if (state is AuthSignedIn) {
+        context.go('/customer');
+        return;
+      }
+    } catch (_) {
+      // In standalone test without BlocProvider, proceed to onboarding check
+    }
+
+    final hasSeenOnboarding = await _storage.hasSeenOnboarding();
+    if (!mounted) return;
+
+    if (hasSeenOnboarding) {
+      context.go(AuthRoutes.login);
+    } else {
+      context.go(AuthRoutes.onboarding);
+    }
   }
 
   @override
   void dispose() {
+    _timer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -39,33 +96,34 @@ class _DealGoSplashScreenState extends State<DealGoSplashScreen>
       body: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: DealGoSpacing.s24),
+            const SizedBox(height: DealGoSpacing.s20),
 
             // Top Brand Section
             const DealGoLogo.stacked(
-              size: 68,
+              size: 58,
               subtitle: 'Đi muôn nơi · Ăn vạn món',
             ),
 
-            const SizedBox(height: DealGoSpacing.s16),
+            const SizedBox(height: DealGoSpacing.s12),
 
-            // Middle Visual Hero Section
+            // Middle Visual Hero Section with Floating Badges
             Expanded(
               child: Stack(
                 alignment: Alignment.center,
+                clipBehavior: Clip.none,
                 children: [
-                  // Danang Landmark & Transport Background
+                  // High-fidelity Da Nang Hero Visual (Bridge, car, pho, milk tea)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: DealGoSpacing.s16),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(DealGoRadius.card),
                       child: Image.asset(
-                        'assets/images/banner_danang_hero.png',
+                        'assets/images/hero_dealgo_danang.png',
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) => Container(
                           height: 240,
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
+                            gradient: const LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                               colors: [
@@ -87,26 +145,24 @@ class _DealGoSplashScreenState extends State<DealGoSplashScreen>
                     ),
                   ),
 
-                  // Floating Service Badge: Ride
+                  // Floating Service Badge: Đặt xe (top left)
                   Positioned(
-                    top: 24,
+                    top: 18,
                     left: 20,
                     child: _ServiceFloatBadge(
-                      icon: Icons.directions_car_rounded,
-                      iconColor: Colors.white,
+                      icon: Icons.directions_car_filled_rounded,
                       iconBgColor: DealGoColors.primary,
                       title: 'Đặt xe',
                       subtitle: 'Đi muôn nơi\nan toàn, tiện lợi',
                     ),
                   ),
 
-                  // Floating Service Badge: Food
+                  // Floating Service Badge: Đồ ăn (middle right)
                   Positioned(
-                    bottom: 28,
+                    bottom: 24,
                     right: 20,
                     child: _ServiceFloatBadge(
                       icon: Icons.shopping_bag_rounded,
-                      iconColor: Colors.white,
                       iconBgColor: DealGoColors.brandGreen,
                       title: 'Đồ ăn',
                       subtitle: 'Hàng ngàn món\nngon mỗi ngày',
@@ -175,14 +231,12 @@ class _DealGoSplashScreenState extends State<DealGoSplashScreen>
 class _ServiceFloatBadge extends StatelessWidget {
   const _ServiceFloatBadge({
     required this.icon,
-    required this.iconColor,
     required this.iconBgColor,
     required this.title,
     required this.subtitle,
   });
 
   final IconData icon;
-  final Color iconColor;
   final Color iconBgColor;
   final String title;
   final String subtitle;
@@ -190,15 +244,15 @@ class _ServiceFloatBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: DealGoColors.border.withValues(alpha: 0.6)),
+        color: Colors.white.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 16,
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 18,
             offset: const Offset(0, 6),
           ),
         ],
@@ -207,15 +261,22 @@ class _ServiceFloatBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: iconBgColor,
               shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: iconBgColor.withValues(alpha: 0.35),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
-            child: Icon(icon, color: iconColor, size: 20),
+            child: Icon(icon, color: Colors.white, size: 20),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -223,16 +284,16 @@ class _ServiceFloatBadge extends StatelessWidget {
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: DealGoColors.text,
                 ),
               ),
-              const SizedBox(height: 1),
+              const SizedBox(height: 2),
               Text(
                 subtitle,
                 style: const TextStyle(
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: FontWeight.w500,
                   color: DealGoColors.textSecondary,
                   height: 1.25,
@@ -240,11 +301,19 @@ class _ServiceFloatBadge extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(width: 8),
-          const Icon(
-            Icons.arrow_forward_rounded,
-            size: 15,
-            color: DealGoColors.textSecondary,
+          const SizedBox(width: 10),
+          Container(
+            width: 26,
+            height: 26,
+            decoration: const BoxDecoration(
+              color: DealGoColors.canvas,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.arrow_forward_rounded,
+              size: 14,
+              color: DealGoColors.textSecondary,
+            ),
           ),
         ],
       ),
