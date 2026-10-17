@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/config/app_env.dart';
+import '../../../../core/design_system/components/dealgo_logo.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
@@ -17,8 +18,8 @@ import '../cubit/auth_cubit.dart';
 import '../cubit/phone_auth_cubit.dart';
 import '../widgets/auth_widgets.dart';
 
-/// Screen S003: Nhập số điện thoại đăng nhập / đăng ký
-/// Matches design/mockups/screens/shared/S003.png
+/// Screen S003: Welcome & Phone Login
+/// Corresponding to Mockup design/mockups/new/S003.png
 class PhoneLoginPage extends StatefulWidget {
   const PhoneLoginPage({super.key});
 
@@ -90,229 +91,324 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
           backgroundColor: DealGoColors.canvas,
           body: SafeArea(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Top App Bar: Back button and DealGo wordmark
+                // Top Bar: DealGo Wordmark & Help button
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    DealGoSpacing.s8,
-                    DealGoSpacing.s8,
-                    DealGoDimensions.pageGutter,
-                    0,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: DealGoDimensions.pageGutter,
+                    vertical: DealGoSpacing.s8,
                   ),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      AuthBackButton(
+                      const DealGoLogo.wordmark(size: 26),
+                      TextButton(
                         onPressed: () {
-                          if (context.canPop()) {
-                            context.pop();
-                          } else {
-                            context.go(AuthRoutes.onboarding);
-                          }
+                          // Opens help center or displays quick modal
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Trung tâm trợ giúp DealGo: 1900 xxxx'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
                         },
+                        style: TextButton.styleFrom(
+                          foregroundColor: DealGoColors.primary,
+                          textStyle: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        child: const Text('Trợ giúp'),
                       ),
-                      const Spacer(),
-                      const DealGoWordmark(),
                     ],
                   ),
                 ),
 
-                // Form Content
+                // Main Form Content
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: DealGoDimensions.pageGutter,
+                    ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        const SizedBox(height: DealGoSpacing.s8),
-                        const _PhoneMark(),
-                        const SizedBox(height: DealGoSpacing.s24),
-                        Text.rich(
-                          TextSpan(
-                            style: textTheme.headlineMedium?.copyWith(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w800,
-                              height: 1.25,
-                              color: DealGoColors.text,
-                            ),
-                            children: [
-                              TextSpan(
-                                text: AppLocalizations.of(context)
-                                    .authWelcomePrefix,
-                              ),
-                              TextSpan(
-                                text: AppLocalizations.of(context)
-                                    .authWelcomeBrand,
-                                style: const TextStyle(
-                                  color: DealGoColors.primary,
+                        // Hero Visual (Da Nang scenic graphic)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(DealGoRadius.card),
+                          child: Container(
+                            constraints: const BoxConstraints(maxHeight: 200),
+                            child: Image.asset(
+                              'assets/images/hero_dealgo_danang.png',
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                height: 160,
+                                decoration: BoxDecoration(
+                                  color: DealGoColors.subtlePurple,
+                                  borderRadius: BorderRadius.circular(DealGoRadius.card),
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.travel_explore_rounded,
+                                    size: 64,
+                                    color: DealGoColors.primary,
+                                  ),
                                 ),
                               ),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: DealGoSpacing.s16),
+
+                        // Headline
+                        Text.rich(
+                          const TextSpan(
+                            style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              color: DealGoColors.text,
+                              height: 1.25,
+                              letterSpacing: -0.5,
+                            ),
+                            children: [
+                              TextSpan(text: 'Chào mừng bạn\nđến với '),
                               TextSpan(
-                                text: AppLocalizations.of(context)
-                                    .authWelcomeSuffix,
+                                text: 'DealGo!',
+                                style: TextStyle(color: DealGoColors.primary),
                               ),
                             ],
                           ),
+                          textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: DealGoSpacing.s12),
-                        Text(
-                          AppLocalizations.of(context).authWelcomeBody,
-                          style: textTheme.bodyMedium?.copyWith(
+
+                        const SizedBox(height: DealGoSpacing.s8),
+
+                        const Text(
+                          'Nhập số điện thoại để tiếp tục đặt xe,\ngọi đồ ăn và mua sắm.',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w400,
                             color: DealGoColors.textSecondary,
                             height: 1.45,
-                            fontSize: 14.5,
                           ),
+                          textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: DealGoSpacing.s24),
-                        ExcludeSemantics(
+
+                        const SizedBox(height: DealGoSpacing.s20),
+
+                        // Phone label
+                        const Align(
+                          alignment: Alignment.centerLeft,
                           child: Text(
-                            AppLocalizations.of(context).authPhoneLabel,
-                            style: textTheme.labelLarge?.copyWith(
+                            'Số điện thoại',
+                            style: TextStyle(
+                              fontSize: 14,
                               fontWeight: FontWeight.w700,
                               color: DealGoColors.text,
                             ),
                           ),
                         ),
+
                         const SizedBox(height: DealGoSpacing.s8),
-                        Semantics(
-                          label: AppLocalizations.of(context).authPhoneLabel,
-                          textField: true,
-                          child: ExcludeSemantics(
-                            child: TextField(
-                              key: const Key('phone-field'),
-                              controller: _phone,
-                              enabled: !submitting,
-                              keyboardType: TextInputType.phone,
-                              textInputAction: TextInputAction.done,
-                              autofillHints: const [
-                                AutofillHints.telephoneNumber,
-                              ],
-                              inputFormatters: [
-                                FilteringTextInputFormatter.allow(
-                                  RegExp(r'[0-9+\s]'),
-                                ),
-                                LengthLimitingTextInputFormatter(16),
-                              ],
-                              onChanged: (_) => setState(() {}),
-                              onSubmitted: (_) => _submit(),
-                              style: textTheme.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                              decoration: InputDecoration(
-                                hintText: AppLocalizations.of(context)
-                                    .authPhoneHint,
-                                hintStyle: textTheme.bodyLarge?.copyWith(
-                                  color: DealGoColors.textSecondary
-                                      .withValues(alpha: 0.7),
-                                  fontWeight: FontWeight.normal,
-                                ),
-                                filled: true,
-                                fillColor: DealGoColors.card,
-                                prefixIcon: const _DialCodePrefix(),
-                                prefixIconConstraints: const BoxConstraints(
-                                  minWidth: 0,
-                                  minHeight: 0,
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: DealGoSpacing.s16,
-                                  vertical: DealGoSpacing.s16,
-                                ),
-                                enabledBorder: _fieldBorder(DealGoColors.border),
-                                disabledBorder: _fieldBorder(
-                                  DealGoColors.border,
-                                ),
-                                focusedBorder: _fieldBorder(
-                                  DealGoColors.primary,
-                                  width: 1.6,
-                                ),
-                              ),
+
+                        // Phone Input Field with VN Flag & +84
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(DealGoRadius.button),
+                            border: Border.all(
+                              color: DealGoColors.border,
+                              width: 1.2,
                             ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.04),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          child: Row(
+                            children: [
+                              const _VietnamFlagBadge(),
+                              const SizedBox(width: 8),
+                              const Text(
+                                '+84',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: DealGoColors.text,
+                                ),
+                              ),
+                              const Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                                size: 18,
+                                color: DealGoColors.textSecondary,
+                              ),
+                              const SizedBox(width: 10),
+                              Container(
+                                width: 1,
+                                height: 24,
+                                color: DealGoColors.border,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextField(
+                                  key: const Key('phone-field'),
+                                  controller: _phone,
+                                  enabled: !submitting,
+                                  keyboardType: TextInputType.phone,
+                                  textInputAction: TextInputAction.done,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.allow(RegExp(r'[0-9\s]')),
+                                    LengthLimitingTextInputFormatter(14),
+                                  ],
+                                  onChanged: (_) => setState(() {}),
+                                  onSubmitted: (_) => _submit(),
+                                  style: const TextStyle(
+                                    fontSize: 15.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: DealGoColors.text,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: 'Nhập số điện thoại',
+                                    hintStyle: TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w400,
+                                      color: DealGoColors.textSecondary.withValues(alpha: 0.7),
+                                    ),
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
+
                         if (error != null) ...[
                           const SizedBox(height: DealGoSpacing.s12),
                           AuthErrorText(error: error),
                         ],
-                        const SizedBox(height: DealGoSpacing.s16),
-                        AuthInfoBanner(
-                          message: AppLocalizations.of(context).authOtpInfo,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
 
-                // Bottom Area: Terms and Action Button
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    DealGoDimensions.pageGutter,
-                    DealGoSpacing.s8,
-                    DealGoDimensions.pageGutter,
-                    DealGoSpacing.s16,
-                  ),
-                  child: Column(
-                    children: [
-                      Text.rich(
-                        TextSpan(
-                          style: textTheme.bodySmall?.copyWith(
-                            height: 1.4,
-                            fontSize: 12,
-                          ),
+                        const SizedBox(height: DealGoSpacing.s12),
+
+                        // Security lock hint
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            TextSpan(
-                              text: AppLocalizations.of(context)
-                                  .authTermsPrefix,
+                            const Icon(
+                              Icons.lock_outline_rounded,
+                              size: 16,
+                              color: DealGoColors.textSecondary,
                             ),
-                            TextSpan(
-                              text: AppLocalizations.of(context).authTermsOfUse,
-                              style: const TextStyle(
-                                color: DealGoColors.primary,
-                                fontWeight: FontWeight.w600,
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Mã OTP sẽ được gửi để xác minh và bảo vệ tài khoản của bạn.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w400,
+                                  color: DealGoColors.textSecondary.withValues(alpha: 0.85),
+                                  height: 1.35,
+                                ),
                               ),
-                            ),
-                            TextSpan(
-                              text: AppLocalizations.of(context).authTermsAnd,
-                            ),
-                            TextSpan(
-                              text: AppLocalizations.of(context)
-                                  .authPrivacyPolicy,
-                              style: const TextStyle(
-                                color: DealGoColors.primary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            TextSpan(
-                              text: AppLocalizations.of(context)
-                                  .authTermsSuffix,
                             ),
                           ],
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: DealGoSpacing.s12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: DealGoPrimaryButton(
-                          label: AppLocalizations.of(context).actionContinue,
-                          trailingIcon: Icons.arrow_forward,
+
+                        const SizedBox(height: DealGoSpacing.s20),
+
+                        // Primary Action Button: Tiếp tục
+                        DealGoPrimaryButton(
+                          label: 'Tiếp tục',
+                          trailingIcon: Icons.arrow_forward_rounded,
                           isLoading: submitting,
                           enabled: _phoneReady && !submitting,
                           onPressed: _submit,
                         ),
-                      ),
-                      if (useMockData) ...[
+
+                        const SizedBox(height: DealGoSpacing.s12),
+
+                        // Alternate login buttons (Email, Passkey)
+                        _AlternateAuthButton(
+                          icon: Icons.mail_outline_rounded,
+                          label: 'Đăng nhập bằng Email',
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Đăng nhập bằng Email sẽ hỗ trợ ở bản tới'),
+                              ),
+                            );
+                          },
+                        ),
+
                         const SizedBox(height: DealGoSpacing.s8),
-                        SizedBox(
-                          width: double.infinity,
-                          child: DealGoSecondaryButton(
+
+                        _AlternateAuthButton(
+                          icon: Icons.key_rounded,
+                          label: 'Dùng Passkey',
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Đăng nhập bằng Passkey sẽ hỗ trợ ở bản tới'),
+                              ),
+                            );
+                          },
+                        ),
+
+                        if (useMockData) ...[
+                          const SizedBox(height: DealGoSpacing.s8),
+                          DealGoSecondaryButton(
                             key: const Key('mock-demo-enter'),
-                            label: AppLocalizations.of(context).authMockDemo,
+                            label: 'Vào nhanh chế độ Demo (Mock)',
                             enabled: !submitting,
                             onPressed: _enterMockDemo,
                           ),
+                        ],
+
+                        const SizedBox(height: DealGoSpacing.s16),
+
+                        // Legal Terms Notice
+                        Text.rich(
+                          const TextSpan(
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: DealGoColors.textSecondary,
+                              height: 1.45,
+                            ),
+                            children: [
+                              TextSpan(text: 'Bằng việc tiếp tục, bạn đồng ý với '),
+                              TextSpan(
+                                text: 'Điều khoản',
+                                style: TextStyle(
+                                  color: DealGoColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                              TextSpan(text: '\nvà '),
+                              TextSpan(
+                                text: 'Chính sách quyền riêng tư',
+                                style: TextStyle(
+                                  color: DealGoColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                              TextSpan(text: '.'),
+                            ],
+                          ),
+                          textAlign: TextAlign.center,
                         ),
+
+                        const SizedBox(height: DealGoSpacing.s16),
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ],
@@ -324,115 +420,65 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
   }
 }
 
-OutlineInputBorder _fieldBorder(Color color, {double width = 1}) {
-  return OutlineInputBorder(
-    borderRadius: BorderRadius.circular(DealGoRadius.input),
-    borderSide: BorderSide(color: color, width: width),
-  );
-}
-
-class _PhoneMark extends StatelessWidget {
-  const _PhoneMark();
-
-  static const _appColors = <Color>[
-    Color(0xFF6D28D9),
-    Color(0xFF16A34A),
-    Color(0xFFF59E0B),
-    Color(0xFFEF4444),
-    Color(0xFF0EA5E9),
-    Color(0xFF8B5CF6),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return const DecoratedBox(
-      decoration: BoxDecoration(
-        color: DealGoColors.subtlePurple,
-        borderRadius: BorderRadius.all(Radius.circular(DealGoRadius.card)),
-      ),
-      child: SizedBox(
-        width: 72,
-        height: 72,
-        child: Center(child: _PhoneGlyph()),
-      ),
-    );
-  }
-}
-
-class _PhoneGlyph extends StatelessWidget {
-  const _PhoneGlyph();
+class _VietnamFlagBadge extends StatelessWidget {
+  const _VietnamFlagBadge();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 34,
+      width: 26,
+      height: 26,
+      decoration: const BoxDecoration(
+        color: Color(0xFFDA251D),
+        shape: BoxShape.circle,
+      ),
+      child: const Center(
+        child: Icon(Icons.star_rounded, color: Color(0xFFFFE14A), size: 14),
+      ),
+    );
+  }
+}
+
+class _AlternateAuthButton extends StatelessWidget {
+  const _AlternateAuthButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
       height: 48,
-      padding: const EdgeInsets.fromLTRB(4, 6, 4, 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1C2230),
-        borderRadius: BorderRadius.circular(7),
-      ),
-      child: Wrap(
-        spacing: 3,
-        runSpacing: 3,
-        children: [
-          for (final color in _PhoneMark._appColors)
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(2),
-              ),
-              child: const SizedBox(width: 7, height: 7),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DialCodePrefix extends StatelessWidget {
-  const _DialCodePrefix();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: DealGoSpacing.s12),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const _VietnamFlag(),
-          const SizedBox(width: DealGoSpacing.s8),
-          Text(
-            '+84',
-            style: Theme.of(context).textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.w700),
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: DealGoColors.border, width: 1.2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(DealGoRadius.button),
           ),
-          const SizedBox(width: DealGoSpacing.s12),
-          const SizedBox(
-            width: 1,
-            height: 22,
-            child: ColoredBox(color: DealGoColors.border),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _VietnamFlag extends StatelessWidget {
-  const _VietnamFlag();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SizedBox(
-      width: 22,
-      height: 16,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Color(0xFFDA251D),
-          borderRadius: BorderRadius.all(Radius.circular(2)),
+          backgroundColor: Colors.white,
         ),
-        child: Icon(Icons.star_rounded, color: Color(0xFFFFE14A), size: 11),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: DealGoColors.primary),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: DealGoColors.text,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
