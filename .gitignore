@@ -117,3 +117,7 @@ tmp/
 temp/
 .temp/
 .tmp/
+
+#landing page
+landing/.next/
+landing/next-env.d.ts
