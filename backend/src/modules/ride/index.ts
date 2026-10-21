@@ -8,3 +8,4 @@ export * from './ride.constants.js';
 export * from './ride.dto.js';
 export * from './ride.error.js';
 export * from './ride-geo.js';
+export * from './ride-pickup-code.js';

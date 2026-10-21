@@ -2,7 +2,11 @@ import '../entities/food_models.dart';
 import '../params/place_food_order_params.dart';
 
 abstract interface class FoodRepository {
-  Future<List<FoodStoreSummary>> listStores(String accessToken);
+  Future<List<FoodStoreSummary>> listStores(
+    String accessToken, {
+    double? lat,
+    double? lng,
+  });
 
   Future<FoodStoreDetail> getStore(String accessToken, String storeId);
 
@@ -22,12 +26,25 @@ abstract interface class FoodRepository {
     required String orderId,
   });
 
+  Future<MerchantOrderUpdate> rejectOrder({
+    required String accessToken,
+    required String orderId,
+    required FoodRejectReason reason,
+    String? note,
+  });
+
   Future<MerchantOrderUpdate> markOrderReady({
     required String accessToken,
     required String orderId,
   });
 
   Future<ClaimedFoodDelivery> claimOrder({
+    required String accessToken,
+    required String orderId,
+  });
+
+  /// Customer cancel (backend allows PLACED only).
+  Future<ClaimedFoodDelivery> cancelOrder({
     required String accessToken,
     required String orderId,
   });
@@ -46,6 +63,17 @@ abstract interface class FoodRepository {
     required String itemId,
     String? name,
     int? priceVnd,
+    bool? available,
+    String? description,
+    int? prepMinutes,
+    String? imageUrl,
+    String? menuCategoryId,
+  });
+
+  Future<FoodMenuItem> replaceMerchantItemOptions({
+    required String accessToken,
+    required String itemId,
+    required List<FoodOptionGroup> groups,
   });
 
   Future<FoodMenuItem> setMerchantItemAvailability({

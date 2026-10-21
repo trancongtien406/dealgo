@@ -8,12 +8,14 @@ class FoodMenuItemModel {
     required this.name,
     required this.priceVnd,
     required this.available,
+    this.optionGroups = const [],
   });
 
   final String id;
   final String name;
   final int priceVnd;
   final bool available;
+  final List<FoodOptionGroup> optionGroups;
 
   factory FoodMenuItemModel.fromJson(Map<String, Object?> json) {
     final id = json['id'];
@@ -28,7 +30,7 @@ class FoodMenuItemModel {
         available is! bool) {
       throw const ApiException(
         statusCode: 200,
-        message: 'Phản hồi không hợp lệ',
+        message: 'Invalid response',
         errorCode: 'INVALID_RESPONSE',
       );
     }
@@ -37,6 +39,7 @@ class FoodMenuItemModel {
       name: name,
       priceVnd: priceVnd,
       available: available,
+      optionGroups: decodeFoodOptionGroups(json['optionGroups']),
     );
   }
 
@@ -46,6 +49,7 @@ class FoodMenuItemModel {
       name: item.name,
       priceVnd: item.priceVnd,
       available: item.available,
+      optionGroups: item.optionGroups,
     );
   }
 
@@ -55,6 +59,8 @@ class FoodMenuItemModel {
       'name': name,
       'priceVnd': priceVnd,
       'available': available,
+      if (optionGroups.isNotEmpty)
+        'optionGroups': encodeFoodOptionGroups(optionGroups),
     };
   }
 
@@ -64,6 +70,7 @@ class FoodMenuItemModel {
       name: name,
       priceVnd: priceVnd,
       available: available,
+      optionGroups: optionGroups,
     );
   }
 }
@@ -80,7 +87,7 @@ class FoodStoreSummaryModel {
     if (id is! String || id.isEmpty || name is! String || name.isEmpty) {
       throw const ApiException(
         statusCode: 200,
-        message: 'Phản hồi không hợp lệ',
+        message: 'Invalid response',
         errorCode: 'INVALID_RESPONSE',
       );
     }
@@ -101,11 +108,15 @@ class FoodStoreDetailModel {
     required this.id,
     required this.name,
     required this.items,
+    this.category,
+    this.addressLabel,
   });
 
   final String id;
   final String name;
   final List<FoodMenuItemModel> items;
+  final String? category;
+  final String? addressLabel;
 
   factory FoodStoreDetailModel.fromJson(Map<String, Object?> json) {
     final id = json['id'];
@@ -118,7 +129,7 @@ class FoodStoreDetailModel {
         rawItems is! List) {
       throw const ApiException(
         statusCode: 200,
-        message: 'Phản hồi không hợp lệ',
+        message: 'Invalid response',
         errorCode: 'INVALID_RESPONSE',
       );
     }
@@ -134,10 +145,17 @@ class FoodStoreDetailModel {
         continue;
       }
     }
+    String? text(String key) {
+      final value = json[key];
+      return value is String && value.trim().isNotEmpty ? value.trim() : null;
+    }
+
     return FoodStoreDetailModel(
       id: id,
       name: name,
       items: List.unmodifiable(items),
+      category: text('category'),
+      addressLabel: text('addressLabel'),
     );
   }
 
@@ -145,6 +163,8 @@ class FoodStoreDetailModel {
     return FoodStoreDetailModel(
       id: store.id,
       name: store.name,
+      category: store.category,
+      addressLabel: store.addressLabel,
       items: [
         for (final item in store.items) FoodMenuItemModel.fromEntity(item),
       ],
@@ -155,6 +175,8 @@ class FoodStoreDetailModel {
     return {
       'id': id,
       'name': name,
+      'category': ?category,
+      'addressLabel': ?addressLabel,
       'items': [for (final item in items) item.toJson()],
     };
   }
@@ -163,6 +185,8 @@ class FoodStoreDetailModel {
     return FoodStoreDetail(
       id: id,
       name: name,
+      category: category,
+      addressLabel: addressLabel,
       items: List.unmodifiable([for (final item in items) item.toEntity()]),
     );
   }
@@ -176,6 +200,8 @@ class PlacedFoodOrderModel {
     required this.subtotalVnd,
     required this.totalVnd,
     required this.lines,
+    this.discountVnd = 0,
+    this.voucherCode,
   });
 
   final String id;
@@ -184,6 +210,8 @@ class PlacedFoodOrderModel {
   final int subtotalVnd;
   final int totalVnd;
   final List<FoodOrderLine> lines;
+  final int discountVnd;
+  final String? voucherCode;
 
   factory PlacedFoodOrderModel.fromEntity(PlacedFoodOrder order) {
     return PlacedFoodOrderModel(
@@ -193,6 +221,8 @@ class PlacedFoodOrderModel {
       subtotalVnd: order.subtotalVnd,
       totalVnd: order.totalVnd,
       lines: order.lines,
+      discountVnd: order.discountVnd,
+      voucherCode: order.voucherCode,
     );
   }
 
@@ -204,6 +234,8 @@ class PlacedFoodOrderModel {
       subtotalVnd: subtotalVnd,
       totalVnd: totalVnd,
       lines: lines,
+      discountVnd: discountVnd,
+      voucherCode: voucherCode,
     );
   }
 }

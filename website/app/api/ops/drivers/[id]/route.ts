@@ -1,3 +1,4 @@
+import { enrichOpsDriverPayload } from "@/lib/api/ops-people";
 import { isUuid } from "@/lib/api/ops-bff-guards";
 import { jsonFromOpsUpstream } from "@/lib/api/ops-bff-response";
 import { fetchOpsUpstream } from "@/lib/api/ops-upstream";
@@ -16,5 +17,11 @@ export async function GET(_request: Request, context: RouteContext) {
   const result = await fetchOpsUpstream({
     path: `/v1/ops/drivers/${id}`,
   });
+  if (result.ok) {
+    return jsonFromOpsUpstream({
+      ...result,
+      data: await enrichOpsDriverPayload(result.data),
+    });
+  }
   return jsonFromOpsUpstream(result);
 }

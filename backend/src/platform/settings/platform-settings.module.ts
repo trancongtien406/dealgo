@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../database/prisma.module.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -15,7 +15,7 @@ import { PlatformSettingsService } from './platform-settings.service.js';
 import { OpsPlatformSettingsController } from './platform-settings.controller.js';
 
 @Module({
-  imports: [PrismaModule, IdentityModule],
+  imports: [PrismaModule, forwardRef(() => IdentityModule)],
   controllers: [OpsPlatformSettingsController],
   providers: [
     PlatformSettingsService,

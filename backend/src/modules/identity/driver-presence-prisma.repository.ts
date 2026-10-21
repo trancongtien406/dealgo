@@ -1,6 +1,7 @@
 import { resolveServiceRegionCode } from '../service-area/service-regions.js';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import type {
+  DriverLocation,
   DriverPresenceRepository,
   DriverPresenceView,
   UpsertPresenceInput,
@@ -16,8 +17,11 @@ export class PrismaDriverPresenceRepository implements DriverPresenceRepository 
     const serviceRegionCode = resolveServiceRegionCode({ lat, lng });
     const data = {
       online: input.online,
+      ...(input.rideEnabled !== undefined ? { rideEnabled: input.rideEnabled } : {}),
+      ...(input.foodEnabled !== undefined ? { foodEnabled: input.foodEnabled } : {}),
       ...(input.lat !== undefined ? { lat: input.lat } : {}),
       ...(input.lng !== undefined ? { lng: input.lng } : {}),
+      ...(input.lat !== undefined && input.lng !== undefined ? { locationAt: new Date() } : {}),
       serviceRegionCode,
     };
     const row = await this.db.driverPresence.upsert({
@@ -25,11 +29,36 @@ export class PrismaDriverPresenceRepository implements DriverPresenceRepository 
       create: {
         userId,
         online: input.online,
+        rideEnabled: input.rideEnabled ?? true,
+        foodEnabled: input.foodEnabled ?? true,
         lat: input.lat ?? null,
         lng: input.lng ?? null,
+        locationAt: input.lat !== undefined && input.lng !== undefined ? new Date() : null,
         serviceRegionCode,
       },
       update: data,
+    });
+    return toView(row);
+  }
+
+  async updateLocation(userId: string, location: DriverLocation): Promise<DriverPresenceView> {
+    const serviceRegionCode = resolveServiceRegionCode({ lat: location.lat, lng: location.lng });
+    const row = await this.db.driverPresence.upsert({
+      where: { userId },
+      create: {
+        userId,
+        online: true,
+        lat: location.lat,
+        lng: location.lng,
+        locationAt: location.at,
+        serviceRegionCode,
+      },
+      update: {
+        lat: location.lat,
+        lng: location.lng,
+        locationAt: location.at,
+        serviceRegionCode,
+      },
     });
     return toView(row);
   }
@@ -43,16 +72,22 @@ export class PrismaDriverPresenceRepository implements DriverPresenceRepository 
 function toView(row: {
   userId: string;
   online: boolean;
+  rideEnabled: boolean;
+  foodEnabled: boolean;
   lat: number | null;
   lng: number | null;
+  locationAt: Date | null;
   serviceRegionCode?: string | null;
   updatedAt: Date;
 }): DriverPresenceView {
   return {
     userId: row.userId,
     online: row.online,
+    rideEnabled: row.rideEnabled,
+    foodEnabled: row.foodEnabled,
     lat: row.lat,
     lng: row.lng,
+    locationAt: row.locationAt,
     serviceRegionCode: row.serviceRegionCode ?? null,
     updatedAt: row.updatedAt,
   };

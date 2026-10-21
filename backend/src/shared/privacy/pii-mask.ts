@@ -1,16 +1,3 @@
-/**
- * Privacy & PII protection utilities.
- * Ensures sensitive data like phone numbers and emails are masked at the server
- * level before being sent to client browsers or logged.
- */
-
-/**
- * Masks a phone number for display in ops consoles and public interfaces.
- * Examples:
- *   "0901234567" -> "0901 *** 567"
- *   "+84901234567" -> "+8490 *** 567"
- *   null / undefined / "" -> null
- */
 export function maskPhone(raw: string | null | undefined): string | null {
   if (!raw || typeof raw !== 'string') {
     return null;
@@ -28,10 +15,6 @@ export function maskPhone(raw: string | null | undefined): string | null {
   return `${prefix} *** ${suffix}`;
 }
 
-/**
- * Masks an email address for privacy.
- * Example: "nguyen.van.a@example.com" -> "ng***a@example.com"
- */
 export function maskEmail(raw: string | null | undefined): string | null {
   if (!raw || typeof raw !== 'string') {
     return null;
@@ -47,4 +30,25 @@ export function maskEmail(raw: string | null | undefined): string | null {
     return `${user.charAt(0)}*${domain}`;
   }
   return `${user.slice(0, 2)}***${user.slice(-1)}${domain}`;
+}
+
+/**
+ * Counterpart-safe name for partner screens: given name plus family initial, e.g.
+ * "Trần Công Tiến" → "Tiến T." (Vietnamese order: given name is the last word).
+ * Single-word names are returned as-is; blank names give null.
+ */
+export function maskPersonName(raw: string | null | undefined): string | null {
+  if (!raw || typeof raw !== 'string') {
+    return null;
+  }
+  const parts = raw.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) {
+    return null;
+  }
+  const given = parts[parts.length - 1]!.slice(0, 40);
+  if (parts.length === 1) {
+    return given;
+  }
+  const initial = Array.from(parts[0]!)[0]!.toLocaleUpperCase('vi');
+  return `${given} ${initial}.`;
 }

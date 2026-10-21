@@ -19,14 +19,11 @@ class PhoneChallengeModel {
         expiresAt.isEmpty) {
       throw const ApiException(
         statusCode: 200,
-        message: 'Phản hồi không hợp lệ',
+        message: 'Invalid response',
         errorCode: 'INVALID_RESPONSE',
       );
     }
-    return PhoneChallengeModel(
-      challengeId: challengeId,
-      expiresAt: expiresAt,
-    );
+    return PhoneChallengeModel(challengeId: challengeId, expiresAt: expiresAt);
   }
 
   Map<String, Object?> toJson() {

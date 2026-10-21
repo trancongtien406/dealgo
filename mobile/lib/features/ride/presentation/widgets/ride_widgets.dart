@@ -4,13 +4,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
-import '../../../identity/presentation/widgets/auth_widgets.dart';
 import '../../domain/entities/ride_models.dart';
-import '../../domain/entities/ride_money.dart';
+import '../../../../l10n/app_localizations.dart';
 
 String? rideAccessToken(BuildContext context) {
   final auth = context.read<AuthCubit>().state;
@@ -27,68 +27,76 @@ bool rideFailureIsOffline(Object error) {
   return error.statusCode == 0 || error.errorCode == 'NETWORK_ERROR';
 }
 
-class RideScreenHeader extends StatelessWidget {
-  const RideScreenHeader({
-    required this.title,
-    required this.onBack,
-    this.subtitle,
-    this.trailing,
-    super.key,
-  });
-
-  final String title;
-  final VoidCallback onBack;
-  final String? subtitle;
-  final Widget? trailing;
+/// Drag handle used on ride bottom sheets (C002 / C003).
+class RideSheetHandle extends StatelessWidget {
+  const RideSheetHandle({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        DealGoSpacing.s8,
-        DealGoSpacing.s8,
-        DealGoDimensions.pageGutter,
-        DealGoSpacing.s8,
-      ),
-      child: Row(
-        children: [
-          AuthBackButton(onPressed: onBack),
-          const SizedBox(width: DealGoSpacing.s8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: textTheme.titleMedium),
-                if (subtitle != null)
-                  Text(subtitle!, style: textTheme.bodySmall),
-              ],
-            ),
-          ),
-          ?trailing,
-        ],
+    return Center(
+      child: Container(
+        width: 36,
+        height: 4,
+        decoration: BoxDecoration(
+          color: DealGoColors.border,
+          borderRadius: BorderRadius.circular(DealGoRadius.pill),
+        ),
       ),
     );
   }
 }
 
 class RidePanel extends StatelessWidget {
-  const RidePanel({required this.child, super.key});
+  const RidePanel({
+    required this.child,
+    this.color = DealGoColors.card,
+    this.padding = const EdgeInsets.all(DealGoSpacing.s16),
+    this.elevated = false,
+    super.key,
+  });
+
+  final Widget child;
+  final Color color;
+  final EdgeInsetsGeometry padding;
+  final bool elevated;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(DealGoRadius.card);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: radius,
+        border: Border.all(
+          color: color == DealGoColors.card
+              ? DealGoColors.border
+              : Colors.transparent,
+        ),
+        boxShadow: elevated ? DealGoShadows.card : null,
+      ),
+      child: Padding(padding: padding, child: child),
+    );
+  }
+}
+
+/// Rounded top sheet surface for map-backed ride steps.
+class RideBottomSheet extends StatelessWidget {
+  const RideBottomSheet({required this.child, super.key});
 
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: DealGoColors.card,
-        borderRadius: BorderRadius.circular(DealGoRadius.card),
-        border: Border.all(color: DealGoColors.border),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(DealGoRadius.sheet),
+        ),
+        border: Border(top: BorderSide(color: DealGoColors.border)),
+        boxShadow: DealGoShadows.floating,
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(DealGoSpacing.s16),
-        child: child,
-      ),
+      child: child,
     );
   }
 }
@@ -112,26 +120,65 @@ class RideStopList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        RideStopRow(
-          color: DealGoColors.brandGreen,
-          label: 'Điểm đón',
-          value: pickup,
-        ),
-        const SizedBox(height: DealGoSpacing.s12),
-        const RideStopRow(
-          color: DealGoColors.border,
-          label: '',
-          value: '',
-          connector: true,
-        ),
-        RideStopRow(
-          color: DealGoColors.danger,
-          label: 'Điểm đến',
-          value: dropoff,
-        ),
-      ],
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Column(
+            children: [
+              const _StopDot(color: DealGoColors.brandGreen),
+              Expanded(
+                child: Container(
+                  width: 2,
+                  margin: const EdgeInsets.symmetric(
+                    vertical: DealGoSpacing.s4,
+                  ),
+                  color: DealGoColors.border,
+                ),
+              ),
+              const _StopDot(color: DealGoColors.danger),
+            ],
+          ),
+          const SizedBox(width: DealGoSpacing.s12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                RideStopRow(
+                  color: DealGoColors.brandGreen,
+                  label: AppLocalizations.of(context).ridePickup,
+                  value: pickup,
+                  showDot: false,
+                ),
+                const SizedBox(height: DealGoSpacing.s16),
+                RideStopRow(
+                  color: DealGoColors.danger,
+                  label: AppLocalizations.of(context).rideDropoff,
+                  value: dropoff,
+                  showDot: false,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StopDot extends StatelessWidget {
+  const _StopDot({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: DecoratedBox(
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        child: const SizedBox(width: 10, height: 10),
+      ),
     );
   }
 }
@@ -142,6 +189,7 @@ class RideStopRow extends StatelessWidget {
     required this.label,
     required this.value,
     this.connector = false,
+    this.showDot = true,
     super.key,
   });
 
@@ -149,6 +197,7 @@ class RideStopRow extends StatelessWidget {
   final String label;
   final String value;
   final bool connector;
+  final bool showDot;
 
   @override
   Widget build(BuildContext context) {
@@ -159,14 +208,10 @@ class RideStopRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: DecoratedBox(
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            child: const SizedBox(width: 10, height: 10),
-          ),
-        ),
-        const SizedBox(width: DealGoSpacing.s8),
+        if (showDot) ...[
+          _StopDot(color: color),
+          const SizedBox(width: DealGoSpacing.s8),
+        ],
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -182,6 +227,94 @@ class RideStopRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Bordered pickup/dropoff field used on the map booking sheet (C002).
+class RideStopField extends StatelessWidget {
+  const RideStopField({
+    required this.icon,
+    required this.tone,
+    required this.caption,
+    required this.value,
+    required this.placeholder,
+    required this.onTap,
+    this.trailing,
+    super.key,
+  });
+
+  final IconData icon;
+  final Color tone;
+  final String caption;
+  final String? value;
+  final String placeholder;
+  final VoidCallback onTap;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final chosen = value;
+    return Semantics(
+      button: true,
+      label: '$caption: ${chosen ?? placeholder}',
+      excludeSemantics: true,
+      child: Material(
+        color: DealGoColors.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(DealGoRadius.input),
+          side: const BorderSide(color: DealGoColors.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: DealGoSpacing.s12,
+              vertical: DealGoSpacing.s12,
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: tone, size: 20),
+                const SizedBox(width: DealGoSpacing.s12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(caption, style: textTheme.labelSmall),
+                      Text(
+                        chosen ?? placeholder,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: chosen == null
+                              ? FontWeight.w400
+                              : FontWeight.w700,
+                          color: chosen == null
+                              ? DealGoColors.textSecondary
+                              : DealGoColors.text,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (trailing != null) ...[
+                  const SizedBox(width: DealGoSpacing.s8),
+                  trailing!,
+                ] else
+                  Icon(
+                    chosen == null
+                        ? DealGoIcons.chevronRight
+                        : DealGoIcons.edit,
+                    color: DealGoColors.textSecondary,
+                    size: 18,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -206,6 +339,45 @@ class RideNote extends StatelessWidget {
             color: DealGoColors.warning,
             fontWeight: FontWeight.w600,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class RideInfoBanner extends StatelessWidget {
+  const RideInfoBanner({required this.message, super.key});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: DealGoColors.greenSurface,
+        borderRadius: BorderRadius.circular(DealGoRadius.input),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(DealGoSpacing.s12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(
+              DealGoIcons.info,
+              color: DealGoColors.brandGreen,
+              size: 18,
+            ),
+            const SizedBox(width: DealGoSpacing.s8),
+            Expanded(
+              child: Text(
+                message,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: DealGoColors.brandGreen,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -307,7 +479,7 @@ class RideStateHero extends StatelessWidget {
         DecoratedBox(
           decoration: BoxDecoration(
             color: background,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(DealGoRadius.input),
           ),
           child: SizedBox(
             width: 64,
@@ -387,7 +559,7 @@ class RideOfflineNotice extends StatelessWidget {
     return Column(
       children: [
         Text(
-          'Bạn đang ngoại tuyến',
+          AppLocalizations.of(context).rideYouAreOffline,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.titleMedium,
         ),
@@ -414,33 +586,26 @@ class RideRoutePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF4F0FA),
-        borderRadius: BorderRadius.circular(DealGoRadius.card),
-        border: Border.all(color: DealGoColors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(DealGoSpacing.s16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const RideStatusChip(
-              label: rideVehicleLabel,
-              tone: RideChipTone.purple,
-            ),
-            const SizedBox(height: DealGoSpacing.s12),
-            RideStopList(pickup: pickup, dropoff: dropoff),
-          ],
-        ),
+    return RidePanel(
+      color: DealGoColors.lavender,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          RideStatusChip(
+            label: AppLocalizations.of(context).rideVehicleMotorbike,
+            tone: RideChipTone.purple,
+          ),
+          const SizedBox(height: DealGoSpacing.s12),
+          RideStopList(pickup: pickup, dropoff: dropoff),
+        ],
       ),
     );
   }
 }
 
-String rideOfferKindLabel(RideOfferKind kind) {
+String rideOfferKindLabel(AppLocalizations l10n, RideOfferKind kind) {
   return switch (kind) {
-    RideOfferKind.accept => 'Bằng giá bạn đề xuất',
-    RideOfferKind.counter => 'Đề nghị khác',
+    RideOfferKind.accept => l10n.rideOfferKindAccept,
+    RideOfferKind.counter => l10n.rideOfferKindCounter,
   };
 }

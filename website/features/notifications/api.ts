@@ -132,6 +132,28 @@ export async function rejectNotificationCampaign(
   });
 }
 
+/** DRAFT → PENDING_APPROVAL (reason optional). */
+export async function submitNotificationCampaign(
+  code: string,
+  reason?: string,
+): Promise<void> {
+  await apiFetch(apiPaths.opsNotificationSubmit(code), {
+    method: "POST",
+    body: reason ? { reason } : {},
+  });
+}
+
+/** DRAFT | PENDING_APPROVAL | RUNNING → CANCELLED (reason required, audited). */
+export async function cancelNotificationCampaign(
+  code: string,
+  reason: string,
+): Promise<void> {
+  await apiFetch(apiPaths.opsNotificationCancel(code), {
+    method: "POST",
+    body: { reason },
+  });
+}
+
 export async function updateNotificationCampaign(
   code: string,
   body: Record<string, unknown>,

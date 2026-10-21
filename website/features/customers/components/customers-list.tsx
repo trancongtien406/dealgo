@@ -1,5 +1,6 @@
 "use client";
 
+import { accountDeletionLabel } from "@/lib/account-deletion";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { OpsIcon } from "@/components/ui/ops-icons";
@@ -345,7 +346,9 @@ export function CustomersList() {
                               {customer.name}
                             </p>
                             <p className="text-xs whitespace-nowrap text-muted">
-                              {"Danh bạ khách hàng"}
+                              {customer.deletion
+                                ? accountDeletionLabel(customer.deletion)
+                                : "Danh bạ khách hàng"}
                             </p>
                           </div>
                         </div>

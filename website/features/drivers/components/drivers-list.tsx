@@ -1,5 +1,6 @@
 "use client";
 
+import { accountDeletionLabel } from "@/lib/account-deletion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { OpsIcon } from "@/components/ui/ops-icons";
@@ -366,7 +367,9 @@ export function DriversList() {
                               {driver.name}
                             </p>
                             <p className="text-xs whitespace-nowrap text-muted">
-                              Tài xế DealGo
+                              {driver.deletion
+                                ? accountDeletionLabel(driver.deletion)
+                                : "Tài xế DealGo"}
                             </p>
                           </div>
                         </div>
@@ -394,7 +397,7 @@ export function DriversList() {
                         <RatingValue value={driver.rating} />
                       </AdminTableCell>
                       <AdminTableCell align="right" className="tabular-nums">
-                        {driver.trips}
+                        {driver.trips ?? "—"}
                       </AdminTableCell>
                       <AdminTableCell
                         onClick={(event) => event.stopPropagation()}

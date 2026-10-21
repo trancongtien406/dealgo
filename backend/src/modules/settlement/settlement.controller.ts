@@ -2,7 +2,8 @@ import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
-import { OpsSessionGuard } from '../identity/access-auth.guard.js';
+import { OpsPermissionGuard } from '../identity/ops-rbac/ops-permission.guard.js';
+import { RequireOpsPermission } from '../identity/ops-rbac/ops-permission.decorator.js';
 import { SettlementService } from './settlement.service.js';
 
 export class SettlementPageQueryDto {
@@ -26,11 +27,12 @@ export type OpsSettlementPageQueryDto = SettlementPageQueryDto;
 @ApiTags('ops')
 @ApiBearerAuth()
 @Controller('v1/ops/settlements')
-@UseGuards(OpsSessionGuard)
+@UseGuards(OpsPermissionGuard)
 export class SettlementController {
   constructor(private readonly settlements: SettlementService) {}
 
   @Get()
+  @RequireOpsPermission('settlements.read')
   @ApiOperation({
     summary:
       'Sandbox settlement stub: COD ledger journals grouped by UTC day (read-only; no payout)',

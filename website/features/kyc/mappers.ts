@@ -5,6 +5,13 @@ import type {
 } from "@/features/kyc/nest-types";
 import type { KycCase, KycStatus } from "@/features/kyc/types";
 import { formatOpsDate } from "@/lib/ops-time";
+import {
+  businessTypeLabel,
+  maskAccountNumber,
+  mapPartnerDocuments,
+  mapPartnerIssues,
+  registrationSubjectLabel,
+} from "@/features/kyc/partner-review";
 
 const nestPartnerStatusMap: Record<NestPartnerStatus, KycStatus> = {
   DRAFT: "UNDER_REVIEW",
@@ -47,8 +54,40 @@ export function mapNestPartnerApplicationToKycCase(
 ): KycCase {
   const name = readName(app.metadata) || shortId(app.id);
   const initials = initialsFrom(name);
+  const meta = app.metadata;
+  const services = [
+    meta.rideService === true ? "Chở khách" : null,
+    meta.foodService === true ? "Giao đồ ăn" : null,
+  ].filter(Boolean);
+  const account = readString(meta, "bankAccountNumber");
+  const details: Array<[string, string]> = (
+    [
+      ["Họ và tên", readString(meta, "fullName")],
+      ["Ngày sinh", readString(meta, "birthDate")],
+      ["Địa chỉ", readString(meta, "address")],
+      ["Số CCCD", readString(meta, "idNumber")],
+      ["Dịch vụ", services.join(", ")],
+      ["Hạng GPLX", readString(meta, "licenseClass")],
+      ["Số GPLX", readString(meta, "licenseNumber")],
+      ["Hãng xe", readString(meta, "vehicleBrand")],
+      ["Dòng xe", readString(meta, "vehicleModel")],
+      ["Năm sản xuất", readString(meta, "vehicleYear")],
+      ["Tên cửa hàng", readString(meta, "shopName")],
+      ["Địa chỉ cửa hàng", readString(meta, "shopAddress")],
+      ["Loại hình", businessTypeLabel(readString(meta, "businessType"))],
+      [
+        "Hình thức đăng ký",
+        registrationSubjectLabel(readString(meta, "registrationSubject")),
+      ],
+      ["Người đại diện", readString(meta, "representativeName")],
+      ["Ngân hàng", readString(meta, "bankName")],
+      ["Số tài khoản", account ? maskAccountNumber(account) : ""],
+      ["Chủ tài khoản", readString(meta, "bankAccountHolder")],
+    ] as Array<[string, string]>
+  ).filter(([, value]) => value.length > 0);
   return {
     code: app.id,
+    role: app.role,
     initials,
     name,
     submittedAt: formatOpsDate(app.submittedAt ?? app.createdAt),
@@ -60,13 +99,21 @@ export function mapNestPartnerApplicationToKycCase(
     area: readString(app.metadata, "area") || "—",
     vehicleKind:
       app.role === "DRIVER"
-        ? readString(app.metadata, "vehicleKind") || "Tài xế"
+        ? readString(app.metadata, "vehicleType") ||
+          readString(app.metadata, "vehicleKind") ||
+          "Tài xế"
         : "Cửa hàng",
     vehicle:
+      [readString(app.metadata, "vehicleBrand"), readString(app.metadata, "vehicleModel")]
+        .filter(Boolean)
+        .join(" ") ||
       readString(app.metadata, "vehicle") ||
       readString(app.metadata, "shopName") ||
       "—",
-    plate: readString(app.metadata, "plate") || "—",
+    plate:
+      readString(app.metadata, "vehiclePlate") ||
+      readString(app.metadata, "plate") ||
+      "—",
     status: nestPartnerStatusToFeature(app.status),
     activity:
       app.role === "DRIVER"
@@ -77,6 +124,11 @@ export function mapNestPartnerApplicationToKycCase(
           ? "Merchant · Đã duyệt"
           : "Merchant · Chờ xử lý",
     activated: app.status === "APPROVED",
+    details,
+    documents: mapPartnerDocuments(app),
+    reason: app.reason,
+    issues: mapPartnerIssues(app),
+    reviewedAt: app.reviewedAt ? formatOpsDate(app.reviewedAt) : null,
   };
 }
 

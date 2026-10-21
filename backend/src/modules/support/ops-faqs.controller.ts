@@ -14,16 +14,17 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentActor,
-  OpsSessionGuard,
   type RequestActor,
 } from '../identity/access-auth.guard.js';
 import { CreateOpsFaqDto, ListOpsFaqQueryDto, PatchOpsFaqDto } from './ops-faqs.dto.js';
 import { OpsFaqService } from './ops-faq.service.js';
+import { OpsPermissionGuard } from '../identity/ops-rbac/ops-permission.guard.js';
+import { RequireOpsPermission } from '../identity/ops-rbac/ops-permission.decorator.js';
 
 @ApiTags('ops')
 @ApiBearerAuth()
 @Controller('v1/ops/faqs')
-@UseGuards(OpsSessionGuard)
+@UseGuards(OpsPermissionGuard)
 export class OpsFaqsController {
   constructor(private readonly faqs: OpsFaqService) {}
 
@@ -36,6 +37,7 @@ export class OpsFaqsController {
     return this.faqs.list(query.status);
   }
 
+  @RequireOpsPermission('notifications.write')
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
@@ -47,6 +49,7 @@ export class OpsFaqsController {
       question: body.question,
       suggestedAnswer: body.suggestedAnswer,
       category: body.category,
+      audience: body.audience,
       status: body.status,
       sortOrder: body.sortOrder,
       actorUserId: actor.userId,
@@ -54,6 +57,7 @@ export class OpsFaqsController {
     });
   }
 
+  @RequireOpsPermission('notifications.write')
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -72,6 +76,7 @@ export class OpsFaqsController {
       suggestedAnswer: body.suggestedAnswer,
       status: body.status,
       category: body.category,
+      audience: body.audience,
       sortOrder: body.sortOrder,
       actorUserId: actor.userId,
       reason: body.reason,

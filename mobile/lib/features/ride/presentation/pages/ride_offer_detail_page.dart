@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../driver_card/domain/driver_card.dart';
+import '../../../driver_card/presentation/driver_card_tile.dart';
+
 import '../../../../core/design_system/components/dealgo_banner.dart';
+import '../../../../core/design_system/components/dealgo_state_view.dart';
+import '../../../../core/network/request_failure.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
@@ -15,6 +20,8 @@ import '../../domain/usecases/select_ride_offer.dart';
 import '../cubit/ride_offers_cubit.dart';
 import '../utils/ride_routes.dart';
 import '../widgets/ride_widgets.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 class RideOfferDetailArgs {
   const RideOfferDetailArgs({required this.ride, required this.offer});
@@ -43,21 +50,13 @@ class RideOfferDetailPage extends StatelessWidget {
         selectRideOffer: context.read<SelectRideOffer>(),
         cancelRide: context.read<CancelRide>(),
       ),
-      child: _RideOfferDetailView(
-        rideId: rideId,
-        offerId: offerId,
-        seed: args,
-      ),
+      child: _RideOfferDetailView(rideId: rideId, offerId: offerId, seed: args),
     );
   }
 }
 
 class _RideOfferDetailView extends StatefulWidget {
-  const _RideOfferDetailView({
-    required this.rideId,
-    this.offerId,
-    this.seed,
-  });
+  const _RideOfferDetailView({required this.rideId, this.offerId, this.seed});
 
   final String rideId;
   final String? offerId;
@@ -71,6 +70,7 @@ class _RideOfferDetailViewState extends State<_RideOfferDetailView> {
   RideView? _ride;
   RideOffer? _offer;
   var _loading = true;
+  Object? _failure;
   String? _error;
 
   @override
@@ -91,12 +91,13 @@ class _RideOfferDetailViewState extends State<_RideOfferDetailView> {
     if (token == null) {
       setState(() {
         _loading = false;
-        _error = AppLocalizations.of(context).errorUnauthorized;
+        _failure = sessionExpiredFailure;
       });
       return;
     }
     setState(() {
       _loading = true;
+      _failure = null;
       _error = null;
     });
     try {
@@ -126,13 +127,13 @@ class _RideOfferDetailViewState extends State<_RideOfferDetailView> {
           _error = AppLocalizations.of(context).emptyOffers;
         }
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
         _loading = false;
-        _error = AppLocalizations.of(context).errorLoadFailed;
+        _failure = error;
       });
     }
   }
@@ -148,7 +149,6 @@ class _RideOfferDetailViewState extends State<_RideOfferDetailView> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final textTheme = Theme.of(context).textTheme;
     final ride = _ride;
     final offer = _offer;
 
@@ -157,10 +157,17 @@ class _RideOfferDetailViewState extends State<_RideOfferDetailView> {
       body: SafeArea(
         child: Column(
           children: [
-            RideScreenHeader(title: l10n.rideOfferDetailTitle, onBack: _back),
+            DealGoAppHeader(title: l10n.rideOfferDetailTitle, onBack: _back),
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
+                  : _failure != null && offer == null
+                  ? DealGoStateView.failure(
+                      context,
+                      onRetry: _load,
+                      cause: _failure,
+                      message: l10n.errorLoadFailed,
+                    )
                   : ListView(
                       padding: const EdgeInsets.fromLTRB(
                         DealGoDimensions.pageGutter,
@@ -181,45 +188,15 @@ class _RideOfferDetailViewState extends State<_RideOfferDetailView> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  children: [
-                                    CircleAvatar(
-                                      backgroundColor:
-                                          DealGoColors.subtlePurple,
-                                      child: Text(
-                                        offer.driverId.isEmpty
-                                            ? '?'
-                                            : offer.driverId
-                                                .substring(0, 1)
-                                                .toUpperCase(),
-                                        style: const TextStyle(
-                                          color: DealGoColors.primary,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: DealGoSpacing.s12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '${l10n.rideDriverLabel} ${offer.driverId}',
-                                            style: textTheme.titleMedium,
-                                          ),
-                                          Text(
-                                            rideVehicleLabel,
-                                            style: textTheme.bodySmall,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
+                                DriverCardTile(
+                                  job: DriverCardJob.rideOffer,
+                                  jobId: ride.id,
+                                  offerId: offer.id,
+                                  accessToken: rideAccessToken(context) ?? '',
                                 ),
                                 const SizedBox(height: DealGoSpacing.s12),
                                 DealGoChip(
-                                  label: rideOfferKindLabel(offer.kind),
+                                  label: rideOfferKindLabel(AppLocalizations.of(context), offer.kind),
                                   tone: offer.kind == RideOfferKind.accept
                                       ? DealGoChipTone.success
                                       : DealGoChipTone.neutral,
@@ -275,7 +252,7 @@ class _RideOfferDetailViewState extends State<_RideOfferDetailView> {
                 child: DealGoPrimaryButton(
                   key: const Key('ride-offer-detail-select'),
                   label: l10n.rideSelectOfferCta,
-                  trailingIcon: Icons.arrow_forward,
+                  trailingIcon: DealGoIcons.arrowRight,
                   onPressed: () => context.push(
                     RideRoutes.confirm(ride.id),
                     extra: RideConfirmArgs(

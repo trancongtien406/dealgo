@@ -1,8 +1,17 @@
+import '../../core/realtime/snapshot_realtime.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../features/account_deletion/presentation/delete_account_page.dart';
+import '../../features/account_settings/presentation/change_password_page.dart';
+import '../../features/account_settings/presentation/edit_profile_page.dart';
+import '../../features/account_settings/presentation/notification_prefs_page.dart';
+import '../../features/account_settings/presentation/security_page.dart';
+import '../../features/account_settings/presentation/sessions_page.dart';
+import '../../features/driver_history/domain/driver_history.dart';
 
 import '../../core/motion/dealgo_page_transitions.dart';
 import '../../features/driver/domain/usecases/list_open_driver_rides.dart';
@@ -22,13 +31,19 @@ import '../../features/merchant/domain/usecases/list_merchant_order_queue.dart';
 import '../../features/merchant/presentation/pages/merchant_accept_settings_page.dart';
 import '../../features/merchant/presentation/pages/merchant_busy_page.dart';
 import '../../features/merchant/presentation/pages/merchant_hours_page.dart';
+import '../../features/merchant/presentation/pages/merchant_location_page.dart';
+import '../../features/merchant/presentation/pages/merchant_profile_page.dart';
 import '../../features/merchant/presentation/pages/merchant_item_variants_page.dart';
+import '../../features/merchant/presentation/pages/merchant_item_edit_page.dart';
+import '../../features/merchant/presentation/pages/merchant_categories_page.dart';
+import '../../features/merchant/presentation/pages/merchant_history_page.dart';
 import '../../features/merchant/presentation/pages/merchant_order_page.dart';
 import '../../features/merchant/presentation/cubit/merchant_queue_cubit.dart';
 import '../../features/merchant/presentation/utils/merchant_routes.dart';
 import '../../features/food/presentation/pages/food_cancel_page.dart';
 import '../../features/food/presentation/pages/food_cart_page.dart';
 import '../../features/food/presentation/pages/food_category_page.dart';
+import '../../features/food/presentation/widgets/store_meta.dart';
 import '../../features/food/presentation/pages/food_checkout_page.dart';
 import '../../features/food/presentation/pages/food_invoice_page.dart';
 import '../../features/food/presentation/pages/food_item_options_page.dart';
@@ -37,8 +52,9 @@ import '../../features/food/presentation/pages/food_search_page.dart';
 import '../../features/food/presentation/utils/food_routes.dart';
 import '../../features/food/presentation/pages/food_store_page.dart';
 import '../../features/food/presentation/pages/food_tracking_page.dart';
+import '../../features/places/presentation/place_picker_page.dart';
+import '../../features/ride/presentation/pages/ride_map_page.dart';
 import '../../features/ride/domain/entities/ride_models.dart';
-import '../../features/ride/domain/entities/ride_money.dart';
 import '../../features/ride/domain/entities/ride_vehicle.dart';
 import '../../features/ride/presentation/pages/ride_cancel_page.dart';
 import '../../features/ride/presentation/pages/ride_confirm_page.dart';
@@ -54,19 +70,25 @@ import '../../features/ride/presentation/utils/ride_routes.dart';
 import '../../features/ride/presentation/pages/ride_safety_page.dart';
 import '../../features/ride/presentation/pages/ride_tracking_page.dart';
 import '../../features/ride/presentation/pages/ride_vehicle_page.dart';
+import '../../features/promotion/presentation/pages/vouchers_page.dart';
 import '../../features/shell/presentation/payment_history_page.dart';
+import '../../core/auth/post_auth_gate.dart';
 import '../../features/identity/domain/entities/app_role.dart';
 import '../../features/identity/domain/auth_redirect.dart';
 import '../../features/identity/domain/entities/auth_state.dart';
+import '../../features/identity/domain/passkey_platform.dart';
+import '../../features/identity/domain/repositories/identity_repository.dart';
 import '../../features/identity/domain/usecases/create_phone_challenge.dart';
 import '../../features/identity/domain/usecases/verify_phone_challenge.dart';
 import '../../features/identity/presentation/cubit/auth_cubit.dart';
+import '../../features/identity/presentation/pages/email_login_page.dart';
+import '../../features/identity/presentation/pages/forgot_password_page.dart';
 import '../../features/identity/presentation/pages/otp_page.dart';
 import '../../features/identity/presentation/cubit/phone_auth_cubit.dart';
+import '../../features/identity/presentation/pages/phone_input_page.dart';
 import '../../features/identity/presentation/pages/phone_login_page.dart';
 import '../../features/identity/presentation/pages/splash_page.dart';
 import '../../features/onboarding/presentation/pages/customer_onboarding_page.dart';
-import '../../features/onboarding/presentation/pages/permissions_page.dart';
 import '../../features/onboarding/presentation/pages/profile_setup_page.dart';
 import '../../features/onboarding/presentation/pages/driver_kyc_pages.dart';
 import '../../features/onboarding/presentation/utils/driver_kyc_routes.dart';
@@ -74,8 +96,11 @@ import '../../features/onboarding/presentation/pages/merchant_kyb_pages.dart';
 import '../../features/onboarding/presentation/utils/merchant_kyb_routes.dart';
 import '../../features/shell/presentation/account_routes.dart';
 import '../../features/shell/presentation/help_center_page.dart';
+import '../../features/support/domain/support_ticket.dart';
+import '../../features/support/presentation/support_ticket_create_page.dart';
+import '../../features/support/presentation/support_ticket_detail_page.dart';
+import '../../features/support/presentation/support_tickets_page.dart';
 import '../../features/shell/presentation/notifications_inbox_page.dart';
-import '../../features/shell/presentation/place_search_page.dart';
 import '../../features/shell/presentation/role_picker_page.dart';
 import '../../features/shell/presentation/role_shell.dart';
 import '../../features/shell/presentation/saved_addresses_page.dart';
@@ -85,6 +110,7 @@ import '../../features/shell/presentation/shell_tab_page.dart';
 GoRouter createAppRouter({
   required AuthCubit auth,
   required Listenable refreshListenable,
+  PostAuthGate? postAuth,
   String initialLocation = AuthRoutes.splash,
 }) {
   final rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -92,7 +118,8 @@ GoRouter createAppRouter({
     navigatorKey: rootNavigatorKey,
     initialLocation: initialLocation,
     refreshListenable: refreshListenable,
-    redirect: (context, state) => authRedirect(auth.state, state.uri),
+    redirect: (context, state) =>
+        authRedirect(auth.state, state.uri, postAuth: postAuth),
     routes: [
       GoRoute(
         path: AuthRoutes.splash,
@@ -108,6 +135,8 @@ GoRouter createAppRouter({
               createPhoneChallenge: context.read<CreatePhoneChallenge>(),
               verifyPhoneChallenge: context.read<VerifyPhoneChallenge>(),
               auth: context.read<AuthCubit>(),
+              identityRepository: context.read<IdentityRepository>(),
+              passkeyPlatform: context.read<PasskeyPlatform>(),
             ),
             child: child,
           );
@@ -118,14 +147,37 @@ GoRouter createAppRouter({
             builder: (context, state) => const PhoneLoginPage(),
             routes: [
               GoRoute(
+                path: 'phone',
+                builder: (context, state) => const PhoneInputPage(),
+              ),
+              GoRoute(
+                path: 'email',
+                builder: (context, state) => const EmailLoginPage(),
+                routes: [
+                  GoRoute(
+                    path: 'forgot',
+                    builder: (context, state) => ForgotPasswordPage(
+                      initialEmail: state.uri.queryParameters['email'],
+                    ),
+                  ),
+                ],
+              ),
+              GoRoute(
                 path: 'otp',
                 builder: (context, state) {
                   final challengeId = state.uri.queryParameters['challengeId'];
                   final phone = state.uri.queryParameters['phone'];
-                  if (challengeId == null ||
-                      challengeId.isEmpty ||
-                      phone == null ||
-                      phone.isEmpty) {
+                  final email = state.uri.queryParameters['email'];
+                  if (challengeId == null || challengeId.isEmpty) {
+                    return const PhoneLoginPage();
+                  }
+                  if (email != null && email.isNotEmpty) {
+                    return OtpPage.email(
+                      challengeId: challengeId,
+                      email: email,
+                    );
+                  }
+                  if (phone == null || phone.isEmpty) {
                     return const PhoneLoginPage();
                   }
                   return OtpPage(challengeId: challengeId, phone: phone);
@@ -150,13 +202,6 @@ GoRouter createAppRouter({
         ),
       ),
       GoRoute(
-        path: AuthRoutes.permissions,
-        pageBuilder: (context, state) => dealgoFadeSlidePage(
-          key: state.pageKey,
-          child: const PermissionsPage(),
-        ),
-      ),
-      GoRoute(
         path: AuthRoutes.roles,
         pageBuilder: (context, state) {
           final authState = context.watch<AuthCubit>().state;
@@ -169,7 +214,9 @@ GoRouter createAppRouter({
           );
         },
       ),
-      _roleShell(customerShellTabs, fadeSlideEntry: true),
+      // Use builder (not pageBuilder+pageKey): auth/postAuth refreshListenable
+      // would otherwise push a second RoleShell during fade and stack two nav bars.
+      _roleShell(customerShellTabs),
       _merchantScopedShell(),
       _driverScopedShell(),
       for (final shellPath in const [
@@ -183,17 +230,21 @@ GoRouter createAppRouter({
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (context, state) => dealgoFadeSlidePage(
           key: state.pageKey,
-          child: const FoodSearchPage(),
+          child: FoodSearchPage(
+            initialQuery: state.uri.queryParameters['q'] ?? '',
+          ),
         ),
       ),
       GoRoute(
         path: FoodRoutes.category,
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (context, state) {
-          final name = state.uri.queryParameters['name'];
+          final group = FoodStoreGroup.fromWire(
+            state.uri.queryParameters['group'],
+          );
           return dealgoFadeSlidePage(
             key: state.pageKey,
-            child: FoodCategoryPage(category: name),
+            child: FoodCategoryPage(group: group),
           );
         },
       ),
@@ -258,19 +309,34 @@ GoRouter createAppRouter({
         },
       ),
       GoRoute(
+        path: PlaceRoutes.pick,
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) {
+          final extra = state.extra;
+          return dealgoFadeSlidePage(
+            key: state.pageKey,
+            child: PlacePickerPage(
+              purpose: switch (extra) {
+                PlacePickPurpose purpose => purpose,
+                PlacePickRequest request => request.purpose,
+                _ => PlacePickPurpose.dropoff,
+              },
+              initialQuery: extra is PlacePickRequest ? extra.initialQuery : '',
+            ),
+          );
+        },
+      ),
+      GoRoute(
         path: RideRoutes.routeOverview,
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (context, state) {
           final extra = state.extra;
-          final places = extra is RidePlaces
-              ? extra
-              : const RidePlaces(
-                  pickupLabel: rideSamplePickupLabel,
-                  dropoffLabel: rideSampleDropoffLabel,
-                );
           return dealgoFadeSlidePage(
             key: state.pageKey,
-            child: RideRouteOverviewPage(places: places),
+            // Deep links without chosen places go back to choosing them.
+            child: extra is RidePlaces
+                ? RideRouteOverviewPage(places: extra)
+                : const RideMapPage(),
           );
         },
       ),
@@ -279,15 +345,12 @@ GoRouter createAppRouter({
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (context, state) {
           final extra = state.extra;
-          final places = extra is RidePlaces
-              ? extra
-              : const RidePlaces(
-                  pickupLabel: rideSamplePickupLabel,
-                  dropoffLabel: rideSampleDropoffLabel,
-                );
           return dealgoFadeSlidePage(
             key: state.pageKey,
-            child: RideVehiclePage(places: places),
+            // Deep links without chosen places go back to choosing them.
+            child: extra is RidePlaces
+                ? RideVehiclePage(places: extra)
+                : const RideMapPage(),
           );
         },
       ),
@@ -298,17 +361,14 @@ GoRouter createAppRouter({
           final extra = state.extra;
           final draft = extra is RideBookingDraft
               ? extra
-              : RideBookingDraft(
-                  places: extra is RidePlaces
-                      ? extra
-                      : const RidePlaces(
-                          pickupLabel: rideSamplePickupLabel,
-                          dropoffLabel: rideSampleDropoffLabel,
-                        ),
-                );
+              : extra is RidePlaces
+              ? RideBookingDraft(places: extra)
+              : null;
           return dealgoFadeSlidePage(
             key: state.pageKey,
-            child: RideFareBreakdownPage(draft: draft),
+            child: draft == null
+                ? const RideMapPage()
+                : RideFareBreakdownPage(draft: draft),
           );
         },
       ),
@@ -322,16 +382,11 @@ GoRouter createAppRouter({
             child = RideFarePage(
               places: extra.places,
               initialFareVnd: extra.suggestedFareVnd,
-              vehicleLabel: extra.vehicleLabel,
             );
+          } else if (extra is RidePlaces) {
+            child = RideFarePage(places: extra);
           } else {
-            final places = extra is RidePlaces
-                ? extra
-                : const RidePlaces(
-                    pickupLabel: rideSamplePickupLabel,
-                    dropoffLabel: rideSampleDropoffLabel,
-                  );
-            child = RideFarePage(places: places);
+            child = const RideMapPage();
           }
           return dealgoFadeSlidePage(key: state.pageKey, child: child);
         },
@@ -487,20 +542,26 @@ GoRouter createAppRouter({
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const DriverKycGatePage(),
         routes: [
+          // Push children on the root navigator so Gate is not left under them.
+          // Otherwise Back lands on the gate spinner and redirects again.
           GoRoute(
             path: 'intro',
+            parentNavigatorKey: rootNavigatorKey,
             builder: (context, state) => const DriverKycIntroPage(),
           ),
           GoRoute(
             path: 'steps',
+            parentNavigatorKey: rootNavigatorKey,
             builder: (context, state) => const DriverKycStepsPage(),
           ),
           GoRoute(
             path: 'status',
+            parentNavigatorKey: rootNavigatorKey,
             builder: (context, state) => const DriverKycStatusPage(),
           ),
           GoRoute(
             path: 'rejected',
+            parentNavigatorKey: rootNavigatorKey,
             builder: (context, state) => const DriverKycRejectedPage(),
           ),
         ],
@@ -512,18 +573,22 @@ GoRouter createAppRouter({
         routes: [
           GoRoute(
             path: 'intro',
+            parentNavigatorKey: rootNavigatorKey,
             builder: (context, state) => const MerchantKybIntroPage(),
           ),
           GoRoute(
             path: 'steps',
+            parentNavigatorKey: rootNavigatorKey,
             builder: (context, state) => const MerchantKybStepsPage(),
           ),
           GoRoute(
             path: 'status',
+            parentNavigatorKey: rootNavigatorKey,
             builder: (context, state) => const MerchantKybStatusPage(),
           ),
           GoRoute(
             path: 'rejected',
+            parentNavigatorKey: rootNavigatorKey,
             builder: (context, state) => const MerchantKybRejectedPage(),
           ),
         ],
@@ -667,7 +732,13 @@ ShellRoute _driverScopedShell() {
         path: '/driver/jobs/completed/:jobId',
         builder: (context, state) {
           final jobId = state.pathParameters['jobId'] ?? '';
-          return DriverJobCompletedPage(jobId: jobId);
+          final extra = state.extra;
+          return DriverJobCompletedPage(
+            jobId: jobId,
+            item: extra is DriverHistoryItem && extra.id == jobId
+                ? extra
+                : null,
+          );
         },
       ),
     ],
@@ -680,6 +751,7 @@ ShellRoute _merchantScopedShell() {
       return BlocProvider(
         create: (context) => MerchantQueueCubit(
           listMerchantOrderQueue: context.read<ListMerchantOrderQueue>(),
+          realtime: context.read<SnapshotRealtime>(),
         ),
         child: child,
       );
@@ -709,6 +781,39 @@ ShellRoute _merchantScopedShell() {
         builder: (context, state) => const MerchantBusyPage(),
       ),
       GoRoute(
+        path: MerchantRoutes.location,
+        builder: (context, state) => const MerchantLocationPage(),
+      ),
+      GoRoute(
+        path: MerchantRoutes.profile,
+        builder: (context, state) => const MerchantProfilePage(),
+      ),
+      GoRoute(
+        path: MerchantRoutes.locationPick,
+        builder: (context, state) =>
+            const PlacePickerPage(purpose: PlacePickPurpose.storeLocation),
+      ),
+
+      GoRoute(
+        path: MerchantRoutes.categories,
+        builder: (context, state) => const MerchantCategoriesPage(),
+      ),
+      GoRoute(
+        path: MerchantRoutes.history,
+        builder: (context, state) => const MerchantHistoryPageView(),
+      ),
+      GoRoute(
+        path: '/merchant/products/:itemId/edit',
+        builder: (context, state) {
+          final itemId = state.pathParameters['itemId'] ?? '';
+          final extra = state.extra;
+          return MerchantItemEditPage(
+            itemId: itemId,
+            initial: extra is FoodMenuItem ? extra : null,
+          );
+        },
+      ),
+      GoRoute(
         path: '/merchant/products/:itemId/variants',
         builder: (context, state) {
           final itemId = state.pathParameters['itemId'] ?? '';
@@ -720,46 +825,29 @@ ShellRoute _merchantScopedShell() {
   );
 }
 
-StatefulShellRoute _roleShell(
-  List<ShellTab> tabs, {
-  bool fadeSlideEntry = false,
-}) {
-  final branches = [
-    for (final tab in tabs)
-      StatefulShellBranch(
-        routes: [
-          GoRoute(
-            path: tab.path,
-            builder: (context, state) => ShellTabPage(tab: tab),
-            routes: [
-              if (tab.kind == ShellTabKind.account)
-                GoRoute(
-                  path: 'notifications',
-                  builder: (context, state) => const NotificationsInboxPage(),
-                ),
-            ],
-          ),
-        ],
-      ),
-  ];
-
-  if (fadeSlideEntry) {
-    return StatefulShellRoute.indexedStack(
-      pageBuilder: (context, state, navigationShell) {
-        return dealgoFadeSlidePage(
-          key: state.pageKey,
-          child: RoleShell(navigationShell: navigationShell, tabs: tabs),
-        );
-      },
-      branches: branches,
-    );
-  }
-
+StatefulShellRoute _roleShell(List<ShellTab> tabs) {
   return StatefulShellRoute.indexedStack(
     builder: (context, state, navigationShell) {
       return RoleShell(navigationShell: navigationShell, tabs: tabs);
     },
-    branches: branches,
+    branches: [
+      for (final tab in tabs)
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: tab.path,
+              builder: (context, state) => ShellTabPage(tab: tab),
+              routes: [
+                if (tab.kind == ShellTabKind.account)
+                  GoRoute(
+                    path: 'notifications',
+                    builder: (context, state) => const NotificationsInboxPage(),
+                  ),
+              ],
+            ),
+          ],
+        ),
+    ],
   );
 }
 
@@ -774,19 +862,70 @@ List<GoRoute> _accountOverlayRoutes(
       builder: (context, state) => SavedAddressesPage(shellPath: shellPath),
     ),
     GoRoute(
-      path: AccountRoutes.places(shellPath),
+      path: AccountRoutes.vouchers(shellPath),
       parentNavigatorKey: rootNavigatorKey,
-      builder: (context, state) => PlaceSearchPage(shellPath: shellPath),
+      builder: (context, state) => const VouchersPage(),
     ),
     GoRoute(
       path: AccountRoutes.help(shellPath),
       parentNavigatorKey: rootNavigatorKey,
-      builder: (context, state) => const HelpCenterPage(),
+      builder: (context, state) => HelpCenterPage(shellPath: shellPath),
+    ),
+    GoRoute(
+      path: AccountRoutes.supportTickets(shellPath),
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) => SupportTicketsPage(shellPath: shellPath),
+    ),
+    GoRoute(
+      path: AccountRoutes.supportTicketNew(shellPath),
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) => SupportTicketCreatePage(
+        shellPath: shellPath,
+        initialCategory: state.extra is SupportCategory
+            ? state.extra! as SupportCategory
+            : null,
+      ),
+    ),
+    GoRoute(
+      path: '${AccountRoutes.supportTickets(shellPath)}/:ticketId',
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) =>
+          SupportTicketDetailPage(ticketId: state.pathParameters['ticketId']!),
     ),
     GoRoute(
       path: AccountRoutes.payments(shellPath),
       parentNavigatorKey: rootNavigatorKey,
       builder: (context, state) => const PaymentHistoryPage(),
+    ),
+    GoRoute(
+      path: AccountRoutes.deleteAccount(shellPath),
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) => const DeleteAccountPage(),
+    ),
+    GoRoute(
+      path: AccountRoutes.editProfile(shellPath),
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) => const EditProfilePage(),
+    ),
+    GoRoute(
+      path: AccountRoutes.notificationPrefs(shellPath),
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) => const NotificationPrefsPage(),
+    ),
+    GoRoute(
+      path: AccountRoutes.security(shellPath),
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) => SecurityPage(shellPath: shellPath),
+    ),
+    GoRoute(
+      path: AccountRoutes.sessions(shellPath),
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) => const SessionsPage(),
+    ),
+    GoRoute(
+      path: AccountRoutes.changePassword(shellPath),
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) => const ChangePasswordPage(),
     ),
   ];
 }

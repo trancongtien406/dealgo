@@ -1,16 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/components/dealgo_banner.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
+import '../../../../core/design_system/components/dealgo_haptics.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/network/api_exception.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../domain/usecases/cancel_food_order.dart';
 import '../utils/food_routes.dart';
 import '../widgets/food_widgets.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
-/// C035 — cancel food order reason picker (local/mock; soft-fail Nest).
+/// C035 — cancel food order (`POST /v1/food/orders/:id/cancel`, PLACED only).
+/// The reason stays on device; the API takes no body.
 class FoodCancelPage extends StatefulWidget {
   const FoodCancelPage({required this.orderId, super.key});
 
@@ -23,6 +29,8 @@ class FoodCancelPage extends StatefulWidget {
 class _FoodCancelPageState extends State<FoodCancelPage> {
   String? _reasonId;
   var _submitted = false;
+  var _busy = false;
+  String? _error;
 
   List<_FoodCancelReason> _reasons(AppLocalizations l10n) {
     return [
@@ -41,11 +49,49 @@ class _FoodCancelPageState extends State<FoodCancelPage> {
     context.go(FoodRoutes.order(widget.orderId));
   }
 
-  void _confirm() {
-    if (_reasonId == null) {
+  Future<void> _confirm() async {
+    if (_reasonId == null || _busy) {
       return;
     }
-    setState(() => _submitted = true);
+    final l10n = AppLocalizations.of(context);
+    final token = currentAccessToken(context);
+    if (token == null || token.isEmpty) {
+      setState(() => _error = l10n.errorSessionExpired);
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    String? failure;
+    try {
+      await context.read<CancelFoodOrder>()(
+        accessToken: token,
+        orderId: widget.orderId,
+      );
+    } on ApiException catch (error) {
+      failure = switch (error.statusCode) {
+        409 => l10n.foodCancelNotAllowed,
+        401 => l10n.errorSessionExpired,
+        _ when error.statusCode <= 0 => l10n.errorNetwork,
+        _ => l10n.foodCancelFailed,
+      };
+    } catch (_) {
+      failure = l10n.foodCancelFailed;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _busy = false;
+      _error = failure;
+      _submitted = failure == null;
+    });
+    if (failure == null) {
+      DealGoHaptics.success();
+    } else {
+      DealGoHaptics.error();
+    }
   }
 
   @override
@@ -59,7 +105,7 @@ class _FoodCancelPageState extends State<FoodCancelPage> {
       body: SafeArea(
         child: Column(
           children: [
-            FoodScreenHeader(title: l10n.foodCancelTitle, onBack: _back),
+            DealGoAppHeader(title: l10n.foodCancelTitle, onBack: _back),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(
@@ -91,7 +137,7 @@ class _FoodCancelPageState extends State<FoodCancelPage> {
                       clipBehavior: Clip.antiAlias,
                       child: InkWell(
                         key: Key('food-cancel-reason-${reason.id}'),
-                        onTap: _submitted
+                        onTap: _submitted || _busy
                             ? null
                             : () => setState(() => _reasonId = reason.id),
                         child: Padding(
@@ -112,11 +158,18 @@ class _FoodCancelPageState extends State<FoodCancelPage> {
                     ),
                     const SizedBox(height: DealGoSpacing.s8),
                   ],
+                  if (_error != null) ...[
+                    const SizedBox(height: DealGoSpacing.s12),
+                    DealGoBanner(
+                      tone: DealGoBannerTone.warning,
+                      message: _error!,
+                    ),
+                  ],
                   if (_submitted) ...[
                     const SizedBox(height: DealGoSpacing.s12),
                     DealGoBanner(
                       tone: DealGoBannerTone.info,
-                      message: l10n.foodCancelSoftFail,
+                      message: l10n.foodCancelDone,
                     ),
                   ],
                 ],
@@ -136,7 +189,8 @@ class _FoodCancelPageState extends State<FoodCancelPage> {
                     DealGoPrimaryButton(
                       key: const Key('food-cancel-confirm'),
                       label: l10n.foodCancelConfirm,
-                      enabled: _reasonId != null,
+                      enabled: _reasonId != null && !_busy,
+                      isLoading: _busy,
                       onPressed: _confirm,
                     )
                   else
@@ -148,7 +202,7 @@ class _FoodCancelPageState extends State<FoodCancelPage> {
                   const SizedBox(height: DealGoSpacing.s8),
                   DealGoSecondaryButton(
                     label: l10n.foodCancelKeep,
-                    enabled: !_submitted,
+                    enabled: !_submitted && !_busy,
                     onPressed: _back,
                   ),
                 ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../tokens/dealgo_tokens.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// Supported layout orientations for the [DealGoLogo].
 enum DealGoLogoVariant {
@@ -27,19 +28,15 @@ class DealGoLogo extends StatelessWidget {
     this.showSlogan = false,
   });
 
-  const DealGoLogo.wordmark({
-    super.key,
-    this.size = 24.0,
-  })  : variant = DealGoLogoVariant.wordmarkOnly,
-        subtitle = null,
-        showSlogan = false;
+  const DealGoLogo.wordmark({super.key, this.size = 24.0})
+    : variant = DealGoLogoVariant.wordmarkOnly,
+      subtitle = null,
+      showSlogan = false;
 
-  const DealGoLogo.icon({
-    super.key,
-    this.size = 40.0,
-  })  : variant = DealGoLogoVariant.iconOnly,
-        subtitle = null,
-        showSlogan = false;
+  const DealGoLogo.icon({super.key, this.size = 40.0})
+    : variant = DealGoLogoVariant.iconOnly,
+      subtitle = null,
+      showSlogan = false;
 
   const DealGoLogo.stacked({
     super.key,
@@ -102,7 +99,7 @@ class DealGoLogo extends StatelessWidget {
             if (showSlogan || subtitle != null) ...[
               const SizedBox(height: 4),
               Text(
-                subtitle ?? 'Đi muôn nơi · Ăn vạn món',
+                subtitle ?? AppLocalizations.of(context).splashTagline,
                 style: TextStyle(
                   fontSize: size * 0.22,
                   fontWeight: FontWeight.w600,
@@ -146,15 +143,7 @@ class DealGoLogo extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         borderRadius: borderRadius,
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF1E1B4B),
-            Color(0xFF2E1065),
-            Color(0xFF090A0F),
-          ],
-        ),
+        color: DealGoColors.primaryDeep,
         boxShadow: [
           BoxShadow(
             color: DealGoColors.primary.withValues(alpha: 0.25),

@@ -14,7 +14,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DriverLocationQueryDto } from '../dispatch/driver-location-query.dto.js';
 import { CurrentActor, CustomerSessionGuard, type RequestActor } from '../identity/access-auth.guard.js';
-import { CreateOfferDto, CreateRideDto, RidePageQueryDto, SelectOfferDto } from './ride.dto.js';
+import { CreateOfferDto, CreateRideDto, QuoteRideDto, RidePageQueryDto, SelectOfferDto, StartTripDto } from './ride.dto.js';
 import { rideError } from './ride.error.js';
 import { RideService } from './ride.service.js';
 
@@ -36,6 +36,13 @@ export class RideController {
     return this.rides.create(actor, readIdempotencyKey(idempotencyKey), dto);
   }
 
+  @Post('quote')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Route distance, server reference fare and admin fare bounds before booking' })
+  quote(@CurrentActor() actor: RequestActor, @Body() dto: QuoteRideDto) {
+    return this.rides.quote(actor, dto);
+  }
+
   @Get()
   @ApiOperation({ summary: 'Customer paginated ride history (actor-scoped)' })
   listMine(@CurrentActor() actor: RequestActor, @Query() query: RidePageQueryDto) {
@@ -55,6 +62,15 @@ export class RideController {
   @ApiOperation({ summary: 'Get a ride by id' })
   get(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
     return this.rides.get(actor, id);
+  }
+
+  @Get(':id/driver-location')
+  @ApiOperation({
+    summary:
+      'Customer: assigned driver position while the ride is active (DEC-PROD-031). location=null when unknown or older than 2 minutes.',
+  })
+  driverLocation(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.rides.driverLocation(actor, id);
   }
 
   @Get(':id/ledger')
@@ -102,9 +118,15 @@ export class RideController {
 
   @Post(':id/start')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Assigned driver starts trip (DRIVER_ARRIVED → IN_TRIP)' })
-  startTrip(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
-    return this.rides.startTrip(actor, id);
+  @ApiOperation({
+    summary: 'Assigned driver starts trip with the customer pickup code (DRIVER_ARRIVED → IN_TRIP)',
+  })
+  startTrip(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: StartTripDto,
+  ) {
+    return this.rides.startTrip(actor, id, dto.pickupCode);
   }
 
   @Post(':id/complete')

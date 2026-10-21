@@ -94,7 +94,7 @@ Tài liệu trả lời các câu hỏi ở **cấp release**, không đi vào p
 | `SCOPE-002` | **Food:** khách đặt món, Merchant thực hiện, Driver giao. | Customer + Merchant + Driver mobile | `CONFIRMED` |
 | `SCOPE-003` | **Một app Flutter** hỗ trợ ba vai trò; không tách thành ba app mặc định. | Mobile | `CONFIRMED` |
 | `SCOPE-004` | Tham chiếu Grab/GrabFood/ShopeeFood cho dịch vụ và inDrive cho thương lượng giá Ride. | Nghiên cứu | `CONFIRMED` |
-| `SCOPE-005` | Passkey, verified phone SMS và email; Admin method management có quyền. | Account/security | `CONFIRMED` (`DEC-PROD-006`) |
+| `SCOPE-005` | Phone SMS, email+password đăng ký/đăng nhập, passkey; Admin method management. | Account/security | `CONFIRMED` (`DEC-PROD-006` SUPERSEDED → email/password allowed) |
 | `SCOPE-006` | In-app transaction-scoped chat và voice call cho Ride/Food. | Communication | `CONFIRMED` (`DEC-PROD-007`) |
 
 **Admin Web:** `BASELINE` theo hồ sơ DealGo và Charter — năng lực admin tối thiểu được đề xuất P0 để vận hành an toàn; không mặc nhiên biến toàn bộ **37 trang** đã liệt kê trước đó thành P0. Tương tự, danh sách khoảng **165 màn mobile** trước đó là **inventory tham chiếu chưa phân pha**, không phải yêu cầu phải hoàn thành toàn bộ để được gọi là MVP. Con số màn hình cuối cùng phải xác thực ở `04-experience/screen-inventory.md`.
@@ -112,7 +112,7 @@ Tài liệu trả lời các câu hỏi ở **cấp release**, không đi vào p
 
 | Capability | P0 cần nghiệm thu ở mức nào? | Các phụ thuộc / điều kiện chặn |
 |---|---|---|
-| `CAP-CORE-01` Account & session | Passkey, xác minh phone SMS + email, login/link/recovery, session/logout; admin method controls. | `DEC-PROD-006`; recovery/provider detail `OPEN-008/020`. |
+| `CAP-CORE-01` Account & session | Phone SMS, email+password register/login, passkey, session/logout; admin method controls. | `DEC-PROD-006` SUPERSEDED; recovery/provider detail `OPEN-008/020`. |
 | `CAP-CORE-02` Multi-role & permission | Role eligibility, active role, navigation riêng, API object-level authorization, khóa role chưa duyệt. | `OPEN-005`; policy ở `02-domain/roles-and-permissions.md`. |
 | `CAP-CORE-03` Partner onboarding | Hồ sơ Driver/Merchant; xét duyệt, từ chối, yêu cầu bổ sung, gia hạn/thu hồi quyền theo điều kiện hợp lệ. | `OPEN-006`, `OPEN-008`, mô hình KYC/KYB. |
 | `CAP-CORE-04` Location foundation | Chọn/tìm địa chỉ, kiểm tra tọa độ/địa bàn, route/ETA ước tính và xử lý lỗi geocoding. | Maps vendor/quota `OPEN-008`, vùng `OPEN-001`. |

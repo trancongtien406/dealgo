@@ -12,6 +12,7 @@ import '../core/auth/token_store.dart';
 import '../core/config/app_env.dart';
 import '../core/di/injection.dart';
 import '../core/location/location_service.dart';
+import '../core/navigation/external_navigator.dart';
 import '../core/maps/create_map_port.dart';
 import '../core/maps/map_port.dart';
 import '../core/network/connectivity_service.dart';
@@ -46,15 +47,51 @@ import '../features/driver/data/datasources/driver_jobs_remote_datasource.dart';
 import '../features/driver/data/repositories/driver_jobs_repository_impl.dart';
 import '../features/driver/domain/repositories/driver_jobs_repository.dart';
 import '../features/driver/domain/usecases/claim_food_order.dart';
+import '../features/driver/domain/usecases/advance_driver_ride.dart';
+import '../features/driver/domain/usecases/advance_food_delivery.dart';
 import '../features/driver/domain/usecases/list_open_driver_rides.dart';
 import '../features/driver/domain/usecases/list_ready_driver_orders.dart';
 import '../features/driver/domain/usecases/submit_driver_ride_offer.dart';
 import '../features/driver/presentation/cubit/driver_duty_cubit.dart';
+import '../features/driver/presentation/cubit/driver_services_cubit.dart';
 import '../features/food/data/datasources/dio_food_remote_datasource.dart';
 import '../features/food/data/datasources/food_remote_datasource.dart';
 import '../features/food/data/repositories/food_repository_impl.dart';
 import '../features/food/domain/repositories/food_repository.dart';
+import '../features/food/domain/usecases/cancel_food_order.dart';
 import '../features/food/domain/usecases/get_food_order.dart';
+import '../features/promotion/data/datasources/promotion_remote_datasource.dart';
+import '../features/promotion/data/repositories/promotion_repository_impl.dart';
+import '../features/promotion/domain/usecases/list_available_vouchers.dart';
+import '../features/promotion/domain/usecases/validate_voucher.dart';
+import '../features/support/data/help_faq_remote_datasource.dart';
+import '../features/support/domain/help_faq.dart';
+import '../features/ride/data/ride_share_remote_datasource.dart';
+import '../features/ride/domain/ride_share.dart';
+import '../features/address_book/data/datasources/address_book_remote_datasource.dart';
+import '../features/address_book/domain/repositories/address_book_repository.dart';
+import '../features/driver_history/data/driver_history_remote_datasource.dart';
+import '../features/account_deletion/data/account_deletion_remote_datasource.dart';
+import '../features/account_deletion/domain/account_deletion.dart';
+import '../features/account_settings/data/account_settings_remote_datasource.dart';
+import '../features/account_settings/domain/account_settings.dart';
+import '../features/support/data/support_remote_datasource.dart';
+import '../features/support/domain/support_ticket.dart';
+import '../features/driver_card/domain/driver_card.dart';
+import '../features/pricing/domain/pricing.dart';
+import '../features/places/data/places_remote_datasource.dart';
+import '../features/live_location/data/driver_location_remote_datasource.dart';
+import '../features/live_location/domain/driver_location.dart';
+import '../features/live_location/presentation/driver_location_reporter.dart';
+import '../features/pricing/data/pricing_remote_datasource.dart';
+import '../features/driver_card/data/driver_card_remote_datasource.dart';
+import '../features/places/domain/place.dart';
+import '../features/driver_history/domain/driver_history.dart';
+import '../features/rating/data/rating_remote_datasource.dart';
+import '../features/rating/domain/service_rating.dart';
+import '../features/inbox/data/datasources/inbox_remote_datasource.dart';
+import '../features/inbox/data/repositories/inbox_repository_impl.dart';
+import '../features/inbox/domain/usecases/inbox_usecases.dart';
 import '../features/food/domain/usecases/get_food_store.dart';
 import '../features/food/domain/usecases/list_food_stores.dart';
 import '../features/food/domain/usecases/list_ready_food_orders.dart';
@@ -65,8 +102,11 @@ import '../features/identity/data/datasources/identity_remote_datasource.dart';
 import '../features/identity/data/repositories/identity_repository_impl.dart';
 import '../features/identity/domain/entities/auth_state.dart';
 import '../features/identity/domain/repositories/identity_repository.dart';
+import '../features/identity/data/device_passkey_platform.dart';
+import '../features/identity/domain/passkey_platform.dart';
 import '../features/identity/domain/usecases/create_phone_challenge.dart';
 import '../features/identity/domain/usecases/fetch_me.dart';
+import '../features/identity/domain/usecases/get_auth_methods.dart';
 import '../features/identity/domain/usecases/refresh_session.dart';
 import '../features/identity/domain/usecases/verify_phone_challenge.dart';
 import '../features/identity/presentation/cubit/auth_cubit.dart';
@@ -75,21 +115,32 @@ import '../features/merchant/data/datasources/merchant_orders_remote_datasource.
 import '../features/merchant/data/repositories/merchant_orders_repository_impl.dart';
 import '../features/merchant/domain/repositories/merchant_orders_repository.dart';
 import '../features/merchant/domain/usecases/accept_merchant_order.dart';
+import '../features/merchant/domain/usecases/reject_merchant_order.dart';
 import '../features/merchant/domain/usecases/create_merchant_catalog_item.dart';
+import '../features/merchant/domain/usecases/update_store_accept_settings.dart';
+import '../features/merchant/domain/usecases/update_store_hours.dart';
+import '../features/merchant/domain/usecases/update_store_location.dart';
+import '../features/merchant/domain/usecases/update_store_service_mode.dart';
 import '../features/merchant/domain/usecases/get_merchant_catalog.dart';
 import '../features/merchant/domain/usecases/get_merchant_order.dart';
 import '../features/merchant/domain/usecases/list_merchant_order_queue.dart';
 import '../features/merchant/domain/usecases/mark_merchant_order_ready.dart';
+import '../features/merchant/domain/usecases/replace_merchant_item_options.dart';
 import '../features/merchant/domain/usecases/set_merchant_item_availability.dart';
 import '../features/onboarding/data/datasources/dio_partner_applications_remote_datasource.dart';
 import '../features/onboarding/data/datasources/fake_partner_applications_client.dart';
 import '../features/onboarding/data/datasources/partner_applications_remote_datasource.dart';
 import '../features/onboarding/data/repositories/partner_applications_repository_impl.dart';
 import '../features/onboarding/domain/repositories/partner_applications_repository.dart';
+import '../features/onboarding/domain/usecases/get_my_partner_application.dart';
 import '../features/onboarding/domain/usecases/list_my_partner_applications.dart';
 import '../features/onboarding/domain/usecases/submit_partner_application.dart';
 import '../features/onboarding/presentation/cubit/driver_kyc_cubit.dart';
 import '../features/onboarding/presentation/cubit/merchant_kyb_cubit.dart';
+import '../features/onboarding/presentation/document_image_source.dart';
+import '../features/merchant/data/datasources/dio_merchant_stats_remote_datasource.dart';
+import '../features/merchant/data/datasources/fake_merchant_stats_remote_datasource.dart';
+import '../features/merchant/domain/merchant_stats.dart';
 import '../features/presence/data/datasources/dio_presence_remote_datasource.dart';
 import '../features/presence/data/datasources/fake_presence_client.dart';
 import '../features/presence/data/datasources/presence_remote_datasource.dart';
@@ -106,8 +157,8 @@ import '../features/ride/domain/usecases/get_ride.dart';
 import '../features/ride/domain/usecases/list_open_rides.dart';
 import '../features/ride/domain/usecases/select_ride_offer.dart';
 import '../features/ride/domain/usecases/submit_ride_offer.dart';
+import '../features/ride/presentation/cubit/ride_destination.dart';
 import '../features/ride/presentation/cubit/ride_session.dart';
-import '../features/shell/presentation/address_draft_cubit.dart';
 import '../features/voice/data/datasources/dio_voice_remote_datasource.dart';
 import '../features/voice/data/datasources/fake_voice_client.dart';
 import '../features/voice/data/datasources/voice_remote_datasource.dart';
@@ -164,6 +215,7 @@ class DealGoDependencies {
   HistoryRepository get historyRepository => _locator<HistoryRepository>();
   PushPort get push => _locator<PushPort>();
   MapPort get mapPort => _locator<MapPort>();
+  ExternalNavigator get externalNavigator => _locator<ExternalNavigator>();
   SnapshotRealtime get realtime => _locator<SnapshotRealtime>();
   AnalyticsPort get analytics => _locator<AnalyticsPort>();
   NotificationRouter get notificationRouter => _locator<NotificationRouter>();
@@ -175,11 +227,13 @@ class DealGoDependencies {
       _locator<CreatePhoneChallenge>();
   VerifyPhoneChallenge get verifyPhoneChallenge =>
       _locator<VerifyPhoneChallenge>();
+  GetAuthMethods get getAuthMethods => _locator<GetAuthMethods>();
 
   /// Composition root: builds an isolated GetIt graph and mirrors it to [getIt].
   static DealGoDependencies create({
     IdentityClient? identityClient,
     TokenStore? tokenStore,
+    PasskeyPlatform? passkeyPlatform,
     FoodClient? foodClient,
     RideClient? rideClient,
     DriverJobsClient? driverJobsClient,
@@ -191,15 +245,33 @@ class DealGoDependencies {
     HistoryClient? historyClient,
     PushPort? push,
     MapPort? mapPort,
+    ExternalNavigator? externalNavigator,
     SnapshotRealtime? realtime,
     AnalyticsPort? analytics,
     NotificationRouter? notificationRouter,
+    InboxRemoteDataSource? inboxRemote,
+    AddressBookRepository? addressBook,
+    RatingRepository? ratings,
+    DriverHistoryRepository? driverHistory,
+    SupportRepository? support,
+    AccountDeletionRepository? accountDeletion,
+    AccountSettingsRepository? accountSettings,
+    HelpFaqRepository? helpFaqs,
+    RideShareRepository? rideShare,
+    DriverCardRepository? driverCard,
+    LocationService? locationOverride,
+    PricingRepository? pricing,
+    PlacesRepository? places,
+    DocumentImageSource? documentImageSource,
+    MerchantStatsRepository? merchantStats,
+    DriverLocationRepository? driverLocation,
   }) {
     final locator = GetIt.asNewInstance();
     _registerGraph(
       locator,
       identityClient: identityClient,
       tokenStore: tokenStore,
+      passkeyPlatform: passkeyPlatform,
       foodClient: foodClient,
       rideClient: rideClient,
       driverJobsClient: driverJobsClient,
@@ -211,9 +283,26 @@ class DealGoDependencies {
       historyClient: historyClient,
       push: push,
       mapPort: mapPort,
+      externalNavigator: externalNavigator,
       realtime: realtime,
       analytics: analytics,
       notificationRouter: notificationRouter,
+      inboxRemote: inboxRemote,
+      addressBook: addressBook,
+      ratings: ratings,
+      driverHistory: driverHistory,
+      support: support,
+      accountDeletion: accountDeletion,
+      accountSettings: accountSettings,
+      helpFaqs: helpFaqs,
+      rideShare: rideShare,
+      driverCard: driverCard,
+      locationOverride: locationOverride,
+      pricing: pricing,
+      places: places,
+      documentImageSource: documentImageSource,
+      merchantStats: merchantStats,
+      driverLocation: driverLocation,
     );
 
     // Process-wide locator for `getIt<T>()` outside the widget tree.
@@ -223,6 +312,7 @@ class DealGoDependencies {
       getIt,
       identityClient: identityClient,
       tokenStore: tokenStore,
+      passkeyPlatform: passkeyPlatform,
       foodClient: foodClient,
       rideClient: rideClient,
       driverJobsClient: driverJobsClient,
@@ -234,9 +324,26 @@ class DealGoDependencies {
       historyClient: historyClient,
       push: push,
       mapPort: mapPort,
+      externalNavigator: externalNavigator,
       realtime: realtime,
       analytics: analytics,
       notificationRouter: notificationRouter,
+      inboxRemote: inboxRemote,
+      addressBook: addressBook,
+      ratings: ratings,
+      driverHistory: driverHistory,
+      support: support,
+      accountDeletion: accountDeletion,
+      accountSettings: accountSettings,
+      helpFaqs: helpFaqs,
+      rideShare: rideShare,
+      driverCard: driverCard,
+      locationOverride: locationOverride,
+      pricing: pricing,
+      places: places,
+      documentImageSource: documentImageSource,
+      merchantStats: merchantStats,
+      driverLocation: driverLocation,
       skipLeafServices: true,
     );
 
@@ -276,6 +383,7 @@ class DealGoDependencies {
     bool skipLeafServices = false,
     IdentityClient? identityClient,
     TokenStore? tokenStore,
+    PasskeyPlatform? passkeyPlatform,
     FoodClient? foodClient,
     RideClient? rideClient,
     DriverJobsClient? driverJobsClient,
@@ -287,10 +395,33 @@ class DealGoDependencies {
     HistoryClient? historyClient,
     PushPort? push,
     MapPort? mapPort,
+    ExternalNavigator? externalNavigator,
     SnapshotRealtime? realtime,
     AnalyticsPort? analytics,
     NotificationRouter? notificationRouter,
+    InboxRemoteDataSource? inboxRemote,
+    AddressBookRepository? addressBook,
+    RatingRepository? ratings,
+    DriverHistoryRepository? driverHistory,
+    SupportRepository? support,
+    AccountDeletionRepository? accountDeletion,
+    AccountSettingsRepository? accountSettings,
+    HelpFaqRepository? helpFaqs,
+    RideShareRepository? rideShare,
+    DriverCardRepository? driverCard,
+    LocationService? locationOverride,
+    PricingRepository? pricing,
+    PlacesRepository? places,
+    DocumentImageSource? documentImageSource,
+    MerchantStatsRepository? merchantStats,
+    DriverLocationRepository? driverLocation,
   }) {
+    if (locationOverride != null) {
+      if (locator.isRegistered<LocationService>()) {
+        locator.unregister<LocationService>();
+      }
+      locator.registerSingleton<LocationService>(locationOverride);
+    }
     final tokens = tokenStore ?? SecureTokenStore();
     late final AuthCubit auth;
     final dio = createDealGoDio(
@@ -309,7 +440,16 @@ class DealGoDependencies {
     final foodRepository = FoodRepositoryImpl(food);
     final rideRepository = RideRepositoryImpl(rides);
     final fetchMe = FetchMe(identityRepository);
-    auth = AuthCubit(fetchMe: fetchMe, tokens: tokens);
+    final passkeys =
+        passkeyPlatform ??
+        (useOverrides || useMockData
+            ? FakePasskeyPlatform()
+            : DevicePasskeyPlatform());
+    auth = AuthCubit(
+      fetchMe: fetchMe,
+      tokens: tokens,
+      identityRepository: identityRepository,
+    );
 
     late final PartnerApplicationsClient partners;
     late final ChatClient chat;
@@ -328,7 +468,7 @@ class DealGoDependencies {
       history = historyClient ?? FakeHistoryClient();
       pushPort = push ?? FakePush();
       snapshot = realtime ?? FakeSnapshotRealtime();
-      analyticsPort = analytics ?? NoopAnalytics();
+      analyticsPort = analytics ?? const NoopAnalytics();
     } else {
       partners =
           partnerApplicationsClient ??
@@ -354,10 +494,103 @@ class DealGoDependencies {
       analyticsPort =
           analytics ??
           (useMockData
-              ? NoopAnalytics()
-              : (kDebugMode ? ConsoleAnalytics() : NoopAnalytics()));
+              ? const NoopAnalytics()
+              : (kDebugMode
+                    ? const ConsoleAnalytics()
+                    : const NoopAnalytics()));
     }
 
+    final promotionRepository = PromotionRepositoryImpl(
+      useOverrides || useMockData
+          ? FakePromotionRemoteDataSource()
+          : DioPromotionRemoteDataSource(dio: dio),
+    );
+    final addressBookRepository =
+        addressBook ??
+        (useOverrides
+            ? FakeAddressBookRemoteDataSource()
+            : useMockData
+            ? FakeAddressBookRemoteDataSource(
+                seed: FakeAddressBookRemoteDataSource.sample(),
+              )
+            : DioAddressBookRemoteDataSource(dio: dio));
+    final ratingRepository =
+        ratings ??
+        (useOverrides || useMockData
+            ? FakeRatingRemoteDataSource()
+            : DioRatingRemoteDataSource(dio: dio));
+    final driverHistoryRepository =
+        driverHistory ??
+        (useOverrides
+            ? FakeDriverHistoryRemoteDataSource()
+            : useMockData
+            ? FakeDriverHistoryRemoteDataSource(
+                seed: FakeDriverHistoryRemoteDataSource.sample(DateTime.now()),
+              )
+            : DioDriverHistoryRemoteDataSource(dio: dio));
+    final placesRepository =
+        places ??
+        (useOverrides
+            ? FakePlacesRemoteDataSource()
+            : useMockData
+            ? FakePlacesRemoteDataSource(
+                catalog: FakePlacesRemoteDataSource.sampleCatalog,
+                recent: FakePlacesRemoteDataSource.sampleRecent,
+              )
+            : DioPlacesRemoteDataSource(dio: dio));
+    final pricingRepository =
+        pricing ??
+        (useOverrides || useMockData
+            ? FakePricingRemoteDataSource()
+            : DioPricingRemoteDataSource(dio: dio));
+    final driverCardRepository =
+        driverCard ??
+        (useOverrides || useMockData
+            ? FakeDriverCardRemoteDataSource()
+            : DioDriverCardRemoteDataSource(dio: dio));
+    final merchantStatsRepository =
+        merchantStats ??
+        (useOverrides || useMockData
+            ? FakeMerchantStatsRemoteDataSource()
+            : DioMerchantStatsRemoteDataSource(dio: dio));
+    final driverLocationRepository =
+        driverLocation ??
+        (useOverrides || useMockData
+            ? FakeDriverLocationRemoteDataSource()
+            : DioDriverLocationRemoteDataSource(dio: dio));
+    final helpFaqRepository =
+        helpFaqs ??
+        (useOverrides || useMockData
+            ? FakeHelpFaqRepository()
+            : DioHelpFaqRemoteDataSource(dio: dio));
+    final rideShareRepository =
+        rideShare ??
+        (useOverrides || useMockData
+            ? FakeRideShareRepository()
+            : DioRideShareRemoteDataSource(dio: dio));
+    final supportRepository =
+        support ??
+        (useOverrides || useMockData
+            ? FakeSupportRepository()
+            : DioSupportRemoteDataSource(dio: dio));
+    final accountDeletionRepository =
+        accountDeletion ??
+        (useOverrides || useMockData
+            ? FakeAccountDeletionRepository()
+            : DioAccountDeletionRemoteDataSource(dio: dio));
+    final accountSettingsRepository =
+        accountSettings ??
+        (useOverrides || useMockData
+            ? FakeAccountSettingsRepository()
+            : DioAccountSettingsRemoteDataSource(dio: dio));
+    final inboxRepository = InboxRepositoryImpl(
+      inboxRemote ??
+          (useOverrides
+              ? FakeInboxRemoteDataSource(seed: const [])
+              : useMockData
+              ? FakeInboxRemoteDataSource()
+              : DioInboxRemoteDataSource(dio: dio)),
+    );
     final driverJobs =
         driverJobsClient ?? DefaultDriverJobsClient(rides: rides, food: food);
     final merchantOrders =
@@ -387,9 +620,11 @@ class DealGoDependencies {
     put<Dio>(dio);
     put<IdentityRemoteDataSource>(identity);
     put<IdentityRepository>(identityRepository);
+    put<PasskeyPlatform>(passkeys);
     put<FetchMe>(fetchMe);
     put<CreatePhoneChallenge>(CreatePhoneChallenge(identityRepository));
     put<VerifyPhoneChallenge>(VerifyPhoneChallenge(identityRepository));
+    put<GetAuthMethods>(GetAuthMethods(identityRepository));
     put<RefreshSession>(RefreshSession(identityRepository));
     put<FoodClient>(food);
     put<FoodRemoteDataSource>(food);
@@ -398,6 +633,27 @@ class DealGoDependencies {
     put<GetFoodStore>(GetFoodStore(foodRepository));
     put<PlaceFoodOrder>(PlaceFoodOrder(foodRepository));
     put<GetFoodOrder>(GetFoodOrder(foodRepository));
+    put<CancelFoodOrder>(CancelFoodOrder(foodRepository));
+    put<ValidateVoucher>(ValidateVoucher(promotionRepository));
+    put<ListAvailableVouchers>(ListAvailableVouchers(promotionRepository));
+    put<AddressBookRepository>(addressBookRepository);
+    put<RatingRepository>(ratingRepository);
+    put<MerchantStatsRepository>(merchantStatsRepository);
+    put<DriverHistoryRepository>(driverHistoryRepository);
+    put<PlacesRepository>(placesRepository);
+    put<PricingRepository>(pricingRepository);
+    put<DriverLocationRepository>(driverLocationRepository);
+    put<DriverCardRepository>(driverCardRepository);
+    put<SupportRepository>(supportRepository);
+    put<AccountDeletionRepository>(accountDeletionRepository);
+    put<AccountSettingsRepository>(accountSettingsRepository);
+    put<HelpFaqRepository>(helpFaqRepository);
+    put<RideShareRepository>(rideShareRepository);
+    put<ListInboxNotifications>(ListInboxNotifications(inboxRepository));
+    put<MarkInboxNotificationRead>(MarkInboxNotificationRead(inboxRepository));
+    put<MarkAllInboxNotificationsRead>(
+      MarkAllInboxNotificationsRead(inboxRepository),
+    );
     put<ListReadyFoodOrders>(ListReadyFoodOrders(foodRepository));
     put<RideClient>(rides);
     put<RideRemoteDataSource>(rides);
@@ -409,10 +665,7 @@ class DealGoDependencies {
     put<CancelRide>(CancelRide(rideRepository));
     put<SubmitRideOffer>(SubmitRideOffer(rideRepository));
     put<SnapshotSessionBinder>(
-      SnapshotSessionBinder(
-        authCubit: auth,
-        realtime: snapshot,
-      ),
+      SnapshotSessionBinder(authCubit: auth, realtime: snapshot),
     );
     put<DriverJobsClient>(driverJobs);
     put<DriverJobsRepository>(driverJobsRepository);
@@ -420,16 +673,27 @@ class DealGoDependencies {
     put<ListReadyDriverOrders>(ListReadyDriverOrders(driverJobsRepository));
     put<SubmitDriverRideOffer>(SubmitDriverRideOffer(driverJobsRepository));
     put<ClaimFoodOrder>(ClaimFoodOrder(driverJobsRepository));
+    put<AdvanceDriverRide>(AdvanceDriverRide(driverJobsRepository));
+    put<AdvanceFoodDelivery>(AdvanceFoodDelivery(driverJobsRepository));
     put<MerchantOrdersClient>(merchantOrders);
     put<MerchantOrdersRepository>(merchantOrdersRepository);
     put<ListMerchantOrderQueue>(
       ListMerchantOrderQueue(merchantOrdersRepository),
     );
     put<AcceptMerchantOrder>(AcceptMerchantOrder(merchantOrdersRepository));
+    put<RejectMerchantOrder>(RejectMerchantOrder(merchantOrdersRepository));
     put<MarkMerchantOrderReady>(
       MarkMerchantOrderReady(merchantOrdersRepository),
     );
     put<GetMerchantCatalog>(GetMerchantCatalog(merchantOrdersRepository));
+    put<UpdateStoreServiceMode>(
+      UpdateStoreServiceMode(merchantOrdersRepository),
+    );
+    put<UpdateStoreHours>(UpdateStoreHours(merchantOrdersRepository));
+    put<UpdateStoreLocation>(UpdateStoreLocation(merchantOrdersRepository));
+    put<UpdateStoreAcceptSettings>(
+      UpdateStoreAcceptSettings(merchantOrdersRepository),
+    );
     put<GetMerchantOrder>(GetMerchantOrder(merchantOrdersRepository));
     put<CreateMerchantCatalogItem>(
       CreateMerchantCatalogItem(merchantOrdersRepository),
@@ -437,10 +701,19 @@ class DealGoDependencies {
     put<SetMerchantItemAvailability>(
       SetMerchantItemAvailability(merchantOrdersRepository),
     );
+    put<ReplaceMerchantItemOptions>(
+      ReplaceMerchantItemOptions(merchantOrdersRepository),
+    );
     put<PartnerApplicationsClient>(partners);
     put<PartnerApplicationsRepository>(partnerApplicationsRepository);
     put<ListMyPartnerApplications>(
       ListMyPartnerApplications(partnerApplicationsRepository),
+    );
+    put<GetMyPartnerApplication>(
+      GetMyPartnerApplication(partnerApplicationsRepository),
+    );
+    put<DocumentImageSource>(
+      documentImageSource ?? ImagePickerDocumentSource(),
     );
     put<SubmitPartnerApplication>(
       SubmitPartnerApplication(partnerApplicationsRepository),
@@ -449,12 +722,8 @@ class DealGoDependencies {
     put<ChatRepository>(chatRepository);
     put<ListRideChatMessages>(ListRideChatMessages(chatRepository));
     put<SendRideChatMessage>(SendRideChatMessage(chatRepository));
-    put<ListFoodOrderChatMessages>(
-      ListFoodOrderChatMessages(chatRepository),
-    );
-    put<SendFoodOrderChatMessage>(
-      SendFoodOrderChatMessage(chatRepository),
-    );
+    put<ListFoodOrderChatMessages>(ListFoodOrderChatMessages(chatRepository));
+    put<SendFoodOrderChatMessage>(SendFoodOrderChatMessage(chatRepository));
     put<VoiceClient>(voice);
     put<VoiceRepository>(voiceRepository);
     put<CreateRideVoiceSession>(CreateRideVoiceSession(voiceRepository));
@@ -470,6 +739,7 @@ class DealGoDependencies {
     put<ListFoodHistory>(ListFoodHistory(historyRepository));
     put<PushPort>(pushPort);
     put<MapPort>(maps);
+    put<ExternalNavigator>(externalNavigator ?? UrlLauncherNavigator());
     put<SnapshotRealtime>(snapshot);
     put<AnalyticsPort>(analyticsPort);
     put<NotificationRouter>(notifications);
@@ -511,13 +781,82 @@ class DealGoDependencies {
         RepositoryProvider<GetFoodStore>.value(value: getFoodStore),
         RepositoryProvider<PlaceFoodOrder>.value(value: placeFoodOrder),
         RepositoryProvider<GetFoodOrder>.value(value: getFoodOrder),
-        RepositoryProvider<ListReadyFoodOrders>.value(value: listReadyFoodOrders),
+        RepositoryProvider<CancelFoodOrder>.value(
+          value: _locator<CancelFoodOrder>(),
+        ),
+        RepositoryProvider<ValidateVoucher>.value(
+          value: _locator<ValidateVoucher>(),
+        ),
+        RepositoryProvider<RatingRepository>.value(
+          value: _locator<RatingRepository>(),
+        ),
+        RepositoryProvider<MerchantStatsRepository>.value(
+          value: _locator<MerchantStatsRepository>(),
+        ),
+        RepositoryProvider<AddressBookRepository>.value(
+          value: _locator<AddressBookRepository>(),
+        ),
+        RepositoryProvider<DriverHistoryRepository>.value(
+          value: _locator<DriverHistoryRepository>(),
+        ),
+        RepositoryProvider<PlacesRepository>.value(
+          value: _locator<PlacesRepository>(),
+        ),
+        RepositoryProvider<DriverCardRepository>.value(
+          value: _locator<DriverCardRepository>(),
+        ),
+        RepositoryProvider<SupportRepository>.value(
+          value: _locator<SupportRepository>(),
+        ),
+        RepositoryProvider<AccountDeletionRepository>.value(
+          value: _locator<AccountDeletionRepository>(),
+        ),
+        RepositoryProvider<AccountSettingsRepository>.value(
+          value: _locator<AccountSettingsRepository>(),
+        ),
+        RepositoryProvider<HelpFaqRepository>.value(
+          value: _locator<HelpFaqRepository>(),
+        ),
+        RepositoryProvider<RideShareRepository>.value(
+          value: _locator<RideShareRepository>(),
+        ),
+        RepositoryProvider<ListAvailableVouchers>.value(
+          value: _locator<ListAvailableVouchers>(),
+        ),
+        RepositoryProvider<PricingRepository>.value(
+          value: _locator<PricingRepository>(),
+        ),
+        RepositoryProvider<DriverLocationRepository>.value(
+          value: _locator<DriverLocationRepository>(),
+        ),
+        RepositoryProvider<ListInboxNotifications>.value(
+          value: _locator<ListInboxNotifications>(),
+        ),
+        RepositoryProvider<MarkInboxNotificationRead>.value(
+          value: _locator<MarkInboxNotificationRead>(),
+        ),
+        RepositoryProvider<MarkAllInboxNotificationsRead>.value(
+          value: _locator<MarkAllInboxNotificationsRead>(),
+        ),
+        RepositoryProvider<ListReadyFoodOrders>.value(
+          value: listReadyFoodOrders,
+        ),
         RepositoryProvider<IdentityClient>.value(value: identityClient),
         RepositoryProvider<IdentityRepository>.value(value: identityRepository),
-        RepositoryProvider<CreatePhoneChallenge>.value(value: createPhoneChallenge),
-        RepositoryProvider<VerifyPhoneChallenge>.value(value: verifyPhoneChallenge),
+        RepositoryProvider<PasskeyPlatform>.value(
+          value: _locator<PasskeyPlatform>(),
+        ),
+        RepositoryProvider<CreatePhoneChallenge>.value(
+          value: createPhoneChallenge,
+        ),
+        RepositoryProvider<VerifyPhoneChallenge>.value(
+          value: verifyPhoneChallenge,
+        ),
+        RepositoryProvider<GetAuthMethods>.value(value: getAuthMethods),
         RepositoryProvider<DriverJobsClient>.value(value: driverJobsClient),
-        RepositoryProvider<DriverJobsRepository>.value(value: driverJobsRepository),
+        RepositoryProvider<DriverJobsRepository>.value(
+          value: driverJobsRepository,
+        ),
         RepositoryProvider<ListOpenDriverRides>.value(
           value: _locator<ListOpenDriverRides>(),
         ),
@@ -527,8 +866,18 @@ class DealGoDependencies {
         RepositoryProvider<SubmitDriverRideOffer>.value(
           value: _locator<SubmitDriverRideOffer>(),
         ),
-        RepositoryProvider<ClaimFoodOrder>.value(value: _locator<ClaimFoodOrder>()),
-        RepositoryProvider<MerchantOrdersClient>.value(value: merchantOrdersClient),
+        RepositoryProvider<ClaimFoodOrder>.value(
+          value: _locator<ClaimFoodOrder>(),
+        ),
+        RepositoryProvider<AdvanceDriverRide>.value(
+          value: _locator<AdvanceDriverRide>(),
+        ),
+        RepositoryProvider<AdvanceFoodDelivery>.value(
+          value: _locator<AdvanceFoodDelivery>(),
+        ),
+        RepositoryProvider<MerchantOrdersClient>.value(
+          value: merchantOrdersClient,
+        ),
         RepositoryProvider<MerchantOrdersRepository>.value(
           value: merchantOrdersRepository,
         ),
@@ -538,11 +887,26 @@ class DealGoDependencies {
         RepositoryProvider<AcceptMerchantOrder>.value(
           value: _locator<AcceptMerchantOrder>(),
         ),
+        RepositoryProvider<RejectMerchantOrder>.value(
+          value: _locator<RejectMerchantOrder>(),
+        ),
         RepositoryProvider<MarkMerchantOrderReady>.value(
           value: _locator<MarkMerchantOrderReady>(),
         ),
         RepositoryProvider<GetMerchantCatalog>.value(
           value: _locator<GetMerchantCatalog>(),
+        ),
+        RepositoryProvider<UpdateStoreServiceMode>.value(
+          value: _locator<UpdateStoreServiceMode>(),
+        ),
+        RepositoryProvider<UpdateStoreLocation>.value(
+          value: _locator<UpdateStoreLocation>(),
+        ),
+        RepositoryProvider<UpdateStoreHours>.value(
+          value: _locator<UpdateStoreHours>(),
+        ),
+        RepositoryProvider<UpdateStoreAcceptSettings>.value(
+          value: _locator<UpdateStoreAcceptSettings>(),
         ),
         RepositoryProvider<GetMerchantOrder>.value(
           value: _locator<GetMerchantOrder>(),
@@ -552,6 +916,9 @@ class DealGoDependencies {
         ),
         RepositoryProvider<SetMerchantItemAvailability>.value(
           value: _locator<SetMerchantItemAvailability>(),
+        ),
+        RepositoryProvider<ReplaceMerchantItemOptions>.value(
+          value: _locator<ReplaceMerchantItemOptions>(),
         ),
         RepositoryProvider<PartnerApplicationsClient>.value(
           value: partnerApplicationsClient,
@@ -564,6 +931,9 @@ class DealGoDependencies {
         ),
         RepositoryProvider<ListMyPartnerApplications>.value(
           value: _locator<ListMyPartnerApplications>(),
+        ),
+        RepositoryProvider<DocumentImageSource>.value(
+          value: _locator<DocumentImageSource>(),
         ),
         RepositoryProvider<ChatClient>.value(value: chatClient),
         RepositoryProvider<ChatRepository>.value(value: chatRepository),
@@ -600,26 +970,42 @@ class DealGoDependencies {
         ),
         RepositoryProvider<PushPort>.value(value: push),
         RepositoryProvider<MapPort>.value(value: mapPort),
+        RepositoryProvider<ExternalNavigator>.value(value: externalNavigator),
         RepositoryProvider<SnapshotRealtime>.value(value: realtime),
         RepositoryProvider<AnalyticsPort>.value(value: analytics),
         RepositoryProvider<NotificationRouter>.value(value: notificationRouter),
         RepositoryProvider<ConnectivityService>.value(value: connectivity),
+        RepositoryProvider<AppPermissionService>.value(value: permissions),
+        RepositoryProvider<LocationService>.value(value: location),
       ],
       child: MultiBlocProvider(
         providers: [
           BlocProvider<AuthCubit>.value(value: authCubit),
-          BlocProvider(create: (_) => AddressDraftCubit()),
           BlocProvider(create: (_) => FoodCartCubit()),
           BlocProvider(create: (_) => RideSessionCubit()),
+          BlocProvider(create: (_) => RideDestinationCubit()),
           BlocProvider(
             create: (_) => DriverDutyCubit(
               setPresence: _locator<SetPresence>(),
               accessToken: _accessToken,
+              locationReporter: DriverLocationReporter(
+                repository: _locator<DriverLocationRepository>(),
+                location: _locator<LocationService>(),
+                accessToken: _accessToken,
+              ),
+            ),
+          ),
+          BlocProvider(
+            create: (context) => DriverServicesCubit(
+              repository: _locator<PresenceRepository>(),
+              accessToken: _accessToken,
+              online: () => context.read<DriverDutyCubit>().state,
             ),
           ),
           BlocProvider(
             create: (_) => DriverKycCubit(
               submitPartnerApplication: _locator<SubmitPartnerApplication>(),
+              getMyPartnerApplication: _locator<GetMyPartnerApplication>(),
               accessToken: _accessToken,
               useMock: useMockData,
             ),
@@ -627,6 +1013,7 @@ class DealGoDependencies {
           BlocProvider(
             create: (_) => MerchantKybCubit(
               submitPartnerApplication: _locator<SubmitPartnerApplication>(),
+              getMyPartnerApplication: _locator<GetMyPartnerApplication>(),
               accessToken: _accessToken,
               useMock: useMockData,
             ),

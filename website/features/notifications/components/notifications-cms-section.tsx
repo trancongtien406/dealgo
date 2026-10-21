@@ -135,7 +135,6 @@ export function NotificationsCmsSection({
         )}
       </section>
 
-      {/* Reading Modal: CMS Item */}
       {readingCms ? (
         <div
           role="dialog"

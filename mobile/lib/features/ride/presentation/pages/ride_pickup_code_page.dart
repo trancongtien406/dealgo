@@ -7,11 +7,11 @@ import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
 import '../../../../l10n/app_localizations.dart';
-import '../../domain/entities/ride_vehicle.dart';
 import '../../domain/usecases/get_ride.dart';
 import '../utils/ride_routes.dart';
 import '../cubit/ride_tracking_cubit.dart';
 import '../widgets/ride_widgets.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 /// C012 — customer view of pickup verification code.
 class RidePickupCodePage extends StatelessWidget {
@@ -50,14 +50,15 @@ class _RidePickupCodeView extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final state = context.watch<RideTrackingCubit>().state;
     final ride = state.ride;
-    final code = ride == null ? '7294' : ridePickupCode(ride.id);
+    // DEC-PROD-017: issued by the backend; absent until a driver accepts.
+    final code = ride?.pickupCode;
 
     return Scaffold(
       backgroundColor: DealGoColors.canvas,
       body: SafeArea(
         child: Column(
           children: [
-            RideScreenHeader(
+            DealGoAppHeader(
               title: l10n.ridePickupCodeTitle,
               onBack: () => _back(context),
             ),
@@ -92,14 +93,23 @@ class _RidePickupCodeView extends StatelessWidget {
                         ),
                         const SizedBox(height: DealGoSpacing.s24),
                         Center(
-                          child: Text(
-                            code.split('').join('  '),
-                            key: const Key('ride-pickup-code-full'),
-                            style: textTheme.displaySmall?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 4,
-                            ),
-                          ),
+                          child: code == null
+                              ? Text(
+                                  l10n.ridePickupCodeUnavailable,
+                                  key: const Key(
+                                    'ride-pickup-code-unavailable',
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  style: textTheme.bodyMedium,
+                                )
+                              : Text(
+                                  code.split('').join('  '),
+                                  key: const Key('ride-pickup-code-full'),
+                                  style: textTheme.displaySmall?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 4,
+                                  ),
+                                ),
                         ),
                         const SizedBox(height: DealGoSpacing.s16),
                         Center(

@@ -1,13 +1,16 @@
 import 'package:dealgo/features/food/data/datasources/dio_food_remote_datasource.dart';
 import 'package:dealgo/features/food/domain/entities/food_models.dart';
 import 'package:dealgo/core/network/api_exception.dart';
+import 'package:dealgo/features/food/domain/params/food_delivery_action.dart';
 import 'package:dealgo/features/identity/domain/entities/user_profile.dart';
 import 'package:dealgo/features/ride/data/models/ride_models.dart';
 import 'package:dealgo/features/ride/domain/entities/ride_models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:dealgo/core/navigation/external_navigator.dart';
 import 'support/auth_test_harness.dart';
+import 'support/fake_external_navigator.dart';
 import 'support/fake_food_client.dart';
 import 'support/fake_ride_client.dart';
 
@@ -56,11 +59,46 @@ void main() {
     });
     expect(jobs.single.lineCount, 2);
     expect(jobs.single.deliveryFareVnd, 25000);
+    expect(jobs.single.pickup, isNull);
 
-    expect(
-      const SubmitRideOfferBody(amountVnd: 45000).toJson(),
-      {'amountVnd': 45000},
-    );
+    // DEC-PROD-034: order pickup snapshot; legacy `store` coords still read.
+    final withPickup = decodeReadyFoodJobs({
+      'success': true,
+      'data': [
+        {
+          'id': 'food-2',
+          'storeId': 'store-1',
+          'storeName': 'Bún chả cá',
+          'storeAddress': 'Địa chỉ hiện tại',
+          'deliveryFareVnd': 25000,
+          'subtotalVnd': 150000,
+          'totalVnd': 175000,
+          'dropoff': {'lat': 16.1, 'lng': 108.2, 'label': 'Khách'},
+          'pickup': {'lat': 16.06, 'lng': 108.22, 'label': '12 Bạch Đằng'},
+          'store': {'lat': 16.06, 'lng': 108.22},
+          'lineCount': 1,
+        },
+        {
+          'id': 'food-3',
+          'storeId': 'store-1',
+          'storeName': 'Cơm gà',
+          'deliveryFareVnd': 25000,
+          'subtotalVnd': 150000,
+          'totalVnd': 175000,
+          'dropoff': {'lat': 16.1, 'lng': 108.2, 'label': 'Khách'},
+          'store': {'lat': 16.07, 'lng': 108.23},
+          'lineCount': 1,
+        },
+      ],
+    });
+    expect(withPickup[0].pickup?.label, '12 Bạch Đằng');
+    expect(withPickup[0].pickup?.lat, 16.06);
+    expect(withPickup[1].pickup?.lng, 108.23);
+    expect(withPickup[1].pickup?.label, 'Cơm gà');
+
+    expect(const SubmitRideOfferBody(amountVnd: 45000).toJson(), {
+      'amountVnd': 45000,
+    });
   });
 
   testWidgets('offline toggle does not request jobs', (tester) async {
@@ -75,7 +113,7 @@ void main() {
     await tester.tap(find.byKey(const Key('driver-go-online')));
     await tester.pumpAndSettle();
     expect(find.text('Tổng quan tài xế'), findsOneWidget);
-    expect(find.text('Online'), findsOneWidget);
+    expect(find.text('Trực tuyến'), findsOneWidget);
     expect(rides.openCalls, isEmpty);
     expect(food.readyCalls, isEmpty);
 
@@ -124,12 +162,185 @@ void main() {
     expect(request.rideId, 'ride-open-1');
     expect(request.accessToken, 'access-token');
     expect(request.amountVnd, 45000);
-    expect(
-      SubmitRideOfferBody(amountVnd: request.amountVnd).toJson(),
-      {'amountVnd': 45000},
-    );
+    expect(SubmitRideOfferBody(amountVnd: request.amountVnd).toJson(), {
+      'amountVnd': 45000,
+    });
     expect(find.text('Đã gửi báo giá'), findsOneWidget);
-    expect(find.textContaining('COUNTER'), findsWidgets);
+    expect(find.text('Giá của bạn · Chờ khách chọn'), findsOneWidget);
+    // No navigation before the customer actually picks this driver.
+    expect(find.byKey(const Key('driver-open-active-ride')), findsNothing);
+  });
+
+  testWidgets('food job shows the store pickup point and map (DEC-PROD-034)', (
+    tester,
+  ) async {
+    final food = FakeFoodClient()
+      ..readyOrders = [
+        _readyJob(
+          pickup: const FoodDropoff(
+            lat: 16.06,
+            lng: 108.22,
+            label: '12 Bạch Đằng',
+          ),
+        ),
+        _readyJob(id: 'food-job-2'),
+      ];
+    await _openDriver(tester, rides: FakeRideClient(), food: food);
+    await _connectAndOpenJobs(tester);
+
+    await tester.tap(find.byKey(const Key('driver-food-food-job-1')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('driver-food-map')), findsOneWidget);
+    expect(find.byKey(const Key('driver-food-no-store-point')), findsNothing);
+    expect(find.text('Bún chả cá · 12 Bạch Đằng'), findsOneWidget);
+  });
+
+  testWidgets('claimed food job offers Google Maps / Waze and reports a failed hand-off', (
+    tester,
+  ) async {
+    final food = FakeFoodClient()
+      ..readyOrders = [
+        _readyJob(
+          pickup: const FoodDropoff(lat: 16.06, lng: 108.22, label: '12 Bạch Đằng'),
+        ),
+      ]
+      ..claimed = const ClaimedFoodDelivery(id: 'food-job-1', status: 'ASSIGNED');
+    final nav = FakeExternalNavigator(result: false);
+    await pumpSignedIn(
+      tester,
+      profile: _driverProfile,
+      rideClient: FakeRideClient(),
+      foodClient: food,
+      externalNavigator: nav,
+    );
+    await _connectAndOpenJobs(tester);
+    await tester.tap(find.byKey(const Key('driver-food-food-job-1')));
+    await tester.pumpAndSettle();
+    // Not before the claim.
+    expect(find.byKey(const Key('driver-nav-buttons')), findsNothing);
+    await tester.tap(find.byKey(const Key('driver-claim-job')));
+    await tester.pumpAndSettle();
+
+    final google = find.byKey(const Key('driver-nav-google'));
+    await tester.ensureVisible(google);
+    await tester.pumpAndSettle();
+    await tester.tap(google);
+    await tester.pumpAndSettle();
+    expect(nav.calls, [(NavigationApp.googleMaps, 16.06, 108.22)]);
+    expect(
+      find.text('Không mở được ứng dụng chỉ đường. Hãy đi theo bản đồ trong app.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('pickup and delivery ask for the server codes (DEC-PROD-036)', (
+    tester,
+  ) async {
+    final food = FakeFoodClient()
+      ..readyOrders = [
+        _readyJob(
+          pickup: const FoodDropoff(lat: 16.06, lng: 108.22, label: '12 Bạch Đằng'),
+        ),
+      ]
+      ..claimed = const ClaimedFoodDelivery(id: 'food-job-1', status: 'ASSIGNED')
+      ..expectedHandoverCode = '2891'
+      ..expectedDeliveryCode = '4821';
+    await pumpSignedIn(
+      tester,
+      profile: _driverProfile,
+      rideClient: FakeRideClient(),
+      foodClient: food,
+      externalNavigator: FakeExternalNavigator(),
+    );
+    await _connectAndOpenJobs(tester);
+    await tester.tap(find.byKey(const Key('driver-food-food-job-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('driver-claim-job')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('driver-arrived-pickup')));
+    await tester.pumpAndSettle();
+
+    Future<void> enter(String code) async {
+      expect(find.byKey(const Key('driver-food-code-sheet')), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('driver-food-code-input')), code);
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('driver-food-code-submit')));
+      await tester.pumpAndSettle();
+    }
+
+    // Handover: the store's code is asked for, a wrong one is flagged.
+    await tester.tap(find.byKey(const Key('driver-food-pickup')));
+    await tester.pumpAndSettle();
+    expect(find.text('Mã bàn giao'), findsOneWidget);
+    await enter('1111');
+    expect(find.text('Mã chưa đúng, kiểm tra lại.'), findsOneWidget);
+    await enter('2891');
+    expect(find.byKey(const Key('driver-food-code-sheet')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('driver-food-deliver')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('driver-food-complete')));
+    await tester.pumpAndSettle();
+    expect(find.text('Mã giao hàng'), findsOneWidget);
+    await enter('4821');
+    expect(find.byKey(const Key('driver-food-home')), findsOneWidget);
+    expect(food.submittedCodes, [
+      (action: FoodDeliveryAction.pickup, code: null),
+      (action: FoodDeliveryAction.pickup, code: '1111'),
+      (action: FoodDeliveryAction.pickup, code: '2891'),
+      (action: FoodDeliveryAction.deliver, code: null),
+      (action: FoodDeliveryAction.deliver, code: '4821'),
+    ]);
+  });
+
+  testWidgets('a locked delivery code shows the support message', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(400, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final food = FakeFoodClient()
+      ..readyOrders = [_readyJob()]
+      ..claimed = const ClaimedFoodDelivery(id: 'food-job-1', status: 'ASSIGNED');
+    await pumpSignedIn(
+      tester,
+      profile: _driverProfile,
+      rideClient: FakeRideClient(),
+      foodClient: food,
+      externalNavigator: FakeExternalNavigator(),
+    );
+    await _connectAndOpenJobs(tester);
+    await tester.tap(find.byKey(const Key('driver-food-food-job-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('driver-claim-job')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('driver-arrived-pickup')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('driver-food-pickup')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('driver-food-deliver')));
+    await tester.pumpAndSettle();
+    food.advanceError = const ApiException(
+      statusCode: 423,
+      message: 'locked',
+      errorCode: 'FOOD_DELIVERY_CODE_LOCKED',
+    );
+    await tester.tap(find.byKey(const Key('driver-food-complete')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Nhập sai quá số lần cho phép. Liên hệ hỗ trợ để xử lý đơn.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('driver-food-code-sheet')), findsNothing);
+  });
+
+  testWidgets('food job without store coordinates says to follow the address', (
+    tester,
+  ) async {
+    final food = FakeFoodClient()..readyOrders = [_readyJob(id: 'food-job-2')];
+    await _openDriver(tester, rides: FakeRideClient(), food: food);
+    await _connectAndOpenJobs(tester);
+    await tester.tap(find.byKey(const Key('driver-food-food-job-2')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('driver-food-map')), findsOneWidget);
+    expect(find.byKey(const Key('driver-food-no-store-point')), findsOneWidget);
   });
 
   testWidgets('409 on food claim shows the job-taken message and not success', (
@@ -153,7 +364,7 @@ void main() {
 
     expect(food.claimCalls, ['food-job-1']);
     expect(find.text('Yêu cầu đã được nhận'), findsOneWidget);
-    expect(find.text('TAKEN / EXPIRED'), findsOneWidget);
+    expect(find.text('Yêu cầu không còn khả dụng'), findsOneWidget);
     expect(find.text('Giao đồ ăn'), findsWidgets);
     expect(find.text('Nhận việc'), findsNothing);
     expect(find.textContaining('thành công'), findsNothing);
@@ -180,8 +391,8 @@ void main() {
 
     expect(rides.openCalls, isNotEmpty);
     expect(food.readyCalls, isNotEmpty);
-    expect(find.text('Tạm hạn chế nhận chuyến'), findsWidgets);
-    expect(find.text('Đã hết hạn'), findsWidgets);
+    expect(find.text('Chưa thể nhận việc'), findsOneWidget);
+    expect(find.byKey(const Key('driver-open-application')), findsOneWidget);
     expect(find.text('Chưa có yêu cầu đang mở'), findsNothing);
     expect(find.text('123 Lê Lợi'), findsNothing);
     expect(find.text('Không được hiện như danh sách trống'), findsNothing);
@@ -204,7 +415,7 @@ Future<void> _openDriver(
 Future<void> _connectAndOpenJobs(WidgetTester tester) async {
   await tester.tap(find.byKey(const Key('driver-go-online')));
   await tester.pumpAndSettle();
-  await tester.tap(navLabel('Công việc'));
+  await tester.tap(navLabel('Việc nhận'));
   await tester.pumpAndSettle();
 }
 
@@ -224,10 +435,13 @@ OpenRide _openRide() {
 ReadyFoodJob _readyJob({
   String id = 'food-job-1',
   String dropoff = '456 Trần Hưng Đạo',
+  FoodDropoff? pickup,
 }) {
   return ReadyFoodJob(
     id: id,
     storeId: 'store-1',
+    storeName: 'Bún chả cá',
+    pickup: pickup,
     deliveryFareVnd: 25000,
     subtotalVnd: 150000,
     totalVnd: 175000,

@@ -1,4 +1,5 @@
 import type { StatusTone } from "@/lib/admin-format";
+import type { AccountDeletionInfo } from "@/lib/account-deletion";
 
 export const CUSTOMER_STATUSES = [
   "ACTIVE",
@@ -22,6 +23,7 @@ export type CustomerListItem = {
   time: string;
   createdAt?: string;
   lastLogin?: string;
+  deletion?: AccountDeletionInfo | null;
 };
 
 export type CustomerActivityItem = {

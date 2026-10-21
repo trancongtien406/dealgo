@@ -53,7 +53,9 @@ export const kycStatusUiOptions: SearchSelectOption[] = [
 export const storeStatusOptions: SearchSelectOption[] = [
   { value: "ALL", label: "Tất cả trạng thái" },
   { value: "OPEN", label: "Đang mở" },
-  { value: "CLOSED", label: "Tạm đóng" },
+  { value: "BUSY", label: "Bếp đang bận" },
+  { value: "PAUSED", label: "Tạm ngưng nhận đơn" },
+  { value: "CLOSED", label: "Không còn món bán" },
   { value: "SUSPENDED", label: "Tạm khóa" },
 ];
 
@@ -224,17 +226,22 @@ export const promotionAudienceOptions: SearchSelectOption[] = [
 ];
 
 export const promotionChannelOptions: SearchSelectOption[] = [
-  { value: "ALL", label: "Tất cả kênh" },
-  { value: "PUSH", label: "Push" },
-  { value: "SMS", label: "SMS" },
-  { value: "EMAIL", label: "Email" },
-  { value: "IN_APP", label: "In-app" },
+  { value: "ALL", label: "Tất cả dịch vụ" },
+  { value: "RIDE", label: "Xe 2 bánh (Ride)" },
+  { value: "FOOD", label: "Giao đồ ăn (Food)" },
+];
+
+export const promotionServiceTypeOptions: SearchSelectOption[] = [
+  { value: "ALL", label: "Tất cả dịch vụ" },
+  { value: "RIDE", label: "Xe 2 bánh (Ride)" },
+  { value: "FOOD", label: "Giao đồ ăn (Food)" },
 ];
 
 export const promotionStatusOptions: SearchSelectOption[] = [
-  { value: "ALL", label: "Tất cả" },
-  { value: "ACTIVE", label: "Đang chạy" },
-  { value: "SCHEDULED", label: "Lên lịch" },
+  { value: "ALL", label: "Tất cả trạng thái" },
+  { value: "ACTIVE", label: "Đang hoạt động" },
+  { value: "SCHEDULED", label: "Đã lên lịch" },
+  { value: "PAUSED", label: "Tạm dừng" },
   { value: "ENDED", label: "Đã kết thúc" },
 ];
 

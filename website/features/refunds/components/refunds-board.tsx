@@ -259,50 +259,52 @@ export function RefundsBoard() {
         ))}
       </ul>
 
-      <AdminFilterToolbar>
-        <AdminFilterField className="min-w-[10rem]">
-          <SearchSelect
-            label="Trạng thái"
-            icon="sliders"
-            value={status}
-            options={refundStatusOptions.filter(
-              (option) => option.value !== "ALL",
-            )}
-            placeholder="Tất cả trạng thái"
-            onChange={handleStatusChange}
-          />
-        </AdminFilterField>
-        <AdminFilterField grow>
-          <label
-            htmlFor="refund-query"
-            className="text-xs font-medium text-muted"
-          >
-            Tìm yêu cầu hoàn tiền
-          </label>
-          <div className="relative mt-1.5">
-            <OpsIcon
-              name="search"
-              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted"
+      <section className="min-w-0 rounded-2xl border border-border bg-white p-4 shadow-sm">
+        <AdminFilterToolbar>
+          <AdminFilterField className="min-w-[10rem]">
+            <SearchSelect
+              label="Trạng thái"
+              icon="sliders"
+              value={status}
+              options={refundStatusOptions.filter(
+                (option) => option.value !== "ALL",
+              )}
+              placeholder="Tất cả trạng thái"
+              onChange={handleStatusChange}
             />
-            <input
-              id="refund-query"
-              type="search"
-              autoComplete="off"
-              value={searchQuery}
-              onChange={handleSearchChange}
-              placeholder="Mã hoàn tiền, mã đơn, khách hàng..."
-              className={`h-10 w-full rounded-xl border border-border bg-white pr-3 pl-10 text-sm text-ink placeholder:text-muted ${focusRing}`}
-            />
+          </AdminFilterField>
+          <AdminFilterField grow>
+            <label
+              htmlFor="refund-query"
+              className="text-xs font-medium text-muted"
+            >
+              Tìm yêu cầu hoàn tiền
+            </label>
+            <div className="relative mt-1.5">
+              <OpsIcon
+                name="search"
+                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted"
+              />
+              <input
+                id="refund-query"
+                type="search"
+                autoComplete="off"
+                value={searchQuery}
+                onChange={handleSearchChange}
+                placeholder="Mã hoàn tiền, mã đơn, khách hàng..."
+                className={`h-10 w-full rounded-xl border border-border bg-white pr-3 pl-10 text-sm text-ink placeholder:text-muted ${focusRing}`}
+              />
+            </div>
+          </AdminFilterField>
+          <div className="flex shrink-0 items-end gap-2">
+            <PreviewButton onClick={() => void refetch()}>
+              <OpsIcon name="refresh" className="size-4" />
+              Làm mới
+            </PreviewButton>
+            <AdminResetFilterButton onClick={handleResetFilters} />
           </div>
-        </AdminFilterField>
-        <div className="flex shrink-0 items-end gap-2">
-          <PreviewButton onClick={() => void refetch()}>
-            <OpsIcon name="refresh" className="size-4" />
-            Làm mới
-          </PreviewButton>
-          <AdminResetFilterButton onClick={handleResetFilters} />
-        </div>
-      </AdminFilterToolbar>
+        </AdminFilterToolbar>
+      </section>
 
       {forbidden ? (
         <AdminForbiddenState

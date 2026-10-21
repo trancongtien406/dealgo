@@ -52,12 +52,38 @@ class FakePartnerApplicationsClient implements PartnerApplicationsClient {
     if (handler != null) {
       return handler(request);
     }
+    PartnerApplicationView? previous;
+    for (final app in applications) {
+      if (app.role == request.role) {
+        previous = app;
+      }
+    }
+    final sentKinds = {for (final doc in request.documents) doc.kind};
+    final kept = [
+      for (final doc in previous?.documents ?? const <PartnerDocumentSummary>[])
+        if (doc.hasFile && !sentKinds.contains(doc.kind)) doc,
+    ];
     final view = PartnerApplicationView(
       id: 'app-${request.role.toLowerCase()}',
       role: request.role,
       status: 'SUBMITTED',
       metadata: request.metadata,
       submittedAt: DateTime.now().toUtc().toIso8601String(),
+      documents: [
+        for (final (index, doc) in [
+          ...kept.map((d) => (d.kind, d.contentType, d.sizeBytes)),
+          ...request.documents.map(
+            (d) => (d.kind, d.contentType, d.contentBase64.length * 3 ~/ 4),
+          ),
+        ].indexed)
+          PartnerDocumentSummary(
+            index: index,
+            kind: doc.$1,
+            contentType: doc.$2,
+            sizeBytes: doc.$3,
+            hasFile: true,
+          ),
+      ],
     );
     applications = [
       for (final app in applications)

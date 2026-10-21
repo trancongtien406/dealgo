@@ -167,7 +167,7 @@ export function AuditLogsBoard() {
       </div>
 
       {/* Filter toolbar */}
-      <section className="rounded-2xl border border-border bg-white p-4 shadow-xs">
+      <section className="min-w-0 rounded-2xl border border-border bg-white p-4 shadow-sm">
         <AdminFilterToolbar>
           <AdminFilterField className="min-w-[12rem]">
             <SearchSelect

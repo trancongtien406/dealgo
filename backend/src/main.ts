@@ -5,6 +5,7 @@ import { AppModule } from './app.module.js';
 import {
   buildOpenApiDocument,
   localDevCors,
+  registerRouteBodyParsers,
   requestIdMiddleware,
   shouldServeSwagger,
 } from './platform/http/index.js';
@@ -15,6 +16,7 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   app.use(requestIdMiddleware);
   app.use(createMorganMiddleware());
+  registerRouteBodyParsers(app);
   app.enableShutdownHooks();
   const config = app.get(ConfigService<AppEnv, true>);
   const nodeEnv = config.get('NODE_ENV', { infer: true });

@@ -228,6 +228,7 @@ export function RidesList() {
       </ul>
       {isMapVisible && (
         <RideMapPreview
+          ride={pickPreviewRide(items)}
           isExpanded={isMapExpanded}
           onToggleExpand={() => setIsMapExpanded((prev) => !prev)}
           onClose={() => setIsMapVisible(false)}
@@ -541,18 +542,30 @@ function Place({
   );
 }
 
+/** First active ride with coordinates on this page, else any ride with coordinates. */
+export function pickPreviewRide(items: RideListItem[]): RideListItem | null {
+  const located = items.filter((row) => row.pickupPoint && row.dropoffPoint);
+  return (
+    located.find((row) => row.status === "IN_TRIP" || row.status === "PICKING_UP") ??
+    located[0] ??
+    null
+  );
+}
+
 function RideMapPreview({
+  ride,
   isExpanded = false,
   onToggleExpand,
   onClose,
 }: {
+  ride: RideListItem | null;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
   onClose?: () => void;
 }) {
   return (
     <aside
-      aria-label="Xem trước tuyến DGX-240610-1024, đang di chuyển tại Đà Nẵng"
+      aria-label={ride ? `Xem trước tuyến ${ride.code}` : "Xem trước tuyến"}
       className="relative isolate overflow-hidden rounded-2xl border border-border bg-white shadow-sm transition-all duration-200"
     >
       {/* Live Dispatch Header Bar */}
@@ -562,24 +575,25 @@ function RideMapPreview({
             <OpsIcon name="car" className="size-4.5" />
           </span>
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-bold text-ink">
-                DGX-240610-1024
-              </span>
-              <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
-                {rideStatusLabel("IN_TRIP")}
-              </span>
-              <span className="hidden text-xs text-muted sm:inline-block">
-                ·
-              </span>
-              <span className="hidden text-xs font-medium text-ink sm:inline-block">
-                Hải Châu → Sơn Trà (5.2 km · ~12 phút)
-              </span>
-            </div>
-            <p className="text-xs text-muted">
-              Tài xế: Lê Văn Nam (30A-123.45) · Điểm đón: 12 Lê Lợi · Điểm trả:
-              24 Võ Nguyên Giáp
-            </p>
+            {ride ? (
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-bold text-ink">{ride.code}</span>
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                    {rideStatusLabel(ride.status)}
+                  </span>
+                </div>
+                <p className="text-xs text-muted">
+                  Tài xế: {ride.driver}
+                  {ride.plate && ride.plate !== "—" ? ` (${ride.plate})` : ""} · Điểm đón:{" "}
+                  {ride.pickup} · Điểm trả: {ride.dropoff}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted">
+                Chưa có chuyến nào trong trang này có toạ độ để xem trước tuyến.
+              </p>
+            )}
           </div>
         </div>
 
@@ -611,22 +625,27 @@ function RideMapPreview({
       </div>
 
       {/* Map View Canvas with generous height */}
-      <div style={{ height: isExpanded ? 520 : 420 }}>
-        <LazyRealMapView
-          center={[16.061, 108.2208]}
-          zoom={14}
-          height="100%"
-          route={[
-            [16.0544, 108.2022], // Điểm đón: 12 Lê Lợi (Hải Châu)
-            [16.0592, 108.2435], // Điểm trả: 24 Võ Nguyên Giáp (Sơn Trà / Mỹ Khê)
-          ]}
-          startLabel="12 Lê Lợi (Hải Châu)"
-          endLabel="24 Võ Nguyên Giáp (Sơn Trà)"
-          showControls={true}
-          showAttribution={true}
-          showDriverProgress={true}
-        />
-      </div>
+      {ride?.pickupPoint && ride.dropoffPoint ? (
+        <div style={{ height: isExpanded ? 520 : 420 }}>
+          <LazyRealMapView
+            center={[
+              (ride.pickupPoint.lat + ride.dropoffPoint.lat) / 2,
+              (ride.pickupPoint.lng + ride.dropoffPoint.lng) / 2,
+            ]}
+            zoom={13}
+            height="100%"
+            route={[
+              [ride.pickupPoint.lat, ride.pickupPoint.lng],
+              [ride.dropoffPoint.lat, ride.dropoffPoint.lng],
+            ]}
+            startLabel={ride.pickup}
+            endLabel={ride.dropoff}
+            showControls={true}
+            showAttribution={true}
+            showDriverProgress={false}
+          />
+        </div>
+      ) : null}
     </aside>
   );
 }

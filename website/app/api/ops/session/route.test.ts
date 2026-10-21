@@ -96,4 +96,29 @@ describe("Ops Session Route /api/ops/session", () => {
     expect(setCookie).toContain(`${OPS_ACCESS_COOKIE}=;`);
     expect(setCookie).toContain(`${OPS_REFRESH_COOKIE}=;`);
   });
+
+  it("maps an upstream 429 to a Vietnamese wait message (DEC-PROD-044)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        json: async () => ({ statusCode: 429, message: "ThrottlerException: Too Many Requests" }),
+        text: async () => JSON.stringify({ statusCode: 429, message: "ThrottlerException: Too Many Requests" }),
+      }),
+    );
+    const req = new Request("http://localhost:3000/api/ops/session", {
+      method: "POST",
+      headers: {
+        Origin: "http://localhost:3000",
+        Host: "localhost:3000",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email: "ops@dealgo.vn", password: "Password123!" }),
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(429);
+    const json = await res.json();
+    expect(json.message).toContain("quá nhiều lần");
+  });
 });

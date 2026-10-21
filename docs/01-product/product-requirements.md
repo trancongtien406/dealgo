@@ -146,7 +146,7 @@ DealGo là nền tảng dịch vụ địa phương có hai hành trình:
 | `DEC-PROD-003` | Dùng tài liệu công khai của Grab/GrabFood/ShopeeFood để nghiên cứu *patterns*, không sao chép hoặc mặc định policy. |
 | `DEC-PROD-004` | Docs phải hỗ trợ coding/testing/operations; không chỉ có screen list. |
 | `DEC-PROD-005` | Ride có thương lượng giá trước assignment. |
-| `DEC-PROD-006` | Passkey + phone SMS + verified email; Admin quản lý bật/tắt method có kiểm soát. |
+| `DEC-PROD-006` | **SUPERSEDED** — email+password đăng ký/đăng nhập bình thường cùng phone SMS và passkey. |
 | `DEC-PROD-007` | Chat và gọi thoại trong app theo transaction Ride/Food. |
 
 ### 5.2. Phân loại mức ưu tiên
@@ -302,7 +302,7 @@ Merchant closed, món hết khi checkout, giá đổi, merchant không phản h�
 | `FR-CORE-013` | Lịch sử và chi tiết giao dịch phản ánh nhất quán các trạng thái. | Receipt, estimated amount, paid amount, due amount, settled amount không bị đánh đồng. | `CAP-CORE-08/09` |
 | `FR-CORE-014` | Notification không tiết lộ dữ liệu nhạy cảm và chỉ đến actor liên quan. | Push/deep link không lộ order/trip nhạy cảm trên role không được phép. | `CAP-CORE-09/10`, `OPEN-014` |
 | `FR-CORE-015` | Hệ thống ghi nhận actor/time/reason cho thay đổi nhạy cảm. | Có audit chain đủ tra cứu sự cố mà không rò PII trong log ứng dụng công khai. | `CAP-CORE-10/11/12` |
-| `FR-CORE-016` | Đăng ký/liên kết passkey, xác minh phone SMS, email; account quản lý nhiều method, recovery an toàn. | Server xác minh passkey; SMS OTP rate-limited; email verified, không dùng email OTP để login độc lập. | `CAP-CORE-01`, `DEC-PROD-006`, `OPEN-020` |
+| `FR-CORE-016` | Passkey-first cho đăng ký/đăng nhập không cần nhập identifier; email+password và phone SMS OTP là fallback; account quản lý nhiều method, recovery an toàn. | Discoverable credential ánh xạ về Account ở server; đăng ký passkey-first tạo CUSTOMER contact-less; passkey không đọc phone; SMS OTP rate-limited. | `CAP-CORE-01`, `DEC-PROD-046`, `OPEN-020` |
 | `FR-CORE-017` | Chat văn bản với participant Ride/Food trong cửa sổ liên lạc được cấp. | Chỉ participant server-authorized đọc/gửi; message gắn đúng context; Admin đọc theo case/audit. | `CAP-CORE-13`, `DEC-PROD-007`, `OPEN-021` |
 | `FR-CORE-018` | Gọi thoại trong app giữa participant Ride/Food đủ điều kiện. | Call authorization ngắn hạn; không lộ số; microphone permission rõ; không ghi âm mặc định. | `CAP-CORE-13`, `DEC-PROD-007`, `OPEN-021` |
 

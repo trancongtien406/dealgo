@@ -91,15 +91,9 @@ export class RoleGrantsService {
       (grant) => grant.role === role,
     );
     if (existing) {
+      // Suspension (ops reject or enforcement) is lifted only by ops, never by re-requesting.
       if (existing.status === 'SUSPENDED') {
-        const reopened = await this.repository.updateGrantStatus(
-          existing.id,
-          this.initialStatus(),
-        );
-        if (!reopened) {
-          throw authError(404, 'ROLE_GRANT_NOT_FOUND', 'Role grant was not found');
-        }
-        return viewOf(reopened);
+        throw authError(403, 'ROLE_GRANT_SUSPENDED', 'Role grant is suspended');
       }
       return viewOf(existing);
     }

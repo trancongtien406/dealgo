@@ -82,6 +82,7 @@ describe('ops platform settings + faqs http', () => {
               SMS_PROVIDER: 'mock',
               EMAIL_PROVIDER: 'mock',
               OTP_THROTTLE_LIMIT: '1000',
+              OTP_PHONE_LIMIT: '1000',
               DRIVER_SEARCH_RADIUS_KM: '5',
               RIDE_OFFER_TTL_SECONDS: '60',
               RIDE_MIN_FARE_VND: '10000',
@@ -205,13 +206,94 @@ describe('ops platform settings + faqs http', () => {
     expect(resolved).toBe(12);
   });
 
+  it('seeds platform fees and the rating window, and validates fee percents', async () => {
+    const listed = await request(app.getHttpServer())
+      .get('/v1/ops/platform-settings?category=FARE')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    const byKey = new Map(
+      (listed.body.data as Array<{ key: string; value: string }>).map((r) => [r.key, r.value]),
+    );
+    expect(byKey.get('PLATFORM_FEE_RIDE_PERCENT')).toBe('0');
+    expect(byKey.get('PLATFORM_FEE_FOOD_PERCENT')).toBe('0');
+    const service = app.get(PlatformSettingsService);
+    expect(await service.getNumber('RATING_WINDOW_DAYS')).toBe(7);
+
+    const patch = (key: string, value: string) =>
+      request(app.getHttpServer())
+        .patch(`/v1/ops/platform-settings/${key}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ value, reason: 'fee policy TEST_ONLY' });
+    for (const bad of ['-1', '100.5', '12.345', 'abc', '1e1']) {
+      const res = await patch('PLATFORM_FEE_RIDE_PERCENT', bad).expect(400);
+      expect(res.body.errorCode).toBe('PLATFORM_SETTING_INVALID');
+    }
+    await patch('RATING_WINDOW_DAYS', '2.5').expect(400);
+    await patch('RATING_WINDOW_DAYS', '0').expect(400);
+
+    const ok = await patch('PLATFORM_FEE_RIDE_PERCENT', '12.50').expect(200);
+    expect(ok.body.data).toMatchObject({ value: '12.5', source: 'db' });
+    expect(settingsRepo.audits.at(-1)).toEqual(
+      expect.objectContaining({
+        reason: 'fee policy TEST_ONLY',
+        metadata: expect.objectContaining({
+          key: 'PLATFORM_FEE_RIDE_PERCENT',
+          value: '12.5',
+          previousValue: '0',
+        }),
+      }),
+    );
+    expect(await service.getNumber('PLATFORM_FEE_RIDE_PERCENT')).toBe(12.5);
+    await patch('RATING_WINDOW_DAYS', '14').expect(200);
+    expect(await service.getNumber('RATING_WINDOW_DAYS')).toBe(14);
+  });
+
+  it('seeds and validates the upload limits (DEC-PROD-020)', async () => {
+    const service = app.get(PlatformSettingsService);
+    expect(await service.getNumber('UPLOAD_MAX_FILE_KB')).toBe(4096);
+    expect(await service.getJson('UPLOAD_ALLOWED_TYPES')).toEqual([
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'application/pdf',
+    ]);
+    const patch = (key: string, value: string) =>
+      request(app.getHttpServer())
+        .patch(`/v1/ops/platform-settings/${key}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ value, reason: 'upload policy TEST_ONLY' });
+    await patch('UPLOAD_MAX_FILE_KB', '99').expect(400);
+    await patch('UPLOAD_MAX_FILE_KB', '5121').expect(400);
+    for (const bad of ['[]', '["image/svg+xml"]', '["image/jpeg","image/jpeg"]', '"image/jpeg"']) {
+      const res = await patch('UPLOAD_ALLOWED_TYPES', bad).expect(400);
+      expect(res.body.errorCode).toBe('PLATFORM_SETTING_INVALID');
+    }
+    await patch('UPLOAD_ALLOWED_TYPES', '["image/jpeg","application/pdf"]').expect(200);
+    expect(await service.getJson('UPLOAD_ALLOWED_TYPES')).toEqual(['image/jpeg', 'application/pdf']);
+    await patch('UPLOAD_MAX_FILE_KB', '2048').expect(200);
+    expect(await service.getNumber('UPLOAD_MAX_FILE_KB')).toBe(2048);
+  });
+
   it('lists FAQ drafts for OPEN-001..021 and allows create', async () => {
     const listed = await request(app.getHttpServer())
       .get('/v1/ops/faqs')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
-    expect(listed.body.data).toHaveLength(OPS_FAQ_SEEDS.length);
+    const internal = listed.body.data.filter((f: { audience: string }) => f.audience === 'INTERNAL');
+    expect(internal).toHaveLength(OPS_FAQ_SEEDS.length);
+    expect(
+      listed.body.data.filter((f: { audience: string }) => f.audience === 'CUSTOMER').length,
+    ).toBeGreaterThanOrEqual(5);
+    const help = await request(app.getHttpServer()).get('/v1/public/help/faqs').expect(200);
+    expect(help.body.data[0]).toEqual({
+      id: expect.any(String),
+      question: expect.any(String),
+      answer: expect.any(String),
+      updatedAt: expect.any(String),
+    });
+    expect(help.body.data.every((f: { question: string }) => !f.question.includes('pilot'))).toBe(true);
+    await request(app.getHttpServer()).get('/v1/public/help/faqs?audience=INTERNAL').expect(400);
     expect(listed.body.data[0]).toEqual(
       expect.objectContaining({
         openId: 'OPEN-001',

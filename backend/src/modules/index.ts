@@ -14,6 +14,7 @@ export * as PartnerDomain from './partner/index.js';
 export * as SupportDomain from './support/index.js';
 export * as OperationsDomain from './operations/index.js';
 export * as CommunicationDomain from './communication/index.js';
+export * as PromotionDomain from './promotion/index.js';
 
 export { IdentityModule } from './identity/index.js';
 export { FoodModule, FoodOrderModule } from './food-order/index.js';
@@ -33,3 +34,10 @@ export { OutboxModule } from './communication/outbox/index.js';
 export { ChatModule } from './communication/chat/index.js';
 export { RealtimeModule } from './communication/realtime/index.js';
 export { NotificationModule } from './communication/notifications/index.js';
+export { PromotionModule } from './promotion/index.js';
+export { InboxModule } from './communication/inbox/index.js';
+export { AddressBookModule } from './address-book/index.js';
+export { RatingModule } from './rating/index.js';
+export { DriverHistoryModule } from './driver-history/index.js';
+export { AccountDeletionModule } from './account-deletion/index.js';
+export { AccountSettingsModule } from './account-settings/index.js';

@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../driver_card/domain/driver_card.dart';
+import '../../../driver_card/presentation/driver_card_tile.dart';
+
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/ride_money.dart';
 import '../../domain/entities/ride_models.dart';
 import '../../domain/entities/ride_vehicle.dart';
+import '../../../promotion/domain/entities/voucher_quote.dart';
+import '../../../promotion/presentation/widgets/voucher_field.dart';
 import '../pages/ride_offer_detail_page.dart';
 import '../utils/ride_routes.dart';
 import 'ride_widgets.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 class OfferBlock {
   const OfferBlock.expired({this.amountVnd}) : taken = false;
@@ -29,16 +36,12 @@ class OfflineOffers extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        RideScreenHeader(
-          title: 'Tài xế chào giá',
-          subtitle: 'DealGo · Biến thể trạng thái',
-          onBack: onBack,
-        ),
-        const Expanded(
+        DealGoAppHeader(title: AppLocalizations.of(context).rideDriverOffers, onBack: onBack),
+        Expanded(
           child: Padding(
-            padding: EdgeInsets.all(DealGoDimensions.pageGutter),
+            padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
             child: RideOfflineNotice(
-              detail: 'Chưa tải được báo giá. Chuyến chưa được xác nhận.',
+              detail: AppLocalizations.of(context).rideOffersLoadFailed,
             ),
           ),
         ),
@@ -80,11 +83,7 @@ class EmptyOffers extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        RideScreenHeader(
-          title: 'Tài xế chào giá',
-          subtitle: 'DealGo · Biến thể trạng thái',
-          onBack: onBack,
-        ),
+        DealGoAppHeader(title: AppLocalizations.of(context).rideDriverOffers, onBack: onBack),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(
@@ -94,19 +93,19 @@ class EmptyOffers extends StatelessWidget {
               DealGoSpacing.s16,
             ),
             children: [
-              const RideStateHero(
-                icon: Icons.hourglass_empty,
+              RideStateHero(
+                icon: DealGoIcons.hourglass,
                 iconColor: DealGoColors.warning,
                 background: DealGoColors.amberSurface,
-                title: 'Chưa có tài xế chào giá',
-                message: 'Trong khu vực này chưa có báo giá hợp lệ cho yêu cầu hiện tại.',
+                title: AppLocalizations.of(context).rideNoOffersTitle,
+                message: AppLocalizations.of(context).rideNoOffersMessage,
               ),
               const SizedBox(height: DealGoSpacing.s16),
               RidePanel(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const RideSectionTitle('Hành trình đang chọn'),
+                    RideSectionTitle(AppLocalizations.of(context).rideCurrentRoute),
                     const SizedBox(height: DealGoSpacing.s12),
                     RideStopList(
                       pickup: ride.pickup.label,
@@ -120,28 +119,27 @@ class EmptyOffers extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const RideSectionTitle('Giá của báo giá đang sử dụng'),
+                    RideSectionTitle(AppLocalizations.of(context).rideCurrentQuoteFare),
                     const SizedBox(height: DealGoSpacing.s8),
                     RideMoneyLine(
-                      label: 'Mã báo giá',
-                      amount: rideQuoteDisplayId(ride.id),
+                      label: AppLocalizations.of(context).rideTripCode,
+                      amount: rideShortRef(ride.id),
                     ),
                     RideMoneyLine(
-                      label: 'Giá đề xuất',
+                      label: AppLocalizations.of(context).rideOfferedFare,
                       amount: formatRideVnd(ride.offeredFareVnd),
                       emphasize: true,
                     ),
-                    const RideMoneyLine(label: 'Phiên báo giá', amount: 'v1'),
                   ],
                 ),
               ),
               const SizedBox(height: DealGoSpacing.s12),
-              const RideNote(
-                message: 'Có thể chỉnh giá đề xuất, mở rộng bán kính hoặc thử lại sau.',
+              RideNote(
+                message: AppLocalizations.of(context).rideNoOffersHint,
               ),
               if (offline) ...[
                 const SizedBox(height: DealGoSpacing.s12),
-                const RideOfflineNotice(detail: 'Chưa làm mới được danh sách.'),
+                RideOfflineNotice(detail: AppLocalizations.of(context).rideListRefreshFailed),
               ],
               if (message != null) ...[
                 const SizedBox(height: DealGoSpacing.s12),
@@ -166,7 +164,7 @@ class EmptyOffers extends StatelessWidget {
           ),
           child: RideDualActions(
             secondaryLabel: AppLocalizations.of(context).actionRetry,
-            primaryLabel: 'Thay đổi đề xuất',
+            primaryLabel: AppLocalizations.of(context).rideChangeOffer,
             enabled: !busy,
             onSecondary: onRetry,
             onPrimary: onChangeFare,
@@ -194,19 +192,19 @@ class ExpiredRide extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _QuoteState(
-      title: 'Báo giá đã hết hạn',
-      message: 'Báo giá cũ không thể được chọn vì đã quá thời gian hiệu lực.',
-      icon: Icons.timelapse,
+      title: AppLocalizations.of(context).rideQuoteExpiredTitle,
+      message: AppLocalizations.of(context).rideQuoteExpiredMessage,
+      icon: DealGoIcons.timer,
       iconColor: DealGoColors.danger,
       background: DealGoColors.dangerSurface,
       ride: ride,
-      badge: ride.status == RideStatus.expired ? ride.status.wire : 'EXPIRED',
-      quoteLabel: 'Giá cũ (tham khảo)',
+      badge: AppLocalizations.of(context).rideQuoteExpiredBadge,
+      quoteLabel: AppLocalizations.of(context).rideOldFare,
       quoteAmount: formatRideVnd(ride.offeredFareVnd),
-      note: 'Phải lấy quoteId + version mới trước khi xác nhận; tuyệt đối không gửi lại báo giá cũ.',
+      note: AppLocalizations.of(context).rideQuoteExpiredNote,
       onBack: onBack,
-      secondaryLabel: 'Thay đổi đề xuất',
-      primaryLabel: 'Tìm báo giá mới',
+      secondaryLabel: AppLocalizations.of(context).rideChangeOffer,
+      primaryLabel: AppLocalizations.of(context).rideFindNewOffers,
       onSecondary: onChangeFare,
       onPrimary: onRefresh,
     );
@@ -234,39 +232,40 @@ class BlockedOffers extends StatelessWidget {
     final amount = block.amountVnd ?? ride.offeredFareVnd;
     if (block.taken) {
       return _QuoteState(
-        title: 'Tài xế đã nhận việc khác',
+        title: AppLocalizations.of(context).rideOfferTakenTitle,
         message:
-            'Báo giá bạn vừa chọn không còn khả dụng tại thời điểm xác nhận.',
-        icon: Icons.swap_horiz,
+            AppLocalizations.of(context).rideOfferTakenMessage,
+        icon: DealGoIcons.swapHoriz,
         iconColor: DealGoColors.warning,
         background: DealGoColors.amberSurface,
         ride: ride,
-        badge: 'Không còn khả dụng',
-        quoteLabel: 'Giá chào trước đó',
+        taken: true,
+        badge: AppLocalizations.of(context).rideOfferUnavailable,
+        quoteLabel: AppLocalizations.of(context).ridePreviousOffer,
         quoteAmount: formatRideVnd(amount),
         note:
-            'Dữ liệu danh sách có thể đã cũ. Làm mới và chọn một đề nghị khác.',
+            AppLocalizations.of(context).rideOfferTakenNote,
         onBack: onBack,
-        secondaryLabel: 'Làm mới danh sách',
-        primaryLabel: 'Xem tài xế khác',
+        secondaryLabel: AppLocalizations.of(context).rideRefreshList,
+        primaryLabel: AppLocalizations.of(context).rideSeeOtherDrivers,
         onSecondary: onRefresh,
         onPrimary: onRefresh,
       );
     }
     return _QuoteState(
-      title: 'Báo giá đã hết hạn',
-      message: 'Báo giá cũ không thể được chọn vì đã quá thời gian hiệu lực.',
-      icon: Icons.timelapse,
+      title: AppLocalizations.of(context).rideQuoteExpiredTitle,
+      message: AppLocalizations.of(context).rideQuoteExpiredMessage,
+      icon: DealGoIcons.timer,
       iconColor: DealGoColors.danger,
       background: DealGoColors.dangerSurface,
       ride: ride,
-      badge: 'EXPIRED',
-      quoteLabel: 'Giá cũ (tham khảo)',
+      badge: AppLocalizations.of(context).rideQuoteExpiredBadge,
+      quoteLabel: AppLocalizations.of(context).rideOldFare,
       quoteAmount: formatRideVnd(amount),
-      note: 'Phải lấy quoteId + version mới trước khi xác nhận; tuyệt đối không gửi lại báo giá cũ.',
+      note: AppLocalizations.of(context).rideQuoteExpiredNote,
       onBack: onBack,
-      secondaryLabel: 'Thay đổi đề xuất',
-      primaryLabel: 'Tìm báo giá mới',
+      secondaryLabel: AppLocalizations.of(context).rideChangeOffer,
+      primaryLabel: AppLocalizations.of(context).rideFindNewOffers,
       onSecondary: onChangeFare,
       onPrimary: onRefresh,
     );
@@ -290,8 +289,10 @@ class _QuoteState extends StatelessWidget {
     required this.primaryLabel,
     required this.onSecondary,
     required this.onPrimary,
+    this.taken = false,
   });
 
+  final bool taken;
   final String title;
   final String message;
   final IconData icon;
@@ -312,11 +313,7 @@ class _QuoteState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        RideScreenHeader(
-          title: 'Danh sách báo giá',
-          subtitle: 'DealGo · Biến thể trạng thái',
-          onBack: onBack,
-        ),
+        DealGoAppHeader(title: AppLocalizations.of(context).rideOfferList, onBack: onBack),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(
@@ -338,7 +335,7 @@ class _QuoteState extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const RideSectionTitle('Hành trình đang chọn'),
+                    RideSectionTitle(AppLocalizations.of(context).rideCurrentRoute),
                     const SizedBox(height: DealGoSpacing.s12),
                     RideStopList(
                       pickup: ride.pickup.label,
@@ -353,21 +350,21 @@ class _QuoteState extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     RideSectionTitle(
-                      badge == 'Không còn khả dụng'
-                          ? 'Báo giá vừa hết hiệu lực'
-                          : 'Báo giá hết hạn',
+                      taken
+                          ? AppLocalizations.of(context).rideOfferJustInvalid
+                          : AppLocalizations.of(context).rideOfferExpiredShort,
                     ),
                     const SizedBox(height: DealGoSpacing.s8),
                     RideStatusChip(
                       label: badge,
-                      tone: badge == 'Không còn khả dụng'
+                      tone: taken
                           ? RideChipTone.warning
                           : RideChipTone.danger,
                     ),
                     const SizedBox(height: DealGoSpacing.s8),
                     RideMoneyLine(
-                      label: 'Báo giá',
-                      amount: rideQuoteDisplayId(ride.id),
+                      label: AppLocalizations.of(context).rideTripCode,
+                      amount: rideShortRef(ride.id),
                     ),
                     RideMoneyLine(label: quoteLabel, amount: quoteAmount),
                   ],
@@ -421,7 +418,7 @@ class TerminalRide extends StatelessWidget {
     final label = actionLabel;
     return Column(
       children: [
-        RideScreenHeader(title: title, onBack: onBack),
+        DealGoAppHeader(title: title, onBack: onBack),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
@@ -456,6 +453,10 @@ class OfferList extends StatelessWidget {
     required this.onSelectOffer,
     required this.onConfirm,
     required this.onCancel,
+    this.onVoucherQuote,
+    this.voucherCode,
+    this.voucherDiscountVnd = 0,
+    this.voucherEpoch = 0,
     super.key,
   });
 
@@ -470,13 +471,22 @@ class OfferList extends StatelessWidget {
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
 
+  /// DEC-PROD-024: voucher quoted on the selected offer and redeemed with the selection.
+  final ValueChanged<VoucherQuote?>? onVoucherQuote;
+  final String? voucherCode;
+  final int voucherDiscountVnd;
+
+  /// Bumped by the page to reset the field after the server refuses the code.
+  final int voucherEpoch;
+
   @override
   Widget build(BuildContext context) {
     final selected = _selected(offers, selectedOfferId);
+    final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
     return Column(
       children: [
-        RideScreenHeader(title: 'Tài xế chào giá', onBack: onBack),
+        DealGoAppHeader(title: AppLocalizations.of(context).rideDriverOffers, onBack: onBack),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(
@@ -490,7 +500,7 @@ class OfferList extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const RideSectionTitle('Hành trình & giá đề xuất'),
+                    RideSectionTitle(AppLocalizations.of(context).rideRouteAndFare),
                     const SizedBox(height: DealGoSpacing.s12),
                     RideStopList(
                       pickup: ride.pickup.label,
@@ -498,7 +508,7 @@ class OfferList extends StatelessWidget {
                     ),
                     const SizedBox(height: DealGoSpacing.s12),
                     RideMoneyLine(
-                      label: 'Giá bạn đề xuất',
+                      label: AppLocalizations.of(context).rideYourBidLabel,
                       amount: formatRideVnd(ride.offeredFareVnd),
                       emphasize: true,
                     ),
@@ -510,7 +520,7 @@ class OfferList extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      '${offers.length} báo giá phù hợp',
+                      AppLocalizations.of(context).rideOffersCount(offers.length),
                       style: textTheme.titleMedium,
                     ),
                   ),
@@ -528,7 +538,7 @@ class OfferList extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            'Giá thấp nhất',
+                            AppLocalizations.of(context).rideLowestFirst,
                             style: textTheme.labelSmall?.copyWith(
                               color: DealGoColors.primary,
                               fontWeight: FontWeight.w700,
@@ -536,7 +546,7 @@ class OfferList extends StatelessWidget {
                           ),
                           const SizedBox(width: 4),
                           const Icon(
-                            Icons.keyboard_arrow_down,
+                            DealGoIcons.chevronDown,
                             size: 16,
                             color: DealGoColors.primary,
                           ),
@@ -549,6 +559,7 @@ class OfferList extends StatelessWidget {
               const SizedBox(height: DealGoSpacing.s12),
               for (final offer in offers) ...[
                 _OfferCard(
+                  rideId: ride.id,
                   offer: offer,
                   selected: offer.id == selectedOfferId,
                   onTap: () => onSelectOffer(offer.id),
@@ -559,13 +570,49 @@ class OfferList extends StatelessWidget {
                 ),
                 const SizedBox(height: DealGoSpacing.s12),
               ],
-              const RideNote(
-                message: 'Chỉ có báo giá bạn xác nhận mới tạo thành chuyến đi. Báo giá chưa chọn có thể hết hạn.',
+              RideNote(
+                message: AppLocalizations.of(context).rideOffersNote,
               ),
+              if (onVoucherQuote != null && selected != null) ...[
+                const SizedBox(height: DealGoSpacing.s12),
+                RidePanel(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      RideSectionTitle(l10n.rideVoucherTitle),
+                      const SizedBox(height: DealGoSpacing.s12),
+                      VoucherField(
+                        key: ValueKey('ride-voucher-$voucherEpoch'),
+                        service: VoucherService.ride,
+                        orderAmountVnd: selected.amountVnd,
+                        accessToken: () => rideAccessToken(context),
+                        formatAmount: formatRideVnd,
+                        initialCode: voucherCode,
+                        onQuote: onVoucherQuote,
+                      ),
+                      if (voucherDiscountVnd > 0) ...[
+                        const SizedBox(height: DealGoSpacing.s12),
+                        RideMoneyLine(
+                          label: l10n.rideCashDueLabel,
+                          amount: formatRideVnd(
+                            rideCashAfterVoucher(selected.amountVnd, voucherDiscountVnd),
+                          ),
+                          emphasize: true,
+                        ),
+                      ],
+                      const SizedBox(height: DealGoSpacing.s8),
+                      Text(
+                        l10n.rideVoucherNote,
+                        style: textTheme.bodySmall?.copyWith(color: DealGoColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               if (offline) ...[
                 const SizedBox(height: DealGoSpacing.s12),
-                const RideOfflineNotice(
-                  detail: 'Chưa gửi được lựa chọn. Giá chuyến chưa được chốt.',
+                RideOfflineNotice(
+                  detail: AppLocalizations.of(context).rideSelectOffline,
                 ),
               ],
               if (message != null) ...[
@@ -592,9 +639,10 @@ class OfferList extends StatelessWidget {
           child: DealGoPrimaryButton(
             key: const Key('ride-select-offer'),
             label: selected == null
-                ? 'Chọn báo giá'
-                : 'Xem tài xế ${_offerDriverLabel(selected)}',
-            trailingIcon: Icons.arrow_forward,
+                ? AppLocalizations.of(context).rideSelectOfferPrompt
+                : AppLocalizations.of(context)
+                      .rideSelectOfferAmount(formatRideVnd(selected.amountVnd)),
+            trailingIcon: DealGoIcons.arrowRight,
             isLoading: busy,
             enabled: selected != null,
             onPressed: onConfirm,
@@ -614,28 +662,16 @@ RideOffer? _selected(List<RideOffer> offers, String? id) {
   return null;
 }
 
-String _offerDriverLabel(RideOffer offer) {
-  final id = offer.driverId;
-  if (id.isEmpty) {
-    return 'tài xế';
-  }
-  if (id == 'driver-hung' || id.endsWith('-hung')) {
-    return 'Nguyễn Văn Hùng';
-  }
-  if (id == 'driver-1' || id.contains('hung')) {
-    return 'Nguyễn Văn Hùng';
-  }
-  return 'Tài xế $id';
-}
-
 class _OfferCard extends StatelessWidget {
   const _OfferCard({
+    required this.rideId,
     required this.offer,
     required this.selected,
     required this.onTap,
     required this.onOpenDetail,
   });
 
+  final String rideId;
   final RideOffer offer;
   final bool selected;
   final VoidCallback onTap;
@@ -645,8 +681,6 @@ class _OfferCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final l10n = AppLocalizations.of(context);
-    final name = _offerDriverLabel(offer);
-    final initial = name.isEmpty ? '?' : name.substring(0, 1).toUpperCase();
     return Material(
       color: DealGoColors.card,
       shape: RoundedRectangleBorder(
@@ -668,36 +702,12 @@ class _OfferCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    backgroundColor: DealGoColors.subtlePurple,
-                    child: Text(
-                      initial,
-                      style: const TextStyle(
-                        color: DealGoColors.primary,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: DealGoSpacing.s12),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: textTheme.titleMedium?.copyWith(fontSize: 16),
-                        ),
-                        Text(
-                          '⭐ 4,9 · $rideVehicleLabel',
-                          style: textTheme.bodySmall,
-                        ),
-                        Text(
-                          '43A-567.89 · Đến đón sau 4 phút',
-                          style: textTheme.bodySmall,
-                        ),
-                      ],
+                    child: DriverCardTile(
+                      job: DriverCardJob.rideOffer,
+                      jobId: rideId,
+                      offerId: offer.id,
+                      accessToken: rideAccessToken(context) ?? '',
                     ),
                   ),
                   const SizedBox(width: DealGoSpacing.s8),
@@ -717,7 +727,7 @@ class _OfferCard extends StatelessWidget {
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: RideStatusChip(
-                        label: rideOfferKindLabel(offer.kind),
+                        label: rideOfferKindLabel(l10n, offer.kind),
                         tone: offer.kind == RideOfferKind.accept
                             ? RideChipTone.green
                             : RideChipTone.neutral,

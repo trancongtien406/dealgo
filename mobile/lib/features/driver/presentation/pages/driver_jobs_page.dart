@@ -5,6 +5,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../../core/design_system/components/dealgo_skeleton.dart';
+import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_money.dart';
@@ -13,9 +15,14 @@ import '../../../ride/domain/entities/ride_models.dart';
 import '../../../ride/domain/entities/ride_money.dart';
 import '../cubit/driver_duty_cubit.dart';
 import '../cubit/driver_feed_cubit.dart';
+import '../cubit/driver_services_cubit.dart';
 import 'driver_home_page.dart';
 import '../utils/driver_routes.dart';
 import '../widgets/driver_widgets.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/format/short_ref.dart';
+import '../../../../core/l10n/api_error_text.dart';
+import '../../../../core/network/request_failure.dart';
 
 class DriverJobsPage extends StatefulWidget {
   const DriverJobsPage({super.key});
@@ -28,7 +35,12 @@ class _DriverJobsPageState extends State<DriverJobsPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _sync());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _sync();
+      if (mounted) {
+        context.read<DriverServicesCubit>().load();
+      }
+    });
   }
 
   void _sync() {
@@ -45,8 +57,17 @@ class _DriverJobsPageState extends State<DriverJobsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<DriverDutyCubit, bool>(
-      listener: (context, online) => _sync(),
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<DriverDutyCubit, bool>(
+          listener: (context, online) => _sync(),
+        ),
+        // A saved service switch changes which jobs the server offers.
+        BlocListener<DriverServicesCubit, DriverServicesState>(
+          listenWhen: (before, after) => before.saved != after.saved,
+          listener: (context, _) => _sync(),
+        ),
+      ],
       child: BlocBuilder<DriverFeedCubit, DriverFeedState>(
         builder: (context, feed) {
           if (feed is DriverFeedIneligible) {
@@ -68,24 +89,22 @@ class _JobsOffline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return DriverPageFrame(
-      title: 'Yêu cầu đang mở',
-      subtitle: driverStateSubtitle,
+      title: l10n.driverOpenRequests,
       onBack: () => driverBack(context),
       body: ListView(
         padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
-        children: const [
+        children: [
           DriverHero(
-            icon: Icons.bolt,
+            icon: DealGoIcons.bolt,
             iconColor: DealGoColors.amber,
             background: DealGoColors.amberSurface,
-            title: 'Bạn đang ngoại tuyến',
-            message: 'Danh sách việc không được tải khi thiết bị đang offline.',
+            title: l10n.driverOfflineTitle,
+            message: l10n.driverJobsOfflineBody,
           ),
-          SizedBox(height: DealGoSpacing.s16),
-          DriverNote(
-            message: 'Offline trên thiết bị không đồng nghĩa backend đã đổi trạng thái ca làm. Cần đồng bộ lại.',
-          ),
+          const SizedBox(height: DealGoSpacing.s16),
+          DriverNote(message: l10n.driverOfflineNote),
         ],
       ),
     );
@@ -101,13 +120,15 @@ class _JobsOnline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context);
+    final services = context.watch<DriverServicesCubit>().state.saved;
     final state = feed;
     final DriverFeedReady? ready = state is DriverFeedReady ? state : null;
     final DriverFeedFailed? failed = state is DriverFeedFailed ? state : null;
     final loading = state is DriverFeedLoading || state is DriverFeedIdle;
 
     return DriverPageFrame(
-      title: 'Yêu cầu đang mở',
+      title: l10n.driverOpenRequests,
       onBack: () => driverBack(context),
       footer: ready == null || (ready.rides.isEmpty && ready.food.isEmpty)
           ? null
@@ -120,8 +141,8 @@ class _JobsOnline extends StatelessWidget {
               ),
               child: DealGoPrimaryButton(
                 key: const Key('driver-open-first-job'),
-                label: 'Xem chi tiết công việc',
-                trailingIcon: Icons.arrow_forward,
+                label: l10n.driverOpenJobDetails,
+                trailingIcon: DealGoIcons.arrowRight,
                 onPressed: () => _openFirst(context, ready),
               ),
             ),
@@ -133,78 +154,67 @@ class _JobsOnline extends StatelessWidget {
           DealGoSpacing.s16,
         ),
         children: [
-          const DriverPanel(
+          DriverPanel(
+            elevated: true,
             child: Row(
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Khu vực nhận việc'),
-                      SizedBox(height: DealGoSpacing.s4),
                       Text(
-                        'Đà Nẵng · Hải Châu',
-                        style: TextStyle(fontWeight: FontWeight.w700),
+                        l10n.driverServicesAreaSection,
+                        style: textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: DealGoSpacing.s4),
+                      Text(
+                        driverServicesSummary(l10n, services),
+                        key: const Key('driver-jobs-services'),
+                        style: textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                DriverChip(label: 'Online', tone: DriverChipTone.green),
-              ],
-            ),
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          DriverPanel(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Chế độ nhận việc', style: textTheme.titleMedium),
-                const SizedBox(height: DealGoSpacing.s8),
-                const Row(
-                  children: [
-                    DriverChip(
-                      label: 'Giao đồ ăn',
-                      tone: DriverChipTone.green,
-                    ),
-                    SizedBox(width: DealGoSpacing.s8),
-                    Expanded(
-                      child: Text(
-                        'Đã bật · Hồ sơ hợp lệ',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ],
+                TextButton(
+                  key: const Key('driver-jobs-open-services'),
+                  onPressed: () => context.push(DriverRoutes.services),
+                  child: Text(l10n.driverConfigure),
+                ),
+                DriverChip(
+                  label: l10n.driverOnlineBadge,
+                  tone: DriverChipTone.green,
                 ),
               ],
             ),
           ),
           const SizedBox(height: DealGoSpacing.s12),
-          if (loading)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: DealGoSpacing.s32),
-              child: Text(
-                'Đang tải yêu cầu',
-                textAlign: TextAlign.center,
-                style: textTheme.bodyMedium,
-              ),
+          if (loading) const DealGoSkeletonList(itemCount: 3),
+          if (failed != null)
+            DealGoStateView.failure(
+              context,
+              onRetry: onRetry,
+              cause: failed.sessionExpired ? sessionExpiredFailure : failed.error,
+              message: failed.sessionExpired
+                  ? l10n.errorSessionExpired
+                  : apiErrorText(
+                      l10n,
+                      failed.error,
+                      fallback: l10n.driverLoadRequestsFailed,
+                    ),
+              compact: true,
             ),
-          if (failed != null) ...[
-            Text(failed.message, style: textTheme.bodyMedium),
-            const SizedBox(height: DealGoSpacing.s12),
-            DealGoPrimaryButton(
-              label: AppLocalizations.of(context).actionRetry,
-              onPressed: onRetry,
-            ),
-          ],
           if (ready != null && ready.rides.isEmpty && ready.food.isEmpty)
-            Text(
-              'Chưa có yêu cầu đang mở',
-              style: textTheme.bodyMedium?.copyWith(
-                color: DealGoColors.textSecondary,
-              ),
+            DealGoStateView(
+              art: DealGoStateArt.noOrders,
+              title: services.rideEnabled || services.foodEnabled
+                  ? l10n.driverNoOpenRequests
+                  : l10n.driverServicesNoneOn,
+              compact: true,
             ),
           if (ready != null && ready.rides.isNotEmpty) ...[
-            Text('Chở khách có thể nhận', style: textTheme.titleMedium),
+            Text(l10n.driverRidesAvailable, style: textTheme.titleMedium),
             const SizedBox(height: DealGoSpacing.s8),
             for (final ride in ready.rides) ...[
               _RideJobCard(ride: ride),
@@ -212,16 +222,16 @@ class _JobsOnline extends StatelessWidget {
             ],
           ],
           if (ready != null && ready.food.isNotEmpty) ...[
-            Text('Giao đồ ăn có thể nhận', style: textTheme.titleMedium),
+            Text(l10n.driverFoodAvailable, style: textTheme.titleMedium),
             const SizedBox(height: DealGoSpacing.s8),
             for (final job in ready.food) ...[
               _FoodJobCard(job: job),
               const SizedBox(height: DealGoSpacing.s12),
             ],
           ],
-          const DriverNote(
+          DriverNote(
             tone: DriverNoteTone.green,
-            message: 'Một tài xế chỉ nhận tối đa một công việc đang thực hiện.',
+            message: l10n.driverOneJobNote,
           ),
           const SizedBox(height: DealGoSpacing.s16),
           Text(
@@ -230,15 +240,9 @@ class _JobsOnline extends StatelessWidget {
           ),
           const SizedBox(height: DealGoSpacing.s8),
           TextButton(
-            key: const Key('driver-open-failed-sample'),
-            onPressed: () => context.push(DriverRoutes.failed('job-demo-1')),
-            child: Text(AppLocalizations.of(context).driverJobFailedTitle),
-          ),
-          TextButton(
-            key: const Key('driver-open-completed-from-jobs'),
-            onPressed: () =>
-                context.push(DriverRoutes.completed('job-demo-1')),
-            child: Text(AppLocalizations.of(context).driverJobCompletedTitle),
+            key: const Key('driver-open-history'),
+            onPressed: () => context.go('/driver/earnings'),
+            child: Text(AppLocalizations.of(context).driverOpenHistory),
           ),
         ],
       ),
@@ -267,6 +271,8 @@ class _RideJobCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return DriverPanel(
+      elevated: true,
+      borderColor: DealGoColors.primary.withValues(alpha: 0.35),
       child: InkWell(
         key: Key('driver-ride-${ride.id}'),
         onTap: () => context.push(DriverRoutes.ride(ride.id), extra: ride),
@@ -275,27 +281,29 @@ class _RideJobCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const DriverChip(
-                  label: 'Chở khách · Xe máy',
+                Expanded(
+                  child: Text(
+                    AppLocalizations.of(context).rideRef(shortRef(ride.id)),
+                    style: textTheme.titleSmall,
+                  ),
+                ),
+                DriverChip(
+                  label: AppLocalizations.of(context).driverRideChip,
                   tone: DriverChipTone.green,
                 ),
-                const Spacer(),
-                Text('Đã đồng bộ', style: textTheme.bodySmall),
               ],
             ),
             const SizedBox(height: DealGoSpacing.s12),
-            Text('Đơn #${ride.id}', style: textTheme.bodySmall),
-            const SizedBox(height: DealGoSpacing.s8),
             Text(ride.pickup.label, style: textTheme.titleMedium),
             Text(ride.dropoff.label, style: textTheme.bodySmall),
             const SizedBox(height: DealGoSpacing.s12),
             DriverMoneyRow(
-              label: 'Giá khách đề xuất',
+              label: AppLocalizations.of(context).driverCustomerFare,
               value: formatRideVnd(ride.offeredFareVnd),
               emphasize: true,
             ),
             DriverMoneyRow(
-              label: 'Giá tham chiếu',
+              label: AppLocalizations.of(context).driverReferenceFare,
               value: formatRideVnd(ride.referenceFareVnd),
             ),
           ],
@@ -313,7 +321,10 @@ class _FoodJobCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context);
     return DriverPanel(
+      elevated: true,
+      borderColor: DealGoColors.primary.withValues(alpha: 0.35),
       child: InkWell(
         key: Key('driver-food-${job.id}'),
         onTap: () => context.push(DriverRoutes.food(job.id), extra: job),
@@ -322,11 +333,15 @@ class _FoodJobCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text('Đơn #${job.id}', style: textTheme.bodySmall),
-                const Spacer(),
-                const DriverChip(
-                  label: 'v1 · Dữ liệu đồng bộ',
-                  tone: DriverChipTone.neutral,
+                Expanded(
+                  child: Text(
+                    l10n.orderRef(shortRef(job.id)),
+                    style: textTheme.titleSmall,
+                  ),
+                ),
+                DriverChip(
+                  label: l10n.driverServicesFoodTitle,
+                  tone: DriverChipTone.green,
                 ),
               ],
             ),
@@ -334,18 +349,15 @@ class _FoodJobCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const DecoratedBox(
+                DecoratedBox(
                   decoration: BoxDecoration(
                     color: DealGoColors.subtlePurple,
-                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                    borderRadius: BorderRadius.circular(DealGoRadius.input),
                   ),
-                  child: SizedBox(
+                  child: const SizedBox(
                     width: 48,
                     height: 48,
-                    child: Icon(
-                      Icons.storefront_outlined,
-                      color: DealGoColors.primary,
-                    ),
+                    child: Icon(DealGoIcons.store, color: DealGoColors.primary),
                   ),
                 ),
                 const SizedBox(width: DealGoSpacing.s12),
@@ -354,11 +366,16 @@ class _FoodJobCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Cửa hàng ${job.storeId}',
+                        job.storeName ?? l10n.driverPickupStore,
                         style: textTheme.titleMedium,
                       ),
+                      if (job.storeAddress != null)
+                        Text(job.storeAddress!, style: textTheme.bodySmall),
                       Text(
-                        '${job.lineCount} món · ${job.dropoff.label}',
+                        l10n.driverFoodJobSummary(
+                          job.lineCount,
+                          job.dropoff.label,
+                        ),
                         style: textTheme.bodySmall,
                       ),
                     ],
@@ -368,17 +385,15 @@ class _FoodJobCard extends StatelessWidget {
             ),
             const SizedBox(height: DealGoSpacing.s12),
             DriverMoneyRow(
-              label: 'Giá giao được chấp nhận',
+              label: l10n.driverDeliveryFare,
               value: formatVnd(job.deliveryFareVnd),
               emphasize: true,
             ),
             Text(
-              'Thu nhập tài xế theo đối soát hệ thống sau khi giao xong.',
-              style: textTheme.bodySmall,
-            ),
-            Text(
-              'Chỉ được nhận sau khi Shop xác nhận và tài xế đủ điều kiện.',
-              style: textTheme.bodySmall,
+              l10n.driverDeliveryFareNote,
+              style: textTheme.bodySmall?.copyWith(
+                color: DealGoColors.textSecondary,
+              ),
             ),
           ],
         ),

@@ -8,6 +8,7 @@ class PlaceFoodOrderBody {
     required this.dropoffLng,
     required this.dropoffLabel,
     required this.deliveryFareVnd,
+    this.voucherCode,
   });
 
   factory PlaceFoodOrderBody.fromParams(PlaceFoodOrderParams request) {
@@ -15,12 +16,17 @@ class PlaceFoodOrderBody {
       storeId: request.storeId,
       items: [
         for (final item in request.items)
-          {'itemId': item.itemId, 'quantity': item.quantity},
+          {
+            'itemId': item.itemId,
+            'quantity': item.quantity,
+            if (item.optionIds.isNotEmpty) 'optionIds': item.optionIds,
+          },
       ],
       dropoffLat: request.dropoff.lat,
       dropoffLng: request.dropoff.lng,
       dropoffLabel: request.dropoff.label,
       deliveryFareVnd: request.deliveryFareVnd,
+      voucherCode: request.voucherCode,
     );
   }
 
@@ -30,17 +36,15 @@ class PlaceFoodOrderBody {
   final double dropoffLng;
   final String dropoffLabel;
   final int deliveryFareVnd;
+  final String? voucherCode;
 
   Map<String, Object?> toJson() {
     return {
       'storeId': storeId,
       'items': items,
-      'dropoff': {
-        'lat': dropoffLat,
-        'lng': dropoffLng,
-        'label': dropoffLabel,
-      },
+      'dropoff': {'lat': dropoffLat, 'lng': dropoffLng, 'label': dropoffLabel},
       'deliveryFareVnd': deliveryFareVnd,
+      if (voucherCode != null) 'voucherCode': voucherCode,
     };
   }
 }

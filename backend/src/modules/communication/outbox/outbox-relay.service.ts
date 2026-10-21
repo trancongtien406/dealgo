@@ -10,6 +10,10 @@ import type { PushSender } from '../../../integrations/push/push-sender.js';
 import type { SnapshotEventPayload } from '../realtime/realtime.constants.js';
 import { SnapshotFanoutService } from '../realtime/snapshot-fanout.service.js';
 import { RideService } from '../../ride/ride.service.js';
+import { INBOX_REPOSITORY } from '../inbox/inbox.constants.js';
+import type { InboxRepository } from '../inbox/inbox.repository.js';
+import { AccountSettingsService } from '../../account-settings/account-settings.service.js';
+import { statusInboxText } from '../inbox/inbox-text.js';
 import { OUTBOX_REPOSITORY } from './outbox.constants.js';
 import type { OutboxPendingRow, OutboxRepository } from './outbox.repository.js';
 
@@ -19,6 +23,9 @@ const DEFAULT_BATCH = 50;
  * Claims pending outbox rows, marks processed, then fans out snapshot + push mock.
  * Socket/push delivery is best-effort; clients must GET authoritative state on reconnect.
  */
+/** Users per inbox/push batch when fanning out a campaign. */
+export const CAMPAIGN_BATCH_SIZE = 500;
+
 @Injectable()
 export class OutboxRelayService {
   private readonly logger = new Logger(OutboxRelayService.name);
@@ -30,6 +37,8 @@ export class OutboxRelayService {
     @Optional() private readonly rides?: RideService,
     @Optional() private readonly food?: FoodService,
     @Optional() private readonly prisma?: PrismaService,
+    @Optional() @Inject(INBOX_REPOSITORY) private readonly inbox?: InboxRepository,
+    @Optional() private readonly prefs?: AccountSettingsService,
   ) {}
 
   async relayOnce(limit = DEFAULT_BATCH, now = new Date()): Promise<number> {
@@ -102,25 +111,31 @@ export class OutboxRelayService {
       });
       return;
     }
-    const title = `${row.aggregateType} update`;
-    const body = `Status: ${status}`;
+    const text = statusInboxText(row.aggregateType, status);
+    const title = text?.title ?? `${row.aggregateType} update`;
+    const body = text?.body ?? `Status: ${status}`;
     const data = {
       aggregateType: row.aggregateType,
       aggregateId: row.aggregateId,
       status,
       eventType: row.eventType,
     };
-    for (const userId of userIds) {
+    if (text) {
+      await this.writeInbox(userIds, row.eventKey, text.category, title, body, data);
+    }
+    const pushUsers = text && this.prefs
+      ? await this.prefs.filterRecipients(userIds, text.category)
+      : userIds;
+    for (const userId of pushUsers) {
       await this.push.send({ userId, title, body, data });
     }
   }
 
+  /**
+   * Campaigns reach every targeted user's inbox, in keyset batches (no recipient cap).
+   * FCM pushes still go only to users with a registered device token.
+   */
   private async pushCampaign(row: OutboxPendingRow): Promise<void> {
-    if (!this.push) {
-      throw new Error(
-        `OutboxRelayService: PushSender unavailable for campaign (eventKey: ${row.eventKey})`,
-      );
-    }
     const payload = row.payload as {
       title?: string;
       body?: string;
@@ -130,7 +145,6 @@ export class OutboxRelayService {
     const title = typeof payload.title === 'string' ? payload.title : 'DealGo';
     const body = typeof payload.body === 'string' ? payload.body : '';
     const audience = typeof payload.audience === 'string' ? payload.audience : 'ALL';
-    const userIds = await this.resolveCampaignAudience(audience);
     const data = {
       aggregateType: row.aggregateType,
       aggregateId: row.aggregateId,
@@ -138,41 +152,102 @@ export class OutboxRelayService {
       eventType: row.eventType,
       code: typeof payload.code === 'string' ? payload.code : '',
     };
-    for (const userId of userIds) {
-      await this.push.send({ userId, title, body, data });
+    if (!this.push) {
+      this.logger.warn({
+        msg: 'outbox.campaign_push_unavailable',
+        eventKey: row.eventKey,
+      });
+    }
+    let recipients = 0;
+    let pushed = 0;
+    for await (const userIds of this.campaignAudienceBatches(audience)) {
+      recipients += userIds.length;
+      await this.writeInbox(userIds, row.eventKey, 'PROMOTION', title, body, data);
+      if (!this.push) {
+        continue;
+      }
+      for (const userId of await this.usersWithPushTokens(userIds)) {
+        await this.push.send({ userId, title, body, data });
+        pushed += 1;
+      }
     }
     this.logger.log({
       msg: 'outbox.campaign_push_fanout',
       eventKey: row.eventKey,
       audience,
-      recipients: userIds.length,
+      recipients,
+      pushed,
     });
   }
 
-  private async resolveCampaignAudience(audience: string): Promise<string[]> {
+  /** Inbox rows are keyed by eventKey per user, so a retried relay does not duplicate them. */
+  private async writeInbox(
+    userIds: string[],
+    eventKey: string,
+    category: 'RIDE' | 'FOOD' | 'PROMOTION' | 'SYSTEM' | 'CHAT' | 'NEWS',
+    title: string,
+    body: string,
+    data: Record<string, string>,
+  ): Promise<void> {
+    if (!this.inbox || userIds.length === 0) {
+      return;
+    }
+    const allowed = this.prefs
+      ? await this.prefs.filterRecipients(userIds, category)
+      : userIds;
+    if (allowed.length === 0) {
+      return;
+    }
+    await this.inbox.createMany(
+      allowed.map((userId) => ({ userId, category, title, body, data, sourceEventKey: eventKey })),
+    );
+  }
+
+  private campaignDb() {
     if (!this.prisma) {
       throw new Error(
         'OutboxRelayService: PrismaService unavailable for campaign audience resolution',
       );
     }
-    const db = this.prisma.db();
+    return this.prisma.db();
+  }
+
+  /** Every user in the audience, ordered by id and paged with a keyset cursor. */
+  private async *campaignAudienceBatches(audience: string): AsyncGenerator<string[]> {
+    const db = this.campaignDb();
     if (!db) {
-      return [];
+      return;
     }
     const role = audienceRole(audience);
+    let cursor: string | undefined;
+    for (;;) {
+      const rows = await db.user.findMany({
+        where: role ? { roleGrants: { some: { role, status: 'ACTIVE' } } } : undefined,
+        select: { id: true },
+        orderBy: { id: 'asc' },
+        take: CAMPAIGN_BATCH_SIZE,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      });
+      if (rows.length === 0) {
+        return;
+      }
+      yield rows.map((r) => r.id);
+      if (rows.length < CAMPAIGN_BATCH_SIZE) {
+        return;
+      }
+      cursor = rows[rows.length - 1]!.id;
+    }
+  }
+
+  private async usersWithPushTokens(userIds: string[]): Promise<string[]> {
+    const db = this.campaignDb();
+    if (!db || userIds.length === 0) {
+      return [];
+    }
     const tokens = await db.pushDeviceToken.findMany({
-      where: role
-        ? {
-            user: {
-              roleGrants: {
-                some: { role, status: 'ACTIVE' },
-              },
-            },
-          }
-        : undefined,
+      where: { userId: { in: userIds } },
       select: { userId: true },
       distinct: ['userId'],
-      take: 500,
     });
     return tokens.map((t) => t.userId);
   }
@@ -216,6 +291,7 @@ function toSnapshotPayload(row: OutboxPendingRow, now: Date): SnapshotEventPaylo
   if (!status) {
     return null;
   }
+  const storeId = storeIdFromPayload(row.payload);
   return {
     eventType: row.eventType,
     aggregateType: row.aggregateType,
@@ -223,7 +299,16 @@ function toSnapshotPayload(row: OutboxPendingRow, now: Date): SnapshotEventPaylo
     status,
     revision: row.eventKey,
     occurredAt: now.toISOString(),
+    ...(storeId ? { storeId } : {}),
   };
+}
+
+function storeIdFromPayload(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return undefined;
+  }
+  const raw = (payload as Record<string, unknown>).storeId;
+  return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
 }
 
 function statusFromPayload(payload: unknown): string | null {

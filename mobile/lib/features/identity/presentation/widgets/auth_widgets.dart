@@ -3,14 +3,23 @@ import 'package:flutter/material.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/network/api_exception.dart';
 import '../pages/splash_page.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../../../core/l10n/api_error_text.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 class DealGoWordmark extends StatelessWidget {
-  const DealGoWordmark({super.key});
+  const DealGoWordmark({this.compact = false, super.key});
+
+  /// Smaller mark for [DealGoAppHeader] trailing slots.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.titleLarge
-        ?.copyWith(fontWeight: FontWeight.w800);
+    final base = compact
+        ? Theme.of(context).textTheme.titleMedium
+        : Theme.of(context).textTheme.titleLarge;
+    final style = base?.copyWith(fontWeight: FontWeight.w800);
     return Text.rich(
       TextSpan(
         style: style,
@@ -29,6 +38,8 @@ class DealGoWordmark extends StatelessWidget {
   }
 }
 
+/// Plain app-bar back control (chevron, no chrome). Prefer this over custom
+/// circled buttons so nested screens stay visually consistent.
 class AuthBackButton extends StatelessWidget {
   const AuthBackButton({required this.onPressed, super.key});
 
@@ -37,18 +48,9 @@ class AuthBackButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      tooltip: 'Quay lại',
+      tooltip: AppLocalizations.of(context).actionBack,
       onPressed: onPressed,
-      style: IconButton.styleFrom(
-        backgroundColor: DealGoColors.card,
-        foregroundColor: DealGoColors.text,
-        fixedSize: const Size(
-          DealGoDimensions.minTapTarget,
-          DealGoDimensions.minTapTarget,
-        ),
-        shape: const CircleBorder(side: BorderSide(color: DealGoColors.border)),
-      ),
-      icon: const Icon(Icons.arrow_back),
+      icon: const Icon(DealGoIcons.back, size: 24),
     );
   }
 }
@@ -73,7 +75,7 @@ class AuthInfoBanner extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Icon(
-              Icons.verified_user_outlined,
+              DealGoIcons.shield,
               color: DealGoColors.primary,
               size: 20,
             ),
@@ -118,7 +120,7 @@ class AuthErrorText extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return Text(
-      '${error.errorCode}: ${error.message}',
+      apiErrorText(AppLocalizations.of(context), error),
       key: const Key('auth-error'),
       style: textTheme.bodyMedium?.copyWith(
         color: Theme.of(context).colorScheme.error,
@@ -133,6 +135,6 @@ class SessionRestoringPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const DealGoSplashScreen();
+    return const DealGoSplashScreen(autoNavigate: false);
   }
 }

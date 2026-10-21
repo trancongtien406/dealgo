@@ -20,7 +20,7 @@ class RidePointModel {
     if (lat == null || lng == null || label is! String || label.isEmpty) {
       throw const ApiException(
         statusCode: 200,
-        message: 'Phản hồi không hợp lệ',
+        message: 'Invalid response',
         errorCode: 'INVALID_RESPONSE',
       );
     }
@@ -71,7 +71,7 @@ class RideOfferModel {
         expiresAt.isEmpty) {
       throw const ApiException(
         statusCode: 200,
-        message: 'Phản hồi không hợp lệ',
+        message: 'Invalid response',
         errorCode: 'INVALID_RESPONSE',
       );
     }
@@ -132,6 +132,10 @@ class RideViewModel {
     required this.selectedOfferId,
     required this.expiresAt,
     required this.offers,
+    this.pickupCode,
+    this.updatedAt,
+    this.discountVnd = 0,
+    this.voucherCode,
   });
 
   final String id;
@@ -145,6 +149,10 @@ class RideViewModel {
   final String? selectedOfferId;
   final String expiresAt;
   final List<RideOfferModel> offers;
+  final String? pickupCode;
+  final String? updatedAt;
+  final int discountVnd;
+  final String? voucherCode;
 
   factory RideViewModel.fromJson(Map<String, Object?> json) {
     final id = json['id'];
@@ -167,7 +175,7 @@ class RideViewModel {
         rawOffers is! List) {
       throw const ApiException(
         statusCode: 200,
-        message: 'Phản hồi không hợp lệ',
+        message: 'Invalid response',
         errorCode: 'INVALID_RESPONSE',
       );
     }
@@ -195,6 +203,10 @@ class RideViewModel {
       selectedOfferId: _nullableString(json['selectedOfferId']),
       expiresAt: expiresAt,
       offers: List.unmodifiable(offers),
+      pickupCode: _nullableString(json['pickupCode']),
+      updatedAt: _nullableString(json['updatedAt']),
+      discountVnd: _nullableInt(json['discountVnd']) ?? 0,
+      voucherCode: _nullableString(json['voucherCode']),
     );
   }
 
@@ -213,6 +225,10 @@ class RideViewModel {
       offers: [
         for (final offer in ride.offers) RideOfferModel.fromEntity(offer),
       ],
+      pickupCode: ride.pickupCode,
+      updatedAt: ride.updatedAt,
+      discountVnd: ride.discountVnd,
+      voucherCode: ride.voucherCode,
     );
   }
 
@@ -233,6 +249,10 @@ class RideViewModel {
       'selectedOfferId': selectedOfferId,
       'expiresAt': expiresAt,
       'offers': [for (final offer in offers) offer.toJson()],
+      if (pickupCode != null) 'pickupCode': pickupCode,
+      if (updatedAt != null) 'updatedAt': updatedAt,
+      'discountVnd': discountVnd,
+      'voucherCode': voucherCode,
     };
   }
 
@@ -249,6 +269,10 @@ class RideViewModel {
       selectedOfferId: selectedOfferId,
       expiresAt: expiresAt,
       offers: List.unmodifiable([for (final offer in offers) offer.toEntity()]),
+      pickupCode: pickupCode,
+      updatedAt: updatedAt,
+      discountVnd: discountVnd < 0 ? 0 : discountVnd,
+      voucherCode: voucherCode,
     );
   }
 }
@@ -296,7 +320,7 @@ class OpenRideModel {
         offerCount == null) {
       throw const ApiException(
         statusCode: 200,
-        message: 'Phản hồi không hợp lệ',
+        message: 'Invalid response',
         errorCode: 'INVALID_RESPONSE',
       );
     }
@@ -330,7 +354,7 @@ class OpenRideModel {
     if (data is! List) {
       throw const ApiException(
         statusCode: 200,
-        message: 'Phản hồi không hợp lệ',
+        message: 'Invalid response',
         errorCode: 'INVALID_RESPONSE',
       );
     }
@@ -397,11 +421,16 @@ class CreateRideBody {
 }
 
 class SelectRideOfferBody {
-  const SelectRideOfferBody({required this.offerId});
+  const SelectRideOfferBody({required this.offerId, this.voucherCode});
 
   final String offerId;
+  final String? voucherCode;
 
-  Map<String, Object?> toJson() => {'offerId': offerId};
+  Map<String, Object?> toJson() => {
+    'offerId': offerId,
+    if (voucherCode != null && voucherCode!.trim().isNotEmpty)
+      'voucherCode': voucherCode!.trim().toUpperCase(),
+  };
 }
 
 class SubmitRideOfferBody {

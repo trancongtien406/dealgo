@@ -10,11 +10,17 @@ class FakeSnapshotRealtime implements SnapshotRealtime {
   var connectCalls = 0;
   var disconnectCalls = 0;
 
+  /// Tests set this true to exercise the socket-connected path (no poll).
+  var connected = false;
+
   @override
   Stream<SnapshotHint> get snapshots => _snapshots.stream;
 
   @override
   Stream<void> get reconnects => _reconnects.stream;
+
+  @override
+  bool get isConnected => connected;
 
   @override
   Future<void> connect({required String accessToken}) async {
@@ -25,6 +31,7 @@ class FakeSnapshotRealtime implements SnapshotRealtime {
   Future<void> disconnect() async {
     disconnectCalls += 1;
     subscribed.clear();
+    connected = false;
   }
 
   @override

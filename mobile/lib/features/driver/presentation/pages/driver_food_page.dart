@@ -3,16 +3,26 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/maps/map_lat_lng.dart';
+import '../../../../core/maps/map_port.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_models.dart';
 import '../../../food/domain/entities/food_money.dart';
+import '../../../food/domain/params/food_delivery_action.dart';
+import '../../domain/usecases/advance_food_delivery.dart';
 import '../../domain/usecases/claim_food_order.dart';
+import '../utils/driver_action_runner.dart';
 import '../cubit/driver_duty_cubit.dart';
 import '../cubit/driver_feed_cubit.dart';
 import '../cubit/driver_food_cubit.dart';
 import '../utils/driver_routes.dart';
+import '../widgets/driver_navigate_buttons.dart';
+import '../widgets/driver_food_code_sheet.dart';
 import '../widgets/driver_widgets.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/format/short_ref.dart';
+import '../../../../core/l10n/api_error_text.dart';
 
 enum _FoodPhase { offer, navigate, wait, pickup, deliver, complete }
 
@@ -40,7 +50,8 @@ class _DriverFoodDetailView extends StatefulWidget {
   State<_DriverFoodDetailView> createState() => _DriverFoodDetailPageState();
 }
 
-class _DriverFoodDetailPageState extends State<_DriverFoodDetailView> {
+class _DriverFoodDetailPageState extends State<_DriverFoodDetailView>
+    with DriverActionRunner {
   var _claiming = false;
   var _taken = false;
   var _phase = _FoodPhase.offer;
@@ -53,7 +64,7 @@ class _DriverFoodDetailPageState extends State<_DriverFoodDetailView> {
     }
     final token = driverAccessToken(context);
     if (token == null || token.isEmpty) {
-      setState(() => _error = 'Phiên đăng nhập không còn hiệu lực');
+      setState(() => _error = AppLocalizations.of(context).errorSessionExpired);
       return;
     }
     setState(() {
@@ -85,7 +96,7 @@ class _DriverFoodDetailPageState extends State<_DriverFoodDetailView> {
           _error = null;
           return;
         }
-        _error = error.message;
+        _error = apiErrorText(AppLocalizations.of(context), error);
       });
     } catch (_) {
       if (!mounted) {
@@ -93,8 +104,71 @@ class _DriverFoodDetailPageState extends State<_DriverFoodDetailView> {
       }
       setState(() {
         _claiming = false;
-        _error = 'Không nhận được việc';
+        _error = AppLocalizations.of(context).driverClaimFailed;
       });
+    }
+  }
+
+  /// Pickup and deliver hit the backend; the store/customer arrival steps are
+  /// on-device only (the API has no such states).
+  Future<void> _goTo(_FoodPhase next) async {
+    final action = switch (next) {
+      _FoodPhase.pickup => FoodDeliveryAction.pickup,
+      _FoodPhase.complete => FoodDeliveryAction.deliver,
+      _ => null,
+    };
+    if (action == null) {
+      setState(() {
+        actionError = null;
+        _phase = next;
+      });
+      return;
+    }
+    final advance = context.read<AdvanceFoodDelivery>();
+    // DEC-PROD-036: when the server asks for a delivery / handover code, prompt and retry.
+    String? code;
+    while (true) {
+      ApiException? codePrompt;
+      final ok = await runDriverAction((token) async {
+        try {
+          final updated = await advance(
+            accessToken: token,
+            orderId: widget.job.id,
+            action: action,
+            code: code,
+          );
+          _claimed = updated;
+        } on ApiException catch (error) {
+          final errorCode = error.errorCode;
+          if (errorCode.endsWith('_CODE_REQUIRED') ||
+              errorCode.endsWith('_CODE_INVALID')) {
+            codePrompt = error;
+            return;
+          }
+          rethrow;
+        }
+      });
+      if (!mounted) {
+        return;
+      }
+      final prompt = codePrompt;
+      if (prompt == null) {
+        if (ok) {
+          setState(() => _phase = next);
+        }
+        return;
+      }
+      final l10n = AppLocalizations.of(context);
+      code = await showDriverFoodCodeSheet(
+        context,
+        delivery: action == FoodDeliveryAction.deliver,
+        error: prompt.errorCode.endsWith('_INVALID')
+            ? l10n.driverFoodCodeWrong
+            : null,
+      );
+      if (code == null || !mounted) {
+        return;
+      }
     }
   }
 
@@ -115,7 +189,9 @@ class _DriverFoodDetailPageState extends State<_DriverFoodDetailView> {
         job: widget.job,
         claimed: _claimed!,
         phase: _phase,
-        onPhase: (phase) => setState(() => _phase = phase),
+        busy: actionBusy,
+        error: actionError,
+        onPhase: _goTo,
         onBack: () => driverBack(context),
       );
     }
@@ -124,12 +200,12 @@ class _DriverFoodDetailPageState extends State<_DriverFoodDetailView> {
     final job = widget.job;
     return Scaffold(
       body: DriverPageFrame(
-        title: 'Chi tiết yêu cầu giao món',
+        title: l10n.driverFoodRequestTitle,
         insetBottom: true,
         onBack: () => driverBack(context),
         footer: DriverFooter(
-          secondaryLabel: 'Bỏ qua',
-          primaryLabel: 'Nhận việc',
+          secondaryLabel: l10n.actionSkip,
+          primaryLabel: l10n.driverClaimJob,
           primaryKey: const Key('driver-claim-job'),
           primaryEnabled: !_claiming,
           primaryLoading: _claiming,
@@ -148,38 +224,32 @@ class _DriverFoodDetailPageState extends State<_DriverFoodDetailView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Thông tin việc', style: textTheme.titleMedium),
+                  Text(l10n.driverJobInfo, style: textTheme.titleMedium),
                   const SizedBox(height: DealGoSpacing.s8),
                   Row(
                     children: [
                       Expanded(
                         child: Text(
-                          'Đơn #${job.id}',
+                          l10n.orderRef(shortRef(job.id)),
                           style: textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
-                      const DriverChip(
-                        label: 'v1 • Dữ liệu đồng bộ',
+                      DriverChip(
+                        label: l10n.driverItemsCount(job.lineCount),
                         tone: DriverChipTone.neutral,
                       ),
                     ],
                   ),
                   const SizedBox(height: DealGoSpacing.s12),
-                  Text('Bún Bò Huế O Cô', style: textTheme.titleMedium),
-                  Text(
-                    '123 Lê Lợi, Hải Châu, Đà Nẵng',
-                    style: textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: DealGoSpacing.s12),
                   DriverMoneyRow(
-                    label: 'Phí giao khách thanh toán',
+                    label: l10n.driverFoodFeeCustomerPays,
                     value: formatVnd(job.deliveryFareVnd),
                     emphasize: true,
                   ),
                   DriverMoneyRow(
-                    label: 'Thu nhập tài xế dự kiến',
+                    label: l10n.driverFoodExpectedIncome,
                     value: l10n.driverFoodIncomePending,
                     emphasize: true,
                   ),
@@ -187,21 +257,28 @@ class _DriverFoodDetailPageState extends State<_DriverFoodDetailView> {
               ),
             ),
             const SizedBox(height: DealGoSpacing.s12),
+            DriverFoodJobMap(job: job),
+            const SizedBox(height: DealGoSpacing.s12),
             DriverPanel(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Điểm nhận và giao', style: textTheme.titleMedium),
+                  Text(l10n.driverDeliveryStops, style: textTheme.titleMedium),
                   const SizedBox(height: DealGoSpacing.s12),
-                  const DriverStop(
+                  DriverStop(
                     color: DealGoColors.brandGreen,
-                    label: 'Điểm lấy món',
-                    value: '123 Lê Lợi, Hải Châu, Đà Nẵng',
+                    label: l10n.driverPickupPoint,
+                    value: <String>{
+                      job.storeName ?? l10n.driverPickupStore,
+                      ?(job.pickup?.label.isNotEmpty == true
+                          ? job.pickup!.label
+                          : job.storeAddress),
+                    }.join(' · '),
                   ),
                   const SizedBox(height: DealGoSpacing.s12),
                   DriverStop(
                     color: DealGoColors.danger,
-                    label: 'Giao cho khách',
+                    label: l10n.driverDropoffPoint,
                     value: job.dropoff.label,
                   ),
                 ],
@@ -212,7 +289,7 @@ class _DriverFoodDetailPageState extends State<_DriverFoodDetailView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Thông tin tài chính', style: textTheme.titleMedium),
+                  Text(l10n.driverFinance, style: textTheme.titleMedium),
                   const SizedBox(height: DealGoSpacing.s8),
                   DriverMoneyRow(
                     label: l10n.driverFoodCodCollect,
@@ -220,11 +297,11 @@ class _DriverFoodDetailPageState extends State<_DriverFoodDetailView> {
                     emphasize: true,
                   ),
                   DriverMoneyRow(
-                    label: 'Tiền món (subtotal)',
+                    label: l10n.driverFoodSubtotal,
                     value: formatVnd(job.subtotalVnd),
                   ),
                   DriverMoneyRow(
-                    label: 'Phí giao (server)',
+                    label: l10n.driverFoodDeliveryFee,
                     value: formatVnd(job.deliveryFareVnd),
                   ),
                 ],
@@ -234,7 +311,7 @@ class _DriverFoodDetailPageState extends State<_DriverFoodDetailView> {
             DriverNote(
               tone: DriverNoteTone.green,
               message:
-                  'Khoản COD ${formatVnd(job.totalVnd)} là tiền thu hộ; không phải doanh thu cá nhân. ${l10n.driverFoodNoClientFee}',
+                  '${l10n.driverCodNote(formatVnd(job.totalVnd))} ${l10n.driverFoodNoClientFee}',
             ),
             if (_error != null) ...[
               const SizedBox(height: DealGoSpacing.s12),
@@ -254,6 +331,8 @@ class _FoodLifecycle extends StatelessWidget {
     required this.phase,
     required this.onPhase,
     required this.onBack,
+    this.busy = false,
+    this.error,
   });
 
   final ReadyFoodJob job;
@@ -261,6 +340,8 @@ class _FoodLifecycle extends StatelessWidget {
   final _FoodPhase phase;
   final ValueChanged<_FoodPhase> onPhase;
   final VoidCallback onBack;
+  final bool busy;
+  final String? error;
 
   @override
   Widget build(BuildContext context) {
@@ -272,7 +353,7 @@ class _FoodLifecycle extends StatelessWidget {
       _FoodPhase.pickup => l10n.driverFoodPhasePickupTitle,
       _FoodPhase.deliver => l10n.driverFoodPhaseDeliverTitle,
       _FoodPhase.complete => l10n.driverFoodPhaseCompleteTitle,
-      _FoodPhase.offer => 'Chi tiết yêu cầu giao món',
+      _FoodPhase.offer => l10n.driverFoodRequestTitle,
     };
     final footer = switch (phase) {
       _FoodPhase.navigate => DriverFooter(
@@ -286,6 +367,8 @@ class _FoodLifecycle extends StatelessWidget {
         secondaryLabel: l10n.driverActiveReportIssue,
         primaryLabel: l10n.driverFoodConfirmPickup,
         primaryKey: const Key('driver-food-pickup'),
+        primaryLoading: busy,
+        primaryEnabled: !busy,
         onSecondary: () => context.push(DriverRoutes.failed(job.id)),
         onPrimary: () => onPhase(_FoodPhase.pickup),
       ),
@@ -300,6 +383,8 @@ class _FoodLifecycle extends StatelessWidget {
         secondaryLabel: l10n.driverActiveReportIssue,
         primaryLabel: l10n.driverFoodCompleteDelivery,
         primaryKey: const Key('driver-food-complete'),
+        primaryLoading: busy,
+        primaryEnabled: !busy,
         onSecondary: () => context.push(DriverRoutes.failed(job.id)),
         onPrimary: () => onPhase(_FoodPhase.complete),
       ),
@@ -330,30 +415,31 @@ class _FoodLifecycle extends StatelessWidget {
             if (phase == _FoodPhase.complete) ...[
               const Center(
                 child: Icon(
-                  Icons.check_circle,
+                  DealGoIcons.success,
                   size: 56,
                   color: DealGoColors.brandGreen,
                 ),
               ),
               const SizedBox(height: DealGoSpacing.s12),
               Text(
-                'Đã giao thành công',
+                l10n.driverDeliveredTitle,
                 textAlign: TextAlign.center,
                 style: textTheme.titleLarge,
               ),
               Text(
-                'Đơn #${job.id} · trạng thái ${claimed.status}',
+                l10n.orderRef(shortRef(job.id)),
                 textAlign: TextAlign.center,
                 style: textTheme.bodySmall,
               ),
               const SizedBox(height: DealGoSpacing.s16),
             ],
-            if (phase == _FoodPhase.navigate || phase == _FoodPhase.deliver) ...[
+            if (phase == _FoodPhase.navigate ||
+                phase == _FoodPhase.deliver) ...[
               DriverPanel(
                 color: const Color(0xFF1E1B4B),
                 child: Row(
                   children: [
-                    const Icon(Icons.turn_right, color: Colors.white),
+                    const Icon(DealGoIcons.turnRight, color: Colors.white),
                     const SizedBox(width: DealGoSpacing.s12),
                     Expanded(
                       child: Column(
@@ -361,8 +447,8 @@ class _FoodLifecycle extends StatelessWidget {
                         children: [
                           Text(
                             phase == _FoodPhase.deliver
-                                ? 'Đến điểm giao'
-                                : 'Rẽ phải sau 200 m',
+                                ? l10n.driverHeadToCustomer
+                                : l10n.driverHeadToStore,
                             style: textTheme.titleMedium?.copyWith(
                               color: Colors.white,
                             ),
@@ -370,7 +456,11 @@ class _FoodLifecycle extends StatelessWidget {
                           Text(
                             phase == _FoodPhase.deliver
                                 ? job.dropoff.label
-                                : 'Vào đường Lê Lợi',
+                                : <String>{
+                                    job.storeName ?? l10n.driverPickupStore,
+                                    if (job.pickup?.label.isNotEmpty == true)
+                                      job.pickup!.label,
+                                  }.join(' · '),
                             style: textTheme.bodySmall?.copyWith(
                               color: Colors.white70,
                             ),
@@ -382,6 +472,12 @@ class _FoodLifecycle extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: DealGoSpacing.s12),
+              DriverFoodJobMap(
+                job: job,
+                focusDropoff: phase == _FoodPhase.deliver,
+                showNavigate: true,
+              ),
+              const SizedBox(height: DealGoSpacing.s12),
             ],
             DriverPanel(
               child: Column(
@@ -390,29 +486,27 @@ class _FoodLifecycle extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: Text('Đơn #${job.id}', style: textTheme.titleMedium),
+                        child: Text(
+                          l10n.orderRef(shortRef(job.id)),
+                          style: textTheme.titleMedium,
+                        ),
                       ),
                       DriverChip(
                         label: switch (phase) {
-                          _FoodPhase.navigate => 'Đang đón',
-                          _FoodPhase.wait => 'Chờ món',
-                          _FoodPhase.pickup => 'Đã lấy',
-                          _FoodPhase.deliver => 'Đang giao',
-                          _FoodPhase.complete => 'DELIVERED',
-                          _FoodPhase.offer => 'OPEN',
+                          _FoodPhase.navigate => l10n.driverHeadToStore,
+                          _FoodPhase.wait => l10n.driverFoodPhaseWait,
+                          _FoodPhase.pickup => l10n.driverFoodPhasePicked,
+                          _FoodPhase.deliver => l10n.driverFoodPhaseDelivering,
+                          _FoodPhase.complete => l10n.driverPhaseDone,
+                          _FoodPhase.offer => l10n.driverClaimJob,
                         },
                         tone: DriverChipTone.green,
                       ),
                     ],
                   ),
-                  const SizedBox(height: DealGoSpacing.s8),
-                  Text(
-                    'Trạng thái máy chủ · ${claimed.status}',
-                    style: textTheme.bodySmall,
-                  ),
                   const SizedBox(height: DealGoSpacing.s12),
                   DriverMoneyRow(
-                    label: 'Phí giao',
+                    label: l10n.driverFoodDeliveryFee,
                     value: formatVnd(job.deliveryFareVnd),
                     emphasize: true,
                   ),
@@ -428,8 +522,7 @@ class _FoodLifecycle extends StatelessWidget {
             DriverNote(
               tone: DriverNoteTone.green,
               message: switch (phase) {
-                _FoodPhase.navigate =>
-                  'Bản đồ thật chưa gắn SDK. Màn D026 là mock điều hướng tới quán.',
+                _FoodPhase.navigate => l10n.driverFoodNavigateBody,
                 _FoodPhase.wait => l10n.driverFoodWaitBody,
                 _FoodPhase.pickup => l10n.driverFoodPickupBody,
                 _FoodPhase.deliver => l10n.driverFoodDeliverBody,
@@ -437,6 +530,10 @@ class _FoodLifecycle extends StatelessWidget {
                 _FoodPhase.offer => '',
               },
             ),
+            if (error != null) ...[
+              const SizedBox(height: DealGoSpacing.s12),
+              DriverNote(message: error!),
+            ],
           ],
         ),
       ),
@@ -452,16 +549,16 @@ class _JobTaken extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
     return Scaffold(
       body: DriverPageFrame(
-        title: 'Yêu cầu gần tài xế',
-        subtitle: driverStateSubtitle,
+        title: l10n.driverNearbyRequests,
         insetBottom: true,
         onBack: () => driverBack(context),
         footer: DriverFooter(
-          secondaryLabel: 'Làm mới',
-          primaryLabel: 'Tìm việc khác',
+          secondaryLabel: l10n.actionRefresh,
+          primaryLabel: l10n.driverFindOtherJobs,
           onSecondary: () async {
             await onRefresh();
             if (context.mounted) {
@@ -478,47 +575,90 @@ class _JobTaken extends StatelessWidget {
             DealGoSpacing.s16,
           ),
           children: [
-            const DriverHero(
-              icon: Icons.swap_horiz,
+            DriverHero(
+              icon: DealGoIcons.swapHoriz,
               iconColor: DealGoColors.amber,
               background: DealGoColors.amberSurface,
-              title: 'Yêu cầu đã được nhận',
-              message:
-                  'Yêu cầu vừa chọn đã được phân công cho tài xế khác hoặc hết thời hạn giữ chỗ.',
+              title: l10n.driverJobTakenTitle,
+              message: l10n.driverJobTakenBody,
             ),
             const SizedBox(height: DealGoSpacing.s24),
             DriverPanel(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Yêu cầu không còn khả dụng',
-                    style: textTheme.titleMedium,
-                  ),
+                  Text(l10n.driverJobUnavailable, style: textTheme.titleMedium),
                   const SizedBox(height: DealGoSpacing.s12),
-                  DriverMoneyRow(label: 'Mã yêu cầu', value: job.id),
-                  const DriverMoneyRow(label: 'Dịch vụ', value: 'Giao đồ ăn'),
-                  const SizedBox(height: DealGoSpacing.s8),
-                  const Row(
-                    children: [
-                      Expanded(child: Text('Trạng thái')),
-                      DriverChip(
-                        label: 'TAKEN / EXPIRED',
-                        tone: DriverChipTone.warning,
-                      ),
-                    ],
+                  DriverMoneyRow(label: l10n.driverRequestId, value: job.id),
+                  DriverMoneyRow(
+                    label: l10n.driverService,
+                    value: l10n.driverServiceFood,
                   ),
                 ],
               ),
             ),
             const SizedBox(height: DealGoSpacing.s12),
-            const DriverNote(
-              message:
-                  'Không giữ nút “Nhận việc” khả dụng sau lỗi 409; làm mới nguồn yêu cầu.',
-            ),
+            DriverNote(message: l10n.driverJobTakenHint),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Store → customer map for a food job. Uses the pickup point snapshotted on
+/// the order (DEC-PROD-034); without store coordinates only the customer pin is
+/// drawn and a note asks the driver to follow the address.
+class DriverFoodJobMap extends StatelessWidget {
+  const DriverFoodJobMap({
+    required this.job,
+    this.focusDropoff = false,
+    this.showNavigate = false,
+    super.key,
+  });
+
+  final ReadyFoodJob job;
+  final bool focusDropoff;
+
+  /// Google Maps / Waze hand-off for the current stop (after claim only).
+  final bool showNavigate;
+
+  @override
+  Widget build(BuildContext context) {
+    final pickup = job.pickup;
+    final dropoff = MapLatLng(lat: job.dropoff.lat, lng: job.dropoff.lng);
+    final store = pickup == null
+        ? null
+        : MapLatLng(lat: pickup.lat, lng: pickup.lng);
+    final center = focusDropoff || store == null ? dropoff : store;
+    // Head to the store first; without a store point only the address helps.
+    final target = focusDropoff ? dropoff : store;
+    return Column(
+      key: const Key('driver-food-map'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(DealGoRadius.card),
+          child: SizedBox(
+            height: 180,
+            child: context.read<MapPort>().buildMap(
+              center: center,
+              markers: [?store, dropoff],
+            ),
+          ),
+        ),
+        if (showNavigate && target != null) ...[
+          const SizedBox(height: DealGoSpacing.s8),
+          DriverNavigateButtons(lat: target.lat, lng: target.lng),
+        ],
+        if (store == null) ...[
+          const SizedBox(height: DealGoSpacing.s8),
+          DriverNote(
+            key: const Key('driver-food-no-store-point'),
+            message: AppLocalizations.of(context).driverFoodNoStorePoint,
+          ),
+        ],
+      ],
     );
   }
 }

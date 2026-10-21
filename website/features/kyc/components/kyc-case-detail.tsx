@@ -25,6 +25,12 @@ import {
 import { kycStatusLabel, kycStatusTone } from "@/features/kyc/mappers";
 import { ApiError, isForbiddenError } from "@/lib/api/errors";
 import { SearchSelect } from "@/components/ui/search-select";
+import {
+  PartnerDocumentsPanel,
+  PartnerIssuePicker,
+  PartnerReviewOutcome,
+} from "@/features/kyc/components/partner-review-panels";
+import { validateIssues, type PartnerIssue } from "@/features/kyc/partner-review";
 
 type Decision = "" | "approve" | "reject" | "request";
 type PendingConfirm = null | "approve" | "reject";
@@ -57,6 +63,7 @@ export function KycCaseDetail({ code }: { code: string }) {
   const [outcome, setOutcome] = useState<LocalOutcome>({ kind: "idle" });
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<PendingConfirm>(null);
+  const [issues, setIssues] = useState<PartnerIssue[]>([]);
 
   const crumbs = useMemo(
     () => [
@@ -112,13 +119,29 @@ export function KycCaseDetail({ code }: { code: string }) {
     }
   };
 
-  const runRequestLocal = () => {
+  const runRequestMoreInfo = async () => {
     if (locked || decision !== "request") {
       return;
     }
+    const invalid = validateIssues(issues);
+    if (invalid) {
+      setActionError(invalid);
+      return;
+    }
     setActionError(null);
-    setOutcome({ kind: "requested", note: note.trim() });
-    toast.success("Đã ghi nhận yêu cầu bổ sung (chỉ UI).");
+    const reason = note.trim() || "Hồ sơ cần bổ sung theo các mục bên dưới.";
+    try {
+      await rejectMutation.mutateAsync({
+        reason,
+        issues: issues.map((issue) => ({ ...issue, note: issue.note.trim() })),
+      });
+      setOutcome({ kind: "requested", note: reason });
+      toast.success("Đã gửi yêu cầu bổ sung hồ sơ.");
+    } catch (error) {
+      const message = errorMessage(error);
+      setActionError(message);
+      toast.error(message);
+    }
   };
 
   return (
@@ -308,9 +331,11 @@ export function KycCaseDetail({ code }: { code: string }) {
                     </li>
                   ) : null}
                 </ol>
-                <p className="mt-3 text-xs text-muted">
-                  Nhật ký chi tiết sự kiện KYC chưa có.
-                </p>
+                {selected.reviewedAt && outcome.kind === "idle" ? (
+                  <p className="mt-3 text-xs text-muted">
+                    Đã xét duyệt lúc {selected.reviewedAt}.
+                  </p>
+                ) : null}
               </section>
             </div>
             <div className="space-y-4">
@@ -318,38 +343,27 @@ export function KycCaseDetail({ code }: { code: string }) {
                 <h3 className="text-sm font-semibold text-ink">
                   Kiểm tra giấy tờ tải lên
                 </h3>
-                <p className="mt-3 rounded-xl border border-dashed border-border bg-canvas/40 px-3 py-8 text-center text-sm text-muted">
-                  Chưa có dữ liệu
-                </p>
+                <PartnerDocumentsPanel documents={selected.documents} />
               </section>
               <section className="rounded-2xl border border-border bg-white p-4 shadow-sm">
                 <h3 className="text-sm font-semibold text-ink">
-                  Điều kiện nhận xe{" "}
-                  {selected.vehicleKind.toLocaleLowerCase("vi")}
+                  Thông tin đối tác khai báo
                 </h3>
-                <dl className="mt-3 space-y-2 text-sm">
-                  <div className="flex justify-between gap-3 rounded-xl border border-border px-3 py-3">
-                    <dt className="text-muted">Loại xe</dt>
-                    <dd className="font-medium text-ink">
-                      {selected.vehicleKind || "Chưa có dữ liệu"}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between gap-3 rounded-xl border border-border px-3 py-3">
-                    <dt className="text-muted">Mẫu xe</dt>
-                    <dd className="font-medium text-ink">
-                      {selected.vehicle || "Chưa có dữ liệu"}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between gap-3 rounded-xl border border-border px-3 py-3">
-                    <dt className="text-muted">Biển số</dt>
-                    <dd className="font-medium text-ink">
-                      {selected.plate || "Chưa có dữ liệu"}
-                    </dd>
-                  </div>
-                </dl>
-                <p className="mt-3 text-xs text-muted">
-                  Checklist điều kiện chi tiết chưa có.
-                </p>
+                {selected.details.length > 0 ? (
+                  <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                    {selected.details.map(([label, value]) => (
+                      <div
+                        key={label}
+                        className="flex justify-between gap-3 rounded-xl border border-border px-3 py-2"
+                      >
+                        <dt className="text-muted">{label}</dt>
+                        <dd className="text-right font-medium text-ink">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : (
+                  <p className="mt-3 text-sm text-muted">Hồ sơ chưa có thông tin khai báo.</p>
+                )}
               </section>
             </div>
             <aside className="space-y-4">
@@ -369,6 +383,13 @@ export function KycCaseDetail({ code }: { code: string }) {
                     {actionError}
                   </div>
                 ) : null}
+                {selected.status === "REJECTED" && outcome.kind === "idle" ? (
+                  <PartnerReviewOutcome
+                    role={selected.role}
+                    reason={selected.reason}
+                    issues={selected.issues}
+                  />
+                ) : null}
                 {outcome.kind !== "idle" ? (
                   <div
                     role="status"
@@ -378,7 +399,7 @@ export function KycCaseDetail({ code }: { code: string }) {
                       ? "Đã duyệt trên máy chủ."
                       : outcome.kind === "rejected"
                         ? "Đã từ chối trên máy chủ."
-                        : "Đã ghi nhận yêu cầu bổ sung cục bộ."}
+                        : "Đã gửi yêu cầu bổ sung; đối tác thấy từng mục trong ứng dụng."}
                   </div>
                 ) : null}
                 <div className="mt-3">
@@ -391,6 +412,14 @@ export function KycCaseDetail({ code }: { code: string }) {
                     onChange={(val) => setDecision((val ?? "") as Decision)}
                   />
                 </div>
+                {decision === "request" ? (
+                  <PartnerIssuePicker
+                    role={selected.role}
+                    value={issues}
+                    onChange={setIssues}
+                    disabled={locked}
+                  />
+                ) : null}
                 <label
                   htmlFor="kyc-note"
                   className="mt-3 block text-xs font-medium text-muted"
@@ -410,7 +439,7 @@ export function KycCaseDetail({ code }: { code: string }) {
                   <button
                     type="button"
                     disabled={locked || decision !== "request"}
-                    onClick={runRequestLocal}
+                    onClick={() => void runRequestMoreInfo()}
                     className={`inline-flex h-10 items-center rounded-xl border border-brand/30 bg-white px-3 text-sm font-medium text-brand disabled:cursor-not-allowed disabled:opacity-40 ${focusRing}`}
                   >
                     Yêu cầu bổ sung

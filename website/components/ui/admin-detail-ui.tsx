@@ -2,10 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { AdminBreadcrumb, focusRing, vnd } from "@/components/ui/admin-list-ui";
 import { OpsIcon, type OpsIconName } from "@/components/ui/ops-icons";
-import {
-  LazyRealMapView,
-  type MapCoordinate,
-} from "@/components/ui/lazy-real-map-view";
+import { LazyRealMapView } from "@/components/ui/lazy-real-map-view";
 
 export function DetailHeader({
   crumbs,
@@ -261,33 +258,104 @@ export function MilestoneList({
   );
 }
 
+export type RoutePoint = { lat: number; lng: number };
+
+function isRoutePoint(point: RoutePoint | null | undefined): point is RoutePoint {
+  return (
+    !!point &&
+    Number.isFinite(point.lat) &&
+    Number.isFinite(point.lng) &&
+    Math.abs(point.lat) <= 90 &&
+    Math.abs(point.lng) <= 180
+  );
+}
+
+/** Rough zoom so both ends fit in the sketch (Web Mercator, ~440px). */
+export function routeSketchZoom(from: RoutePoint, to: RoutePoint): number {
+  const span = Math.max(Math.abs(from.lat - to.lat), Math.abs(from.lng - to.lng));
+  if (span < 0.008) return 15;
+  if (span < 0.02) return 14;
+  if (span < 0.05) return 13;
+  if (span < 0.12) return 12;
+  if (span < 0.3) return 11;
+  if (span < 0.8) return 9;
+  return 7;
+}
+
+/**
+ * Route map between the order's real points. With one point it shows a single
+ * marker; with none it renders an honest empty state instead of a sample route.
+ */
 export function RouteSketch({
   label,
   start,
   end,
+  from,
+  to,
   height = 440,
 }: {
   label: string;
   start: string;
   end: string;
+  from?: RoutePoint | null;
+  to?: RoutePoint | null;
   city?: string;
   height?: number | string;
 }) {
-  // Coordinates in Da Nang: Origin (12 Le Loi) to Destination (24 Vo Nguyen Giap)
-  const sampleRoute: MapCoordinate[] = [
-    [16.0544, 108.2022], // Điểm đón: 12 Lê Lợi (Hải Châu)
-    [16.0592, 108.2435], // Điểm trả: 24 Võ Nguyên Giáp (Sơn Trà / Mỹ Khê)
-  ];
+  const a = isRoutePoint(from) ? from : null;
+  const b = isRoutePoint(to) ? to : null;
 
+  if (!a && !b) {
+    return (
+      <figure
+        aria-label={label}
+        data-testid="route-sketch-empty"
+        className="relative isolate grid min-w-0 place-items-center rounded-xl border border-dashed border-border bg-canvas p-6 text-center text-sm text-muted"
+        style={{ height }}
+      >
+        <span>Chưa có toạ độ để vẽ tuyến.</span>
+        <figcaption className="sr-only">{label}</figcaption>
+      </figure>
+    );
+  }
+
+  if (a && b) {
+    return (
+      <figure aria-label={label} data-testid="route-sketch" className="relative isolate min-w-0">
+        <LazyRealMapView
+          center={[(a.lat + b.lat) / 2, (a.lng + b.lng) / 2]}
+          zoom={routeSketchZoom(a, b)}
+          height={height}
+          route={[
+            [a.lat, a.lng],
+            [b.lat, b.lng],
+          ]}
+          startLabel={start}
+          endLabel={end}
+          showControls={true}
+          showAttribution={true}
+        />
+        <figcaption className="sr-only">{label}</figcaption>
+      </figure>
+    );
+  }
+
+  const only = (a ?? b) as RoutePoint;
   return (
-    <figure aria-label={label} className="relative isolate min-w-0">
+    <figure aria-label={label} data-testid="route-sketch-point" className="relative isolate min-w-0">
       <LazyRealMapView
-        center={[16.0595, 108.2228]}
-        zoom={14}
+        center={[only.lat, only.lng]}
+        zoom={15}
         height={height}
-        route={sampleRoute}
-        startLabel={start}
-        endLabel={end}
+        markers={[
+          {
+            id: a ? "start" : "end",
+            lat: only.lat,
+            lng: only.lng,
+            label: a ? start : end,
+            type: a ? "pickup" : "dropoff",
+          },
+        ]}
         showControls={true}
         showAttribution={true}
       />

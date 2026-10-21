@@ -3,6 +3,7 @@ export const STORE_SALE_STATUSES = [
   "OPEN",
   "CLOSED",
   "PAUSED",
+  "BUSY",
   "PENDING_APPROVAL",
   "SUSPENDED",
 ] as const;
@@ -28,4 +29,10 @@ export type StoreListItem = {
   rating: number | null;
   sale: StoreSaleStatus | null;
   kyb: StoreKybStatus | null;
+  /** DEC-PROD-026: auto-resume time of a BUSY/PAUSED mode (ISO), when set. */
+  serviceModeUntil: string | null;
+  /** DEC-PROD-028: M022 intake line, e.g. "Tự động · tối đa 8 đơn"; null when not reported. */
+  acceptSummary: string | null;
+  /** Current kitchen estimate in minutes (default prep + BUSY extra). */
+  prepMinutes: number | null;
 };

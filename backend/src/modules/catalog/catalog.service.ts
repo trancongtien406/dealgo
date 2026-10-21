@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { RequestActor } from '../identity/access-auth.guard.js';
 import type {
   CreateFoodItemDto,
+  ReplaceFoodItemOptionsDto,
   OpsCatalogCategoriesQueryDto,
   OpsCatalogModerationQueryDto,
   SetFoodItemAvailabilityDto,
@@ -36,6 +37,14 @@ export class CatalogService {
     return this.food.updateItem(actor, itemId, dto);
   }
 
+  replaceItemOptions(
+    actor: RequestActor,
+    itemId: string,
+    dto: ReplaceFoodItemOptionsDto,
+  ): Promise<StoreItemView> {
+    return this.food.replaceItemOptions(actor, itemId, dto);
+  }
+
   setItemAvailability(
     actor: RequestActor,
     itemId: string,
@@ -50,6 +59,10 @@ export class CatalogService {
 
   getCategory(code: string): Promise<OpsCatalogCategoryItem> {
     return this.food.getStoreCategory(code);
+  }
+
+  renameCategory(code: string, name: string): Promise<OpsCatalogCategoryItem> {
+    return this.food.renameStoreCategory(code, name);
   }
 
   listModeration(query: OpsCatalogModerationQueryDto): Promise<OpsCatalogModerationPage> {

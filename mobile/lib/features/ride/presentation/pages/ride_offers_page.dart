@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/api_error_l10n.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/network/request_failure.dart';
+import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/ride_money.dart';
@@ -18,6 +20,9 @@ import '../widgets/ride_offers_widgets.dart';
 import '../utils/ride_routes.dart';
 import '../cubit/ride_session.dart';
 import '../widgets/ride_widgets.dart';
+import '../../../../core/l10n/api_error_text.dart';
+import '../../../promotion/domain/entities/voucher_quote.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 class RideOffersPage extends StatelessWidget {
   const RideOffersPage({required this.rideId, this.clock, super.key});
@@ -55,8 +60,22 @@ class _RideOffersPageState extends State<_RideOffersView> {
   var _loading = true;
   var _offline = false;
   var _busy = false;
+  Object? _failure;
   String? _message;
   String? _selectKey;
+  String? _voucherCode;
+  var _voucherDiscountVnd = 0;
+  var _voucherEpoch = 0;
+
+  void _onVoucherQuote(VoucherQuote? quote) {
+    final valid = quote != null && quote.valid;
+    setState(() {
+      _voucherCode = valid ? quote.code : null;
+      _voucherDiscountVnd = valid ? quote.discountVnd : 0;
+      // A different voucher is a different request; never replay the old key.
+      _selectKey = null;
+    });
+  }
 
   DateTime get _now => (widget.clock ?? DateTime.now)();
 
@@ -72,7 +91,8 @@ class _RideOffersPageState extends State<_RideOffersView> {
       setState(() {
         _loading = false;
         _offline = false;
-        _message = sessionExpiredMessage(context);
+        _failure = sessionExpiredFailure;
+        _message = null;
       });
       return;
     }
@@ -97,7 +117,7 @@ class _RideOffersPageState extends State<_RideOffersView> {
       } else {
         session.clear();
       }
-      if (ride.status == RideStatus.assigned) {
+      if (ride.status.hasDriver) {
         session.clear();
         setState(() {
           _ride = ride;
@@ -122,15 +142,13 @@ class _RideOffersPageState extends State<_RideOffersView> {
       }
       setState(() {
         _loading = false;
-        if (rideFailureIsOffline(error)) {
-          _offline = true;
-          _message = null;
-        } else {
-          _offline = false;
-          _message = error is ApiException
-              ? error.message
-              : AppLocalizations.of(context).errorLoadFailed;
-        }
+        _failure = error;
+        _offline = rideFailureIsOffline(error);
+        _message = _offline
+            ? null
+            : (error is ApiException
+                  ? apiErrorText(AppLocalizations.of(context), error)
+                  : AppLocalizations.of(context).errorLoadFailed);
       });
     }
   }
@@ -191,6 +209,7 @@ class _RideOffersPageState extends State<_RideOffersView> {
       idempotencyKey: key,
       rideId: ride.id,
       offerId: chosen.id,
+      voucherCode: _voucherCode,
     );
     setState(() {
       _busy = true;
@@ -203,11 +222,11 @@ class _RideOffersPageState extends State<_RideOffersView> {
         return;
       }
       final agreed = updated.agreedFareVnd;
-      if (updated.status != RideStatus.assigned || agreed == null) {
+      if (!updated.status.hasDriver || agreed == null) {
         setState(() {
           _busy = false;
           _ride = updated;
-          _message = 'Máy chủ chưa chốt giá chuyến.';
+          _message = AppLocalizations.of(context).rideNoAgreedYet;
         });
         return;
       }
@@ -239,6 +258,18 @@ class _RideOffersPageState extends State<_RideOffersView> {
         });
         return;
       }
+      if (error is ApiException && error.errorCode.startsWith('VOUCHER_')) {
+        // The selection rolled back with the voucher; drop the code so the next tap is plain.
+        final l10n = AppLocalizations.of(context);
+        setState(() {
+          _busy = false;
+          _voucherCode = null;
+          _voucherDiscountVnd = 0;
+          _voucherEpoch += 1;
+          _message = l10n.rideVoucherDropped(apiErrorText(l10n, error));
+        });
+        return;
+      }
       if (error is ApiException &&
           error.errorCode == 'RIDE_OFFER_UNAVAILABLE') {
         setState(() {
@@ -253,8 +284,8 @@ class _RideOffersPageState extends State<_RideOffersView> {
           _offline = true;
         } else {
           _message = error is ApiException
-              ? error.message
-              : 'Không chọn được báo giá.';
+              ? apiErrorText(AppLocalizations.of(context), error)
+              : AppLocalizations.of(context).rideSelectFailed;
         }
       });
     }
@@ -297,8 +328,8 @@ class _RideOffersPageState extends State<_RideOffersView> {
           _offline = true;
         } else {
           _message = error is ApiException
-              ? error.message
-              : 'Không hủy được yêu cầu.';
+              ? apiErrorText(AppLocalizations.of(context), error)
+              : AppLocalizations.of(context).rideCancelFailed;
         }
       });
     }
@@ -307,10 +338,7 @@ class _RideOffersPageState extends State<_RideOffersView> {
   void _changeFare(RideView ride) {
     context.push(
       RideRoutes.fare,
-      extra: RidePlaces(
-        pickupLabel: ride.pickup.label,
-        dropoffLabel: ride.dropoff.label,
-      ),
+      extra: RidePlaces(pickup: ride.pickup, dropoff: ride.dropoff),
     );
   }
 
@@ -338,24 +366,22 @@ class _RideOffersPageState extends State<_RideOffersView> {
     if (_loading && ride == null) {
       return Column(
         children: [
-          RideScreenHeader(title: 'Tài xế chào giá', onBack: _back),
+          DealGoAppHeader(title: AppLocalizations.of(context).rideDriverOffers, onBack: _back),
           const Expanded(child: Center(child: CircularProgressIndicator())),
         ],
       );
     }
-    if (_offline && ride == null) {
-      return OfflineOffers(onBack: _back, onRetry: _load);
-    }
     if (ride == null) {
+      final l10n = AppLocalizations.of(context);
       return Column(
         children: [
-          RideScreenHeader(title: 'Tài xế chào giá', onBack: _back),
+          DealGoAppHeader(title: l10n.rideDriverOffers, onBack: _back),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
-              child: Text(
-                _message ?? AppLocalizations.of(context).errorLoadFailed,
-              ),
+            child: DealGoStateView.failure(
+              context,
+              onRetry: _load,
+              cause: _failure,
+              message: _message ?? l10n.rideOffersLoadFailed,
             ),
           ),
         ],
@@ -382,22 +408,24 @@ class _RideOffersPageState extends State<_RideOffersView> {
     }
     if (ride.status == RideStatus.cancelled) {
       return TerminalRide(
-        title: 'Yêu cầu đã hủy',
+        title: AppLocalizations.of(context).rideRequestCancelled,
         status: ride.status.wire,
-        message: 'Đề xuất không còn hiệu lực.',
+        message: AppLocalizations.of(context).rideOfferInvalid,
         onBack: _back,
       );
     }
-    if (ride.status == RideStatus.assigned) {
+    if (ride.status.hasDriver) {
       final agreed = ride.agreedFareVnd;
       return TerminalRide(
-        title: 'Chuyến đã được chốt',
+        title: AppLocalizations.of(context).rideAgreedTitle,
         status: ride.status.wire,
         message: agreed == null
-            ? 'Máy chủ chưa trả giá đã chốt.'
-            : 'Khách thanh toán ${formatRideVnd(agreed)}.',
+            ? AppLocalizations.of(context).rideAgreedMissing
+            : AppLocalizations.of(context).rideCustomerPaysAmount(
+                formatRideVnd(rideCashAfterVoucher(agreed, ride.discountVnd)),
+              ),
         onBack: _back,
-        actionLabel: agreed == null ? null : 'Theo dõi chuyến',
+        actionLabel: agreed == null ? null : AppLocalizations.of(context).rideTrack,
         onAction: agreed == null
             ? null
             : () => context.push(RideRoutes.tracking(ride.id)),
@@ -427,6 +455,10 @@ class _RideOffersPageState extends State<_RideOffersView> {
       onSelectOffer: (id) => setState(() => _selectedOfferId = id),
       onConfirm: _select,
       onCancel: _cancel,
+      onVoucherQuote: _onVoucherQuote,
+      voucherCode: _voucherCode,
+      voucherDiscountVnd: _voucherDiscountVnd,
+      voucherEpoch: _voucherEpoch,
     );
   }
 }

@@ -1,5 +1,7 @@
-import type { StatusTone } from "@/lib/admin-format";
+import { cancelActorLabel } from "@/lib/cancel-actor";
+import { vnd, type StatusTone } from "@/lib/admin-format";
 import type {
+  NestFoodLineOption,
   NestFoodOrderStatus,
   NestFoodOrderView,
 } from "@/features/food-orders/nest-types";
@@ -8,6 +10,7 @@ import type {
   FoodOrderStatus,
 } from "@/features/food-orders/types";
 import { serviceRegionLabel } from "@/lib/service-region-labels";
+import { geoPoint, personLabel } from "@/features/rides/mappers";
 
 const nestFoodStatusMap: Record<NestFoodOrderStatus, FoodOrderStatus> = {
   PLACED: "AWAITING_CONFIRMATION",
@@ -26,6 +29,24 @@ export function nestFoodOrderStatusToFeature(
   return nestFoodStatusMap[status];
 }
 
+/** Chosen options as one readable line (DEC-PROD-033). */
+export function formatLineOptions(
+  options: NestFoodLineOption[] | undefined,
+): string {
+  if (!Array.isArray(options)) return "";
+  return options
+    .filter((option) => option && typeof option.name === "string")
+    .map((option) => {
+      const group = option.groupName?.trim();
+      const delta =
+        option.priceDeltaVnd > 0
+          ? ` (+${vnd(option.priceDeltaVnd)})`
+          : "";
+      return `${group ? `${group}: ` : ""}${option.name}${delta}`;
+    })
+    .join(" · ");
+}
+
 export function mapNestFoodOrderToListItem(
   order: NestFoodOrderView,
 ): FoodOrderListItem {
@@ -33,6 +54,7 @@ export function mapNestFoodOrderToListItem(
     name: line.name,
     quantity: line.quantity,
     unitPriceVnd: line.unitPriceVnd,
+    options: formatLineOptions(line.options),
   }));
   const items =
     lines.length > 0
@@ -41,7 +63,8 @@ export function mapNestFoodOrderToListItem(
   const storeName = order.storeName?.trim();
   return {
     code: order.id,
-    customer: actorLabel("Khách", order.customerId),
+    customer: personLabel(order.customerProfile, "Khách", order.customerId),
+    customerPhone: order.customerProfile?.phoneMasked ?? null,
     store: storeName || actorLabel("CH", order.storeId),
     regionLabel:
       serviceRegionLabel(order.serviceRegionCode) ??
@@ -52,11 +75,32 @@ export function mapNestFoodOrderToListItem(
     total: order.totalVnd,
     payment: "COD",
     driver: order.assignedDriverId
-      ? actorLabel("TX", order.assignedDriverId)
+      ? personLabel(order.driverProfile, "TX", order.assignedDriverId)
       : null,
     status: nestFoodOrderStatusToFeature(order.status),
     time: order.dropoff.label.trim() || "—",
+    cancelReason: foodCancelReasonLabel(order.cancelReason),
+    cancelledBy: cancelActorLabel(order.cancelledBy),
+    pickupPoint: geoPoint(order.pickup),
+    dropoffPoint: geoPoint(order.dropoff),
   };
+}
+
+const FOOD_REJECT_LABELS: Record<string, string> = {
+  OUT_OF_STOCK: "Hết món",
+  STORE_BUSY: "Quán đang quá tải",
+  STORE_CLOSING: "Quán sắp đóng cửa",
+  ITEM_PRICE_CHANGED: "Giá món đã thay đổi",
+  OTHER: "Lý do khác",
+};
+
+export function foodCancelReasonLabel(
+  reason: NestFoodOrderView["cancelReason"],
+): string | null {
+  if (!reason) return null;
+  const label = FOOD_REJECT_LABELS[reason.code] ?? FOOD_REJECT_LABELS.OTHER;
+  const note = reason.note?.trim();
+  return note ? `${label} — ${note}` : label;
 }
 
 function actorLabel(prefix: string, id: string): string {

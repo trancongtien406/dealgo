@@ -98,11 +98,16 @@ class FcmPush implements PushPort {
     }
 
     try {
-      final settings = await FirebaseMessaging.instance.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
+      // Prefer reading current settings first so token registration after the
+      // launch prompt does not re-show the OS dialog.
+      var settings = await FirebaseMessaging.instance.getNotificationSettings();
+      if (settings.authorizationStatus == AuthorizationStatus.notDetermined) {
+        settings = await FirebaseMessaging.instance.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      }
       if (kDebugMode) {
         debugPrint('FCM permission: ${settings.authorizationStatus}');
       }

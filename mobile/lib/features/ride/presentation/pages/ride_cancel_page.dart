@@ -17,6 +17,8 @@ import '../cubit/ride_offers_cubit.dart';
 import '../utils/ride_routes.dart';
 import '../cubit/ride_session.dart';
 import '../widgets/ride_widgets.dart';
+import '../../../../core/l10n/api_error_text.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 /// C016 — cancel ride reason picker. Does not invent fee/penalty policies.
 class RideCancelPage extends StatelessWidget {
@@ -107,7 +109,7 @@ class _RideCancelViewState extends State<_RideCancelView> {
       setState(() {
         _busy = false;
         _message = error is ApiException
-            ? error.message
+            ? apiErrorText(AppLocalizations.of(context), error)
             : l10n.rideCancelSoftFail;
         _done = true;
       });
@@ -125,7 +127,7 @@ class _RideCancelViewState extends State<_RideCancelView> {
       body: SafeArea(
         child: Column(
           children: [
-            RideScreenHeader(title: l10n.rideCancelTitle, onBack: _back),
+            DealGoAppHeader(title: l10n.rideCancelTitle, onBack: _back),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(

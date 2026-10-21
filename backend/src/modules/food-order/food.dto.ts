@@ -1,6 +1,9 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
+  IsDefined,
+  ArrayMaxSize,
   ArrayMinSize,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -9,12 +12,29 @@ import {
   IsString,
   IsUUID,
   Max,
+  Matches,
   MaxLength,
   Min,
   MinLength,
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
+
+import { LAST_ORDER_MINUTES, MAX_STORE_CLOSURES } from './store-schedule.js';
+import {
+  BUSY_EXTRA_MINUTES,
+  MAX_ACTIVE_ORDERS_LIMIT,
+  PREP_MINUTES_MAX,
+  PREP_MINUTES_MIN,
+  STORE_ACCEPT_MODES,
+  type StoreAcceptMode,
+} from './store-accept.js';
+import {
+  STORE_RESUME_MINUTES,
+  STORE_SERVICE_MODES,
+  type StoreServiceMode,
+} from './store-service-mode.js';
+import { FOOD_REJECT_NOTE_MAX, FOOD_REJECT_REASONS, type FoodRejectReason } from './food.constants.js';
 
 export const FOOD_STORE_SORT_BY = ['name', 'createdAt', 'distance'] as const;
 export type FoodStoreSortBy = (typeof FOOD_STORE_SORT_BY)[number];
@@ -38,6 +58,16 @@ export class FoodDropoffDto {
   label!: string;
 }
 
+export class QuoteFoodDeliveryDto {
+  @IsUUID()
+  storeId!: string;
+
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => FoodDropoffDto)
+  dropoff!: FoodDropoffDto;
+}
+
 export class FoodLineDto {
   @IsUUID()
   itemId!: string;
@@ -47,6 +77,81 @@ export class FoodLineDto {
   @Min(1)
   @Max(20)
   quantity!: number;
+
+  /** Chosen option ids; validated against the item's groups and priced server-side. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsUUID('all', { each: true })
+  optionIds?: string[];
+}
+
+export class FoodOptionDto {
+  @IsOptional()
+  @IsUUID()
+  id?: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  name!: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(1_000_000)
+  priceDeltaVnd!: number;
+
+  @IsOptional()
+  @IsBoolean()
+  available?: boolean;
+
+  /** DEC-PROD-042 — max times this option may be chosen on one line (1–20). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  maxQuantity?: number;
+}
+
+export class FoodOptionGroupDto {
+  @IsOptional()
+  @IsUUID()
+  id?: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  name!: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(20)
+  minSelect!: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  maxSelect!: number;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(20)
+  @ValidateNested({ each: true })
+  @Type(() => FoodOptionDto)
+  options!: FoodOptionDto[];
+}
+
+/** Full replacement of a dish's option groups (send [] to remove all). */
+export class ReplaceFoodItemOptionsDto {
+  @IsArray()
+  @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => FoodOptionGroupDto)
+  groups!: FoodOptionGroupDto[];
 }
 
 export class PlaceFoodOrderDto {
@@ -58,6 +163,7 @@ export class PlaceFoodOrderDto {
   @Type(() => FoodLineDto)
   items!: FoodLineDto[];
 
+  @IsDefined()
   @ValidateNested()
   @Type(() => FoodDropoffDto)
   dropoff!: FoodDropoffDto;
@@ -67,6 +173,14 @@ export class PlaceFoodOrderDto {
   @Type(() => Number)
   @IsInt()
   deliveryFareVnd?: number;
+
+  /** Optional voucher; re-validated and redeemed atomically with the order. */
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  @Matches(/^[A-Za-z0-9_-]+$/)
+  voucherCode?: string;
 }
 
 export class CreateFoodItemDto {
@@ -84,6 +198,33 @@ export class CreateFoodItemDto {
   @IsOptional()
   @IsBoolean()
   available?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  description?: string | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(240)
+  prepMinutes?: number | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  imageUrl?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  imageUrls?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(36)
+  menuCategoryId?: string | null;
 }
 
 export class UpdateFoodItemDto {
@@ -99,11 +240,112 @@ export class UpdateFoodItemDto {
   @Min(1)
   @Max(2_147_483_647)
   priceVnd?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  available?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  description?: string | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(240)
+  prepMinutes?: number | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  imageUrl?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  imageUrls?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(36)
+  menuCategoryId?: string | null;
+}
+
+export class UpsertMenuCategoryDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  description?: string | null;
+}
+
+export class ReorderMenuCategoriesDto {
+  @IsString({ each: true })
+  orderedIds!: string[];
+}
+
+export class MerchantHistoryQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(24)
+  tab?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  q?: string;
+
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @IsOptional()
+  @IsString()
+  to?: string;
+}
+
+export class RejectFoodOrderDto {
+  @IsIn(FOOD_REJECT_REASONS)
+  reasonCode!: FoodRejectReason;
+
+  /** Shown to the customer; required when reasonCode is OTHER. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(FOOD_REJECT_NOTE_MAX)
+  note?: string;
 }
 
 export class SetFoodItemAvailabilityDto {
   @IsBoolean()
   available!: boolean;
+}
+
+/** M030 (DEC-PROD-045): the merchant renames the store shown to customers. */
+export class UpdateStoreProfileDto {
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : value))
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  name!: string;
 }
 
 export class UpdateStoreLocationDto {
@@ -116,6 +358,93 @@ export class UpdateStoreLocationDto {
   @Min(-180)
   @Max(180)
   lng!: number;
+
+  /** Street address shown to drivers on ready jobs. Send null to clear. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  addressLabel?: string | null;
+}
+
+export class StoreHourDto {
+  /** 1 = Monday … 7 = Sunday. A weekday left out is closed. */
+  @IsInt()
+  @Min(1)
+  @Max(7)
+  weekday!: number;
+
+  @Matches(/^([01]\d|2[0-4]):[0-5]\d$/)
+  opensAt!: string;
+
+  /** Same day; use 24:00 for midnight. Overnight ranges are not supported. */
+  @Matches(/^([01]\d|2[0-4]):[0-5]\d$/)
+  closesAt!: string;
+}
+
+export class StoreClosureDto {
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  date!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  note?: string | null;
+}
+
+/** M023 / DEC-PROD-027 — replaces the whole schedule. */
+export class UpdateStoreHoursDto {
+  @IsArray()
+  @ArrayMaxSize(7)
+  @ValidateNested({ each: true })
+  @Type(() => StoreHourDto)
+  weekly!: StoreHourDto[];
+
+  @IsArray()
+  @ArrayMaxSize(MAX_STORE_CLOSURES)
+  @ValidateNested({ each: true })
+  @Type(() => StoreClosureDto)
+  closures!: StoreClosureDto[];
+
+  @IsIn(LAST_ORDER_MINUTES)
+  lastOrderMinutes!: number;
+}
+
+export class UpdateStoreServiceModeDto {
+  /** M024: OPEN takes orders, BUSY takes orders with a longer prep note, PAUSED blocks new orders. */
+  @IsIn(STORE_SERVICE_MODES)
+  mode!: StoreServiceMode;
+
+  /** Auto-resume to OPEN after 30/60/120 minutes; omit or null = manual. Ignored for OPEN. */
+  @IsOptional()
+  @IsIn(STORE_RESUME_MINUTES)
+  resumeAfterMinutes?: number | null;
+
+  /** M024 BUSY: extra prep minutes added to the customer estimate; omit to keep the saved value. */
+  @IsOptional()
+  @IsIn(BUSY_EXTRA_MINUTES)
+  busyExtraMinutes?: number;
+}
+
+/** M022 order-acceptance settings (DEC-PROD-028). */
+export class UpdateStoreAcceptSettingsDto {
+  @IsIn(STORE_ACCEPT_MODES)
+  acceptMode!: StoreAcceptMode;
+
+  /** Max orders in PLACED+PREPARING; null = no cap. */
+  @ValidateIf((_dto, value) => value !== null)
+  @IsInt()
+  @Min(1)
+  @Max(MAX_ACTIVE_ORDERS_LIMIT)
+  maxActiveOrders!: number | null;
+
+  @IsInt()
+  @Min(PREP_MINUTES_MIN)
+  @Max(PREP_MINUTES_MAX)
+  defaultPrepMinutes!: number;
+
+  /** Stop taking orders this many minutes before closing; shared with M023. */
+  @IsIn(LAST_ORDER_MINUTES)
+  lastOrderMinutes!: number;
 }
 
 export class OpsInterveneDto {
@@ -279,3 +608,26 @@ export {
   OpsInterveneDto as FoodOrderInterveneDto,
 };
 
+
+export class MerchantStatsQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(30)
+  days?: number;
+}
+
+/** DEC-PROD-036: the merchant's handover code, required when FOOD_HANDOVER_CODE_REQUIRED. */
+export class PickupFoodOrderDto {
+  @IsOptional()
+  @Matches(/^\d{4}$/, { message: 'handoverCode must be 4 digits' })
+  handoverCode?: string;
+}
+
+/** DEC-PROD-036: the customer's delivery code, required when FOOD_DELIVERY_CODE_REQUIRED. */
+export class DeliverFoodOrderDto {
+  @IsOptional()
+  @Matches(/^\d{4}$/, { message: 'deliveryCode must be 4 digits' })
+  deliveryCode?: string;
+}

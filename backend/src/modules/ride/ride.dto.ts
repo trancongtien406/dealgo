@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsDefined,
   IsInt,
   IsNumber,
   IsOptional,
@@ -8,6 +9,7 @@ import {
   Max,
   MaxLength,
   Min,
+  Matches,
   MinLength,
   ValidateNested,
 } from 'class-validator';
@@ -30,10 +32,12 @@ export class GeoPointDto {
 }
 
 export class CreateRideDto {
+  @IsDefined()
   @ValidateNested()
   @Type(() => GeoPointDto)
   pickup!: GeoPointDto;
 
+  @IsDefined()
   @ValidateNested()
   @Type(() => GeoPointDto)
   dropoff!: GeoPointDto;
@@ -44,6 +48,18 @@ export class CreateRideDto {
   offeredFareVnd!: number;
 }
 
+export class QuoteRideDto {
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => GeoPointDto)
+  pickup!: GeoPointDto;
+
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => GeoPointDto)
+  dropoff!: GeoPointDto;
+}
+
 export class CreateOfferDto {
   @Type(() => Number)
   @IsInt()
@@ -51,9 +67,24 @@ export class CreateOfferDto {
   amountVnd!: number;
 }
 
+export class StartTripDto {
+  /** DEC-PROD-017: the 4-digit code the customer reads out at pickup. */
+  @IsString()
+  @Matches(/^\d{4}$/, { message: 'pickupCode must be 4 digits' })
+  pickupCode!: string;
+}
+
 export class SelectOfferDto {
   @IsUUID()
   offerId!: string;
+
+  /** DEC-PROD-024: optional voucher, redeemed atomically with the selection on the agreed fare. */
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  @Matches(/^[A-Za-z0-9_-]+$/)
+  voucherCode?: string;
 }
 
 export class RidePageQueryDto {

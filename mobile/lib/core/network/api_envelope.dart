@@ -16,7 +16,7 @@ Map<String, Object?> requireSuccessData(Object? body) {
   if (data == null) {
     throw const ApiException(
       statusCode: 200,
-      message: 'Phản hồi không hợp lệ',
+      message: 'Invalid response',
       errorCode: 'INVALID_RESPONSE',
     );
   }
@@ -28,7 +28,7 @@ Object? readSuccessPayload(Object? body) {
   if (root == null) {
     throw const ApiException(
       statusCode: 0,
-      message: 'Phản hồi không hợp lệ',
+      message: 'Invalid response',
       errorCode: 'INVALID_RESPONSE',
     );
   }
@@ -38,7 +38,7 @@ Object? readSuccessPayload(Object? body) {
   if (!root.containsKey('data') || root['data'] == null) {
     throw const ApiException(
       statusCode: 200,
-      message: 'Phản hồi không hợp lệ',
+      message: 'Invalid response',
       errorCode: 'INVALID_RESPONSE',
     );
   }
@@ -54,6 +54,7 @@ ApiException errorFromEnvelope(
     statusCode: _asInt(body['statusCode']) ?? statusCode,
     message: readMessage(body['message']),
     errorCode: code is String && code.isNotEmpty ? code : 'HTTP_ERROR',
+    details: asJsonMap(body['details']),
   );
 }
 
@@ -68,7 +69,7 @@ String readMessage(Object? message) {
       return joined;
     }
   }
-  return 'Yêu cầu không thành công';
+  return 'Request failed';
 }
 
 int? _asInt(Object? value) {

@@ -1,4 +1,9 @@
-import { ArgumentsHost, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  ArgumentsHost,
+  BadRequestException,
+  HttpException,
+  NotFoundException,
+} from '@nestjs/common';
 import { HttpExceptionFilter } from './http-exception.filter.js';
 
 function createHost(path: string, requestIdHeader?: string) {
@@ -39,6 +44,27 @@ describe('HttpExceptionFilter', () => {
     });
     expect(body.timestamp).toEqual(expect.any(String));
     expect(body).not.toHaveProperty('stack');
+    expect(body).not.toHaveProperty('details');
+  });
+
+  it('passes through a details object attached by the thrower', () => {
+    const { host, json } = createHost('/v1/auth/email/login');
+
+    filter.catch(
+      new HttpException(
+        { message: 'Not verified', errorCode: 'AUTH_EMAIL_NOT_VERIFIED', details: { challengeId: 'c1' } },
+        403,
+      ),
+      host,
+    );
+
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 403,
+        errorCode: 'AUTH_EMAIL_NOT_VERIFIED',
+        details: { challengeId: 'c1' },
+      }),
+    );
   });
 
   it('uses VALIDATION_ERROR when the message is a list of field errors', () => {

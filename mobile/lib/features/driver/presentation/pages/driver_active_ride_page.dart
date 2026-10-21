@@ -1,12 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/network/request_failure.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../ride/domain/entities/ride_models.dart';
 import '../../../ride/domain/entities/ride_money.dart';
+import '../../../ride/domain/params/get_ride_params.dart';
+import '../../../ride/domain/usecases/get_ride.dart';
+import '../../../ride/domain/params/ride_driver_action.dart';
+import '../../domain/usecases/advance_driver_ride.dart';
+import '../utils/driver_action_runner.dart';
 import '../utils/driver_routes.dart';
+import '../widgets/driver_contact_actions.dart';
+import '../widgets/driver_navigate_buttons.dart';
 import '../widgets/driver_widgets.dart';
+import '../../../../core/maps/map_lat_lng.dart';
+import '../../../../core/maps/map_port.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/format/short_ref.dart';
 
 enum DriverRidePhase { navigatePickup, arrived, onTrip, complete }
 
@@ -19,7 +33,8 @@ DriverRidePhase parseDriverRidePhase(Object? raw) {
   };
 }
 
-/// D021–D025 — active ride lifecycle fidelity (local phase machine; mock map).
+/// D021–D025 — active ride lifecycle, driven by the backend trip state machine
+/// (`POST /v1/rides/:id/{en-route,arrived,start,complete}`).
 class DriverActiveRidePage extends StatefulWidget {
   const DriverActiveRidePage({
     required this.rideId,
@@ -36,35 +51,104 @@ class DriverActiveRidePage extends StatefulWidget {
   State<DriverActiveRidePage> createState() => _DriverActiveRidePageState();
 }
 
-class _DriverActiveRidePageState extends State<DriverActiveRidePage> {
+class _DriverActiveRidePageState extends State<DriverActiveRidePage>
+    with DriverActionRunner {
   late DriverRidePhase _phase = widget.initialPhase;
 
-  OpenRide get _ride =>
-      widget.ride ??
-      OpenRide(
-        id: widget.rideId,
-        status: 'ASSIGNED',
-        pickup: const RidePoint(
-          lat: 16.05,
-          lng: 108.2,
-          label: '123 Nguyễn Văn Linh, Hải Châu',
-        ),
-        dropoff: const RidePoint(
-          lat: 16.04,
-          lng: 108.21,
-          label: '302 Trần Phú, Hải Châu',
-        ),
-        offeredFareVnd: 45000,
-        referenceFareVnd: 45000,
-        expiresAt: '2030-01-01T00:00:00.000Z',
-        offerCount: 1,
+  /// Loaded from GET /v1/rides/:id when the page opens without ride data
+  /// (deep link, notification, app restart). Never a made-up ride.
+  OpenRide? _loaded;
+  Object? _loadFailure;
+
+  /// DEC-PROD-024: customer voucher on this ride; the driver collects fare minus this.
+  var _discountVnd = 0;
+
+  /// True once the backend has the ride in DRIVER_EN_ROUTE or later.
+  late bool _enRoute =
+      widget.ride?.status != null &&
+      widget.ride!.status != 'ASSIGNED' &&
+      widget.ride!.status != 'NEGOTIATING';
+
+  @override
+  void initState() {
+    super.initState();
+    // Always read the server ride: the job card has no voucher, the cash to collect does.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    final token = driverAccessToken(context);
+    final hasCard = widget.ride != null;
+    if (token == null || token.isEmpty) {
+      if (!hasCard) {
+        setState(() => _loadFailure = sessionExpiredFailure);
+      }
+      return;
+    }
+    setState(() => _loadFailure = null);
+    try {
+      final view = await context.read<GetRide>()(
+        GetRideParams(accessToken: token, rideId: widget.rideId),
       );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _loaded = openRideFromView(view);
+        _discountVnd = view.discountVnd;
+        _enRoute = view.status != RideStatus.assigned && view.status != RideStatus.negotiating;
+        _phase = driverPhaseForStatus(view.status) ?? _phase;
+      });
+    } catch (error) {
+      if (mounted && !hasCard) {
+        setState(() => _loadFailure = error);
+      }
+    }
+  }
+
+  Future<void> _advance(
+    List<RideDriverAction> actions,
+    DriverRidePhase next,
+  ) async {
+    final advance = context.read<AdvanceDriverRide>();
+    final ok = await runDriverAction((token) async {
+      for (final action in actions) {
+        await advance(
+          accessToken: token,
+          rideId: widget.rideId,
+          action: action,
+        );
+        if (action == RideDriverAction.enRoute) {
+          _enRoute = true;
+        }
+      }
+    });
+    if (ok && mounted) {
+      setState(() => _phase = next);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
-    final ride = _ride;
+    final ride = _loaded ?? widget.ride;
+    if (ride == null) {
+      return DriverPageFrame(
+        title: l10n.driverActiveNavTitle,
+        insetBottom: true,
+        onBack: () => driverBack(context),
+        body: _loadFailure != null
+            ? DealGoStateView.failure(
+                context,
+                key: const Key('driver-active-retry'),
+                onRetry: _load,
+                cause: _loadFailure,
+                message: l10n.driverRideLoadFailed,
+              )
+            : const Center(child: CircularProgressIndicator()),
+      );
+    }
     final title = switch (_phase) {
       DriverRidePhase.navigatePickup => l10n.driverActiveNavTitle,
       DriverRidePhase.arrived => l10n.driverActiveArrivedTitle,
@@ -76,36 +160,39 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage> {
         secondaryLabel: l10n.driverActiveReportIssue,
         primaryLabel: l10n.driverActiveArrivedCta,
         primaryKey: const Key('driver-active-arrived'),
-        onSecondary: () =>
-            context.push(DriverRoutes.failed(widget.rideId)),
-        onPrimary: () => setState(() => _phase = DriverRidePhase.arrived),
+        primaryLoading: actionBusy,
+        primaryEnabled: !actionBusy,
+        onSecondary: () => context.push(DriverRoutes.failed(widget.rideId)),
+        onPrimary: () => _advance([
+          if (!_enRoute) RideDriverAction.enRoute,
+          RideDriverAction.arrived,
+        ], DriverRidePhase.arrived),
       ),
       DriverRidePhase.arrived => DriverFooter(
         secondaryLabel: l10n.driverActiveReportIssue,
         primaryLabel: l10n.driverActiveOpenOtp,
         primaryKey: const Key('driver-active-open-otp'),
-        onSecondary: () =>
-            context.push(DriverRoutes.failed(widget.rideId)),
-        onPrimary: () => context.push(
-          DriverRoutes.passengerOtp(widget.rideId),
-          extra: ride,
-        ),
+        onSecondary: () => context.push(DriverRoutes.failed(widget.rideId)),
+        onPrimary: () =>
+            context.push(DriverRoutes.passengerOtp(widget.rideId), extra: ride),
       ),
       DriverRidePhase.onTrip => DriverFooter(
         secondaryLabel: l10n.driverActiveReportIssue,
         primaryLabel: l10n.driverActiveCompleteCta,
         primaryKey: const Key('driver-active-complete'),
-        onSecondary: () =>
-            context.push(DriverRoutes.failed(widget.rideId)),
-        onPrimary: () => setState(() => _phase = DriverRidePhase.complete),
+        primaryLoading: actionBusy,
+        primaryEnabled: !actionBusy,
+        onSecondary: () => context.push(DriverRoutes.failed(widget.rideId)),
+        onPrimary: () => _advance(const [
+          RideDriverAction.complete,
+        ], DriverRidePhase.complete),
       ),
       DriverRidePhase.complete => DriverFooter(
         secondaryLabel: l10n.driverBackToJobs,
         primaryLabel: l10n.driverOpenCompletedSample,
         primaryKey: const Key('driver-active-done'),
         onSecondary: () => context.go('/driver/jobs'),
-        onPrimary: () =>
-            context.push(DriverRoutes.completed(widget.rideId)),
+        onPrimary: () => context.push(DriverRoutes.completed(widget.rideId)),
       ),
     };
 
@@ -130,8 +217,8 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage> {
                 children: [
                   Icon(
                     _phase == DriverRidePhase.onTrip
-                        ? Icons.navigation
-                        : Icons.turn_right,
+                        ? DealGoIcons.navigation
+                        : DealGoIcons.turnRight,
                     color: Colors.white,
                   ),
                   const SizedBox(width: DealGoSpacing.s12),
@@ -141,8 +228,8 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage> {
                       children: [
                         Text(
                           _phase == DriverRidePhase.onTrip
-                              ? 'Tiếp tục theo lộ trình'
-                              : 'Rẽ phải sau 200 m',
+                              ? l10n.driverFollowRoute
+                              : l10n.driverHeadToPickup,
                           style: textTheme.titleMedium?.copyWith(
                             color: Colors.white,
                           ),
@@ -150,7 +237,7 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage> {
                         Text(
                           _phase == DriverRidePhase.onTrip
                               ? ride.dropoff.label
-                              : 'Vào đường Nguyễn Văn Linh',
+                              : ride.pickup.label,
                           style: textTheme.bodySmall?.copyWith(
                             color: Colors.white70,
                           ),
@@ -162,21 +249,38 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage> {
               ),
             ),
             const SizedBox(height: DealGoSpacing.s12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(DealGoRadius.card),
-              child: const SizedBox(
-                height: 160,
-                child: ColoredBox(
-                  color: Color(0xFFE7EEF5),
-                  child: Center(
-                    child: Icon(
-                      Icons.map_outlined,
-                      size: 40,
-                      color: DealGoColors.primary,
+            Builder(
+              builder: (context) {
+                final pickup = MapLatLng(
+                  lat: ride.pickup.lat,
+                  lng: ride.pickup.lng,
+                );
+                final dropoff = MapLatLng(
+                  lat: ride.dropoff.lat,
+                  lng: ride.dropoff.lng,
+                );
+                final target = _phase == DriverRidePhase.onTrip
+                    ? dropoff
+                    : pickup;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ClipRRect(
+                      key: const Key('driver-active-map'),
+                      borderRadius: BorderRadius.circular(DealGoRadius.card),
+                      child: SizedBox(
+                        height: 160,
+                        child: context.read<MapPort>().buildMap(
+                          center: target,
+                          markers: [pickup, dropoff],
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ),
+                    const SizedBox(height: DealGoSpacing.s8),
+                    DriverNavigateButtons(lat: target.lat, lng: target.lng),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: DealGoSpacing.s12),
           ],
@@ -192,14 +296,14 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage> {
                         children: [
                           Text(
                             _phase == DriverRidePhase.onTrip
-                                ? 'Còn 12 phút'
-                                : 'Còn 4 phút',
+                                ? l10n.driverDropoffLabel
+                                : l10n.driverPickupLabel,
                             style: textTheme.titleMedium,
                           ),
                           Text(
                             _phase == DriverRidePhase.onTrip
-                                ? '3,4 km đến điểm đến'
-                                : '1,2 km đến điểm đón',
+                                ? ride.dropoff.label
+                                : ride.pickup.label,
                             style: textTheme.bodySmall,
                           ),
                         ],
@@ -207,10 +311,11 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage> {
                     ),
                     DriverChip(
                       label: switch (_phase) {
-                        DriverRidePhase.navigatePickup => 'Đang đón',
-                        DriverRidePhase.arrived => 'Chờ khách',
-                        DriverRidePhase.onTrip => 'Đang chạy',
-                        DriverRidePhase.complete => 'Hoàn tất',
+                        DriverRidePhase.navigatePickup =>
+                          l10n.driverPhasePickup,
+                        DriverRidePhase.arrived => l10n.driverPhaseWaiting,
+                        DriverRidePhase.onTrip => l10n.driverPhaseOnTrip,
+                        DriverRidePhase.complete => l10n.driverPhaseDone,
                       },
                       tone: DriverChipTone.green,
                     ),
@@ -221,35 +326,19 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage> {
                   children: [
                     const CircleAvatar(
                       backgroundColor: DealGoColors.subtlePurple,
-                      child: Text(
-                        'T',
-                        style: TextStyle(
-                          color: DealGoColors.primary,
-                          fontWeight: FontWeight.w800,
-                        ),
+                      child: Icon(
+                        DealGoIcons.user,
+                        color: DealGoColors.primary,
                       ),
                     ),
                     const SizedBox(width: DealGoSpacing.s12),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Trần Minh Anh', style: textTheme.titleMedium),
-                          Text(
-                            ride.pickup.label,
-                            style: textTheme.bodySmall,
-                          ),
-                        ],
+                      child: Text(
+                        l10n.driverPassenger,
+                        style: textTheme.titleMedium,
                       ),
                     ),
-                    IconButton.outlined(
-                      onPressed: () {},
-                      icon: const Icon(Icons.phone_outlined),
-                    ),
-                    IconButton.outlined(
-                      onPressed: () {},
-                      icon: const Icon(Icons.chat_bubble_outline),
-                    ),
+                    DriverContactActions(resourceId: widget.rideId),
                   ],
                 ),
               ],
@@ -264,10 +353,9 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Chuyến #${ride.id}', style: textTheme.titleMedium),
                       Text(
-                        'Honda Vision · 43H1-123.45',
-                        style: textTheme.bodySmall,
+                        l10n.rideRef(shortRef(ride.id)),
+                        style: textTheme.titleMedium,
                       ),
                     ],
                   ),
@@ -282,7 +370,7 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage> {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    Text('Giá đã chốt', style: textTheme.bodySmall),
+                    Text(l10n.driverAgreedFare, style: textTheme.bodySmall),
                   ],
                 ),
               ],
@@ -292,33 +380,63 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage> {
           DriverNote(
             tone: DriverNoteTone.green,
             message: switch (_phase) {
-              DriverRidePhase.navigatePickup =>
-                'Bản đồ thật chưa gắn SDK. Màn D021 là mock điều hướng đón khách.',
+              DriverRidePhase.navigatePickup => l10n.driverRideNavigateNote,
               DriverRidePhase.arrived => l10n.driverActiveWaitingBody,
               DriverRidePhase.onTrip => l10n.driverActiveOnTripBody,
-              DriverRidePhase.complete => l10n.driverActiveCompleteBody,
+              DriverRidePhase.complete => _discountVnd > 0
+                  ? l10n.driverVoucherFunded(formatRideVnd(_discountVnd))
+                  : l10n.driverActiveCompleteBody,
             },
           ),
+          if (actionError != null) ...[
+            const SizedBox(height: DealGoSpacing.s12),
+            DriverNote(message: actionError!),
+          ],
           if (_phase == DriverRidePhase.complete) ...[
             const SizedBox(height: DealGoSpacing.s12),
             DriverPanel(
               child: Column(
                 children: [
                   DriverMoneyRow(
-                    label: 'Giá đã chốt',
+                    label: l10n.driverAgreedFare,
                     value: formatRideVnd(ride.offeredFareVnd),
                     emphasize: true,
                   ),
-                  const DriverMoneyRow(
-                    label: 'Thu tiền',
-                    value: 'Theo hình thức khách đã chọn trên máy chủ',
+                  DriverMoneyRow(
+                    key: const Key('driver-cash-to-collect'),
+                    label: l10n.driverCollect,
+                    value: l10n.driverCashToCollect(
+                      formatRideVnd(rideCashAfterVoucher(ride.offeredFareVnd, _discountVnd)),
+                    ),
                   ),
                 ],
               ),
             ),
+
           ],
         ],
       ),
     );
   }
 }
+
+/// The phase screen for a ride the server already moved on; null keeps the caller's phase.
+DriverRidePhase? driverPhaseForStatus(RideStatus status) => switch (status) {
+  RideStatus.assigned || RideStatus.driverEnRoute => DriverRidePhase.navigatePickup,
+  RideStatus.driverArrived => DriverRidePhase.arrived,
+  RideStatus.inTrip => DriverRidePhase.onTrip,
+  RideStatus.completed => DriverRidePhase.complete,
+  _ => null,
+};
+
+/// A server ride as the driver screens show it; the agreed fare once there is one.
+OpenRide openRideFromView(RideView view) => OpenRide(
+  id: view.id,
+  status: view.status.wire,
+  pickup: view.pickup,
+  dropoff: view.dropoff,
+  offeredFareVnd: view.agreedFareVnd ?? view.offeredFareVnd,
+  referenceFareVnd: view.referenceFareVnd,
+  expiresAt: view.expiresAt,
+  offerCount: view.offers.length,
+);

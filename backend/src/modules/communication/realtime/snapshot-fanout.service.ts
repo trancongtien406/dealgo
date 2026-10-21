@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { Server } from 'socket.io';
 import {
   roomForAggregate,
+  roomForStore,
   SNAPSHOT_EVENT,
   type SnapshotEventPayload,
 } from './realtime.constants.js';
@@ -9,6 +10,7 @@ import {
 /**
  * Thin fan-out for status snapshots. Postgres remains source of truth;
  * missing server (tests / pre-listen) is a silent no-op.
+ * FoodOrder events also emit to store:{storeId} when storeId is set (merchant board).
  */
 @Injectable()
 export class SnapshotFanoutService {
@@ -38,5 +40,9 @@ export class SnapshotFanoutService {
       return;
     }
     this.server.to(room).emit(SNAPSHOT_EVENT, payload);
+    const storeId = payload.storeId?.trim();
+    if (payload.aggregateType === 'FoodOrder' && storeId) {
+      this.server.to(roomForStore(storeId)).emit(SNAPSHOT_EVENT, payload);
+    }
   }
 }

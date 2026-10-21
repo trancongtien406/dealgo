@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import type { StoredDocumentRef } from '../../integrations/object-storage/mock-kyc-storage.js';
+import type { StoredDocumentRef } from '../../platform/storage/document-store.service.js';
+
+/** A stored upload tagged with its document kind (ID_FRONT, LICENSE, ...). */
+export type PartnerDocumentRef = StoredDocumentRef & { kind?: string };
+
+export type PartnerReviewIssue = { section: string; note: string };
 
 export type PartnerRoleName = 'DRIVER' | 'MERCHANT';
 export type PartnerStatusName = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
@@ -10,8 +15,9 @@ export type PartnerApplicationRecord = {
   role: PartnerRoleName;
   status: PartnerStatusName;
   metadata: Record<string, unknown>;
-  documents: StoredDocumentRef[];
+  documents: PartnerDocumentRef[];
   reason: string | null;
+  reviewIssues: PartnerReviewIssue[];
   reviewedBy: string | null;
   reviewedAt: Date | null;
   submittedAt: Date | null;
@@ -41,13 +47,14 @@ export type PartnerRepository = {
     userId: string;
     role: PartnerRoleName;
     metadata: Record<string, unknown>;
-    documents: StoredDocumentRef[];
+    documents: PartnerDocumentRef[];
     now: Date;
   }): Promise<PartnerApplicationRecord>;
   review(input: {
     id: string;
     status: Extract<PartnerStatusName, 'APPROVED' | 'REJECTED'>;
     reason: string | null;
+    reviewIssues: PartnerReviewIssue[];
     reviewedBy: string;
     now: Date;
   }): Promise<PartnerApplicationRecord | null>;
@@ -133,7 +140,7 @@ export class MemoryPartnerRepository implements PartnerRepository {
     userId: string;
     role: PartnerRoleName;
     metadata: Record<string, unknown>;
-    documents: StoredDocumentRef[];
+    documents: PartnerDocumentRef[];
     now: Date;
   }): Promise<PartnerApplicationRecord> {
     const existing = await this.findByUserAndRole(input.userId, input.role);
@@ -144,6 +151,7 @@ export class MemoryPartnerRepository implements PartnerRepository {
         metadata: { ...input.metadata },
         documents: input.documents.map((doc) => ({ ...doc })),
         reason: null,
+        reviewIssues: [],
         reviewedBy: null,
         reviewedAt: null,
         submittedAt: input.now,
@@ -160,6 +168,7 @@ export class MemoryPartnerRepository implements PartnerRepository {
       metadata: { ...input.metadata },
       documents: input.documents.map((doc) => ({ ...doc })),
       reason: null,
+      reviewIssues: [],
       reviewedBy: null,
       reviewedAt: null,
       submittedAt: input.now,
@@ -174,17 +183,20 @@ export class MemoryPartnerRepository implements PartnerRepository {
     id: string;
     status: Extract<PartnerStatusName, 'APPROVED' | 'REJECTED'>;
     reason: string | null;
+    reviewIssues: PartnerReviewIssue[];
     reviewedBy: string;
     now: Date;
   }): Promise<PartnerApplicationRecord | null> {
     const existing = this.byId.get(input.id);
-    if (!existing) {
+    // Conditional like the Prisma updateMany: only a SUBMITTED row can be reviewed once.
+    if (!existing || existing.status !== 'SUBMITTED') {
       return null;
     }
     const updated: Stored = {
       ...existing,
       status: input.status,
       reason: input.reason,
+      reviewIssues: input.reviewIssues.map((issue) => ({ ...issue })),
       reviewedBy: input.reviewedBy,
       reviewedAt: input.now,
       updatedAt: input.now,
@@ -199,6 +211,7 @@ function copy(row: Stored): PartnerApplicationRecord {
     ...row,
     metadata: { ...row.metadata },
     documents: row.documents.map((doc) => ({ ...doc })),
+    reviewIssues: row.reviewIssues.map((issue) => ({ ...issue })),
     reviewedAt: row.reviewedAt ? new Date(row.reviewedAt) : null,
     submittedAt: row.submittedAt ? new Date(row.submittedAt) : null,
     createdAt: new Date(row.createdAt),

@@ -6,7 +6,10 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/network/api_error_l10n.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../../pricing/domain/pricing.dart';
 import '../../domain/entities/ride_money.dart';
 import '../../domain/entities/ride_models.dart';
 import '../../domain/params/create_ride_params.dart';
@@ -16,27 +19,37 @@ import '../cubit/ride_fare_cubit.dart';
 import '../utils/ride_routes.dart';
 import '../cubit/ride_session.dart';
 import '../widgets/ride_widgets.dart';
+import 'ride_route_overview_page.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/l10n/api_error_text.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 class RideFarePage extends StatelessWidget {
   const RideFarePage({
     required this.places,
-    this.initialFareVnd = rideDefaultOfferVnd,
-    this.vehicleLabel = rideVehicleLabel,
+    this.initialFareVnd,
     super.key,
   });
 
   final RidePlaces places;
-  final int initialFareVnd;
-  final String vehicleLabel;
+
+  /// Defaults to the server reference fare.
+  final int? initialFareVnd;
 
   @override
   Widget build(BuildContext context) {
+    final quote = places.quote;
+    if (quote == null) {
+      // Bounds come from the server quote; price the route first.
+      return RideRouteOverviewPage(places: places);
+    }
     return BlocProvider(
-      create: (context) => RideFareCubit(createRide: context.read<CreateRide>()),
+      create: (context) =>
+          RideFareCubit(createRide: context.read<CreateRide>()),
       child: _RideFareView(
         places: places,
-        initialFareVnd: initialFareVnd,
-        vehicleLabel: vehicleLabel,
+        quote: quote,
+        initialFareVnd: initialFareVnd ?? quote.referenceFareVnd,
       ),
     );
   }
@@ -45,13 +58,13 @@ class RideFarePage extends StatelessWidget {
 class _RideFareView extends StatefulWidget {
   const _RideFareView({
     required this.places,
+    required this.quote,
     required this.initialFareVnd,
-    required this.vehicleLabel,
   });
 
   final RidePlaces places;
+  final RideQuote quote;
   final int initialFareVnd;
-  final String vehicleLabel;
 
   @override
   State<_RideFareView> createState() => _RideFarePageState();
@@ -75,6 +88,12 @@ class _RideFarePageState extends State<_RideFareView> {
 
   int? get _amount => parseRideFareInput(_fare.text);
 
+  String _rangeLabel(BuildContext context) => AppLocalizations.of(context)
+      .rideFareRange(
+        formatRideVnd(widget.quote.minFareVnd),
+        formatRideVnd(widget.quote.maxFareVnd),
+      );
+
   Future<void> _submit() async {
     if (_busy) {
       return;
@@ -87,10 +106,10 @@ class _RideFarePageState extends State<_RideFareView> {
       await context.push(RideRoutes.matching(openRideId));
       return;
     }
-    if (amount == null || !rideFareAllowed(amount)) {
+    if (amount == null || !widget.quote.allows(amount)) {
       setState(() {
         _offline = false;
-        _message = rideFareRangeLabel();
+        _message = _rangeLabel(context);
       });
       return;
     }
@@ -151,10 +170,10 @@ class _RideFarePageState extends State<_RideFareView> {
         } else {
           _offline = false;
           _message = alreadyOpen
-              ? 'Bạn đang có một đề xuất chờ. Hãy mở báo giá đó hoặc hủy trước khi gửi giá mới.'
+              ? AppLocalizations.of(context).rideFarePendingExists
               : error is ApiException
-              ? error.message
-              : 'Không gửi được đề xuất.';
+              ? apiErrorText(AppLocalizations.of(context), error)
+              : AppLocalizations.of(context).rideFareSendFailed;
         }
       });
     }
@@ -169,7 +188,7 @@ class _RideFarePageState extends State<_RideFareView> {
         ride.selectedOfferId == null &&
         ride.offers.isEmpty &&
         !expired;
-    if (ride.status == RideStatus.assigned) {
+    if (ride.status.hasDriver) {
       await context.push(RideRoutes.tracking(ride.id));
       return;
     }
@@ -191,7 +210,7 @@ class _RideFarePageState extends State<_RideFareView> {
   @override
   Widget build(BuildContext context) {
     final amount = _amount;
-    final allowed = amount != null && rideFareAllowed(amount);
+    final allowed = amount != null && widget.quote.allows(amount);
     final textTheme = Theme.of(context).textTheme;
     final viewExisting =
         _openRideId != null &&
@@ -204,7 +223,7 @@ class _RideFarePageState extends State<_RideFareView> {
         body: SafeArea(
           child: Column(
             children: [
-              RideScreenHeader(title: 'Tự đề xuất giá chuyến', onBack: _back),
+              DealGoAppHeader(title: AppLocalizations.of(context).rideFareTitle, onBack: _back),
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(
@@ -218,7 +237,7 @@ class _RideFarePageState extends State<_RideFareView> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const RideSectionTitle('Thông tin đặt xe'),
+                          RideSectionTitle(AppLocalizations.of(context).rideBookingInfo),
                           const SizedBox(height: DealGoSpacing.s12),
                           RideStopList(
                             pickup: widget.places.pickup.label,
@@ -228,13 +247,13 @@ class _RideFarePageState extends State<_RideFareView> {
                           Row(
                             children: [
                               const Icon(
-                                Icons.two_wheeler,
+                                DealGoIcons.motorbike,
                                 color: DealGoColors.primary,
                                 size: 18,
                               ),
                               const SizedBox(width: DealGoSpacing.s8),
                               Text(
-                                widget.vehicleLabel,
+                                AppLocalizations.of(context).rideVehicleMotorbike,
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -249,14 +268,14 @@ class _RideFarePageState extends State<_RideFareView> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const RideSectionTitle('Mức giá bạn muốn đề xuất'),
+                          RideSectionTitle(AppLocalizations.of(context).rideFareAsk),
                           const SizedBox(height: DealGoSpacing.s4),
                           Text(
-                            rideFareRangeLabel(),
+                            _rangeLabel(context),
                             style: textTheme.bodySmall,
                           ),
                           const SizedBox(height: DealGoSpacing.s12),
-                          Text('Đề xuất của bạn', style: textTheme.bodySmall),
+                          Text(AppLocalizations.of(context).rideYourOffer, style: textTheme.bodySmall),
                           const SizedBox(height: DealGoSpacing.s8),
                           DecoratedBox(
                             decoration: BoxDecoration(
@@ -281,46 +300,23 @@ class _RideFarePageState extends State<_RideFareView> {
                             ),
                           ),
                           const SizedBox(height: DealGoSpacing.s12),
-                          TextField(
-                            key: const Key('ride-fare-field'),
+                          DealGoTextField(
+                            label: AppLocalizations.of(context).rideEnterAmount,
+                            showLabel: false,
+                            hint: AppLocalizations.of(context).rideEnterAmount,
                             controller: _fare,
+                            fieldKey: const Key('ride-fare-field'),
                             keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
                             inputFormatters: [
                               FilteringTextInputFormatter.digitsOnly,
                             ],
                             onChanged: (_) => setState(() => _message = null),
-                            textAlign: TextAlign.center,
-                            style: textTheme.titleLarge?.copyWith(
-                              color: DealGoColors.primary,
-                              fontWeight: FontWeight.w800,
-                            ),
-                            decoration: InputDecoration(
-                              filled: true,
-                              fillColor: DealGoColors.canvas,
-                              hintText: 'Nhập số tiền',
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(
-                                  DealGoRadius.input,
-                                ),
-                                borderSide: const BorderSide(
-                                  color: DealGoColors.border,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(
-                                  DealGoRadius.input,
-                                ),
-                                borderSide: const BorderSide(
-                                  color: DealGoColors.primary,
-                                  width: 1.4,
-                                ),
-                              ),
-                            ),
                           ),
                           const SizedBox(height: DealGoSpacing.s12),
                           Row(
                             children: [
-                              for (final preset in rideFarePresetsVnd) ...[
+                              for (final preset in widget.quote.presetsVnd) ...[
                                 Expanded(
                                   child: _FarePreset(
                                     amount: preset,
@@ -331,7 +327,7 @@ class _RideFarePageState extends State<_RideFareView> {
                                     },
                                   ),
                                 ),
-                                if (preset != rideFarePresetsVnd.last)
+                                if (preset != widget.quote.presetsVnd.last)
                                   const SizedBox(width: DealGoSpacing.s8),
                               ],
                             ],
@@ -340,23 +336,23 @@ class _RideFarePageState extends State<_RideFareView> {
                       ),
                     ),
                     const SizedBox(height: DealGoSpacing.s12),
-                    const RidePanel(
+                    RidePanel(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          RideSectionTitle('Thương lượng minh bạch'),
-                          SizedBox(height: DealGoSpacing.s8),
+                          RideSectionTitle(AppLocalizations.of(context).rideFairNegotiation),
+                          const SizedBox(height: DealGoSpacing.s8),
                           Text(
-                            'Tài xế có thể chào giá khác. Bạn chỉ trả số tiền của báo giá đã được máy chủ chấp nhận.',
+                            AppLocalizations.of(context).rideFairNegotiationNote,
                           ),
                         ],
                       ),
                     ),
                     if (_offline) ...[
                       const SizedBox(height: DealGoSpacing.s16),
-                      const RideOfflineNotice(
+                      RideOfflineNotice(
                         detail:
-                            'Chưa gửi được đề xuất. Chuyến xe chưa được tạo.',
+                            AppLocalizations.of(context).rideFareOffline,
                       ),
                     ],
                     if (_message != null) ...[
@@ -376,9 +372,9 @@ class _RideFarePageState extends State<_RideFareView> {
                 child: DealGoPrimaryButton(
                   key: const Key('ride-submit-fare'),
                   label: viewExisting
-                      ? 'Xem tài xế chào giá'
-                      : 'Gửi đề xuất ${amount == null ? '' : formatRideVnd(amount)}',
-                  trailingIcon: Icons.arrow_forward,
+                      ? AppLocalizations.of(context).rideSeeDriverOffers
+                      : AppLocalizations.of(context).rideSendOffer(amount == null ? '' : formatRideVnd(amount)),
+                  trailingIcon: DealGoIcons.arrowRight,
                   isLoading: _busy,
                   enabled: viewExisting || allowed,
                   onPressed: _submit,
@@ -436,7 +432,11 @@ class _FarePreset extends StatelessWidget {
               ),
               if (selected) ...[
                 const SizedBox(width: 2),
-                const Icon(Icons.check, size: 14, color: DealGoColors.primary),
+                const Icon(
+                  DealGoIcons.check,
+                  size: 14,
+                  color: DealGoColors.primary,
+                ),
               ],
             ],
           ),

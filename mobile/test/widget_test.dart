@@ -16,10 +16,15 @@ void main() {
       initialLocation: AuthRoutes.roles,
     );
 
-    expect(find.text('Trung tâm vai trò'), findsOneWidget);
-    expect(find.text('Chế độ Khách hàng'), findsOneWidget);
-    expect(find.text('Chế độ Shop'), findsOneWidget);
-    expect(find.text('Chế độ Tài xế'), findsOneWidget);
+    expect(
+      find.text('Bạn muốn dùng DealGo theo vai trò nào?', findRichText: true),
+      findsOneWidget,
+    );
+    expect(find.text('Khách hàng'), findsOneWidget);
+    expect(find.text('Cửa hàng'), findsOneWidget);
+    expect(find.text('Tài xế'), findsOneWidget);
+    expect(find.text('Tiếp tục'), findsOneWidget);
+    expect(find.text('Tìm hiểu thêm'), findsOneWidget);
   });
 
   testWidgets('tapping Khách hàng shows customer nav label Trang chủ', (
@@ -31,7 +36,9 @@ void main() {
       initialLocation: AuthRoutes.roles,
     );
 
-    await tester.tap(find.text('Tiếp tục với Khách hàng'));
+    await tester.tap(find.text('Khách hàng'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tiếp tục'));
     await tester.pumpAndSettle();
 
     expect(find.byType(CustomerTabBar), findsOneWidget);
@@ -52,39 +59,48 @@ void main() {
       initialLocation: AuthRoutes.roles,
     );
 
-    await tester.tap(find.text('Tiếp tục với Khách hàng'));
+    await tester.tap(find.text('Khách hàng'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tiếp tục'));
     await tester.pumpAndSettle();
     expect(find.byType(CustomerTabBar), findsOneWidget);
     expect(navLabel('Đặt'), findsOneWidget);
 
-    await _switchRole(tester, 'Chế độ Shop', 'Tiếp tục với Shop');
+    await _switchRole(tester, 'Cửa hàng');
 
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(navLabel('Tổng quan'), findsOneWidget);
-    expect(navLabel('Sản phẩm'), findsOneWidget);
+    expect(navLabel('Thực đơn'), findsOneWidget);
     expect(navLabel('Đặt'), findsNothing);
-    expect(navLabel('Công việc'), findsNothing);
+    expect(navLabel('Việc nhận'), findsNothing);
 
-    await _switchRole(tester, 'Chế độ Tài xế', 'Tiếp tục với Tài xế');
+    await _switchRole(tester, 'Tài xế');
 
     expect(find.byType(NavigationBar), findsOneWidget);
-    expect(navLabel('Công việc'), findsOneWidget);
+    expect(navLabel('Việc nhận'), findsOneWidget);
     expect(navLabel('Thu nhập'), findsOneWidget);
     expect(navLabel('Đặt'), findsNothing);
-    expect(navLabel('Sản phẩm'), findsNothing);
+    expect(navLabel('Thực đơn'), findsNothing);
   });
 
   testWidgets(
-    'multi-role user automatically enters customer shell and skips role picker',
+    'multi-role user lands on role picker then can open customer shell',
     (tester) async {
       await pumpSignedIn(tester, profile: multiRoleProfile);
 
-      // Skips role picker, lands directly in Customer shell
+      expect(
+        find.text('Bạn muốn dùng DealGo theo vai trò nào?', findRichText: true),
+        findsOneWidget,
+      );
+      expect(find.byType(CustomerTabBar), findsNothing);
+
+      await tester.ensureVisible(find.text('Tiếp tục'));
+      await tester.tap(find.text('Tiếp tục'));
+      await tester.pumpAndSettle();
+
       expect(find.byType(CustomerTabBar), findsOneWidget);
       expect(navLabel('Trang chủ'), findsOneWidget);
-      expect(find.text('Trung tâm vai trò'), findsNothing);
 
-      // User can switch role from Account page
       await tester.tap(navLabel('Tài khoản'));
       await tester.pumpAndSettle();
       expect(find.text('Đổi vai trò'), findsOneWidget);
@@ -92,20 +108,16 @@ void main() {
   );
 }
 
-Future<void> _switchRole(
-  WidgetTester tester,
-  String mode,
-  String continueLabel,
-) async {
+Future<void> _switchRole(WidgetTester tester, String roleTitle) async {
   await tester.tap(navLabel('Tài khoản'));
   await tester.pumpAndSettle();
   await tester.ensureVisible(find.text('Đổi vai trò'));
   await tester.tap(find.text('Đổi vai trò'));
   await tester.pumpAndSettle();
-  await tester.ensureVisible(find.text(mode));
-  await tester.tap(find.text(mode));
+  await tester.ensureVisible(find.text(roleTitle));
+  await tester.tap(find.text(roleTitle));
   await tester.pumpAndSettle();
-  await tester.ensureVisible(find.text(continueLabel));
-  await tester.tap(find.text(continueLabel));
+  await tester.ensureVisible(find.text('Tiếp tục'));
+  await tester.tap(find.text('Tiếp tục'));
   await tester.pumpAndSettle();
 }

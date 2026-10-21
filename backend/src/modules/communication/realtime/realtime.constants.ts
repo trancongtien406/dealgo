@@ -4,7 +4,7 @@ export const SUBSCRIBE_EVENT = 'subscribe';
 
 export const UNSUBSCRIBE_EVENT = 'unsubscribe';
 
-export type SnapshotRoomKind = 'ride' | 'food';
+export type SnapshotRoomKind = 'ride' | 'food' | 'store';
 
 export type ParsedSnapshotRoom = {
   kind: SnapshotRoomKind;
@@ -20,7 +20,7 @@ export function parseSnapshotRoom(raw: string | undefined | null): ParsedSnapsho
     return null;
   }
   const trimmed = raw.trim();
-  const match = /^(ride|food):(.+)$/.exec(trimmed);
+  const match = /^(ride|food|store):(.+)$/.exec(trimmed);
   if (!match) {
     return null;
   }
@@ -45,6 +45,11 @@ export function roomForAggregate(
   return null;
 }
 
+/** Merchant kitchen board listens on store:{storeId} (DEC-PROD-041). */
+export function roomForStore(storeId: string): string {
+  return `store:${storeId}`;
+}
+
 export type SnapshotEventPayload = {
   eventType: string;
   aggregateType: string;
@@ -52,4 +57,6 @@ export type SnapshotEventPayload = {
   status: string;
   revision: string;
   occurredAt: string;
+  /** Present on FoodOrder events so fan-out can also hit the store room. */
+  storeId?: string;
 };

@@ -1,14 +1,29 @@
+import '../../../pricing/domain/pricing.dart';
 import 'ride_money.dart';
 
 enum RideStatus {
   negotiating('NEGOTIATING'),
   assigned('ASSIGNED'),
+  driverEnRoute('DRIVER_EN_ROUTE'),
+  driverArrived('DRIVER_ARRIVED'),
+  inTrip('IN_TRIP'),
+  completed('COMPLETED'),
   cancelled('CANCELLED'),
   expired('EXPIRED');
 
   const RideStatus(this.wire);
 
   final String wire;
+
+  /// A driver is attached (ASSIGNED through COMPLETED).
+  bool get hasDriver => switch (this) {
+    assigned || driverEnRoute || driverArrived || inTrip || completed => true,
+    negotiating || cancelled || expired => false,
+  };
+
+  /// The trip can no longer change.
+  bool get isTerminal =>
+      this == completed || this == cancelled || this == expired;
 
   static RideStatus? parse(String raw) {
     for (final status in RideStatus.values) {
@@ -65,27 +80,21 @@ class RidePoint {
   final String label;
 }
 
+/// Pickup and drop-off chosen by the customer, with real coordinates.
 class RidePlaces {
-  const RidePlaces({required this.pickupLabel, required this.dropoffLabel});
+  const RidePlaces({required this.pickup, required this.dropoff, this.quote});
 
-  final String pickupLabel;
-  final String dropoffLabel;
+  final RidePoint pickup;
+  final RidePoint dropoff;
 
-  RidePoint get pickup {
-    return RidePoint(
-      lat: rideSamplePickupLat,
-      lng: rideSamplePickupLng,
-      label: pickupLabel.trim(),
-    );
-  }
+  /// Server quote (`POST /v1/rides/quote`), once the route overview loaded it.
+  final RideQuote? quote;
 
-  RidePoint get dropoff {
-    return RidePoint(
-      lat: rideSampleDropoffLat,
-      lng: rideSampleDropoffLng,
-      label: dropoffLabel.trim(),
-    );
-  }
+  RidePlaces withQuote(RideQuote quote) =>
+      RidePlaces(pickup: pickup, dropoff: dropoff, quote: quote);
+
+  String get pickupLabel => pickup.label;
+  String get dropoffLabel => dropoff.label;
 
   bool get canContinue {
     final pickup = pickupLabel.trim();
@@ -128,6 +137,10 @@ class RideView {
     required this.selectedOfferId,
     required this.expiresAt,
     required this.offers,
+    this.pickupCode,
+    this.updatedAt,
+    this.discountVnd = 0,
+    this.voucherCode,
   });
 
   final String id;
@@ -141,6 +154,27 @@ class RideView {
   final String? selectedOfferId;
   final String expiresAt;
   final List<RideOffer> offers;
+
+  /// Server-issued pickup code; only present on the customer's own ride while
+  /// the driver is on the way (DEC-PROD-017). Never derived on the client.
+  final String? pickupCode;
+
+  /// ISO time of the last status change (completion time once completed).
+  final String? updatedAt;
+
+  /// DEC-PROD-024: voucher discount reserved at offer selection (0 when none).
+  final int discountVnd;
+  final String? voucherCode;
+
+  /// Cash the customer hands the driver: the agreed fare minus the voucher.
+  int? get cashDueVnd {
+    final agreed = agreedFareVnd;
+    if (agreed == null) {
+      return null;
+    }
+    final due = agreed - discountVnd;
+    return due < 0 ? 0 : due;
+  }
 }
 
 class OpenRide {

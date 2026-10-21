@@ -46,15 +46,37 @@ export async function GET(_request: Request, context: RouteContext) {
   });
 }
 
-export async function PATCH() {
-  return NextResponse.json(
-    {
-      success: false,
-      message:
-        "Ngành hàng được tổng hợp từ hồ sơ cửa hàng; chỉnh ngành hàng trên cửa hàng.",
-    },
-    { status: 501 },
-  );
+export async function PATCH(request: Request, context: RouteContext) {
+  const { code } = await context.params;
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { success: false, message: "Invalid JSON body" },
+      { status: 400 },
+    );
+  }
+  const name =
+    body && typeof body === "object" && "name" in body
+      ? String((body as { name: unknown }).name ?? "").trim()
+      : "";
+  if (name.length < 1 || name.length > 64) {
+    return NextResponse.json(
+      { success: false, message: "name must be 1–64 characters" },
+      { status: 400 },
+    );
+  }
+  const result = await fetchOpsUpstream({
+    path: `/v1/ops/catalog/categories/${encodeURIComponent(code)}`,
+    method: "PATCH",
+    body: { name },
+  });
+  if (!result.ok) {
+    return jsonFromOpsUpstream(result);
+  }
+  const row = result.data as NestCategory;
+  return NextResponse.json({ success: true, data: mapItem(row) });
 }
 
 export async function DELETE() {

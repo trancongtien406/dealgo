@@ -1,6 +1,6 @@
 export type PlatformSettingValueType = "string" | "number" | "json";
 
-export type CategoryKey = "ALL" | "FARE" | "DISPATCH" | "ZONE_PAYMENT";
+export type CategoryKey = "ALL" | "FARE" | "DISPATCH" | "ZONE_PAYMENT" | "SUPPORT";
 
 export type PlatformSettingSourceFilter = "ALL" | "db" | "env";
 

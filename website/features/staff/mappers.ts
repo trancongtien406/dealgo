@@ -13,9 +13,10 @@ const tones: Record<StaffStatus, StatusTone> = {
 };
 
 const roleLabels: Record<string, string> = {
-  ADMIN: "Quản trị",
-  OPS: "Vận hành",
+  ADMIN: "Admin",
+  OPS: "Ops (chưa gán)",
   SUPPORT: "CSKH",
+  OPERATIONS: "Vận hành",
   FINANCE: "Tài chính",
   CUSTOMER: "Khách hàng",
   DRIVER: "Tài xế",

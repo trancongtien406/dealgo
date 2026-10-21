@@ -47,13 +47,14 @@ export async function approveKycApplication(id: string): Promise<KycCase> {
 export async function rejectKycApplication(
   id: string,
   reason: string,
+  issues: Array<{ section: string; note: string }> = [],
 ): Promise<KycCase> {
   const envelope = await apiFetch<{
     success: boolean;
     data: NestPartnerApplicationView;
   }>(apiPaths.opsPartnerApplicationReject(id), {
     method: "POST",
-    body: { reason },
+    body: issues.length > 0 ? { reason, issues } : { reason },
   });
   return mapNestPartnerApplicationToKycCase(envelope.data);
 }

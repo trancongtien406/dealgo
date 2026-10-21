@@ -1,6 +1,8 @@
 import '../../../food/domain/entities/food_models.dart';
 import '../../../ride/domain/entities/ride_models.dart';
 import '../../../ride/domain/params/submit_ride_offer_params.dart';
+import '../../../food/domain/params/food_delivery_action.dart';
+import '../../../ride/domain/params/ride_driver_action.dart';
 import '../../domain/repositories/driver_jobs_repository.dart';
 import '../datasources/driver_jobs_remote_datasource.dart';
 
@@ -30,5 +32,36 @@ class DriverJobsRepositoryImpl implements DriverJobsRepository {
     required String orderId,
   }) {
     return _remote.claimOrder(accessToken: accessToken, orderId: orderId);
+  }
+
+  @override
+  Future<RideView> advanceRide({
+    required String accessToken,
+    required String rideId,
+    required RideDriverAction action,
+    String? pickupCode,
+  }) {
+    return _remote.advanceRide(
+      accessToken: accessToken,
+      rideId: rideId,
+      action: action,
+      pickupCode: pickupCode,
+    );
+  }
+
+  @override
+  Future<ClaimedFoodDelivery> advanceDelivery({
+    required String accessToken,
+    required String orderId,
+    required FoodDeliveryAction action,
+    /// DEC-PROD-036: handover code (pickup) or delivery code (deliver).
+    String? code,
+  }) {
+    return _remote.advanceDelivery(
+      accessToken: accessToken,
+      orderId: orderId,
+      action: action,
+      code: code,
+    );
   }
 }

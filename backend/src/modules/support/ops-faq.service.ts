@@ -1,8 +1,10 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { HELP_FAQ_SEEDS } from './help-faq.seed.js';
 import { OPS_FAQ_SEEDS } from './ops-faq.seed.js';
 import { OPS_FAQ_REPOSITORY } from './support.constants.js';
 import type {
   CreateOpsFaqInput,
+  FaqAudienceName,
   OpsFaqRecord,
   OpsFaqRepository,
   OpsFaqStatusName,
@@ -16,12 +18,15 @@ export type OpsFaqView = {
   suggestedAnswer: string;
   status: OpsFaqStatusName;
   category: string;
+  audience: FaqAudienceName;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
   createdByUserId: string | null;
   updatedByUserId: string | null;
 };
+
+export type HelpFaqView = { id: string; question: string; answer: string; updatedAt: string };
 
 @Injectable()
 export class OpsFaqService {
@@ -33,6 +38,18 @@ export class OpsFaqService {
     await this.ensureSeeded();
     const rows = await this.repo.list(status);
     return rows.map(toView);
+  }
+
+  /** In-app help: PUBLISHED entries for one audience, question + answer only. */
+  async listHelp(audience: Exclude<FaqAudienceName, 'INTERNAL'>): Promise<HelpFaqView[]> {
+    await this.ensureSeeded();
+    const rows = await this.repo.listPublished(audience);
+    return rows.map((row) => ({
+      id: row.id,
+      question: row.question,
+      answer: row.suggestedAnswer,
+      updatedAt: row.updatedAt.toISOString(),
+    }));
   }
 
   async create(
@@ -64,7 +81,7 @@ export class OpsFaqService {
     if (this.seeded) {
       return;
     }
-    await this.repo.ensureSeeds(OPS_FAQ_SEEDS);
+    await this.repo.ensureSeeds([...OPS_FAQ_SEEDS, ...HELP_FAQ_SEEDS]);
     this.seeded = true;
   }
 }
@@ -77,6 +94,7 @@ function toView(row: OpsFaqRecord): OpsFaqView {
     suggestedAnswer: row.suggestedAnswer,
     status: row.status,
     category: row.category,
+    audience: row.audience,
     sortOrder: row.sortOrder,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

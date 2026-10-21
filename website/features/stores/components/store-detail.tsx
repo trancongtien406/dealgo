@@ -248,6 +248,23 @@ export function StoreDetail({ code }: { code: string }) {
                         "—"
                       ),
                     },
+                    {
+                      label: "Tự mở lại",
+                      value: store.serviceModeUntil
+                        ? formatResumeAt(store.serviceModeUntil)
+                        : "—",
+                    },
+                    {
+                      label: "Nhận đơn",
+                      value: store.acceptSummary ?? "—",
+                    },
+                    {
+                      label: "Thời gian chuẩn bị",
+                      value:
+                        store.prepMinutes != null
+                          ? `${store.prepMinutes} phút`
+                          : "—",
+                    },
                   ]}
                 />
               </DetailSection>
@@ -495,4 +512,17 @@ function Kpi({
       <p className="mt-1 text-xs text-muted">{hint}</p>
     </li>
   );
+}
+
+/** Vietnam wall-clock time of an auto-resume (DEC-PROD-026). */
+function formatResumeAt(iso: string): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return "—";
+  return new Intl.DateTimeFormat("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+  }).format(at);
 }

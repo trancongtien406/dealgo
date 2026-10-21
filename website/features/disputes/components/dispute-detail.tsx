@@ -249,7 +249,6 @@ export function DisputeDetail({ code }: { code: string }) {
           </p>
 
           <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)_minmax(18rem,24rem)]">
-            {/* Left Column: Metadata & Parties */}
             <div className="space-y-4">
               <section className="rounded-2xl border border-border bg-white p-4 shadow-sm">
                 <StatusChip
@@ -322,7 +321,6 @@ export function DisputeDetail({ code }: { code: string }) {
               </section>
             </div>
 
-            {/* Center Column: Messages & Order Details */}
             <div className="space-y-4">
               <section className="rounded-2xl border border-border bg-white p-4 shadow-sm">
                 <PreviewTabs
@@ -504,7 +502,6 @@ export function DisputeDetail({ code }: { code: string }) {
               </section>
             </div>
 
-            {/* Right Column: Resolution Form (Real API + Audit Log) */}
             <aside className="space-y-4">
               <section className="rounded-2xl border border-border bg-white p-4 shadow-sm">
                 <div className="flex items-center justify-between gap-2">

@@ -6,10 +6,7 @@ import 'deep_link_parser.dart';
 /// Thin go_router hook for incoming URIs. Call from platform channel /
 /// app_links later; safe to leave unbound until OS registration exists.
 class DeepLinkRouterHook {
-  DeepLinkRouterHook({
-    this.parser = const DeepLinkParser(),
-    this.router,
-  });
+  DeepLinkRouterHook({this.parser = const DeepLinkParser(), this.router});
 
   final DeepLinkParser parser;
   GoRouter? router;

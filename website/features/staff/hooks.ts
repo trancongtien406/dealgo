@@ -3,10 +3,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   approveRoleGrant,
+  fetchRbacMatrix,
   fetchRoleGrants,
   fetchStaff,
   fetchStaffAuditLogs,
+  fetchStaffMe,
   rejectRoleGrant,
+  resetStaffPassword,
+  setStaffSuperAdmin,
+  setStaffRole,
   type FetchRoleGrantsParams,
   type FetchStaffParams,
 } from "@/features/staff/api";
@@ -49,6 +54,49 @@ export function usePendingRoleGrantsQuery(
   });
 }
 
+export function useRbacMatrixQuery() {
+  return useQuery({
+    queryKey: ["ops", "staff", "rbac-matrix"],
+    queryFn: () => fetchRbacMatrix(),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useStaffMeQuery() {
+  return useQuery({
+    queryKey: ["ops", "staff", "me"],
+    queryFn: () => fetchStaffMe(),
+    staleTime: 60_000,
+  });
+}
+
+export function useResetStaffPasswordMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; newPassword: string; reason: string }) =>
+      resetStaffPassword(input.id, {
+        newPassword: input.newPassword,
+        reason: input.reason,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: staffAuditLogsQueryKey });
+    },
+  });
+}
+
+/** Grant/revoke super-admin; refreshes the staff list, "me" and the audit log. */
+export function useSetStaffSuperAdminMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; superAdmin: boolean; reason: string }) =>
+      setStaffSuperAdmin(input.id, { superAdmin: input.superAdmin, reason: input.reason }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["ops", "staff"] });
+      void queryClient.invalidateQueries({ queryKey: staffAuditLogsQueryKey });
+    },
+  });
+}
+
 export function useStaffAuditLogsQuery() {
   return useQuery({
     queryKey: staffAuditLogsQueryKey,
@@ -74,6 +122,19 @@ export function useRejectRoleGrantMutation() {
     mutationFn: (id: string) => rejectRoleGrant(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: roleGrantsQueryKey });
+      void queryClient.invalidateQueries({ queryKey: ["ops", "staff"] });
+      void queryClient.invalidateQueries({ queryKey: staffAuditLogsQueryKey });
+    },
+  });
+}
+
+
+export function useSetStaffRoleMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; staffRole: string; reason: string }) =>
+      setStaffRole(input.id, { staffRole: input.staffRole, reason: input.reason }),
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["ops", "staff"] });
       void queryClient.invalidateQueries({ queryKey: staffAuditLogsQueryKey });
     },

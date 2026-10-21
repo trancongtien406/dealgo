@@ -3,6 +3,8 @@ import { ApiError } from "@/lib/api/errors";
 import { apiPaths } from "@/lib/api/paths";
 import type { PaginatedList } from "@/lib/api/pagination";
 import type { DeliveryStatus } from "@/features/deliveries/types";
+import type { NestFoodOrderView } from "@/features/food-orders/nest-types";
+import { geoPoint, personLabel } from "@/features/rides/mappers";
 
 export type DeliveryItem = {
   code: string;
@@ -14,6 +16,8 @@ export type DeliveryItem = {
   status: DeliveryStatus;
   time: string;
   regionLabel?: string;
+  pickupPoint?: { lat: number; lng: number } | null;
+  dropoffPoint?: { lat: number; lng: number } | null;
 };
 
 export type FetchDeliveriesParams = {
@@ -46,15 +50,20 @@ export async function fetchDeliveryByCode(
   try {
     const envelope = await apiFetch<{
       success: boolean;
-      data: {
-        id: string;
-        customerId: string;
-        storeId: string;
-        status: string;
-        deliveryFareVnd: number;
-        totalVnd: number;
-        dropoff?: { label?: string };
-        assignedDriverId: string | null;
+      data: Pick<
+        NestFoodOrderView,
+        | "id"
+        | "customerId"
+        | "storeId"
+        | "storeName"
+        | "status"
+        | "deliveryFareVnd"
+        | "totalVnd"
+        | "pickup"
+        | "assignedDriverId"
+        | "driverProfile"
+      > & {
+        dropoff?: { lat?: number; lng?: number; label?: string };
         lines?: Array<{ name: string; quantity: number }>;
       };
     }>(apiPaths.opsFoodOrder(code));
@@ -75,15 +84,17 @@ export async function fetchDeliveryByCode(
     };
     return {
       code: order.id,
-      sender: `CH · ${order.storeId.slice(0, 8)}`,
+      sender: order.storeName?.trim() || `CH · ${order.storeId.slice(0, 8)}`,
       route: order.dropoff?.label?.trim() || "Điểm giao",
       cargo,
       fee: order.deliveryFareVnd ?? order.totalVnd ?? 0,
       driver: order.assignedDriverId
-        ? `TX · ${order.assignedDriverId.slice(0, 8)}`
+        ? personLabel(order.driverProfile, "TX", order.assignedDriverId)
         : null,
       status: statusMap[order.status] ?? "WAITING_DRIVER",
       time: "—",
+      pickupPoint: geoPoint(order.pickup),
+      dropoffPoint: geoPoint(order.dropoff),
     };
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) {

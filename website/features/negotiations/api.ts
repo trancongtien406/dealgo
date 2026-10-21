@@ -9,6 +9,7 @@ import type {
   NestRidePage,
   NestRideView,
 } from "@/features/rides/nest-types";
+import { geoPoint, personLabel } from "@/features/rides/mappers";
 import type {
   NegotiationOffer,
   NegotiationSession,
@@ -49,6 +50,8 @@ function mapOffer(offer: NestRideOffer): NegotiationOffer {
     kind: offer.kind,
     status: offer.status,
     expiresAt: offer.expiresAt,
+    driverLabel: personLabel(offer.driverProfile, "TX", offer.driverId),
+    driverPlate: offer.driverProfile?.vehiclePlate ?? null,
   };
 }
 
@@ -66,7 +69,10 @@ function mapNestRide(ride: NestRideView): NegotiationSession {
 
   return {
     code: ride.id,
-    customer: "Khách hàng",
+    customer: personLabel(ride.customerProfile, "KH", ride.customerId),
+    customerPhone: ride.customerProfile?.phoneMasked ?? null,
+    pickupPoint: geoPoint(ride.pickup),
+    dropoffPoint: geoPoint(ride.dropoff),
     route: `${pickup} → ${dropoff}`,
     budget: ride.offeredFareVnd ?? ride.referenceFareVnd ?? 0,
     lowest: ride.agreedFareVnd ?? lowestOfferAmount(ride.offers ?? []),

@@ -28,6 +28,9 @@ class SocketSnapshotRealtime implements SnapshotRealtime {
   Stream<void> get reconnects => _reconnects.stream;
 
   @override
+  bool get isConnected => _socket?.connected ?? false;
+
+  @override
   Future<void> connect({required String accessToken}) async {
     final token = accessToken.trim();
     if (token.isEmpty) {
@@ -140,5 +143,6 @@ SnapshotHint? _parseHint(Object? raw) {
     status: status,
     revision: revision,
     occurredAt: occurredAt,
+    storeId: map['storeId'] is String ? map['storeId'] as String : null,
   );
 }

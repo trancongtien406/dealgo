@@ -9,13 +9,18 @@ export type NestPartnerApplicationView = {
   status: NestPartnerStatus;
   metadata: Record<string, unknown>;
   documents: Array<{
-    key: string;
+    index?: number;
+    kind?: string | null;
     label: string;
     contentType: string;
     sizeBytes: number;
     uploadedAt: string;
+    /** False for seed/legacy refs without stored bytes. */
+    hasFile?: boolean;
   }>;
   reason: string | null;
+  /** Sections ops asked the applicant to fix (DEC-PROD-020). */
+  issues?: Array<{ section: string; note: string }>;
   reviewedBy: string | null;
   reviewedAt: string | null;
   submittedAt: string | null;

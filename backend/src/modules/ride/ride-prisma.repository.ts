@@ -1,3 +1,5 @@
+import { cancellationCountsAgainstDriver } from '../../shared/cancel-actor.js';
+import type { DriverJobCounts } from '../../shared/driver-job-counts.js';
 import { randomUUID } from 'node:crypto';
 import {
   normalizeRegionFilter,
@@ -8,16 +10,25 @@ import { Prisma, type PrismaClient } from '../../generated/prisma/client.js';
 import { writeOpsActionOutbox, writeStatusOutbox } from '../communication/outbox/outbox.write.js';
 import { RideRuleError } from './ride.error.js';
 import {
+  redeemVoucherInTx,
+  releaseVoucherInTx,
+  VoucherRejectedError,
+} from '../promotion/promotion-redemption.js';
+import type { CompletionHook } from '../../shared/tx/completion-hook.js';
+import {
   RideLedger,
   rideRowFromRecord,
   type CancelInput,
   type CreateRideInput,
+  DRIVER_HISTORY_RIDE_STATUSES,
+  type DriverHistoryWindow,
   type DriverLifecycleInput,
   type OfferInput,
   type OpenRideListing,
   type OpsCancelInput,
   type OpsReassignInput,
   type RideSnapshot,
+  type CancelActorName,
   type RideStatusName,
   type SelectInput,
 } from './ride-ledger.js';
@@ -180,37 +191,77 @@ export class PrismaRideRepository implements RideRepository {
           }
         }
 
-        const selected = ledger.select(input);
+        let selected = ledger.select(input);
+        // DEC-PROD-024: the voucher is reserved in the selection transaction, on the agreed
+        // fare; a rejection rolls the selection back. Replays (prior selection) never redeem.
+        const voucherCode = input.voucherCode?.trim();
+        if (!priorSelection && voucherCode && selected.ride && !selected.error) {
+          const agreed = selected.ride.agreedFareVnd ?? 0;
+          const redeemed = await redeemVoucherInTx(
+            tx,
+            {
+              code: voucherCode,
+              userId: input.customerId,
+              entityType: 'RIDE',
+              entityId: selected.ride.id,
+              serviceType: 'RIDE',
+              orderAmount: agreed,
+            },
+            input.now,
+          );
+          const applied = ledger.applyVoucher(selected.ride.id, {
+            code: redeemed.code,
+            discountVnd: redeemed.discountVnd,
+            sponsor: redeemed.sponsor,
+          });
+          if (applied) {
+            selected = { ride: applied };
+          }
+        }
         await this.persist(tx, ledger);
         return selected;
       });
     } catch (error) {
-      if (error instanceof RideRuleError) {
+      const conflict = error instanceof RideAssignmentConflict || isUniqueConflict(error);
+      const rule = error instanceof RideRuleError || error instanceof VoucherRejectedError;
+      if (!conflict && !rule) {
         throw error;
       }
-      if (error instanceof RideAssignmentConflict || isUniqueConflict(error)) {
-        const prior = await this.db.rideSelection.findUnique({
-          where: {
-            customerId_idempotencyKey: {
-              customerId: input.customerId,
-              idempotencyKey: input.idempotencyKey,
-            },
-          },
-        });
-        if (prior) {
-          const ride = await this.findById(prior.rideId, input.now);
-          if (ride && ride.customerId === input.customerId) {
-            return ride;
-          }
-        }
-        throw new RideRuleError('RIDE_OFFER_UNAVAILABLE');
+      // Idempotency wins: a same-key request that committed while this one waited (on the ride
+      // row or the voucher row) makes this rule error a replay.
+      const replay = await this.selectionReplay(input);
+      if (replay) {
+        return replay;
       }
-      throw error;
+      if (rule) {
+        throw error;
+      }
+      throw new RideRuleError('RIDE_OFFER_UNAVAILABLE');
     }
     if (outcome.error || !outcome.ride) {
+      const replay = outcome.error ? await this.selectionReplay(input) : null;
+      if (replay) {
+        return replay;
+      }
       throw new RideRuleError(outcome.error ?? 'RIDE_NOT_FOUND');
     }
     return outcome.ride;
+  }
+
+  private async selectionReplay(input: SelectInput): Promise<RideSnapshot | null> {
+    const prior = await this.db.rideSelection.findUnique({
+      where: {
+        customerId_idempotencyKey: {
+          customerId: input.customerId,
+          idempotencyKey: input.idempotencyKey,
+        },
+      },
+    });
+    if (!prior) {
+      return null;
+    }
+    const ride = await this.findById(prior.rideId, input.now);
+    return ride && ride.customerId === input.customerId ? ride : null;
   }
 
   async cancel(input: CancelInput): Promise<RideSnapshot> {
@@ -223,6 +274,10 @@ export class PrismaRideRepository implements RideRepository {
         }
         const cancelled = ledger.cancel(input);
         await this.persist(tx, ledger);
+        if (cancelled.ride && !cancelled.error) {
+          // Idempotent: a ride without a voucher has nothing to release.
+          await releaseVoucherInTx(tx, { entityType: 'RIDE', entityId: input.rideId }, input.now);
+        }
         return cancelled;
       });
     } catch (error) {
@@ -349,6 +404,61 @@ export class PrismaRideRepository implements RideRepository {
     return { items, total };
   }
 
+  async countFinishedForDrivers(
+    driverIds: readonly string[],
+  ): Promise<Map<string, DriverJobCounts>> {
+    const counts = new Map<string, DriverJobCounts>();
+    if (driverIds.length === 0) {
+      return counts;
+    }
+    const rows = await this.db.ride.groupBy({
+      by: ['assignedDriverId', 'status', 'cancelledBy'],
+      where: {
+        assignedDriverId: { in: [...driverIds] },
+        status: { in: [...DRIVER_HISTORY_RIDE_STATUSES] },
+      },
+      _count: { _all: true },
+    });
+    for (const row of rows) {
+      if (!row.assignedDriverId) continue;
+      // DEC-PROD-035: only driver cancellations count against the driver.
+      if (!cancellationCountsAgainstDriver(row.status, row.cancelledBy)) continue;
+      const current = counts.get(row.assignedDriverId) ?? { completed: 0, finished: 0 };
+      current.finished += row._count._all;
+      if (row.status === 'COMPLETED') {
+        current.completed += row._count._all;
+      }
+      counts.set(row.assignedDriverId, current);
+    }
+    return counts;
+  }
+
+  async listFinishedForDriver(
+    driverId: string,
+    window: DriverHistoryWindow,
+  ): Promise<RideSnapshot[]> {
+    const rows = await this.db.ride.findMany({
+      where: {
+        assignedDriverId: driverId,
+        status: { in: [...DRIVER_HISTORY_RIDE_STATUSES] },
+        updatedAt: {
+          ...(window.before ? { lte: window.before } : {}),
+          ...(window.since ? { gte: window.since } : {}),
+        },
+      },
+      include: { offers: true },
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+      take: window.limit,
+    });
+    // Terminal rides never expire, so reading them needs no persist pass.
+    const ledger = this.ledgerFrom(rows, []);
+    const now = new Date();
+    return rows.flatMap((row) => {
+      const ride = ledger.read(row.id, now);
+      return ride ? [ride] : [];
+    });
+  }
+
   private async opsIntervene(
     rideId: string,
     now: Date,
@@ -369,6 +479,8 @@ export class PrismaRideRepository implements RideRepository {
           return { error: outcome.error ?? 'RIDE_NOT_FOUND' };
         }
         await this.persist(tx, ledger);
+        // Cancel and reassign both return the reserved voucher (reassign clears the snapshot).
+        await releaseVoucherInTx(tx, { entityType: 'RIDE', entityId: rideId }, now);
         const auditId = randomUUID();
         await tx.opsAuditLog.create({
           data: {
@@ -423,8 +535,11 @@ export class PrismaRideRepository implements RideRepository {
     return this.driverLifecycle(input, (ledger) => ledger.startTrip(input));
   }
 
-  complete(input: DriverLifecycleInput): Promise<RideSnapshot> {
-    return this.driverLifecycle(input, (ledger) => ledger.complete(input));
+  complete(
+    input: DriverLifecycleInput,
+    onCompleted?: CompletionHook<RideSnapshot>,
+  ): Promise<RideSnapshot> {
+    return this.driverLifecycle(input, (ledger) => ledger.complete(input), onCompleted);
   }
 
   async expireDue(now: Date, limit = 100): Promise<string[]> {
@@ -463,6 +578,7 @@ export class PrismaRideRepository implements RideRepository {
   private async driverLifecycle(
     input: DriverLifecycleInput,
     apply: (ledger: RideLedger) => Awaited<ReturnType<RideLedger['markEnRoute']>>,
+    onChanged?: CompletionHook<RideSnapshot>,
   ): Promise<RideSnapshot> {
     let outcome: Awaited<ReturnType<RideLedger['markEnRoute']>>;
     try {
@@ -473,6 +589,9 @@ export class PrismaRideRepository implements RideRepository {
         }
         const next = apply(ledger);
         await this.persist(tx, ledger);
+        if (next.ride && !next.error && onChanged) {
+          await onChanged(tx, next.ride);
+        }
         return next;
       });
     } catch (error) {
@@ -576,6 +695,10 @@ export class PrismaRideRepository implements RideRepository {
       offeredFareVnd: number;
       referenceFareVnd: number;
       agreedFareVnd: number | null;
+      discountVnd: number;
+      voucherCode: string | null;
+      voucherSponsor: 'PLATFORM' | 'MERCHANT' | 'SHARED' | null;
+      cancelledBy?: CancelActorName | null;
       status: RideStatusName;
       assignedDriverId: string | null;
       selectedOfferId: string | null;
@@ -616,6 +739,10 @@ export class PrismaRideRepository implements RideRepository {
           offeredFareVnd: ride.offeredFareVnd,
           referenceFareVnd: ride.referenceFareVnd,
           agreedFareVnd: ride.agreedFareVnd,
+          discountVnd: ride.discountVnd,
+          voucherCode: ride.voucherCode,
+          voucherSponsor: ride.voucherSponsor,
+          cancelledBy: ride.cancelledBy ?? null,
           status: ride.status,
           assignedDriverId: ride.assignedDriverId,
           selectedOfferId: ride.selectedOfferId,
@@ -785,6 +912,10 @@ function ridePatch(row: {
   offeredFareVnd: number;
   referenceFareVnd: number;
   agreedFareVnd: number | null;
+  discountVnd: number;
+  voucherCode: string | null;
+  voucherSponsor: 'PLATFORM' | 'MERCHANT' | 'SHARED' | null;
+  cancelledBy: CancelActorName | null;
   status: RideStatusName;
   assignedDriverId: string | null;
   selectedOfferId: string | null;
@@ -800,6 +931,10 @@ function ridePatch(row: {
     offeredFareVnd: row.offeredFareVnd,
     referenceFareVnd: row.referenceFareVnd,
     agreedFareVnd: row.agreedFareVnd,
+    discountVnd: row.discountVnd,
+    voucherCode: row.voucherCode,
+    voucherSponsor: row.voucherSponsor,
+    cancelledBy: row.cancelledBy,
     status: row.status,
     assignedDriverId: row.assignedDriverId,
     selectedOfferId: row.selectedOfferId,

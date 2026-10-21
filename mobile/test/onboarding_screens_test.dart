@@ -38,8 +38,12 @@ void main() {
   });
 
   group('S001 DealGoSplashScreen', () {
-    testWidgets('renders brand slogan and floating service highlights', (tester) async {
-      await tester.pumpWidget(_wrap(const DealGoSplashScreen(autoNavigate: false)));
+    testWidgets('renders brand slogan and floating service highlights', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(const DealGoSplashScreen(autoNavigate: false)),
+      );
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.text('Đi muôn nơi · Ăn vạn món'), findsOneWidget);
@@ -50,19 +54,26 @@ void main() {
   });
 
   group('S002 CustomerOnboardingPage', () {
-    testWidgets('renders initial slide and allows advancing through steps', (tester) async {
+    testWidgets('renders initial slide and allows advancing through steps', (
+      tester,
+    ) async {
       var completed = false;
       final storage = MemoryOnboardingStorage();
       await tester.pumpWidget(
-        _wrap(CustomerOnboardingPage(
-          onComplete: () => completed = true,
-          storage: storage,
-        )),
+        _wrap(
+          CustomerOnboardingPage(
+            onComplete: () => completed = true,
+            storage: storage,
+          ),
+        ),
       );
       await tester.pumpAndSettle();
 
       // Step 1 check
-      expect(find.text('Một ứng dụng,\nvạn trải nghiệm', findRichText: true), findsOneWidget);
+      expect(
+        find.text('Một ứng dụng,\nvạn trải nghiệm', findRichText: true),
+        findsOneWidget,
+      );
       expect(find.text('Bước 1 trong 3'), findsOneWidget);
 
       // Tap Next to step 2
@@ -70,14 +81,17 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Bước 2 trong 3'), findsOneWidget);
-      expect(find.text('Di chuyển nhanh,\nan toàn & tiết kiệm', findRichText: true), findsOneWidget);
+      expect(
+        find.text('Di chuyển nhanh,\nan toàn & tiết kiệm', findRichText: true),
+        findsOneWidget,
+      );
 
       // Tap Next to step 3
       await tester.tap(find.byKey(const Key('onboarding-next-btn')));
       await tester.pumpAndSettle();
 
       expect(find.text('Bước 3 trong 3'), findsOneWidget);
-      expect(find.text('Tiếp tục'), findsOneWidget);
+      expect(find.text('Bắt đầu ngay'), findsOneWidget);
 
       // Tap Finish on last step
       await tester.tap(find.byKey(const Key('onboarding-next-btn')));

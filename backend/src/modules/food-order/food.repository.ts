@@ -1,3 +1,7 @@
+import { cancellationCountsAgainstDriver } from '../../shared/cancel-actor.js';
+import type { CancelActorName } from '../../shared/cancel-actor.js';
+import type { DriverJobCounts } from '../../shared/driver-job-counts.js';
+import type { CompletionHook } from '../../shared/tx/completion-hook.js';
 import { randomUUID } from 'node:crypto';
 import { pageOffset } from '../../shared/pagination/pagination.js';
 import {
@@ -6,13 +10,52 @@ import {
 } from '../service-area/service-regions.js';
 import { haversineKm } from '../ride/ride-geo.js';
 import { FoodRuleError } from './food.error.js';
-import { OPEN_FOOD_STATUSES, type FoodOrderStatusName } from './food.constants.js';
+import {
+  effectiveServiceMode,
+  type StoreServiceMode,
+  type StoreServiceState,
+} from './store-service-mode.js';
+import {
+  ALWAYS_OPEN,
+  scheduleView,
+  storeAvailability,
+  type StoreAvailability,
+  type StoreSchedule,
+  type StoreScheduleView,
+} from './store-schedule.js';
+import {
+  acceptSettingsFromRow,
+  atCapacity,
+  estimatedReadyAt,
+  KITCHEN_ACTIVE_STATUSES,
+  placementStatus,
+  prepMinutesFor,
+  type StoreAcceptSettings,
+} from './store-accept.js';
+import { OPEN_FOOD_STATUSES, type FoodOrderStatusName, type FoodRejectReason } from './food.constants.js';
+import {
+  VoucherRejectedError,
+  type VoucherRedeemer,
+} from '../promotion/promotion-redemption.js';
+import {
+  lineKey,
+  normalizeOptionGroups,
+  priceOptionSelection,
+  type FoodLineOption,
+  type FoodOptionGroupInput,
+  type FoodOptionGroupView,
+} from './food-options.js';
 
 export type FoodLineView = {
   itemId: string;
   name: string;
+  /** Base price + chosen option deltas, per unit, at placement. */
   unitPriceVnd: number;
   quantity: number;
+  /** Cover image snapshotted at placement (DEC-PROD-043). */
+  imageUrl: string | null;
+  /** Chosen options snapshotted at placement (DEC-PROD-033); [] when none. */
+  options: FoodLineOption[];
 };
 
 export type StoreListItem = {
@@ -23,12 +66,18 @@ export type StoreListItem = {
   lng: number | null;
   category: string | null;
   serviceRegionCode?: string | null;
+  /** M030 logo path (DEC-PROD-045); null = none uploaded. */
+  logoUrl?: string | null;
 };
 
-export type StoreBrowseItem = StoreListItem & {
-  createdAt: Date;
-  distanceKm: number | null;
-};
+export type StoreBrowseItem = StoreListItem &
+  StoreAvailability & {
+    createdAt: Date;
+    distanceKm: number | null;
+    serviceMode: StoreServiceMode;
+    /** Cover thumb: first available menu item imageUrl (DEC-PROD-041). */
+    imageUrl: string | null;
+  };
 
 export type StoreBrowsePage = {
   items: StoreBrowseItem[];
@@ -51,16 +100,71 @@ export type StoreItemView = {
   name: string;
   priceVnd: number;
   available: boolean;
+  /** M027 (DEC-PROD-039). */
+  description: string | null;
+  prepMinutes: number | null;
+  imageUrl: string | null;
+  /** Gallery URLs (DEC-PROD-042); cover is imageUrl / first entry. */
+  imageUrls: string[];
+  /** DELIVERED line qty sum (DEC-PROD-042). */
+  soldCount: number;
+  menuCategoryId: string | null;
+  /** Option groups in display order (DEC-PROD-033); [] when the dish has none. */
+  optionGroups: FoodOptionGroupView[];
 };
 
-export type StoreDetail = StoreListItem & {
-  items: StoreItemView[];
-};
-
-export type OpsStoreSummary = StoreListItem & {
-  createdAt: Date;
+export type MenuCategoryView = {
+  id: string;
+  name: string;
+  description: string | null;
+  position: number;
   itemCount: number;
 };
+
+export type StoreDetail = StoreListItem &
+  StoreServiceState &
+  StoreAvailability & {
+    /** M023 weekly hours / closed days / cut-off (DEC-PROD-027). */
+    schedule: StoreScheduleView;
+    /** M022 intake settings (DEC-PROD-028); stripped from the customer payload. */
+    acceptSettings: StoreAcceptSettings;
+    /** Default prep + BUSY extra right now; what customers see as the kitchen time. */
+    estimatedPrepMinutes: number;
+    /** Address the merchant set for pickup; shown on the store's info tab. */
+    addressLabel?: string | null;
+    items: StoreItemView[];
+  };
+
+export type UpdateStoreScheduleInput = {
+  ownerId: string;
+  schedule: StoreSchedule;
+};
+
+export type UpdateStoreServiceModeInput = {
+  ownerId: string;
+  mode: StoreServiceMode;
+  until: Date | null;
+  /** M024 BUSY extra prep minutes; undefined keeps the saved value. */
+  busyExtraMinutes?: number;
+};
+
+export type UpdateStoreAcceptSettingsInput = {
+  ownerId: string;
+  acceptMode: StoreAcceptSettings['acceptMode'];
+  maxActiveOrders: number | null;
+  defaultPrepMinutes: number;
+  /** Shared with M023 (StoreSchedule.lastOrderMinutes). */
+  lastOrderMinutes: number;
+};
+
+export type OpsStoreSummary = StoreListItem &
+  StoreServiceState &
+  StoreAvailability & {
+    createdAt: Date;
+    itemCount: number;
+    acceptSettings: StoreAcceptSettings;
+    estimatedPrepMinutes: number;
+  };
 
 export type OpsStoreDetail = OpsStoreSummary & {
   items: StoreItemView[];
@@ -176,11 +280,22 @@ export function filterStoreCategories(
   };
 }
 
+/** M030 (DEC-PROD-045): undefined fields keep their current value. */
+export type UpdateStoreProfileInput = {
+  ownerId: string;
+  name?: string;
+  logoUrl?: string | null;
+};
+
 export type UpdateStoreLocationInput = {
   ownerId: string;
   lat: number;
   lng: number;
+  /** Street address shown to drivers; omitted keeps the current value. */
+  addressLabel?: string | null;
 };
+
+export type VoucherSponsor = 'PLATFORM' | 'MERCHANT' | 'SHARED';
 
 export type FoodOrderView = {
   id: string;
@@ -192,12 +307,37 @@ export type FoodOrderView = {
   status: FoodOrderStatusName;
   deliveryFareVnd: number;
   subtotalVnd: number;
+  /** Voucher discount snapshotted at placement; totalVnd is already net of it. */
+  discountVnd: number;
+  voucherCode: string | null;
+  /** Internal accounting only (stripped from public payloads). */
+  voucherSponsor: VoucherSponsor | null;
   totalVnd: number;
   dropoff: { lat: number; lng: number; label: string };
+  /** Store pickup point when the store has coordinates (driver navigation, Admin route). */
+  pickup: { lat: number; lng: number; label: string | null } | null;
   assignedDriverId: string | null;
+  /** Set only when the merchant declined the order (DEC-PROD-021). */
+  cancelReason: FoodCancelReason | null;
+  /** DEC-PROD-035: who cancelled (null unless CANCELLED). */
+  cancelledBy: CancelActorName | null;
   lines: FoodLineView[];
+  /** Kitchen estimate snapshotted at placement (DEC-PROD-028); null on legacy orders. */
+  prepMinutes: number | null;
+  estimatedReadyAt: Date | null;
   updatedAt: Date;
 };
+
+export type FoodCancelReason = { code: FoodRejectReason; note: string | null };
+
+/** Driver history window: finished jobs, newest first. */
+export type FoodDriverHistoryWindow = {
+  before?: Date;
+  since?: Date;
+  limit: number;
+};
+
+export const DRIVER_HISTORY_FOOD_STATUSES = ['DELIVERED', 'FAILED', 'CANCELLED'] as const;
 
 export type CatalogItemInput = {
   name: string;
@@ -209,13 +349,51 @@ export type CreateCatalogItemInput = {
   name: string;
   priceVnd: number;
   available?: boolean;
+  description?: string | null;
+  prepMinutes?: number | null;
+  imageUrl?: string | null;
+  menuCategoryId?: string | null;
 };
 
 export type UpdateCatalogItemInput = {
+  imageUrls?: string[];
   ownerId: string;
   itemId: string;
   name?: string;
   priceVnd?: number;
+  available?: boolean;
+  description?: string | null;
+  prepMinutes?: number | null;
+  imageUrl?: string | null;
+  menuCategoryId?: string | null;
+};
+
+export type MerchantHistoryFilter = {
+  ownerId: string;
+  page: number;
+  limit: number;
+  /** ALL | DELIVERED | CANCELLED | FAILED */
+  tab?: string;
+  q?: string;
+  from?: Date;
+  to?: Date;
+};
+
+export type MerchantHistoryRow = {
+  id: string;
+  status: string;
+  subtotalVnd: number;
+  totalVnd: number;
+  createdAt: Date;
+  finishedAt: Date;
+  customerName: string | null;
+  lineSummary: string;
+};
+
+export type ReplaceItemOptionsInput = {
+  ownerId: string;
+  itemId: string;
+  groups: FoodOptionGroupInput[];
 };
 
 export type SetItemAvailabilityInput = {
@@ -233,12 +411,16 @@ export type ReadyOrderSummary = {
   id: string;
   storeId: string;
   status: 'READY';
+  storeName: string;
+  storeAddress: string | null;
   deliveryFareVnd: number;
   subtotalVnd: number;
   totalVnd: number;
   dropoff: { lat: number; lng: number; label: string };
-  /** Store coords when set; dispatch radius prefers these over dropoff. */
+  /** Pickup coords (order snapshot, else store); dispatch radius prefers these over dropoff. */
   store: { lat: number; lng: number } | null;
+  /** Where the driver collects the order (DEC-PROD-034 snapshot; legacy rows use the store). */
+  pickup: { lat: number; lng: number; label: string | null } | null;
   lineCount: number;
 };
 
@@ -257,15 +439,29 @@ export type QueueOrderSummary = {
   dropoff: { lat: number; lng: number; label: string };
   lineCount: number;
   createdAt: Date;
+  /** Internal: resolved to masked display names by FoodService, never returned. */
+  customerId: string;
+  assignedDriverId: string | null;
 };
+
+/** Raw rows for merchant stats; FoodService buckets them by Vietnam day. */
+export type MerchantStatsRows = {
+  finished: Array<{ status: 'DELIVERED' | 'CANCELLED' | 'FAILED'; subtotalVnd: number; finishedAt: Date }>;
+  openCount: number;
+  topItems: Array<{ name: string; quantity: number }>;
+};
+
+export type PlaceFoodLineInput = { itemId: string; quantity: number; optionIds?: string[] };
 
 export type PlaceFoodInput = {
   customerId: string;
   storeId: string;
   idempotencyKey: string;
-  items: { itemId: string; quantity: number }[];
+  items: PlaceFoodLineInput[];
   dropoff: { lat: number; lng: number; label: string };
   deliveryFareVnd: number;
+  /** Re-validated and redeemed in the same unit of work as the order. */
+  voucherCode?: string;
 };
 
 export interface FoodRepository {
@@ -298,14 +494,47 @@ export interface FoodRepository {
     q?: string;
   }): Promise<OpsCatalogCategoryPage>;
   findStoreCategoryByCode(code: string): Promise<OpsCatalogCategoryItem | null>;
+  renameStoreCategory(code: string, name: string): Promise<OpsCatalogCategoryItem>;
   findStore(storeId: string): Promise<StoreDetail | null>;
   findStoreForOps(storeId: string): Promise<OpsStoreDetail | null>;
   findStoreByOwner(ownerId: string): Promise<StoreDetail | null>;
   ensureOwnedStore(ownerId: string, name: string): Promise<StoreDetail>;
   updateStoreLocation(input: UpdateStoreLocationInput): Promise<StoreDetail>;
+  updateStoreProfile(input: UpdateStoreProfileInput): Promise<StoreDetail>;
+  findStoreLogoUrl(storeId: string): Promise<string | null>;
+  updateStoreServiceMode(input: UpdateStoreServiceModeInput): Promise<StoreDetail>;
+  updateStoreSchedule(input: UpdateStoreScheduleInput): Promise<StoreDetail>;
+  updateStoreAcceptSettings(input: UpdateStoreAcceptSettingsInput): Promise<StoreDetail>;
+  listMenuCategories(ownerId: string): Promise<MenuCategoryView[]>;
+  createMenuCategory(input: {
+    ownerId: string;
+    name: string;
+    description?: string | null;
+  }): Promise<MenuCategoryView>;
+  updateMenuCategory(input: {
+    ownerId: string;
+    categoryId: string;
+    name?: string;
+    description?: string | null;
+  }): Promise<MenuCategoryView>;
+  deleteMenuCategory(ownerId: string, categoryId: string): Promise<{ deleted: true }>;
+  reorderMenuCategories(ownerId: string, orderedIds: string[]): Promise<MenuCategoryView[]>;
+  listMerchantHistory(filter: MerchantHistoryFilter): Promise<{
+    items: MerchantHistoryRow[];
+    page: number;
+    limit: number;
+    total: number;
+    deliveredCount: number;
+    deliveredRevenueVnd: number;
+  }>;
   createItem(input: CreateCatalogItemInput): Promise<StoreItemView>;
   updateItem(input: UpdateCatalogItemInput): Promise<StoreItemView>;
+  /** Public image serve: current imageUrl for an item id, or null. */
+  findItemImageUrl(itemId: string): Promise<string | null>;
+  findItemImageUrls(itemId: string): Promise<string[]>;
   setItemAvailability(input: SetItemAvailabilityInput): Promise<StoreItemView>;
+  /** Replaces the item's option groups (ids on this item are kept). */
+  replaceItemOptions(input: ReplaceItemOptionsInput): Promise<StoreItemView>;
   setCatalogModeration(
     itemId: string,
     decision: 'APPROVED' | 'REJECTED',
@@ -314,6 +543,8 @@ export interface FoodRepository {
   findOrder(orderId: string): Promise<FoodOrderView | null>;
   listReady(limit?: number): Promise<ReadyOrderSummary[]>;
   listQueue(ownerId: string): Promise<QueueOrderSummary[]>;
+  /** Owner-scoped finished orders since `since` (by last status change), open count, top items. */
+  merchantStats(ownerId: string, since: Date, topLimit: number): Promise<MerchantStatsRows>;
   listOrdersPage(
     page: number,
     limit: number,
@@ -331,13 +562,24 @@ export interface FoodRepository {
     page: number,
     limit: number,
   ): Promise<OpsFoodOrderPage>;
+  /** DELIVERED/FAILED/CANCELLED orders still assigned to the driver, newest updatedAt first. */
+  listFinishedForDriver(driverId: string, window: FoodDriverHistoryWindow): Promise<FoodOrderView[]>;
+  /** Lifetime DELIVERED / terminal order counts per assigned driver (Admin stats). */
+  countFinishedForDrivers(driverIds: readonly string[]): Promise<Map<string, DriverJobCounts>>;
   accept(orderId: string, ownerId: string): Promise<FoodOrderView>;
   markReady(orderId: string, ownerId: string): Promise<FoodOrderView>;
   claim(orderId: string, driverId: string, maxConcurrentJobs?: number): Promise<FoodOrderView>;
   pickup(orderId: string, driverId: string): Promise<FoodOrderView>;
-  deliver(orderId: string, driverId: string): Promise<FoodOrderView>;
+  /** `onDelivered` runs in the delivery transaction; if it throws the order stays PICKED_UP. */
+  deliver(
+    orderId: string,
+    driverId: string,
+    onDelivered?: CompletionHook<FoodOrderView>,
+  ): Promise<FoodOrderView>;
   fail(orderId: string, driverId: string): Promise<FoodOrderView>;
   cancel(orderId: string, customerId: string): Promise<FoodOrderView>;
+  /** Store owner declines a PLACED order (→ CANCELLED, voucher released). */
+  reject(orderId: string, ownerId: string, reason: FoodCancelReason): Promise<FoodOrderView>;
   opsCancel(
     orderId: string,
     actorUserId: string,
@@ -352,7 +594,29 @@ export interface FoodRepository {
 
 type CatalogModerationStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
-type StoredStore = StoreListItem & { createdAt: Date };
+type StoredStore = StoreListItem & {
+  createdAt: Date;
+  addressLabel?: string | null;
+  serviceMode?: StoreServiceMode;
+  serviceModeUntil?: Date | null;
+  schedule?: StoreSchedule;
+  accept?: StoreAcceptSettings;
+};
+
+function memoryAccept(store: StoredStore): Pick<StoreDetail, 'acceptSettings' | 'estimatedPrepMinutes'> {
+  const acceptSettings = store.accept ?? acceptSettingsFromRow({});
+  const mode = effectiveServiceMode(store.serviceMode, store.serviceModeUntil).serviceMode;
+  return { acceptSettings: { ...acceptSettings }, estimatedPrepMinutes: prepMinutesFor(acceptSettings, mode) };
+}
+
+function memoryAvailability(store: StoredStore, now = new Date()): StoreAvailability {
+  return storeAvailability(
+    store.serviceMode,
+    store.serviceModeUntil,
+    store.schedule ?? ALWAYS_OPEN,
+    now,
+  );
+}
 type StoredItem = StoreItemView & {
   storeId: string;
   moderationStatus: CatalogModerationStatus;
@@ -366,6 +630,8 @@ function touchOrder(order: StoredOrder): void {
 const OPEN = new Set<string>(OPEN_FOOD_STATUSES);
 
 export class MemoryFoodRepository implements FoodRepository {
+  constructor(private readonly vouchers?: VoucherRedeemer) {}
+
   private readonly stores: StoredStore[] = [];
   private readonly items: StoredItem[] = [];
   private readonly orders: StoredOrder[] = [];
@@ -396,6 +662,13 @@ export class MemoryFoodRepository implements FoodRepository {
         priceVnd: item.priceVnd,
         available: true,
         moderationStatus: 'APPROVED',
+        description: null,
+        prepMinutes: null,
+        imageUrl: null,
+        imageUrls: [],
+        soldCount: 0,
+        menuCategoryId: null,
+        optionGroups: [],
       });
     }
   }
@@ -430,7 +703,15 @@ export class MemoryFoodRepository implements FoodRepository {
 
     const sortBy =
       query.sortBy === 'distance' && !origin ? 'createdAt' : query.sortBy;
+    const now = new Date();
+    const open = new Map(filtered.map((entry) => [entry.store.id, memoryAvailability(entry.store, now)]));
     filtered.sort((left, right) => {
+      // DEC-PROD-027: open stores first; paused/closed stay listed with a label.
+      const openRank =
+        Number(open.get(right.store.id)!.openNow) - Number(open.get(left.store.id)!.openNow);
+      if (openRank !== 0) {
+        return openRank;
+      }
       if (sortBy === 'name') {
         return (
           left.store.name.localeCompare(right.store.name) ||
@@ -454,8 +735,12 @@ export class MemoryFoodRepository implements FoodRepository {
     const start = (pageOffset(query.page, query.limit));
     const items = filtered.slice(start, start + query.limit).map((entry) => ({
       ...toStoreListItem(entry.store),
+      ...open.get(entry.store.id)!,
+      serviceMode: effectiveServiceMode(entry.store.serviceMode, entry.store.serviceModeUntil)
+        .serviceMode,
       createdAt: entry.store.createdAt,
       distanceKm: entry.distanceKm,
+      imageUrl: coverImageForStore(this.items, entry.store.id),
     }));
     return { items, total };
   }
@@ -544,6 +829,19 @@ export class MemoryFoodRepository implements FoodRepository {
     return this.aggregateCategories().find((c) => c.code === normalized) ?? null;
   }
 
+  async renameStoreCategory(code: string, name: string): Promise<OpsCatalogCategoryItem> {
+    const current = await this.findStoreCategoryByCode(code);
+    if (!current) throw new FoodRuleError('FOOD_CATEGORY_NOT_FOUND');
+    for (const store of this.stores) {
+      if (slugifyStoreCategory(normalizeStoreCategoryName(store.category)) === current.code) {
+        store.category = name;
+      }
+    }
+    const next = await this.findStoreCategoryByCode(slugifyStoreCategory(name));
+    if (!next) throw new FoodRuleError('FOOD_CATEGORY_NOT_FOUND');
+    return next;
+  }
+
   private aggregateCategories(): OpsCatalogCategoryItem[] {
     return aggregateStoreCategories(
       this.stores.map((store) => ({
@@ -560,9 +858,12 @@ export class MemoryFoodRepository implements FoodRepository {
     }
     return {
       ...toStoreListItem(store),
-      items: this.items
-        .filter((item) => item.storeId === storeId)
-        .map(({ storeId: _storeId, ...item }) => item),
+      ...effectiveServiceMode(store.serviceMode, store.serviceModeUntil),
+      ...memoryAvailability(store),
+      schedule: scheduleView(store.schedule ?? ALWAYS_OPEN),
+      ...memoryAccept(store),
+      addressLabel: store.addressLabel ?? null,
+      items: this.items.filter((item) => item.storeId === storeId).map(memoryItemView),
     };
   }
 
@@ -594,25 +895,73 @@ export class MemoryFoodRepository implements FoodRepository {
     if (!store) {
       throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
     }
+    const availability = memoryAvailability(store);
+    if (availability.closedReason === 'PAUSED') {
+      throw new FoodRuleError('FOOD_STORE_PAUSED');
+    }
+    if (availability.closedReason === 'CLOSED') {
+      throw new FoodRuleError('FOOD_STORE_CLOSED');
+    }
+    const { acceptSettings, estimatedPrepMinutes } = memoryAccept(store);
+    const kitchen = new Set<string>(KITCHEN_ACTIVE_STATUSES);
+    const active = this.orders.filter(
+      (order) => order.storeId === store.id && kitchen.has(order.status),
+    ).length;
+    if (atCapacity(acceptSettings, active)) {
+      throw new FoodRuleError('FOOD_STORE_AT_CAPACITY');
+    }
     const lines = this.snapshotLines(input.storeId, input.items);
     const subtotalVnd = lines.reduce((sum, line) => sum + line.unitPriceVnd * line.quantity, 0);
+    const orderId = randomUUID();
+    let discountVnd = 0;
+    let voucherCode: string | null = null;
+    let voucherSponsor: VoucherSponsor | null = null;
+    if (input.voucherCode) {
+      if (!this.vouchers) {
+        throw new VoucherRejectedError('VOUCHER_NOT_FOUND', 'Vouchers are not configured');
+      }
+      const redeemed = await this.vouchers.redeem({
+        code: input.voucherCode,
+        userId: input.customerId,
+        serviceType: 'FOOD',
+        orderAmount: subtotalVnd,
+        deliveryFee: input.deliveryFareVnd,
+        entityType: 'FOOD_ORDER',
+        entityId: orderId,
+      });
+      discountVnd = redeemed.discountVnd;
+      voucherCode = redeemed.code;
+      voucherSponsor = redeemed.sponsor;
+    }
+    const placedAt = new Date();
     const order: StoredOrder = {
-      id: randomUUID(),
+      id: orderId,
       customerId: input.customerId,
       storeId: store.id,
       storeName: store.name,
+      pickup:
+        store.lat != null && store.lng != null
+          ? { lat: store.lat, lng: store.lng, label: store.addressLabel ?? null }
+          : null,
       serviceRegionCode: store.serviceRegionCode ?? null,
       ownerId: store.ownerId,
-      status: 'PLACED',
+      status: placementStatus(acceptSettings),
       deliveryFareVnd: input.deliveryFareVnd,
       subtotalVnd,
-      totalVnd: subtotalVnd + input.deliveryFareVnd,
+      discountVnd,
+      voucherCode,
+      voucherSponsor,
+      totalVnd: Math.max(0, subtotalVnd + input.deliveryFareVnd - discountVnd),
       dropoff: { ...input.dropoff },
       assignedDriverId: null,
+      cancelReason: null,
+      cancelledBy: null,
       lines,
+      prepMinutes: estimatedPrepMinutes,
+      estimatedReadyAt: estimatedReadyAt(placedAt, estimatedPrepMinutes),
       idempotencyKey: input.idempotencyKey,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: placedAt,
+      updatedAt: placedAt,
     };
     this.orders.push(order);
     return copyOrder(order);
@@ -629,17 +978,23 @@ export class MemoryFoodRepository implements FoodRepository {
       .sort(byCreatedAt)
       .map((order) => {
         const store = this.stores.find((entry) => entry.id === order.storeId);
-        const storeCoords =
-          store?.lat != null && store?.lng != null ? { lat: store.lat, lng: store.lng } : null;
+        const pickup = order.pickup
+          ? { ...order.pickup }
+          : store?.lat != null && store?.lng != null
+            ? { lat: store.lat, lng: store.lng, label: store.addressLabel ?? null }
+            : null;
         return {
           id: order.id,
           storeId: order.storeId,
           status: 'READY' as const,
+          storeName: store?.name ?? order.storeName ?? '',
+          storeAddress: store?.addressLabel ?? null,
           deliveryFareVnd: order.deliveryFareVnd,
           subtotalVnd: order.subtotalVnd,
           totalVnd: order.totalVnd,
           dropoff: { ...order.dropoff },
-          store: storeCoords,
+          store: pickup ? { lat: pickup.lat, lng: pickup.lng } : null,
+          pickup,
           lineCount: order.lines.length,
         };
       });
@@ -666,7 +1021,36 @@ export class MemoryFoodRepository implements FoodRepository {
         dropoff: { ...order.dropoff },
         lineCount: order.lines.length,
         createdAt: new Date(order.createdAt),
+        customerId: order.customerId,
+        assignedDriverId: order.assignedDriverId,
       }));
+  }
+
+  async merchantStats(ownerId: string, since: Date, topLimit: number): Promise<MerchantStatsRows> {
+    const owned = this.orders.filter((order) => order.ownerId === ownerId);
+    const finished = owned.flatMap((order) =>
+      (order.status === 'DELIVERED' || order.status === 'CANCELLED' || order.status === 'FAILED') &&
+      order.updatedAt >= since
+        ? [{ status: order.status, subtotalVnd: order.subtotalVnd, finishedAt: new Date(order.updatedAt) }]
+        : [],
+    );
+    const quantities = new Map<string, number>();
+    for (const order of owned) {
+      if (order.status !== 'DELIVERED' || order.updatedAt < since) {
+        continue;
+      }
+      for (const line of order.lines) {
+        quantities.set(line.name, (quantities.get(line.name) ?? 0) + line.quantity);
+      }
+    }
+    return {
+      finished,
+      openCount: owned.filter((order) => OPEN.has(order.status)).length,
+      topItems: [...quantities.entries()]
+        .map(([name, quantity]) => ({ name, quantity }))
+        .sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name))
+        .slice(0, topLimit),
+    };
   }
 
   async findStoreByOwner(ownerId: string): Promise<StoreDetail | null> {
@@ -699,8 +1083,81 @@ export class MemoryFoodRepository implements FoodRepository {
       lat: null,
       lng: null,
       category: null,
+      serviceMode: 'OPEN',
+      serviceModeUntil: null,
+      openNow: true,
+      closedReason: null,
+      schedule: scheduleView(ALWAYS_OPEN),
+      ...memoryAccept({ id: storeId, name, ownerId, lat: null, lng: null, category: null, createdAt: new Date() }),
       items: [],
     };
+  }
+
+  async updateStoreSchedule(input: UpdateStoreScheduleInput): Promise<StoreDetail> {
+    const store = this.stores.find((entry) => entry.ownerId === input.ownerId);
+    if (!store) {
+      throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
+    }
+    store.schedule = input.schedule;
+    const detail = await this.findStore(store.id);
+    if (!detail) {
+      throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
+    }
+    return detail;
+  }
+
+  async updateStoreAcceptSettings(input: UpdateStoreAcceptSettingsInput): Promise<StoreDetail> {
+    const store = this.stores.find((entry) => entry.ownerId === input.ownerId);
+    if (!store) {
+      throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
+    }
+    store.accept = {
+      ...(store.accept ?? acceptSettingsFromRow({})),
+      acceptMode: input.acceptMode,
+      maxActiveOrders: input.maxActiveOrders,
+      defaultPrepMinutes: input.defaultPrepMinutes,
+    };
+    store.schedule = { ...(store.schedule ?? ALWAYS_OPEN), lastOrderMinutes: input.lastOrderMinutes };
+    const detail = await this.findStore(store.id);
+    if (!detail) {
+      throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
+    }
+    return detail;
+  }
+
+  async updateStoreServiceMode(input: UpdateStoreServiceModeInput): Promise<StoreDetail> {
+    const store = this.stores.find((entry) => entry.ownerId === input.ownerId);
+    if (!store) {
+      throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
+    }
+    store.serviceMode = input.mode;
+    store.serviceModeUntil = input.until;
+    if (input.busyExtraMinutes !== undefined) {
+      store.accept = { ...(store.accept ?? acceptSettingsFromRow({})), busyExtraMinutes: input.busyExtraMinutes };
+    }
+    const detail = await this.findStore(store.id);
+    if (!detail) {
+      throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
+    }
+    return detail;
+  }
+
+  async updateStoreProfile(input: UpdateStoreProfileInput): Promise<StoreDetail> {
+    const store = this.stores.find((entry) => entry.ownerId === input.ownerId);
+    if (!store) {
+      throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
+    }
+    if (input.name !== undefined) store.name = input.name;
+    if (input.logoUrl !== undefined) store.logoUrl = input.logoUrl;
+    const detail = await this.findStore(store.id);
+    if (!detail) {
+      throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
+    }
+    return detail;
+  }
+
+  async findStoreLogoUrl(storeId: string): Promise<string | null> {
+    return this.stores.find((entry) => entry.id === storeId)?.logoUrl ?? null;
   }
 
   async updateStoreLocation(input: UpdateStoreLocationInput): Promise<StoreDetail> {
@@ -710,6 +1167,9 @@ export class MemoryFoodRepository implements FoodRepository {
     }
     store.lat = input.lat;
     store.lng = input.lng;
+    if (input.addressLabel !== undefined) {
+      store.addressLabel = input.addressLabel?.trim() || null;
+    }
     const detail = await this.findStore(store.id);
     if (!detail) {
       throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
@@ -747,30 +1207,173 @@ export class MemoryFoodRepository implements FoodRepository {
       priceVnd: input.priceVnd,
       available,
       moderationStatus: available ? 'APPROVED' : 'PENDING',
+      description: input.description ?? null,
+      prepMinutes: input.prepMinutes ?? null,
+      imageUrl: input.imageUrl ?? null,
+      imageUrls: input.imageUrl ? [input.imageUrl] : [],
+      soldCount: 0,
+      menuCategoryId: input.menuCategoryId ?? null,
+      optionGroups: [],
     };
     this.items.push(stored);
-    return {
-      id: stored.id,
-      name: stored.name,
-      priceVnd: stored.priceVnd,
-      available: stored.available,
-    };
+    return memoryItemView(stored);
   }
 
   async updateItem(input: UpdateCatalogItemInput): Promise<StoreItemView> {
     const item = this.requireOwnedItem(input.ownerId, input.itemId);
-    if (input.name !== undefined) {
-      item.name = input.name;
+    if (input.name !== undefined) item.name = input.name;
+    if (input.priceVnd !== undefined) item.priceVnd = input.priceVnd;
+    if (input.available !== undefined) item.available = input.available;
+    if (input.description !== undefined) item.description = input.description;
+    if (input.prepMinutes !== undefined) item.prepMinutes = input.prepMinutes;
+    if (input.imageUrl !== undefined) item.imageUrl = input.imageUrl;
+    if (input.imageUrls !== undefined) {
+      item.imageUrls = input.imageUrls;
+      item.imageUrl = input.imageUrls[0] ?? null;
+    } else if (input.imageUrl !== undefined) {
+      item.imageUrls = input.imageUrl ? [input.imageUrl] : [];
     }
-    if (input.priceVnd !== undefined) {
-      item.priceVnd = input.priceVnd;
-    }
-    return {
-      id: item.id,
-      name: item.name,
-      priceVnd: item.priceVnd,
-      available: item.available,
+    if (input.menuCategoryId !== undefined) item.menuCategoryId = input.menuCategoryId;
+    return memoryItemView(item);
+  }
+
+  async findItemImageUrls(itemId: string): Promise<string[]> {
+    const item = this.items.find((entry) => entry.id === itemId);
+    if (!item) return [];
+    if (item.imageUrls?.length) return [...item.imageUrls];
+    return item.imageUrl ? [item.imageUrl] : [];
+  }
+
+  async findItemImageUrl(itemId: string): Promise<string | null> {
+    const item = this.items.find((entry) => entry.id === itemId);
+    return item?.imageUrl ?? null;
+  }
+
+  private menuCategories = new Map<string, MenuCategoryView[]>();
+
+  async listMenuCategories(ownerId: string): Promise<MenuCategoryView[]> {
+    const store = this.stores.find((e) => e.ownerId === ownerId);
+    if (!store) return [];
+    return [...(this.menuCategories.get(store.id) ?? [])];
+  }
+
+  async createMenuCategory(input: {
+    ownerId: string;
+    name: string;
+    description?: string | null;
+  }): Promise<MenuCategoryView> {
+    const store = this.stores.find((e) => e.ownerId === input.ownerId);
+    if (!store) throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
+    const list = this.menuCategories.get(store.id) ?? [];
+    const row: MenuCategoryView = {
+      id: randomUUID(),
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      position: list.length,
+      itemCount: 0,
     };
+    list.push(row);
+    this.menuCategories.set(store.id, list);
+    return { ...row };
+  }
+
+  async updateMenuCategory(input: {
+    ownerId: string;
+    categoryId: string;
+    name?: string;
+    description?: string | null;
+  }): Promise<MenuCategoryView> {
+    const store = this.stores.find((e) => e.ownerId === input.ownerId);
+    if (!store) throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
+    const list = this.menuCategories.get(store.id) ?? [];
+    const row = list.find((c) => c.id === input.categoryId);
+    if (!row) throw new FoodRuleError('FOOD_CATEGORY_NOT_FOUND');
+    if (input.name !== undefined) row.name = input.name.trim();
+    if (input.description !== undefined) row.description = input.description?.trim() || null;
+    return { ...row };
+  }
+
+  async deleteMenuCategory(ownerId: string, categoryId: string): Promise<{ deleted: true }> {
+    const store = this.stores.find((e) => e.ownerId === ownerId);
+    if (!store) throw new FoodRuleError('FOOD_CATEGORY_NOT_FOUND');
+    const list = this.menuCategories.get(store.id) ?? [];
+    const next = list.filter((c) => c.id !== categoryId);
+    if (next.length === list.length) throw new FoodRuleError('FOOD_CATEGORY_NOT_FOUND');
+    this.menuCategories.set(store.id, next);
+    for (const item of this.items) {
+      if (item.menuCategoryId === categoryId) item.menuCategoryId = null;
+    }
+    return { deleted: true };
+  }
+
+  async reorderMenuCategories(ownerId: string, orderedIds: string[]): Promise<MenuCategoryView[]> {
+    const store = this.stores.find((e) => e.ownerId === ownerId);
+    if (!store) throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
+    const list = this.menuCategories.get(store.id) ?? [];
+    if (orderedIds.length !== list.length || orderedIds.some((id) => !list.some((c) => c.id === id))) {
+      throw new FoodRuleError('FOOD_CATEGORY_REORDER_INVALID');
+    }
+    const byId = new Map(list.map((c) => [c.id, c]));
+    const next = orderedIds.map((id, position) => {
+      const row = byId.get(id)!;
+      row.position = position;
+      return row;
+    });
+    this.menuCategories.set(store.id, next);
+    return next.map((c) => ({ ...c }));
+  }
+
+  async listMerchantHistory(filter: MerchantHistoryFilter) {
+    const store = this.stores.find((e) => e.ownerId === filter.ownerId);
+    if (!store) {
+      return {
+        items: [],
+        page: filter.page,
+        limit: filter.limit,
+        total: 0,
+        deliveredCount: 0,
+        deliveredRevenueVnd: 0,
+      };
+    }
+    const tab = (filter.tab ?? 'ALL').toUpperCase();
+    let rows = this.orders.filter(
+      (o) =>
+        o.storeId === store.id &&
+        ['DELIVERED', 'CANCELLED', 'FAILED'].includes(o.status) &&
+        (tab === 'ALL' || o.status === tab),
+    );
+    const q = filter.q?.trim().toLowerCase();
+    if (q) {
+      rows = rows.filter((o) => o.id.toLowerCase().includes(q));
+    }
+    rows = [...rows].sort(
+      (a, b) => (b.updatedAt?.getTime?.() ?? 0) - (a.updatedAt?.getTime?.() ?? 0),
+    );
+    const delivered = rows.filter((o) => o.status === 'DELIVERED');
+    const pageRows = rows.slice((filter.page - 1) * filter.limit, filter.page * filter.limit);
+    return {
+      items: pageRows.map((o) => ({
+        id: o.id,
+        status: o.status,
+        subtotalVnd: o.subtotalVnd,
+        totalVnd: o.totalVnd,
+        createdAt: o.createdAt,
+        finishedAt: o.updatedAt ?? o.createdAt,
+        customerName: null,
+        lineSummary: '',
+      })),
+      page: filter.page,
+      limit: filter.limit,
+      total: rows.length,
+      deliveredCount: delivered.length,
+      deliveredRevenueVnd: delivered.reduce((sum, o) => sum + o.subtotalVnd, 0),
+    };
+  }
+
+  async replaceItemOptions(input: ReplaceItemOptionsInput): Promise<StoreItemView> {
+    const item = this.requireOwnedItem(input.ownerId, input.itemId);
+    item.optionGroups = normalizeOptionGroups(input.groups, item.optionGroups, randomUUID);
+    return memoryItemView(item);
   }
 
   async setItemAvailability(input: SetItemAvailabilityInput): Promise<StoreItemView> {
@@ -779,12 +1382,7 @@ export class MemoryFoodRepository implements FoodRepository {
     if (input.available && item.moderationStatus === 'REJECTED') {
       item.moderationStatus = 'APPROVED';
     }
-    return {
-      id: item.id,
-      name: item.name,
-      priceVnd: item.priceVnd,
-      available: item.available,
-    };
+    return memoryItemView(item);
   }
 
   async setCatalogModeration(
@@ -879,12 +1477,72 @@ export class MemoryFoodRepository implements FoodRepository {
     };
   }
 
+  async countFinishedForDrivers(
+    driverIds: readonly string[],
+  ): Promise<Map<string, DriverJobCounts>> {
+    const wanted = new Set(driverIds);
+    const statuses: readonly string[] = DRIVER_HISTORY_FOOD_STATUSES;
+    const counts = new Map<string, DriverJobCounts>();
+    for (const order of this.orders) {
+      const driverId = order.assignedDriverId;
+      if (
+        !driverId ||
+        !wanted.has(driverId) ||
+        !statuses.includes(order.status) ||
+        !cancellationCountsAgainstDriver(order.status, order.cancelledBy)
+      ) {
+        continue;
+      }
+      const current = counts.get(driverId) ?? { completed: 0, finished: 0 };
+      current.finished += 1;
+      if (order.status === 'DELIVERED') {
+        current.completed += 1;
+      }
+      counts.set(driverId, current);
+    }
+    return counts;
+  }
+
+  async listFinishedForDriver(
+    driverId: string,
+    window: FoodDriverHistoryWindow,
+  ): Promise<FoodOrderView[]> {
+    const statuses: readonly string[] = DRIVER_HISTORY_FOOD_STATUSES;
+    return this.orders
+      .filter(
+        (order) =>
+          order.assignedDriverId === driverId &&
+          statuses.includes(order.status) &&
+          (!window.before || order.updatedAt.getTime() <= window.before.getTime()) &&
+          (!window.since || order.updatedAt.getTime() >= window.since.getTime()),
+      )
+      .sort(
+        (left, right) =>
+          right.updatedAt.getTime() - left.updatedAt.getTime() || right.id.localeCompare(left.id),
+      )
+      .slice(0, window.limit)
+      .map(copyOrder);
+  }
+
   async accept(orderId: string, ownerId: string): Promise<FoodOrderView> {
     const order = this.requireOwned(orderId, ownerId);
     if (order.status !== 'PLACED') {
       throw new FoodRuleError('FOOD_STATUS_CONFLICT');
     }
     order.status = 'PREPARING';
+    touchOrder(order);
+    return copyOrder(order);
+  }
+
+  async reject(orderId: string, ownerId: string, reason: FoodCancelReason): Promise<FoodOrderView> {
+    const order = this.requireOwned(orderId, ownerId);
+    if (order.status !== 'PLACED') {
+      throw new FoodRuleError('FOOD_STATUS_CONFLICT');
+    }
+    order.status = 'CANCELLED';
+    order.cancelReason = { ...reason };
+    order.cancelledBy = 'MERCHANT';
+    await this.vouchers?.release({ entityType: 'FOOD_ORDER', entityId: order.id });
     touchOrder(order);
     return copyOrder(order);
   }
@@ -931,8 +1589,21 @@ export class MemoryFoodRepository implements FoodRepository {
     return this.assignedDriverTransition(orderId, driverId, 'ASSIGNED', 'PICKED_UP');
   }
 
-  async deliver(orderId: string, driverId: string): Promise<FoodOrderView> {
-    return this.assignedDriverTransition(orderId, driverId, 'PICKED_UP', 'DELIVERED');
+  async deliver(
+    orderId: string,
+    driverId: string,
+    onDelivered?: CompletionHook<FoodOrderView>,
+  ): Promise<FoodOrderView> {
+    const order = this.requireAssignedDriver(orderId, driverId);
+    if (order.status !== 'PICKED_UP') {
+      throw new FoodRuleError('FOOD_STATUS_CONFLICT');
+    }
+    const delivered = { ...copyOrder(order), status: 'DELIVERED' as const };
+    // Memory mode: run the hook before mutating so a failure leaves the order PICKED_UP.
+    await onDelivered?.(null, delivered);
+    order.status = 'DELIVERED';
+    touchOrder(order);
+    return copyOrder(order);
   }
 
   async fail(orderId: string, driverId: string): Promise<FoodOrderView> {
@@ -941,6 +1612,8 @@ export class MemoryFoodRepository implements FoodRepository {
       throw new FoodRuleError('FOOD_STATUS_CONFLICT');
     }
     order.status = 'FAILED';
+    // Confirmed (DEC-PROD-012): a failed delivery gives the voucher use back.
+    await this.vouchers?.release({ entityType: 'FOOD_ORDER', entityId: order.id });
     touchOrder(order);
     return copyOrder(order);
   }
@@ -954,6 +1627,8 @@ export class MemoryFoodRepository implements FoodRepository {
       throw new FoodRuleError('FOOD_NOT_CANCELLABLE');
     }
     order.status = 'CANCELLED';
+    order.cancelledBy = 'CUSTOMER';
+    await this.vouchers?.release({ entityType: 'FOOD_ORDER', entityId: order.id });
     touchOrder(order);
     return copyOrder(order);
   }
@@ -975,6 +1650,8 @@ export class MemoryFoodRepository implements FoodRepository {
       throw new FoodRuleError('FOOD_NOT_CANCELLABLE');
     }
     order.status = 'CANCELLED';
+    order.cancelledBy = 'OPS';
+    await this.vouchers?.release({ entityType: 'FOOD_ORDER', entityId: order.id });
     touchOrder(order);
     return { order: copyOrder(order), auditId: `memory-audit-${order.id}-cancel` };
   }
@@ -1034,6 +1711,9 @@ export class MemoryFoodRepository implements FoodRepository {
   private toOpsStoreSummary(store: StoredStore): OpsStoreSummary {
     return {
       ...toStoreListItem(store),
+      ...effectiveServiceMode(store.serviceMode, store.serviceModeUntil),
+      ...memoryAvailability(store),
+      ...memoryAccept(store),
       createdAt: new Date(store.createdAt),
       itemCount: this.items.filter((item) => item.storeId === store.id).length,
     };
@@ -1051,25 +1731,29 @@ export class MemoryFoodRepository implements FoodRepository {
     return item;
   }
 
-  private snapshotLines(storeId: string, requested: { itemId: string; quantity: number }[]): FoodLineView[] {
-    const seen = new Set<string>();
-    return requested.map((line) => {
-      if (seen.has(line.itemId)) {
-        throw new FoodRuleError('FOOD_ITEM_UNAVAILABLE');
-      }
-      seen.add(line.itemId);
-      const item = this.items.find((entry) => entry.id === line.itemId && entry.storeId === storeId);
-      if (!item || !item.available) {
-        throw new FoodRuleError('FOOD_ITEM_UNAVAILABLE');
-      }
-      return {
-        itemId: item.id,
-        name: item.name,
-        unitPriceVnd: item.priceVnd,
-        quantity: line.quantity,
-      };
-    });
+  private snapshotLines(storeId: string, requested: PlaceFoodLineInput[]): FoodLineView[] {
+    return snapshotFoodLines(
+      this.items.filter((entry) => entry.storeId === storeId),
+      requested,
+    );
   }
+}
+
+function coverImageForStore(
+  items: Array<{ storeId: string; available: boolean; imageUrl: string | null }>,
+  storeId: string,
+): string | null {
+  for (const item of items) {
+    if (item.storeId === storeId && item.available && item.imageUrl) {
+      return item.imageUrl;
+    }
+  }
+  for (const item of items) {
+    if (item.storeId === storeId && item.imageUrl) {
+      return item.imageUrl;
+    }
+  }
+  return null;
 }
 
 function toStoreListItem(store: StoredStore): StoreListItem {
@@ -1080,6 +1764,7 @@ function toStoreListItem(store: StoredStore): StoreListItem {
     lat: store.lat,
     lng: store.lng,
     category: store.category,
+    logoUrl: store.logoUrl ?? null,
   };
 }
 
@@ -1094,6 +1779,65 @@ function byCreatedAtDesc(
   return right.createdAt.getTime() - left.createdAt.getTime() || left.id.localeCompare(right.id);
 }
 
+function memoryItemView(item: StoredItem): StoreItemView {
+  return {
+    id: item.id,
+    name: item.name,
+    priceVnd: item.priceVnd,
+    available: item.available,
+    description: item.description ?? null,
+    prepMinutes: item.prepMinutes ?? null,
+    imageUrl: item.imageUrl ?? null,
+    imageUrls: item.imageUrls ?? (item.imageUrl ? [item.imageUrl] : []),
+    soldCount: item.soldCount ?? 0,
+    menuCategoryId: item.menuCategoryId ?? null,
+    optionGroups: item.optionGroups.map((group) => ({
+      ...group,
+      options: group.options.map((option) => ({
+        ...option,
+        maxQuantity: option.maxQuantity ?? 1,
+      })),
+    })),
+  };
+}
+
+/**
+ * Shared by both repositories: validates every requested line against the
+ * store catalog, prices chosen options server-side and snapshots them. The same
+ * dish may appear twice only with a different option choice.
+ */
+export function snapshotFoodLines(
+  catalog: ReadonlyArray<
+    Pick<
+      StoreItemView,
+      'id' | 'name' | 'priceVnd' | 'available' | 'optionGroups' | 'imageUrl'
+    >
+  >,
+  requested: PlaceFoodLineInput[],
+): FoodLineView[] {
+  const seen = new Set<string>();
+  return requested.map((line) => {
+    const key = lineKey(line.itemId, line.optionIds);
+    if (seen.has(key)) {
+      throw new FoodRuleError('FOOD_ITEM_UNAVAILABLE');
+    }
+    seen.add(key);
+    const item = catalog.find((entry) => entry.id === line.itemId);
+    if (!item || !item.available) {
+      throw new FoodRuleError('FOOD_ITEM_UNAVAILABLE');
+    }
+    const priced = priceOptionSelection(item.optionGroups, line.optionIds ?? []);
+    return {
+      itemId: item.id,
+      name: item.name,
+      unitPriceVnd: item.priceVnd + priced.deltaVnd,
+      quantity: line.quantity,
+      imageUrl: item.imageUrl ?? null,
+      options: priced.options,
+    };
+  });
+}
+
 function copyOrder(order: StoredOrder): FoodOrderView {
   return {
     id: order.id,
@@ -1105,10 +1849,21 @@ function copyOrder(order: StoredOrder): FoodOrderView {
     status: order.status,
     deliveryFareVnd: order.deliveryFareVnd,
     subtotalVnd: order.subtotalVnd,
+    discountVnd: order.discountVnd,
+    voucherCode: order.voucherCode,
+    voucherSponsor: order.voucherSponsor ?? null,
     totalVnd: order.totalVnd,
     dropoff: { ...order.dropoff },
+    pickup: order.pickup ? { ...order.pickup } : null,
     assignedDriverId: order.assignedDriverId,
-    lines: order.lines.map((line) => ({ ...line })),
+    cancelReason: order.cancelReason ? { ...order.cancelReason } : null,
+    cancelledBy: order.cancelledBy ?? null,
+    lines: order.lines.map((line) => ({
+      ...line,
+      options: line.options.map((option) => ({ ...option })),
+    })),
+    prepMinutes: order.prepMinutes ?? null,
+    estimatedReadyAt: order.estimatedReadyAt ? new Date(order.estimatedReadyAt) : null,
     updatedAt: new Date(order.updatedAt),
   };
 }

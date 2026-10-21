@@ -1,10 +1,10 @@
 ---
 doc_id: DG-AI-004
 title: "DealGo — Admin Web gap matrix vs dealgo-website.mdc"
-version: "0.5.5"
+version: "0.5.6"
 status: "ACTIVE"
 owner: "Tech Lead"
-last_updated: "2026-10-14"
+last_updated: "2026-10-18"
 ---
 
 # Admin Web gap matrix
@@ -80,3 +80,7 @@ last_updated: "2026-10-14"
 | Drivers / stores / transactions / … | No | Paths reserved | Fixtures |
 | Customer labels on food detail | Nest returns `customerId` on food order | N/A (via food BFF) | Live label `Khách · {id}` (not full profile) |
 | Customer labels on ride detail | RideView omits `customerId` | N/A | Placeholder `Khách (Nest ẩn id)` |
+| Promotions | Yes `/v1/ops/promotions` (Postgres) | Yes; POST/PATCH status kiểm same-origin | Yes |
+| Public support form (`/support`) | **No** Nest endpoint | `POST /api/public/support` chỉ log (mask PII) và trả mã `INQ-*`; nội dung **không** được lưu | Cần endpoint Support trước khi coi là live |
+
+CSP `connect-src` dựng trong `next.config.ts`: `'self'` + origin `NEXT_PUBLIC_API_BASE_URL` (nếu có, đọc lúc build); `localhost`/`ws:` chỉ ở dev.

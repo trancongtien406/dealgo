@@ -7,7 +7,6 @@ import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_segmented_control.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
-import '../utils/driver_routes.dart';
 import '../widgets/driver_widgets.dart';
 
 /// D031 — delivery/job failed outcome UI (mock reasons; no invented fees).
@@ -41,9 +40,7 @@ class _DriverJobFailedPageState extends State<DriverJobFailedPage> {
         ),
         child: DealGoPrimaryButton(
           key: const Key('driver-job-failed-submit'),
-          label: _submitted
-              ? l10n.actionBack
-              : l10n.driverJobFailedSubmit,
+          label: _submitted ? l10n.actionBack : l10n.driverJobFailedSubmit,
           onPressed: () {
             if (_submitted) {
               context.go('/driver/jobs');
@@ -80,10 +77,7 @@ class _DriverJobFailedPageState extends State<DriverJobFailedPage> {
                   ],
                 ),
                 const SizedBox(height: DealGoSpacing.s8),
-                Text(
-                  l10n.driverJobFailedBody,
-                  style: textTheme.bodySmall,
-                ),
+                Text(l10n.driverJobFailedBody, style: textTheme.bodySmall),
               ],
             ),
           ),
@@ -100,14 +94,8 @@ class _DriverJobFailedPageState extends State<DriverJobFailedPage> {
                 id: 'wrong_address',
                 label: l10n.driverFailAddress,
               ),
-              DealGoSegmentItem(
-                id: 'refused',
-                label: l10n.driverFailRefused,
-              ),
-              DealGoSegmentItem(
-                id: 'other',
-                label: l10n.driverFailOther,
-              ),
+              DealGoSegmentItem(id: 'refused', label: l10n.driverFailRefused),
+              DealGoSegmentItem(id: 'other', label: l10n.driverFailOther),
             ],
             value: _outcome,
             onChanged: _submitted
@@ -126,14 +114,6 @@ class _DriverJobFailedPageState extends State<DriverJobFailedPage> {
               message: l10n.driverJobFailedSoftFail,
             ),
           ],
-          const SizedBox(height: DealGoSpacing.s12),
-          TextButton(
-            key: const Key('driver-open-completed-sample'),
-            onPressed: () => context.push(
-              DriverRoutes.completed(widget.jobId),
-            ),
-            child: Text(l10n.driverOpenCompletedSample),
-          ),
         ],
       ),
     );

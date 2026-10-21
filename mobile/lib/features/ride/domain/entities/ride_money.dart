@@ -1,21 +1,4 @@
-const rideFareMinVnd = 10000;
-const rideFareMaxVnd = 500000;
-const rideDefaultOfferVnd = 42000;
-const rideFarePresetsVnd = <int>[38000, 42000, 48000];
-
-const rideSamplePickupLat = 16.0544;
-const rideSamplePickupLng = 108.2022;
-const rideSamplePickupLabel = 'Hải Châu';
-const rideSampleDropoffLat = 16.0471;
-const rideSampleDropoffLng = 108.2062;
-const rideSampleDropoffLabel = 'Sân bay';
-
-const rideVehicleLabel = 'Xe máy';
 const rideLabelMaxLength = 160;
-
-bool rideFareAllowed(int amount) {
-  return amount >= rideFareMinVnd && amount <= rideFareMaxVnd;
-}
 
 String formatRideVnd(int amount) {
   final sign = amount < 0 ? '-' : '';
@@ -35,6 +18,8 @@ String formatRideVndDelta(int amount) {
   return formatRideVnd(amount);
 }
 
-String rideFareRangeLabel() {
-  return 'Mức cho phép từ ${formatRideVnd(rideFareMinVnd)} đến ${formatRideVnd(rideFareMaxVnd)}';
+/// DEC-PROD-024: cash the customer hands the driver after a voucher (never negative).
+int rideCashAfterVoucher(int fareVnd, int discountVnd) {
+  final due = fareVnd - discountVnd;
+  return due < 0 ? 0 : due;
 }

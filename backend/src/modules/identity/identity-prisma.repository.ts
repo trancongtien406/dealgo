@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Prisma, PrismaClient } from '../../generated/prisma/client.js';
 import {
   UniqueConflictError,
@@ -5,12 +6,20 @@ import {
   type GrantStatusName,
   type IdentityRepository,
   type NewSession,
+  type OpsCredentialRecord,
+  type OpsPasswordResetInput,
   type OpsRoleGrantListItem,
   type OpsUserDirectoryRecord,
+  type OpsSuperAdminChangeInput,
+  type OpsSuperAdminChangeResult,
   type OpsUserPage,
   type PasskeyCeremonyName,
   type PasskeyChallengeRecord,
   type PasskeyRecord,
+  type EmailChallengePurpose,
+  type EmailSignupChallengeRecord,
+  type PasswordResetRecord,
+  type PasswordResetReissueInput,
   type PhoneChallengeRecord,
   type RevokeReasonName,
   type RoleGrantRecord,
@@ -18,6 +27,8 @@ import {
   type RotateResult,
   type SessionRecord,
   type StoredChannel,
+  type UserGenderName,
+  type UserProfilePatch,
   type UserRecord,
 } from './identity.repository.js';
 
@@ -26,9 +37,15 @@ type DbUser = {
   email: string | null;
   phone: string | null;
   displayName: string;
+  dateOfBirth: Date | null;
+  gender: UserGenderName | null;
+  avatarUrl: string | null;
   phoneVerifiedAt: Date | null;
   emailVerifiedAt: Date | null;
   createdAt: Date;
+  deletedAt: Date | null;
+  purgeAfter: Date | null;
+  purgedAt: Date | null;
 };
 
 export class PrismaIdentityRepository implements IdentityRepository {
@@ -88,8 +105,34 @@ export class PrismaIdentityRepository implements IdentityRepository {
     }
   }
 
+  async updateUserProfile(userId: string, patch: UserProfilePatch): Promise<UserRecord> {
+    const data: {
+      displayName?: string;
+      dateOfBirth?: Date | null;
+      gender?: UserGenderName | null;
+      avatarUrl?: string | null;
+    } = {};
+    if (patch.displayName !== undefined) {
+      data.displayName = patch.displayName;
+    }
+    if (patch.dateOfBirth !== undefined) {
+      data.dateOfBirth = patch.dateOfBirth;
+    }
+    if (patch.gender !== undefined) {
+      data.gender = patch.gender;
+    }
+    if (patch.avatarUrl !== undefined) {
+      data.avatarUrl = patch.avatarUrl;
+    }
+    const user = await this.db.user.update({
+      where: { id: userId },
+      data,
+    });
+    return mapUser(user);
+  }
+
   async createPhoneChallenge(input: {
-    userId: string;
+    userId: string | null;
     phone: string;
     codeHash: string;
     expiresAt: Date;
@@ -169,9 +212,245 @@ export class PrismaIdentityRepository implements IdentityRepository {
     return updated.count === 1;
   }
 
+  async createEmailSignupChallenge(input: {
+    purpose?: EmailChallengePurpose;
+    userId?: string | null;
+    email: string;
+    passwordHash: string | null;
+    displayName: string;
+    codeHash: string;
+    expiresAt: Date;
+    sentAt: Date;
+  }): Promise<EmailSignupChallengeRecord> {
+    return this.db.emailSignupChallenge.create({
+      data: {
+        purpose: input.purpose ?? 'SIGNUP',
+        userId: input.userId ?? null,
+        email: input.email,
+        passwordHash: input.passwordHash,
+        displayName: input.displayName,
+        codeHash: input.codeHash,
+        expiresAt: input.expiresAt,
+        lastSentAt: input.sentAt,
+      },
+    });
+  }
+
+  async findEmailSignupChallenge(id: string): Promise<EmailSignupChallengeRecord | null> {
+    return this.db.emailSignupChallenge.findUnique({ where: { id } });
+  }
+
+  async findLatestEmailSignupChallenge(
+    email: string,
+  ): Promise<EmailSignupChallengeRecord | null> {
+    return this.db.emailSignupChallenge.findFirst({
+      where: { email },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async countEmailSignupChallengesSince(email: string, since: Date): Promise<number> {
+    return this.db.emailSignupChallenge.count({
+      where: { email, createdAt: { gte: since } },
+    });
+  }
+
+  async recordFailedEmailSignupAttempt(id: string): Promise<EmailSignupChallengeRecord> {
+    return this.db.emailSignupChallenge.update({
+      where: { id },
+      data: { attemptCount: { increment: 1 } },
+    });
+  }
+
+  async reissueEmailSignupCode(
+    id: string,
+    input: {
+      codeHash: string;
+      expiresAt: Date;
+      sentAt: Date;
+      sentBefore: Date;
+      maxSends: number;
+      maxAttempts: number;
+    },
+  ): Promise<EmailSignupChallengeRecord | null> {
+    // Conditional update so two concurrent resends cannot both pass the cooldown check,
+    // and a locked challenge cannot be revived by a resend.
+    const updated = await this.db.emailSignupChallenge.updateMany({
+      where: {
+        id,
+        consumedAt: null,
+        attemptCount: { lt: input.maxAttempts },
+        lastSentAt: { lte: input.sentBefore },
+        sendCount: { lt: input.maxSends },
+      },
+      data: {
+        codeHash: input.codeHash,
+        expiresAt: input.expiresAt,
+        lastSentAt: input.sentAt,
+        sendCount: { increment: 1 },
+      },
+    });
+    if (updated.count !== 1) {
+      return null;
+    }
+    return this.db.emailSignupChallenge.findUnique({ where: { id } });
+  }
+
+  async consumeEmailSignupChallenge(id: string, at: Date): Promise<boolean> {
+    const updated = await this.db.emailSignupChallenge.updateMany({
+      where: { id, consumedAt: null },
+      data: { consumedAt: at },
+    });
+    return updated.count === 1;
+  }
+
+  async createEmailPasswordUser(input: {
+    email: string;
+    displayName: string;
+    passwordHash: string;
+    verifiedAt: Date;
+  }): Promise<UserRecord> {
+    try {
+      return await this.db.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            email: input.email,
+            phone: null,
+            displayName: input.displayName,
+            emailVerifiedAt: input.verifiedAt,
+          },
+        });
+        await tx.customerCredential.create({
+          data: { userId: user.id, passwordHash: input.passwordHash },
+        });
+        await tx.roleGrant.create({
+          data: { userId: user.id, role: 'CUSTOMER', status: 'ACTIVE' },
+        });
+        return mapUser(user);
+      });
+    } catch (error) {
+      throw mapUnique(error);
+    }
+  }
+
+  async createPasswordReset(input: {
+    userId: string | null;
+    email: string;
+    tokenHash: string;
+    expiresAt: Date;
+    sentAt: Date;
+  }): Promise<PasswordResetRecord> {
+    const reset = await this.db.passwordReset.create({
+      data: {
+        userId: input.userId,
+        email: input.email,
+        tokenHash: input.tokenHash,
+        expiresAt: input.expiresAt,
+        lastSentAt: input.sentAt,
+      },
+    });
+    return mapPasswordReset(reset);
+  }
+
+  async findPasswordReset(id: string): Promise<PasswordResetRecord | null> {
+    const reset = await this.db.passwordReset.findUnique({ where: { id } });
+    return reset ? mapPasswordReset(reset) : null;
+  }
+
+  async countPasswordResetsSince(email: string, since: Date): Promise<number> {
+    return this.db.passwordReset.count({ where: { email, createdAt: { gte: since } } });
+  }
+
+  async recordFailedPasswordResetAttempt(id: string): Promise<PasswordResetRecord> {
+    const reset = await this.db.passwordReset.update({
+      where: { id },
+      data: { attemptCount: { increment: 1 } },
+    });
+    return mapPasswordReset(reset);
+  }
+
+  async reissuePasswordResetCode(
+    id: string,
+    input: PasswordResetReissueInput,
+  ): Promise<PasswordResetRecord | null> {
+    // Conditional update: concurrent resends cannot both pass the cooldown, and a locked
+    // challenge cannot be revived.
+    const updated = await this.db.passwordReset.updateMany({
+      where: {
+        id,
+        consumedAt: null,
+        attemptCount: { lt: input.maxAttempts },
+        lastSentAt: { lte: input.sentBefore },
+        sendCount: { lt: input.maxSends },
+      },
+      data: {
+        tokenHash: input.tokenHash,
+        expiresAt: input.expiresAt,
+        lastSentAt: input.sentAt,
+        sendCount: { increment: 1 },
+      },
+    });
+    if (updated.count !== 1) {
+      return null;
+    }
+    const reset = await this.db.passwordReset.findUnique({ where: { id } });
+    return reset ? mapPasswordReset(reset) : null;
+  }
+
+  async consumePasswordReset(id: string, at: Date, maxAttempts: number): Promise<boolean> {
+    const updated = await this.db.passwordReset.updateMany({
+      where: { id, consumedAt: null, attemptCount: { lt: maxAttempts } },
+      data: { consumedAt: at },
+    });
+    return updated.count === 1;
+  }
+
   async createSession(input: NewSession): Promise<SessionRecord> {
-    const session = await this.db.session.create({ data: input });
+    const session = await this.db.session.create({
+      data: {
+        userId: input.userId,
+        familyId: input.familyId,
+        channel: input.channel,
+        refreshTokenHash: input.refreshTokenHash,
+        expiresAt: input.expiresAt,
+        deviceLabel: input.deviceLabel ?? null,
+        userAgent: input.userAgent ?? null,
+        ipAddress: input.ipAddress ?? null,
+      },
+    });
     return mapSession(session);
+  }
+
+  async listActiveSessions(userId: string): Promise<SessionRecord[]> {
+    const rows = await this.db.session.findMany({
+      where: { userId, revokedAt: null },
+      orderBy: { lastSeenAt: 'desc' },
+    });
+    return rows.map(mapSession);
+  }
+
+  async revokeOtherSessions(userId: string, keepSessionId: string, at: Date): Promise<number> {
+    const result = await this.db.session.updateMany({
+      where: { userId, revokedAt: null, id: { not: keepSessionId } },
+      data: { revokedAt: at, revokeReason: 'USER' },
+    });
+    return result.count;
+  }
+
+  async touchSessionMeta(
+    id: string,
+    meta: { deviceLabel?: string | null; userAgent?: string | null; ipAddress?: string | null },
+    at: Date,
+  ): Promise<void> {
+    await this.db.session.updateMany({
+      where: { id, revokedAt: null },
+      data: {
+        lastSeenAt: at,
+        ...(meta.deviceLabel !== undefined ? { deviceLabel: meta.deviceLabel } : {}),
+        ...(meta.userAgent !== undefined ? { userAgent: meta.userAgent } : {}),
+        ...(meta.ipAddress !== undefined ? { ipAddress: meta.ipAddress } : {}),
+      },
+    });
   }
 
   async findSessionById(id: string): Promise<SessionRecord | null> {
@@ -227,6 +506,10 @@ export class PrismaIdentityRepository implements IdentityRepository {
           channel: current.channel,
           refreshTokenHash: next.refreshTokenHash,
           expiresAt: next.expiresAt,
+          deviceLabel: current.deviceLabel,
+          userAgent: current.userAgent,
+          ipAddress: current.ipAddress,
+          lastSeenAt: at,
         },
       });
       return { status: 'rotated', session: mapSession(created) };
@@ -237,6 +520,20 @@ export class PrismaIdentityRepository implements IdentityRepository {
     await this.db.session.updateMany({
       where: { id, revokedAt: null },
       data: { revokedAt: at, revokeReason: reason },
+    });
+  }
+
+  async revokeUserSessions(userId: string, channel: StoredChannel, at: Date): Promise<void> {
+    await this.db.session.updateMany({
+      where: { userId, channel, revokedAt: null },
+      data: { revokedAt: at, revokeReason: 'USER' },
+    });
+  }
+
+  async revokeAllUserSessions(userId: string, at: Date): Promise<void> {
+    await this.db.session.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: at, revokeReason: 'USER' },
     });
   }
 
@@ -364,12 +661,16 @@ export class PrismaIdentityRepository implements IdentityRepository {
         phoneVerifiedAt: user.phoneVerifiedAt,
         emailVerifiedAt: user.emailVerifiedAt,
         createdAt: user.createdAt,
+        deletedAt: user.deletedAt,
+        purgeAfter: user.purgeAfter,
+        purgedAt: user.purgedAt,
         grants: user.roleGrants.map((grant) => ({
           id: grant.id,
           role: grant.role,
           status: grant.status,
         })),
-        staffRole: user.opsCredential ? 'ADMIN' : 'OPS',
+        staffRole: user.opsCredential?.staffRole ?? 'OPS',
+        superAdmin: user.opsCredential?.superAdmin === true,
         scope: 'NATIONAL' as const,
       })),
     };
@@ -550,6 +851,9 @@ export class PrismaIdentityRepository implements IdentityRepository {
       phoneVerifiedAt: user.phoneVerifiedAt,
       emailVerifiedAt: user.emailVerifiedAt,
       createdAt: user.createdAt,
+      deletedAt: user.deletedAt,
+      purgeAfter: user.purgeAfter,
+      purgedAt: user.purgedAt,
       grants: user.roleGrants.map((grant) => ({
         id: grant.id,
         role: grant.role,
@@ -599,18 +903,141 @@ export class PrismaIdentityRepository implements IdentityRepository {
     }
   }
 
-  async findOpsCredential(userId: string): Promise<{ passwordHash: string } | null> {
+  async findOpsCredential(userId: string): Promise<OpsCredentialRecord | null> {
     const credential = await this.db.opsCredential.findUnique({ where: { userId } });
+    if (!credential?.passwordHash) {
+      return null;
+    }
+    return {
+      passwordHash: credential.passwordHash,
+      superAdmin: credential.superAdmin,
+      staffRole: credential.staffRole,
+    };
+  }
+
+  async setOpsStaffRole(input: {
+    targetUserId: string;
+    staffRole: 'ADMIN' | 'SUPPORT' | 'OPERATIONS' | 'FINANCE';
+    actorUserId: string;
+    reason: string;
+  }): Promise<'ok' | 'unchanged' | 'no_credential'> {
+    return this.db.$transaction(async (tx) => {
+      const target = await tx.opsCredential.findUnique({ where: { userId: input.targetUserId } });
+      if (!target?.passwordHash) return 'no_credential' as const;
+      if (target.staffRole === input.staffRole) return 'unchanged' as const;
+      await tx.opsCredential.update({
+        where: { userId: input.targetUserId },
+        data: { staffRole: input.staffRole },
+      });
+      await tx.opsAuditLog.create({
+        data: {
+          id: randomUUID(),
+          actorUserId: input.actorUserId,
+          action: 'OPS_STAFF_ROLE_ASSIGN',
+          entityType: 'OPS_STAFF',
+          entityId: input.targetUserId,
+          reason: input.reason,
+          metadata: { staffRole: input.staffRole, previous: target.staffRole },
+        },
+      });
+      return 'ok' as const;
+    });
+  }
+
+  async setOpsSuperAdmin(userId: string, superAdmin: boolean): Promise<void> {
+    await this.db.opsCredential.updateMany({ where: { userId }, data: { superAdmin } });
+  }
+
+  async resetOpsPassword(input: OpsPasswordResetInput): Promise<void> {
+    await this.db.$transaction(async (tx) => {
+      const updated = await tx.opsCredential.updateMany({
+        where: { userId: input.targetUserId, passwordHash: { not: null } },
+        data: { passwordHash: input.passwordHash },
+      });
+      if (updated.count !== 1) {
+        throw new Error('OPS_NO_PASSWORD_LOGIN');
+      }
+      await tx.session.updateMany({
+        where: { userId: input.targetUserId, channel: 'OPS', revokedAt: null },
+        data: { revokedAt: input.at, revokeReason: 'USER' },
+      });
+      await tx.opsAuditLog.create({
+        data: {
+          id: randomUUID(),
+          actorUserId: input.actorUserId,
+          action: 'OPS_PASSWORD_RESET',
+          entityType: 'OPS_STAFF',
+          entityId: input.targetUserId,
+          reason: input.reason,
+          // Never the password or its hash.
+          metadata: { sessionsRevoked: true },
+        },
+      });
+    });
+  }
+
+  async changeOpsSuperAdmin(input: OpsSuperAdminChangeInput): Promise<OpsSuperAdminChangeResult> {
+    return this.db.$transaction(async (tx) => {
+      // Serializes concurrent grant/revoke so two admins cannot revoke each other to zero.
+      await tx.$queryRaw`SELECT "userId" FROM "ops_credentials" WHERE "superAdmin" = true OR "userId" = ${input.targetUserId}::uuid FOR UPDATE`;
+      const target = await tx.opsCredential.findUnique({ where: { userId: input.targetUserId } });
+      if (!target?.passwordHash) {
+        return 'no_credential' as const;
+      }
+      if (target.superAdmin === input.superAdmin) {
+        return 'unchanged' as const;
+      }
+      if (!input.superAdmin) {
+        const others = await tx.opsCredential.count({
+          where: {
+            superAdmin: true,
+            userId: { not: input.targetUserId },
+            user: { roleGrants: { some: { role: 'OPS', status: 'ACTIVE' } } },
+          },
+        });
+        if (others === 0) {
+          return 'last' as const;
+        }
+      }
+      await tx.opsCredential.update({
+        where: { userId: input.targetUserId },
+        data: { superAdmin: input.superAdmin },
+      });
+      await tx.opsAuditLog.create({
+        data: {
+          id: randomUUID(),
+          actorUserId: input.actorUserId,
+          action: input.superAdmin ? 'OPS_SUPER_ADMIN_GRANT' : 'OPS_SUPER_ADMIN_REVOKE',
+          entityType: 'OPS_STAFF',
+          entityId: input.targetUserId,
+          reason: input.reason,
+          metadata: { superAdmin: input.superAdmin },
+        },
+      });
+      return 'ok' as const;
+    });
+  }
+
+  async saveOpsCredential(userId: string, passwordHash: string): Promise<void> {
+    await this.db.opsCredential.upsert({
+      where: { userId },
+      create: { userId, passwordHash, staffRole: 'ADMIN' },
+      update: { passwordHash },
+    });
+  }
+
+  async findCustomerCredential(userId: string): Promise<{ passwordHash: string } | null> {
+    const credential = await this.db.customerCredential.findUnique({ where: { userId } });
     if (!credential?.passwordHash) {
       return null;
     }
     return { passwordHash: credential.passwordHash };
   }
 
-  async saveOpsCredential(userId: string, passwordHash: string): Promise<void> {
-    await this.db.opsCredential.upsert({
+  async saveCustomerCredential(userId: string, passwordHash: string): Promise<void> {
+    await this.db.customerCredential.upsert({
       where: { userId },
-      create: { userId, passwordHash },
+      create: { userId, passwordHash, staffRole: 'ADMIN' },
       update: { passwordHash },
     });
   }
@@ -656,17 +1083,43 @@ export class PrismaIdentityRepository implements IdentityRepository {
     await this.db.passkey.update({ where: { id }, data: { counter } });
   }
 
+  async createPasskeyUser(
+    input: Omit<Parameters<IdentityRepository['savePasskey']>[0], 'userId'>,
+  ): Promise<UserRecord> {
+    try {
+      const user = await this.db.$transaction(async (tx) => {
+        const created = await tx.user.create({ data: { displayName: 'DealGo user' } });
+        await tx.roleGrant.create({
+          data: { userId: created.id, role: 'CUSTOMER', status: 'ACTIVE' },
+        });
+        await tx.passkey.create({
+          data: {
+            ...input,
+            userId: created.id,
+            publicKey: Buffer.from(input.publicKey),
+          },
+        });
+        return created;
+      });
+      return mapUser(user);
+    } catch (error) {
+      throw mapUnique(error);
+    }
+  }
+
   async replacePasskeyChallenge(input: {
-    userId: string;
+    userId: string | null;
     kind: PasskeyCeremonyName;
     challenge: string;
     expiresAt: Date;
   }): Promise<PasskeyChallengeRecord> {
     return this.db.$transaction(async (tx) => {
-      await tx.passkeyChallenge.updateMany({
-        where: { userId: input.userId, kind: input.kind, consumedAt: null },
-        data: { consumedAt: new Date() },
-      });
+      if (input.userId !== null) {
+        await tx.passkeyChallenge.updateMany({
+          where: { userId: input.userId, kind: input.kind, consumedAt: null },
+          data: { consumedAt: new Date() },
+        });
+      }
       const created = await tx.passkeyChallenge.create({ data: input });
       return mapCeremony(created);
     });
@@ -680,6 +1133,11 @@ export class PrismaIdentityRepository implements IdentityRepository {
       where: { userId, kind, consumedAt: null },
       orderBy: { createdAt: 'desc' },
     });
+    return challenge ? mapCeremony(challenge) : null;
+  }
+
+  async findPasskeyChallenge(id: string): Promise<PasskeyChallengeRecord | null> {
+    const challenge = await this.db.passkeyChallenge.findUnique({ where: { id } });
     return challenge ? mapCeremony(challenge) : null;
   }
 
@@ -698,9 +1156,15 @@ function mapUser(user: DbUser): UserRecord {
     email: user.email,
     phone: user.phone,
     displayName: user.displayName,
+    dateOfBirth: user.dateOfBirth,
+    gender: user.gender,
+    avatarUrl: user.avatarUrl,
     phoneVerifiedAt: user.phoneVerifiedAt,
     emailVerifiedAt: user.emailVerifiedAt,
     createdAt: user.createdAt,
+    deletedAt: user.deletedAt,
+    purgeAfter: user.purgeAfter,
+    purgedAt: user.purgedAt,
   };
 }
 
@@ -715,6 +1179,32 @@ function mapEmail(verification: {
   return verification;
 }
 
+function mapPasswordReset(reset: {
+  id: string;
+  userId: string | null;
+  email: string;
+  tokenHash: string;
+  expiresAt: Date;
+  attemptCount: number;
+  sendCount: number;
+  lastSentAt: Date;
+  consumedAt: Date | null;
+  createdAt: Date;
+}): PasswordResetRecord {
+  return {
+    id: reset.id,
+    userId: reset.userId,
+    email: reset.email,
+    tokenHash: reset.tokenHash,
+    expiresAt: reset.expiresAt,
+    attemptCount: reset.attemptCount,
+    sendCount: reset.sendCount,
+    lastSentAt: reset.lastSentAt,
+    consumedAt: reset.consumedAt,
+    createdAt: reset.createdAt,
+  };
+}
+
 function mapSession(session: {
   id: string;
   userId: string;
@@ -725,8 +1215,28 @@ function mapSession(session: {
   rotatedAt: Date | null;
   revokedAt: Date | null;
   revokeReason: RevokeReasonName | null;
+  deviceLabel: string | null;
+  userAgent: string | null;
+  ipAddress: string | null;
+  lastSeenAt: Date;
+  createdAt: Date;
 }): SessionRecord {
-  return session;
+  return {
+    id: session.id,
+    userId: session.userId,
+    familyId: session.familyId,
+    channel: session.channel,
+    refreshTokenHash: session.refreshTokenHash,
+    expiresAt: session.expiresAt,
+    rotatedAt: session.rotatedAt,
+    revokedAt: session.revokedAt,
+    revokeReason: session.revokeReason,
+    deviceLabel: session.deviceLabel,
+    userAgent: session.userAgent,
+    ipAddress: session.ipAddress,
+    lastSeenAt: session.lastSeenAt,
+    createdAt: session.createdAt,
+  };
 }
 
 function mapPasskey(passkey: {
@@ -753,7 +1263,7 @@ function mapPasskey(passkey: {
 
 function mapCeremony(challenge: {
   id: string;
-  userId: string;
+  userId: string | null;
   kind: PasskeyCeremonyName;
   challenge: string;
   expiresAt: Date;

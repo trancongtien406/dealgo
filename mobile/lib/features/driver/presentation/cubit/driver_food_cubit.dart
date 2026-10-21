@@ -5,9 +5,7 @@ import '../../domain/params/claim_food_order_params.dart';
 import '../../domain/usecases/claim_food_order.dart';
 
 class DriverFoodCubit extends Cubit<int> {
-  DriverFoodCubit({required ClaimFoodOrder claimFoodOrder})
-    : _claimFoodOrder = claimFoodOrder,
-      super(0);
+  DriverFoodCubit({required this._claimFoodOrder}) : super(0);
 
   final ClaimFoodOrder _claimFoodOrder;
 

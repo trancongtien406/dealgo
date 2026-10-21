@@ -5,9 +5,7 @@ import '../../domain/params/get_food_store_params.dart';
 import '../../domain/usecases/get_food_store.dart';
 
 class FoodStoreCubit extends Cubit<int> {
-  FoodStoreCubit({required GetFoodStore getFoodStore})
-    : _getFoodStore = getFoodStore,
-      super(0);
+  FoodStoreCubit({required this._getFoodStore}) : super(0);
 
   final GetFoodStore _getFoodStore;
 

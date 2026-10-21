@@ -29,7 +29,7 @@ class VerifiedSessionModel {
         seconds < 0) {
       throw const ApiException(
         statusCode: 200,
-        message: 'Phản hồi không hợp lệ',
+        message: 'Invalid response',
         errorCode: 'INVALID_RESPONSE',
       );
     }

@@ -256,7 +256,8 @@ export function DeliveryDetail({ code }: { code: string }) {
                     label={`Sơ đồ tuyến giao ${delivery.code}`}
                     start={delivery.sender}
                     end={delivery.route}
-                    city={delivery.regionLabel || "Đà Nẵng"}
+                    from={delivery.pickupPoint}
+                    to={delivery.dropoffPoint}
                   />
                 </div>
                 <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">

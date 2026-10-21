@@ -6,7 +6,11 @@ class ListFoodStores {
 
   final FoodRepository _repository;
 
-  Future<List<FoodStoreSummary>> call(String accessToken) {
-    return _repository.listStores(accessToken);
+  Future<List<FoodStoreSummary>> call(
+    String accessToken, {
+    double? lat,
+    double? lng,
+  }) {
+    return _repository.listStores(accessToken, lat: lat, lng: lng);
   }
 }

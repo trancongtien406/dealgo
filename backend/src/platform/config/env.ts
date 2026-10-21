@@ -66,6 +66,7 @@ const envSchema = z.object({
   ),
   PORT: positiveInt(3001),
   DATABASE_URL: optionalString,
+  DATABASE_POOL_MAX: positiveInt(10),
   REDIS_URL: optionalString,
   JWT_ACCESS_SECRET: optionalString,
   // Access default 1h; refresh remains ~14d. Ops Admin BFF also refreshes on 401.
@@ -74,7 +75,16 @@ const envSchema = z.object({
   WEBAUTHN_RP_ID: optionalString,
   WEBAUTHN_RP_NAME: optionalString,
   WEBAUTHN_ORIGIN: optionalString,
+  /** Public website origin for share links (DEC-PROD-021), e.g. https://dealgo.vn. */
+  PUBLIC_WEB_BASE_URL: optionalString,
   MAPS_PROVIDER: optionalString,
+  /** DEC-PROD-045: Admin map road geometry — none (default, straight line) | osrm | mapbox. */
+  ROUTING_PROVIDER: optionalString,
+  /** Self-hosted OSRM base URL (no trailing path), e.g. http://osrm:5000. */
+  ROUTING_OSRM_URL: optionalString,
+  /** Server-side Mapbox Directions token (never sent to browsers). */
+  MAPBOX_DIRECTIONS_TOKEN: optionalString,
+  ROUTING_TIMEOUT_MS: positiveInt(4_000),
   GOONG_API_KEY: optionalString,
   GOOGLE_MAPS_API_KEY: optionalString,
   SMS_PROVIDER: optionalString,
@@ -114,6 +124,9 @@ const envSchema = z.object({
   // Contact window in minutes for chat and voice communication after terminal status.
   CONTACT_WINDOW_MINUTES: positiveInt(120),
   KYC_STORAGE_PROVIDER: optionalString,
+  // memory | local | s3 (DEC-PROD-020); see platform/storage/storage.module.ts for defaults.
+  OBJECT_STORAGE_PROVIDER: optionalString,
+  OBJECT_STORAGE_LOCAL_DIR: optionalString,
   OPS_BOOTSTRAP_EMAIL: optionalString,
   OPS_BOOTSTRAP_PASSWORD: optionalString,
   S3_ENDPOINT: optionalString,
@@ -157,9 +170,16 @@ const envSchema = z.object({
   DISPATCH_FALLBACK_LIMIT: positiveInt(20),
   OTP_THROTTLE_TTL_MS: positiveInt(60_000),
   OTP_THROTTLE_LIMIT: positiveInt(10),
+  /** DEC-PROD-044: SMS OTP sends per phone number per window (on top of the per-IP limit). */
+  OTP_PHONE_LIMIT: positiveInt(5),
+  OTP_PHONE_WINDOW_MS: positiveInt(900_000),
   // Background workers (BullMQ when REDIS_URL up; interval fallback in non-prod).
   RIDE_EXPIRY_INTERVAL_MS: positiveInt(5_000),
   OUTBOX_RELAY_INTERVAL_MS: positiveInt(2_000),
+  /** DEC-PROD-022: how often the worker sweeps unreferenced uploads (age threshold is an admin setting). */
+  UPLOAD_ORPHAN_CLEANUP_INTERVAL_MS: positiveInt(21_600_000),
+  /** DEC-PROD-037: how often the worker anonymizes accounts whose deletion grace period ended. */
+  ACCOUNT_PURGE_INTERVAL_MS: positiveInt(3_600_000),
   // When true, skip APPROVED KYC/KYB for DRIVER listOpen / FOOD claim after ACTIVE grant.
   // Defaults: true outside production; false in production unless explicitly set.
   PARTNER_ELIGIBILITY_BYPASS: optionalBoolean,

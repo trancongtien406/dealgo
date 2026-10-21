@@ -1,12 +1,11 @@
 enum AppRole {
-  customer('/customer', 'Khách hàng', 'CUSTOMER'),
-  merchant('/merchant', 'Cửa hàng', 'MERCHANT'),
-  driver('/driver', 'Tài xế', 'DRIVER');
+  customer('/customer', 'CUSTOMER'),
+  merchant('/merchant', 'MERCHANT'),
+  driver('/driver', 'DRIVER');
 
-  const AppRole(this.homePath, this.label, this.grantName);
+  const AppRole(this.homePath, this.grantName);
 
   final String homePath;
-  final String label;
   final String grantName;
 
   static AppRole? fromGrant(String role) {

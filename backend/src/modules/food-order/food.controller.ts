@@ -14,7 +14,16 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DriverLocationQueryDto } from '../dispatch/driver-location-query.dto.js';
 import { CurrentActor, CustomerSessionGuard, type RequestActor } from '../identity/access-auth.guard.js';
-import { ListFoodStoresQueryDto, OpsPageQueryDto, PlaceFoodOrderDto } from './food.dto.js';
+import {
+  DeliverFoodOrderDto,
+  ListFoodStoresQueryDto,
+  MerchantStatsQueryDto,
+  OpsPageQueryDto,
+  PickupFoodOrderDto,
+  PlaceFoodOrderDto,
+  QuoteFoodDeliveryDto,
+  RejectFoodOrderDto,
+} from './food.dto.js';
 import { foodError } from './food.error.js';
 import { FoodService } from './food.service.js';
 
@@ -39,6 +48,13 @@ export class FoodController {
   @ApiOperation({ summary: 'Get store catalog' })
   getStore(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
     return this.food.getStore(actor, id);
+  }
+
+  @Post('quote')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Server delivery fare for a store and drop-off (same rule as placement)' })
+  quote(@CurrentActor() actor: RequestActor, @Body() dto: QuoteFoodDeliveryDto) {
+    return this.food.quoteDelivery(actor, dto.storeId, dto.dropoff);
   }
 
   @Post('orders')
@@ -73,10 +89,28 @@ export class FoodController {
     return this.food.listQueue(actor);
   }
 
+  @Get('merchant/stats')
+  @ApiOperation({
+    summary:
+      'Merchant sales summary by Vietnam day: delivered/cancelled counts, item sales, open orders, top items',
+  })
+  merchantStats(@CurrentActor() actor: RequestActor, @Query() query: MerchantStatsQueryDto) {
+    return this.food.merchantStats(actor, query.days ?? 7);
+  }
+
   @Get('orders/:id')
   @ApiOperation({ summary: 'Get a food order by id' })
   getOrder(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
     return this.food.get(actor, id);
+  }
+
+  @Get('orders/:id/driver-location')
+  @ApiOperation({
+    summary:
+      'Customer: courier position while the order is ASSIGNED/PICKED_UP (DEC-PROD-031). location=null when unknown or older than 2 minutes.',
+  })
+  driverLocation(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.food.driverLocation(actor, id);
   }
 
   @Get('orders/:id/ledger')
@@ -90,6 +124,17 @@ export class FoodController {
   @ApiOperation({ summary: 'Merchant accepts order (PLACED → PREPARING)' })
   accept(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
     return this.food.accept(actor, id);
+  }
+
+  @Post('orders/:id/reject')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Merchant declines a new order with a reason (PLACED → CANCELLED)' })
+  reject(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RejectFoodOrderDto,
+  ) {
+    return this.food.reject(actor, id, dto);
   }
 
   @Post('orders/:id/ready')
@@ -108,16 +153,30 @@ export class FoodController {
 
   @Post('orders/:id/pickup')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Assigned driver picks up (ASSIGNED → PICKED_UP)' })
-  pickup(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
-    return this.food.pickup(actor, id);
+  @ApiOperation({
+    summary:
+      'Assigned driver picks up (ASSIGNED → PICKED_UP); handoverCode required when FOOD_HANDOVER_CODE_REQUIRED (DEC-PROD-036)',
+  })
+  pickup(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: PickupFoodOrderDto,
+  ) {
+    return this.food.pickup(actor, id, dto.handoverCode);
   }
 
   @Post('orders/:id/deliver')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Assigned driver delivers (PICKED_UP → DELIVERED)' })
-  deliver(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
-    return this.food.deliver(actor, id);
+  @ApiOperation({
+    summary:
+      'Assigned driver delivers (PICKED_UP → DELIVERED); deliveryCode required when FOOD_DELIVERY_CODE_REQUIRED (DEC-PROD-036)',
+  })
+  deliver(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: DeliverFoodOrderDto,
+  ) {
+    return this.food.deliver(actor, id, dto.deliveryCode);
   }
 
   @Post('orders/:id/fail')

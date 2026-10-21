@@ -1,50 +1,41 @@
-"use client";
-
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
 import { BrandMark } from "@/components/layout/brand-mark";
 import { OpsIcon } from "@/components/ui/ops-icons";
 
 const focusRing =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
 
+// DEC-PROD-036: Admin accounts have no self-service reset. A super-admin sets a new
+// password from Nhân sự & phân quyền; that signs the account out everywhere and is audited.
 const features = [
   {
-    title: "Xác minh an toàn",
-    detail: "Gửi mã OTP hoặc liên kết đặt lại tới tài khoản đã đăng ký",
+    title: "Xác minh bởi quản trị viên",
+    detail: "Chỉ super-admin mới đặt lại được mật khẩu, sau khi xác minh danh tính bạn",
     icon: "shield" as const,
     tone: "bg-brand/10 text-brand",
   },
   {
-    title: "Khôi phục nhanh",
-    detail: "Hoàn tất chỉ với vài bước đơn giản",
+    title: "Đăng xuất mọi phiên",
+    detail: "Khi đặt lại, mọi phiên Admin cũ của tài khoản bị thu hồi ngay",
     icon: "trend" as const,
     tone: "bg-success/10 text-success",
   },
   {
-    title: "Hỗ trợ 24/7",
-    detail: "Đội ngũ kỹ thuật luôn sẵn sàng hỗ trợ",
+    title: "Có nhật ký kiểm toán",
+    detail: "Mỗi lần đặt lại đều ghi người thực hiện và lý do",
     icon: "headset" as const,
     tone: "bg-brand/10 text-brand",
   },
 ] as const;
 
+const steps = [
+  "Liên hệ quản trị viên (super-admin) của đội vận hành DealGo qua kênh nội bộ.",
+  "Cung cấp email đăng nhập Admin và xác minh danh tính theo yêu cầu.",
+  "Quản trị viên đặt mật khẩu tạm thời tại Nhân sự & phân quyền và gửi riêng cho bạn.",
+  "Đăng nhập lại bằng mật khẩu mới.",
+] as const;
+
 export default function ForgotPasswordPage() {
-  const [account, setAccount] = useState("");
-  const [notice, setNotice] = useState("");
-  const [sent, setSent] = useState(false);
-
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (account.trim() === "") {
-      setNotice("Nhập email hoặc số điện thoại.");
-      setSent(false);
-      return;
-    }
-    setNotice("");
-    setSent(true);
-  }
-
   return (
     <main className="relative flex min-h-svh flex-col overflow-x-clip px-4 py-8 sm:px-6 sm:py-12">
       <div
@@ -59,11 +50,11 @@ export default function ForgotPasswordPage() {
         <div className="relative hidden flex-col overflow-hidden bg-brand/5 px-8 py-10 lg:flex xl:px-10">
           <BrandMark />
           <p className="mt-8 max-w-sm text-3xl leading-tight font-bold tracking-tight text-ink">
-            Khôi phục truy cập, nhanh chóng và an toàn
+            Khôi phục truy cập qua quản trị viên
           </p>
           <p className="mt-3 max-w-sm text-sm leading-6 text-muted">
-            Đừng lo lắng. DealGo sẽ giúp bạn đặt lại mật khẩu quản trị thông qua
-            email hoặc số điện thoại đã đăng ký.
+            Mật khẩu Admin chỉ được đặt lại bởi super-admin, có xác minh và ghi
+            nhật ký.
           </p>
           <ul className="mt-8 space-y-5">
             {features.map((feature) => (
@@ -91,74 +82,31 @@ export default function ForgotPasswordPage() {
             Quên mật khẩu
           </h1>
           <p className="mt-2 text-sm leading-6 text-muted">
-            Nhập email hoặc số điện thoại để nhận hướng dẫn đặt lại mật khẩu.
+            Vì lý do bảo mật, tài khoản Admin không tự đặt lại mật khẩu qua
+            email hay OTP. Hãy liên hệ quản trị viên của bạn.
           </p>
-          <form
-            onSubmit={onSubmit}
-            className="mt-6 space-y-4"
-            aria-busy={false}
+          <ol
+            data-testid="forgot-admin-steps"
+            className="mt-6 space-y-3"
           >
-            <div className="space-y-1.5">
-              <label
-                htmlFor="forgot-account"
-                className="text-sm font-medium text-ink"
-              >
-                Email hoặc số điện thoại
-              </label>
-              <div className="relative">
-                <OpsIcon
-                  name="user"
-                  className="pointer-events-none absolute top-1/2 left-3 size-5 -translate-y-1/2 text-muted"
-                />
-                <input
-                  id="forgot-account"
-                  type="text"
-                  inputMode="email"
-                  autoComplete="username"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  required
-                  value={account}
-                  onChange={(event) => {
-                    setAccount(event.target.value);
-                    setSent(false);
-                  }}
-                  placeholder="Nhập email hoặc số điện thoại..."
-                  className={`h-12 w-full rounded-xl border border-border bg-white pr-3 pl-11 text-base text-ink placeholder:text-muted ${focusRing}`}
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 rounded-2xl border border-delivery/20 bg-delivery/5 p-4">
-              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-delivery/15 text-delivery">
-                <OpsIcon name="alert" className="size-4" />
-              </span>
-              <p className="text-sm leading-6 text-ink">
-                Chúng tôi sẽ gửi liên kết đặt lại hoặc mã OTP tới tài khoản của
-                bạn.
-              </p>
-            </div>
-            <button
-              type="submit"
-              className={`inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand text-sm font-semibold text-white ${focusRing}`}
-            >
-              Gửi yêu cầu
-              <OpsIcon name="arrowRight" className="size-4" />
-            </button>
-            {sent ? (
-              <p
-                role="status"
-                className="rounded-xl border border-success/30 bg-success/5 px-3 py-2 text-sm leading-6 text-ink"
-              >
-                Yêu cầu mẫu đã ghi nhận cho “{account.trim()}”. Bản demo không
-                gửi email/OTP thật.
-              </p>
-            ) : null}
-            {notice ? (
-              <p role="alert" className="text-sm text-danger">
-                {notice}
-              </p>
-            ) : null}
-          </form>
+            {steps.map((step, index) => (
+              <li key={step} className="flex items-start gap-3">
+                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-brand/10 text-sm font-semibold text-brand">
+                  {index + 1}
+                </span>
+                <span className="pt-0.5 text-sm leading-6 text-ink">{step}</span>
+              </li>
+            ))}
+          </ol>
+          <div className="mt-6 flex gap-3 rounded-2xl border border-delivery/20 bg-delivery/5 p-4">
+            <span className="grid size-8 shrink-0 place-items-center rounded-full bg-delivery/15 text-delivery">
+              <OpsIcon name="alert" className="size-4" />
+            </span>
+            <p className="text-sm leading-6 text-ink">
+              DealGo không bao giờ hỏi mật khẩu của bạn. Đừng chia sẻ mật khẩu
+              qua tin nhắn nhóm.
+            </p>
+          </div>
           <div className="mt-6 flex items-center gap-3 text-xs text-muted">
             <span className="h-px flex-1 bg-border" />
             Hoặc
@@ -178,7 +126,7 @@ export default function ForgotPasswordPage() {
               <div className="min-w-0">
                 <p className="text-sm font-medium text-ink">Cần hỗ trợ thêm?</p>
                 <p className="text-sm text-muted">
-                  Liên hệ đội ngũ kỹ thuật DealGo
+                  Liên hệ quản trị viên của bạn
                 </p>
               </div>
             </div>

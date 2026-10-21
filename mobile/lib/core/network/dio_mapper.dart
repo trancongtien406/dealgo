@@ -11,7 +11,7 @@ ApiException apiExceptionFromDio(DioException error) {
   }
   return ApiException(
     statusCode: status,
-    message: 'Không thể kết nối máy chủ',
+    message: 'Network error',
     errorCode: status == 0 ? 'NETWORK_ERROR' : 'HTTP_ERROR',
   );
 }

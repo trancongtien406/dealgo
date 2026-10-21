@@ -10,6 +10,7 @@ const campaignLabels: Record<NotificationCampaignStatus, string> = {
   RUNNING: "Đang chạy",
   PENDING_APPROVAL: "Chờ duyệt",
   DRAFT: "Bản nháp",
+  CANCELLED: "Đã huỷ",
 };
 
 const cmsLabels: Record<CmsStatus, string> = {
@@ -27,12 +28,13 @@ export function cmsStatusLabel(status: CmsStatus) {
   return cmsLabels[status];
 }
 export function isQuietCampaignStatus(status: NotificationCampaignStatus) {
-  return status === "DRAFT";
+  return status === "DRAFT" || status === "CANCELLED";
 }
 export function campaignStatusTone(
   status: NotificationCampaignStatus,
 ): StatusTone | "quiet" {
   if (status === "DRAFT") return "quiet";
+  if (status === "CANCELLED") return "danger";
   if (status === "PENDING_APPROVAL") return "food";
   return "success";
 }

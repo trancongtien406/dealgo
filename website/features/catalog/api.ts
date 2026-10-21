@@ -38,3 +38,14 @@ export async function fetchCatalogCategories(
 
   return res.data;
 }
+
+export async function renameCatalogCategory(
+  code: string,
+  name: string,
+): Promise<CatalogCategory> {
+  const res = await apiFetch<{ success: boolean; data: CatalogCategory }>(
+    apiPaths.opsCatalogCategoryItem(code),
+    { method: "PATCH", body: JSON.stringify({ name }) },
+  );
+  return res.data;
+}

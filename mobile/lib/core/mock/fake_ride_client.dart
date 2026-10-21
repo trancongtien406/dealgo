@@ -3,6 +3,7 @@ import '../../features/ride/data/datasources/ride_remote_datasource.dart';
 import '../../features/ride/data/models/ride_models.dart';
 import '../../features/ride/domain/entities/ride_models.dart';
 import '../../features/ride/domain/params/create_ride_params.dart';
+import '../../features/ride/domain/params/ride_driver_action.dart';
 import '../../features/ride/domain/params/select_ride_offer_params.dart';
 import '../../features/ride/domain/params/submit_ride_offer_params.dart';
 
@@ -13,6 +14,7 @@ class FakeRideClient implements RideClient {
   Object? cancelError;
   Object? openError;
   Object? offerError;
+  Object? advanceError;
 
   List<OpenRide> openRides = const [];
 
@@ -22,12 +24,14 @@ class FakeRideClient implements RideClient {
   final List<String> cancelCalls = [];
   final List<String> openCalls = [];
   final List<SubmitRideOfferRequest> offerCalls = [];
+  final List<({String rideId, RideDriverAction action})> advanceCalls = [];
 
   RideView Function(CreateRideRequest request)? onCreate;
   RideView Function(SubmitRideOfferRequest request)? onOffer;
   RideView Function(String rideId)? onGet;
   RideView Function(SelectRideOfferRequest request)? onSelect;
   RideView Function(String rideId)? onCancel;
+  RideView Function(String rideId, RideDriverAction action)? onAdvance;
 
   @override
   Future<List<OpenRideModel>> listOpenRides(String accessToken) async {
@@ -135,5 +139,28 @@ class FakeRideClient implements RideClient {
       );
     }
     return RideViewModel.fromEntity(handler(rideId));
+  }
+
+  @override
+  Future<RideViewModel> advanceRide({
+    required String accessToken,
+    required String rideId,
+    required RideDriverAction action,
+    String? pickupCode,
+  }) async {
+    advanceCalls.add((rideId: rideId, action: action));
+    final error = advanceError;
+    if (error != null) {
+      throw error;
+    }
+    final handler = onAdvance;
+    if (handler == null) {
+      throw const ApiException(
+        statusCode: 500,
+        message: 'FakeRideClient has no advance handler',
+        errorCode: 'FAKE_RIDE',
+      );
+    }
+    return RideViewModel.fromEntity(handler(rideId, action));
   }
 }

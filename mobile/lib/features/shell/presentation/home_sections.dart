@@ -1,8 +1,26 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
-import '../../../core/design_system/components/dealgo_illustration.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/config/api_base_url.dart';
+import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../activity/domain/entities/history_models.dart';
+import '../../activity/domain/usecases/list_food_history.dart';
+import '../../activity/domain/usecases/list_ride_history.dart';
+import '../../food/domain/entities/food_models.dart';
+import '../../food/domain/entities/food_money.dart';
+import '../../food/domain/usecases/list_food_stores.dart';
+import '../../food/presentation/utils/food_routes.dart';
+import '../../food/presentation/widgets/store_meta.dart';
+import '../../identity/domain/entities/auth_state.dart';
+import '../../identity/presentation/cubit/auth_cubit.dart';
+import '../../rating/domain/service_rating.dart';
+import 'account_routes.dart';
+import 'customer_activity_page.dart';
 import 'home_shared.dart';
 
 class SectionTitle extends StatelessWidget {
@@ -10,25 +28,75 @@ class SectionTitle extends StatelessWidget {
     required this.title,
     required this.action,
     required this.onAction,
+    this.leadingIcon,
     super.key,
   });
 
   final String title;
   final String action;
   final VoidCallback onAction;
+  final IconData? leadingIcon;
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Row(
       children: [
+        if (leadingIcon != null) ...[
+          Icon(leadingIcon, color: DealGoColors.primary, size: 20),
+          const SizedBox(width: DealGoSpacing.s8),
+        ],
         Expanded(
-          child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+          child: Text(title, style: textTheme.titleMedium),
         ),
         TextButton(
           onPressed: onAction,
-          style: TextButton.styleFrom(foregroundColor: DealGoColors.primary),
-          child: Text(action),
+          style: TextButton.styleFrom(
+            foregroundColor: DealGoColors.primary,
+            padding: const EdgeInsets.symmetric(horizontal: DealGoSpacing.s8),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                action,
+                style: textTheme.labelLarge?.copyWith(
+                  color: DealGoColors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 2),
+              const Icon(DealGoIcons.arrowRight, size: 14),
+            ],
+          ),
         ),
+      ],
+    );
+  }
+}
+
+/// C001 “Mua hàng nổi bật”: section title, round categories, store strip.
+class FeaturedShoppingCard extends StatelessWidget {
+  const FeaturedShoppingCard({required this.onOpen, super.key});
+
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionTitle(
+          title: AppLocalizations.of(context).homeShopTitle,
+          action: AppLocalizations.of(context).actionSeeAll,
+          onAction: onOpen,
+        ),
+        const SizedBox(height: DealGoSpacing.s12),
+        CategoryRow(onOpen: onOpen),
+        const SizedBox(height: DealGoSpacing.s16),
+        StoreRow(onOpen: onOpen),
       ],
     );
   }
@@ -41,53 +109,54 @@ class CategoryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const categories = <_Category>[
+    final l10n = AppLocalizations.of(context);
+    final categories = <_Category>[
       _Category(
-        'Đồ ăn',
-        Icons.ramen_dining,
-        Color(0xFFFFF1E6),
-        Color(0xFFEA580C),
+        l10n.homeCatFood,
+        DealGoIcons.food,
+        const Color(0xFFFFF1E6),
+        const Color(0xFFEA580C),
       ),
       _Category(
-        'Siêu thị',
-        Icons.shopping_cart_outlined,
-        Color(0xFFE7F8EC),
+        l10n.homeCatMart,
+        DealGoIcons.grocery,
+        const Color(0xFFE7F8EC),
         DealGoColors.brandGreen,
       ),
       _Category(
-        'Cửa hàng tiện lợi',
-        Icons.storefront_outlined,
-        Color(0xFFE8F1FF),
-        Color(0xFF2563EB),
+        l10n.homeCatConvenience,
+        DealGoIcons.store,
+        const Color(0xFFE8F1FF),
+        const Color(0xFF2563EB),
       ),
       _Category(
-        'Giao thuốc',
-        Icons.medical_services_outlined,
-        Color(0xFFFFEEF1),
+        l10n.homeCatPharmacy,
+        DealGoIcons.medical,
+        const Color(0xFFFFEEF1),
         DealGoColors.danger,
       ),
       _Category(
-        'Hoa & Quà',
-        Icons.local_florist_outlined,
-        Color(0xFFF3EAFF),
+        l10n.homeCatFlowers,
+        DealGoIcons.flower,
+        const Color(0xFFF3EAFF),
         DealGoColors.primary,
       ),
       _Category(
-        'Điện tử',
-        Icons.devices_outlined,
-        Color(0xFFEEF2FF),
-        Color(0xFF4F46E5),
+        l10n.homeCatElectronics,
+        DealGoIcons.devices,
+        const Color(0xFFEEF2FF),
+        const Color(0xFF4F46E5),
       ),
       _Category(
-        'Thời trang',
-        Icons.checkroom_outlined,
-        Color(0xFFFFF1F6),
-        Color(0xFFDB2777),
+        l10n.homeCatFashion,
+        DealGoIcons.clothes,
+        const Color(0xFFF5EDE4),
+        const Color(0xFF92400E),
       ),
     ];
 
     return SizedBox(
-      height: 104,
+      height: 92,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: categories.length,
@@ -123,17 +192,17 @@ class _CategoryTile extends StatelessWidget {
       width: 72,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(DealGoRadius.input),
         child: Column(
           children: [
             DecoratedBox(
               decoration: BoxDecoration(
                 color: category.background,
-                borderRadius: BorderRadius.circular(14),
+                shape: BoxShape.circle,
               ),
               child: SizedBox(
-                width: 52,
-                height: 52,
+                width: 56,
+                height: 56,
                 child: Icon(category.icon, color: category.color, size: 22),
               ),
             ),
@@ -153,94 +222,94 @@ class _CategoryTile extends StatelessWidget {
   }
 }
 
-class StoreRow extends StatelessWidget {
+/// Real nearby stores (S013 strip). Hidden while loading or when there are none,
+/// so the home screen never shows invented shops.
+class StoreRow extends StatefulWidget {
   const StoreRow({required this.onOpen, super.key});
 
   final VoidCallback onOpen;
 
   @override
+  State<StoreRow> createState() => _StoreRowState();
+}
+
+class _StoreRowState extends State<StoreRow> {
+  List<FoodStoreSummary> _stores = const [];
+  Map<String, StoreRating> _ratings = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    final token = homeAccessToken(context);
+    if (token == null) return;
+    try {
+      final stores = (await context.read<ListFoodStores>()(token))
+          .take(6)
+          .toList(growable: false);
+      if (!mounted || stores.isEmpty) return;
+      setState(() => _stores = stores);
+      final ratings = await context.read<RatingRepository>().storeRatings(
+        accessToken: token,
+        storeIds: [for (final store in stores) store.id],
+      );
+      if (mounted) {
+        setState(() => _ratings = ratings);
+      }
+    } on Object {
+      // Optional section: failures leave it hidden.
+      return;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_stores.isEmpty) return const SizedBox.shrink();
     return SizedBox(
-      height: 280,
+      height: 214,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: _stores.length,
         separatorBuilder: (context, index) =>
             const SizedBox(width: DealGoSpacing.s12),
         itemBuilder: (context, index) {
-          return _StoreCard(store: _stores[index], onTap: onOpen);
+          final store = _stores[index];
+          return _StoreCard(
+            key: Key('home-store-${store.id}'),
+            store: store,
+            rating: _ratings[store.id],
+            onTap: () => context.push(FoodRoutes.store(store.id)),
+          );
         },
       ),
     );
   }
 }
 
-class _StoreSample {
-  const _StoreSample({
-    required this.name,
-    required this.rating,
-    required this.reviews,
-    required this.time,
-    required this.kind,
-    required this.imageAsset,
-    this.price,
+class _StoreCard extends StatelessWidget {
+  const _StoreCard({
+    required this.store,
+    required this.onTap,
+    this.rating,
+    super.key,
   });
 
-  final String name;
-  final String rating;
-  final String reviews;
-  final String time;
-  final _StoreKind kind;
-  final String imageAsset;
-  final String? price;
-}
-
-enum _StoreKind { food, mart, convenience }
-
-const _stores = <_StoreSample>[
-  _StoreSample(
-    name: 'Bún Bò Huế Ô Cồ',
-    rating: '4.8',
-    reviews: '(1.2k+)',
-    time: '20-30 phút',
-    price: '35.000đ',
-    kind: _StoreKind.food,
-    imageAsset: 'assets/images/food_bun_bo_hue.png',
-  ),
-  _StoreSample(
-    name: 'Co.opmart Đà Nẵng',
-    rating: '4.7',
-    reviews: '(3.4k+)',
-    time: '30-45 phút',
-    kind: _StoreKind.mart,
-    imageAsset: 'assets/images/store_supermarket.png',
-  ),
-  _StoreSample(
-    name: 'Circle K',
-    rating: '4.6',
-    reviews: '(2.1k+)',
-    time: '15-25 phút',
-    kind: _StoreKind.convenience,
-    imageAsset: 'assets/images/store_convenience.png',
-  ),
-];
-
-class _StoreCard extends StatelessWidget {
-  const _StoreCard({required this.store, required this.onTap});
-
-  final _StoreSample store;
+  final FoodStoreSummary store;
+  final StoreRating? rating;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final price = store.price;
     return SizedBox(
       width: 176,
       child: Material(
         color: DealGoColors.card,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(DealGoRadius.card),
+          borderRadius: BorderRadius.circular(DealGoRadius.button),
           side: const BorderSide(color: DealGoColors.border),
         ),
         clipBehavior: Clip.antiAlias,
@@ -250,11 +319,33 @@ class _StoreCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
-                height: 84,
+                height: 118,
                 width: double.infinity,
-                child: _StoreArt(
-                  kind: store.kind,
-                  imageAsset: store.imageAsset,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _StoreCover(imageUrl: store.imageUrl),
+                    const Positioned(
+                      top: DealGoSpacing.s8,
+                      right: DealGoSpacing.s8,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: DealGoColors.card,
+                          shape: BoxShape.circle,
+                          boxShadow: DealGoShadows.card,
+                        ),
+                        child: SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: Icon(
+                            DealGoIcons.heart,
+                            size: 14,
+                            color: DealGoColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Padding(
@@ -269,43 +360,7 @@ class _StoreCard extends StatelessWidget {
                       style: textTheme.titleMedium?.copyWith(fontSize: 14),
                     ),
                     const SizedBox(height: DealGoSpacing.s4),
-                    Text(
-                      '★ ${store.rating} ${store.reviews}',
-                      style: textTheme.bodySmall?.copyWith(
-                        color: DealGoColors.amber,
-                      ),
-                    ),
-                    Text(store.time, style: textTheme.bodySmall),
-                    const SizedBox(height: DealGoSpacing.s8),
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: DealGoColors.greenSurface,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: DealGoSpacing.s8,
-                          vertical: DealGoSpacing.s4,
-                        ),
-                        child: Text(
-                          AppLocalizations.of(context).foodFreeshipChip,
-                          style: textTheme.labelSmall?.copyWith(
-                            color: DealGoColors.brandGreen,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (price != null) ...[
-                      const SizedBox(height: DealGoSpacing.s4),
-                      Text(
-                        price,
-                        style: textTheme.titleMedium?.copyWith(
-                          color: DealGoColors.primary,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
+                    StoreMetaLine(store: store, rating: rating),
                   ],
                 ),
               ),
@@ -317,58 +372,31 @@ class _StoreCard extends StatelessWidget {
   }
 }
 
-class _StoreArt extends StatelessWidget {
-  const _StoreArt({required this.kind, required this.imageAsset});
+class _StoreCover extends StatelessWidget {
+  const _StoreCover({this.imageUrl});
 
-  final _StoreKind kind;
-  final String imageAsset;
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
-    return Image.asset(
-      imageAsset,
+    const placeholder = ColoredBox(
+      color: Color(0xFFFFF4EA),
+      child: Center(
+        child: Icon(
+          DealGoIcons.food,
+          color: Color(0xFFEA580C),
+          size: 40,
+        ),
+      ),
+    );
+    final resolved = resolveMediaUrl(imageUrl);
+    if (resolved == null || resolved.isEmpty) {
+      return placeholder;
+    }
+    return Image.network(
+      resolved,
       fit: BoxFit.cover,
-      errorBuilder: (context, error, stack) {
-        return switch (kind) {
-          _StoreKind.food => const ColoredBox(
-            color: Color(0xFFFFF4EA),
-            child: Center(
-              child: Icon(
-                Icons.ramen_dining,
-                color: Color(0xFFEA580C),
-                size: 42,
-              ),
-            ),
-          ),
-          _StoreKind.mart => const ColoredBox(
-            color: Color(0xFF1D4ED8),
-            child: Center(
-              child: Text(
-                'co.opmart',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18,
-                ),
-              ),
-            ),
-          ),
-          _StoreKind.convenience => const ColoredBox(
-            color: Color(0xFFE11D2E),
-            child: Center(
-              child: Text(
-                'CIRCLE K',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.2,
-                  fontSize: 18,
-                ),
-              ),
-            ),
-          ),
-        };
-      },
+      errorBuilder: (context, error, stack) => placeholder,
     );
   }
 }
@@ -379,63 +407,54 @@ class VoucherBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFF4ECFF), Color(0xFFE8F8EC)],
-        ),
-        borderRadius: BorderRadius.circular(DealGoRadius.card),
+        color: DealGoColors.greenSurface,
+        borderRadius: BorderRadius.circular(DealGoRadius.button),
+        border: Border.all(color: DealGoColors.border),
+        boxShadow: DealGoShadows.card,
       ),
       child: Padding(
-        padding: const EdgeInsets.all(DealGoSpacing.s16),
+        padding: const EdgeInsets.symmetric(
+          horizontal: DealGoSpacing.s16,
+          vertical: DealGoSpacing.s12,
+        ),
         child: Row(
           children: [
-            const Icon(Icons.local_offer_outlined, color: DealGoColors.primary),
+            const Icon(DealGoIcons.voucher, color: DealGoColors.primary, size: 28),
             const SizedBox(width: DealGoSpacing.s12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'DealGo Voucher',
+                    l10n.homeVoucherBadge,
                     style: textTheme.labelSmall?.copyWith(
-                      color: DealGoColors.primary,
-                      fontWeight: FontWeight.w700,
+                      color: DealGoColors.textSecondary,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   Text(
-                    'Ưu đãi mỗi ngày, tiết kiệm mỗi chuyến!',
-                    style: textTheme.titleMedium?.copyWith(fontSize: 15),
-                  ),
-                  const SizedBox(height: DealGoSpacing.s4),
-                  Text(
-                    'Giảm đến 50% cho Đặt xe, Mua hàng và nhiều dịch vụ khác.',
-                    style: textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: DealGoSpacing.s8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: HomePillButton(
-                      label: AppLocalizations.of(context).actionHuntDeals,
-                      onPressed: _noop,
+                    l10n.homeVoucherTitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.titleMedium?.copyWith(
+                      fontSize: 14,
+                      color: DealGoColors.primary,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: DealGoSpacing.s8),
-            Image.asset(
-              'assets/images/promo_voucher_clean.png',
-              width: 64,
-              height: 64,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stack) {
-                return const DealGoIllustration(
-                  'assets/illustrations/accent_promo_gift.svg',
-                  width: 64,
-                  height: 64,
-                );
-              },
+            HomeOutlinePillButton(
+              key: const Key('home-voucher-see-all'),
+              label: l10n.homeVoucherSeeAll,
+              onPressed: () => context.push(
+                AccountRoutes.vouchers('/customer/account'),
+              ),
             ),
           ],
         ),
@@ -444,85 +463,152 @@ class VoucherBanner extends StatelessWidget {
   }
 }
 
-void _noop() {}
-
-class RecentTripCard extends StatelessWidget {
+/// Latest ride (or food order) from the real history endpoints.
+class RecentTripCard extends StatefulWidget {
   const RecentTripCard({super.key});
+
+  @override
+  State<RecentTripCard> createState() => _RecentTripCardState();
+}
+
+class _RecentTripCardState extends State<RecentTripCard> {
+  HistoryItem? _item;
+  var _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    final token = homeAccessToken(context);
+    HistoryItem? latest;
+    if (token != null) {
+      try {
+        final rides = await context.read<ListRideHistory>()(token);
+        latest = rides.firstOrNull;
+        if (latest == null && mounted) {
+          latest = (await context.read<ListFoodHistory>()(token)).firstOrNull;
+        }
+      } on Object {
+        latest = null;
+      }
+    }
+    if (mounted) {
+      setState(() {
+        _item = latest;
+        _loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: DealGoColors.card,
-        borderRadius: BorderRadius.circular(DealGoRadius.card),
-        border: Border.all(color: DealGoColors.border),
+    final l10n = AppLocalizations.of(context);
+    final item = _item;
+    final amount = item?.amountVnd;
+    final bad = item != null && historyStatusIsBad(item.status);
+    return Material(
+      key: const Key('home-recent-activity'),
+      color: DealGoColors.card,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(DealGoRadius.button),
+        side: const BorderSide(color: DealGoColors.border),
       ),
-      child: Padding(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.go('/customer/trips'),
+        child: Padding(
         padding: const EdgeInsets.all(DealGoSpacing.s16),
         child: Row(
           children: [
-            const DecoratedBox(
-              decoration: BoxDecoration(
+            DecoratedBox(
+              decoration: const BoxDecoration(
                 color: DealGoColors.subtlePurple,
-                borderRadius: BorderRadius.all(Radius.circular(12)),
+                shape: BoxShape.circle,
               ),
               child: SizedBox(
-                width: 40,
-                height: 40,
-                child: Icon(Icons.two_wheeler, color: DealGoColors.primary),
+                width: 44,
+                height: 44,
+                child: Icon(
+                  item?.kind == HistoryKind.food
+                      ? DealGoIcons.food
+                      : DealGoIcons.motorbike,
+                  color: DealGoColors.primary,
+                ),
               ),
             ),
             const SizedBox(width: DealGoSpacing.s12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: item == null
+                  ? Text(
+                      _loading ? '…' : l10n.homeRecentEmpty,
+                      style: textTheme.bodyMedium,
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item.meta, style: textTheme.bodySmall),
+                        Text(
+                          historyTitle(AppLocalizations.of(context), item),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+            if (item != null) ...[
+              const SizedBox(width: DealGoSpacing.s8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('Hôm qua · 14:32', style: textTheme.bodySmall),
-                  Text(
-                    'Sân bay Đà Nẵng → 123 Nguyễn Văn Linh',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
+                  if (amount != null)
+                    Text(
+                      formatVnd(amount),
+                      style: textTheme.titleMedium?.copyWith(fontSize: 15),
+                    ),
+                  const SizedBox(height: DealGoSpacing.s4),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: bad
+                          ? DealGoColors.dangerSurface
+                          : DealGoColors.greenSurface,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: DealGoSpacing.s8,
+                        vertical: 2,
+                      ),
+                      child: Text(
+                        historyStatusLabel(l10n, item.status),
+                        style: textTheme.labelSmall?.copyWith(
+                          color: bad
+                              ? DealGoColors.danger
+                              : DealGoColors.brandGreen,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: DealGoSpacing.s8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '72.000đ',
-                  style: textTheme.titleMedium?.copyWith(fontSize: 15),
-                ),
-                const SizedBox(height: DealGoSpacing.s4),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: DealGoColors.greenSurface,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: DealGoSpacing.s8,
-                      vertical: 2,
-                    ),
-                    child: Text(
-                      'Hoàn thành',
-                      style: textTheme.labelSmall?.copyWith(
-                        color: DealGoColors.brandGreen,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            ],
           ],
+        ),
         ),
       ),
     );
   }
+}
+
+String? homeAccessToken(BuildContext context) {
+  final auth = context.read<AuthCubit>().state;
+  return auth is AuthSignedIn ? auth.tokens.accessToken : null;
 }

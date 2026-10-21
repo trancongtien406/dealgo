@@ -30,18 +30,18 @@ final class DriverFeedIneligible extends DriverFeedState {
 }
 
 final class DriverFeedFailed extends DriverFeedState {
-  const DriverFeedFailed(this.message);
+  const DriverFeedFailed([this.error, this.sessionExpired = false]);
 
-  final String message;
+  /// The failure behind it, turned into text by the page (see apiErrorText).
+  final Object? error;
+  final bool sessionExpired;
 }
 
 class DriverFeedCubit extends Cubit<DriverFeedState> {
   DriverFeedCubit({
-    required ListOpenDriverRides listOpenDriverRides,
-    required ListReadyDriverOrders listReadyDriverOrders,
-  }) : _listOpenDriverRides = listOpenDriverRides,
-       _listReadyDriverOrders = listReadyDriverOrders,
-       super(const DriverFeedIdle());
+    required this._listOpenDriverRides,
+    required this._listReadyDriverOrders,
+  }) : super(const DriverFeedIdle());
 
   final ListOpenDriverRides _listOpenDriverRides;
   final ListReadyDriverOrders _listReadyDriverOrders;
@@ -58,7 +58,7 @@ class DriverFeedCubit extends Cubit<DriverFeedState> {
     }
     final token = accessToken?.trim() ?? '';
     if (token.isEmpty) {
-      emit(const DriverFeedFailed('Phiên đăng nhập không còn hiệu lực'));
+      emit(const DriverFeedFailed(null, true));
       return;
     }
     emit(const DriverFeedLoading());
@@ -117,12 +117,8 @@ bool _roleInactive(Object? error) {
       error.errorCode == 'ROLE_NOT_ACTIVE';
 }
 
-String _failureMessage(Object error) {
-  if (error is ApiException && error.message.isNotEmpty) {
-    return error.message;
-  }
-  return 'Không tải được yêu cầu';
-}
+/// Known codes keep their own sentence; anything else shows the generic load failure.
+Object? _failureMessage(Object error) => error;
 
 class _Capture<T> {
   const _Capture.ok(this.value) : error = null;

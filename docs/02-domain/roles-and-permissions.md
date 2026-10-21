@@ -153,6 +153,8 @@ flowchart LR
 
 Nếu cần thực hiện hành động hỗ trợ đang có active job sau suspend, phải có quy tắc safety-in-flight trong `OPEN-005/006/015`; **không tự biến suspend thành hủy chuyến/giao hàng tự động**.
 
+> **Đã triển khai trong code (2026-10-18):** grant `SUSPENDED` không thể tự mở lại qua `POST /v1/me/role-grants` (403 `ROLE_GRANT_SUSPENDED`); chỉ ops đổi trạng thái grant. Đăng ký/verify phone lần đầu cấp `CUSTOMER` `ACTIVE`; `requestRole` CUSTOMER ở production vẫn `PENDING`.
+
 ## 6. Actor và vai trò nghiệp vụ
 
 | Principal/role | Kênh | Quyền cốt lõi | Giới hạn |

@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  PartnerDocumentsPanel,
+  PartnerIssuePicker,
+  PartnerReviewOutcome,
+} from "@/features/kyc/components/partner-review-panels";
+import { validateIssues, type PartnerIssue } from "@/features/kyc/partner-review";
 import { useMemo, useState } from "react";
 import { OpsIcon } from "@/components/ui/ops-icons";
 import {
@@ -78,6 +84,7 @@ export function StoreApprovalsBoard() {
 
   const [selectedCode, setSelectedCode] = useState<string>("");
   const [rejectReason, setRejectReason] = useState("");
+  const [issues, setIssues] = useState<PartnerIssue[]>([]);
   const selected =
     pagedApprovals.find((s) => s.code === selectedCode) ??
     pagedApprovals[0] ??
@@ -152,6 +159,29 @@ export function StoreApprovalsBoard() {
     }
   };
 
+  const handleRequestMoreInfo = async () => {
+    if (!selected || selected.status === "REJECTED") return;
+    const invalid = validateIssues(issues);
+    if (invalid) {
+      toast.message(invalid);
+      return;
+    }
+    try {
+      await rejectMutation.mutateAsync({
+        id: selected.code,
+        reason: rejectReason.trim() || "Hồ sơ cần bổ sung theo các mục bên dưới.",
+        issues: issues.map((issue) => ({ ...issue, note: issue.note.trim() })),
+      });
+      toast.success(`Đã gửi yêu cầu bổ sung cho ${selected.name}`);
+      setRejectReason("");
+      setIssues([]);
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Không thể gửi yêu cầu bổ sung.",
+      );
+    }
+  };
+
   const handleReject = async () => {
     if (!selected || selected.status === "REJECTED") return;
     const reason = rejectReason.trim();
@@ -216,7 +246,7 @@ export function StoreApprovalsBoard() {
           </li>
         ))}
       </ul>
-      <section className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+      <section className="min-w-0 rounded-2xl border border-border bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="w-full sm:w-72">
             <SearchSelect
@@ -333,15 +363,19 @@ export function StoreApprovalsBoard() {
                   <h3 className="text-sm font-semibold text-ink">
                     Giấy tờ & quyết định
                   </h3>
-                  <p className="mt-3 text-sm text-muted">
-                    Hồ sơ đối tác MERCHANT — duyệt/từ chối qua Nest
-                    partner-applications.
-                  </p>
+                  <PartnerDocumentsPanel documents={selected.documents} />
+                  {selected.status === "REJECTED" ? (
+                    <PartnerReviewOutcome
+                      role="MERCHANT"
+                      reason={selected.reason}
+                      issues={selected.issues}
+                    />
+                  ) : null}
                   {selected.status === "PENDING_KYB" ||
                   selected.status === "NEEDS_VERIFY" ? (
                     <div className="mt-4 space-y-3">
                       <label className="block text-xs font-medium text-muted">
-                        Lý do từ chối (bắt buộc khi từ chối)
+                        Lý do (bắt buộc khi từ chối)
                         <textarea
                           value={rejectReason}
                           onChange={(e) => setRejectReason(e.target.value)}
@@ -350,7 +384,19 @@ export function StoreApprovalsBoard() {
                           placeholder="Ví dụ: thiếu giấy phép kinh doanh / địa chỉ không khớp…"
                         />
                       </label>
+                      <PartnerIssuePicker
+                        role="MERCHANT"
+                        value={issues}
+                        onChange={setIssues}
+                        disabled={actionPending}
+                      />
                       <div className="flex flex-wrap gap-2">
+                        <PreviewButton
+                          tone="neutral"
+                          onClick={() => void handleRequestMoreInfo()}
+                        >
+                          Yêu cầu bổ sung
+                        </PreviewButton>
                         <PreviewButton
                           tone="danger"
                           onClick={() => void handleReject()}

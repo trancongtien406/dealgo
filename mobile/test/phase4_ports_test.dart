@@ -1,3 +1,4 @@
+import 'package:dealgo/l10n/app_localizations.dart';
 import 'package:dealgo/features/voice/domain/usecases/create_ride_voice_session.dart';
 import 'package:dealgo/features/voice/domain/usecases/create_food_order_voice_session.dart';
 import 'package:dealgo/features/voice/data/repositories/voice_repository_impl.dart';
@@ -131,11 +132,14 @@ void main() {
     expect(items.single.amountVnd, 50000);
   });
 
-  testWidgets('PlaceholderMapPort shows center coordinates', (tester) async {
+  testWidgets('PlaceholderMapPort is labelled as illustrative and invents no place', (tester) async {
     final port = createMapPort();
     expect(port, isA<PlaceholderMapPort>());
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('vi'),
         home: Scaffold(
           body: port.buildMap(
             center: const MapLatLng(lat: 16.0544, lng: 108.2022),
@@ -145,6 +149,7 @@ void main() {
     );
     expect(find.byKey(const Key('map-placeholder')), findsOneWidget);
     expect(find.text('Bản đồ minh họa'), findsOneWidget);
-    expect(find.textContaining('Hải Châu'), findsWidgets);
+    expect(find.textContaining('Hải Châu'), findsNothing);
+    expect(find.text('SÔNG HÀN'), findsNothing);
   });
 }

@@ -1,3 +1,4 @@
+import { enrichOpsFoodOrderPayload } from "@/lib/api/ops-people";
 import { NextResponse } from "next/server";
 import { assertSameOriginMutation, isUuid } from "@/lib/api/ops-bff-guards";
 import { readInterveneReasonBody } from "@/lib/api/ops-intervene-body";
@@ -33,5 +34,11 @@ export async function POST(request: Request, context: RouteContext) {
     path: `/v1/ops/food-orders/${id}/cancel`,
     body: { reason: body.reason },
   });
+  if (result.ok) {
+    return jsonFromOpsUpstream({
+      ...result,
+      data: await enrichOpsFoodOrderPayload(result.data),
+    });
+  }
   return jsonFromOpsUpstream(result);
 }

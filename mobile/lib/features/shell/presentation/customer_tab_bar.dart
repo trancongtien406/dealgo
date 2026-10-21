@@ -5,8 +5,15 @@ import '../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import 'shell_tab.dart';
 
-/// Customer shell with elevated center “Đặt” orb (C001). Material icons are
-/// temporary until brand tab assets are wired.
+/// Comfort inset under the last scroll item (Scaffold already clears the bar).
+double customerShellBottomClearance(
+  BuildContext context, {
+  double extra = DealGoSpacing.s16,
+}) {
+  return extra;
+}
+
+/// Customer bottom nav. The selected tab is a static plate, not a sliding one.
 class CustomerTabBar extends StatelessWidget {
   const CustomerTabBar({
     required this.navigationShell,
@@ -17,89 +24,72 @@ class CustomerTabBar extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
   final List<ShellTab> tabs;
 
+  static const double barHeight = 64;
+  static const double orbSize = 44;
+  /// Kept for call sites that still add overhang; flat bar has none.
+  static const double orbOverhang = 0;
+
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom;
     final textTheme = Theme.of(context).textTheme;
     final l10n = AppLocalizations.of(context);
+    final selected = navigationShell.currentIndex.clamp(0, tabs.length - 1);
 
-    return SizedBox(
-      height: 108 + bottom,
-      child: Stack(
-        children: [
-          Positioned(
-            top: 30,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: DealGoColors.card,
-                border: const Border(
-                  top: BorderSide(color: DealGoColors.border),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: DealGoColors.text.withValues(alpha: 0.06),
-                    blurRadius: 16,
-                    offset: const Offset(0, -4),
-                  ),
-                ],
-              ),
+    return Material(
+      color: DealGoColors.card,
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: DealGoColors.border)),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x0F0F172A),
+              blurRadius: 12,
+              offset: Offset(0, -2),
             ),
-          ),
-          Padding(
-            padding: EdgeInsets.only(bottom: bottom, top: DealGoSpacing.s8),
+          ],
+        ),
+        child: SizedBox(
+          height: barHeight + bottom,
+          child: Padding(
+            padding: EdgeInsets.only(bottom: bottom),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                for (var index = 0; index < tabs.length; index++)
+                for (var i = 0; i < tabs.length; i++)
                   Expanded(
-                    child: _TabSlot(
-                      label: tabs[index].localizedLabel(l10n),
-                      selected: navigationShell.currentIndex == index,
-                      raised: index == 2,
-                      icon: _iconFor(
-                        index,
-                        navigationShell.currentIndex == index,
-                      ),
+                    child: _TabItem(
+                      label: tabs[i].localizedLabel(l10n),
+                      icon: selected == i
+                          ? tabs[i].selectedIcon
+                          : tabs[i].icon,
+                      selected: selected == i,
                       textTheme: textTheme,
-                      onTap: () => navigationShell.goBranch(index),
+                      onTap: () => navigationShell.goBranch(i),
                     ),
                   ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-IconData _iconFor(int index, bool selected) {
-  return switch (index) {
-    0 => selected ? Icons.home_rounded : Icons.home_outlined,
-    1 => selected ? Icons.place : Icons.place_outlined,
-    2 => Icons.qr_code_scanner_rounded,
-    3 => selected ? Icons.shopping_bag : Icons.shopping_bag_outlined,
-    _ => selected ? Icons.person : Icons.person_outline,
-  };
-}
-
-class _TabSlot extends StatelessWidget {
-  const _TabSlot({
+class _TabItem extends StatelessWidget {
+  const _TabItem({
     required this.label,
-    required this.selected,
-    required this.raised,
     required this.icon,
+    required this.selected,
     required this.textTheme,
     required this.onTap,
   });
 
   final String label;
-  final bool selected;
-  final bool raised;
   final IconData icon;
+  final bool selected;
   final TextTheme textTheme;
   final VoidCallback onTap;
 
@@ -112,59 +102,39 @@ class _TabSlot extends StatelessWidget {
       label: label,
       child: InkWell(
         onTap: onTap,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
         child: ExcludeSemantics(
           child: Padding(
-            padding: const EdgeInsets.only(bottom: DealGoSpacing.s8),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                if (raised)
-                  const _BookOrb()
-                else
-                  Icon(icon, color: color, size: 24),
-                const SizedBox(height: DealGoSpacing.s4),
-                Text(
-                  label,
-                  style: textTheme.labelSmall?.copyWith(
-                    color: raised ? DealGoColors.primary : color,
-                    fontWeight: selected || raised
-                        ? FontWeight.w700
-                        : FontWeight.w500,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: selected
+                    ? DealGoColors.subtlePurple
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(DealGoRadius.input),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 22, color: color),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.fade,
+                    style: (textTheme.labelSmall ?? const TextStyle()).copyWith(
+                      color: color,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      fontSize: 11,
+                      height: 1.1,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _BookOrb extends StatelessWidget {
-  const _BookOrb();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: DealGoColors.primary,
-        boxShadow: [
-          BoxShadow(
-            color: DealGoColors.primary.withValues(alpha: 0.28),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: const SizedBox(
-        width: 56,
-        height: 56,
-        child: Icon(
-          Icons.qr_code_scanner_rounded,
-          color: Colors.white,
-          size: 28,
         ),
       ),
     );

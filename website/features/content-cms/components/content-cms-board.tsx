@@ -41,7 +41,6 @@ export function ContentCmsBoard() {
     activeTab === "Chính sách riêng tư" ? "PRIVACY" : "TERMS";
   const isSupportTab = activeTab === "Kênh & Hỗ trợ";
 
-  // Document query & mutations
   const {
     data: docData,
     isPending: isDocPending,
@@ -52,7 +51,6 @@ export function ContentCmsBoard() {
   const saveDocMutation = useSaveCmsDocumentMutation();
   const resetDocMutation = useResetCmsDocumentMutation();
 
-  // Support query & mutations
   const {
     data: supportData,
     isPending: isSupportPending,
@@ -69,7 +67,6 @@ export function ContentCmsBoard() {
   const refetch = isSupportTab ? refetchSupport : refetchDoc;
   const forbidden = isError && isForbiddenError(error);
 
-  // Local draft states
   const [editedDoc, setEditedDoc] = useState<{
     key: ContentDocKey;
     doc: LegalDocument;
@@ -121,7 +118,6 @@ export function ContentCmsBoard() {
       ? "/terms"
       : "/privacy";
 
-  // Section handling for legal documents
   const handleUpdateSection = (
     id: string,
     field: "title" | "content",
@@ -174,7 +170,6 @@ export function ContentCmsBoard() {
     });
   };
 
-  // Save handler
   const handleSaveDoc = () => {
     if (!docDraft) return;
     saveDocMutation.mutate(
@@ -237,7 +232,6 @@ export function ContentCmsBoard() {
         ]}
       />
 
-      {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
@@ -265,7 +259,6 @@ export function ContentCmsBoard() {
         </div>
       </div>
 
-      {/* Tabs */}
       <PreviewTabs
         label="Phân hệ nội dung"
         current={activeTab}
@@ -299,7 +292,6 @@ export function ContentCmsBoard() {
           <div className="h-40 rounded-xl bg-canvas" />
         </div>
       ) : isSupportTab && supportDraft ? (
-        /* Support Settings Editor */
         <div className="space-y-5">
           <section className="rounded-2xl border border-border bg-white p-5 shadow-sm space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
@@ -393,7 +385,6 @@ export function ContentCmsBoard() {
             </div>
           </section>
 
-          {/* Categories Manager */}
           <section className="rounded-2xl border border-border bg-white p-5 shadow-sm space-y-4">
             <h2 className="text-base font-bold text-ink">
               Danh mục chủ đề hỗ trợ theo vai trò
@@ -448,7 +439,6 @@ export function ContentCmsBoard() {
             </div>
           </section>
 
-          {/* Action footer */}
           <div className="flex items-center justify-end gap-3 rounded-2xl border border-border bg-white p-4">
             <button
               type="button"
@@ -460,9 +450,7 @@ export function ContentCmsBoard() {
           </div>
         </div>
       ) : docDraft ? (
-        /* Legal Document Editor */
         <div className="space-y-5">
-          {/* Document Metadata */}
           <section className="rounded-2xl border border-border bg-white p-5 shadow-sm space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
               <div>
@@ -533,7 +521,6 @@ export function ContentCmsBoard() {
             </div>
           </section>
 
-          {/* Sections List */}
           <section className="rounded-2xl border border-border bg-white p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -617,7 +604,6 @@ export function ContentCmsBoard() {
             </div>
           </section>
 
-          {/* Action footer */}
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-white p-4">
             <span className="text-xs text-muted">
               Lưu thay đổi sẽ cập nhật tức thời giao diện tại trang công khai{" "}
@@ -634,7 +620,6 @@ export function ContentCmsBoard() {
         </div>
       ) : null}
 
-      {/* Confirmation Dialog for Publishing */}
       <ConfirmDialog
         open={confirmPublish}
         title="Xác nhận lưu và xuất bản thay đổi"
@@ -668,7 +653,6 @@ export function ContentCmsBoard() {
         onConfirm={isSupportTab ? handleSaveSupport : handleSaveDoc}
       />
 
-      {/* Confirmation Dialog for Reset */}
       <ConfirmDialog
         open={confirmReset}
         title="Khôi phục nội dung mặc định"

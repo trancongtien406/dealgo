@@ -1,10 +1,10 @@
 ---
 doc_id: DG-AI-003
 title: "DealGo — Backend gap matrix (honest)"
-version: "0.1.9"
+version: "0.1.10"
 status: "ACTIVE"
 owner: "Tech Lead"
-last_updated: "2026-10-15"
+last_updated: "2026-10-18"
 related_decisions:
   - ADR-001
   - ADR-002
@@ -31,7 +31,7 @@ Owner decisions noted: **1A** keep DEC-PROD-007 chat+voice; **2A** adapters with
 |---|---|---|
 | 0 Docs/ADR/secrets | PARTIAL | ADR còn `PROPOSED` |
 | 1 Health/config/DB/Redis | PARTIAL | `/health/live` + `/health/ready`; Redis ping + Socket.IO adapter + OTP Redis throttler |
-| 2 Auth + roles | PARTIAL | OTP/passkey mock; KYC/KYB mock + ops review; sandbox auto-ACTIVE + eligibility bypass ngoài production |
+| 2 Auth + roles | PARTIAL | OTP/passkey mock; email+password (OTP đăng ký + reset qua `MailSender`); KYC/KYB mock + ops review; sandbox auto-ACTIVE + eligibility bypass ngoài production; grant `SUSPENDED` chỉ ops mở lại |
 | 3 Ride | PARTIAL | Lifecycle tới `COMPLETED` + COD journal; customer history; driver presence filters open list; MapsPort; expiry worker; chưa fee policy |
 | 4 Food | PARTIAL | Lifecycle tới `DELIVERED`/`FAILED`; store lat/lng + ready radius prefers store; customer order history; claim gated; outbox |
 | 5 Ledger/COD | PARTIAL | Double-entry sandbox + PaymentIntent; VNPAY/MoMo **redirect create only** + webhook stub; **ops settlements** heuristic; **không** real payout |
@@ -65,8 +65,12 @@ Owner decisions noted: **1A** keep DEC-PROD-007 chat+voice; **2A** adapters with
 | Real settlement / payout | Ops day-bucket heuristic |
 | Contact retention `OPEN-021` | `CONTACT_WINDOW_MINUTES` is TEST_ONLY heuristic on status+updatedAt |
 | Food store geocoords | Optional lat/lng + merchant PATCH; ready list uses store when set; delivery fare still TEST_ONLY (no invented fee %) |
-| Full P0 concurrency matrix | Ride select + **food claim** race specs (`*.race.pg.spec.ts`); capacity gate still TEST_ONLY (`OPEN-005`) |
+| Full P0 concurrency matrix | Ride select + **food claim** race specs (`test/concurrency/*.race.spec.ts`); capacity gate still TEST_ONLY (`OPEN-005`) |
 | Ops customers/users list | **Landed:** `GET /v1/ops/customers` (+ drivers/staff); Admin board may still use fixtures until wired |
+| Promotion redemption | `POST /v1/promotions/validate` chỉ báo giá; chưa ghi redemption/trừ ngân sách, `userLimit` chưa thực thi |
+| Food claim race vs Postgres | `food-claim.race.spec.ts` đỏ khi chạy với Postgres (merchant catalog 404 trước bước claim) — có từ trước 2026-10-18 |
+| Ops RBAC chi tiết | `OpsSessionGuard` chỉ kiểm grant `OPS`; staff role/scope chưa thực thi |
+| SMS production | Chỉ `mock`/unavailable; chưa adapter ESMS/Twilio |
 | Migration timestamp collision | Historical `20261014160000_*` triple prefix remains; new indexes use `20261015173000_hot_path_indexes` |
 
 ## Fixes landed (2026-10-15)
@@ -74,11 +78,26 @@ Owner decisions noted: **1A** keep DEC-PROD-007 chat+voice; **2A** adapters with
 | Item | Notes |
 |---|---|
 | S3 KYC storage | `KYC_STORAGE_PROVIDER=s3` + S3_* env; SigV4 PUT; aliases `S3_BUCKET_NAME` / `S3_API_ENDPOINT` |
-| Food claim concurrency | Conditional `READY AND assignedDriverId IS NULL` + `food-claim.race.pg.spec.ts` |
+| Food claim concurrency | Conditional `READY AND assignedDriverId IS NULL` + `test/concurrency/food-claim.race.spec.ts` |
 | `MAX_CONCURRENT_JOBS_PER_DRIVER` | Enforced on food claim + ride select (ride+food active statuses); TEST_ONLY / OPEN-005 |
 | Hot-path indexes | `rides(status,createdAt)`, `food_orders(status,createdAt)`, `food_stores(lat,lng)` |
 | Ride expiry spam | Outbox duplicate used `create`+catch P2002 which **aborts PG TX**; switched to `createMany({ skipDuplicates })` |
 | SMTP discrete env | `SMTP_HOST/PORT/USER/PASSWORD` → `SMTP_URL`; `EMAIL_PROVIDER=smtp` uses SmtpMailSender |
+
+## Fixes landed (2026-10-18)
+
+| Item | Notes |
+|---|---|
+| Promotions persistence | Bảng `promotions` (migration `20261018202000_promotions`), repository Prisma/Memory; dữ liệu mẫu chỉ trong `prisma/seed.ts` và unit test |
+| Promotion validate auth | `POST /v1/promotions/validate` yêu cầu customer session; `customerId` lấy từ session (field body cũ bị bỏ qua) |
+| Email register | Hai bước OTP: `email_signup_challenges` (migration `20261018220000_email_signup_challenges`); Account/grant/session chỉ tạo sau `…/register/:id/verify`; login email chưa verify → 403 + OTP kích hoạt (`20261018230000_email_challenge_activation`, `DEC-PROD-008`) |
+| Password reset | `POST /v1/auth/email/password-resets` (202, không lộ email tồn tại) + `/:id/confirm`; bảng `password_resets`; revoke customer sessions |
+| Phone OTP sign-up | Không tạo user trước verify (`phone_challenges.userId` nullable); cấp `CUSTOMER` `ACTIVE` ở mọi môi trường khi verify lần đầu |
+| Suspended grant | `POST /v1/me/role-grants` trả 403 `ROLE_GRANT_SUSPENDED`, không tự mở lại |
+| Avatar body limit | JSON 3mb chỉ cho `POST /v1/me/avatar`; route khác giữ 100kb; lỗi body-parser trả 413/400 thay vì 500 |
+| Prisma pool | `DATABASE_POOL_MAX` (mặc định 10/process) |
+| Worker boot | Standalone worker import `ThrottlerModule` để DI `ThrottlerGuard` không lỗi |
+| CI | Backend thêm `npm run typecheck` (gồm test/prisma/scripts) + `npm run lint`; Node từ `.nvmrc` |
 
 ## Definition of Done (áp dụng lại)
 

@@ -40,7 +40,6 @@ import {
 import {
   foodOrderStatusFilterOptions,
   foodOrderStatusLabel,
-  foodOrderStatusTabs,
   foodOrderStatusTone,
 } from "@/features/food-orders/mappers";
 import type { FoodOrderListItem } from "@/features/food-orders/types";
@@ -259,34 +258,7 @@ export function FoodOrdersList() {
           />
         </li>
       </ul>
-      <div className="min-w-0 overflow-x-auto">
-        <ul
-          aria-label="Lọc theo trạng thái đơn"
-          className="flex w-max min-w-full gap-2 pb-1"
-        >
-          {foodOrderStatusTabs.map((item) => {
-            const selected = filters.status === item.value;
-            return (
-              <li key={item.value}>
-                <button
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => {
-                    void setFilters({ status: item.value, page: 1 });
-                  }}
-                  className={
-                    selected
-                      ? `inline-flex h-9 items-center rounded-full bg-brand/10 px-3 text-sm font-semibold whitespace-nowrap text-brand ${focusRing}`
-                      : `inline-flex h-9 items-center rounded-full border border-border bg-white px-3 text-sm whitespace-nowrap text-ink ${focusRing}`
-                  }
-                >
-                  {item.label} {item.count}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+
       <section className="min-w-0 rounded-2xl border border-border bg-white p-4 shadow-sm">
         <AdminFilterToolbar>
           <AdminFilterField className="min-w-[12rem]">

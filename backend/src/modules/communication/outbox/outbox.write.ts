@@ -22,6 +22,7 @@ const RIDE_OUTBOX_STATUSES = new Set([
 ]);
 
 const FOOD_OUTBOX_STATUSES = new Set([
+  'PLACED',
   'PREPARING',
   'READY',
   'ASSIGNED',

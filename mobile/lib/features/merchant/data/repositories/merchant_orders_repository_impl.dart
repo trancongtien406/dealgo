@@ -1,4 +1,5 @@
 import '../../../food/domain/entities/food_models.dart';
+import '../../domain/entities/merchant_menu_models.dart';
 import '../../domain/repositories/merchant_orders_repository.dart';
 import '../datasources/merchant_orders_remote_datasource.dart';
 
@@ -18,6 +19,21 @@ class MerchantOrdersRepositoryImpl implements MerchantOrdersRepository {
     required String orderId,
   }) {
     return _remote.acceptOrder(accessToken: accessToken, orderId: orderId);
+  }
+
+  @override
+  Future<MerchantOrderUpdate> rejectOrder({
+    required String accessToken,
+    required String orderId,
+    required FoodRejectReason reason,
+    String? note,
+  }) {
+    return _remote.rejectOrder(
+      accessToken: accessToken,
+      orderId: orderId,
+      reason: reason,
+      note: note,
+    );
   }
 
   @override
@@ -42,6 +58,83 @@ class MerchantOrdersRepositoryImpl implements MerchantOrdersRepository {
   }
 
   @override
+  Future<FoodStoreDetail> updateStoreProfile({
+    required String accessToken,
+    required String name,
+  }) =>
+      _remote.updateStoreProfile(accessToken: accessToken, name: name);
+
+  @override
+  Future<FoodStoreDetail> uploadStoreLogo({
+    required String accessToken,
+    required String contentBase64,
+    String? contentType,
+  }) =>
+      _remote.uploadStoreLogo(
+        accessToken: accessToken,
+        contentBase64: contentBase64,
+        contentType: contentType,
+      );
+
+  @override
+  Future<FoodStoreDetail> clearStoreLogo({required String accessToken}) =>
+      _remote.clearStoreLogo(accessToken: accessToken);
+
+  @override
+  Future<FoodStoreDetail> updateStoreLocation({
+    required String accessToken,
+    required double lat,
+    required double lng,
+    String? addressLabel,
+  }) {
+    return _remote.updateStoreLocation(
+      accessToken: accessToken,
+      lat: lat,
+      lng: lng,
+      addressLabel: addressLabel,
+    );
+  }
+
+  @override
+  Future<FoodStoreDetail> updateStoreHours({
+    required String accessToken,
+    required StoreSchedule schedule,
+  }) {
+    return _remote.updateStoreHours(
+      accessToken: accessToken,
+      schedule: schedule,
+    );
+  }
+
+  @override
+  Future<FoodStoreDetail> updateStoreServiceMode({
+    required String accessToken,
+    required StoreServiceMode mode,
+    int? resumeAfterMinutes,
+    int? busyExtraMinutes,
+  }) {
+    return _remote.updateStoreServiceMode(
+      accessToken: accessToken,
+      mode: mode,
+      resumeAfterMinutes: resumeAfterMinutes,
+      busyExtraMinutes: busyExtraMinutes,
+    );
+  }
+
+  @override
+  Future<FoodStoreDetail> updateStoreAcceptSettings({
+    required String accessToken,
+    required StoreAcceptSettings settings,
+    required int lastOrderMinutes,
+  }) {
+    return _remote.updateStoreAcceptSettings(
+      accessToken: accessToken,
+      settings: settings,
+      lastOrderMinutes: lastOrderMinutes,
+    );
+  }
+
+  @override
   Future<FoodMenuItem> createCatalogItem({
     required String accessToken,
     required String name,
@@ -62,12 +155,35 @@ class MerchantOrdersRepositoryImpl implements MerchantOrdersRepository {
     required String itemId,
     String? name,
     int? priceVnd,
+    bool? available,
+    String? description,
+    int? prepMinutes,
+    String? imageUrl,
+    String? menuCategoryId,
   }) {
     return _remote.updateCatalogItem(
       accessToken: accessToken,
       itemId: itemId,
       name: name,
       priceVnd: priceVnd,
+      available: available,
+      description: description,
+      prepMinutes: prepMinutes,
+      imageUrl: imageUrl,
+      menuCategoryId: menuCategoryId,
+    );
+  }
+
+  @override
+  Future<FoodMenuItem> replaceItemOptions({
+    required String accessToken,
+    required String itemId,
+    required List<FoodOptionGroup> groups,
+  }) {
+    return _remote.replaceItemOptions(
+      accessToken: accessToken,
+      itemId: itemId,
+      groups: groups,
     );
   }
 
@@ -83,4 +199,88 @@ class MerchantOrdersRepositoryImpl implements MerchantOrdersRepository {
       available: available,
     );
   }
+
+  @override
+  Future<List<MerchantMenuCategory>> listMenuCategories(String accessToken) =>
+      _remote.listMenuCategories(accessToken);
+
+  @override
+  Future<MerchantMenuCategory> createMenuCategory({
+    required String accessToken,
+    required String name,
+    String? description,
+  }) =>
+      _remote.createMenuCategory(
+        accessToken: accessToken,
+        name: name,
+        description: description,
+      );
+
+  @override
+  Future<MerchantMenuCategory> updateMenuCategory({
+    required String accessToken,
+    required String categoryId,
+    required String name,
+    String? description,
+  }) =>
+      _remote.updateMenuCategory(
+        accessToken: accessToken,
+        categoryId: categoryId,
+        name: name,
+        description: description,
+      );
+
+  @override
+  Future<void> deleteMenuCategory({
+    required String accessToken,
+    required String categoryId,
+  }) =>
+      _remote.deleteMenuCategory(
+        accessToken: accessToken,
+        categoryId: categoryId,
+      );
+
+  @override
+  Future<MerchantHistoryPage> listOrderHistory({
+    required String accessToken,
+    int page = 1,
+    int limit = 20,
+    String? tab,
+    String? q,
+  }) =>
+      _remote.listOrderHistory(
+        accessToken: accessToken,
+        page: page,
+        limit: limit,
+        tab: tab,
+        q: q,
+      );
+
+  @override
+  Future<List<MerchantMenuCategory>> reorderMenuCategories({
+    required String accessToken,
+    required List<String> orderedIds,
+  }) =>
+      _remote.reorderMenuCategories(accessToken: accessToken, orderedIds: orderedIds);
+
+  @override
+  Future<FoodMenuItem> uploadItemImage({
+    required String accessToken,
+    required String itemId,
+    required String contentBase64,
+    String? contentType,
+  }) =>
+      _remote.uploadItemImage(
+        accessToken: accessToken,
+        itemId: itemId,
+        contentBase64: contentBase64,
+        contentType: contentType,
+      );
+
+  @override
+  Future<FoodMenuItem> clearItemImage({
+    required String accessToken,
+    required String itemId,
+  }) =>
+      _remote.clearItemImage(accessToken: accessToken, itemId: itemId);
 }

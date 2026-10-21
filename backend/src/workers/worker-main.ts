@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { loadEnv } from '../platform/config/index.js';
 import { WorkersModule } from './workers.module.js';
 
@@ -11,6 +12,9 @@ import { WorkersModule } from './workers.module.js';
       isGlobal: true,
       validate: (config) => loadEnv(config),
     }),
+    // No HTTP here; this only satisfies ThrottlerGuard DI on controllers pulled in
+    // through RideModule -> IdentityModule. Without it the worker fails to boot.
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 1_000 }]),
     WorkersModule,
   ],
 })

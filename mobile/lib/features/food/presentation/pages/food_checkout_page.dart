@@ -13,6 +13,8 @@ import '../widgets/food_checkout_widgets.dart';
 import 'food_order_success_page.dart';
 import '../utils/food_routes.dart';
 import '../widgets/food_widgets.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 class FoodCheckoutPage extends StatelessWidget {
   const FoodCheckoutPage({super.key});
@@ -120,18 +122,25 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
       }
       setState(() {
         _busy = false;
-        _phase = checkoutFailurePhase(error, attempt);
+        _phase = checkoutFailurePhase(
+          error,
+          attempt,
+          AppLocalizations.of(context),
+        );
       });
     }
   }
 
-  Future<void> _openSuccess(PlacedFoodOrder order, CheckoutHeldAttempt attempt) async {
+  Future<void> _openSuccess(
+    PlacedFoodOrder order,
+    CheckoutHeldAttempt attempt,
+  ) async {
     await context.push(
       FoodRoutes.orderSuccess,
       extra: FoodOrderSuccessArgs(
         order: order,
         storeName: attempt.storeName,
-        storeAddress: '123 Lê Lợi, Hải Châu, Đà Nẵng',
+        storeAddress: null,
       ),
     );
   }
@@ -160,17 +169,15 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
     final next = cart.state;
     if (!next.canCheckout) {
       setState(() {
-        _phase = const CheckoutRejected(
-          'Thực đơn vừa đổi và không còn món đã chọn.',
+        _phase = CheckoutRejected(
+          AppLocalizations.of(context).checkoutMenuChangedEmpty,
         );
       });
       return;
     }
     final token = currentAccessToken(context);
     if (token == null) {
-      setState(
-        () => _phase = CheckoutRejected(sessionExpiredMessage(context)),
-      );
+      setState(() => _phase = CheckoutRejected(sessionExpiredMessage(context)));
       return;
     }
     _attempt = CheckoutHeldAttempt.fromCart(next, token);
@@ -185,22 +192,23 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
       canPop: !submitting,
       child: Scaffold(
         backgroundColor: DealGoColors.canvas,
+        extendBody: true,
         body: SafeArea(
           bottom: false,
           child: Column(
             children: [
-              FoodScreenHeader(
+              DealGoAppHeader(
                 title: switch (phase) {
-                  CheckoutSubmitting() => 'Đang xác nhận đơn',
-                  CheckoutOffline() => 'Thanh toán đơn hàng',
-                  CheckoutRepriced() => 'Xác nhận lại giỏ hàng',
-                  _ => 'Thanh toán đơn đồ ăn',
-                },
-                subtitle: switch (phase) {
-                  CheckoutEditing() => null,
-                  CheckoutPlaced() => null,
-                  CheckoutRejected() => null,
-                  _ => 'DealGo · Biến thể trạng thái',
+                  CheckoutSubmitting() => AppLocalizations.of(
+                    context,
+                  ).checkoutTitleSubmitting,
+                  CheckoutOffline() => AppLocalizations.of(
+                    context,
+                  ).checkoutTitleOffline,
+                  CheckoutRepriced() => AppLocalizations.of(
+                    context,
+                  ).checkoutTitleRepriced,
+                  _ => AppLocalizations.of(context).checkoutTitle,
                 },
                 onBack: submitting ? () {} : null,
               ),

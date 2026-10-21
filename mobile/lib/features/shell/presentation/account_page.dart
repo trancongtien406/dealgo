@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/config/api_base_url.dart';
 import '../../../core/design_system/components/dealgo_card.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../identity/domain/entities/app_role.dart';
@@ -15,17 +16,20 @@ import '../../onboarding/presentation/utils/driver_kyc_routes.dart';
 import '../../onboarding/presentation/cubit/merchant_kyb_cubit.dart';
 import '../../onboarding/presentation/utils/merchant_kyb_routes.dart';
 import '../../merchant/presentation/utils/merchant_routes.dart';
+import '../../../l10n/app_localizations.dart';
 import 'account_routes.dart';
-import 'address_draft_cubit.dart';
+import 'customer_tab_bar.dart';
+import '../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../core/design_system/components/dealgo_app_header.dart';
 
-String accountShellRoleLabel(String shellPath) {
+String accountShellRoleLabel(AppLocalizations l10n, String shellPath) {
   if (shellPath.startsWith('/merchant')) {
-    return 'Shop';
+    return l10n.accountRoleShop;
   }
   if (shellPath.startsWith('/driver')) {
-    return 'Tài xế';
+    return l10n.roleDriver;
   }
-  return 'Khách hàng';
+  return l10n.roleCustomer;
 }
 
 class AccountPage extends StatelessWidget {
@@ -40,7 +44,10 @@ class AccountPage extends StatelessWidget {
     final phone = signedIn?.profile.phone;
     final canSwitchRole =
         signedIn != null && signedIn.profile.activeAppRoles.length > 1;
-    final roleLabel = accountShellRoleLabel(shellPath);
+    final roleLabel = accountShellRoleLabel(
+      AppLocalizations.of(context),
+      shellPath,
+    );
     final textTheme = Theme.of(context).textTheme;
     final partnerRows = _partnerOnboardingRows(
       context,
@@ -51,130 +58,207 @@ class AccountPage extends StatelessWidget {
     return ColoredBox(
       color: DealGoColors.canvas,
       child: SafeArea(
-        bottom: false,
+        bottom: dealGoSafeAreaBottom(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Material(
-              color: DealGoColors.card,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  DealGoDimensions.pageGutter,
-                  DealGoSpacing.s12,
-                  DealGoDimensions.pageGutter,
-                  DealGoSpacing.s12,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text('Tài khoản', style: textTheme.titleLarge),
-                    ),
-                    IconButton(
-                      tooltip: 'Thông báo',
-                      onPressed: () =>
-                          context.push(AccountRoutes.notifications(shellPath)),
-                      icon: const Icon(Icons.notifications_none_outlined),
-                      color: DealGoColors.text,
-                    ),
-                  ],
+            DealGoAppHeader(
+              title: AppLocalizations.of(context).accountTitle,
+              showBack: false,
+              actions: IconButton(
+                tooltip: AppLocalizations.of(context).accountNotifications,
+                onPressed: () =>
+                    context.push(AccountRoutes.notifications(shellPath)),
+                icon: const Icon(
+                  DealGoIcons.notifications,
+                  color: DealGoColors.text,
                 ),
               ),
             ),
+            const Divider(height: 1, color: DealGoColors.divider),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(
+                padding: EdgeInsets.fromLTRB(
                   DealGoDimensions.pageGutter,
                   DealGoSpacing.s16,
                   DealGoDimensions.pageGutter,
-                  DealGoSpacing.s24,
+                  DealGoSpacing.s24 +
+                      (shellPath.startsWith('/customer')
+                          ? customerShellBottomClearance(context)
+                          : MediaQuery.viewPaddingOf(context).bottom),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _ProfileCard(phone: phone, roleLabel: roleLabel),
+                    _ProfileCard(
+                      phone: phone,
+                      roleLabel: roleLabel,
+                      avatarUrl: resolveMediaUrl(signedIn?.profile.avatarUrl),
+                      onTap: signedIn == null
+                          ? null
+                          : () => context.push(
+                              AccountRoutes.editProfile(shellPath),
+                            ),
+                    ),
                     const SizedBox(height: DealGoSpacing.s12),
-                    const _MenuRow(
-                      icon: Icons.card_giftcard_outlined,
-                      title: 'Ưu đãi của tôi',
-                      subtitle: 'Các mã giảm giá đang có',
-                      trailing: _LinkLabel('Xem tất cả →'),
-                      showChevron: false,
+                    _MenuGroup(
+                      children: [
+                        _MenuRow(
+                          icon: DealGoIcons.gift,
+                          title: AppLocalizations.of(context).accountVouchers,
+                          subtitle: AppLocalizations.of(context)
+                              .accountVouchersBody,
+                          trailing: _LinkLabel(
+                            AppLocalizations.of(context).actionSeeAll,
+                          ),
+                          showChevron: false,
+                          onTap: () =>
+                              context.push(AccountRoutes.vouchers(shellPath)),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: DealGoSpacing.s20),
-                    Text('Tài khoản và dịch vụ', style: textTheme.titleMedium),
-                    const SizedBox(height: DealGoSpacing.s12),
-                    const _MenuRow(
-                      icon: Icons.format_list_bulleted,
-                      title: 'Hoạt động của tôi',
-                      subtitle: 'Chuyến đi và đơn hàng',
+                    Text(
+                      AppLocalizations.of(context).accountSectionServices,
+                      style: textTheme.titleMedium,
                     ),
                     const SizedBox(height: DealGoSpacing.s12),
-                    _MenuRow(
-                      icon: Icons.place_outlined,
-                      title: 'Địa chỉ đã lưu',
-                      subtitle: 'Nhà riêng, công ty và địa chỉ khác',
-                      onTap: () =>
-                          context.push(AccountRoutes.addresses(shellPath)),
+                    _MenuGroup(
+                      children: [
+                        _MenuRow(
+                          icon: DealGoIcons.list,
+                          title: AppLocalizations.of(context).accountActivity,
+                          subtitle: AppLocalizations.of(context)
+                              .accountActivityBody,
+                          onTap: () => context.go(_activityPath(shellPath)),
+                        ),
+                        _MenuRow(
+                          icon: DealGoIcons.pin,
+                          title: AppLocalizations.of(context).accountAddresses,
+                          subtitle: AppLocalizations.of(context)
+                              .accountAddressesBody,
+                          onTap: () =>
+                              context.push(AccountRoutes.addresses(shellPath)),
+                        ),
+                        _MenuRow(
+                          icon: DealGoIcons.card,
+                          title: AppLocalizations.of(context).accountPayments,
+                          subtitle: AppLocalizations.of(context)
+                              .accountPaymentsBody,
+                          onTap: () =>
+                              context.push(AccountRoutes.payments(shellPath)),
+                        ),
+                        _MenuRow(
+                          icon: DealGoIcons.user,
+                          title: AppLocalizations.of(context).accountRoles,
+                          subtitle: roleLabel,
+                          trailing: canSwitchRole
+                              ? _LinkLabel(
+                                  AppLocalizations.of(context)
+                                      .accountSwitchRole,
+                                )
+                              : null,
+                          onTap: signedIn != null
+                              ? () => context.push(AuthRoutes.roles)
+                              : null,
+                        ),
+                        ...partnerRows,
+                        if (shellPath.startsWith('/merchant')) ...[
+                          _MenuRow(
+                            icon: DealGoIcons.filter,
+                            title: AppLocalizations.of(context)
+                                .accountAcceptMode,
+                            subtitle: AppLocalizations.of(context)
+                                .accountAcceptModeBody,
+                            onTap: () =>
+                                context.push(MerchantRoutes.acceptSettings),
+                          ),
+                          _MenuRow(
+                            icon: DealGoIcons.clock,
+                            title: AppLocalizations.of(context).accountHours,
+                            subtitle: AppLocalizations.of(context)
+                                .accountHoursBody,
+                            onTap: () => context.push(MerchantRoutes.hours),
+                          ),
+                          _MenuRow(
+                            key: const Key('account-store-profile'),
+                            icon: DealGoIcons.restaurant,
+                            title: AppLocalizations.of(context)
+                                .merchantProfileTitle,
+                            subtitle: AppLocalizations.of(context)
+                                .accountStoreProfileBody,
+                            onTap: () => context.push(MerchantRoutes.profile),
+                          ),
+                          _MenuRow(
+                            icon: DealGoIcons.pin,
+                            title: AppLocalizations.of(context)
+                                .merchantLocationTitle,
+                            subtitle: AppLocalizations.of(context)
+                                .accountStoreLocationBody,
+                            onTap: () => context.push(MerchantRoutes.location),
+                          ),
+                          _MenuRow(
+                            icon: DealGoIcons.pause,
+                            title: AppLocalizations.of(context).accountBusy,
+                            subtitle: AppLocalizations.of(context)
+                                .accountBusyBody,
+                            onTap: () => context.push(MerchantRoutes.busy),
+                          ),
+                        ],
+                      ],
                     ),
-                    const SizedBox(height: DealGoSpacing.s12),
-                    _MenuRow(
-                      icon: Icons.credit_card_outlined,
-                      title: 'Lịch sử thanh toán',
-                      subtitle: 'Biên nhận và hoàn tiền (fixture)',
-                      onTap: () =>
-                          context.push(AccountRoutes.payments(shellPath)),
-                    ),
-                    const SizedBox(height: DealGoSpacing.s12),
-                    _MenuRow(
-                      icon: Icons.person_outline,
-                      title: 'Trung tâm vai trò',
-                      subtitle: roleLabel,
-                      trailing: canSwitchRole
-                          ? const _LinkLabel('Đổi vai trò')
-                          : null,
-                      onTap: signedIn != null
-                          ? () => context.push(AuthRoutes.roles)
-                          : null,
-                    ),
-                    for (final row in partnerRows) ...[
-                      const SizedBox(height: DealGoSpacing.s12),
-                      row,
-                    ],
-                    if (shellPath.startsWith('/merchant')) ...[
-                      const SizedBox(height: DealGoSpacing.s12),
-                      _MenuRow(
-                        icon: Icons.tune,
-                        title: 'Nhận đơn auto/manual',
-                        subtitle: 'Cấu hình trên thiết bị (mock)',
-                        onTap: () =>
-                            context.push(MerchantRoutes.acceptSettings),
-                      ),
-                      const SizedBox(height: DealGoSpacing.s12),
-                      _MenuRow(
-                        icon: Icons.schedule,
-                        title: 'Giờ hoạt động',
-                        subtitle: 'Lịch mở cửa / nghỉ',
-                        onTap: () => context.push(MerchantRoutes.hours),
-                      ),
-                      const SizedBox(height: DealGoSpacing.s12),
-                      _MenuRow(
-                        icon: Icons.pause_circle_outline,
-                        title: 'Chế độ bận',
-                        subtitle: 'Tạm ngưng nhận đơn',
-                        onTap: () => context.push(MerchantRoutes.busy),
-                      ),
-                    ],
                     const SizedBox(height: DealGoSpacing.s20),
-                    Text('Trợ giúp và cài đặt', style: textTheme.titleMedium),
-                    const SizedBox(height: DealGoSpacing.s12),
-                    _MenuRow(
-                      icon: Icons.help_outline,
-                      title: 'Trung tâm hỗ trợ',
-                      subtitle: 'Câu hỏi thường gặp và khiếu nại',
-                      onTap: () => context.push(AccountRoutes.help(shellPath)),
+                    Text(
+                      AppLocalizations.of(context).accountSectionHelp,
+                      style: textTheme.titleMedium,
                     ),
                     const SizedBox(height: DealGoSpacing.s12),
-                    const _LogoutRow(),
+                    _MenuGroup(
+                      children: [
+                        _MenuRow(
+                          icon: DealGoIcons.help,
+                          title: AppLocalizations.of(context).accountSupport,
+                          subtitle: AppLocalizations.of(context)
+                              .accountSupportBody,
+                          onTap: () =>
+                              context.push(AccountRoutes.help(shellPath)),
+                        ),
+                        if (signedIn != null) ...[
+                          _MenuRow(
+                            key: const ValueKey('account-notif-row'),
+                            icon: DealGoIcons.notifications,
+                            title: AppLocalizations.of(context)
+                                .accountNotifPrefs,
+                            subtitle: AppLocalizations.of(context)
+                                .accountNotifPrefsBody,
+                            onTap: () => context.push(
+                              AccountRoutes.notificationPrefs(shellPath),
+                            ),
+                          ),
+                          _MenuRow(
+                            key: const ValueKey('account-security-row'),
+                            icon: DealGoIcons.shield,
+                            title: AppLocalizations.of(context).accountSecurity,
+                            subtitle: AppLocalizations.of(context)
+                                .accountSecurityBody,
+                            onTap: () =>
+                                context.push(AccountRoutes.security(shellPath)),
+                          ),
+                          _MenuRow(
+                            key: const ValueKey('account-delete-row'),
+                            icon: DealGoIcons.deleteAccount,
+                            title: AppLocalizations.of(context)
+                                .accountDeleteRow,
+                            subtitle: AppLocalizations.of(context)
+                                .accountDeleteRowBody,
+                            onTap: () => context.push(
+                              AccountRoutes.deleteAccount(shellPath),
+                            ),
+                          ),
+                        ],
+                        const _LogoutRow(),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -210,40 +294,53 @@ List<Widget> _partnerOnboardingRows(
 
 Widget _driverOnboardingRow(BuildContext context, UserProfile? profile) {
   final cubit = context.watch<DriverKycCubit>();
+  final l10n = AppLocalizations.of(context);
   final status = cubit.state.seeded
       ? cubit.state.status
       : _statusFromGrant(profile?.grantStatus(AppRole.driver));
   return _MenuRow(
-    icon: Icons.badge_outlined,
-    title: 'Hồ sơ đối tác tài xế',
-    subtitle: _partnerStatusLabel(status),
-    trailing: _LinkLabel(_partnerActionLabel(status)),
+    icon: DealGoIcons.idCard,
+    title: l10n.accountDriverPartner,
+    subtitle: _partnerStatusLabel(l10n, status),
+    trailing: _LinkLabel(_partnerActionLabel(l10n, status)),
     onTap: () {
       if (profile != null) {
         cubit.seedFromProfile(profile);
       }
-      context.push(DriverKycRoutes.root);
+      // Skip the gate spinner — open the screen matching known grant status.
+      context.push(DriverKycRoutes.entryFromCubit(cubit));
     },
   );
 }
 
 Widget _merchantOnboardingRow(BuildContext context, UserProfile? profile) {
   final cubit = context.watch<MerchantKybCubit>();
+  final l10n = AppLocalizations.of(context);
   final status = cubit.state.seeded
       ? cubit.state.status
       : _statusFromGrant(profile?.grantStatus(AppRole.merchant));
   return _MenuRow(
-    icon: Icons.storefront_outlined,
-    title: 'Hồ sơ đối tác Shop',
-    subtitle: _partnerStatusLabel(status),
-    trailing: _LinkLabel(_partnerActionLabel(status)),
+    icon: DealGoIcons.store,
+    title: l10n.accountShopPartner,
+    subtitle: _partnerStatusLabel(l10n, status),
+    trailing: _LinkLabel(_partnerActionLabel(l10n, status)),
     onTap: () {
       if (profile != null) {
         cubit.seedFromProfile(profile);
       }
-      context.push(MerchantKybRoutes.root);
+      context.push(MerchantKybRoutes.entryFromCubit(cubit));
     },
   );
+}
+
+String _activityPath(String shellPath) {
+  if (shellPath.startsWith('/driver')) {
+    return '/driver/jobs';
+  }
+  if (shellPath.startsWith('/merchant')) {
+    return '/merchant/orders';
+  }
+  return '/customer/trips';
 }
 
 PartnerApplicationStatus _statusFromGrant(String? grant) {
@@ -255,92 +352,143 @@ PartnerApplicationStatus _statusFromGrant(String? grant) {
   };
 }
 
-String _partnerStatusLabel(PartnerApplicationStatus status) {
+String _partnerStatusLabel(
+  AppLocalizations l10n,
+  PartnerApplicationStatus status,
+) {
   return switch (status) {
-    PartnerApplicationStatus.draft => 'Chưa gửi xét duyệt',
-    PartnerApplicationStatus.pending => 'Đang thẩm định',
-    PartnerApplicationStatus.rejected => 'Cần bổ sung hồ sơ',
-    PartnerApplicationStatus.active => 'Đã kích hoạt',
+    PartnerApplicationStatus.draft => l10n.partnerStatusDraft,
+    PartnerApplicationStatus.pending => l10n.partnerStatusPending,
+    PartnerApplicationStatus.rejected => l10n.partnerStatusRejected,
+    PartnerApplicationStatus.active => l10n.partnerStatusActive,
   };
 }
 
-String _partnerActionLabel(PartnerApplicationStatus status) {
+String _partnerActionLabel(
+  AppLocalizations l10n,
+  PartnerApplicationStatus status,
+) {
   return switch (status) {
-    PartnerApplicationStatus.draft => 'Đăng ký',
-    PartnerApplicationStatus.pending => 'Theo dõi',
-    PartnerApplicationStatus.rejected => 'Bổ sung',
-    PartnerApplicationStatus.active => 'Xem',
+    PartnerApplicationStatus.draft => l10n.partnerActionRegister,
+    PartnerApplicationStatus.pending => l10n.partnerActionTrack,
+    PartnerApplicationStatus.rejected => l10n.partnerActionUpdate,
+    PartnerApplicationStatus.active => l10n.partnerActionView,
   };
 }
 
 class _ProfileCard extends StatelessWidget {
-  const _ProfileCard({required this.phone, required this.roleLabel});
+  const _ProfileCard({
+    required this.phone,
+    required this.roleLabel,
+    this.avatarUrl,
+    this.onTap,
+  });
 
   final String? phone;
+  final String? avatarUrl;
   final String roleLabel;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final shownPhone = phone;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(DealGoRadius.card),
-        gradient: const LinearGradient(
-          colors: [DealGoColors.subtlePurple, Color(0xFFEFFAF3)],
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(DealGoSpacing.s16),
-        child: Row(
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                color: DealGoColors.card,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.person,
-                color: DealGoColors.primary,
-                size: 32,
-              ),
+    return DealGoCard(
+      onTap: onTap,
+      color: DealGoColors.subtlePurple,
+      borderColor: DealGoColors.border,
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            alignment: Alignment.center,
+            clipBehavior: Clip.antiAlias,
+            decoration: const BoxDecoration(
+              color: DealGoColors.card,
+              shape: BoxShape.circle,
             ),
-            const SizedBox(width: DealGoSpacing.s12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (shownPhone != null && shownPhone.isNotEmpty) ...[
-                    Text(shownPhone, style: textTheme.titleMedium),
-                    const SizedBox(height: DealGoSpacing.s8),
-                  ],
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: DealGoColors.greenSurface,
-                      borderRadius: BorderRadius.circular(999),
+            child: avatarUrl == null
+                ? const Icon(
+                    DealGoIcons.user,
+                    color: DealGoColors.primary,
+                    size: 32,
+                  )
+                : Image.network(
+                    avatarUrl!,
+                    key: const Key('account-avatar'),
+                    width: 56,
+                    height: 56,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const Icon(
+                      DealGoIcons.user,
+                      color: DealGoColors.primary,
+                      size: 32,
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: DealGoSpacing.s12,
-                        vertical: DealGoSpacing.s4,
-                      ),
-                      child: Text(
-                        roleLabel,
-                        style: textTheme.labelSmall?.copyWith(
-                          color: DealGoColors.brandGreen,
-                          fontWeight: FontWeight.w600,
-                        ),
+                  ),
+          ),
+          const SizedBox(width: DealGoSpacing.s12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (shownPhone != null && shownPhone.isNotEmpty) ...[
+                  Text(shownPhone, style: textTheme.titleMedium),
+                  const SizedBox(height: DealGoSpacing.s8),
+                ],
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: DealGoColors.greenSurface,
+                    borderRadius: BorderRadius.circular(DealGoRadius.pill),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: DealGoSpacing.s12,
+                      vertical: DealGoSpacing.s4,
+                    ),
+                    child: Text(
+                      roleLabel,
+                      style: textTheme.labelSmall?.copyWith(
+                        color: DealGoColors.brandGreen,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
+          ),
+          if (onTap != null)
+            const Icon(
+              DealGoIcons.chevronRight,
+              color: DealGoColors.textSecondary,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MenuGroup extends StatelessWidget {
+  const _MenuGroup({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    if (children.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return DealGoCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0)
+              const Divider(height: 1, indent: 68, color: DealGoColors.divider),
+            children[i],
           ],
-        ),
+        ],
       ),
     );
   }
@@ -367,6 +515,7 @@ class _LinkLabel extends StatelessWidget {
 class _MenuRow extends StatelessWidget {
   const _MenuRow({
     required this.icon,
+    super.key,
     required this.title,
     required this.subtitle,
     this.trailing,
@@ -384,34 +533,43 @@ class _MenuRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return DealGoCard(
-      onTap: onTap,
-      child: Row(
-        children: [
-          _IconBadge(icon: icon),
-          const SizedBox(width: DealGoSpacing.s12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: textTheme.titleMedium?.copyWith(fontSize: 16),
+    return Material(
+      color: DealGoColors.card,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(DealGoSpacing.s16),
+          child: Row(
+            children: [
+              _IconBadge(icon: icon),
+              const SizedBox(width: DealGoSpacing.s12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: textTheme.titleMedium?.copyWith(fontSize: 16),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: textTheme.bodySmall),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(subtitle, style: textTheme.bodySmall),
+              ),
+              if (trailing != null) ...[
+                const SizedBox(width: DealGoSpacing.s8),
+                trailing!,
               ],
-            ),
+              if (showChevron) ...[
+                const SizedBox(width: DealGoSpacing.s4),
+                const Icon(
+                  DealGoIcons.chevronRight,
+                  color: DealGoColors.textSecondary,
+                ),
+              ],
+            ],
           ),
-          if (trailing != null) ...[
-            const SizedBox(width: DealGoSpacing.s8),
-            trailing!,
-          ],
-          if (showChevron) ...[
-            const SizedBox(width: DealGoSpacing.s4),
-            const Icon(Icons.chevron_right, color: DealGoColors.textSecondary),
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -452,7 +610,6 @@ class _LogoutRowState extends State<_LogoutRow> {
       return;
     }
     setState(() => _signingOut = true);
-    context.read<AddressDraftCubit>().clear();
     final auth = context.read<AuthCubit>();
     await auth.signOut();
     if (!mounted) {
@@ -464,44 +621,50 @@ class _LogoutRowState extends State<_LogoutRow> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return DealGoCard(
-      onTap: _signingOut ? null : _logout,
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: DealGoColors.dangerSurface,
-              shape: BoxShape.circle,
-            ),
-            child: _signingOut
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: DealGoColors.danger,
-                    ),
-                  )
-                : const Icon(
-                    Icons.logout,
-                    color: DealGoColors.danger,
-                    size: 22,
-                  ),
-          ),
-          const SizedBox(width: DealGoSpacing.s12),
-          Expanded(
-            child: Text(
-              'Đăng xuất',
-              style: textTheme.titleMedium?.copyWith(
-                fontSize: 16,
-                color: DealGoColors.danger,
+    return Material(
+      color: DealGoColors.card,
+      child: InkWell(
+        onTap: _signingOut ? null : _logout,
+        child: Padding(
+          padding: const EdgeInsets.all(DealGoSpacing.s16),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: DealGoColors.dangerSurface,
+                  shape: BoxShape.circle,
+                ),
+                child: _signingOut
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: DealGoColors.danger,
+                        ),
+                      )
+                    : const Icon(
+                        DealGoIcons.logout,
+                        color: DealGoColors.danger,
+                        size: 22,
+                      ),
               ),
-            ),
+              const SizedBox(width: DealGoSpacing.s12),
+              Expanded(
+                child: Text(
+                  AppLocalizations.of(context).accountSignOut,
+                  style: textTheme.titleMedium?.copyWith(
+                    fontSize: 16,
+                    color: DealGoColors.danger,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

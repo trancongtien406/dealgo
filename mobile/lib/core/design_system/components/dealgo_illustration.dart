@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../tokens/dealgo_tokens.dart';
+import '../icons/dealgo_icons.dart';
 
 class DealGoIllustration extends StatelessWidget {
   const DealGoIllustration(this.asset, {this.width, this.height, super.key});
@@ -20,7 +21,7 @@ class DealGoIllustration extends StatelessWidget {
       excludeFromSemantics: true,
       errorBuilder: (context, error, stackTrace) {
         return Icon(
-          Icons.two_wheeler,
+          DealGoIcons.motorbike,
           size: (height ?? width ?? 48) * 0.55,
           color: DealGoColors.primary,
         );

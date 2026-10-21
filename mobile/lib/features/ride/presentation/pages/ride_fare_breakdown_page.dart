@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/components/dealgo_banner.dart';
-import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
@@ -10,6 +9,9 @@ import '../../domain/entities/ride_money.dart';
 import '../../domain/entities/ride_vehicle.dart';
 import '../utils/ride_routes.dart';
 import '../widgets/ride_widgets.dart';
+import 'ride_route_overview_page.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 /// C005 — illustrative fare components before customer proposes a bid (C006).
 class RideFareBreakdownPage extends StatelessWidget {
@@ -33,16 +35,18 @@ class RideFareBreakdownPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
-    final total = draft.suggestedFareVnd;
-    // Fixture split matching C005 mock — not an OPEN fee policy.
-    final base = (total * 0.6).round();
-    final distance = total - base;
+    final quote = draft.places.quote;
+    if (quote == null) {
+      // Opened without a quote (deep link): price the route first.
+      return RideRouteOverviewPage(places: draft.places);
+    }
+    final total = quote.referenceFareVnd;
     return Scaffold(
       backgroundColor: DealGoColors.canvas,
       body: SafeArea(
         child: Column(
           children: [
-            RideScreenHeader(
+            DealGoAppHeader(
               title: l10n.rideFareBreakdownTitle,
               onBack: () => _back(context),
             ),
@@ -75,7 +79,7 @@ class RideFareBreakdownPage extends StatelessWidget {
                               width: 56,
                               height: 56,
                               child: Icon(
-                                Icons.directions_car_filled,
+                                DealGoIcons.motorbike,
                                 color: DealGoColors.primary,
                               ),
                             ),
@@ -86,7 +90,7 @@ class RideFareBreakdownPage extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '${draft.vehicleLabel} · Toyota Vios',
+                                  l10n.rideVehicleBikeTitle,
                                   style: textTheme.titleMedium,
                                 ),
                                 const SizedBox(height: DealGoSpacing.s8),
@@ -100,11 +104,6 @@ class RideFareBreakdownPage extends StatelessWidget {
                                     color: DealGoColors.primary,
                                     fontWeight: FontWeight.w800,
                                   ),
-                                ),
-                                const SizedBox(height: DealGoSpacing.s8),
-                                DealGoChip(
-                                  label: l10n.rideFareVersionChip,
-                                  tone: DealGoChipTone.success,
                                 ),
                               ],
                             ),
@@ -121,26 +120,29 @@ class RideFareBreakdownPage extends StatelessWidget {
                         RideSectionTitle(l10n.rideFareComponentsTitle),
                         const SizedBox(height: DealGoSpacing.s12),
                         RideMoneyLine(
-                          label: l10n.rideFareBase,
-                          amount: formatRideVnd(base),
+                          label: l10n.rideRouteDistance,
+                          amount: l10n.rideDistanceKm(
+                            quote.distanceKm
+                                .toStringAsFixed(1)
+                                .replaceAll('.', ','),
+                          ),
                         ),
                         RideMoneyLine(
-                          label: l10n.rideFareDistance,
-                          amount: formatRideVnd(distance),
-                        ),
-                        RideMoneyLine(
-                          label: l10n.rideFareSurcharge,
-                          amount: formatRideVnd(0),
-                        ),
-                        RideMoneyLine(
-                          label: l10n.rideFareDiscount,
-                          amount: formatRideVnd(0),
+                          label: l10n.rideFareAllowedRange,
+                          amount:
+                              '${formatRideVnd(quote.minFareVnd)} – ${formatRideVnd(quote.maxFareVnd)}',
                         ),
                         const Divider(height: DealGoSpacing.s24),
                         RideMoneyLine(
-                          label: l10n.rideFareProposedTotal,
+                          key: const Key('ride-breakdown-reference'),
+                          label: l10n.rideRouteRefPrice,
                           amount: formatRideVnd(total),
                           emphasize: true,
+                        ),
+                        const SizedBox(height: DealGoSpacing.s8),
+                        Text(
+                          l10n.rideFareReferenceExplain,
+                          style: textTheme.bodySmall,
                         ),
                       ],
                     ),
@@ -177,7 +179,7 @@ class RideFareBreakdownPage extends StatelessWidget {
               child: DealGoPrimaryButton(
                 key: const Key('ride-open-fare-bid'),
                 label: l10n.rideFareProposeCta,
-                trailingIcon: Icons.arrow_forward,
+                trailingIcon: DealGoIcons.arrowRight,
                 onPressed: () => _continue(context),
               ),
             ),

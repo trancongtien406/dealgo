@@ -17,6 +17,8 @@ export type NestOpsCustomer = {
   emailVerifiedAt: string | null;
   createdAt: string;
   grants: NestOpsUserGrant[];
+  /** S027 (DEC-PROD-037): null/absent = active account. */
+  deletion?: unknown;
 };
 
 export type NestOpsCustomerPage = {

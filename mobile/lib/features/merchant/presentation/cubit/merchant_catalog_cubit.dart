@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/l10n/ui_message.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../food/domain/entities/food_models.dart';
 import '../../domain/params/create_merchant_catalog_item_params.dart';
@@ -20,12 +21,12 @@ final class MerchantCatalogReady extends MerchantCatalogState {
   const MerchantCatalogReady(this.store, {this.actionError, this.busyItemId});
 
   final FoodStoreDetail store;
-  final String? actionError;
+  final UiMessage? actionError;
   final String? busyItemId;
 
   MerchantCatalogReady copyWith({
     FoodStoreDetail? store,
-    String? actionError,
+    UiMessage? actionError,
     String? busyItemId,
     bool clearActionError = false,
     bool clearBusyItemId = false,
@@ -41,18 +42,15 @@ final class MerchantCatalogReady extends MerchantCatalogState {
 final class MerchantCatalogFailed extends MerchantCatalogState {
   const MerchantCatalogFailed(this.message);
 
-  final String message;
+  final UiMessage message;
 }
 
 class MerchantCatalogCubit extends Cubit<MerchantCatalogState> {
   MerchantCatalogCubit({
-    required GetMerchantCatalog getMerchantCatalog,
-    required CreateMerchantCatalogItem createMerchantCatalogItem,
-    required SetMerchantItemAvailability setMerchantItemAvailability,
-  }) : _getMerchantCatalog = getMerchantCatalog,
-       _createMerchantCatalogItem = createMerchantCatalogItem,
-       _setMerchantItemAvailability = setMerchantItemAvailability,
-       super(const MerchantCatalogLoading());
+    required this._getMerchantCatalog,
+    required this._createMerchantCatalogItem,
+    required this._setMerchantItemAvailability,
+  }) : super(const MerchantCatalogLoading());
 
   final GetMerchantCatalog _getMerchantCatalog;
   final CreateMerchantCatalogItem _createMerchantCatalogItem;
@@ -61,7 +59,7 @@ class MerchantCatalogCubit extends Cubit<MerchantCatalogState> {
   Future<void> load(String? accessToken) async {
     final token = accessToken?.trim() ?? '';
     if (token.isEmpty) {
-      emit(const MerchantCatalogFailed('Bạn cần đăng nhập lại.'));
+      emit(MerchantCatalogFailed(UiMessage((l10n) => l10n.errorSessionExpired)));
       return;
     }
     emit(const MerchantCatalogLoading());
@@ -72,11 +70,11 @@ class MerchantCatalogCubit extends Cubit<MerchantCatalogState> {
       }
     } on ApiException catch (error) {
       if (!isClosed) {
-        emit(MerchantCatalogFailed(error.message));
+        emit(MerchantCatalogFailed(UiMessage.error(error)));
       }
-    } catch (_) {
+    } catch (error) {
       if (!isClosed) {
-        emit(const MerchantCatalogFailed('Không thể kết nối máy chủ'));
+        emit(MerchantCatalogFailed(UiMessage.error(error)));
       }
     }
   }
@@ -92,7 +90,7 @@ class MerchantCatalogCubit extends Cubit<MerchantCatalogState> {
     }
     final token = accessToken?.trim() ?? '';
     if (token.isEmpty) {
-      emit(ready.copyWith(actionError: 'Bạn cần đăng nhập lại.'));
+      emit(ready.copyWith(actionError: UiMessage((l10n) => l10n.errorSessionExpired)));
       return;
     }
     emit(ready.copyWith(busyItemId: itemId, clearActionError: true));
@@ -116,16 +114,16 @@ class MerchantCatalogCubit extends Cubit<MerchantCatalogState> {
       if (!isClosed && state is MerchantCatalogReady) {
         emit(
           (state as MerchantCatalogReady).copyWith(
-            actionError: error.message,
+            actionError: UiMessage.error(error),
             clearBusyItemId: true,
           ),
         );
       }
-    } catch (_) {
+    } catch (error) {
       if (!isClosed && state is MerchantCatalogReady) {
         emit(
           (state as MerchantCatalogReady).copyWith(
-            actionError: 'Không thể cập nhật trạng thái món',
+            actionError: UiMessage.error(error, fallback: (l10n) => l10n.merchantItemUpdateFailed),
             clearBusyItemId: true,
           ),
         );
@@ -144,12 +142,12 @@ class MerchantCatalogCubit extends Cubit<MerchantCatalogState> {
     }
     final token = accessToken?.trim() ?? '';
     if (token.isEmpty) {
-      emit(ready.copyWith(actionError: 'Bạn cần đăng nhập lại.'));
+      emit(ready.copyWith(actionError: UiMessage((l10n) => l10n.errorSessionExpired)));
       return;
     }
     final trimmed = name.trim();
     if (trimmed.isEmpty || priceVnd < 1) {
-      emit(ready.copyWith(actionError: 'Tên món và giá không hợp lệ.'));
+      emit(ready.copyWith(actionError: UiMessage((l10n) => l10n.merchantItemInvalid)));
       return;
     }
     emit(ready.copyWith(busyItemId: '_create', clearActionError: true));
@@ -170,9 +168,7 @@ class MerchantCatalogCubit extends Cubit<MerchantCatalogState> {
       }
       emit(
         MerchantCatalogReady(
-          FoodStoreDetail(
-            id: current.store.id,
-            name: current.store.name,
+          current.store.copyWith(
             items: List.unmodifiable([...current.store.items, created]),
           ),
         ),
@@ -181,16 +177,16 @@ class MerchantCatalogCubit extends Cubit<MerchantCatalogState> {
       if (!isClosed && state is MerchantCatalogReady) {
         emit(
           (state as MerchantCatalogReady).copyWith(
-            actionError: error.message,
+            actionError: UiMessage.error(error),
             clearBusyItemId: true,
           ),
         );
       }
-    } catch (_) {
+    } catch (error) {
       if (!isClosed && state is MerchantCatalogReady) {
         emit(
           (state as MerchantCatalogReady).copyWith(
-            actionError: 'Không thể thêm món',
+            actionError: UiMessage.error(error, fallback: (l10n) => l10n.merchantItemCreateFailed),
             clearBusyItemId: true,
           ),
         );
@@ -206,9 +202,7 @@ class MerchantCatalogCubit extends Cubit<MerchantCatalogState> {
   }
 
   FoodStoreDetail _replaceItem(FoodStoreDetail store, FoodMenuItem updated) {
-    return FoodStoreDetail(
-      id: store.id,
-      name: store.name,
+    return store.copyWith(
       items: List.unmodifiable([
         for (final item in store.items)
           if (item.id == updated.id) updated else item,

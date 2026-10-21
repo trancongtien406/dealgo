@@ -3,12 +3,15 @@
 import { useMemo } from "react";
 import { useDriverDetailQuery } from "@/features/drivers/hooks";
 import {
+  completionRateLabel,
   driverActivityStatusLabel,
   driverActivityStatusTone,
   driverKycStatusLabel,
   driverKycStatusTone,
 } from "@/features/drivers/mappers";
 import { OpsIcon, type OpsIconName } from "@/components/ui/ops-icons";
+import { AccountDeletionCard } from "@/features/account-deletion/components/account-deletion-card";
+import { DriverFeeCard } from "@/features/account-deletion/components/driver-fee-card";
 import {
   AdminBreadcrumb,
   Avatar,
@@ -112,7 +115,7 @@ export function DriverDetail({ code }: { code: string }) {
               </>
             }
           />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <article className="min-w-0 rounded-2xl border border-border bg-white p-4 shadow-sm sm:col-span-2 xl:col-span-1">
               <div className="flex min-w-0 items-center gap-3">
                 <Avatar
@@ -148,22 +151,30 @@ export function DriverDetail({ code }: { code: string }) {
                 {driver.rating != null
                   ? String(driver.rating).replace(".", ",")
                   : "—"}{" "}
-                ({driver.trips} chuyến/đơn) · {driver.area}
+                ({driver.trips ?? "—"} chuyến/đơn) · {driver.area}
               </p>
             </article>
             <MetricCard
               icon="categories"
               tone="bg-brand/10 text-brand"
               label="Chuyến / đơn đã nhận"
-              value={String(driver.trips)}
-              hint="Từ hồ sơ tài xế"
+              value={driver.trips == null ? "—" : String(driver.trips)}
+              hint={
+                driver.trips == null
+                  ? "Chưa có dữ liệu"
+                  : `Hoàn thành / ${driver.finishedJobs ?? 0} đã kết thúc`
+              }
             />
             <MetricCard
               icon="trend"
               tone="bg-success/10 text-success"
               label="Tỷ lệ hoàn thành"
-              value="—"
-              hint="Chưa có dữ liệu"
+              value={completionRateLabel(driver.completionRate)}
+              hint={
+                driver.completionRate == null
+                  ? "Chưa có chuyến/đơn kết thúc"
+                  : "Trên các chuyến/đơn đã nhận"
+              }
             />
             <MetricCard
               icon="star"
@@ -175,13 +186,6 @@ export function DriverDetail({ code }: { code: string }) {
                   : "—"
               }
               hint={driver.rating != null ? "Từ khách hàng" : "Chưa có dữ liệu"}
-            />
-            <MetricCard
-              icon="wallet"
-              tone="bg-delivery/10 text-delivery"
-              label="Số dư khả dụng"
-              value="—"
-              hint="Chưa có dữ liệu"
             />
           </div>
           <div className="grid items-start gap-4 xl:grid-cols-3">
@@ -271,6 +275,12 @@ export function DriverDetail({ code }: { code: string }) {
                   </PreviewLink>
                 </div>
               </DetailSection>
+              <AccountDeletionCard
+                userId={driver.code}
+                name={driver.name}
+                deletion={driver.deletion}
+              />
+              <DriverFeeCard driverId={driver.code} name={driver.name} />
             </div>
             <div className="min-w-0 space-y-4">
               <DetailSection

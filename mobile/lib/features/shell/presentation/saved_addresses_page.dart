@@ -1,237 +1,331 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
+import '../../../core/design_system/components/dealgo_app_header.dart';
+import '../../../core/design_system/components/dealgo_bottom_bar.dart';
 import '../../../core/design_system/components/dealgo_card.dart';
+import '../../../core/design_system/components/dealgo_dialog.dart';
 import '../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../core/design_system/components/dealgo_refresh.dart';
+import '../../../core/design_system/components/dealgo_skeleton.dart';
+import '../../../core/design_system/components/dealgo_state_view.dart';
+import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
-import 'account_routes.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../address_book/domain/entities/saved_address.dart';
+import '../../address_book/domain/repositories/address_book_repository.dart';
+import '../../address_book/presentation/cubit/saved_addresses_cubit.dart';
+import '../../identity/domain/entities/auth_state.dart';
+import '../../identity/presentation/cubit/auth_cubit.dart';
 import 'account_widgets.dart';
-import 'address_draft_cubit.dart';
+import 'address_form_sheet.dart';
 
-class SavedAddressesPage extends StatefulWidget {
+class SavedAddressesPage extends StatelessWidget {
   const SavedAddressesPage({required this.shellPath, super.key});
 
   final String shellPath;
 
   @override
-  State<SavedAddressesPage> createState() => _SavedAddressesPageState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) {
+        final auth = context.read<AuthCubit>();
+        return SavedAddressesCubit(
+          repository: context.read<AddressBookRepository>(),
+          accessToken: () {
+            final state = auth.state;
+            return state is AuthSignedIn ? state.tokens.accessToken : null;
+          },
+        )..load();
+      },
+      child: const _SavedAddressesView(),
+    );
+  }
 }
 
-class _SavedAddressesPageState extends State<SavedAddressesPage> {
-  final TextEditingController _label = TextEditingController();
-  int? _editingIndex;
+class _SavedAddressesView extends StatelessWidget {
+  const _SavedAddressesView();
 
-  @override
-  void dispose() {
-    _label.dispose();
-    super.dispose();
+  Future<void> _openForm(BuildContext context, {SavedAddress? editing}) async {
+    final cubit = context.read<SavedAddressesCubit>();
+    final current = cubit.state;
+    final taken = {
+      if (current is SavedAddressesLoaded)
+        for (final address in current.items)
+          if (address.id != editing?.id) address.kind,
+    };
+    final saved = await showAddressFormSheet(
+      context,
+      editing: editing,
+      takenKinds: taken,
+      onSubmit: (draft) => cubit.save(draft, id: editing?.id),
+    );
+    if (saved == true && context.mounted) {
+      _toast(context, AppLocalizations.of(context).addrBookSaved);
+    }
   }
 
-  void _commit() {
-    final cubit = context.read<AddressDraftCubit>();
-    final editing = _editingIndex;
-    final wrote = editing == null
-        ? cubit.addLabel(_label.text)
-        : cubit.replaceLabel(editing, _label.text);
-    if (!wrote) {
+  Future<void> _confirmDelete(
+    BuildContext context,
+    SavedAddress address,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final cubit = context.read<SavedAddressesCubit>();
+    final ok = await showDealGoConfirmDialog(
+      context: context,
+      title: l10n.addrBookDeleteTitle,
+      body: l10n.addrBookDeleteBody(address.label),
+      confirmLabel: l10n.addrBookDelete,
+      cancelLabel: l10n.addrBookCancel,
+      confirmTone: DealGoDialogPrimaryTone.danger,
+      confirmKey: const Key('address-delete-confirm'),
+    );
+    if (ok != true || !context.mounted) {
       return;
     }
-    _label.clear();
-    setState(() => _editingIndex = null);
+    final error = await cubit.remove(address.id);
+    if (context.mounted) {
+      _toast(
+        context,
+        error == null ? l10n.addrBookDeleted : addressErrorText(l10n, error),
+      );
+    }
   }
 
-  void _beginEdit(int index, String value) {
-    _label.text = value;
-    setState(() => _editingIndex = index);
+  Future<void> _makeDefault(BuildContext context, SavedAddress address) async {
+    final l10n = AppLocalizations.of(context);
+    final error = await context.read<SavedAddressesCubit>().makeDefault(
+      address.id,
+    );
+    if (error != null && context.mounted) {
+      _toast(context, addressErrorText(l10n, error));
+    }
+  }
+
+  void _toast(BuildContext context, String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
-    final labels = context.watch<AddressDraftCubit>().state;
-    final editing = _editingIndex;
-    final canAdd = labels.length < AddressDraftCubit.limit || editing != null;
-    final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context);
+    final state = context.watch<SavedAddressesCubit>().state;
+    final full = state is SavedAddressesLoaded && state.isFull;
     return Scaffold(
       backgroundColor: DealGoColors.canvas,
+      extendBody: true,
       body: SafeArea(
+        bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const AccountScreenHeader(title: 'Địa chỉ đã lưu'),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(
-                  DealGoDimensions.pageGutter,
-                  DealGoSpacing.s16,
-                  DealGoDimensions.pageGutter,
-                  DealGoSpacing.s16,
-                ),
-                children: [
-                  Text('Địa chỉ của tôi', style: textTheme.titleMedium),
-                  const SizedBox(height: DealGoSpacing.s8),
-                  Text(
-                    'Lưu những địa điểm thường sử dụng để đặt xe và nhận hàng nhanh hơn.',
-                    style: textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: DealGoSpacing.s12),
-                  Text(
-                    'Nhãn bạn gõ chỉ nằm trên máy trong phiên này.',
-                    style: textTheme.bodySmall,
-                  ),
-                  if (canAdd) ...[
-                    const SizedBox(height: DealGoSpacing.s12),
-                    TextField(
-                      key: const Key('address-label-field'),
-                      controller: _label,
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (_) => _commit(),
-                      decoration: accountFieldDecoration(
-                        context,
-                        hint: 'Nhập nhãn trên máy',
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        key: const Key('address-label-add'),
-                        onPressed: _commit,
-                        child: Text(
-                          editing == null
-                              ? 'Ghi nhãn trên máy'
-                              : 'Ghi lại nhãn trên máy',
-                        ),
-                      ),
-                    ),
-                  ] else ...[
-                    const SizedBox(height: DealGoSpacing.s12),
-                    Text(
-                      'Phiên này chỉ giữ hai nhãn trên máy.',
-                      style: textTheme.bodySmall,
-                    ),
-                  ],
-                  const SizedBox(height: DealGoSpacing.s8),
-                  if (labels.isEmpty)
-                    Text(
-                      'Chưa có nhãn trên máy trong phiên này.',
-                      style: textTheme.bodyMedium,
-                    )
-                  else
-                    for (var index = 0; index < labels.length; index++) ...[
-                      _LabelCard(
-                        index: index,
-                        label: labels[index],
-                        onEdit: () => _beginEdit(index, labels[index]),
-                      ),
-                      const SizedBox(height: DealGoSpacing.s12),
-                    ],
-                  const SizedBox(height: DealGoSpacing.s8),
-                  Text('Bản đồ địa chỉ', style: textTheme.titleMedium),
-                  const SizedBox(height: DealGoSpacing.s12),
-                  _DraftMap(caption: labels.isEmpty ? null : labels.first),
-                  const SizedBox(height: DealGoSpacing.s12),
-                  const _SearchHint(),
-                ],
+            DealGoAppHeader(title: l10n.addrBookTitle),
+            Expanded(child: _body(context, state)),
+          ],
+        ),
+      ),
+      bottomNavigationBar: DealGoBottomBar(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (full) ...[
+              Text(
+                l10n.addrBookFull,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                DealGoDimensions.pageGutter,
-                DealGoSpacing.s8,
-                DealGoDimensions.pageGutter,
-                DealGoSpacing.s12,
-              ),
-              child: DealGoPrimaryButton(
-                label: 'Thêm địa chỉ mới',
-                trailingIcon: Icons.arrow_forward,
-                onPressed: () =>
-                    context.push(AccountRoutes.places(widget.shellPath)),
-              ),
+              const SizedBox(height: DealGoSpacing.s8),
+            ],
+            DealGoPrimaryButton(
+              key: const Key('address-add'),
+              label: l10n.addrBookAdd,
+              leadingIcon: DealGoIcons.add,
+              enabled: state is SavedAddressesLoaded && !full,
+              onPressed: () => _openForm(context),
             ),
           ],
         ),
       ),
     );
   }
+
+  Widget _body(BuildContext context, SavedAddressesState state) {
+    final l10n = AppLocalizations.of(context);
+    final cubit = context.read<SavedAddressesCubit>();
+    final padding = EdgeInsets.fromLTRB(
+      DealGoDimensions.pageGutter,
+      DealGoSpacing.s16,
+      DealGoDimensions.pageGutter,
+      DealGoSpacing.s16 + 88 + MediaQuery.viewPaddingOf(context).bottom,
+    );
+    return switch (state) {
+      SavedAddressesLoading() => DealGoSkeletonList(
+        padding: padding,
+        thumbSize: 44,
+        semanticLabel: l10n.addrBookLoading,
+      ),
+      SavedAddressesFailed(:final cause) => ListView(
+        padding: padding,
+        children: [
+          DealGoStateView.failure(
+            context,
+            onRetry: cubit.load,
+            cause: cause,
+            compact: true,
+          ),
+        ],
+      ),
+      SavedAddressesLoaded(:final items) => DealGoRefresh(
+        onRefresh: cubit.load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: padding,
+          children: [
+            if (items.isEmpty)
+              DealGoStateView(
+                art: DealGoStateArt.noAddresses,
+                title: l10n.addrBookEmptyTitle,
+                message: l10n.addrBookEmptyBody,
+                compact: true,
+              )
+            else ...[
+              Text(
+                l10n.addrBookIntro,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: DealGoSpacing.s12),
+              for (final address in items) ...[
+                _AddressCard(
+                  address: address,
+                  onEdit: () => _openForm(context, editing: address),
+                  onDelete: () => _confirmDelete(context, address),
+                  onMakeDefault: () => _makeDefault(context, address),
+                ),
+                const SizedBox(height: DealGoSpacing.s12),
+              ],
+            ],
+          ],
+        ),
+      ),
+    };
+  }
 }
 
-class _LabelCard extends StatelessWidget {
-  const _LabelCard({
-    required this.index,
-    required this.label,
+enum _CardAction { edit, makeDefault, delete }
+
+class _AddressCard extends StatelessWidget {
+  const _AddressCard({
+    required this.address,
     required this.onEdit,
+    required this.onDelete,
+    required this.onMakeDefault,
   });
 
-  final int index;
-  final String label;
+  final SavedAddress address;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final VoidCallback onMakeDefault;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
-    final isDefault = index == 0;
+    final tone = switch (address.kind) {
+      SavedAddressKind.home => (
+        DealGoIcons.home,
+        DealGoColors.subtlePurple,
+        DealGoColors.primary,
+      ),
+      SavedAddressKind.work => (
+        DealGoIcons.work,
+        DealGoColors.amberSurface,
+        DealGoColors.amber,
+      ),
+      SavedAddressKind.other => (
+        DealGoIcons.pin,
+        DealGoColors.greenSurface,
+        DealGoColors.brandGreen,
+      ),
+    };
+    final note = address.note;
     return DealGoCard(
-      key: Key('saved-label-$index'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      key: Key('saved-address-${address.id}'),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              AccountToneIcon(
-                icon: isDefault ? Icons.home_outlined : Icons.work_outline,
-                background: isDefault
-                    ? DealGoColors.subtlePurple
-                    : const Color(0xFFE8F1FF),
-                foreground: isDefault
-                    ? DealGoColors.primary
-                    : const Color(0xFF2563EB),
-              ),
-              const SizedBox(width: DealGoSpacing.s12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          AccountToneIcon(
+            icon: tone.$1,
+            background: tone.$2,
+            foreground: tone.$3,
+          ),
+          const SizedBox(width: DealGoSpacing.s12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: DealGoSpacing.s8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
-                      label,
+                      address.label,
                       style: textTheme.titleMedium?.copyWith(fontSize: 16),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Nhãn trên máy trong phiên này',
-                      style: textTheme.bodySmall,
-                    ),
+                    if (address.isDefault)
+                      _DefaultBadge(label: l10n.addrBookDefault),
                   ],
                 ),
-              ),
-              if (isDefault)
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: DealGoColors.greenSurface,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: DealGoSpacing.s8,
-                      vertical: DealGoSpacing.s4,
-                    ),
-                    child: Text(
-                      'Mặc định',
-                      style: textTheme.labelSmall?.copyWith(
-                        color: DealGoColors.brandGreen,
-                        fontWeight: FontWeight.w600,
-                      ),
+                const SizedBox(height: 2),
+                Text(address.addressLine, style: textTheme.bodyMedium),
+                if (note != null) ...[
+                  const SizedBox(height: 2),
+                  Text(note, style: textTheme.bodySmall),
+                ],
+                if (!address.hasPin) ...[
+                  const SizedBox(height: DealGoSpacing.s4),
+                  Text(
+                    l10n.addrBookNoPin,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: DealGoColors.amber,
                     ),
                   ),
-                ),
-            ],
-          ),
-          const Divider(height: DealGoSpacing.s24),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: onEdit,
-              child: Text(isDefault ? 'Chỉnh sửa' : 'Sửa'),
+                ],
+              ],
             ),
+          ),
+          PopupMenuButton<_CardAction>(
+            key: Key('address-menu-${address.id}'),
+            tooltip: l10n.addrBookMore,
+            icon: const Icon(
+              DealGoIcons.more,
+              color: DealGoColors.textSecondary,
+            ),
+            onSelected: (action) => switch (action) {
+              _CardAction.edit => onEdit(),
+              _CardAction.makeDefault => onMakeDefault(),
+              _CardAction.delete => onDelete(),
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: _CardAction.edit,
+                child: Text(l10n.addrBookEdit),
+              ),
+              if (!address.isDefault)
+                PopupMenuItem(
+                  value: _CardAction.makeDefault,
+                  child: Text(l10n.addrBookMakeDefault),
+                ),
+              PopupMenuItem(
+                value: _CardAction.delete,
+                child: Text(
+                  l10n.addrBookDelete,
+                  style: const TextStyle(color: DealGoColors.danger),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -239,71 +333,28 @@ class _LabelCard extends StatelessWidget {
   }
 }
 
-class _DraftMap extends StatelessWidget {
-  const _DraftMap({required this.caption});
+class _DefaultBadge extends StatelessWidget {
+  const _DefaultBadge({required this.label});
 
-  final String? caption;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    final label = caption;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(DealGoRadius.card),
-      child: ColoredBox(
-        color: const Color(0xFFE7F2EA),
-        child: SizedBox(
-          height: 168,
-          child: Stack(
-            children: [
-              const Positioned(
-                left: 72,
-                top: -20,
-                bottom: -20,
-                child: _MapRoad(),
-              ),
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: DealGoColors.card,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Padding(
-                        padding: EdgeInsets.all(DealGoSpacing.s8),
-                        child: Icon(
-                          Icons.place,
-                          color: DealGoColors.primary,
-                          size: 28,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: DealGoSpacing.s8),
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: DealGoColors.card,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: DealGoSpacing.s12,
-                          vertical: DealGoSpacing.s4,
-                        ),
-                        child: Text(
-                          label ?? 'Minh họa trên máy',
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                color: DealGoColors.text,
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: DealGoColors.greenSurface,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: DealGoSpacing.s8,
+          vertical: 2,
+        ),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: DealGoColors.brandGreen,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
@@ -311,52 +362,10 @@ class _DraftMap extends StatelessWidget {
   }
 }
 
-class _MapRoad extends StatelessWidget {
-  const _MapRoad();
-
-  @override
-  Widget build(BuildContext context) {
-    return Transform.rotate(
-      angle: 0.5,
-      child: const ColoredBox(
-        color: Color(0xFFD5E6F5),
-        child: SizedBox(width: 42, height: 240),
-      ),
-    );
-  }
-}
-
-class _SearchHint extends StatelessWidget {
-  const _SearchHint();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: DealGoColors.subtlePurple,
-        borderRadius: BorderRadius.circular(DealGoRadius.input),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(DealGoSpacing.s12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(
-              Icons.info_outline,
-              color: DealGoColors.primary,
-              size: 20,
-            ),
-            const SizedBox(width: DealGoSpacing.s8),
-            Expanded(
-              child: Text(
-                'Bạn có thể tìm kiếm hoặc ghim địa chỉ chính xác trên bản đồ khi thêm mới.',
-                style: Theme.of(context).textTheme.bodySmall
-                    ?.copyWith(color: DealGoColors.text),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+String addressErrorText(AppLocalizations l10n, String code) => switch (code) {
+  'ADDRESS_KIND_TAKEN' => l10n.addrBookErrKindTaken,
+  'ADDRESS_LIMIT_REACHED' => l10n.addrBookFull,
+  'ADDRESS_NOT_FOUND' => l10n.addrBookErrNotFound,
+  'NETWORK_ERROR' => l10n.addrBookErrOffline,
+  _ => l10n.addrBookErrGeneric,
+};

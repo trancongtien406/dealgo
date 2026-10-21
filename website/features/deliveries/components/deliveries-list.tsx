@@ -49,7 +49,6 @@ import { filteredStatusKpi } from "@/lib/admin-kpi";
 import { isForbiddenError } from "@/lib/api/errors";
 import {
   DELIVERY_COLUMN_COUNT,
-  DELIVERY_STATUS_TABS,
   DELIVERY_TABLE_COLUMNS,
 } from "../constants";
 
@@ -68,12 +67,6 @@ export function DeliveriesList() {
 
   const lastPage = Math.max(1, Math.ceil(total / pageSize));
   const currentPage = Math.min(page, lastPage);
-
-  const activeTabValue = filters.status || "";
-
-  const handleTabClick = (tabValue: string) => {
-    void setFilters({ status: tabValue, page: 1 });
-  };
 
   const waitingKpi = filteredStatusKpi({
     statusFilter: status,
@@ -186,32 +179,7 @@ export function DeliveriesList() {
           />
         </li>
       </ul>
-      <div className="min-w-0 overflow-x-auto">
-        <ul
-          aria-label="Lọc theo trạng thái đơn giao"
-          className="flex w-max min-w-full gap-2 pb-1"
-        >
-          {DELIVERY_STATUS_TABS.map((item) => {
-            const selected = activeTabValue === item.value;
-            return (
-              <li key={item.label}>
-                <button
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => handleTabClick(item.value)}
-                  className={
-                    selected
-                      ? `inline-flex h-9 items-center rounded-full bg-brand/10 px-3 text-sm font-semibold whitespace-nowrap text-brand ${focusRing}`
-                      : `inline-flex h-9 items-center rounded-full border border-border bg-white px-3 text-sm whitespace-nowrap text-ink ${focusRing}`
-                  }
-                >
-                  {item.label}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+
       <section className="min-w-0 rounded-2xl border border-border bg-white p-4 shadow-sm">
         <AdminFilterToolbar>
           <AdminFilterField>

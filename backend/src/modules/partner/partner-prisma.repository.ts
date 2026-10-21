@@ -1,8 +1,9 @@
 import type { Prisma } from '../../generated/prisma/client.js';
 import type { PrismaClient } from '../../generated/prisma/client.js';
-import type { StoredDocumentRef } from '../../integrations/object-storage/mock-kyc-storage.js';
 import type {
   OpsPartnerPage,
+  PartnerDocumentRef,
+  PartnerReviewIssue,
   PartnerApplicationRecord,
   PartnerRepository,
   PartnerRoleName,
@@ -102,7 +103,7 @@ export class PrismaPartnerRepository implements PartnerRepository {
     userId: string;
     role: PartnerRoleName;
     metadata: Record<string, unknown>;
-    documents: StoredDocumentRef[];
+    documents: PartnerDocumentRef[];
     now: Date;
   }): Promise<PartnerApplicationRecord> {
     const row = await this.db.partnerApplication.upsert({
@@ -121,6 +122,7 @@ export class PrismaPartnerRepository implements PartnerRepository {
         metadata: asInputJson(input.metadata),
         documents: asInputJson(input.documents),
         reason: null,
+        reviewIssues: asInputJson([]),
         reviewedBy: null,
         reviewedAt: null,
         submittedAt: input.now,
@@ -133,23 +135,26 @@ export class PrismaPartnerRepository implements PartnerRepository {
     id: string;
     status: Extract<PartnerStatusName, 'APPROVED' | 'REJECTED'>;
     reason: string | null;
+    reviewIssues: PartnerReviewIssue[];
     reviewedBy: string;
     now: Date;
   }): Promise<PartnerApplicationRecord | null> {
-    try {
-      const row = await this.db.partnerApplication.update({
-        where: { id: input.id },
-        data: {
-          status: input.status,
-          reason: input.reason,
-          reviewedBy: input.reviewedBy,
-          reviewedAt: input.now,
-        },
-      });
-      return mapRow(row);
-    } catch {
+    // Conditional on SUBMITTED so concurrent approve/reject cannot both win.
+    const updated = await this.db.partnerApplication.updateMany({
+      where: { id: input.id, status: 'SUBMITTED' },
+      data: {
+        status: input.status,
+        reason: input.reason,
+        reviewIssues: asInputJson(input.reviewIssues),
+        reviewedBy: input.reviewedBy,
+        reviewedAt: input.now,
+      },
+    });
+    if (updated.count !== 1) {
       return null;
     }
+    const row = await this.db.partnerApplication.findUnique({ where: { id: input.id } });
+    return row ? mapRow(row) : null;
   }
 }
 
@@ -161,6 +166,7 @@ function mapRow(row: {
   metadata: unknown;
   documents: unknown;
   reason: string | null;
+  reviewIssues: unknown;
   reviewedBy: string | null;
   reviewedAt: Date | null;
   submittedAt: Date | null;
@@ -175,6 +181,7 @@ function mapRow(row: {
     metadata: asObject(row.metadata),
     documents: asDocuments(row.documents),
     reason: row.reason,
+    reviewIssues: asIssues(row.reviewIssues),
     reviewedBy: row.reviewedBy,
     reviewedAt: row.reviewedAt,
     submittedAt: row.submittedAt,
@@ -190,18 +197,31 @@ function asObject(value: unknown): Record<string, unknown> {
   return {};
 }
 
-function asDocuments(value: unknown): StoredDocumentRef[] {
+function asIssues(value: unknown): PartnerReviewIssue[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+    const { section, note } = item as { section?: unknown; note?: unknown };
+    return typeof section === 'string' && typeof note === 'string' ? [{ section, note }] : [];
+  });
+}
+
+function asDocuments(value: unknown): PartnerDocumentRef[] {
   if (!Array.isArray(value)) {
     return [];
   }
   return value.filter(isDocumentRef);
 }
 
-function isDocumentRef(value: unknown): value is StoredDocumentRef {
+function isDocumentRef(value: unknown): value is PartnerDocumentRef {
   if (!value || typeof value !== 'object') {
     return false;
   }
-  const doc = value as Partial<StoredDocumentRef>;
+  const doc = value as Partial<PartnerDocumentRef>;
   return (
     typeof doc.key === 'string' &&
     typeof doc.label === 'string' &&

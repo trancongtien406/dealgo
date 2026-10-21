@@ -11,8 +11,22 @@ export type GeocodeResult = {
   provider: 'mock' | 'goong' | 'google';
 };
 
+export type PlaceSuggestion = {
+  lat: number;
+  lng: number;
+  /** Short name shown as the title (e.g. "Chợ Hàn"). */
+  name: string;
+  /** Full address line. */
+  address: string;
+  provider: GeocodeResult['provider'];
+};
+
 export interface MapsPort {
   geocode(query: string): Promise<GeocodeResult>;
+  /** Up to `limit` matches for a free-text query; [] when nothing matches. */
+  searchPlaces(query: string, limit: number): Promise<PlaceSuggestion[]>;
+  /** Nearest address for a GPS fix; null when the provider has nothing there. */
+  reverseGeocode(point: GeoPoint): Promise<PlaceSuggestion | null>;
   routeDistanceKm(origin: GeoPoint, destination: GeoPoint): Promise<number>;
 }
 
@@ -45,14 +59,82 @@ export class MockMapsPort implements MapsPort {
     };
   }
 
+  async searchPlaces(query: string, limit: number): Promise<PlaceSuggestion[]> {
+    const needle = foldVietnamese(query);
+    if (!needle) {
+      return [];
+    }
+    return MOCK_DANANG_LANDMARKS.filter(
+      (landmark) =>
+        foldVietnamese(landmark.label).includes(needle) ||
+        foldVietnamese(landmark.address ?? '').includes(needle) ||
+        landmark.keywords.some((keyword) => {
+          const folded = foldVietnamese(keyword);
+          return folded.includes(needle) || needle.includes(folded);
+        }),
+    )
+      .slice(0, limit)
+      .map((landmark) => ({
+        lat: landmark.lat,
+        lng: landmark.lng,
+        name: landmark.name ?? landmark.label,
+        address: landmark.address ?? landmark.label,
+        provider: 'mock' as const,
+      }));
+  }
+
+  async reverseGeocode(point: GeoPoint): Promise<PlaceSuggestion | null> {
+    let best: (typeof MOCK_DANANG_LANDMARKS)[number] | null = null;
+    let bestKm = MOCK_REVERSE_RADIUS_KM;
+    for (const landmark of MOCK_DANANG_LANDMARKS) {
+      const km = haversineKm(point, landmark);
+      if (km <= bestKm) {
+        best = landmark;
+        bestKm = km;
+      }
+    }
+    if (!best) {
+      return null;
+    }
+    return {
+      lat: point.lat,
+      lng: point.lng,
+      name: `Gần ${best.name ?? best.label}`,
+      address: best.address ?? best.label,
+      provider: 'mock',
+    };
+  }
+
   async routeDistanceKm(origin: GeoPoint, destination: GeoPoint): Promise<number> {
     return haversineKm(origin, destination);
   }
 }
 
+/** Mock reverse geocoding only names a GPS fix this close to a known landmark. */
+const MOCK_REVERSE_RADIUS_KM = 0.5;
+
+/** Lower-case, strip Vietnamese diacritics (đ → d) and collapse spaces for matching. */
+export function foldVietnamese(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/gi, 'd')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 @Injectable()
 export class UnavailableMapsPort implements MapsPort {
   async geocode(_query: string): Promise<GeocodeResult> {
+    throw new UnavailableMapsError();
+  }
+
+  async searchPlaces(_query: string, _limit: number): Promise<PlaceSuggestion[]> {
+    throw new UnavailableMapsError();
+  }
+
+  async reverseGeocode(_point: GeoPoint): Promise<PlaceSuggestion | null> {
     throw new UnavailableMapsError();
   }
 
@@ -91,6 +173,20 @@ export class GoongMapsPort implements MapsPort {
       label: first.formatted_address,
       provider: 'goong',
     };
+  }
+
+  async searchPlaces(query: string, limit: number): Promise<PlaceSuggestion[]> {
+    const url = new URL('https://rsapi.goong.io/geocode');
+    url.searchParams.set('address', query);
+    url.searchParams.set('api_key', this.apiKey);
+    return toSuggestions(await this.fetchJson(url), limit, 'goong');
+  }
+
+  async reverseGeocode(point: GeoPoint): Promise<PlaceSuggestion | null> {
+    const url = new URL('https://rsapi.goong.io/Geocode');
+    url.searchParams.set('latlng', `${point.lat},${point.lng}`);
+    url.searchParams.set('api_key', this.apiKey);
+    return toSuggestions(await this.fetchJson(url), 1, 'goong')[0] ?? null;
   }
 
   async routeDistanceKm(origin: GeoPoint, destination: GeoPoint): Promise<number> {
@@ -159,6 +255,21 @@ export class GoogleMapsPort implements MapsPort {
     };
   }
 
+  async searchPlaces(query: string, limit: number): Promise<PlaceSuggestion[]> {
+    const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
+    url.searchParams.set('address', query);
+    url.searchParams.set('region', 'vn');
+    url.searchParams.set('key', this.apiKey);
+    return toSuggestions(await this.fetchJson(url), limit, 'google');
+  }
+
+  async reverseGeocode(point: GeoPoint): Promise<PlaceSuggestion | null> {
+    const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
+    url.searchParams.set('latlng', `${point.lat},${point.lng}`);
+    url.searchParams.set('key', this.apiKey);
+    return toSuggestions(await this.fetchJson(url), 1, 'google')[0] ?? null;
+  }
+
   async routeDistanceKm(origin: GeoPoint, destination: GeoPoint): Promise<number> {
     const url = new URL('https://maps.googleapis.com/maps/api/distancematrix/json');
     url.searchParams.set('origins', `${origin.lat},${origin.lng}`);
@@ -196,8 +307,30 @@ export class GoogleMapsPort implements MapsPort {
   }
 }
 
+function toSuggestions(
+  body: MapsProviderJson,
+  limit: number,
+  provider: 'goong' | 'google',
+): PlaceSuggestion[] {
+  const out: PlaceSuggestion[] = [];
+  for (const result of body?.results ?? []) {
+    const location = result.geometry?.location;
+    const address = result.formatted_address;
+    if (typeof location?.lat !== 'number' || typeof location?.lng !== 'number' || !address) {
+      continue;
+    }
+    const name = result.name?.trim() || address.split(',')[0].trim();
+    out.push({ lat: location.lat, lng: location.lng, name, address, provider });
+    if (out.length >= limit) {
+      break;
+    }
+  }
+  return out;
+}
+
 type MapsProviderJson = {
   results?: Array<{
+    name?: string;
     formatted_address?: string;
     geometry?: { location?: { lat?: number; lng?: number } };
   }>;

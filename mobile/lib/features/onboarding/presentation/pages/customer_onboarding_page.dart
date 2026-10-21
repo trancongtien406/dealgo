@@ -6,6 +6,8 @@ import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/storage/onboarding_storage.dart';
 import '../../../identity/domain/auth_redirect.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../l10n/app_localizations.dart';
 
 class OnboardingSlide {
   const OnboardingSlide({
@@ -22,9 +24,6 @@ class OnboardingSlide {
     required this.pill2Color,
     required this.pill2Title,
     required this.pill2Subtitle,
-    required this.accentIcon,
-    required this.accentColor,
-    required this.accentLabel,
     this.overlayAsset,
   });
 
@@ -41,102 +40,85 @@ class OnboardingSlide {
   final Color pill2Color;
   final String pill2Title;
   final String pill2Subtitle;
-  final IconData accentIcon;
-  final Color accentColor;
-  final String accentLabel;
   final String? overlayAsset;
 }
 
-/// Customer Onboarding Walkthrough corresponding to Mockup S002.
-/// Fully dynamic across Step 1 (Overview), Step 2 (Ride), and Step 3 (Food).
 class CustomerOnboardingPage extends StatefulWidget {
   const CustomerOnboardingPage({
     super.key,
     this.onComplete,
     this.storage,
+    this.initialPage = 0,
   });
 
   final VoidCallback? onComplete;
   final OnboardingStorage? storage;
+  final int initialPage;
 
   @override
   State<CustomerOnboardingPage> createState() => _CustomerOnboardingPageState();
 }
 
 class _CustomerOnboardingPageState extends State<CustomerOnboardingPage> {
-  final PageController _pageController = PageController();
+  late final PageController _pageController;
   late final OnboardingStorage _storage;
-  int _currentIndex = 0;
+  late int _currentIndex;
 
-  final List<OnboardingSlide> _slides = const [
-    // Step 1: Siêu ứng dụng Đà Nẵng (S002 Concept)
+  static const _slideCount = 3;
+
+  List<OnboardingSlide> _slidesFor(AppLocalizations l10n) => [
     OnboardingSlide(
-      title: 'Một ứng dụng,\n',
-      highlightText: 'vạn trải nghiệm',
+      title: l10n.onbSlide1Title,
+      highlightText: l10n.onbSlide1Accent,
       highlightColor: DealGoColors.primary,
-      description:
-          'Đặt xe, khám phá món ngon và mua sắm hằng ngày — tất cả trong DealGo.',
+      description: l10n.onbSlide1Body,
       heroAsset: 'assets/images/hero_dealgo_danang.png',
-      pill1Icon: Icons.directions_car_filled_rounded,
+      pill1Icon: DealGoIcons.car,
       pill1Color: DealGoColors.primary,
-      pill1Title: 'Đặt xe',
-      pill1Subtitle: 'Đi muôn nơi\nan toàn, tiện lợi',
-      pill2Icon: Icons.shopping_bag_rounded,
+      pill1Title: l10n.serviceRideTitle,
+      pill1Subtitle: l10n.serviceRideBlurb,
+      pill2Icon: DealGoIcons.shoppingBag,
       pill2Color: DealGoColors.brandGreen,
-      pill2Title: 'Đồ ăn',
-      pill2Subtitle: 'Hàng ngàn món\nngon mỗi ngày',
-      accentIcon: Icons.verified_rounded,
-      accentColor: DealGoColors.primary,
-      accentLabel: 'Nền tảng công nghệ Đà Nẵng',
+      pill2Title: l10n.serviceFoodTitle,
+      pill2Subtitle: l10n.serviceFoodBlurb,
     ),
-
-    // Step 2: Di chuyển thông minh & Giá thương lượng (Ride)
     OnboardingSlide(
-      title: 'Di chuyển nhanh,\n',
-      highlightText: 'an toàn & tiết kiệm',
+      title: l10n.onbSlide2Title,
+      highlightText: l10n.onbSlide2Accent,
       highlightColor: DealGoColors.primary,
-      description:
-          'Tài xế bản địa đón tận nơi, theo dõi lộ trình thời gian thực, cước phí minh bạch và tự do thương lượng giá.',
-      heroAsset: 'assets/images/hero_danang_sunset_clean.png',
-      overlayAsset: 'assets/images/vehicle_scooter_green.png',
-      pill1Icon: Icons.two_wheeler_rounded,
+      description: l10n.onbSlide2Body,
+      heroAsset: 'assets/images/hero_onboarding_ride_3d.jpg',
+      pill1Icon: DealGoIcons.motorbike,
       pill1Color: DealGoColors.primary,
-      pill1Title: 'Xe máy & Ô tô',
-      pill1Subtitle: 'Đón nhanh chỉ\ntừ 3 phút',
-      pill2Icon: Icons.handshake_rounded,
+      pill1Title: l10n.onbSlide2Pill1Title,
+      pill1Subtitle: l10n.onbSlide2Pill1Body,
+      pill2Icon: DealGoIcons.handshake,
       pill2Color: DealGoColors.amber,
-      pill2Title: 'Giá thương lượng',
-      pill2Subtitle: 'Chủ động chốt\ngiá ưng ý',
-      accentIcon: Icons.location_on_rounded,
-      accentColor: DealGoColors.amber,
-      accentLabel: '100% Bác tài bản địa thân thiện',
+      pill2Title: l10n.onbSlide2Pill2Title,
+      pill2Subtitle: l10n.onbSlide2Pill2Body,
     ),
-
-    // Step 3: Ẩm thực & Món ngon nóng hổi (Food)
     OnboardingSlide(
-      title: 'Món ngon nóng hổi,\n',
-      highlightText: 'giao siêu tốc',
+      title: l10n.onbSlide3Title,
+      highlightText: l10n.onbSlide3Accent,
       highlightColor: DealGoColors.brandGreen,
-      description:
-          'Hàng ngàn quán ăn, nhà hàng đặc sản chuẩn vị Đà Nẵng sẵn sàng phục vụ bạn. Đặt món dễ dàng, giao tận tay trong 20 phút.',
-      heroAsset: 'assets/images/hero_food_clean.png',
-      pill1Icon: Icons.restaurant_rounded,
+      description: l10n.onbSlide3Body,
+      heroAsset: 'assets/images/hero_onboarding_food_3d.jpg',
+      pill1Icon: DealGoIcons.restaurant,
       pill1Color: DealGoColors.brandGreen,
-      pill1Title: 'Đặc sản chuẩn vị',
-      pill1Subtitle: 'Mì Quảng, Bún chả cá,\nBánh mì giòn',
-      pill2Icon: Icons.bolt_rounded,
+      pill1Title: l10n.onbSlide3Pill1Title,
+      pill1Subtitle: l10n.onbSlide3Pill1Body,
+      pill2Icon: DealGoIcons.bolt,
       pill2Color: DealGoColors.primary,
-      pill2Title: 'Giao siêu tốc 20\'',
-      pill2Subtitle: 'Món ngon luôn\nnóng hổi tận tay',
-      accentIcon: Icons.storefront_rounded,
-      accentColor: DealGoColors.brandGreen,
-      accentLabel: 'Hơn 1.500+ quán ngon Đà Nẵng',
+      pill2Title: l10n.onbSlide3Pill2Title,
+      pill2Subtitle: l10n.onbSlide3Pill2Body,
     ),
   ];
 
   @override
   void initState() {
     super.initState();
+    _currentIndex = widget.initialPage;
+    _pageController = PageController(initialPage: widget.initialPage);
     _storage = widget.storage ?? SecureOnboardingStorage();
   }
 
@@ -154,7 +136,7 @@ class _CustomerOnboardingPageState extends State<CustomerOnboardingPage> {
   }
 
   void _nextPage() {
-    if (_currentIndex < _slides.length - 1) {
+    if (_currentIndex < _slideCount - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 320),
         curve: Curves.easeInOut,
@@ -172,72 +154,83 @@ class _CustomerOnboardingPageState extends State<CustomerOnboardingPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       backgroundColor: DealGoColors.canvas,
       body: Stack(
         children: [
-          // Subtle background glow orbs matching S002 aesthetic
           Positioned(
             top: -40,
             left: -40,
-            child: Container(
-              width: 180,
-              height: 180,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: DealGoColors.primary.withValues(alpha: 0.05),
+            child: IgnorePointer(
+              child: Container(
+                width: 180,
+                height: 180,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: DealGoColors.primary.withValues(alpha: 0.05),
+                ),
               ),
             ),
           ),
           Positioned(
             top: 220,
             right: -60,
-            child: Container(
-              width: 220,
-              height: 220,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: DealGoColors.brandGreen.withValues(alpha: 0.05),
+            child: IgnorePointer(
+              child: Container(
+                width: 220,
+                height: 220,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: DealGoColors.brandGreen.withValues(alpha: 0.05),
+                ),
               ),
             ),
           ),
-
           SafeArea(
             child: Column(
               children: [
-                // Top Bar: Logo DealGo
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: DealGoDimensions.pageGutter,
                     vertical: DealGoSpacing.s8,
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: const [
-                      DealGoLogo.wordmark(size: 26),
+                    children: [
+                      const DealGoLogo.wordmark(size: 26),
+                      const Spacer(),
+                      TextButton(
+                        key: const Key('onboarding-skip-btn'),
+                        onPressed: _finishOnboarding,
+                        style: TextButton.styleFrom(
+                          foregroundColor: DealGoColors.primary,
+                          textStyle: textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: DealGoColors.primary,
+                          ),
+                        ),
+                        child: Text(l10n.onbSkip),
+                      ),
                     ],
                   ),
                 ),
-
-                // Main Content Swipable PageView (Hero graphic + floating cards + title + desc)
                 Expanded(
                   child: PageView.builder(
                     controller: _pageController,
-                    itemCount: _slides.length,
+                    itemCount: _slideCount,
                     onPageChanged: (index) {
                       setState(() => _currentIndex = index);
                     },
                     itemBuilder: (context, index) {
-                      final slide = _slides[index];
+                      final slide = _slidesFor(l10n)[index];
                       return Column(
                         children: [
-                          // Top 3D Visual Hero with floating cards
                           Expanded(
                             flex: 5,
                             child: _SlideHeroVisual(slide: slide),
                           ),
-
-                          // Bottom Text Content
                           Expanded(
                             flex: 3,
                             child: Padding(
@@ -249,11 +242,8 @@ class _CustomerOnboardingPageState extends State<CustomerOnboardingPage> {
                                 children: [
                                   Text.rich(
                                     TextSpan(
-                                      style: const TextStyle(
+                                      style: textTheme.headlineMedium?.copyWith(
                                         fontSize: 26,
-                                        fontWeight: FontWeight.w800,
-                                        color: DealGoColors.text,
-                                        height: 1.25,
                                         letterSpacing: -0.5,
                                       ),
                                       children: [
@@ -271,11 +261,8 @@ class _CustomerOnboardingPageState extends State<CustomerOnboardingPage> {
                                   const SizedBox(height: DealGoSpacing.s12),
                                   Text(
                                     slide.description,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w400,
+                                    style: textTheme.bodyMedium?.copyWith(
                                       color: DealGoColors.textSecondary,
-                                      height: 1.45,
                                     ),
                                     textAlign: TextAlign.center,
                                   ),
@@ -288,48 +275,49 @@ class _CustomerOnboardingPageState extends State<CustomerOnboardingPage> {
                     },
                   ),
                 ),
-
-                // Bottom Action Area: Indicators, Primary Button & Step Label
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: DealGoDimensions.pageGutter,
                   ),
                   child: Column(
                     children: [
-                      // Pagination Dots Indicator
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(_slides.length, (index) {
+                        children: List.generate(_slideCount, (index) {
                           final isSelected = index == _currentIndex;
                           return AnimatedContainer(
                             duration: const Duration(milliseconds: 250),
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: DealGoSpacing.s4,
+                            ),
                             width: isSelected ? 24 : 8,
                             height: 8,
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? DealGoColors.primary
                                   : DealGoColors.border,
-                              borderRadius: BorderRadius.circular(4),
+                              borderRadius:
+                                  BorderRadius.circular(DealGoRadius.small),
                             ),
                           );
                         }),
                       ),
-
                       const SizedBox(height: DealGoSpacing.s20),
-
-                      // Primary Next / Continue Button
-                      DealGoPrimaryButton(
-                        key: const Key('onboarding-next-btn'),
-                        label: 'Tiếp tục',
-                        trailingIcon: Icons.arrow_forward_rounded,
-                        onPressed: _nextPage,
+                      SizedBox(
+                        width: double.infinity,
+                        child: DealGoPrimaryButton(
+                          key: const Key('onboarding-next-btn'),
+                          label: _currentIndex == _slideCount - 1
+                              ? l10n.onbStart
+                              : l10n.actionContinue,
+                          trailingIcon: DealGoIcons.arrowRight,
+                          onPressed: _nextPage,
+                        ),
                       ),
                       const SizedBox(height: DealGoSpacing.s8),
                       Text(
-                        'Bước ${_currentIndex + 1} trong ${_slides.length}',
-                        style: const TextStyle(
-                          fontSize: 12,
+                        l10n.onbStep(_currentIndex + 1, _slideCount),
+                        style: textTheme.labelSmall?.copyWith(
                           fontWeight: FontWeight.w500,
                           color: DealGoColors.textSecondary,
                         ),
@@ -347,7 +335,6 @@ class _CustomerOnboardingPageState extends State<CustomerOnboardingPage> {
   }
 }
 
-/// Renders the 3D Graphic Composition for a specific onboarding slide
 class _SlideHeroVisual extends StatelessWidget {
   const _SlideHeroVisual({required this.slide});
 
@@ -361,7 +348,6 @@ class _SlideHeroVisual extends StatelessWidget {
           alignment: Alignment.center,
           clipBehavior: Clip.none,
           children: [
-            // Soft atmospheric glow behind subject
             Positioned(
               top: 10,
               left: 30,
@@ -387,9 +373,10 @@ class _SlideHeroVisual extends StatelessWidget {
               ),
             ),
 
-            // Base Hero Image Container
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: DealGoSpacing.s16),
+              padding: const EdgeInsets.symmetric(
+                horizontal: DealGoSpacing.s16,
+              ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(DealGoRadius.card),
                 child: Image.asset(
@@ -398,12 +385,7 @@ class _SlideHeroVisual extends StatelessWidget {
                   errorBuilder: (context, error, stackTrace) => Container(
                     height: 220,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          slide.pill1Color.withValues(alpha: 0.15),
-                          slide.pill2Color.withValues(alpha: 0.15),
-                        ],
-                      ),
+                      color: slide.pill1Color.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(DealGoRadius.card),
                     ),
                     child: Center(
@@ -418,7 +400,6 @@ class _SlideHeroVisual extends StatelessWidget {
               ),
             ),
 
-            // Optional 3D vehicle overlay for slide 2 (Ride)
             if (slide.overlayAsset != null)
               Positioned(
                 bottom: 12,
@@ -430,9 +411,8 @@ class _SlideHeroVisual extends StatelessWidget {
                 ),
               ),
 
-            // Floating Pill 1 (Top-Left)
             Positioned(
-              top: 14,
+              top: 24,
               left: 16,
               child: _FloatingServicePill(
                 icon: slide.pill1Icon,
@@ -442,25 +422,14 @@ class _SlideHeroVisual extends StatelessWidget {
               ),
             ),
 
-            // Floating Pill 2 (Top-Right / Middle-Right)
             Positioned(
-              top: 76,
+              top: 88,
               right: 16,
               child: _FloatingServicePill(
                 icon: slide.pill2Icon,
                 iconBgColor: slide.pill2Color,
                 title: slide.pill2Title,
                 subtitle: slide.pill2Subtitle,
-              ),
-            ),
-
-            // Bottom Accent Badge
-            Positioned(
-              bottom: 8,
-              child: _AccentPill(
-                icon: slide.accentIcon,
-                iconColor: slide.accentColor,
-                label: slide.accentLabel,
               ),
             ),
           ],
@@ -470,7 +439,6 @@ class _SlideHeroVisual extends StatelessWidget {
   }
 }
 
-/// Glassmorphism Floating Pill Badge with Icon, 2-line title/subtitle, and Trailing Arrow
 class _FloatingServicePill extends StatelessWidget {
   const _FloatingServicePill({
     required this.icon,
@@ -486,19 +454,17 @@ class _FloatingServicePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(
+        horizontal: DealGoSpacing.s12,
+        vertical: DealGoSpacing.s8,
+      ),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.96),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        color: DealGoColors.card.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(DealGoRadius.card),
+        border: Border.all(color: DealGoColors.card, width: 1.5),
+        boxShadow: DealGoShadows.floating,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -517,17 +483,16 @@ class _FloatingServicePill extends StatelessWidget {
                 ),
               ],
             ),
-            child: Icon(icon, color: Colors.white, size: 20),
+            child: Icon(icon, color: DealGoColors.card, size: 20),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: DealGoSpacing.s8),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 13,
+                style: textTheme.labelLarge?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: DealGoColors.text,
                 ),
@@ -535,8 +500,7 @@ class _FloatingServicePill extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: const TextStyle(
-                  fontSize: 10.5,
+                style: textTheme.labelSmall?.copyWith(
                   fontWeight: FontWeight.w500,
                   color: DealGoColors.textSecondary,
                   height: 1.25,
@@ -544,7 +508,7 @@ class _FloatingServicePill extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: DealGoSpacing.s8),
           Container(
             width: 24,
             height: 24,
@@ -553,56 +517,9 @@ class _FloatingServicePill extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: const Icon(
-              Icons.arrow_forward_rounded,
+              DealGoIcons.arrowRight,
               size: 13,
               color: DealGoColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Subtle Bottom Tag for Localized Trust / Quality Accent
-class _AccentPill extends StatelessWidget {
-  const _AccentPill({
-    required this.icon,
-    required this.iconColor,
-    required this.label,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white, width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: iconColor),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: DealGoColors.text,
             ),
           ),
         ],

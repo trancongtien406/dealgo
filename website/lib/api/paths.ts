@@ -45,8 +45,12 @@ export const apiPaths = {
   opsDispute: (code: string) => `/api/ops/disputes/${encodeURIComponent(code)}`,
   opsDisputeResolve: (code: string) =>
     `/api/ops/disputes/${encodeURIComponent(code)}/resolve`,
+  opsSupportTickets: () => "/api/ops/support-tickets",
+  opsSupportTicket: (id: string) =>
+    `/api/ops/support-tickets/${encodeURIComponent(id)}`,
+  opsSupportTicketReplies: (id: string) =>
+    `/api/ops/support-tickets/${encodeURIComponent(id)}/replies`,
   opsAuditLogs: () => "/api/ops/audit-logs",
-  opsKycQueue: () => "/api/ops/kyc",
   opsExceptions: () => "/api/ops/exceptions",
   opsSettlements: () => "/api/ops/settlements",
   opsAuthMethods: () => "/api/ops/auth-methods",
@@ -63,10 +67,27 @@ export const apiPaths = {
   opsRoleGrantReject: (id: string) =>
     `/api/ops/role-grants/${encodeURIComponent(id)}/reject`,
   opsStaff: () => "/api/ops/staff",
+  opsStaffMe: () => "/api/ops/staff/me",
+  opsStaffRbacMatrix: () => "/api/ops/staff/rbac-matrix",
+  opsStaffPasswordReset: (id: string) =>
+    `/api/ops/staff/${encodeURIComponent(id)}/password-reset`,
+  opsStaffSuperAdmin: (id: string) =>
+    `/api/ops/staff/${encodeURIComponent(id)}/super-admin`,
+  opsStaffRole: (id: string) =>
+    `/api/ops/staff/${encodeURIComponent(id)}/staff-role`,
+  opsUserDeletionCancel: (id: string) =>
+    `/api/ops/users/${encodeURIComponent(id)}/account-deletion/cancel`,
+  opsUserFeeBalance: (id: string) =>
+    `/api/ops/users/${encodeURIComponent(id)}/fee-balance`,
+  opsUserFeeSettlement: (id: string) =>
+    `/api/ops/users/${encodeURIComponent(id)}/fee-settlements`,
   opsZones: () => "/api/ops/zones",
   opsZonesRules: () => "/api/ops/zones/rules",
   opsRefunds: () => "/api/ops/refunds",
   opsPromotions: () => "/api/ops/promotions",
+  opsPromotion: (id: string) => `/api/ops/promotions/${encodeURIComponent(id)}`,
+  opsPromotionStatus: (id: string) =>
+    `/api/ops/promotions/${encodeURIComponent(id)}/status`,
   opsDeliveries: () => "/api/ops/deliveries",
   opsNotifications: () => "/api/ops/notifications",
   opsNotificationsCms: () => "/api/ops/notifications/cms",
@@ -78,6 +99,8 @@ export const apiPaths = {
     `/api/ops/notifications/${encodeURIComponent(code)}/reject`,
   opsNotificationSubmit: (code: string) =>
     `/api/ops/notifications/${encodeURIComponent(code)}/submit`,
+  opsNotificationCancel: (code: string) =>
+    `/api/ops/notifications/${encodeURIComponent(code)}/cancel`,
   opsNotificationCmsItem: (id: string) =>
     `/api/ops/notifications/cms/${encodeURIComponent(id)}`,
   opsCatalogCategories: () => "/api/ops/catalog/categories",

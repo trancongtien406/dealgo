@@ -65,7 +65,7 @@ class VoiceCallSheet extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: DealGoSpacing.s8),
-                  Text(message, style: Theme.of(context).textTheme.bodyMedium),
+                  Text(message.resolve(l10n), style: Theme.of(context).textTheme.bodyMedium),
                   const SizedBox(height: DealGoSpacing.s16),
                   DealGoPrimaryButton(
                     key: const Key('voice-dismiss'),

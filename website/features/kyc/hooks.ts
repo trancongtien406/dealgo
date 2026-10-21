@@ -75,7 +75,10 @@ export function useApproveKycMutation(code: string) {
 export function useRejectKycMutation(code: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (reason: string) => rejectKycApplication(code, reason),
+    mutationFn: (input: string | { reason: string; issues: Array<{ section: string; note: string }> }) =>
+      typeof input === "string"
+        ? rejectKycApplication(code, input)
+        : rejectKycApplication(code, input.reason, input.issues),
     onSuccess: (updated) => {
       queryClient.setQueryData(kycQueryKeys.detail(code), updated);
       void queryClient.invalidateQueries({ queryKey: kycQueryKeys.all });

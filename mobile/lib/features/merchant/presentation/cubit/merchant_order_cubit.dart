@@ -1,10 +1,17 @@
+import 'dart:async';
+
+import '../../../../core/l10n/ui_message.dart';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../core/mock/merchant_kitchen_lines.dart';
+import '../utils/merchant_kitchen_lines.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/realtime/snapshot_binding.dart';
+import '../../../../core/realtime/snapshot_realtime.dart';
 import '../../../food/domain/entities/food_models.dart';
 import '../../domain/params/merchant_order_action_params.dart';
 import '../../domain/usecases/accept_merchant_order.dart';
+import '../../domain/usecases/reject_merchant_order.dart';
 import '../../domain/usecases/get_merchant_order.dart';
 import '../../domain/usecases/mark_merchant_order_ready.dart';
 import 'merchant_queue_cubit.dart';
@@ -22,7 +29,11 @@ final class MerchantOrderViewReady extends MerchantOrderViewState {
     this.network = false,
     this.handoffDone = false,
     this.message,
+    this.handoverCode,
   });
+
+  /// DEC-PROD-036: store-only code the driver enters at pickup (when the setting is on).
+  final String? handoverCode;
 
   final MerchantQueueOrder order;
   final List<MerchantKitchenLine> kitchenLines;
@@ -30,7 +41,7 @@ final class MerchantOrderViewReady extends MerchantOrderViewState {
   final bool conflict;
   final bool network;
   final bool handoffDone;
-  final String? message;
+  final UiMessage? message;
 
   MerchantOrderViewReady copyWith({
     MerchantQueueOrder? order,
@@ -39,8 +50,10 @@ final class MerchantOrderViewReady extends MerchantOrderViewState {
     bool? conflict,
     bool? network,
     bool? handoffDone,
-    String? message,
+    UiMessage? message,
     bool clearMessage = false,
+    String? handoverCode,
+    bool clearHandoverCode = false,
   }) {
     return MerchantOrderViewReady(
       order: order ?? this.order,
@@ -50,21 +63,101 @@ final class MerchantOrderViewReady extends MerchantOrderViewState {
       network: network ?? this.network,
       handoffDone: handoffDone ?? this.handoffDone,
       message: clearMessage ? null : (message ?? this.message),
+      handoverCode: clearHandoverCode
+          ? null
+          : (handoverCode ?? this.handoverCode),
     );
   }
 }
 
 class MerchantOrderCubit extends Cubit<MerchantOrderViewState> {
   MerchantOrderCubit({
-    required GetMerchantOrder getMerchantOrder,
-    required AcceptMerchantOrder acceptMerchantOrder,
-    required MarkMerchantOrderReady markMerchantOrderReady,
+    required this._getMerchantOrder,
+    required this._acceptMerchantOrder,
+    required this._markMerchantOrderReady,
     required this.queue,
+    this._rejectMerchantOrder,
     required MerchantQueueOrder order,
-  }) : _getMerchantOrder = getMerchantOrder,
-       _acceptMerchantOrder = acceptMerchantOrder,
-       _markMerchantOrderReady = markMerchantOrderReady,
-       super(MerchantOrderViewReady(order: order, kitchenLines: const []));
+    this.realtime,
+    this.refreshInterval = const Duration(seconds: 10),
+  }) : super(MerchantOrderViewReady(order: order, kitchenLines: const []));
+
+  /// Poll fallback when the store socket is disconnected (DEC-PROD-041).
+  final Duration refreshInterval;
+  final SnapshotRealtime? realtime;
+  Timer? _refreshTimer;
+  SnapshotBinding? _storeBinding;
+  String? Function()? _tokenSource;
+  var _refreshing = false;
+
+  /// Statuses where the next transition is made by another actor.
+  static const awaitingStatuses = {
+    'PLACED',
+    'PREPARING',
+    'READY',
+    'READY_FOR_PICKUP',
+  };
+
+  bool get autoRefreshActive => _refreshTimer?.isActive ?? false;
+
+  void startAutoRefresh(String? Function() token) {
+    _tokenSource = token;
+    unawaited(_startStoreRealtime());
+    _syncAutoRefresh();
+  }
+
+  Future<void> _startStoreRealtime() async {
+    final rt = realtime;
+    final token = _tokenSource?.call()?.trim() ?? '';
+    if (rt == null || token.isEmpty) return;
+    await _storeBinding?.stop();
+    final binding = SnapshotBinding(
+      realtime: rt,
+      room: StoreSnapshotRoom(_ready.order.storeId),
+      onInvalidate: () {
+        unawaited(_tick());
+        _syncAutoRefresh();
+      },
+    );
+    _storeBinding = binding;
+    await binding.start(accessToken: token);
+    _syncAutoRefresh();
+  }
+
+  void _syncAutoRefresh() {
+    if (isClosed || _tokenSource == null) return;
+    final waiting = awaitingStatuses.contains(_ready.order.status);
+    // Poll only while waiting AND socket is down (or realtime not wired).
+    final socketUp = realtime?.isConnected ?? false;
+    final shouldPoll = waiting && !socketUp;
+    if (shouldPoll && !autoRefreshActive) {
+      _refreshTimer = Timer.periodic(refreshInterval, (_) => _tick());
+    } else if (!shouldPoll) {
+      _refreshTimer?.cancel();
+      _refreshTimer = null;
+    }
+  }
+
+  Future<void> _tick() async {
+    final current = _ready;
+    if (_refreshing || current.busy || current.conflict) return;
+    _refreshing = true;
+    try {
+      await loadLines(_tokenSource?.call());
+    } finally {
+      _refreshing = false;
+    }
+  }
+
+  @override
+  Future<void> close() async {
+    _refreshTimer?.cancel();
+    await _storeBinding?.stop();
+    _storeBinding = null;
+    return super.close();
+  }
+
+  final RejectMerchantOrder? _rejectMerchantOrder;
 
   final GetMerchantOrder _getMerchantOrder;
   final AcceptMerchantOrder _acceptMerchantOrder;
@@ -89,18 +182,51 @@ class MerchantOrderCubit extends Cubit<MerchantOrderViewState> {
       if (isClosed) {
         return;
       }
-      emit(current.copyWith(kitchenLines: kitchenLinesFromDetail(detail)));
+      final latest = _ready;
+      final changed = detail.status != latest.order.status;
+      final order = changed
+          ? latest.order.apply(
+              MerchantOrderUpdate(id: latest.order.id, status: detail.status),
+            )
+          : latest.order;
+      if (changed) {
+        queue.replace(order);
+      }
+      emit(
+        latest.copyWith(
+          order: order,
+          kitchenLines: kitchenLinesFromDetail(detail),
+          handoverCode: detail.handoverCode,
+          clearHandoverCode: detail.handoverCode == null,
+        ),
+      );
+      _syncAutoRefresh();
     } catch (_) {
       // Queue summary remains; kitchen panel stays empty until retry.
     }
   }
 
   Future<void> accept(String? accessToken) {
-    return _mutate(accessToken, _acceptMerchantOrder);
+    return _mutate(accessToken, _acceptMerchantOrder.call);
+  }
+
+  /// Declines the order on the server; true when it is now CANCELLED.
+  Future<bool> reject(
+    String? accessToken, {
+    required FoodRejectReason reason,
+    String? note,
+  }) async {
+    final reject = _rejectMerchantOrder;
+    if (reject == null) return false;
+    await _mutate(
+      accessToken,
+      (params) => reject(params, reason: reason, note: note),
+    );
+    return !isClosed && _ready.order.status == 'CANCELLED';
   }
 
   Future<void> markReady(String? accessToken) {
-    return _mutate(accessToken, _markMerchantOrderReady);
+    return _mutate(accessToken, _markMerchantOrderReady.call);
   }
 
   void markHandoffDone() {
@@ -142,7 +268,11 @@ class MerchantOrderCubit extends Cubit<MerchantOrderViewState> {
     }
     final token = accessToken?.trim() ?? '';
     if (token.isEmpty) {
-      emit(current.copyWith(message: 'Phiên đăng nhập không còn hiệu lực'));
+      emit(
+        current.copyWith(
+          message: UiMessage((l10n) => l10n.errorSessionExpired),
+        ),
+      );
       return;
     }
     emit(current.copyWith(busy: true, clearMessage: true));
@@ -163,6 +293,7 @@ class MerchantOrderCubit extends Cubit<MerchantOrderViewState> {
       final next = current.order.apply(update);
       queue.replace(next);
       emit(current.copyWith(order: next, busy: false));
+      _syncAutoRefresh();
     } on ApiException catch (error) {
       if (isClosed) {
         return;
@@ -175,7 +306,7 @@ class MerchantOrderCubit extends Cubit<MerchantOrderViewState> {
         emit(current.copyWith(busy: false, network: true, clearMessage: true));
         return;
       }
-      emit(current.copyWith(busy: false, message: error.message));
+      emit(current.copyWith(busy: false, message: UiMessage.error(error)));
     } catch (_) {
       if (isClosed) {
         return;

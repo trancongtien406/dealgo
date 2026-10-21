@@ -1,6 +1,8 @@
+import { cancelActorLabel } from "@/lib/cancel-actor";
 import type { StatusTone } from "@/lib/admin-format";
 import type { NestRideStatus, NestRideView } from "@/features/rides/nest-types";
-import type { RideListItem, RideStatus } from "@/features/rides/types";
+import type { GeoPoint, RideListItem, RideStatus } from "@/features/rides/types";
+import type { OpsPerson } from "@/lib/api/ops-people";
 import { formatOpsClock } from "@/lib/ops-time";
 
 const nestRideStatusMap: Record<NestRideStatus, RideStatus> = {
@@ -22,21 +24,55 @@ export function mapNestRideToListItem(ride: NestRideView): RideListItem {
   const pickupLabel = ride.pickup.label.trim() || "—";
   const dropoffLabel = ride.dropoff.label.trim() || "—";
   const driverId = ride.assignedDriverId ?? selectedOfferDriverId(ride) ?? null;
+  const driverProfile =
+    ride.driverProfile ??
+    ride.offers?.find((offer) => offer.driverId === driverId)?.driverProfile ??
+    null;
   return {
     code: ride.id,
-    customer: "Khách hàng",
-    phone: "—",
-    driver: driverId ? actorLabel("TX", driverId) : "—",
-    plate: "—",
+    customer: personLabel(ride.customerProfile, "KH", ride.customerId),
+    phone: ride.customerProfile?.phoneMasked ?? "—",
+    driver: driverId ? personLabel(driverProfile, "TX", driverId) : "—",
+    plate: (driverId && driverProfile?.vehiclePlate) || "—",
     pickup: pickupLabel,
     pickupArea: areaHint(pickupLabel),
     dropoff: dropoffLabel,
     dropoffArea: areaHint(dropoffLabel),
     seats: ride.status === "NEGOTIATING" ? "Đang thương lượng" : "—",
     price: ride.agreedFareVnd ?? ride.offeredFareVnd,
+    discountVnd: ride.discountVnd ?? 0,
+    voucherCode: ride.voucherCode ?? null,
+    cashDueVnd:
+      ride.cashDueVnd ??
+      Math.max(0, (ride.agreedFareVnd ?? ride.offeredFareVnd) - (ride.discountVnd ?? 0)),
     status: nestRideStatusToFeature(ride.status),
+    cancelledBy: cancelActorLabel(ride.cancelledBy),
     time: formatOpsClock(ride.expiresAt),
+    pickupPoint: geoPoint(ride.pickup),
+    dropoffPoint: geoPoint(ride.dropoff),
   };
+}
+
+/** Real name, else masked phone, else a short id tag; "—" when nothing is known. */
+export function personLabel(
+  person: OpsPerson | null | undefined,
+  prefix: string,
+  id: string | null | undefined,
+): string {
+  const name = person?.displayName?.trim();
+  if (name) return name;
+  if (person?.phoneMasked) return person.phoneMasked;
+  return id ? actorLabel(prefix, id) : "—";
+}
+
+export function geoPoint(
+  point: { lat?: unknown; lng?: unknown } | null | undefined,
+): GeoPoint | null {
+  if (!point) return null;
+  const { lat, lng } = point;
+  if (typeof lat !== "number" || typeof lng !== "number") return null;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
 }
 
 function selectedOfferDriverId(ride: NestRideView): string | null {

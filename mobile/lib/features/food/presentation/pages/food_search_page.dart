@@ -3,15 +3,22 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/components/dealgo_chip.dart';
+import '../../../../core/design_system/components/dealgo_skeleton.dart';
+import '../../../../core/design_system/components/dealgo_state_view.dart';
+import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
-import '../../../identity/presentation/widgets/auth_widgets.dart';
 import '../../domain/entities/food_models.dart';
-import '../../domain/entities/food_money.dart';
 import '../../domain/usecases/list_food_stores.dart';
+import '../../../../core/location/location_service.dart';
+import '../../../rating/domain/service_rating.dart';
 import '../cubit/food_discovery_cubit.dart';
 import '../utils/food_routes.dart';
 import '../widgets/food_widgets.dart';
+import '../widgets/store_meta.dart';
+import '../../data/food_search_history.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 /// C023 — dedicated food search (suggestions, history, popular keywords).
 class FoodSearchPage extends StatelessWidget {
@@ -22,9 +29,11 @@ class FoodSearchPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) =>
-          FoodDiscoveryCubit(listFoodStores: context.read<ListFoodStores>())
-            ..load(currentAccessToken(context)),
+      create: (context) => FoodDiscoveryCubit(
+        listFoodStores: context.read<ListFoodStores>(),
+        ratings: context.read<RatingRepository>(),
+        location: context.read<LocationService>(),
+      )..load(currentAccessToken(context)),
       child: _FoodSearchView(initialQuery: initialQuery),
     );
   }
@@ -44,20 +53,25 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
     text: widget.initialQuery,
   );
   var _filter = 'all';
+  var _history = const <String>[];
 
-  static const _history = <String>[
-    'Cơm tấm gần tôi',
-    'Trà sữa Gong Cha',
-    'Mì Quảng Đà Nẵng',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    FoodSearchHistory.load().then((items) {
+      if (mounted) setState(() => _history = items);
+    });
+  }
 
-  static const _popular = <String>[
-    'Bún bò',
-    'Cơm gà',
-    'Ăn sáng',
-    'Trà sữa',
-    'Pizza',
-  ];
+  Future<void> _remember() async {
+    final items = await FoodSearchHistory.add(_query.text);
+    if (mounted) setState(() => _history = items);
+  }
+
+  Future<void> _clearHistory() async {
+    await FoodSearchHistory.clear();
+    if (mounted) setState(() => _history = const []);
+  }
 
   @override
   void dispose() {
@@ -66,6 +80,7 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
   }
 
   void _openStore(FoodStoreSummary store) {
+    _remember();
     context.push(FoodRoutes.store(store.id));
   }
 
@@ -78,60 +93,66 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
       FoodDiscoveryReady(:final stores) => stores,
       _ => const <FoodStoreSummary>[],
     };
+    final ratings = switch (discovery) {
+      FoodDiscoveryReady(:final ratings) => ratings,
+      _ => const <String, StoreRating>{},
+    };
     final q = _query.text.trim().toLowerCase();
     final matches = [
       for (final store in stores)
-        if (q.isEmpty || store.name.toLowerCase().contains(q)) store,
+        if (q.isEmpty ||
+            store.name.toLowerCase().contains(q) ||
+            (storeCategoryLabel(
+                  l10n,
+                  store.category,
+                )?.toLowerCase().contains(q) ??
+                false))
+          store,
     ];
+    if (_filter == 'near') {
+      matches.sort(
+        (a, b) => (a.distanceKm ?? double.infinity).compareTo(
+          b.distanceKm ?? double.infinity,
+        ),
+      );
+    } else if (_filter == 'rating') {
+      matches.sort(
+        (a, b) => (ratings[b.id]?.average ?? -1).compareTo(
+          ratings[a.id]?.average ?? -1,
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: DealGoColors.canvas,
       body: SafeArea(
         child: Column(
           children: [
-            FoodScreenHeader(
-              title: l10n.foodSearchTitle,
-              trailing: const DealGoWordmark(),
-            ),
+            DealGoAppHeader(title: l10n.foodSearchTitle),
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: DealGoDimensions.pageGutter,
               ),
-              child: TextField(
-                key: const Key('food-search-field'),
+              child: DealGoTextField(
+                label: l10n.foodSearchHint,
+                showLabel: false,
+                hint: l10n.foodSearchHint,
+                prefixIcon: DealGoIcons.search,
                 controller: _query,
+                fieldKey: const Key('food-search-field'),
                 autofocus: true,
                 textInputAction: TextInputAction.search,
                 onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  hintText: l10n.foodSearchHint,
-                  prefixIcon: const Icon(
-                    Icons.search,
-                    color: DealGoColors.primary,
-                  ),
-                  suffixIcon: _query.text.isEmpty
-                      ? null
-                      : IconButton(
-                          onPressed: () {
-                            _query.clear();
-                            setState(() {});
-                          },
-                          icon: const Icon(Icons.close),
-                        ),
-                  filled: true,
-                  fillColor: DealGoColors.card,
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(DealGoRadius.input),
-                    borderSide: const BorderSide(color: DealGoColors.primary),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(DealGoRadius.input),
-                    borderSide: const BorderSide(
-                      color: DealGoColors.primary,
-                      width: 1.4,
-                    ),
-                  ),
-                ),
+                onSubmitted: (_) => _remember(),
+                suffix: _query.text.isEmpty
+                    ? null
+                    : IconButton(
+                        onPressed: () {
+                          _query.clear();
+                          setState(() {});
+                        },
+                        icon: const Icon(DealGoIcons.close),
+                      ),
               ),
             ),
             const SizedBox(height: DealGoSpacing.s12),
@@ -145,9 +166,8 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
                 children: [
                   for (final entry in [
                     ('all', l10n.foodSearchFilterAll),
-                    ('stores', l10n.foodSearchFilterStores),
-                    ('dishes', l10n.foodSearchFilterDishes),
                     ('near', l10n.foodSearchFilterNear),
+                    ('rating', l10n.foodCategorySortRating),
                   ]) ...[
                     DealGoChip(
                       label: entry.$2,
@@ -178,46 +198,69 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
                     style: textTheme.bodySmall,
                   ),
                   const SizedBox(height: DealGoSpacing.s12),
-                  for (final store in matches.take(4)) ...[
-                    _ResultCard(store: store, onTap: () => _openStore(store)),
-                    const SizedBox(height: DealGoSpacing.s12),
-                  ],
-                  if (matches.isEmpty)
-                    Text(
-                      l10n.foodSearchEmpty,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: DealGoColors.textSecondary,
+                  if (discovery is FoodDiscoveryFailed)
+                    DealGoStateView.failure(
+                      context,
+                      onRetry: () => context.read<FoodDiscoveryCubit>().load(
+                        currentAccessToken(context),
                       ),
-                    ),
-                  const SizedBox(height: DealGoSpacing.s8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          l10n.foodSearchHistory,
-                          style: textTheme.titleMedium,
-                        ),
+                      cause: discovery.message.error,
+                      message: discovery.message.resolve(l10n),
+                      compact: true,
+                    )
+                  else if (discovery is FoodDiscoveryLoading)
+                    const DealGoSkeletonList(itemCount: 3)
+                  else ...[
+                    for (final store in matches.take(4)) ...[
+                      _ResultCard(
+                        store: store,
+                        rating: ratings[store.id],
+                        onTap: () => _openStore(store),
                       ),
-                      Text(
-                        l10n.foodSearchClearHistory,
-                        style: textTheme.labelSmall?.copyWith(
-                          color: DealGoColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                      const SizedBox(height: DealGoSpacing.s12),
                     ],
-                  ),
+                    if (matches.isEmpty)
+                      DealGoStateView(
+                        art: DealGoStateArt.noSearch,
+                        title: l10n.foodSearchEmpty,
+                        compact: true,
+                      ),
+                  ],
                   const SizedBox(height: DealGoSpacing.s8),
+                  if (_history.isNotEmpty) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            l10n.foodSearchHistory,
+                            style: textTheme.titleMedium,
+                          ),
+                        ),
+                        TextButton(
+                          key: const Key('food-search-clear-history'),
+                          onPressed: _clearHistory,
+                          child: Text(
+                            l10n.foodSearchClearHistory,
+                            style: textTheme.labelSmall?.copyWith(
+                              color: DealGoColors.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: DealGoSpacing.s8),
+                  ],
                   for (final item in _history)
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(
-                        Icons.history,
+                        DealGoIcons.history,
                         color: DealGoColors.textSecondary,
                       ),
                       title: Text(item),
                       trailing: const Icon(
-                        Icons.chevron_right,
+                        DealGoIcons.chevronRight,
                         color: DealGoColors.textSecondary,
                       ),
                       onTap: () {
@@ -226,20 +269,24 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
                       },
                     ),
                   const SizedBox(height: DealGoSpacing.s12),
-                  Text(l10n.foodSearchPopular, style: textTheme.titleMedium),
+                  Text(l10n.foodSearchGroups, style: textTheme.titleMedium),
                   const SizedBox(height: DealGoSpacing.s12),
                   Wrap(
                     spacing: DealGoSpacing.s8,
                     runSpacing: DealGoSpacing.s8,
                     children: [
-                      for (final keyword in _popular)
+                      for (final group in FoodStoreGroup.values.skip(1))
                         DealGoChip(
-                          label: '🔥 $keyword',
+                          label: group.label(l10n),
                           tone: DealGoChipTone.neutral,
-                          onTap: () {
-                            _query.text = keyword;
-                            setState(() {});
-                          },
+                          leading: Icon(
+                            group.icon,
+                            size: 14,
+                            color: group.color,
+                          ),
+                          onTap: () => context.push(
+                            '${FoodRoutes.category}?group=${group.wire}',
+                          ),
                         ),
                     ],
                   ),
@@ -254,15 +301,15 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
 }
 
 class _ResultCard extends StatelessWidget {
-  const _ResultCard({required this.store, required this.onTap});
+  const _ResultCard({required this.store, required this.onTap, this.rating});
 
   final FoodStoreSummary store;
+  final StoreRating? rating;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final l10n = AppLocalizations.of(context);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -271,30 +318,16 @@ class _ResultCard extends StatelessWidget {
         child: FoodPanel(
           child: Row(
             children: [
-              const FoodThumb(),
+              FoodThumb(imageUrl: store.imageUrl),
               const SizedBox(width: DealGoSpacing.s12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(store.name, style: textTheme.titleMedium),
-                    Text(
-                      '★ 4.8 · ${l10n.foodCategoryVietnamese} · 1,1 km',
-                      style: textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: DealGoSpacing.s8),
-                    DealGoChip(
-                      label: l10n.foodFreeshipChip,
-                      tone: DealGoChipTone.success,
-                    ),
+                    const SizedBox(height: DealGoSpacing.s4),
+                    StoreMetaLine(store: store, rating: rating),
                   ],
-                ),
-              ),
-              Text(
-                formatVnd(35000),
-                style: textTheme.titleSmall?.copyWith(
-                  color: DealGoColors.primary,
-                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],

@@ -67,6 +67,7 @@ describe('PartnerEligibilityService', () => {
       id: (await partners.findByUserAndRole(user.id, 'DRIVER'))!.id,
       status: 'APPROVED',
       reason: null,
+      reviewIssues: [],
       reviewedBy: user.id,
       now: new Date(),
     });

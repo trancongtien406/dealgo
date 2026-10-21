@@ -1,4 +1,5 @@
 import '../../domain/params/create_ride_params.dart';
+import '../../domain/params/ride_driver_action.dart';
 import '../../domain/params/select_ride_offer_params.dart';
 import '../../domain/params/submit_ride_offer_params.dart';
 import '../models/ride_models.dart';
@@ -20,6 +21,13 @@ abstract interface class RideRemoteDataSource {
   Future<RideViewModel> cancelRide({
     required String accessToken,
     required String rideId,
+  });
+
+  Future<RideViewModel> advanceRide({
+    required String accessToken,
+    required String rideId,
+    required RideDriverAction action,
+    String? pickupCode,
   });
 }
 

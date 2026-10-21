@@ -32,6 +32,19 @@ import { MerchantModule } from './modules/merchant/index.js';
 import { CatalogModule } from './modules/catalog/index.js';
 import { PricingModule } from './modules/pricing/index.js';
 import { DeliveryModule } from './modules/delivery/index.js';
+import { PromotionModule } from './modules/promotion/index.js';
+import { InboxModule } from './modules/communication/inbox/index.js';
+import { AddressBookModule } from './modules/address-book/index.js';
+import { PlacesModule } from './modules/places/index.js';
+import { RatingModule } from './modules/rating/index.js';
+import { DriverCardModule } from './modules/driver-card/index.js';
+import { RideShareModule } from './modules/ride-share/index.js';
+import { AvatarModule } from './modules/avatar/index.js';
+import { SupportTicketModule } from './modules/support-ticket/index.js';
+import { DriverHistoryModule } from './modules/driver-history/index.js';
+import { AccountDeletionModule } from './modules/account-deletion/index.js';
+import { AccountSettingsModule } from './modules/account-settings/index.js';
+import { RoutingModule } from './modules/routing/index.js';
 
 function buildThrottlerOptions(config: ConfigService<AppEnv, true>): ThrottlerModuleOptions {
   const throttlers = [
@@ -85,6 +98,19 @@ function buildThrottlerOptions(config: ConfigService<AppEnv, true>): ThrottlerMo
     CatalogModule,
     PricingModule,
     DeliveryModule,
+    PromotionModule,
+    InboxModule,
+    AddressBookModule,
+    PlacesModule,
+    RatingModule,
+    DriverCardModule,
+    RideShareModule,
+    AvatarModule,
+    SupportTicketModule,
+    DriverHistoryModule,
+    AccountDeletionModule,
+    AccountSettingsModule,
+    RoutingModule,
     OpsModule,
   ],
   controllers: [AppController],

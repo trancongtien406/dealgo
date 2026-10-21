@@ -158,7 +158,7 @@ export function NegotiationDetail({ code }: { code: string }) {
                         label: "Khách hàng",
                         value: session.customer,
                       },
-                      { label: "Số điện thoại", value: "—" },
+                      { label: "Số điện thoại", value: session.customerPhone ?? "—" },
                       {
                         label: "Trạng thái",
                         value: negotiationSessionStatusLabel(session.status),
@@ -215,7 +215,12 @@ export function NegotiationDetail({ code }: { code: string }) {
                         {session.offers.map((offer) => (
                           <AdminTableRow key={offer.id}>
                             <AdminTableCell className="font-medium">
-                              {shortDriverId(offer.driverId)}
+                              <span className="block">{offer.driverLabel}</span>
+                              {offer.driverPlate ? (
+                                <span className="block text-xs text-muted">
+                                  {offer.driverPlate}
+                                </span>
+                              ) : null}
                             </AdminTableCell>
                             <AdminTableCell
                               align="right"
@@ -256,6 +261,8 @@ export function NegotiationDetail({ code }: { code: string }) {
                   label={`Sơ đồ tuyến từ ${pickupLabel} đến ${dropoffLabel}`}
                   start={pickupLabel}
                   end={dropoffLabel}
+                  from={session.pickupPoint}
+                  to={session.dropoffPoint}
                 />
               </DetailSection>
               <DetailSection
@@ -309,9 +316,7 @@ export function NegotiationDetail({ code }: { code: string }) {
   );
 }
 
-function shortDriverId(driverId: string) {
-  return driverId.slice(0, 8);
-}
+
 
 function splitRoute(route: string): [string, string] {
   const parts = route.split("→").map((part) => part.trim());

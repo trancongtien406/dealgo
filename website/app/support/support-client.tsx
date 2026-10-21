@@ -12,13 +12,14 @@ export function SupportClient() {
   const [query, setQuery] = useState("");
   const [role, setRole] = useState("CUSTOMER");
   const [topic, setTopic] = useState("PAYMENT");
+  const [contactName, setContactName] = useState("");
   const [refCode, setRefCode] = useState("");
   const [contact, setContact] = useState("");
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
-  const [inquiryId, setInquiryId] = useState<string | null>(null);
+  const [ticketCode, setTicketCode] = useState<string | null>(null);
 
   if (isPending || !config) {
     return (
@@ -47,9 +48,10 @@ export function SupportClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           role,
-          topic,
+          category: topic,
           refCode: refCode.trim() || undefined,
           contact: contact.trim(),
+          contactName: contactName.trim() || undefined,
           content: content.trim(),
         }),
       });
@@ -57,7 +59,7 @@ export function SupportClient() {
       const json = (await res.json().catch(() => null)) as {
         success?: boolean;
         message?: string;
-        data?: { inquiryId?: string };
+        data?: { ticketCode?: string };
       } | null;
 
       if (!res.ok || !json?.success) {
@@ -67,7 +69,11 @@ export function SupportClient() {
         return;
       }
 
-      setInquiryId(json.data?.inquiryId || "INQ-ACCEPTED");
+      if (!json.data?.ticketCode) {
+        setSubmitError("Không thể gửi yêu cầu hỗ trợ. Vui lòng thử lại.");
+        return;
+      }
+      setTicketCode(json.data.ticketCode);
       setSubmitted(true);
     } catch {
       setSubmitError(
@@ -232,31 +238,30 @@ export function SupportClient() {
               </span>
               <div>
                 <h3 className="text-lg font-bold text-ink">
-                  Đã ghi nhận mã tra soát phản ánh
+                  Đã tạo yêu cầu hỗ trợ
                 </h3>
                 <p className="mt-2 text-sm text-muted">
-                  Hệ thống DealGo đã cấp mã tiếp nhận tra soát cho yêu cầu hỗ
-                  trợ của bạn:
+                  Bộ phận hỗ trợ DealGo đã nhận yêu cầu và sẽ liên hệ lại qua
+                  thông tin bạn cung cấp. Mã yêu cầu của bạn:
                 </p>
                 <div className="mt-2 inline-flex items-center gap-2 rounded-xl bg-white border border-border px-4 py-2 shadow-xs">
-                  <span className="text-xs text-muted">Mã tra soát:</span>
+                  <span className="text-xs text-muted">Mã yêu cầu:</span>
                   <span className="font-mono text-base font-bold text-brand tracking-wider">
-                    {inquiryId}
+                    {ticketCode}
                   </span>
                 </div>
               </div>
               <p className="text-xs text-muted max-w-lg mx-auto">
-                Để đối chiếu kịp thời hoặc bổ sung hình ảnh/chứng từ giao dịch,
-                vui lòng gửi kèm mã này qua hòm thư hỗ trợ hoặc gọi trực tiếp
-                đến tổng đài 24/7.
+                Nếu cần bổ sung hình ảnh/chứng từ, hãy gửi kèm mã này qua hòm
+                thư hỗ trợ hoặc đọc mã khi gọi tổng đài 24/7.
               </p>
               <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                 <a
-                  href={`mailto:${config.email}?subject=${encodeURIComponent(`[DealGo Hỗ trợ] [${inquiryId}] [${role}] [${topic}]${refCode ? ` - Mã đơn: ${refCode}` : ""}`)}&body=${encodeURIComponent(`Kính gửi Bộ phận CSKH DealGo,\n\nTôi đã đăng ký mã tra soát: ${inquiryId}\nNhóm vấn đề: ${topic}\nVai trò: ${role}\nMã đơn/chuyến liên quan: ${refCode || "Không có"}\nThông tin liên hệ của tôi: ${contact}\n\nNội dung cần hỗ trợ:\n${content}\n\nRất mong được hỗ trợ xử lý sớm.\nTrân trọng!`)}`}
+                  href={`mailto:${config.email}?subject=${encodeURIComponent(`[DealGo Hỗ trợ] [${ticketCode}] [${role}] [${topic}]${refCode ? ` - Mã đơn: ${refCode}` : ""}`)}&body=${encodeURIComponent(`Kính gửi Bộ phận CSKH DealGo,\n\nMã yêu cầu hỗ trợ của tôi: ${ticketCode}\nNhóm vấn đề: ${topic}\nVai trò: ${role}\nMã đơn/chuyến liên quan: ${refCode || "Không có"}\nThông tin liên hệ của tôi: ${contact}\n\nNội dung cần hỗ trợ:\n${content}\n\nRất mong được hỗ trợ xử lý sớm.\nTrân trọng!`)}`}
                   className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-brand px-4 text-xs font-semibold text-white hover:bg-brand/90 transition-colors shadow-xs"
                 >
                   <OpsIcon name="mail" className="size-4" />
-                  Mở ứng dụng thư gửi kèm mã tra soát
+                  Gửi bổ sung qua email kèm mã yêu cầu
                 </a>
                 <a
                   href={`tel:${config.hotline.replace(/\s+/g, "")}`}
@@ -272,7 +277,8 @@ export function SupportClient() {
                     setContent("");
                     setContact("");
                     setRefCode("");
-                    setInquiryId(null);
+                    setContactName("");
+                    setTicketCode(null);
                   }}
                   className="inline-flex h-10 items-center rounded-xl border border-transparent px-3 text-xs font-medium text-muted hover:text-ink transition-colors cursor-pointer"
                 >
@@ -306,6 +312,7 @@ export function SupportClient() {
                     <option value="CUSTOMER">Khách hàng đặt xe / đồ ăn</option>
                     <option value="DRIVER">Tài xế đối tác DealGo</option>
                     <option value="MERCHANT">Chủ quán ăn / Cửa hàng</option>
+                    <option value="OTHER">Khác</option>
                   </select>
                 </div>
                 <div>
@@ -321,15 +328,12 @@ export function SupportClient() {
                     onChange={(e) => setTopic(e.target.value)}
                     className="mt-1.5 h-10 w-full rounded-xl border border-border bg-white px-3 text-sm text-ink focus:border-brand focus:outline-none"
                   >
-                    <option value="PAYMENT">Thanh toán, Hoàn tiền & Ví</option>
-                    <option value="TRIP_ISSUE">
-                      Sự cố chuyến đi & Quên đồ
-                    </option>
-                    <option value="FOOD_ORDER">
-                      Đơn hàng món ăn & Giao nhận
-                    </option>
-                    <option value="ACCOUNT">Xác thực tài khoản KYC/KYB</option>
-                    <option value="SAFETY">An toàn, Sự cố khẩn cấp</option>
+                    <option value="PAYMENT">Thanh toán & Hoàn tiền</option>
+                    <option value="RIDE">Chuyến đi & Quên đồ</option>
+                    <option value="FOOD">Đơn đồ ăn & Giao nhận</option>
+                    <option value="ACCOUNT">Tài khoản & Xác minh KYC/KYB</option>
+                    <option value="SAFETY">An toàn & Sự cố</option>
+                    <option value="OTHER">Vấn đề khác</option>
                   </select>
                 </div>
               </div>
@@ -349,6 +353,23 @@ export function SupportClient() {
                   value={contact}
                   onChange={(e) => setContact(e.target.value)}
                   placeholder="Ví dụ: 0901234567 hoặc hotro@domain.vn"
+                  className="mt-1.5 h-10 w-full rounded-xl border border-border bg-white px-3 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="sup-name"
+                  className="block text-xs font-medium text-muted"
+                >
+                  Tên của bạn (không bắt buộc):
+                </label>
+                <input
+                  id="sup-name"
+                  type="text"
+                  maxLength={80}
+                  value={contactName}
+                  onChange={(e) => setContactName(e.target.value)}
                   className="mt-1.5 h-10 w-full rounded-xl border border-border bg-white px-3 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none"
                 />
               </div>
@@ -383,6 +404,7 @@ export function SupportClient() {
                   rows={4}
                   required
                   minLength={10}
+                  maxLength={2000}
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   placeholder="Vui lòng mô tả cụ thể tình huống, thời gian xảy ra và yêu cầu cần trợ giúp..."
@@ -399,10 +421,10 @@ export function SupportClient() {
                   {submitting ? (
                     <>
                       <OpsIcon name="refresh" className="size-4 animate-spin" />
-                      Đang chuyển thông tin phản hồi...
+                      Đang gửi yêu cầu...
                     </>
                   ) : (
-                    "Gửi yêu cầu phản ánh"
+                    "Gửi yêu cầu hỗ trợ"
                   )}
                 </button>
 

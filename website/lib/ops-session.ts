@@ -9,6 +9,10 @@ export {
   opsSessionCookieOptions,
 } from "@/lib/ops-cookies";
 
+export type RequireOpsSessionResult =
+  | { ok: true }
+  | { ok: false; unavailable: true; message: string };
+
 /**
  * Requires a valid ops access cookie (RSC-safe).
  * Probes Nest with the access token only — never rotates refresh here (cookies
@@ -16,7 +20,7 @@ export {
  * refresh cookie remains, redirects to `/api/ops/session/refresh` which can
  * Set-Cookie, then returns to the admin path.
  */
-export async function requireOpsSession(): Promise<void> {
+export async function requireOpsSession(): Promise<RequireOpsSessionResult> {
   const jar = await cookies();
   const accessToken = jar.get(OPS_ACCESS_COOKIE)?.value;
   const refreshToken = jar.get(OPS_REFRESH_COOKIE)?.value;
@@ -33,13 +37,16 @@ export async function requireOpsSession(): Promise<void> {
 
   const verified = await verifyOpsAccessToken(accessToken);
   if (verified.valid) {
-    return;
+    return { ok: true };
   }
 
   if (verified.status >= 500) {
-    throw new Error(
-      "Dịch vụ máy chủ DealGo Ops tạm thời không khả dụng (502/503). Phiên làm việc của bạn vẫn được bảo lưu an toàn. Vui lòng tải lại trang sau ít phút.",
-    );
+    return {
+      ok: false,
+      unavailable: true,
+      message:
+        "Dịch vụ máy chủ DealGo Ops tạm thời không khả dụng (502/503). Kết nối tới NestJS API backend bị gián đoạn. Phiên làm việc của bạn vẫn được bảo lưu an toàn.",
+    };
   }
 
   if (hasRefresh) {

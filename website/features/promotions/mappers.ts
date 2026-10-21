@@ -2,22 +2,33 @@ import type { StatusTone } from "@/lib/admin-format";
 import type { PromotionCampaignStatus } from "@/features/promotions/types";
 
 const labels: Record<PromotionCampaignStatus, string> = {
+  ACTIVE: "Đang hoạt động",
   RUNNING: "Đang chạy",
+  SCHEDULED: "Đã lên lịch",
   UPCOMING: "Sắp diễn ra",
-  ENDED: "Đã kết thúc",
   PAUSED: "Tạm dừng",
-};
-const tones: Record<Exclude<PromotionCampaignStatus, "ENDED">, StatusTone> = {
-  RUNNING: "success",
-  UPCOMING: "delivery",
-  PAUSED: "food",
+  ENDED: "Đã kết thúc",
+  CANCELLED: "Đã hủy",
+  DRAFT: "Bản nháp",
 };
 
-export function promotionCampaignStatusLabel(status: PromotionCampaignStatus) {
-  return labels[status];
+const tones: Record<string, StatusTone> = {
+  ACTIVE: "success",
+  RUNNING: "success",
+  SCHEDULED: "delivery",
+  UPCOMING: "delivery",
+  PAUSED: "food",
+  CANCELLED: "danger",
+  DRAFT: "delivery",
+  ENDED: "delivery",
+};
+
+export function promotionCampaignStatusLabel(status: PromotionCampaignStatus | string): string {
+  return labels[status as PromotionCampaignStatus] || status;
 }
+
 export function promotionCampaignStatusTone(
-  status: Exclude<PromotionCampaignStatus, "ENDED">,
-) {
-  return tones[status];
+  status: PromotionCampaignStatus | string,
+): StatusTone {
+  return tones[status] || "delivery";
 }

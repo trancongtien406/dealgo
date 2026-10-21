@@ -29,12 +29,13 @@
     "start:worker": "node dist/workers/worker-main.js",
     "start:worker:dev": "tsx src/workers/worker-main.ts",
     "lint": "oxlint --type-aware src/ test/",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
-    "openapi:export": "echo 'OpenAPI seed is hand-maintained at docs/06-data-api/rest-api.openapi.yaml; runtime Swagger UI at /docs'"
+    "openapi:export": "echo 'docs/06-data-api/rest-api.openapi.yaml is regenerated from GET /docs-json (runtime Swagger UI at /docs)'"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -56,6 +57,7 @@
     "bullmq": "^5.81.5",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "express": "^5.2.1",
     "morgan": "^1.12.1",
     "pg": "^8.23.1",
     "redis": "^6.3.0",

@@ -37,9 +37,7 @@ class DealGoChip extends StatelessWidget {
         ? DealGoSpacing.s8
         : DealGoSpacing.s12;
     final shape = StadiumBorder(
-      side: BorderSide(
-        color: selected ? DealGoColors.primary : colors.border,
-      ),
+      side: BorderSide(color: selected ? DealGoColors.primary : colors.border),
     );
 
     // Flexible + ellipsis: chips often sit in tight Rows (offer cards, receipts).
@@ -85,7 +83,7 @@ class DealGoChip extends StatelessWidget {
                 constraints: const BoxConstraints(
                   minHeight: DealGoDimensions.minTapTarget,
                 ),
-                child: Align(alignment: Alignment.center, child: content),
+                child: Align(widthFactor: 1, child: content),
               ),
             ),
     );

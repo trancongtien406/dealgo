@@ -11,6 +11,14 @@ import {
 
 export const FAQ_STATUSES = ['DRAFT', 'PUBLISHED', 'ARCHIVED'] as const;
 export const FAQ_CATEGORIES = ['POLICY', 'OPS', 'PRODUCT', 'TECH'] as const;
+export const FAQ_AUDIENCES = ['INTERNAL', 'CUSTOMER', 'DRIVER', 'MERCHANT'] as const;
+export const HELP_FAQ_AUDIENCES = ['CUSTOMER', 'DRIVER', 'MERCHANT'] as const;
+
+export class HelpFaqQueryDto {
+  @IsOptional()
+  @IsIn(HELP_FAQ_AUDIENCES)
+  audience?: (typeof HELP_FAQ_AUDIENCES)[number];
+}
 
 export class CreateOpsFaqDto {
   @IsOptional()
@@ -30,6 +38,10 @@ export class CreateOpsFaqDto {
 
   @IsIn(FAQ_CATEGORIES)
   category!: (typeof FAQ_CATEGORIES)[number];
+
+  @IsOptional()
+  @IsIn(FAQ_AUDIENCES)
+  audience?: (typeof FAQ_AUDIENCES)[number];
 
   @IsOptional()
   @IsIn(FAQ_STATUSES)
@@ -72,6 +84,10 @@ export class PatchOpsFaqDto {
   @IsOptional()
   @IsIn(FAQ_CATEGORIES)
   category?: (typeof FAQ_CATEGORIES)[number];
+
+  @IsOptional()
+  @IsIn(FAQ_AUDIENCES)
+  audience?: (typeof FAQ_AUDIENCES)[number];
 
   @IsOptional()
   @Type(() => Number)

@@ -106,6 +106,34 @@ flutter config --android-sdk "$ANDROID_SDK_ROOT"
 flutter config --jdk-dir "$JAVA_HOME"
 dart --disable-analytics
 
+# Node major comes from /workspace/.nvmrc (same file CI reads via node-version-file).
+NODE_MAJOR="$(tr -d '[:space:]v' < /workspace/.nvmrc)"
+NODE_ROOT="/opt/node-v${NODE_MAJOR}"
+if ! "${NODE_ROOT}/bin/node" -v 2>/dev/null | grep -q "^v${NODE_MAJOR}\."; then
+  node_index="https://nodejs.org/dist/latest-v${NODE_MAJOR}.x"
+  node_sums="$(curl -fsSL "${node_index}/SHASUMS256.txt")"
+  node_tarball="$(awk '/linux-x64\.tar\.xz$/ {print $2; exit}' <<<"$node_sums")"
+  node_sha="$(awk -v f="$node_tarball" '$2 == f {print $1}' <<<"$node_sums")"
+  tmp="$(mktemp)"
+  curl -fsSL "${node_index}/${node_tarball}" -o "$tmp"
+  echo "${node_sha}  ${tmp}" | sha256sum -c -
+  sudo rm -rf "$NODE_ROOT"
+  sudo mkdir -p "$NODE_ROOT"
+  sudo tar -C "$NODE_ROOT" --strip-components=1 -xJf "$tmp"
+  rm -f "$tmp"
+fi
+echo "export PATH=\"${NODE_ROOT}/bin:\${PATH}\"" | sudo tee /etc/profile.d/dealgo-node.sh >/dev/null
+sudo chmod 644 /etc/profile.d/dealgo-node.sh
+export PATH="${NODE_ROOT}/bin:${PATH}"
+
+# Local Postgres + Redis for the API when Docker is unavailable (start script prefers Docker).
+if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+  if ! command -v pg_ctlcluster >/dev/null 2>&1 || ! command -v redis-server >/dev/null 2>&1; then
+    sudo apt-get update
+    sudo apt-get install -y --no-install-recommends postgresql redis-server
+  fi
+fi
+
 cd /workspace
 npm ci --no-audit --no-fund --prefix backend
 npm ci --no-audit --no-fund --prefix website

@@ -1,7 +1,8 @@
 import '../../domain/repositories/partner_applications_repository.dart';
 import '../datasources/partner_applications_remote_datasource.dart';
 
-class PartnerApplicationsRepositoryImpl implements PartnerApplicationsRepository {
+class PartnerApplicationsRepositoryImpl
+    implements PartnerApplicationsRepository {
   PartnerApplicationsRepositoryImpl(this._remote);
 
   final PartnerApplicationsRemoteDataSource _remote;

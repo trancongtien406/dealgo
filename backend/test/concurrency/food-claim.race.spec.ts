@@ -2,6 +2,8 @@
  * Concurrent food claim against Postgres.
  * Skips when DATABASE_URL is unset (default unit suite uses memory repos).
  */
+import { randomUUID } from 'node:crypto';
+import { uniqueTestPhone } from './test-phone.js';
 import { INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
@@ -18,6 +20,7 @@ import { MockSmsSender } from '../../src/integrations/sms/sms-sender.js';
 import { PrismaModule } from '../../src/platform/database/prisma.module.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 import { FoodModule } from '../../src/modules/food-order/food.module.js';
+import { CatalogModule } from '../../src/modules/catalog/catalog.module.js';
 
 const hasDatabase = Boolean(process.env.DATABASE_URL?.trim());
 const describePg = hasDatabase ? describe : describe.skip;
@@ -27,7 +30,6 @@ const dropoff = { lat: 16.047079, lng: 108.20623, label: 'Hải Châu' };
 describePg('food claim race (postgres)', () => {
   let app: INestApplication;
   let sms: MockSmsSender;
-  let phoneSerial = Number(String(Date.now()).slice(-6));
   let prisma: PrismaService;
 
   beforeAll(async () => {
@@ -46,6 +48,7 @@ describePg('food claim race (postgres)', () => {
               PUSH_PROVIDER: 'mock',
               PARTNER_ELIGIBILITY_BYPASS: 'true',
               OTP_THROTTLE_LIMIT: '1000',
+              OTP_PHONE_LIMIT: '1000',
               FOOD_MIN_DELIVERY_VND: '5000',
               FOOD_MAX_DELIVERY_VND: '100000',
               MAX_CONCURRENT_JOBS_PER_DRIVER: '2',
@@ -54,6 +57,7 @@ describePg('food claim race (postgres)', () => {
         ThrottlerModule.forRoot([{ ttl: 60_000, limit: 1000 }]),
         PrismaModule,
         FoodModule,
+        CatalogModule,
       ],
     })
       .overrideProvider(SMS_SENDER)
@@ -76,9 +80,7 @@ describePg('food claim race (postgres)', () => {
   });
 
   async function login(): Promise<{ token: string; userId: string }> {
-    phoneSerial += 1;
-    // 09 + 8 digits keeps VN-like length without colliding across re-runs.
-    const phone = `09${String(phoneSerial).padStart(8, '0')}`.slice(0, 10);
+    const phone = uniqueTestPhone();
     const created = await request(app.getHttpServer())
       .post('/v1/auth/phone/challenges')
       .send({ phone })
@@ -104,7 +106,7 @@ describePg('food claim race (postgres)', () => {
     await ensureGrant(identity, driverA.userId, 'DRIVER');
     await ensureGrant(identity, driverB.userId, 'DRIVER');
 
-    const suffix = `${Date.now()}-${phoneSerial}`;
+    const suffix = `${Date.now()}-${randomUUID().slice(0, 8)}`;
     await request(app.getHttpServer())
       .get('/v1/food/merchant/catalog')
       .set('Authorization', `Bearer ${merchant.token}`)

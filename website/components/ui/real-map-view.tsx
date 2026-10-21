@@ -93,9 +93,12 @@ export function worldPixelToLatLng(
   ];
 }
 
-const MAPBOX_DEFAULT_TOKEN =
-  process.env.NEXT_PUBLIC_MAPBOX_TOKEN ||
-  "pk.eyJ1IjoidHJhbmNvbmd0aWVuIiwiYSI6ImNtbnUzY2M3bzB3bWIycnF1b2tsMWU4dnkifQ.VSB3sKZDS8B5O8jtoJ1ttQ";
+/**
+ * Mapbox is opt-in: only `NEXT_PUBLIC_MAPBOX_TOKEN` (website/.env.local) enables
+ * it for tiles. Without it Admin maps use OSM/Carto tiles with attribution. Road routes
+ * always come from Nest (`ROUTING_PROVIDER`, DEC-PROD-045); none → straight line.
+ */
+const MAPBOX_DEFAULT_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN?.trim() || "";
 
 // Great-circle Haversine distance in meters
 export function estimateHaversineDistance(coords: MapCoordinate[]): number {
@@ -118,375 +121,97 @@ export function estimateHaversineDistance(coords: MapCoordinate[]): number {
   return total;
 }
 
-// Catmull-Rom spline curve generator to eliminate angular/jagged lines when offline
-export function getCatmullRomPoints(
-  points: MapCoordinate[],
-  numSegments = 8,
-): MapCoordinate[] {
-  if (points.length < 2) return points;
-  if (points.length === 2) {
-    const [pA, pB] = points;
-    const midLat = (pA[0] + pB[0]) / 2 + (pB[1] - pA[1]) * 0.08;
-    const midLng = (pA[1] + pB[1]) / 2 - (pB[0] - pA[0]) * 0.08;
-    points = [pA, [midLat, midLng], pB];
-  }
-
-  const result: MapCoordinate[] = [];
-  const p = [points[0], ...points, points[points.length - 1]];
-
-  for (let i = 1; i < p.length - 2; i++) {
-    const p0 = p[i - 1];
-    const p1 = p[i];
-    const p2 = p[i + 1];
-    const p3 = p[i + 2];
-
-    for (let t = 0; t <= 1; t += 1 / numSegments) {
-      const t2 = t * t;
-      const t3 = t2 * t;
-      const lat =
-        0.5 *
-        (2 * p1[0] +
-          (-p0[0] + p2[0]) * t +
-          (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 +
-          (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3);
-      const lng =
-        0.5 *
-        (2 * p1[1] +
-          (-p0[1] + p2[1]) * t +
-          (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 +
-          (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3);
-      result.push([lat, lng]);
-    }
-  }
-  return result;
-}
-
-// Formal Street Network Graph for Da Nang City
-export const DA_NANG_ROAD_GRAPH = {
-  nodes: {
-    admin: {
-      id: "admin",
-      lat: 16.0544,
-      lng: 108.2022,
-      name: "12 Lê Lợi (Hải Châu)",
-    },
-    bach_dang_1: {
-      id: "bach_dang_1",
-      lat: 16.0585,
-      lng: 108.212,
-      name: "Bạch Đằng - Lê Duẩn",
-    },
-    cau_rong_w: {
-      id: "cau_rong_w",
-      lat: 16.0605,
-      lng: 108.22,
-      name: "Cầu Rồng (Tây)",
-    },
-    cau_rong_mid: {
-      id: "cau_rong_mid",
-      lat: 16.061,
-      lng: 108.2225,
-      name: "Cầu Rồng",
-    },
-    cau_rong_e: {
-      id: "cau_rong_e",
-      lat: 16.0615,
-      lng: 108.2255,
-      name: "Cầu Rồng (Đông)",
-    },
-    vo_van_kiet_1: {
-      id: "vo_van_kiet_1",
-      lat: 16.0616,
-      lng: 108.231,
-      name: "Võ Văn Kiệt - Ngô Quyền",
-    },
-    vo_van_kiet_2: {
-      id: "vo_van_kiet_2",
-      lat: 16.061,
-      lng: 108.238,
-      name: "Võ Văn Kiệt - Hồ Nghinh",
-    },
-    my_khe: {
-      id: "my_khe",
-      lat: 16.0592,
-      lng: 108.2435,
-      name: "24 Võ Nguyên Giáp (Mỹ Khê)",
-    },
-    // Route via Cầu Sông Hàn (Alternative)
-    song_han_w: {
-      id: "song_han_w",
-      lat: 16.069,
-      lng: 108.224,
-      name: "Cầu Sông Hàn (Tây)",
-    },
-    song_han_e: {
-      id: "song_han_e",
-      lat: 16.069,
-      lng: 108.229,
-      name: "Cầu Sông Hàn (Đông)",
-    },
-    pham_van_dong: {
-      id: "pham_van_dong",
-      lat: 16.068,
-      lng: 108.242,
-      name: "Phạm Văn Đồng",
-    },
-    // Route via Cầu Trần Thị Lý (Alternative)
-    tran_thi_ly_w: {
-      id: "tran_thi_ly_w",
-      lat: 16.049,
-      lng: 108.218,
-      name: "Cầu Trần Thị Lý (Tây)",
-    },
-    tran_thi_ly_e: {
-      id: "tran_thi_ly_e",
-      lat: 16.0495,
-      lng: 108.234,
-      name: "Cầu Trần Thị Lý (Đông)",
-    },
-    nguyen_van_thoai: {
-      id: "nguyen_van_thoai",
-      lat: 16.052,
-      lng: 108.241,
-      name: "Nguyễn Văn Thoại",
-    },
-  },
-  edges: [
-    // Main avenue via Cầu Rồng (Optimal speed 45 km/h)
-    { from: "admin", to: "bach_dang_1", distKm: 1.2, speedKmh: 35 },
-    { from: "bach_dang_1", to: "cau_rong_w", distKm: 0.6, speedKmh: 35 },
-    { from: "cau_rong_w", to: "cau_rong_mid", distKm: 0.35, speedKmh: 45 },
-    { from: "cau_rong_mid", to: "cau_rong_e", distKm: 0.35, speedKmh: 45 },
-    { from: "cau_rong_e", to: "vo_van_kiet_1", distKm: 0.6, speedKmh: 45 },
-    { from: "vo_van_kiet_1", to: "vo_van_kiet_2", distKm: 0.75, speedKmh: 45 },
-    { from: "vo_van_kiet_2", to: "my_khe", distKm: 0.6, speedKmh: 35 },
-    // Alternative via Cầu Sông Hàn
-    { from: "admin", to: "song_han_w", distKm: 2.1, speedKmh: 30 },
-    { from: "song_han_w", to: "song_han_e", distKm: 0.6, speedKmh: 35 },
-    { from: "song_han_e", to: "pham_van_dong", distKm: 1.4, speedKmh: 40 },
-    { from: "pham_van_dong", to: "my_khe", distKm: 1.0, speedKmh: 35 },
-    // Alternative via Cầu Trần Thị Lý
-    { from: "admin", to: "tran_thi_ly_w", distKm: 1.9, speedKmh: 30 },
-    { from: "tran_thi_ly_w", to: "tran_thi_ly_e", distKm: 0.8, speedKmh: 40 },
-    {
-      from: "tran_thi_ly_e",
-      to: "nguyen_van_thoai",
-      distKm: 1.1,
-      speedKmh: 35,
-    },
-    { from: "nguyen_van_thoai", to: "my_khe", distKm: 0.9, speedKmh: 30 },
-  ],
-};
-
-// Dijkstra Shortest Duration Algorithm implementation
-export function runDijkstraFastestRoute(
-  startCoord: MapCoordinate,
-  endCoord: MapCoordinate,
-): {
-  coords: MapCoordinate[];
-  durationSec: number;
-  distanceM: number;
-} | null {
-  function haversineDist(c1: MapCoordinate, c2: MapCoordinate): number {
-    const dLat = ((c2[0] - c1[0]) * Math.PI) / 180;
-    const dLng = ((c2[1] - c1[1]) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos((c1[0] * Math.PI) / 180) *
-        Math.cos((c2[0] * Math.PI) / 180) *
-        Math.sin(dLng / 2) ** 2;
-    return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  }
-
-  function findNearest(coord: MapCoordinate): string | null {
-    let best: string | null = null;
-    let bestDist = Infinity;
-    for (const key in DA_NANG_ROAD_GRAPH.nodes) {
-      const node =
-        DA_NANG_ROAD_GRAPH.nodes[key as keyof typeof DA_NANG_ROAD_GRAPH.nodes];
-      const d = haversineDist(coord, [node.lat, node.lng]);
-      if (d < bestDist) {
-        bestDist = d;
-        best = key;
-      }
-    }
-    return best;
-  }
-
-  const startId = findNearest(startCoord);
-  const endId = findNearest(endCoord);
-  if (!startId || !endId) return null;
-
-  const adj: Record<string, { to: string; distM: number; durSec: number }[]> =
-    {};
-  for (const k in DA_NANG_ROAD_GRAPH.nodes) adj[k] = [];
-  for (const edge of DA_NANG_ROAD_GRAPH.edges) {
-    const durSec = (edge.distKm / edge.speedKmh) * 3600;
-    adj[edge.from].push({ to: edge.to, distM: edge.distKm * 1000, durSec });
-    adj[edge.to].push({ to: edge.from, distM: edge.distKm * 1000, durSec });
-  }
-
-  const dist: Record<string, number> = {};
-  const distM: Record<string, number> = {};
-  const prev: Record<string, string> = {};
-  for (const k in DA_NANG_ROAD_GRAPH.nodes) dist[k] = Infinity;
-  dist[startId] = 0;
-  distM[startId] = 0;
-
-  const queue: { id: string; cost: number }[] = [{ id: startId, cost: 0 }];
-  while (queue.length > 0) {
-    queue.sort((a, b) => a.cost - b.cost);
-    const item = queue.shift();
-    if (!item) break;
-    const { id: u, cost } = item;
-    if (u === endId) break;
-    if (cost > dist[u]) continue;
-
-    for (const e of adj[u] || []) {
-      const newCost = dist[u] + e.durSec;
-      if (newCost < dist[e.to]) {
-        dist[e.to] = newCost;
-        distM[e.to] = (distM[u] || 0) + e.distM;
-        prev[e.to] = u;
-        queue.push({ id: e.to, cost: newCost });
-      }
-    }
-  }
-
-  const path: MapCoordinate[] = [];
-  let curr: string | undefined = endId;
-  while (curr) {
-    const node =
-      DA_NANG_ROAD_GRAPH.nodes[curr as keyof typeof DA_NANG_ROAD_GRAPH.nodes];
-    if (node) path.unshift([node.lat, node.lng]);
-    curr = prev[curr];
-  }
-
-  const fullPath: MapCoordinate[] = [startCoord, ...path, endCoord];
-  const smoothed = getCatmullRomPoints(fullPath, 6);
-
-  return {
-    coords: smoothed,
-    durationSec: dist[endId] || 420,
-    distanceM: distM[endId] || 5200,
-  };
-}
-
 // In-memory route cache to avoid redundant API requests
 const routeCache = new Map<string, FetchRouteResult>();
 
-// Routing Engine: Finds the Mathematically Fastest Route between Start and End
+type ServerRoute = {
+  coords: MapCoordinate[];
+  distanceM: number;
+  durationSec: number;
+  summary: string;
+};
+
+/**
+ * DEC-PROD-045 — road geometry comes from Nest (`GET /v1/ops/routing/route` via the
+ * BFF), which uses the configured provider (ROUTING_PROVIDER). The browser never calls
+ * OSRM/Mapbox Directions itself. Unconfigured or failing → `null` (straight line).
+ */
+async function fetchServerRoutes(
+  start: MapCoordinate,
+  end: MapCoordinate,
+): Promise<ServerRoute[] | null> {
+  const params = new URLSearchParams({
+    fromLat: String(start[0]),
+    fromLng: String(start[1]),
+    toLat: String(end[0]),
+    toLng: String(end[1]),
+  });
+  try {
+    const res = await fetch(`/api/ops/routing/route?${params.toString()}`, {
+      signal: AbortSignal.timeout(6000),
+      credentials: "same-origin",
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as {
+      data?: { available?: boolean; routes?: unknown };
+    };
+    if (!body?.data?.available || !Array.isArray(body.data.routes)) return null;
+    const routes: ServerRoute[] = [];
+    for (const raw of body.data.routes as Array<Partial<ServerRoute>>) {
+      if (!Array.isArray(raw?.coords) || raw.coords.length < 2) continue;
+      routes.push({
+        coords: raw.coords,
+        distanceM: typeof raw.distanceM === "number" ? raw.distanceM : 0,
+        durationSec: typeof raw.durationSec === "number" ? raw.durationSec : 0,
+        summary: typeof raw.summary === "string" ? raw.summary : "",
+      });
+    }
+    return routes.length ? routes : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Straight segment between the endpoints; distance is great-circle, time ~34 km/h. */
+export function straightLineRoute(coords: MapCoordinate[]): FetchRouteResult {
+  const start = coords[0];
+  const end = coords[coords.length - 1];
+  const line: MapCoordinate[] = coords.length >= 2 ? [start, end] : coords;
+  const distanceM = estimateHaversineDistance(line);
+  return {
+    fastest: {
+      id: "straight",
+      name: "Đường thẳng (chưa có định tuyến)",
+      coords: line,
+      distanceKm: Number((distanceM / 1000).toFixed(1)),
+      durationMin: line.length >= 2 ? Math.max(1, Math.round(distanceM / 9.5 / 60)) : 0,
+      summary: "Khoảng cách đường chim bay — chưa cấu hình dịch vụ định tuyến",
+      isFastest: true,
+    },
+    alternatives: [],
+  };
+}
+
+// Route between the first and last point: server routes when available, else a straight line.
 export async function fetchRealRoadRoute(
   coords: MapCoordinate[],
 ): Promise<FetchRouteResult> {
   if (coords.length < 2) {
-    const fallback: RoadRouteOption = {
-      id: "direct",
-      name: "Tuyến thẳng",
-      coords,
-      distanceKm: 0,
-      durationMin: 0,
-      isFastest: true,
-    };
-    return { fastest: fallback, alternatives: [] };
+    return straightLineRoute(coords);
   }
 
-  // Pure Origin to Destination calculation to allow the fastest path algorithm
-  // to pick the optimal bridges, avenues, and bypass one-way detours
   const start = coords[0];
   const end = coords[coords.length - 1];
   const key = `fastest;${start[0].toFixed(5)},${start[1].toFixed(5)};${end[0].toFixed(5)},${end[1].toFixed(5)}`;
   const cached = routeCache.get(key);
   if (cached) return cached;
 
-  const query = `${start[1]},${start[0]};${end[1]},${end[0]}`;
-
-  const candidates: {
-    coords: MapCoordinate[];
-    distanceM: number;
-    durationSec: number;
-    summary: string;
-  }[] = [];
-
-  // 1. Query OpenStreetMap OSRM driving engine with alternatives=true
-  try {
-    const res = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/${query}?overview=full&geometries=geojson&alternatives=true`,
-      { signal: AbortSignal.timeout(4500) },
-    );
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data.routes)) {
-        for (const r of data.routes) {
-          if (r?.geometry?.coordinates?.length) {
-            candidates.push({
-              coords: r.geometry.coordinates.map(
-                ([lng, lat]: [number, number]) => [lat, lng],
-              ),
-              distanceM: r.distance || 0,
-              durationSec: r.duration || 0,
-              summary: r.legs?.[0]?.summary || "Qua Cầu Rồng & Võ Văn Kiệt",
-            });
-          }
-        }
-      }
-    }
-  } catch {
-    // continue to Mapbox or Dijkstra
+  const candidates = await fetchServerRoutes(start, end);
+  if (!candidates) {
+    // Not cached: the provider may come back (or be configured) later.
+    return straightLineRoute(coords);
   }
 
-  // 2. Query Mapbox Directions with alternatives=true if no candidates yet
-  if (MAPBOX_DEFAULT_TOKEN && candidates.length === 0) {
-    try {
-      const res = await fetch(
-        `https://api.mapbox.com/directions/v5/mapbox/driving/${query}?geometries=geojson&overview=full&alternatives=true&access_token=${MAPBOX_DEFAULT_TOKEN}`,
-        { signal: AbortSignal.timeout(4500) },
-      );
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.routes)) {
-          for (const r of data.routes) {
-            if (r?.geometry?.coordinates?.length) {
-              candidates.push({
-                coords: r.geometry.coordinates.map(
-                  ([lng, lat]: [number, number]) => [lat, lng],
-                ),
-                distanceM: r.distance || 0,
-                durationSec: r.duration || 0,
-                summary: r.legs?.[0]?.summary || "",
-              });
-            }
-          }
-        }
-      }
-    } catch {
-      // fallback
-    }
-  }
-
-  // 3. Fallback: Formal Dijkstra Shortest Duration Algorithm on Da Nang road graph
-  if (candidates.length === 0) {
-    const dijkstraResult = runDijkstraFastestRoute(start, end);
-    if (dijkstraResult) {
-      candidates.push({
-        coords: dijkstraResult.coords,
-        distanceM: dijkstraResult.distanceM,
-        durationSec: dijkstraResult.durationSec,
-        summary: "Qua Cầu Rồng & Võ Văn Kiệt (Thuật toán Dijkstra)",
-      });
-    } else {
-      const smoothed = getCatmullRomPoints(coords, 10);
-      const dist = estimateHaversineDistance(coords);
-      candidates.push({
-        coords: smoothed,
-        distanceM: dist,
-        durationSec: Math.round(dist / 9.5), // ~34 km/h
-        summary: "Đường nội suy",
-      });
-    }
-  }
-
-  // Sort candidate routes by duration ascending: min(duration) is mathematically the FASTEST route!
   candidates.sort((a, b) => a.durationSec - b.durationSec);
 
   const fastestOption: RoadRouteOption = {
@@ -495,7 +220,7 @@ export async function fetchRealRoadRoute(
     coords: candidates[0].coords,
     distanceKm: Number((candidates[0].distanceM / 1000).toFixed(1)),
     durationMin: Math.max(1, Math.round(candidates[0].durationSec / 60)),
-    summary: candidates[0].summary || "Qua Cầu Rồng & Võ Văn Kiệt",
+    summary: candidates[0].summary,
     isFastest: true,
   };
 
@@ -628,7 +353,9 @@ export function RealMapView({
         : isDark
           ? "dark"
           : "osm"
-      : tileLayer;
+      : tileLayer === "mapbox" && !MAPBOX_DEFAULT_TOKEN
+        ? "osm"
+        : tileLayer;
 
   const centerLat = center[0];
   const centerLng = center[1];
@@ -697,17 +424,7 @@ export function RealMapView({
       })
       .catch(() => {
         if (isCancelled) return;
-        const fallbackCoords = getCatmullRomPoints(route, 8);
-        setRouteOptions([
-          {
-            id: "fallback",
-            name: "Lộ trình dự phòng",
-            coords: fallbackCoords,
-            distanceKm: 5.2,
-            durationMin: 7,
-            isFastest: true,
-          },
-        ]);
+        setRouteOptions([straightLineRoute(route).fastest]);
         setSelectedRouteIndex(0);
         setIsLoadingRoute(false);
       });
@@ -1503,7 +1220,9 @@ export function RealMapView({
             onClick={() =>
               setTileLayer((prev) =>
                 prev === "auto"
-                  ? "mapbox"
+                  ? MAPBOX_DEFAULT_TOKEN
+                    ? "mapbox"
+                    : "osm"
                   : prev === "mapbox"
                     ? "osm"
                     : prev === "osm"
@@ -1583,8 +1302,8 @@ export function RealMapView({
       {showAttribution && (
         <div className="absolute bottom-1 right-2 z-10 pointer-events-none flex items-center gap-2">
           <span className="hidden sm:inline-block rounded bg-white/80 px-1.5 py-0.5 text-[9px] text-muted shadow-2xs backdrop-blur-xs">
-            Cuộn chuột để zoom mượt · Giữ & kéo để di chuyển · Thuật toán
-            Dijkstra & OSRM
+            Cuộn chuột để zoom mượt · Giữ & kéo để di chuyển · Định tuyến qua
+            máy chủ DealGo
           </span>
           <span className="rounded bg-white/80 px-1.5 py-0.5 text-[9px] text-muted shadow-2xs backdrop-blur-xs">
             {effectiveTileLayer === "mapbox" ? (

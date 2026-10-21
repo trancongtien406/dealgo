@@ -22,7 +22,7 @@ describe('AppController (e2e)', () => {
       success: true,
       statusCode: 200,
       message: 'OK',
-      data: 'Hello World!',
+      data: 'DealGo API',
     });
     expect(typeof response.body.requestId).toBe('string');
     expect(response.body.requestId.length).toBeGreaterThanOrEqual(8);

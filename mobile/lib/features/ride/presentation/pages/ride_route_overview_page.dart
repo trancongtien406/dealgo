@@ -1,27 +1,86 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design_system/components/dealgo_banner.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/maps/map_lat_lng.dart';
 import '../../../../core/maps/map_port.dart';
 import '../../../../l10n/app_localizations.dart';
-import '../../../identity/presentation/widgets/auth_widgets.dart';
+import '../../../pricing/domain/pricing.dart';
 import '../../domain/entities/ride_models.dart';
 import '../../domain/entities/ride_money.dart';
 import '../utils/ride_routes.dart';
 import '../widgets/ride_widgets.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
-/// C003 — route overview before vehicle selection (fixture ETA/distance).
-class RideRouteOverviewPage extends StatelessWidget {
+/// C003 — route overview before vehicle selection, priced by the server.
+class RideRouteOverviewPage extends StatefulWidget {
   const RideRouteOverviewPage({required this.places, super.key});
 
   final RidePlaces places;
 
+  @override
+  State<RideRouteOverviewPage> createState() => _RideRouteOverviewPageState();
+}
+
+class _RideRouteOverviewPageState extends State<RideRouteOverviewPage> {
+  RideQuote? _quote;
+  var _failed = false;
+
+  RidePlaces get places => widget.places;
+
+  @override
+  void initState() {
+    super.initState();
+    _quote = widget.places.quote;
+    if (_quote == null) {
+      unawaited(_load());
+    }
+  }
+
+  Future<void> _load() async {
+    final token = rideAccessToken(context);
+    setState(() => _failed = false);
+    if (token == null) {
+      setState(() => _failed = true);
+      return;
+    }
+    try {
+      final quote = await context.read<PricingRepository>().quoteRide(
+        accessToken: token,
+        pickup: (
+          lat: places.pickup.lat,
+          lng: places.pickup.lng,
+          label: places.pickup.label,
+        ),
+        dropoff: (
+          lat: places.dropoff.lat,
+          lng: places.dropoff.lng,
+          label: places.dropoff.label,
+        ),
+      );
+      if (mounted) {
+        setState(() => _quote = quote);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _failed = true);
+      }
+    }
+  }
+
   void _continue(BuildContext context) {
-    context.push(RideRoutes.vehicle, extra: places);
+    final quote = _quote;
+    if (quote == null) {
+      return;
+    }
+    context.push(RideRoutes.vehicle, extra: places.withQuote(quote));
   }
 
   void _back(BuildContext context) {
@@ -36,15 +95,18 @@ class RideRouteOverviewPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
+    final quote = _quote;
+    final distance = quote == null
+        ? '…'
+        : l10n.rideDistanceKm(_formatKm(quote.distanceKm));
     return Scaffold(
       backgroundColor: DealGoColors.canvas,
       body: SafeArea(
         child: Column(
           children: [
-            RideScreenHeader(
+            DealGoAppHeader(
               title: l10n.rideRouteOverviewTitle,
               onBack: () => _back(context),
-              trailing: const DealGoWordmark(),
             ),
             Expanded(
               child: Stack(
@@ -60,33 +122,37 @@ class RideRouteOverviewPage extends StatelessWidget {
                           fit: StackFit.expand,
                           children: [
                             context.read<MapPort>().buildMap(
-                              center: const MapLatLng(
-                                lat: rideSamplePickupLat,
-                                lng: rideSamplePickupLng,
+                              center: MapLatLng(
+                                lat: places.pickup.lat,
+                                lng: places.pickup.lng,
                               ),
-                              markers: const [
+                              markers: [
                                 MapLatLng(
-                                  lat: rideSamplePickupLat,
-                                  lng: rideSamplePickupLng,
+                                  lat: places.pickup.lat,
+                                  lng: places.pickup.lng,
                                 ),
                                 MapLatLng(
-                                  lat: rideSampleDropoffLat,
-                                  lng: rideSampleDropoffLng,
+                                  lat: places.dropoff.lat,
+                                  lng: places.dropoff.lng,
                                 ),
                               ],
                             ),
-                            Align(
-                              alignment: Alignment.center,
-                              child: DealGoChip(
-                                label: l10n.rideRouteOverviewMapBadge,
-                                tone: DealGoChipTone.brand,
-                                leading: const Icon(
-                                  Icons.directions_car_filled,
-                                  size: 14,
-                                  color: DealGoColors.primary,
+                            if (quote != null)
+                              Align(
+                                alignment: Alignment.topCenter,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(top: 96),
+                                  child: DealGoChip(
+                                    label: distance,
+                                    tone: DealGoChipTone.brand,
+                                    leading: const Icon(
+                                      DealGoIcons.motorbike,
+                                      size: 14,
+                                      color: DealGoColors.primary,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
                           ],
                         ),
                       ),
@@ -105,14 +171,6 @@ class RideRouteOverviewPage extends StatelessWidget {
                               dropoff: places.dropoff.label,
                             ),
                           ),
-                          IconButton(
-                            tooltip: l10n.rideRouteSwapTooltip,
-                            onPressed: () {},
-                            icon: const Icon(
-                              Icons.swap_vert,
-                              color: DealGoColors.primary,
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -120,14 +178,7 @@ class RideRouteOverviewPage extends StatelessWidget {
                 ],
               ),
             ),
-            DecoratedBox(
-              decoration: const BoxDecoration(
-                color: DealGoColors.card,
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(DealGoRadius.card),
-                ),
-                border: Border(top: BorderSide(color: DealGoColors.border)),
-              ),
+            RideBottomSheet(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(
                   DealGoDimensions.pageGutter,
@@ -138,78 +189,60 @@ class RideRouteOverviewPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Center(
-                      child: Container(
-                        width: 36,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: DealGoColors.border,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
+                    const RideSheetHandle(),
+                    const SizedBox(height: DealGoSpacing.s12),
+                    Text(
+                      l10n.rideRouteOverviewTitle,
+                      style: textTheme.titleLarge,
+                    ),
+                    Text(
+                      l10n.rideRouteOverviewSubtitle,
+                      style: textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: DealGoSpacing.s12),
+                    if (_failed)
+                      DealGoBanner(
+                        key: const Key('ride-quote-error'),
+                        tone: DealGoBannerTone.warning,
+                        message: l10n.rideQuoteError,
+                        actionLabel: l10n.actionRetry,
+                        onAction: () => unawaited(_load()),
+                      )
+                    else
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _StatTile(
+                              label: l10n.rideRouteDistance,
+                              value: distance,
+                            ),
+                          ),
+                          const SizedBox(width: DealGoSpacing.s8),
+                          Expanded(
+                            child: _StatTile(
+                              key: const Key('ride-quote-reference'),
+                              label: l10n.rideRouteRefPrice,
+                              value: quote == null
+                                  ? '…'
+                                  : formatRideVnd(quote.referenceFareVnd),
+                              emphasize: true,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: DealGoSpacing.s12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                l10n.rideRouteOverviewTitle,
-                                style: textTheme.titleLarge,
-                              ),
-                              Text(
-                                l10n.rideRouteOverviewSubtitle,
-                                style: textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                        ),
-                        DealGoChip(
-                          label: l10n.rideRouteInService,
-                          tone: DealGoChipTone.success,
-                          leading: const Icon(
-                            Icons.check_circle,
-                            size: 14,
-                            color: DealGoColors.brandGreen,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: DealGoSpacing.s12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _StatTile(
-                            label: l10n.rideRouteDistance,
-                            value: l10n.rideRouteDistanceSample,
-                          ),
-                        ),
-                        const SizedBox(width: DealGoSpacing.s8),
-                        Expanded(
-                          child: _StatTile(
-                            label: l10n.rideRouteDuration,
-                            value: l10n.rideRouteDurationSample,
-                          ),
-                        ),
-                        const SizedBox(width: DealGoSpacing.s8),
-                        Expanded(
-                          child: _StatTile(
-                            label: l10n.rideRouteRefPrice,
-                            value: formatRideVnd(rideDefaultOfferVnd),
-                            emphasize: true,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: DealGoSpacing.s12),
-                    Text(l10n.rideRoutePriceHint, style: textTheme.bodySmall),
+                    if (quote == null && !_failed) ...[
+                      const SizedBox(height: DealGoSpacing.s12),
+                      Text(l10n.rideQuoteLoading, style: textTheme.bodySmall),
+                    ] else if (!_failed) ...[
+                      const SizedBox(height: DealGoSpacing.s12),
+                      RideInfoBanner(message: l10n.rideRoutePriceHint),
+                    ],
                     const SizedBox(height: DealGoSpacing.s16),
                     DealGoPrimaryButton(
                       key: const Key('ride-open-vehicle'),
                       label: l10n.rideRouteContinueVehicle,
-                      trailingIcon: Icons.arrow_forward,
+                      trailingIcon: DealGoIcons.arrowRight,
+                      enabled: quote != null,
                       onPressed: () => _continue(context),
                     ),
                   ],
@@ -223,11 +256,14 @@ class RideRouteOverviewPage extends StatelessWidget {
   }
 }
 
+String _formatKm(double km) => km.toStringAsFixed(1).replaceAll('.', ',');
+
 class _StatTile extends StatelessWidget {
   const _StatTile({
     required this.label,
     required this.value,
     this.emphasize = false,
+    super.key,
   });
 
   final String label;

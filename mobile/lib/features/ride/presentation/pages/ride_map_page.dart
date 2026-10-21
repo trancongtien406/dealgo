@@ -1,18 +1,31 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../../core/design_system/components/dealgo_secondary_button.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/maps/map_lat_lng.dart';
 import '../../../../core/maps/map_port.dart';
-import '../../../../core/design_system/components/dealgo_primary_button.dart';
-import '../../../../core/design_system/tokens/dealgo_tokens.dart';
-import '../../../identity/presentation/widgets/auth_widgets.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../../address_book/domain/repositories/address_book_repository.dart';
+import '../../../places/domain/place.dart';
+import '../../../places/presentation/current_place.dart';
+import '../../../places/presentation/place_picker_page.dart';
 import '../../domain/entities/ride_models.dart';
-import '../../domain/entities/ride_money.dart';
-import '../utils/ride_routes.dart';
+import '../cubit/ride_destination.dart';
 import '../cubit/ride_session.dart';
+import '../utils/ride_routes.dart';
 import '../widgets/ride_widgets.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
+const _suggestionLimit = 5;
+
+/// Fast ride entry (Grab / inDrive style): GPS pickup in background, destination
+/// first, auto-advance to route when both points are ready.
 class RideMapPage extends StatefulWidget {
   const RideMapPage({super.key});
 
@@ -21,602 +34,420 @@ class RideMapPage extends StatefulWidget {
 }
 
 class _RideMapPageState extends State<RideMapPage> {
-  final TextEditingController _pickup = TextEditingController(
-    text: rideSamplePickupLabel,
-  );
-  final TextEditingController _dropoff = TextEditingController();
-  var _showMap = false;
-  var _scheduleNote = false;
+  PlaceOption? _pickup;
+  PlaceOption? _dropoff;
+  var _locating = false;
+  var _suggestions = const <PlaceOption>[];
+  var _autoAdvanced = false;
 
   @override
-  void dispose() {
-    _pickup.dispose();
-    _dropoff.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _dropoff = context.read<RideDestinationCubit>().take();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(_locatePickup());
+      unawaited(_loadSuggestions());
+      // Destination-first: open picker immediately when nothing pre-filled.
+      if (_dropoff == null) {
+        unawaited(_pickDropoff(autoOpen: true));
+      } else {
+        _tryAutoAdvance();
+      }
+    });
   }
 
-  void _revealMap() {
-    setState(() => _showMap = true);
+  Future<void> _locatePickup() async {
+    setState(() => _locating = true);
+    final result =
+        await locateCurrentPlace(
+          context,
+          accessToken: rideAccessToken(context),
+        ).timeout(
+          const Duration(seconds: 8),
+          onTimeout: () => const CurrentPlaceFailed(),
+        );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _locating = false;
+      if (result is CurrentPlaceFound && _pickup == null) {
+        _pickup = result.place;
+      }
+    });
+    _tryAutoAdvance();
   }
 
-  void _useSuggestion(String label) {
-    _dropoff.text = label;
-    setState(() {});
+  Future<void> _loadSuggestions() async {
+    final token = rideAccessToken(context);
+    if (token == null) {
+      return;
+    }
+    final places = context.read<PlacesRepository>();
+    final book = context.read<AddressBookRepository>();
+    final recent = await places
+        .recentDestinations(accessToken: token)
+        .then((rows) => rows, onError: (_) => const <PlaceOption>[]);
+    final saved = await book
+        .list(accessToken: token)
+        .then(
+          (rows) => [
+            for (final row in rows)
+              if (row.lat != null && row.lng != null)
+                PlaceOption(
+                  name: row.label,
+                  address: row.addressLine,
+                  lat: row.lat!,
+                  lng: row.lng!,
+                  source: PlaceSource.saved,
+                ),
+          ],
+          onError: (_) => const <PlaceOption>[],
+        );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _suggestions = [...saved, ...recent].take(_suggestionLimit).toList();
+    });
+  }
+
+  Future<void> _pickDropoff({bool autoOpen = false}) async {
+    final place = await pickPlace(context, PlacePickPurpose.dropoff);
+    if (!mounted) {
+      return;
+    }
+    if (place == null) {
+      // User dismissed the auto-opened picker — stay on map.
+      if (autoOpen) {
+        return;
+      }
+      return;
+    }
+    setState(() => _dropoff = place);
+    _tryAutoAdvance();
+  }
+
+  Future<void> _pickPickup() async {
+    final place = await pickPlace(context, PlacePickPurpose.pickup);
+    if (!mounted || place == null) {
+      return;
+    }
+    setState(() => _pickup = place);
+    _tryAutoAdvance();
+  }
+
+  void _chooseSuggestion(PlaceOption place) {
+    setState(() => _dropoff = place);
+    _tryAutoAdvance();
+  }
+
+  void _swap() {
+    setState(() {
+      final pickup = _pickup;
+      _pickup = _dropoff;
+      _dropoff = pickup;
+      _autoAdvanced = false;
+    });
+  }
+
+  RidePlaces? get _places {
+    final pickup = _pickup;
+    final dropoff = _dropoff;
+    if (pickup == null || dropoff == null) {
+      return null;
+    }
+    final places = RidePlaces(
+      pickup: RidePoint(lat: pickup.lat, lng: pickup.lng, label: pickup.label),
+      dropoff: RidePoint(
+        lat: dropoff.lat,
+        lng: dropoff.lng,
+        label: dropoff.label,
+      ),
+    );
+    return places.canContinue ? places : null;
+  }
+
+  bool get _samePlace {
+    final pickup = _pickup;
+    final dropoff = _dropoff;
+    return pickup != null &&
+        dropoff != null &&
+        (pickup.lat - dropoff.lat).abs() < 0.0001 &&
+        (pickup.lng - dropoff.lng).abs() < 0.0001;
+  }
+
+  void _tryAutoAdvance() {
+    if (_autoAdvanced || _places == null || _samePlace) {
+      return;
+    }
+    _autoAdvanced = true;
+    _continue();
   }
 
   void _continue() {
-    final places = RidePlaces(
-      pickupLabel: _pickup.text,
-      dropoffLabel: _dropoff.text,
-    );
-    if (!places.canContinue) {
+    final places = _places;
+    if (places == null || _samePlace) {
       return;
     }
     context.push(RideRoutes.routeOverview, extra: places);
   }
 
-  void _back() => context.go('/customer');
-
-  @override
-  Widget build(BuildContext context) {
-    final openRideId = context.watch<RideSessionCubit>().state;
-    return Material(
-      color: DealGoColors.canvas,
-      child: SafeArea(
-        child: _showMap
-            ? _MapReady(
-                pickup: _pickup,
-                dropoff: _dropoff,
-                scheduleNote: _scheduleNote,
-                openRideId: openRideId,
-                onBack: _back,
-                onChanged: () => setState(() {}),
-                onSchedule: () => setState(() => _scheduleNote = true),
-                onSuggestion: _useSuggestion,
-                onContinue: _continue,
-              )
-            : _MapLoading(onBack: _back, onManual: _revealMap),
-      ),
-    );
+  void _back() {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    context.go('/customer');
   }
-}
-
-class _MapLoading extends StatelessWidget {
-  const _MapLoading({required this.onBack, required this.onManual});
-
-  final VoidCallback onBack;
-  final VoidCallback onManual;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
-    return Column(
-      children: [
-        RideScreenHeader(
-          title: 'Bản đồ đặt xe',
-          subtitle: 'DealGo · Biến thể trạng thái',
-          onBack: onBack,
-        ),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              DealGoDimensions.pageGutter,
-              DealGoSpacing.s24,
-              DealGoDimensions.pageGutter,
-              DealGoSpacing.s16,
-            ),
-            children: [
-              const RideStateHero(
-                icon: Icons.my_location,
-                iconColor: Color(0xFF2563EB),
-                background: Color(0xFFE8F1FF),
-                title: 'Đang tải bản đồ...',
-                message:
-                    'Hệ thống đang lấy bản đồ và gợi ý địa điểm đón quanh bạn.',
-              ),
-              const SizedBox(height: DealGoSpacing.s24),
-              const _SkeletonBlock(widths: [0.92, 0.7]),
-              const SizedBox(height: DealGoSpacing.s12),
-              const _SkeletonBlock(widths: [0.84, 0.55]),
-              const SizedBox(height: DealGoSpacing.s16),
-              const RideNote(
-                message: 'Bạn vẫn có thể nhập địa chỉ nếu bản đồ tải chậm.',
-              ),
-              const SizedBox(height: DealGoSpacing.s8),
-              Text(
-                'Không có khóa bản đồ. Đà Nẵng dùng điểm mẫu cố định.',
-                style: textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            DealGoDimensions.pageGutter,
-            DealGoSpacing.s8,
-            DealGoDimensions.pageGutter,
-            DealGoSpacing.s16,
-          ),
-          child: DealGoPrimaryButton(
-            label: 'Nhập địa chỉ thủ công',
-            trailingIcon: Icons.arrow_forward,
-            onPressed: onManual,
-          ),
-        ),
-      ],
-    );
-  }
-}
+    final pendingRideId = context.watch<RideSessionCubit>().state;
+    final pickup = _pickup;
+    final dropoff = _dropoff;
+    final center = pickup != null
+        ? MapLatLng(lat: pickup.lat, lng: pickup.lng)
+        : dropoff != null
+        ? MapLatLng(lat: dropoff.lat, lng: dropoff.lng)
+        : danangViewportCenter;
 
-class _SkeletonBlock extends StatelessWidget {
-  const _SkeletonBlock({required this.widths});
-
-  final List<double> widths;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: DealGoColors.card,
-        borderRadius: BorderRadius.circular(DealGoRadius.card),
-        border: Border.all(color: DealGoColors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(DealGoSpacing.s16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return BlocListener<RideDestinationCubit, PlaceOption?>(
+      listenWhen: (_, next) => next != null,
+      listener: (context, _) {
+        final place = context.read<RideDestinationCubit>().take();
+        if (place != null) {
+          setState(() {
+            _dropoff = place;
+            _autoAdvanced = false;
+          });
+          _tryAutoAdvance();
+        }
+      },
+      child: Material(
+        color: DealGoColors.canvas,
+        child: Stack(
           children: [
-            for (final width in widths) ...[
-              FractionallySizedBox(
-                widthFactor: width,
-                child: const DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Color(0xFFE7E3EF),
-                    borderRadius: BorderRadius.all(Radius.circular(8)),
+            Positioned.fill(
+              child: context.read<MapPort>().buildMap(
+                center: center,
+                markers: [
+                  if (pickup != null)
+                    MapLatLng(lat: pickup.lat, lng: pickup.lng),
+                  if (dropoff != null)
+                    MapLatLng(lat: dropoff.lat, lng: dropoff.lng),
+                ],
+              ),
+            ),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: DealGoAppHeader(
+                title: l10n.rideBookTitle,
+                onBack: _back,
+
+                backgroundColor: DealGoColors.card.withValues(alpha: 0.94),
+                applySafeArea: true,
+              ),
+            ),
+            Positioned(
+              right: DealGoDimensions.pageGutter,
+              bottom: MediaQuery.sizeOf(context).height * 0.38 + 8,
+              child: Material(
+                color: DealGoColors.card,
+                shape: const CircleBorder(),
+                elevation: 2,
+                child: IconButton(
+                  tooltip: l10n.mapRecenter,
+                  onPressed: _locating ? null : _locatePickup,
+                  icon: const Icon(
+                    DealGoIcons.myLocation,
+                    color: DealGoColors.primary,
                   ),
-                  child: SizedBox(height: 12),
                 ),
               ),
-              const SizedBox(height: DealGoSpacing.s8),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MapReady extends StatelessWidget {
-  const _MapReady({
-    required this.pickup,
-    required this.dropoff,
-    required this.scheduleNote,
-    required this.openRideId,
-    required this.onBack,
-    required this.onChanged,
-    required this.onSchedule,
-    required this.onSuggestion,
-    required this.onContinue,
-  });
-
-  final TextEditingController pickup;
-  final TextEditingController dropoff;
-  final bool scheduleNote;
-  final String? openRideId;
-  final VoidCallback onBack;
-  final VoidCallback onChanged;
-  final VoidCallback onSchedule;
-  final ValueChanged<String> onSuggestion;
-  final VoidCallback onContinue;
-
-  @override
-  Widget build(BuildContext context) {
-    final places = RidePlaces(
-      pickupLabel: pickup.text,
-      dropoffLabel: dropoff.text,
-    );
-    final pendingRideId = openRideId;
-    final textTheme = Theme.of(context).textTheme;
-    return Column(
-      children: [
-        RideScreenHeader(
-          title: 'Đặt xe',
-          onBack: onBack,
-          trailing: const DealGoWordmark(),
-        ),
-        Expanded(
-          flex: 5,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: DealGoDimensions.pageGutter,
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(DealGoRadius.card),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  context.read<MapPort>().buildMap(
-                    center: const MapLatLng(
-                      lat: rideSamplePickupLat,
-                      lng: rideSamplePickupLng,
-                    ),
-                    markers: const [
-                      MapLatLng(
-                        lat: rideSamplePickupLat,
-                        lng: rideSamplePickupLng,
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: FractionallySizedBox(
+                heightFactor: 0.42,
+                widthFactor: 1,
+                child: RideBottomSheet(
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(
+                            DealGoDimensions.pageGutter,
+                            DealGoSpacing.s12,
+                            DealGoDimensions.pageGutter,
+                            DealGoSpacing.s8,
+                          ),
+                          children: [
+                            const RideSheetHandle(),
+                            const SizedBox(height: DealGoSpacing.s12),
+                            Text(l10n.rideWhereTo, style: textTheme.titleLarge),
+                            const SizedBox(height: DealGoSpacing.s12),
+                            // Destination first — primary action.
+                            RideStopField(
+                              key: const Key('ride-dropoff-label'),
+                              icon: DealGoIcons.search,
+                              tone: DealGoColors.primary,
+                              caption: l10n.rideDropoff,
+                              value: dropoff?.label,
+                              placeholder: l10n.rideDropoffPlaceholder,
+                              onTap: () => _pickDropoff(),
+                            ),
+                            const SizedBox(height: DealGoSpacing.s8),
+                            RideStopField(
+                              key: const Key('ride-pickup-label'),
+                              icon: DealGoIcons.myLocation,
+                              tone: DealGoColors.brandGreen,
+                              caption: l10n.ridePickup,
+                              value: pickup?.label,
+                              placeholder: _locating
+                                  ? l10n.placeLocating
+                                  : l10n.ridePickupPlaceholder,
+                              onTap: _pickPickup,
+                              trailing: IconButton(
+                                tooltip: l10n.rideRouteSwapTooltip,
+                                onPressed: pickup == null && dropoff == null
+                                    ? null
+                                    : _swap,
+                                icon: const Icon(
+                                  DealGoIcons.swapVert,
+                                  color: DealGoColors.primary,
+                                ),
+                              ),
+                            ),
+                            if (_samePlace) ...[
+                              const SizedBox(height: DealGoSpacing.s8),
+                              RideNote(message: l10n.rideSamePlaces),
+                            ],
+                            if (_suggestions.isNotEmpty) ...[
+                              const SizedBox(height: DealGoSpacing.s16),
+                              Text(
+                                l10n.rideSuggestionsTitle,
+                                style: textTheme.titleSmall,
+                              ),
+                              const SizedBox(height: DealGoSpacing.s8),
+                              for (final (index, place) in _suggestions.indexed)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    bottom: DealGoSpacing.s8,
+                                  ),
+                                  child: Material(
+                                    key: Key('ride-suggestion-$index'),
+                                    color: DealGoColors.card,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(
+                                        DealGoRadius.input,
+                                      ),
+                                      side: const BorderSide(
+                                        color: DealGoColors.border,
+                                      ),
+                                    ),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: InkWell(
+                                      onTap: () => _chooseSuggestion(place),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(
+                                          DealGoSpacing.s12,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              place.source == PlaceSource.saved
+                                                  ? DealGoIcons.pin
+                                                  : DealGoIcons.history,
+                                              color:
+                                                  place.source ==
+                                                      PlaceSource.saved
+                                                  ? DealGoColors.primary
+                                                  : DealGoColors.brandGreen,
+                                            ),
+                                            const SizedBox(
+                                              width: DealGoSpacing.s12,
+                                            ),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    place.name,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: textTheme.bodyMedium
+                                                        ?.copyWith(
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                        ),
+                                                  ),
+                                                  if (place.address.isNotEmpty)
+                                                    Text(
+                                                      place.address,
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style:
+                                                          textTheme.bodySmall,
+                                                    ),
+                                                ],
+                                              ),
+                                            ),
+                                            const Icon(
+                                              DealGoIcons.chevronRight,
+                                              color: DealGoColors.textTertiary,
+                                              size: 18,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                            if (pendingRideId != null) ...[
+                              const SizedBox(height: DealGoSpacing.s12),
+                              DealGoSecondaryButton(
+                                label: l10n.rideOpenPendingOffers,
+                                onPressed: () => context.push(
+                                  RideRoutes.offers(pendingRideId),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
-                      MapLatLng(
-                        lat: rideSampleDropoffLat,
-                        lng: rideSampleDropoffLng,
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          DealGoDimensions.pageGutter,
+                          DealGoSpacing.s8,
+                          DealGoDimensions.pageGutter,
+                          DealGoSpacing.s12 +
+                              MediaQuery.viewPaddingOf(context).bottom,
+                        ),
+                        child: DealGoPrimaryButton(
+                          key: const Key('ride-open-route-overview'),
+                          label: l10n.rideCheckRoute,
+                          trailingIcon: DealGoIcons.arrowRight,
+                          enabled: _places != null && !_samePlace,
+                          isLoading: _locating && _dropoff != null,
+                          onPressed: _continue,
+                        ),
                       ),
                     ],
                   ),
-                  const _MapChrome(),
-                ],
-              ),
-            ),
-          ),
-        ),
-        Expanded(
-          flex: 6,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              DealGoDimensions.pageGutter,
-              DealGoSpacing.s12,
-              DealGoDimensions.pageGutter,
-              DealGoSpacing.s16,
-            ),
-            children: [
-              Text('Bạn muốn đi đâu?', style: textTheme.titleLarge),
-              Text('Khám phá Đà Nẵng cùng DealGo', style: textTheme.bodySmall),
-              const SizedBox(height: DealGoSpacing.s12),
-              _ModeRow(scheduleNote: scheduleNote, onSchedule: onSchedule),
-              if (scheduleNote) ...[
-                const SizedBox(height: DealGoSpacing.s8),
-                const RideNote(
-                  message: 'Đặt lịch chưa mở. Chuyến này là đơn ngay.',
                 ),
-              ],
-              const SizedBox(height: DealGoSpacing.s12),
-              _LabelField(
-                fieldKey: const Key('ride-pickup-label'),
-                icon: Icons.place_outlined,
-                label: 'Điểm đón',
-                hint: 'Điểm đón',
-                controller: pickup,
-                onChanged: onChanged,
               ),
-              const SizedBox(height: DealGoSpacing.s8),
-              _LabelField(
-                fieldKey: const Key('ride-dropoff-label'),
-                icon: Icons.search,
-                label: 'Điểm đến',
-                hint: 'Nhập điểm đến của bạn',
-                controller: dropoff,
-                onChanged: onChanged,
-              ),
-              const SizedBox(height: DealGoSpacing.s8),
-              Text(
-                'Tọa độ gửi lên là điểm mẫu Đà Nẵng, kể cả khi bạn đổi tên địa điểm.',
-                style: textTheme.bodySmall,
-              ),
-              const SizedBox(height: DealGoSpacing.s16),
-              Row(
-                children: [
-                  Text(
-                    'ĐỊA ĐIỂM GỢI Ý',
-                    style: textTheme.labelSmall?.copyWith(
-                      color: DealGoColors.textSecondary,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    'Xem tất cả',
-                    style: textTheme.labelSmall?.copyWith(
-                      color: DealGoColors.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: DealGoSpacing.s8),
-              _SuggestionTile(
-                icon: Icons.place,
-                iconColor: DealGoColors.primary,
-                title: 'Cầu Rồng',
-                subtitle: 'An Hải, Sơn Trà, Đà Nẵng',
-                onTap: () => onSuggestion('Cầu Rồng'),
-              ),
-              _SuggestionTile(
-                key: const Key('ride-suggestion-airport'),
-                icon: Icons.flight,
-                iconColor: DealGoColors.brandGreen,
-                title: 'Sân bay quốc tế Đà Nẵng',
-                subtitle: 'Đường Duy Tân, Hải Châu',
-                onTap: () => onSuggestion(rideSampleDropoffLabel),
-              ),
-              if (pendingRideId != null) ...[
-                const SizedBox(height: DealGoSpacing.s12),
-                DealGoPrimaryButton(
-                  label: 'Xem đề xuất đang chờ',
-                  onPressed: () =>
-                      context.push(RideRoutes.offers(pendingRideId)),
-                ),
-              ],
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            DealGoDimensions.pageGutter,
-            DealGoSpacing.s8,
-            DealGoDimensions.pageGutter,
-            DealGoSpacing.s12,
-          ),
-          child: DealGoPrimaryButton(
-            key: const Key('ride-open-route-overview'),
-            label: 'Kiểm tra hành trình',
-            trailingIcon: Icons.arrow_forward,
-            enabled: places.canContinue,
-            onPressed: _continueGuard(places, onContinue),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-VoidCallback _continueGuard(RidePlaces places, VoidCallback onContinue) {
-  if (!places.canContinue) {
-    return () {};
-  }
-  return onContinue;
-}
-
-class _ModeRow extends StatelessWidget {
-  const _ModeRow({required this.scheduleNote, required this.onSchedule});
-
-  final bool scheduleNote;
-  final VoidCallback onSchedule;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const _ModeChip(
-          icon: Icons.access_time,
-          label: 'Đón ngay',
-          selected: true,
-          onTap: _noop,
-        ),
-        const SizedBox(width: DealGoSpacing.s8),
-        _ModeChip(
-          icon: Icons.calendar_today_outlined,
-          label: 'Đặt lịch',
-          selected: scheduleNote,
-          onTap: onSchedule,
-        ),
-      ],
-    );
-  }
-}
-
-void _noop() {}
-
-class _ModeChip extends StatelessWidget {
-  const _ModeChip({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = selected ? DealGoColors.primary : DealGoColors.textSecondary;
-    return Material(
-      color: selected ? DealGoColors.subtlePurple : DealGoColors.card,
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: DealGoSpacing.s12,
-            vertical: DealGoSpacing.s8,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(width: DealGoSpacing.s4),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.labelSmall
-                    ?.copyWith(color: color, fontWeight: FontWeight.w700),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LabelField extends StatelessWidget {
-  const _LabelField({
-    required this.fieldKey,
-    required this.icon,
-    required this.label,
-    required this.hint,
-    required this.controller,
-    required this.onChanged,
-  });
-
-  final Key fieldKey;
-  final IconData icon;
-  final String label;
-  final String hint;
-  final TextEditingController controller;
-  final VoidCallback onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      key: fieldKey,
-      controller: controller,
-      textInputAction: TextInputAction.next,
-      maxLength: rideLabelMaxLength,
-      onChanged: (_) => onChanged(),
-      decoration: InputDecoration(
-        counterText: '',
-        labelText: label,
-        hintText: hint,
-        prefixIcon: Icon(icon, color: DealGoColors.primary),
-        filled: true,
-        fillColor: DealGoColors.card,
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(DealGoRadius.input),
-          borderSide: const BorderSide(color: DealGoColors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(DealGoRadius.input),
-          borderSide: const BorderSide(color: DealGoColors.primary, width: 1.4),
-        ),
-      ),
-    );
-  }
-}
-
-class _SuggestionTile extends StatelessWidget {
-  const _SuggestionTile({
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-    super.key,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: iconColor),
-      title: Text(
-        title,
-        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
-      ),
-      subtitle: Text(subtitle, style: textTheme.bodySmall),
-      onTap: onTap,
-    );
-  }
-}
-
-class _MapChrome extends StatelessWidget {
-  const _MapChrome();
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Stack(
-      children: [
-        Positioned(
-          left: 12,
-          top: 12,
-          child: Text(
-            'HẢI CHÂU',
-            style: textTheme.labelSmall?.copyWith(
-              color: DealGoColors.textSecondary,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.6,
-            ),
-          ),
-        ),
-        Positioned(
-          right: 16,
-          top: 36,
-          child: Text(
-            'SÔNG HÀN',
-            style: textTheme.labelSmall?.copyWith(
-              color: const Color(0xFF5B7C99),
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        const Align(alignment: Alignment(0, -0.05), child: _PickupPin()),
-        const Align(alignment: Alignment(0.15, 0.42), child: _HereChip()),
-      ],
-    );
-  }
-}
-
-class _PickupPin extends StatelessWidget {
-  const _PickupPin();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: DealGoColors.card,
-        shape: BoxShape.circle,
-        border: Border.all(color: DealGoColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: DealGoColors.text.withValues(alpha: 0.08),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: const SizedBox(
-        width: 36,
-        height: 36,
-        child: Icon(Icons.circle, color: DealGoColors.primary, size: 16),
-      ),
-    );
-  }
-}
-
-class _HereChip extends StatelessWidget {
-  const _HereChip();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: DealGoColors.card,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: DealGoColors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: DealGoSpacing.s8,
-          vertical: DealGoSpacing.s4,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.place, color: DealGoColors.primary, size: 14),
-            const SizedBox(width: 4),
-            Text(
-              'Vị trí hiện tại',
-              style: Theme.of(context).textTheme.labelSmall
-                  ?.copyWith(fontWeight: FontWeight.w700),
             ),
           ],
         ),

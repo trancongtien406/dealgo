@@ -299,6 +299,9 @@ function isToken(value: unknown): value is string {
 }
 
 function publicErrorMessage(status: number, payload: unknown): string {
+  if (status === 429) {
+    return "Bạn đã thử đăng nhập quá nhiều lần. Vui lòng đợi 5 phút rồi thử lại.";
+  }
   if (status >= 500) {
     return "Không thể đăng nhập. Thử lại.";
   }

@@ -2,7 +2,8 @@ import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { OpsSessionGuard } from '../identity/access-auth.guard.js';
+import { OpsPermissionGuard } from '../identity/ops-rbac/ops-permission.guard.js';
+import { RequireOpsPermission } from '../identity/ops-rbac/ops-permission.decorator.js';
 import { OpsRefundsService } from './ops-refunds.service.js';
 
 class OpsRefundsQueryDto {
@@ -31,11 +32,12 @@ class OpsRefundsQueryDto {
 @ApiTags('ops')
 @ApiBearerAuth()
 @Controller('v1/ops/refunds')
-@UseGuards(OpsSessionGuard)
+@UseGuards(OpsPermissionGuard)
 export class OpsRefundsController {
   constructor(private readonly refunds: OpsRefundsService) {}
 
   @Get()
+  @RequireOpsPermission('refunds.read')
   @ApiOperation({
     summary:
       'List refund-related ops cases derived from disputes (open refund requests and PARTIAL/FULL refund resolutions)',

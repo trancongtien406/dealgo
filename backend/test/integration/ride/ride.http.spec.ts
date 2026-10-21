@@ -1,4 +1,6 @@
+import { MemoryRidePickupCodeStore, RIDE_PICKUP_CODE_STORE } from '../../../src/modules/ride/ride-pickup-code.js';
 import { INestApplication } from '@nestjs/common';
+import { EARNINGS_REPOSITORY, MemoryEarningsRepository } from '../../../src/modules/earnings/index.js';
 import { ConfigModule } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -34,6 +36,8 @@ import { MemoryPaymentRepository } from '../../../src/modules/payment/payment.re
 import { haversineKm, quoteReferenceFareVnd } from '../../../src/modules/ride/ride-geo.js';
 import { RIDE_CLOCK, RIDE_REPOSITORY, type RideClock } from '../../../src/modules/ride/ride.constants.js';
 import { RideModule } from '../../../src/modules/ride/ride.module.js';
+import { PROMOTION_REPOSITORY } from '../../../src/modules/promotion/promotion.constants.js';
+import { MemoryPromotionRepository } from '../../../src/modules/promotion/promotion.repository.js';
 import { MemoryRideRepository } from '../../../src/modules/ride/ride.repository.js';
 
 const OPS_EMAIL = 'ops@dealgo.test';
@@ -87,6 +91,7 @@ describe('ride negotiation http', () => {
               RIDE_MAX_FARE_VND: '500000',
               RIDE_REFERENCE_VND_PER_KM: '8000',
               OTP_THROTTLE_LIMIT: '1000',
+              OTP_PHONE_LIMIT: '1000',
               PARTNER_ELIGIBILITY_BYPASS: 'true',
             }),
         }),
@@ -144,6 +149,27 @@ describe('ride negotiation http', () => {
     const second = await postRide(customer.token, 'idem-create-ride-2', 30_000);
     expect(second.status).toBe(409);
     expect(second.body.errorCode).toBe('RIDE_ALREADY_OPEN');
+  });
+
+  it('quotes distance and the reference fare that create() stores', async () => {
+    const customer = await login();
+    const quote = await request(app.getHttpServer())
+      .post('/v1/rides/quote')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .send({ pickup, dropoff })
+      .expect(200);
+    const km = haversineKm(pickup, dropoff);
+    expect(quote.body.data).toEqual({
+      distanceKm: Math.round(km * 10) / 10,
+      referenceFareVnd: quoteReferenceFareVnd(km, 8000, 10_000),
+      minFareVnd: 10_000,
+      maxFareVnd: expect.any(Number),
+    });
+    await request(app.getHttpServer())
+      .post('/v1/rides/quote')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .send({ pickup })
+      .expect(400);
   });
 
   it('assigns the countered driver and agreed fare, and replays the same selection key', async () => {
@@ -298,7 +324,10 @@ describe('ride negotiation http', () => {
 
   it('does not upgrade a suspended customer grant', async () => {
     const customer = await login();
-    await repository.insertGrant(customer.userId, 'CUSTOMER', 'SUSPENDED');
+    const customerGrant = (await repository.listGrants(customer.userId)).find(
+      (grant) => grant.role === 'CUSTOMER',
+    );
+    await repository.updateGrantStatus(customerGrant!.id, 'SUSPENDED');
 
     const denied = await postRide(customer.token, 'idem-suspended-customer', 30_000);
     expect(denied.status).toBe(403);
@@ -387,9 +416,11 @@ describe('ride negotiation http', () => {
       .expect(200);
     expect(arrived.body.data.status).toBe('DRIVER_ARRIVED');
 
+    const lifecycleCode = await pickupCodeFor(customer, rideId);
     const started = await request(app.getHttpServer())
       .post(`/v1/rides/${rideId}/start`)
       .set('Authorization', `Bearer ${driver.token}`)
+      .send({ pickupCode: lifecycleCode })
       .expect(200);
     expect(started.body.data.status).toBe('IN_TRIP');
 
@@ -451,12 +482,82 @@ describe('ride negotiation http', () => {
       .set('Authorization', `Bearer ${ops.body.data.accessToken}`)
       .expect(200);
     expect(opsDetail.body.data.id).toBe(rideId);
+    // Admin resolves the booking customer's name from this id (ops-only field).
+    expect(opsDetail.body.data.customerId).toBe(customer.userId);
 
     const opsLedger = await request(app.getHttpServer())
       .get(`/v1/ops/rides/${rideId}/ledger`)
       .set('Authorization', `Bearer ${ops.body.data.accessToken}`)
       .expect(200);
     expect(opsLedger.body.data.id).toBe(journal.body.data.id);
+  });
+
+  it('shows the assigned driver’s fresh location to the ride customer only (DEC-PROD-031)', async () => {
+    const customer = await login();
+    const driver = await login();
+    const stranger = await login();
+    await repository.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');
+    const rideId = await assignRide(customer, driver, 'idem-loc-create', 'idem-loc-select');
+    const locationOf = (token: string) =>
+      request(app.getHttpServer())
+        .get(`/v1/rides/${rideId}/driver-location`)
+        .set('Authorization', `Bearer ${token}`);
+
+    // Nothing reported yet.
+    expect((await locationOf(customer.token).expect(200)).body.data).toEqual({ location: null });
+
+    // Only an active driver may report; bad coordinates are rejected.
+    await request(app.getHttpServer())
+      .post('/v1/me/presence/location')
+      .set('Authorization', `Bearer ${stranger.token}`)
+      .send({ lat: 10.78, lng: 106.7 })
+      .expect(403);
+    await request(app.getHttpServer())
+      .post('/v1/me/presence/location')
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ lat: 91, lng: 106.7 })
+      .expect(400);
+    const reported = await request(app.getHttpServer())
+      .post('/v1/me/presence/location')
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ lat: 10.78, lng: 106.7 })
+      .expect(200);
+    expect(reported.body.data).toMatchObject({ lat: 10.78, lng: 106.7 });
+
+    clock.set(new Date());
+    const seen = await locationOf(customer.token).expect(200);
+    expect(seen.body.data.location).toMatchObject({ lat: 10.78, lng: 106.7 });
+    expect(typeof seen.body.data.location.at).toBe('string');
+
+    // The heartbeat keeps the driver's online/service choices.
+    const presence = await request(app.getHttpServer())
+      .post('/v1/me/presence')
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ online: true })
+      .expect(200);
+    expect(presence.body.data).toMatchObject({ online: true, lat: 10.78, lng: 106.7 });
+
+    // Other users (including the driver) get 404, like GET /rides/:id for strangers.
+    await locationOf(stranger.token).expect(404);
+    await locationOf(driver.token).expect(404);
+
+    // Older than 2 minutes → hidden.
+    clock.set(new Date(Date.now() + 3 * 60_000));
+    expect((await locationOf(customer.token).expect(200)).body.data).toEqual({ location: null });
+
+    // After the ride ends the position is no longer shared.
+    clock.set(new Date());
+    await request(app.getHttpServer())
+      .post(`/v1/me/presence/location`)
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ lat: 10.79, lng: 106.71 })
+      .expect(200);
+    await request(app.getHttpServer())
+      .post(`/v1/rides/${rideId}/cancel`)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .send({})
+      .expect(200);
+    expect((await locationOf(customer.token).expect(200)).body.data).toEqual({ location: null });
   });
 
   it('forbids a non-assigned driver from starting a trip', async () => {
@@ -478,9 +579,89 @@ describe('ride negotiation http', () => {
 
     const denied = await request(app.getHttpServer())
       .post(`/v1/rides/${rideId}/start`)
-      .set('Authorization', `Bearer ${other.token}`);
+      .set('Authorization', `Bearer ${other.token}`)
+      .send({ pickupCode: '0000' });
     expect(denied.status).toBe(403);
     expect(denied.body.errorCode).toBe('RIDE_NOT_ASSIGNED_DRIVER');
+  });
+
+  it('issues the pickup code to the customer only and makes the driver submit it', async () => {
+    const customer = await login();
+    const driver = await login();
+    await repository.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');
+    const rideId = await assignRide(customer, driver, 'idem-code-create', 'idem-code-select');
+    const code = await pickupCodeFor(customer, rideId);
+    expect(await pickupCodeFor(customer, rideId)).toBe(code);
+
+    const driverView = await request(app.getHttpServer())
+      .get(`/v1/rides/${rideId}`)
+      .set('Authorization', `Bearer ${driver.token}`)
+      .expect(200);
+    expect(driverView.body.data.pickupCode).toBeUndefined();
+
+    for (const step of ['en-route', 'arrived']) {
+      const res = await request(app.getHttpServer())
+        .post(`/v1/rides/${rideId}/${step}`)
+        .set('Authorization', `Bearer ${driver.token}`)
+        .expect(200);
+      expect(res.body.data.pickupCode).toBeUndefined();
+    }
+
+    const missing = await request(app.getHttpServer())
+      .post(`/v1/rides/${rideId}/start`)
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({});
+    expect(missing.status).toBe(400);
+
+    const wrongCode = code === '0000' ? '1111' : '0000';
+    const wrong = await request(app.getHttpServer())
+      .post(`/v1/rides/${rideId}/start`)
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ pickupCode: wrongCode });
+    expect(wrong.status).toBe(422);
+    expect(wrong.body.errorCode).toBe('RIDE_PICKUP_CODE_INVALID');
+
+    const started = await request(app.getHttpServer())
+      .post(`/v1/rides/${rideId}/start`)
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ pickupCode: code })
+      .expect(200);
+    expect(started.body.data.status).toBe('IN_TRIP');
+    expect(started.body.data.pickupCode).toBeUndefined();
+
+    const afterStart = await request(app.getHttpServer())
+      .get(`/v1/rides/${rideId}`)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    expect(afterStart.body.data.pickupCode).toBeUndefined();
+  });
+
+  it('locks the pickup code after the configured number of wrong attempts', async () => {
+    const customer = await login();
+    const driver = await login();
+    await repository.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');
+    const rideId = await assignRide(customer, driver, 'idem-lock-create', 'idem-lock-select');
+    const code = await pickupCodeFor(customer, rideId);
+    for (const step of ['en-route', 'arrived']) {
+      await request(app.getHttpServer())
+        .post(`/v1/rides/${rideId}/${step}`)
+        .set('Authorization', `Bearer ${driver.token}`)
+        .expect(200);
+    }
+    const wrongCode = code === '0000' ? '1111' : '0000';
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const res = await request(app.getHttpServer())
+        .post(`/v1/rides/${rideId}/start`)
+        .set('Authorization', `Bearer ${driver.token}`)
+        .send({ pickupCode: wrongCode });
+      expect(res.body.errorCode).toBe('RIDE_PICKUP_CODE_INVALID');
+    }
+    const locked = await request(app.getHttpServer())
+      .post(`/v1/rides/${rideId}/start`)
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ pickupCode: code });
+    expect(locked.status).toBe(423);
+    expect(locked.body.errorCode).toBe('RIDE_PICKUP_CODE_LOCKED');
   });
 
   it('rejects an illegal ride status transition with 409', async () => {
@@ -507,6 +688,7 @@ describe('ride negotiation http', () => {
       .set('Authorization', `Bearer ${customer.token}`)
       .expect(200);
     expect(cancelled.body.data.status).toBe('CANCELLED');
+    expect(cancelled.body.data.cancelledBy).toBe('CUSTOMER');
 
     const againCustomer = await login();
     const againDriver = await login();
@@ -525,9 +707,11 @@ describe('ride negotiation http', () => {
       .post(`/v1/rides/${tripId}/arrived`)
       .set('Authorization', `Bearer ${againDriver.token}`)
       .expect(200);
+    const tripCode = await pickupCodeFor(againCustomer, tripId);
     await request(app.getHttpServer())
       .post(`/v1/rides/${tripId}/start`)
       .set('Authorization', `Bearer ${againDriver.token}`)
+      .send({ pickupCode: tripCode })
       .expect(200);
 
     const blocked = await request(app.getHttpServer())
@@ -568,6 +752,7 @@ describe('ride negotiation http', () => {
       .send({ reason: 'Customer unreachable after ops review' })
       .expect(200);
     expect(cancelled.body.data.status).toBe('CANCELLED');
+    expect(cancelled.body.data.cancelledBy).toBe('OPS');
   });
 
   it('hides open rides when driver presence is offline', async () => {
@@ -600,6 +785,56 @@ describe('ride negotiation http', () => {
       .expect(200);
     expect(online.body.data.length).toBeGreaterThanOrEqual(1);
   });
+
+  it('hides open rides while the driver has ride requests switched off (DEC-PROD-023)', async () => {
+    const customer = await login();
+    const driver = await login();
+    await repository.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');
+    await postRide(customer.token, 'idem-presence-toggle', 30_000).expect(200);
+    const presence = (body: Record<string, unknown>) =>
+      request(app.getHttpServer())
+        .post('/v1/me/presence')
+        .set('Authorization', `Bearer ${driver.token}`)
+        .send(body)
+        .expect(200);
+    const open = () =>
+      request(app.getHttpServer())
+        .get('/v1/rides/open')
+        .set('Authorization', `Bearer ${driver.token}`)
+        .expect(200);
+
+    const off = await presence({ online: true, rideEnabled: false, foodEnabled: true });
+    expect(off.body.data).toMatchObject({ online: true, rideEnabled: false, foodEnabled: true });
+    expect((await open()).body.data).toEqual([]);
+
+    // Going online again without the toggles keeps the stored choice.
+    const kept = await presence({ online: true });
+    expect(kept.body.data.rideEnabled).toBe(false);
+    expect((await open()).body.data).toEqual([]);
+
+    await presence({ online: true, rideEnabled: true });
+    expect((await open()).body.data.length).toBeGreaterThanOrEqual(1);
+    const read = await request(app.getHttpServer())
+      .get('/v1/me/presence')
+      .set('Authorization', `Bearer ${driver.token}`)
+      .expect(200);
+    expect(read.body.data).toMatchObject({ rideEnabled: true, foodEnabled: true });
+    await request(app.getHttpServer())
+      .post('/v1/me/presence')
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ online: true, rideEnabled: 'no' })
+      .expect(400);
+  });
+
+  async function pickupCodeFor(customer: { token: string }, rideId: string): Promise<string> {
+    const res = await request(app.getHttpServer())
+      .get(`/v1/rides/${rideId}`)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    const code = res.body.data.pickupCode as string;
+    expect(code).toMatch(/^\d{4}$/);
+    return code;
+  }
 
   async function assignRide(
     customer: { token: string; userId: string },
@@ -660,9 +895,11 @@ describe('ride negotiation http', () => {
 describe('ride negotiation in production', () => {
   let app: INestApplication | undefined;
   let sms: MockSmsSender;
+  let identity: MemoryIdentityRepository;
 
   beforeAll(async () => {
     sms = new MockSmsSender('test');
+    identity = new MemoryIdentityRepository();
     const moduleRef = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({
@@ -677,6 +914,7 @@ describe('ride negotiation in production', () => {
               RIDE_MIN_FARE_VND: '10000',
               RIDE_MAX_FARE_VND: '500000',
               OTP_THROTTLE_LIMIT: '1000',
+              OTP_PHONE_LIMIT: '1000',
               PARTNER_ELIGIBILITY_BYPASS: 'false',
             }),
         }),
@@ -687,7 +925,7 @@ describe('ride negotiation in production', () => {
       .overrideProvider(SMS_SENDER)
       .useValue(sms)
       .overrideProvider(IDENTITY_REPOSITORY)
-      .useValue(new MemoryIdentityRepository())
+      .useValue(identity)
       .overrideProvider(DRIVER_PRESENCE_REPOSITORY)
       .useValue(new MemoryDriverPresenceRepository())
       .overrideProvider(AUTH_METHOD_POLICY_REPOSITORY)
@@ -702,10 +940,16 @@ describe('ride negotiation in production', () => {
       .useValue(new MemoryPartnerRepository())
       .overrideProvider(PLATFORM_SETTINGS_REPOSITORY)
       .useValue(new MemoryPlatformSettingsRepository())
+      .overrideProvider(RIDE_PICKUP_CODE_STORE)
+      .useValue(new MemoryRidePickupCodeStore())
+      .overrideProvider(EARNINGS_REPOSITORY)
+      .useValue(new MemoryEarningsRepository())
       .overrideProvider(OPS_FAQ_REPOSITORY)
       .useValue(new MemoryOpsFaqRepository())
       .overrideProvider(OPS_NOTIFICATION_REPOSITORY)
       .useValue(new MemoryOpsNotificationRepository())
+      .overrideProvider(PROMOTION_REPOSITORY)
+      .useValue(new MemoryPromotionRepository([]))
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -719,21 +963,42 @@ describe('ride negotiation in production', () => {
     await app?.close();
   });
 
-  it('returns ROLE_NOT_ACTIVE when a phone user has no customer grant', async () => {
+  async function phoneLogin(phone: string): Promise<string> {
     const created = await request(app!.getHttpServer())
       .post('/v1/auth/phone/challenges')
-      .send({ phone: '0918888888' })
+      .send({ phone })
       .expect(200);
     const code = sms.sent.at(-1)?.code;
     const verified = await request(app!.getHttpServer())
       .post(`/v1/auth/phone/challenges/${created.body.data.challengeId}/verify`)
       .send({ code })
       .expect(200);
+    return verified.body.data.accessToken as string;
+  }
+
+  it('grants CUSTOMER on phone sign-up so a new user can book', async () => {
+    const token = await phoneLogin('0918888888');
+    const created = await request(app!.getHttpServer())
+      .post('/v1/rides')
+      .set('Authorization', `Bearer ${token}`)
+      .set('Idempotency-Key', 'idem-production-ride')
+      .send({ pickup, dropoff, offeredFareVnd: 30_000 });
+    expect(created.status).toBeLessThan(300);
+  });
+
+  it('returns ROLE_NOT_ACTIVE for a verified phone user without a customer grant', async () => {
+    const legacy = await identity.createUser({
+      phone: '+84918888889',
+      email: null,
+      displayName: 'Legacy user',
+    });
+    await identity.markPhoneVerified(legacy.id, new Date());
+    const token = await phoneLogin('0918888889');
 
     const denied = await request(app!.getHttpServer())
       .post('/v1/rides')
-      .set('Authorization', `Bearer ${verified.body.data.accessToken}`)
-      .set('Idempotency-Key', 'idem-production-ride')
+      .set('Authorization', `Bearer ${token}`)
+      .set('Idempotency-Key', 'idem-production-ride-legacy')
       .send({ pickup, dropoff, offeredFareVnd: 30_000 })
       .expect(403);
     expect(denied.body.errorCode).toBe('ROLE_NOT_ACTIVE');

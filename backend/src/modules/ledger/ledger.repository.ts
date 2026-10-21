@@ -2,13 +2,28 @@ import { randomUUID } from 'node:crypto';
 import {
   LEDGER_CASH_IN_TRANSIT_CODE,
   LEDGER_COD_OBLIGATION_CODE,
+  LEDGER_FEE_DRIVER_RECEIVABLE_CODE,
+  LEDGER_FEE_REVENUE_CODE,
+  LEDGER_PROMO_EXPENSE_CODE,
+  LEDGER_PROMO_DRIVER_PAYABLE_CODE,
+  LEDGER_PROMO_MERCHANT_PAYABLE_CODE,
   type LedgerEntityTypeName,
   type LedgerEntryDirectionName,
   type LedgerJournalEventName,
   type LedgerJournalStatusName,
 } from './ledger.constants.js';
-import { assertBalancedLines, buildCodObligationLines } from './cod-journal.js';
+import {
+  assertBalancedLines,
+  buildCodObligationLines,
+  buildDriverPlatformFeeLines,
+  buildPromotionDiscountLines,
+  type CodJournalLine,
+  LEDGER_LINE_BUILDERS,
+  type PostableLedgerEvent,
+  type LedgerLineBuilder,
+} from './cod-journal.js';
 import { LedgerRuleError } from './ledger.error.js';
+import type { TxHandle } from '../../shared/tx/completion-hook.js';
 
 export type LedgerEntryView = {
   id: string;
@@ -39,7 +54,7 @@ type StoredAccount = {
   id: string;
   code: string;
   name: string;
-  kind: 'ASSET' | 'LIABILITY';
+  kind: 'ASSET' | 'LIABILITY' | 'EXPENSE' | 'REVENUE';
 };
 
 type StoredEntry = {
@@ -63,6 +78,19 @@ type StoredJournal = {
 
 export interface LedgerRepository {
   postCodObligation(input: PostCodObligationInput): Promise<LedgerJournalView>;
+  /** Idempotent per entity: one funded-discount journal per order. */
+  postPromotionDiscount(input: PostCodObligationInput): Promise<LedgerJournalView>;
+  /** Idempotent per entity: one platform-fee journal per completed ride/order. */
+  postDriverPlatformFee(input: PostCodObligationInput): Promise<LedgerJournalView>;
+  /**
+   * Posts inside the caller's transaction (Prisma `tx`, or null in memory mode) so the journal
+   * commits or rolls back with the job's state change. Idempotent per entity + event.
+   */
+  postWithin(
+    tx: TxHandle,
+    event: PostableLedgerEvent,
+    input: PostCodObligationInput,
+  ): Promise<LedgerJournalView>;
   findByEntity(
     entityType: LedgerEntityTypeName,
     entityId: string,
@@ -81,7 +109,30 @@ export class MemoryLedgerRepository implements LedgerRepository {
   }
 
   postCodObligation(input: PostCodObligationInput): Promise<LedgerJournalView> {
-    return this.run(() => this.postSync(input));
+    return this.run(() =>
+      this.postSync(input, 'COD_OBLIGATION_POSTED', buildCodObligationLines),
+    );
+  }
+
+  postPromotionDiscount(input: PostCodObligationInput): Promise<LedgerJournalView> {
+    return this.run(() =>
+      this.postSync(input, 'PROMOTION_DISCOUNT_FUNDED', buildPromotionDiscountLines),
+    );
+  }
+
+  postDriverPlatformFee(input: PostCodObligationInput): Promise<LedgerJournalView> {
+    return this.run(() =>
+      this.postSync(input, 'DRIVER_PLATFORM_FEE_ACCRUED', buildDriverPlatformFeeLines),
+    );
+  }
+
+  /** Memory mode has no transaction; posting is synchronous so it cannot interleave. */
+  async postWithin(
+    _tx: TxHandle,
+    event: PostableLedgerEvent,
+    input: PostCodObligationInput,
+  ): Promise<LedgerJournalView> {
+    return this.postSync(input, event, LEDGER_LINE_BUILDERS[event]);
   }
 
   findByEntity(
@@ -98,25 +149,29 @@ export class MemoryLedgerRepository implements LedgerRepository {
     });
   }
 
-  private postSync(input: PostCodObligationInput): LedgerJournalView {
+  private postSync(
+    input: PostCodObligationInput,
+    event: LedgerJournalEventName,
+    buildLines: LedgerLineBuilder,
+  ): LedgerJournalView {
     const existing = [...this.journals.values()].find(
       (row) =>
         row.entityType === input.entityType &&
         row.entityId === input.entityId &&
-        row.event === 'COD_OBLIGATION_POSTED',
+        row.event === event,
     );
     if (existing) {
       return this.toView(existing);
     }
 
-    const lines = buildCodObligationLines(input.amountVnd);
+    const lines = buildLines(input.amountVnd, input.entityType);
     assertBalancedLines(lines);
 
     const journal: StoredJournal = {
       id: randomUUID(),
       entityType: input.entityType,
       entityId: input.entityId,
-      event: 'COD_OBLIGATION_POSTED',
+      event,
       status: 'POSTED',
       currency: 'VND',
       amountVnd: input.amountVnd,
@@ -188,6 +243,36 @@ export class MemoryLedgerRepository implements LedgerRepository {
         code: LEDGER_COD_OBLIGATION_CODE,
         name: 'Sandbox COD platform clearing obligation',
         kind: 'LIABILITY',
+      },
+      {
+        id: randomUUID(),
+        code: LEDGER_PROMO_EXPENSE_CODE,
+        name: 'Sandbox DealGo-funded voucher discount expense',
+        kind: 'EXPENSE',
+      },
+      {
+        id: randomUUID(),
+        code: LEDGER_PROMO_MERCHANT_PAYABLE_CODE,
+        name: 'Sandbox voucher discount owed to merchant',
+        kind: 'LIABILITY',
+      },
+      {
+        id: randomUUID(),
+        code: LEDGER_PROMO_DRIVER_PAYABLE_CODE,
+        name: 'Sandbox ride voucher discount owed to driver',
+        kind: 'LIABILITY',
+      },
+      {
+        id: randomUUID(),
+        code: LEDGER_FEE_DRIVER_RECEIVABLE_CODE,
+        name: 'Sandbox platform fee owed by driver (COD)',
+        kind: 'ASSET',
+      },
+      {
+        id: randomUUID(),
+        code: LEDGER_FEE_REVENUE_CODE,
+        name: 'Sandbox platform fee revenue',
+        kind: 'REVENUE',
       },
     ];
     for (const row of rows) {

@@ -12,16 +12,17 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentActor,
-  OpsSessionGuard,
   type RequestActor,
 } from '../identity/access-auth.guard.js';
 import { ResolveDisputeDto } from './ops-disputes.dto.js';
 import { OpsDisputesService } from './ops-disputes.service.js';
+import { OpsPermissionGuard } from '../identity/ops-rbac/ops-permission.guard.js';
+import { RequireOpsPermission } from '../identity/ops-rbac/ops-permission.decorator.js';
 
 @ApiTags('ops')
 @ApiBearerAuth()
 @Controller('v1/ops/disputes')
-@UseGuards(OpsSessionGuard)
+@UseGuards(OpsPermissionGuard)
 export class OpsDisputesController {
   constructor(private readonly disputesService: OpsDisputesService) {}
 
@@ -50,6 +51,7 @@ export class OpsDisputesController {
     return this.disputesService.getByCode(code);
   }
 
+  @RequireOpsPermission('disputes.write')
   @Post(':code/resolve')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

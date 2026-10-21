@@ -7,15 +7,6 @@ import { PARTNER_REPOSITORY } from './partner.constants.js';
 import { partnerError } from './partner.error.js';
 import type { PartnerRepository, PartnerRoleName } from './partner.repository.js';
 
-/**
- * Gate hook for DRIVER listOpen / FOOD claim (and reusable for other partner actions).
- *
- * Production (PARTNER_ELIGIBILITY_BYPASS unset/false): requires ACTIVE RoleGrant AND
- * APPROVED PartnerApplication for the role.
- *
- * Development/test: default bypass after ACTIVE grant (sandbox auto-grant still applies
- * elsewhere). Set PARTNER_ELIGIBILITY_BYPASS=false to exercise the full gate locally.
- */
 @Injectable()
 export class PartnerEligibilityService {
   constructor(

@@ -3,21 +3,87 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/components/dealgo_card.dart';
-import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/components/dealgo_segmented_control.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
+import '../../domain/entities/partner_documents.dart';
 import '../../domain/entities/partner_onboarding.dart';
 import '../cubit/merchant_kyb_cubit.dart';
+import '../document_image_source.dart';
 import '../utils/merchant_kyb_routes.dart';
 import '../widgets/onboarding_widgets.dart';
+import '../widgets/partner_kyc_widgets.dart';
 
-void _seedMerchantKyb(BuildContext context) {
+Future<void> _loadMerchantKyb(BuildContext context) async {
   final auth = context.read<AuthCubit>().state;
+  final cubit = context.read<MerchantKybCubit>();
   if (auth is AuthSignedIn) {
-    context.read<MerchantKybCubit>().seedFromProfile(auth.profile);
+    cubit.seedFromProfile(auth.profile);
   }
+  await cubit.refresh().timeout(const Duration(seconds: 12));
+}
+
+bool _isMerchantKybPath(String path) {
+  const root = MerchantKybRoutes.root;
+  return path == root || path.startsWith('$root/');
+}
+
+void _bounceMerchantKybToAccount(GoRouter router) {
+  if (_isMerchantKybPath(router.state.uri.path)) {
+    router.go('/customer/account');
+  }
+}
+
+/// Prefer pop so Account → KYB keeps a working Back; bounce away if a pop
+/// would leave the gate spinner or any KYB child route on screen.
+void _leaveMerchantKyb(BuildContext context) {
+  final router = GoRouter.of(context);
+  if (!context.canPop()) {
+    router.go('/customer/account');
+    return;
+  }
+  context.pop();
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _bounceMerchantKybToAccount(router);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _bounceMerchantKybToAccount(router);
+    });
+  });
+}
+
+void _popMerchantKybStepOrEscapeGate(BuildContext context) {
+  final router = GoRouter.of(context);
+  if (!context.canPop()) {
+    context.push(MerchantKybRoutes.intro);
+    return;
+  }
+  context.pop();
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (router.state.uri.path == MerchantKybRoutes.root) {
+      router.go('/customer/account');
+    }
+  });
+}
+
+String merchantBusinessTypeLabel(AppLocalizations l10n, String code) {
+  return switch (code) {
+    MerchantBusinessType.restaurant => l10n.kybTypeRestaurant,
+    MerchantBusinessType.cafe => l10n.kybTypeCafe,
+    MerchantBusinessType.grocery => l10n.kybTypeGrocery,
+    MerchantBusinessType.convenience => l10n.kybTypeConvenience,
+    _ => l10n.kybTypeOther,
+  };
+}
+
+String merchantSubjectLabel(AppLocalizations l10n, String code) {
+  return switch (code) {
+    MerchantRegistrationSubject.household => l10n.kybSubjectHousehold,
+    MerchantRegistrationSubject.company => l10n.kybSubjectCompany,
+    _ => l10n.kybSubjectOther,
+  };
 }
 
 class MerchantKybGatePage extends StatefulWidget {
@@ -28,24 +94,99 @@ class MerchantKybGatePage extends StatefulWidget {
 }
 
 class _MerchantKybGatePageState extends State<MerchantKybGatePage> {
+  var _failed = false;
+  var _didRedirect = false;
+  var _wasCovered = false;
+  var _escaping = false;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      _seedMerchantKyb(context);
-      final target = MerchantKybRoutes.entryFromCubit(
-        context.read<MerchantKybCubit>(),
-      );
-      context.go(target);
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _open());
   }
+
+  Future<void> _open() async {
+    if (!mounted || _didRedirect || _escaping) {
+      return;
+    }
+    try {
+      await _loadMerchantKyb(context);
+    } catch (_) {}
+    if (!mounted || _escaping) {
+      return;
+    }
+    final next = MerchantKybRoutes.entryFromCubit(
+      context.read<MerchantKybCubit>(),
+    );
+    if (next == MerchantKybRoutes.root) {
+      setState(() => _failed = true);
+      return;
+    }
+    _didRedirect = true;
+    context.go(next);
+  }
+
+  void _escapeIfRevealed() {
+    if (!_didRedirect || !_wasCovered || _failed || _escaping || !mounted) {
+      return;
+    }
+    final route = ModalRoute.of(context);
+    if (route == null || !route.isCurrent) {
+      return;
+    }
+    _escaping = true;
+    GoRouter.of(context).go('/customer/account');
+  }
+
+  void _back() => _leaveMerchantKyb(context);
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    final isCurrent = ModalRoute.of(context)?.isCurrent ?? false;
+    if (_didRedirect && !isCurrent) {
+      _wasCovered = true;
+    }
+    if (_didRedirect && _wasCovered && isCurrent && !_failed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _escapeIfRevealed());
+    }
+    final l10n = AppLocalizations.of(context);
+    return Scaffold(
+      body: SafeArea(
+        child: _failed
+            ? Padding(
+                padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        onPressed: _back,
+                        icon: const Icon(DealGoIcons.back),
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(l10n.errorLoadFailed, textAlign: TextAlign.center),
+                    const SizedBox(height: DealGoSpacing.s16),
+                    FilledButton(
+                      onPressed: () {
+                        setState(() {
+                          _failed = false;
+                          _didRedirect = false;
+                          _wasCovered = false;
+                          _escaping = false;
+                        });
+                        _open();
+                      },
+                      child: Text(l10n.actionRetry),
+                    ),
+                    const Spacer(),
+                  ],
+                ),
+              )
+            : const Center(child: CircularProgressIndicator()),
+      ),
+    );
   }
 }
 
@@ -62,23 +203,24 @@ class _MerchantKybIntroPageState extends State<MerchantKybIntroPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        _seedMerchantKyb(context);
+        _loadMerchantKyb(context);
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
     return OnboardingScaffold(
-      title: MerchantKybCopy.introTitle,
-      roleBadge: MerchantKybCopy.roleBadge,
-      onBack: () => context.canPop() ? context.pop() : context.go('/merchant'),
+      title: l10n.kybIntroTitle,
+      roleBadge: l10n.kybRoleBadge,
+      onBack: () => _leaveMerchantKyb(context),
       footer: OnboardingContinueBar(
-        label: MerchantKybCopy.startCta,
+        label: l10n.kybStartCta,
         onPressed: () {
           context.read<MerchantKybCubit>().startDraft();
-          context.go(MerchantKybRoutes.steps);
+          context.push(MerchantKybRoutes.steps);
         },
       ),
       body: ListView(
@@ -95,27 +237,27 @@ class _MerchantKybIntroPageState extends State<MerchantKybIntroPage> {
               ),
               const SizedBox(width: DealGoSpacing.s8),
               OnboardingStatusChip(
-                label: 'Chế độ đối tác',
+                label: l10n.partnerModeChip,
                 tone: OnboardingBannerTone.neutral,
               ),
             ],
           ),
           Text(
-            'Đối tác cửa hàng',
+            l10n.kybIntroSubtitle,
             style: textTheme.bodyMedium?.copyWith(
               color: DealGoColors.textSecondary,
             ),
           ),
           const SizedBox(height: DealGoSpacing.s8),
           OnboardingStatusChip(
-            label: MerchantKybCopy.flowLabel,
+            label: l10n.kybFlowLabel,
             tone: OnboardingBannerTone.neutral,
           ),
           const SizedBox(height: DealGoSpacing.s12),
-          Text(MerchantKybCopy.introHeadline, style: textTheme.titleLarge),
+          Text(l10n.kybIntroHeadline, style: textTheme.titleLarge),
           const SizedBox(height: DealGoSpacing.s8),
           Text(
-            MerchantKybCopy.introBody,
+            l10n.kybIntroBody,
             style: textTheme.bodyMedium?.copyWith(
               color: DealGoColors.textSecondary,
               height: 1.4,
@@ -126,13 +268,13 @@ class _MerchantKybIntroPageState extends State<MerchantKybIntroPage> {
             child: Column(
               children: [
                 const Icon(
-                  Icons.storefront_outlined,
+                  DealGoIcons.store,
                   size: 48,
                   color: DealGoColors.primary,
                 ),
                 const SizedBox(height: DealGoSpacing.s12),
                 Text(
-                  'Từ gian hàng nhỏ đến cửa hàng phát triển',
+                  l10n.kybIntroHero,
                   style: textTheme.titleMedium?.copyWith(
                     color: DealGoColors.primary,
                   ),
@@ -142,13 +284,11 @@ class _MerchantKybIntroPageState extends State<MerchantKybIntroPage> {
             ),
           ),
           const SizedBox(height: DealGoSpacing.s20),
-          Text('DealGo đồng hành cùng bạn', style: textTheme.titleMedium),
+          Text(l10n.kybIntroBenefits, style: textTheme.titleMedium),
           const SizedBox(height: DealGoSpacing.s12),
           const _BenefitGrid(),
           const SizedBox(height: DealGoSpacing.s16),
-          const OnboardingInfoBanner(
-            message: 'Bạn cần cung cấp thông tin về cửa hàng, người đại diện và giấy tờ phù hợp để được xét duyệt.',
-          ),
+          OnboardingInfoBanner(message: l10n.kybIntroRequirements),
         ],
       ),
     );
@@ -160,34 +300,46 @@ class MerchantKybStepsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return BlocBuilder<MerchantKybCubit, MerchantKybState>(
       builder: (context, state) {
         final cubit = context.read<MerchantKybCubit>();
         final title = switch (state.step) {
-          MerchantKybStep.businessType => 'Loại hình kinh doanh',
-          MerchantKybStep.shopInfo => 'Thông tin cửa hàng',
-          MerchantKybStep.representative => 'Người đại diện',
-          MerchantKybStep.documents => 'Tài liệu kinh doanh',
-          MerchantKybStep.review => 'Rà soát hồ sơ Shop',
+          MerchantKybStep.businessType => l10n.kybStepBusinessType,
+          MerchantKybStep.shopInfo => l10n.kybStepShopInfo,
+          MerchantKybStep.representative => l10n.kybStepRepresentative,
+          MerchantKybStep.documents => l10n.kybStepDocuments,
+          MerchantKybStep.review => l10n.kybStepReview,
         };
+        final isReview = state.step == MerchantKybStep.review;
         return OnboardingScaffold(
           title: title,
-          roleBadge: MerchantKybCopy.roleBadge,
+          roleBadge: l10n.kybRoleBadge,
           onBack: () {
             if (state.step == MerchantKybStep.businessType) {
-              context.go(MerchantKybRoutes.intro);
+              _popMerchantKybStepOrEscapeGate(context);
               return;
             }
             cubit.previousStep();
           },
           footer: OnboardingContinueBar(
-            label: state.step == MerchantKybStep.review
-                ? MerchantKybCopy.submitCta
-                : 'Tiếp tục',
+            label: isReview
+                ? (state.issues.isEmpty
+                      ? l10n.kybSubmitCta
+                      : l10n.kybResubmitCta)
+                : l10n.partnerContinue,
             enabled:
-                state.step != MerchantKybStep.documents || state.docsAttached,
+                !state.submitting &&
+                switch (state.step) {
+                  MerchantKybStep.shopInfo => state.canContinueShopInfo,
+                  MerchantKybStep.representative =>
+                    state.canContinueRepresentative,
+                  MerchantKybStep.documents => state.canContinueDocuments,
+                  MerchantKybStep.review => state.canSubmit,
+                  _ => true,
+                },
             onPressed: () async {
-              if (state.step == MerchantKybStep.review) {
+              if (isReview) {
                 await cubit.submit();
                 if (!context.mounted) {
                   return;
@@ -198,10 +350,6 @@ class MerchantKybStepsPage extends StatelessWidget {
                 }
                 return;
               }
-              if (state.step == MerchantKybStep.documents &&
-                  !state.docsAttached) {
-                return;
-              }
               cubit.nextStep();
             },
           ),
@@ -209,25 +357,22 @@ class MerchantKybStepsPage extends StatelessWidget {
             padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
             children: [
               OnboardingStepHeader(
-                flowLabel: 'THÔNG TIN CỬA HÀNG',
-                stepLabel: 'Bước ${state.stepNumber} / ${state.totalSteps}',
+                flowLabel: l10n.kybStepFlowLabel,
+                stepLabel: l10n.partnerStepOf(
+                  state.stepNumber,
+                  state.totalSteps,
+                ),
                 currentStep: state.stepNumber,
                 totalSteps: state.totalSteps,
-                headline: switch (state.step) {
-                  MerchantKybStep.businessType => 'Bạn kinh doanh gì?',
-                  MerchantKybStep.shopInfo => 'Thông tin cửa hàng',
-                  MerchantKybStep.representative => 'Người đại diện',
-                  MerchantKybStep.documents => 'Tài liệu kinh doanh',
-                  MerchantKybStep.review => 'Rà soát hồ sơ Shop',
-                },
+                headline: state.step == MerchantKybStep.businessType
+                    ? l10n.kybStepBusinessTypeHeadline
+                    : title,
                 subtitle: switch (state.step) {
-                  MerchantKybStep.businessType => 'Chọn loại hình phù hợp để DealGo gợi ý danh mục sản phẩm và quy trình xác minh.',
-                  MerchantKybStep.shopInfo =>
-                    'Tên và địa chỉ dùng khi xét duyệt và hiển thị cho khách.',
-                  MerchantKybStep.representative =>
-                    'Thông tin người đại diện pháp lý của cửa hàng.',
-                  MerchantKybStep.documents => 'Mock UI — không tải ảnh lên Nest. Chỉ đánh dấu đã đính kèm.',
-                  MerchantKybStep.review => 'Kiểm tra trước khi gửi',
+                  MerchantKybStep.businessType => l10n.kybSubBusinessType,
+                  MerchantKybStep.shopInfo => l10n.kybSubShopInfo,
+                  MerchantKybStep.representative => l10n.kybSubRepresentative,
+                  MerchantKybStep.documents => l10n.kybSubDocuments,
+                  MerchantKybStep.review => l10n.kybSubReview,
                 },
               ),
               const SizedBox(height: DealGoSpacing.s20),
@@ -235,14 +380,17 @@ class MerchantKybStepsPage extends StatelessWidget {
                 MerchantKybStep.businessType => _BusinessTypeStep(state: state),
                 MerchantKybStep.shopInfo => _ShopInfoStep(state: state),
                 MerchantKybStep.representative => _RepStep(state: state),
-                MerchantKybStep.documents => OnboardingMockDocSlot(
-                  title: 'Giấy tờ kinh doanh',
-                  hint: 'Đính kèm mock — không upload thật',
-                  attached: state.docsAttached,
-                  onToggle: cubit.toggleDocsAttached,
-                ),
+                MerchantKybStep.documents => _DocumentsStep(state: state),
                 MerchantKybStep.review => _MerchantReviewStep(state: state),
               },
+              if (state.submitError case final code?) ...[
+                const SizedBox(height: DealGoSpacing.s12),
+                OnboardingInfoBanner(
+                  message: partnerSubmitErrorText(l10n, code),
+                  tone: OnboardingBannerTone.warning,
+                  icon: DealGoIcons.warning,
+                ),
+              ],
             ],
           ),
         );
@@ -264,118 +412,125 @@ class _MerchantKybStatusPageState extends State<MerchantKybStatusPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        _seedMerchantKyb(context);
+        _loadMerchantKyb(context);
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return BlocBuilder<MerchantKybCubit, MerchantKybState>(
       builder: (context, state) {
         final isActive = state.status == PartnerApplicationStatus.active;
+        final isRejected = state.status == PartnerApplicationStatus.rejected;
+        final isDraft = state.status == PartnerApplicationStatus.draft;
         final textTheme = Theme.of(context).textTheme;
         return OnboardingScaffold(
-          title: 'Trạng thái xét duyệt Shop',
-          roleBadge: MerchantKybCopy.roleBadge,
-          onBack: () =>
-              context.canPop() ? context.pop() : context.go('/merchant'),
-          footer: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              OnboardingContinueBar(
-                label: isActive ? 'Về trang Shop' : MerchantKybCopy.trackCta,
-                onPressed: () => context.go('/merchant'),
-              ),
-              if (!isActive) ...[
-                const SizedBox(height: DealGoSpacing.s8),
-                DealGoSecondaryButton(
-                  label: 'Demo: từ chối hồ sơ',
-                  onPressed: () {
-                    context.read<MerchantKybCubit>().simulateReject();
-                    context.go(MerchantKybRoutes.rejected);
-                  },
-                ),
-              ],
-              if (isActive) ...[
-                const SizedBox(height: DealGoSpacing.s8),
-                DealGoSecondaryButton(
-                  label: 'Xem lại đăng ký (mock)',
+          title: l10n.kybStatusTitle,
+          roleBadge: l10n.kybRoleBadge,
+          onBack: () => _leaveMerchantKyb(context),
+          footer: isRejected
+              ? OnboardingContinueBar(
+                  label: l10n.partnerStartFix,
+                  onPressed: () => context.push(MerchantKybRoutes.rejected),
+                )
+              : isDraft
+              ? OnboardingContinueBar(
+                  label: l10n.kybStartCta,
                   onPressed: () {
                     context.read<MerchantKybCubit>().startDraft();
-                    context.go(MerchantKybRoutes.intro);
+                    context.push(MerchantKybRoutes.steps);
                   },
+                )
+              : OnboardingContinueBar(
+                  label: l10n.kybTrackCta,
+                  onPressed: () => context.go('/merchant'),
+                ),
+          body: RefreshIndicator(
+            onRefresh: () => context.read<MerchantKybCubit>().refresh(),
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
+              children: [
+                if (state.loading) ...[
+                  const LinearProgressIndicator(),
+                  const SizedBox(height: DealGoSpacing.s12),
+                ],
+                DealGoCard(
+                  child: Column(
+                    children: [
+                      Icon(
+                        isActive
+                            ? DealGoIcons.verified
+                            : isRejected
+                            ? DealGoIcons.warning
+                            : DealGoIcons.document,
+                        size: 40,
+                        color: DealGoColors.primary,
+                      ),
+                      const SizedBox(height: DealGoSpacing.s12),
+                      Text(
+                        isActive
+                            ? l10n.kybActiveTitle
+                            : isRejected
+                            ? l10n.kybRejectedTitle
+                            : l10n.kybPendingTitle,
+                        style: textTheme.titleLarge,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: DealGoSpacing.s8),
+                      Text(
+                        isActive ? l10n.kybActiveBody : state.shopName,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: DealGoColors.textSecondary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: DealGoSpacing.s12),
+                      OnboardingStatusChip(
+                        label: isActive
+                            ? l10n.partnerStatusActive
+                            : isRejected
+                            ? l10n.partnerStatusRejected
+                            : l10n.partnerStatusPending,
+                        tone: isActive
+                            ? OnboardingBannerTone.success
+                            : OnboardingBannerTone.warning,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: DealGoSpacing.s16),
+                PartnerTimelineRow(
+                  title: l10n.partnerTimelineSubmitted,
+                  subtitle: '',
+                  done: !isDraft,
+                  current: isDraft,
+                ),
+                const SizedBox(height: DealGoSpacing.s12),
+                PartnerTimelineRow(
+                  title: l10n.partnerTimelineReview,
+                  subtitle: isActive || isRejected
+                      ? l10n.partnerTimelineReviewed
+                      : l10n.partnerTimelineReviewing,
+                  done: isActive || isRejected,
+                  current: !isActive && !isRejected && !isDraft,
+                ),
+                const SizedBox(height: DealGoSpacing.s12),
+                PartnerTimelineRow(
+                  title: l10n.kybTimelineActivate,
+                  subtitle: l10n.kybTimelineActivateBody,
+                  done: isActive,
+                ),
+                const SizedBox(height: DealGoSpacing.s16),
+                OnboardingInfoBanner(
+                  message: isActive
+                      ? l10n.kybStatusActiveNote
+                      : l10n.kybStatusPendingNote,
                 ),
               ],
-            ],
-          ),
-          body: ListView(
-            padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
-            children: [
-              DealGoCard(
-                child: Column(
-                  children: [
-                    Icon(
-                      isActive ? Icons.verified : Icons.description_outlined,
-                      size: 40,
-                      color: DealGoColors.primary,
-                    ),
-                    const SizedBox(height: DealGoSpacing.s12),
-                    Text(
-                      isActive
-                          ? MerchantKybCopy.activeTitle
-                          : MerchantKybCopy.pendingTitle,
-                      style: textTheme.titleLarge,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: DealGoSpacing.s8),
-                    Text(
-                      isActive ? MerchantKybCopy.activeBody : state.shopName,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: DealGoColors.textSecondary,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: DealGoSpacing.s12),
-                    OnboardingStatusChip(
-                      label: isActive ? 'ACTIVE' : MerchantKybCopy.pendingBadge,
-                      tone: isActive
-                          ? OnboardingBannerTone.success
-                          : OnboardingBannerTone.warning,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: DealGoSpacing.s16),
-              Text('Tiến trình kiểm tra', style: textTheme.titleMedium),
-              const SizedBox(height: DealGoSpacing.s12),
-              const _MerchantTimeline(
-                title: 'Đã tiếp nhận hồ sơ',
-                subtitle: '12/10/2026 · Mã DEMO-SHOP-001',
-                done: true,
-              ),
-              const SizedBox(height: DealGoSpacing.s12),
-              _MerchantTimeline(
-                title: 'Đối chiếu giấy tờ',
-                subtitle: isActive
-                    ? 'Đã xác minh hợp lệ'
-                    : 'Đang chờ xác minh hợp lệ',
-                done: isActive,
-                current: !isActive,
-              ),
-              const SizedBox(height: DealGoSpacing.s12),
-              _MerchantTimeline(
-                title: 'Kích hoạt bán hàng',
-                subtitle: 'Chỉ sau khi được phê duyệt',
-                done: isActive,
-              ),
-              const SizedBox(height: DealGoSpacing.s16),
-              OnboardingInfoBanner(
-                message: isActive
-                    ? 'Seed mock đã ACTIVE — nhận đơn không bị khóa bởi màn này.'
-                    : 'Chưa có thời hạn duyệt được bảo đảm. Ứng dụng sẽ cập nhật khi backend thay đổi trạng thái.',
-              ),
-            ],
+            ),
           ),
         );
       },
@@ -383,74 +538,61 @@ class _MerchantKybStatusPageState extends State<MerchantKybStatusPage> {
   }
 }
 
-class MerchantKybRejectedPage extends StatelessWidget {
+class MerchantKybRejectedPage extends StatefulWidget {
   const MerchantKybRejectedPage({super.key});
 
   @override
+  State<MerchantKybRejectedPage> createState() =>
+      _MerchantKybRejectedPageState();
+}
+
+class _MerchantKybRejectedPageState extends State<MerchantKybRejectedPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadMerchantKyb(context);
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return BlocBuilder<MerchantKybCubit, MerchantKybState>(
       builder: (context, state) {
         final cubit = context.read<MerchantKybCubit>();
+        void fix([String? section]) {
+          cubit.beginResubmit(section);
+          context.push(MerchantKybRoutes.steps);
+        }
+
         return OnboardingScaffold(
-          title: 'Bổ sung hồ sơ Shop',
-          roleBadge: MerchantKybCopy.roleBadge,
-          onBack: () =>
-              context.canPop() ? context.pop() : context.go('/merchant'),
+          title: l10n.kybRejectedTitle,
+          roleBadge: l10n.kybRoleBadge,
+          onBack: () => _leaveMerchantKyb(context),
           footer: OnboardingContinueBar(
-            label: MerchantKybCopy.resubmitCta,
-            onPressed: () async {
-              await cubit.resubmit();
-              if (!context.mounted) {
-                return;
-              }
-              if (cubit.state.submitError == null &&
-                  cubit.state.status == PartnerApplicationStatus.pending) {
-                context.go(MerchantKybRoutes.status);
-              }
-            },
+            label: l10n.partnerStartFix,
+            onPressed: fix,
           ),
           body: ListView(
             padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
             children: [
-              const OnboardingInfoBanner(
-                message: MerchantKybCopy.rejectedBanner,
+              if (state.loading) ...[
+                const LinearProgressIndicator(),
+                const SizedBox(height: DealGoSpacing.s12),
+              ],
+              OnboardingInfoBanner(
+                message: l10n.kybRejectedBanner,
                 tone: OnboardingBannerTone.warning,
-                icon: Icons.warning_amber_rounded,
+                icon: DealGoIcons.warning,
               ),
               const SizedBox(height: DealGoSpacing.s20),
-              Text(
-                'Lý do cần chỉnh sửa',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: DealGoSpacing.s12),
-              OnboardingRejectionList(items: state.rejections),
-              Row(
-                children: [
-                  Expanded(
-                    child: DealGoSecondaryButton(
-                      label: 'Tải ảnh lại',
-                      onPressed: () {
-                        cubit.beginResubmit();
-                        context.go(MerchantKybRoutes.steps);
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: DealGoSpacing.s12),
-                  Expanded(
-                    child: DealGoSecondaryButton(
-                      label: 'Sửa địa chỉ',
-                      onPressed: () {
-                        cubit.beginResubmit();
-                        cubit.goToStep(MerchantKybStep.shopInfo);
-                        context.go(MerchantKybRoutes.steps);
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: DealGoSpacing.s20),
-              const OnboardingInfoBanner(
-                message: 'Sau khi gửi lại, trạng thái chuyển sang RE_SUBMITTED. Không tự hiển thị “Đã duyệt” chỉ vì upload thành công.',
+              PartnerReviewIssuesCard(
+                reason: state.reason,
+                issues: state.issues,
+                onFix: fix,
               ),
             ],
           ),
@@ -465,27 +607,24 @@ class _BenefitGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const items = <(IconData, String, String)>[
+    final l10n = AppLocalizations.of(context);
+    final items = <(IconData, String, String)>[
       (
-        Icons.restaurant,
-        'Tiếp cận khách hàng',
-        'Hiển thị cửa hàng và món ăn theo khu vực',
+        DealGoIcons.restaurant,
+        l10n.kybBenefitReachTitle,
+        l10n.kybBenefitReachBody,
       ),
       (
-        Icons.notifications_none,
-        'Nhận và xử lý đơn',
-        'Theo dõi đơn mới và đơn đang chuẩn bị',
+        DealGoIcons.notifications,
+        l10n.kybBenefitOrdersTitle,
+        l10n.kybBenefitOrdersBody,
       ),
       (
-        Icons.account_balance_wallet_outlined,
-        'Quản lý doanh thu',
-        'Thống kê bán hàng và đối soát',
+        DealGoIcons.wallet,
+        l10n.kybBenefitRevenueTitle,
+        l10n.kybBenefitRevenueBody,
       ),
-      (
-        Icons.verified_user_outlined,
-        'Đăng ký minh bạch',
-        'Hồ sơ được xét duyệt trước khi bán',
-      ),
+      (DealGoIcons.shield, l10n.kybBenefitTrustTitle, l10n.kybBenefitTrustBody),
     ];
     return Column(
       children: [
@@ -536,55 +675,53 @@ class _BusinessTypeStep extends StatelessWidget {
 
   final MerchantKybState state;
 
-  static const types = <(String, String, IconData, Color, Color)>[
-    (
-      'Quán ăn / Nhà hàng',
-      'Món ăn chế biến và giao tận nơi.',
-      Icons.restaurant,
-      DealGoColors.subtlePurple,
-      DealGoColors.primary,
-    ),
-    (
-      'Quán cà phê / Trà sữa',
-      'Đồ uống, bánh ngọt và đồ ăn nhẹ.',
-      Icons.local_cafe_outlined,
-      DealGoColors.greenSurface,
-      DealGoColors.brandGreen,
-    ),
-    (
-      'Siêu thị / Cửa hàng thực phẩm',
-      'Rau củ, thịt cá và đồ gia dụng.',
-      Icons.shopping_bag_outlined,
-      DealGoColors.subtlePurple,
-      DealGoColors.primary,
-    ),
-    (
-      'Cửa hàng tiện lợi',
-      'Hàng tiêu dùng và nhu yếu phẩm.',
-      Icons.store_mall_directory_outlined,
-      DealGoColors.subtlePurple,
-      DealGoColors.primary,
-    ),
-    (
-      'Loại hình khác',
-      'Chọn danh mục khi khai báo sản phẩm.',
-      Icons.add,
-      DealGoColors.greenSurface,
-      DealGoColors.brandGreen,
-    ),
-  ];
-
-  static const subjects = ['Hộ kinh doanh', 'Doanh nghiệp', 'Khác'];
-
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final cubit = context.read<MerchantKybCubit>();
+    final types = <(String, String, IconData, Color, Color)>[
+      (
+        MerchantBusinessType.restaurant,
+        l10n.kybTypeRestaurantBody,
+        DealGoIcons.restaurant,
+        DealGoColors.subtlePurple,
+        DealGoColors.primary,
+      ),
+      (
+        MerchantBusinessType.cafe,
+        l10n.kybTypeCafeBody,
+        DealGoIcons.coffee,
+        DealGoColors.greenSurface,
+        DealGoColors.brandGreen,
+      ),
+      (
+        MerchantBusinessType.grocery,
+        l10n.kybTypeGroceryBody,
+        DealGoIcons.shoppingBag,
+        DealGoColors.subtlePurple,
+        DealGoColors.primary,
+      ),
+      (
+        MerchantBusinessType.convenience,
+        l10n.kybTypeConvenienceBody,
+        DealGoIcons.store,
+        DealGoColors.subtlePurple,
+        DealGoColors.primary,
+      ),
+      (
+        MerchantBusinessType.other,
+        l10n.kybTypeOtherBody,
+        DealGoIcons.add,
+        DealGoColors.greenSurface,
+        DealGoColors.brandGreen,
+      ),
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final type in types) ...[
           OnboardingSelectCard(
-            title: type.$1,
+            title: merchantBusinessTypeLabel(l10n, type.$1),
             subtitle: type.$2,
             selected: state.businessType == type.$1,
             icon: type.$3,
@@ -594,20 +731,24 @@ class _BusinessTypeStep extends StatelessWidget {
           ),
           const SizedBox(height: DealGoSpacing.s12),
         ],
-        Text('Chủ thể đăng ký', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          l10n.kybSubjectLabel,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: DealGoSpacing.s12),
         DealGoSegmentedControl(
           value: state.registrationSubject,
           onChanged: cubit.selectRegistrationSubject,
           items: [
-            for (final subject in subjects)
-              DealGoSegmentItem(id: subject, label: subject),
+            for (final subject in MerchantRegistrationSubject.values)
+              DealGoSegmentItem(
+                id: subject,
+                label: merchantSubjectLabel(l10n, subject),
+              ),
           ],
         ),
         const SizedBox(height: DealGoSpacing.s16),
-        const OnboardingInfoBanner(
-          message: 'Danh mục và điều kiện tham gia có thể thay đổi tùy loại hình và vùng cung cấp dịch vụ.',
-        ),
+        OnboardingInfoBanner(message: l10n.kybTypeNote),
       ],
     );
   }
@@ -620,23 +761,29 @@ class _ShopInfoStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final cubit = context.read<MerchantKybCubit>();
     return Column(
       children: [
         OnboardingMockField(
-          label: 'Tên cửa hàng',
+          label: l10n.kybShopName,
           value: state.shopName,
           required: true,
+          fieldKey: const Key('kyb-shop-name'),
+          onChanged: cubit.setShopName,
         ),
         const SizedBox(height: DealGoSpacing.s12),
         OnboardingMockField(
-          label: 'Địa chỉ',
+          label: l10n.kybShopAddress,
           value: state.shopAddress,
           required: true,
+          fieldKey: const Key('kyb-shop-address'),
+          onChanged: cubit.setShopAddress,
         ),
         const SizedBox(height: DealGoSpacing.s12),
         OnboardingMockField(
-          label: 'Loại hình',
-          value: state.businessType,
+          label: l10n.kybShopType,
+          value: merchantBusinessTypeLabel(l10n, state.businessType),
           required: true,
         ),
       ],
@@ -651,24 +798,60 @@ class _RepStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final cubit = context.read<MerchantKybCubit>();
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         OnboardingMockField(
-          label: 'Họ và tên',
+          label: l10n.kybRepName,
           value: state.representativeName,
           required: true,
+          fieldKey: const Key('kyb-representative'),
+          onChanged: cubit.setRepresentativeName,
         ),
         const SizedBox(height: DealGoSpacing.s12),
-        const OnboardingMockField(
-          label: 'Vai trò',
-          value: 'Chủ hộ kinh doanh',
-          required: true,
-        ),
-        const SizedBox(height: DealGoSpacing.s16),
-        const OnboardingInfoBanner(
-          message: 'Người đại diện chịu trách nhiệm về thông tin khai báo với DealGo.',
+        OnboardingInfoBanner(
+          message: l10n.kybRepNote,
           tone: OnboardingBannerTone.neutral,
         ),
+        const SizedBox(height: DealGoSpacing.s20),
+        PartnerBankFields(
+          bankName: state.bankName,
+          accountNumber: state.bankAccountNumber,
+          holder: state.bankAccountHolder,
+          onBankName: cubit.setBankName,
+          onAccountNumber: cubit.setBankAccountNumber,
+          onHolder: cubit.setBankAccountHolder,
+        ),
+      ],
+    );
+  }
+}
+
+class _DocumentsStep extends StatelessWidget {
+  const _DocumentsStep({required this.state});
+
+  final MerchantKybState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final cubit = context.read<MerchantKybCubit>();
+    final source = context.read<DocumentImageSource>();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final kind in PartnerDocumentKind.merchantAll) ...[
+          PartnerDocumentSlot(
+            kind: kind,
+            draft: state.documents,
+            source: source,
+            optional: kind == PartnerDocumentKind.storefront,
+            onPicked: (image) => cubit.attachDocument(kind, image),
+            onRemove: () => cubit.removeDocument(kind),
+          ),
+          const SizedBox(height: DealGoSpacing.s12),
+        ],
       ],
     );
   }
@@ -681,7 +864,9 @@ class _MerchantReviewStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
+    final cubit = context.read<MerchantKybCubit>();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -689,127 +874,57 @@ class _MerchantReviewStep extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Tình trạng hồ sơ', style: textTheme.titleMedium),
+              Text(l10n.kybReviewStatus, style: textTheme.titleMedium),
               const SizedBox(height: DealGoSpacing.s12),
-              _MerchantReviewRow(
-                title: 'Thông tin cửa hàng',
-                subtitle: state.shopName,
+              PartnerReviewRow(
+                title: l10n.kybReviewShop,
+                subtitle:
+                    '${state.shopName} · ${merchantBusinessTypeLabel(l10n, state.businessType)}',
+                ok: state.canContinueShopInfo,
               ),
-              const _MerchantReviewRow(
-                title: 'Người đại diện',
-                subtitle: 'Đã cung cấp giấy tờ',
+              PartnerReviewRow(
+                title: l10n.kybReviewRep,
+                subtitle:
+                    '${state.representativeName} · ${merchantSubjectLabel(l10n, state.registrationSubject)}',
+                ok: state.representativeName.trim().length >= 2,
               ),
-              _MerchantReviewRow(
-                title: 'Tài liệu kinh doanh',
-                subtitle: state.docsAttached
-                    ? 'Tải đủ theo danh sách yêu cầu'
-                    : 'Chưa đính kèm',
-              ),
-              const _MerchantReviewRow(
-                title: 'Ngân hàng nhận tiền',
-                subtitle: 'Xác nhận thông tin chủ tài khoản',
+              PartnerReviewRow(
+                title: l10n.kybReviewBank,
+                subtitle: state.bankAccountNumber.isEmpty
+                    ? ''
+                    : '${state.bankName} · ${partnerMaskAccount(state.bankAccountNumber)}',
+                ok: state.canContinueRepresentative,
               ),
             ],
           ),
         ),
         const SizedBox(height: DealGoSpacing.s12),
-        const OnboardingInfoBanner(
-          message: 'Gửi hồ sơ tạo một phiên xét duyệt. Mọi thay đổi về giấy tờ sau khi gửi phải tạo lần bổ sung mới.',
+        DealGoCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l10n.partnerReviewTitleDocs, style: textTheme.titleMedium),
+              const SizedBox(height: DealGoSpacing.s12),
+              for (final kind in PartnerDocumentKind.merchantAll)
+                InkWell(
+                  onTap: () => cubit.goToStep(MerchantKybStep.documents),
+                  child: PartnerReviewRow(
+                    title: partnerDocumentLabel(l10n, kind),
+                    subtitle: kind == PartnerDocumentKind.storefront
+                        ? l10n.partnerDocOptional
+                        : '',
+                    ok:
+                        state.documents.has(kind) ||
+                        (kind == PartnerDocumentKind.storefront &&
+                            !state.documents.isFlagged(kind)),
+                  ),
+                ),
+            ],
+          ),
         ),
+        const SizedBox(height: DealGoSpacing.s12),
+        OnboardingInfoBanner(message: l10n.kybReviewNote),
       ],
-    );
-  }
-}
-
-class _MerchantReviewRow extends StatelessWidget {
-  const _MerchantReviewRow({required this.title, required this.subtitle});
-
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: DealGoSpacing.s12),
-      child: Row(
-        children: [
-          const Icon(Icons.check_circle, color: DealGoColors.brandGreen),
-          const SizedBox(width: DealGoSpacing.s12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: textTheme.titleMedium?.copyWith(fontSize: 15),
-                ),
-                Text(subtitle, style: textTheme.bodySmall),
-              ],
-            ),
-          ),
-          const OnboardingStatusChip(
-            label: 'Đủ dữ liệu',
-            tone: OnboardingBannerTone.success,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MerchantTimeline extends StatelessWidget {
-  const _MerchantTimeline({
-    required this.title,
-    required this.subtitle,
-    this.done = false,
-    this.current = false,
-  });
-
-  final String title;
-  final String subtitle;
-  final bool done;
-  final bool current;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return DealGoCard(
-      child: Row(
-        children: [
-          Icon(
-            done
-                ? Icons.check_circle
-                : current
-                ? Icons.schedule
-                : Icons.circle_outlined,
-            color: done ? DealGoColors.brandGreen : DealGoColors.amber,
-          ),
-          const SizedBox(width: DealGoSpacing.s12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: textTheme.titleMedium?.copyWith(fontSize: 15),
-                ),
-                Text(subtitle, style: textTheme.bodySmall),
-              ],
-            ),
-          ),
-          OnboardingStatusChip(
-            label: done
-                ? 'Hoàn thành'
-                : current
-                ? 'Đang kiểm tra'
-                : 'Chưa kích hoạt',
-            tone: done
-                ? OnboardingBannerTone.success
-                : OnboardingBannerTone.warning,
-          ),
-        ],
-      ),
     );
   }
 }

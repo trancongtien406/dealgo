@@ -7,17 +7,21 @@ import '../../domain/entities/food_models.dart';
 import '../../domain/entities/food_money.dart';
 import '../utils/food_routes.dart';
 import '../widgets/food_widgets.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/format/short_ref.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 class FoodOrderSuccessArgs {
   const FoodOrderSuccessArgs({
     required this.order,
     required this.storeName,
-    required this.storeAddress,
+    this.storeAddress,
   });
 
   final PlacedFoodOrder order;
   final String storeName;
-  final String storeAddress;
+  final String? storeAddress;
 }
 
 class FoodOrderSuccessPage extends StatelessWidget {
@@ -46,8 +50,8 @@ class FoodOrderSuccessPage extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            FoodScreenHeader(
-              title: 'Đã gửi đơn hàng',
+            DealGoAppHeader(
+              title: AppLocalizations.of(context).foodOrderSentTitle,
               onBack: () => _back(context),
             ),
             Expanded(
@@ -69,7 +73,7 @@ class FoodOrderSuccessPage extends StatelessWidget {
                         width: 72,
                         height: 72,
                         child: Icon(
-                          Icons.check,
+                          DealGoIcons.check,
                           color: DealGoColors.brandGreen,
                           size: 36,
                         ),
@@ -78,14 +82,14 @@ class FoodOrderSuccessPage extends StatelessWidget {
                   ),
                   const SizedBox(height: DealGoSpacing.s16),
                   Text(
-                    'Đặt hàng thành công',
+                    AppLocalizations.of(context).foodOrderPlaced,
                     key: const Key('food-order-success-title'),
                     textAlign: TextAlign.center,
                     style: textTheme.titleLarge,
                   ),
                   const SizedBox(height: DealGoSpacing.s4),
                   Text(
-                    'Đơn đã được tạo; quán chưa xác nhận',
+                    AppLocalizations.of(context).foodOrderPlacedSub,
                     textAlign: TextAlign.center,
                     style: textTheme.bodySmall,
                   ),
@@ -94,41 +98,33 @@ class FoodOrderSuccessPage extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Đơn hàng', style: textTheme.titleMedium),
+                        Text(AppLocalizations.of(context).merchantConflictOrder, style: textTheme.titleMedium),
                         const SizedBox(height: DealGoSpacing.s8),
                         Row(
                           children: [
                             Expanded(
                               child: Text(
-                                'Đơn #${order.id}',
+                                AppLocalizations.of(context)
+                                    .orderRef(shortRef(order.id)),
                                 style: textTheme.bodyMedium?.copyWith(
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                            ),
-                            FoodStatusChip(
-                              label: 'v1 · Dữ liệu đồng bộ',
-                              tone: FoodChipTone.neutral,
                             ),
                           ],
                         ),
                         const SizedBox(height: DealGoSpacing.s12),
                         Row(
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.asset(
-                                'assets/images/food_bun_bo_hue.png',
+                            const DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: DealGoColors.subtlePurple,
+                                borderRadius: BorderRadius.all(Radius.circular(8)),
+                              ),
+                              child: SizedBox(
                                 width: 48,
                                 height: 48,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) => const SizedBox(
-                                  width: 48,
-                                  height: 48,
-                                  child: ColoredBox(
-                                    color: DealGoColors.subtlePurple,
-                                  ),
-                                ),
+                                child: Icon(DealGoIcons.store, color: DealGoColors.primary),
                               ),
                             ),
                             const SizedBox(width: DealGoSpacing.s12),
@@ -140,10 +136,11 @@ class FoodOrderSuccessPage extends StatelessWidget {
                                     args.storeName,
                                     style: textTheme.titleMedium,
                                   ),
-                                  Text(
-                                    args.storeAddress,
-                                    style: textTheme.bodySmall,
-                                  ),
+                                  if ((args.storeAddress ?? '').isNotEmpty)
+                                    Text(
+                                      args.storeAddress!,
+                                      style: textTheme.bodySmall,
+                                    ),
                                 ],
                               ),
                             ),
@@ -154,7 +151,7 @@ class FoodOrderSuccessPage extends StatelessWidget {
                           children: [
                             Expanded(
                               child: Text(
-                                'Khách thanh toán COD',
+                                AppLocalizations.of(context).foodPayOnDelivery,
                                 style: textTheme.bodyMedium,
                               ),
                             ),
@@ -167,8 +164,8 @@ class FoodOrderSuccessPage extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: DealGoSpacing.s8),
-                        const FoodStatusChip(
-                          label: 'COD · Chưa thu tiền',
+                        FoodStatusChip(
+                          label: AppLocalizations.of(context).foodCashNotPaid,
                           tone: FoodChipTone.warning,
                         ),
                       ],
@@ -179,22 +176,21 @@ class FoodOrderSuccessPage extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Tiến trình', style: textTheme.titleMedium),
+                        Text(AppLocalizations.of(context).rideProgress, style: textTheme.titleMedium),
                         const SizedBox(height: DealGoSpacing.s12),
-                        const _ProgressRow(
-                          label: 'Đơn đã gửi',
-                          time: '13:24',
+                        _ProgressRow(
+                          label: AppLocalizations.of(context).foodStepSent,
                           tone: FoodChipTone.green,
                           done: true,
                         ),
                         const SizedBox(height: DealGoSpacing.s8),
-                        const _ProgressRow(
-                          label: 'Chờ Shop xác nhận',
+                        _ProgressRow(
+                          label: AppLocalizations.of(context).foodStepAwaitStore,
                           tone: FoodChipTone.warning,
                         ),
                         const SizedBox(height: DealGoSpacing.s8),
-                        const _ProgressRow(
-                          label: 'Chưa chuẩn bị',
+                        _ProgressRow(
+                          label: AppLocalizations.of(context).foodStepNotPreparing,
                           tone: FoodChipTone.neutral,
                         ),
                       ],
@@ -209,7 +205,7 @@ class FoodOrderSuccessPage extends StatelessWidget {
                     child: Padding(
                       padding: const EdgeInsets.all(DealGoSpacing.s12),
                       child: Text(
-                        '“Đặt hàng thành công” là tạo đơn thành công, KHÔNG phải giao hàng hoặc thanh toán thành công.',
+                        AppLocalizations.of(context).foodOrderPlacedNote,
                         style: textTheme.bodySmall?.copyWith(
                           color: DealGoColors.brandGreen,
                           fontWeight: FontWeight.w600,
@@ -229,8 +225,8 @@ class FoodOrderSuccessPage extends StatelessWidget {
               ),
               child: DealGoPrimaryButton(
                 key: const Key('food-track-order'),
-                label: 'Theo dõi đơn hàng',
-                trailingIcon: Icons.arrow_forward,
+                label: AppLocalizations.of(context).foodTrackOrder,
+                trailingIcon: DealGoIcons.arrowRight,
                 onPressed: () => _track(context),
               ),
             ),
@@ -245,13 +241,11 @@ class _ProgressRow extends StatelessWidget {
   const _ProgressRow({
     required this.label,
     required this.tone,
-    this.time,
     this.done = false,
   });
 
   final String label;
   final FoodChipTone tone;
-  final String? time;
   final bool done;
 
   @override
@@ -259,7 +253,7 @@ class _ProgressRow extends StatelessWidget {
     return Row(
       children: [
         Icon(
-          done ? Icons.check_circle : Icons.circle,
+          done ? DealGoIcons.success : DealGoIcons.circle,
           size: 18,
           color: switch (tone) {
             FoodChipTone.green => DealGoColors.brandGreen,
@@ -273,8 +267,6 @@ class _ProgressRow extends StatelessWidget {
         Expanded(
           child: FoodStatusChip(label: label, tone: tone),
         ),
-        if (time != null)
-          Text(time!, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
   }

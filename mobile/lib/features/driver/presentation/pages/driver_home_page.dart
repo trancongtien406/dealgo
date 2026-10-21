@@ -3,12 +3,22 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
+import '../../../../core/network/api_exception.dart';
+import '../../../driver_card/presentation/driver_card_tile.dart';
+import '../../../driver_history/domain/driver_history.dart';
+import '../../../ride/domain/entities/ride_money.dart';
+import '../../../onboarding/presentation/utils/driver_kyc_routes.dart';
+import '../../../presence/domain/entities/driver_service_prefs.dart';
+import '../../../shell/presentation/account_routes.dart';
 import '../cubit/driver_duty_cubit.dart';
+import '../cubit/driver_services_cubit.dart';
 import '../cubit/driver_feed_cubit.dart';
 import '../utils/driver_routes.dart';
 import '../widgets/driver_widgets.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
 
 class DriverHomePage extends StatelessWidget {
   const DriverHomePage({super.key});
@@ -27,28 +37,22 @@ class DriverHomePage extends StatelessWidget {
   }
 }
 
-class DriverOfflineView extends StatefulWidget {
+class DriverOfflineView extends StatelessWidget {
   const DriverOfflineView({super.key});
-
-  @override
-  State<DriverOfflineView> createState() => _DriverOfflineViewState();
-}
-
-class _DriverOfflineViewState extends State<DriverOfflineView> {
-  var _historyNote = false;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context);
+    final prefs = context.watch<DriverServicesCubit>().state.saved;
     return DriverPageFrame(
-      title: 'Tổng quan tài xế',
-      subtitle: driverStateSubtitle,
+      title: l10n.driverHomeTitle,
       onBack: () => driverBack(context),
       footer: DriverFooter(
-        secondaryLabel: 'Xem lịch sử',
-        primaryLabel: 'Kết nối lại',
+        secondaryLabel: l10n.driverSeeHistory,
+        primaryLabel: l10n.driverGoOnline,
         primaryKey: const Key('driver-go-online'),
-        onSecondary: () => setState(() => _historyNote = true),
+        onSecondary: () => context.go(driverEarningsPath),
         onPrimary: () => context.read<DriverDutyCubit>().connect(),
       ),
       body: ListView(
@@ -59,69 +63,58 @@ class _DriverOfflineViewState extends State<DriverOfflineView> {
           DealGoSpacing.s16,
         ),
         children: [
-          const DriverHero(
-            icon: Icons.bolt,
+          DriverHero(
+            icon: DealGoIcons.bolt,
             iconColor: DealGoColors.amber,
             background: DealGoColors.amberSurface,
-            title: 'Bạn đang ngoại tuyến',
-            message: 'Hiện không thể bật nhận việc vì ứng dụng chưa kết nối được với máy chủ.',
+            title: l10n.rideYouAreOffline,
+            message: l10n.driverOfflineHeroMessage,
           ),
           const SizedBox(height: DealGoSpacing.s24),
           DriverPanel(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Tình trạng hoạt động', style: textTheme.titleMedium),
+                Text(l10n.driverDutyStatus, style: textTheme.titleMedium),
                 const SizedBox(height: DealGoSpacing.s12),
-                const DriverChip(
-                  label: 'Offline · Chưa nhận việc',
+                DriverChip(
+                  label: l10n.driverOfflineChip,
                   tone: DriverChipTone.warning,
                 ),
                 const SizedBox(height: DealGoSpacing.s16),
-                const DriverMoneyRow(label: 'Khu vực', value: driverAreaLabel),
-                const DriverMoneyRow(
-                  label: 'Loại dịch vụ',
-                  value: 'Chở khách, Giao đồ ăn',
+                DriverMoneyRow(
+                  label: l10n.driverServiceTypes,
+                  value: driverServicesSummary(l10n, prefs),
                 ),
               ],
             ),
           ),
           const SizedBox(height: DealGoSpacing.s12),
-          const DriverNote(
-            message: 'Offline trên thiết bị không đồng nghĩa backend đã đổi trạng thái ca làm. Cần đồng bộ lại.',
-          ),
-          if (_historyNote) ...[
-            const SizedBox(height: DealGoSpacing.s12),
-            Text('Chưa có lịch sử ca từ máy chủ.', style: textTheme.bodySmall),
-          ],
+          DriverNote(message: l10n.driverOfflineNote),
         ],
       ),
     );
   }
 }
 
-class DriverIneligibleView extends StatefulWidget {
+/// Shown when the server answers ROLE_NOT_ACTIVE: the driver role is not (or no longer)
+/// approved. The cause lives in the KYC application, so the screen sends the driver there.
+class DriverIneligibleView extends StatelessWidget {
   const DriverIneligibleView({super.key});
-
-  @override
-  State<DriverIneligibleView> createState() => _DriverIneligibleViewState();
-}
-
-class _DriverIneligibleViewState extends State<DriverIneligibleView> {
-  var _licenseNote = false;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context);
     return DriverPageFrame(
-      title: 'Tổng quan tài xế',
-      subtitle: driverStateSubtitle,
+      title: l10n.driverHomeTitle,
       onBack: () => driverBack(context),
       footer: DriverFooter(
-        secondaryLabel: 'Xem điều kiện',
-        primaryLabel: 'Cập nhật giấy phép',
-        onSecondary: () => setState(() => _licenseNote = true),
-        onPrimary: () => setState(() => _licenseNote = true),
+        secondaryLabel: l10n.driverContactSupport,
+        primaryLabel: l10n.driverOpenApplication,
+        primaryKey: const Key('driver-open-application'),
+        onSecondary: () => context.push(AccountRoutes.help('/driver/account')),
+        onPrimary: () => context.push(DriverKycRoutes.root),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
@@ -131,51 +124,36 @@ class _DriverIneligibleViewState extends State<DriverIneligibleView> {
           DealGoSpacing.s16,
         ),
         children: [
-          const DriverHero(
-            icon: Icons.priority_high,
+          DriverHero(
+            icon: DealGoIcons.alert,
             iconColor: DealGoColors.danger,
             background: DealGoColors.dangerSurface,
-            title: 'Tạm hạn chế nhận chuyến',
-            message: 'Giấy phép lái xe đã hết hiệu lực. Bạn chưa thể nhận dịch vụ chở khách cho đến khi xác minh lại.',
+            title: l10n.driverIneligibleTitle,
+            message: l10n.driverIneligibleMessage,
           ),
           const SizedBox(height: DealGoSpacing.s24),
           DriverPanel(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Quyền theo dịch vụ', style: textTheme.titleMedium),
+                Text(l10n.driverRightsByService, style: textTheme.titleMedium),
                 const SizedBox(height: DealGoSpacing.s12),
-                const _RightRow(
-                  label: 'Chở khách',
-                  chip: 'Tạm hạn chế',
+                _RightRow(
+                  label: l10n.driverServicePassenger,
+                  chip: l10n.driverServiceBlocked,
                   tone: DriverChipTone.danger,
                 ),
                 const SizedBox(height: DealGoSpacing.s12),
-                const _RightRow(
-                  label: 'Giao đồ ăn',
-                  chip: 'Kiểm tra điều kiện riêng',
-                  tone: DriverChipTone.warning,
-                ),
-                const SizedBox(height: DealGoSpacing.s12),
-                const _RightRow(
-                  label: 'Giấy phép lái xe',
-                  chip: 'Đã hết hạn',
-                  tone: DriverChipTone.neutral,
+                _RightRow(
+                  label: l10n.driverServicesFoodTitle,
+                  chip: l10n.driverServiceBlocked,
+                  tone: DriverChipTone.danger,
                 ),
               ],
             ),
           ),
           const SizedBox(height: DealGoSpacing.s12),
-          const DriverNote(
-            message: 'Chỉ hạn chế dịch vụ bị ảnh hưởng; các dịch vụ còn lại phải kiểm tra eligibility độc lập.',
-          ),
-          if (_licenseNote) ...[
-            const SizedBox(height: DealGoSpacing.s12),
-            Text(
-              'Giấy phép được xét trên hệ thống. Thiết bị không tự gia hạn.',
-              style: textTheme.bodySmall,
-            ),
-          ],
+          DriverNote(message: l10n.driverIneligibleNote),
         ],
       ),
     );
@@ -215,18 +193,76 @@ class DriverOnlineView extends StatefulWidget {
 }
 
 class _DriverOnlineViewState extends State<DriverOnlineView> {
-  var _passengerOn = true;
-  var _foodOn = true;
+  DriverHistorySummary? _summary;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSummary();
+      if (mounted) {
+        context.read<DriverServicesCubit>().load();
+      }
+    });
+  }
+
+  /// Home switches save straight away; the job list then follows the new choice.
+  Future<void> _toggle({bool? ride, bool? food}) async {
+    final cubit = context.read<DriverServicesCubit>();
+    if (ride != null) cubit.setRide(ride);
+    if (food != null) cubit.setFood(food);
+    final ok = await cubit.save();
+    if (!mounted || ok) {
+      return;
+    }
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context).driverServicesSaveFailed),
+        ),
+      );
+    cubit.load();
+  }
+
+  /// Real stats from GET /v1/driver/history/summary; tiles show "—" until
+  /// (or unless) it loads.
+  Future<void> _loadSummary() async {
+    final token = driverAccessToken(context);
+    if (token == null || token.isEmpty) {
+      return;
+    }
+    try {
+      final summary = await context.read<DriverHistoryRepository>().summary(
+        accessToken: token,
+      );
+      if (mounted) {
+        setState(() => _summary = summary);
+      }
+    } on ApiException {
+      // Keep placeholders.
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context);
     final auth = context.watch<AuthCubit>().state;
-    final phone = auth is AuthSignedIn ? auth.profile.phone : null;
-    final headline = (phone == null || phone.isEmpty) ? 'Tài xế' : phone;
+    final profile = auth is AuthSignedIn ? auth.profile : null;
+    final name = profile?.displayName.trim() ?? '';
+    final phone = profile?.phone ?? '';
+    final headline = name.isNotEmpty
+        ? name
+        : phone.isNotEmpty
+        ? phone
+        : l10n.roleDriver;
+    final summary = _summary;
+    final rating = summary?.ratingAverage;
+    final services = context.watch<DriverServicesCubit>().state;
 
     return DriverPageFrame(
-      title: 'Tổng quan tài xế',
+      title: l10n.driverHomeTitle,
       onBack: () => driverBack(context),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
@@ -239,12 +275,12 @@ class _DriverOnlineViewState extends State<DriverOnlineView> {
           DriverPanel(
             child: Row(
               children: [
-                const CircleAvatar(
+                CircleAvatar(
                   radius: 22,
                   backgroundColor: DealGoColors.subtlePurple,
                   child: Text(
-                    'T',
-                    style: TextStyle(
+                    headline.characters.first.toUpperCase(),
+                    style: const TextStyle(
                       color: DealGoColors.primary,
                       fontWeight: FontWeight.w800,
                     ),
@@ -255,14 +291,9 @@ class _DriverOnlineViewState extends State<DriverOnlineView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        headline == 'Tài xế' ? 'Trần Minh Anh' : headline,
-                        style: textTheme.titleMedium,
-                      ),
-                      Text(
-                        'Honda Vision · 43H1-123.45',
-                        style: textTheme.bodySmall,
-                      ),
+                      Text(headline, style: textTheme.titleMedium),
+                      if (name.isNotEmpty && phone.isNotEmpty)
+                        Text(phone, style: textTheme.bodySmall),
                     ],
                   ),
                 ),
@@ -275,31 +306,47 @@ class _DriverOnlineViewState extends State<DriverOnlineView> {
           const SizedBox(height: DealGoSpacing.s12),
           const _DutyMap(),
           const SizedBox(height: DealGoSpacing.s12),
-          const Row(
+          Row(
             children: [
               Expanded(
-                child: _StatTile(label: 'Chuyến hoàn thành', value: '12'),
+                child: _StatTile(
+                  key: const Key('driver-stat-today-jobs'),
+                  label: l10n.driverStatTodayJobs,
+                  value: summary == null
+                      ? '—'
+                      : '${summary.today.completedJobs}',
+                ),
               ),
-              SizedBox(width: DealGoSpacing.s12),
+              const SizedBox(width: DealGoSpacing.s12),
               Expanded(
                 child: _StatTile(
-                  label: 'Thu nhập thực nhận',
-                  value: '1.250.000đ',
+                  key: const Key('driver-stat-today-earnings'),
+                  label: l10n.driverStatTodayEarnings,
+                  value: summary == null
+                      ? '—'
+                      : formatRideVnd(summary.today.earningsVnd),
                 ),
               ),
             ],
           ),
           const SizedBox(height: DealGoSpacing.s12),
-          const Row(
+          Row(
             children: [
               Expanded(
-                child: _StatTile(label: 'Đánh giá trung bình', value: '⭐ 4,9'),
+                child: _StatTile(
+                  key: const Key('driver-stat-rating'),
+                  label: l10n.driverStatRating,
+                  value: rating == null || summary!.ratingCount == 0
+                      ? '—'
+                      : formatRatingAverage(context, rating),
+                ),
               ),
-              SizedBox(width: DealGoSpacing.s12),
+              const SizedBox(width: DealGoSpacing.s12),
               Expanded(
                 child: _StatTile(
-                  label: 'Thời gian hoạt động',
-                  value: '2 giờ 30 phút',
+                  key: const Key('driver-stat-week-jobs'),
+                  label: l10n.driverStatWeekJobs,
+                  value: summary == null ? '—' : '${summary.weekCompletedJobs}',
                 ),
               ),
             ],
@@ -313,41 +360,46 @@ class _DriverOnlineViewState extends State<DriverOnlineView> {
                   children: [
                     Expanded(
                       child: Text(
-                        'Dịch vụ được phép nhận',
+                        l10n.driverAllowedServices,
                         style: textTheme.titleMedium,
                       ),
                     ),
                     TextButton(
                       key: const Key('driver-open-services'),
                       onPressed: () => context.push(DriverRoutes.services),
-                      child: const Text('Cấu hình'),
+                      child: Text(l10n.driverConfigure),
                     ),
                   ],
                 ),
                 const SizedBox(height: DealGoSpacing.s8),
                 _ServiceSwitch(
-                  icon: Icons.two_wheeler,
-                  title: 'Chở khách',
-                  subtitle: 'Xe máy · Đã duyệt',
-                  value: _passengerOn,
-                  onChanged: (value) => setState(() => _passengerOn = value),
+                  key: const Key('driver-home-ride-switch'),
+                  icon: DealGoIcons.motorbike,
+                  title: l10n.driverServicePassenger,
+                  subtitle: l10n.rideVehicleMotorbike,
+                  value: services.prefs.rideEnabled,
+                  onChanged: services.busy
+                      ? null
+                      : (value) => _toggle(ride: value),
                 ),
                 const Divider(height: 1),
                 _ServiceSwitch(
-                  icon: Icons.inventory_2_outlined,
-                  title: 'Giao đồ ăn',
-                  subtitle: 'Đã đủ điều kiện',
-                  value: _foodOn,
-                  onChanged: (value) => setState(() => _foodOn = value),
+                  key: const Key('driver-home-food-switch'),
+                  icon: DealGoIcons.package,
+                  title: l10n.driverServicesFoodTitle,
+                  subtitle: l10n.driverServicesFoodBody,
+                  value: services.prefs.foodEnabled,
+                  onChanged: services.busy
+                      ? null
+                      : (value) => _toggle(food: value),
                 ),
               ],
             ),
           ),
           const SizedBox(height: DealGoSpacing.s12),
-          const DriverNote(
+          DriverNote(
             tone: DriverNoteTone.green,
-            message:
-                'Giá và quyền nhận chuyến được kiểm tra bởi hệ thống. Tài xế chỉ có một công việc đang thực hiện tại một thời điểm. Số liệu thống kê trên trang chủ là fixture bố cục.',
+            message: l10n.driverOnlinePolicyNote,
           ),
         ],
       ),
@@ -386,10 +438,10 @@ class _OnlineBadge extends StatelessWidget {
               ),
               const SizedBox(width: DealGoSpacing.s8),
               Text(
-                'Online',
+                AppLocalizations.of(context).driverOnlineBadge,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: DealGoColors.brandGreen,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],
@@ -413,26 +465,6 @@ class _DutyMap extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             const CustomPaint(painter: _DutyMapPainter()),
-            const Positioned(
-              left: 12,
-              top: 12,
-              child: _MapLabel(text: 'Hải Châu · Đà Nẵng'),
-            ),
-            const Positioned(
-              left: 16,
-              top: 56,
-              child: _MapMark(label: 'HẢI CHÂU'),
-            ),
-            const Positioned(
-              right: 28,
-              top: 28,
-              child: _MapMark(label: 'CẦU RỒNG'),
-            ),
-            const Positioned(
-              right: 20,
-              bottom: 52,
-              child: _MapMark(label: 'SÔNG HÀN'),
-            ),
             const Align(
               alignment: Alignment(0.15, 0.05),
               child: DecoratedBox(
@@ -444,30 +476,30 @@ class _DutyMap extends StatelessWidget {
                   width: 36,
                   height: 36,
                   child: Icon(
-                    Icons.two_wheeler,
+                    DealGoIcons.motorbike,
                     color: DealGoColors.primary,
                     size: 20,
                   ),
                 ),
               ),
             ),
-            const Positioned(
+            Positioned(
               right: 12,
               bottom: 12,
               child: DecoratedBox(
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: DealGoColors.primary,
                   borderRadius: BorderRadius.all(Radius.circular(999)),
                 ),
                 child: Padding(
-                  padding: EdgeInsets.symmetric(
+                  padding: const EdgeInsets.symmetric(
                     horizontal: DealGoSpacing.s12,
                     vertical: DealGoSpacing.s8,
                   ),
                   child: Text(
-                    'Khu vực hoạt động',
-                    style: TextStyle(
-                      color: Colors.white,
+                    AppLocalizations.of(context).driverOnDutyMapLabel,
+                    style: const TextStyle(
+                      color: DealGoColors.card,
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
                     ),
@@ -482,58 +514,6 @@ class _DutyMap extends StatelessWidget {
   }
 }
 
-class _MapLabel extends StatelessWidget {
-  const _MapLabel({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: DealGoColors.card,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: DealGoSpacing.s8,
-          vertical: DealGoSpacing.s4,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.place, color: DealGoColors.danger, size: 16),
-            const SizedBox(width: 4),
-            Text(
-              text,
-              style: Theme.of(context).textTheme.labelSmall
-                  ?.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MapMark extends StatelessWidget {
-  const _MapMark({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      label,
-      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-        color: const Color(0xFF5B7C99),
-        fontWeight: FontWeight.w800,
-        letterSpacing: 0.4,
-      ),
-    );
-  }
-}
-
 class _DutyMapPainter extends CustomPainter {
   const _DutyMapPainter();
 
@@ -541,10 +521,10 @@ class _DutyMapPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     canvas.drawRect(
       Offset.zero & size,
-      Paint()..color = const Color(0xFFE7EEF5),
+      Paint()..color = DealGoColors.infoSurface,
     );
     final street = Paint()
-      ..color = const Color(0xFFF7F4EA)
+      ..color = DealGoColors.canvas
       ..strokeWidth = 14
       ..style = PaintingStyle.stroke;
     for (var y = 18.0; y < size.height; y += 36) {
@@ -569,7 +549,7 @@ class _DutyMapPainter extends CustomPainter {
         0,
       )
       ..close();
-    canvas.drawPath(river, Paint()..color = const Color(0xFFD5E6F5));
+    canvas.drawPath(river, Paint()..color = DealGoColors.lavender);
 
     final route = Path()
       ..moveTo(size.width * 0.18, size.height * 0.78)
@@ -598,7 +578,7 @@ class _DutyMapPainter extends CustomPainter {
 }
 
 class _StatTile extends StatelessWidget {
-  const _StatTile({required this.label, required this.value});
+  const _StatTile({required this.label, required this.value, super.key});
 
   final String label;
   final String value;
@@ -622,6 +602,7 @@ class _StatTile extends StatelessWidget {
 class _ServiceSwitch extends StatelessWidget {
   const _ServiceSwitch({
     required this.icon,
+    super.key,
     required this.title,
     required this.subtitle,
     required this.value,
@@ -632,7 +613,7 @@ class _ServiceSwitch extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool value;
-  final ValueChanged<bool> onChanged;
+  final ValueChanged<bool>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -665,7 +646,7 @@ class _ServiceSwitch extends StatelessWidget {
           onChanged: onChanged,
           thumbColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
-              return Colors.white;
+              return DealGoColors.card;
             }
             return DealGoColors.textSecondary;
           }),
@@ -679,4 +660,15 @@ class _ServiceSwitch extends StatelessWidget {
       ],
     );
   }
+}
+
+const driverEarningsPath = '/driver/earnings';
+
+/// "Chở khách, Giao đồ ăn" from the driver's own toggles.
+String driverServicesSummary(AppLocalizations l10n, DriverServicePrefs prefs) {
+  final parts = [
+    if (prefs.rideEnabled) l10n.driverServicePassenger,
+    if (prefs.foodEnabled) l10n.driverServicesFoodTitle,
+  ];
+  return parts.isEmpty ? l10n.driverNoServiceOn : parts.join(', ');
 }

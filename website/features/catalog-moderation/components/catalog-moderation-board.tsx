@@ -225,77 +225,79 @@ export function CatalogModerationBoard() {
           </li>
         ))}
       </ul>
-      <AdminFilterToolbar>
-        <AdminFilterField grow>
-          <label
-            htmlFor="moderation-query"
-            className="text-xs font-medium text-muted"
-          >
-            Tìm kiếm món / quán
-          </label>
-          <div className="relative mt-1.5">
-            <OpsIcon
-              name="search"
-              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted"
-            />
-            <input
-              id="moderation-query"
-              type="search"
-              autoComplete="off"
-              placeholder="Tên món, mã sản phẩm, quán..."
-              value={query}
-              onChange={(e) => {
-                void setFilters({ q: e.target.value, page: 1 });
+      <section className="min-w-0 rounded-2xl border border-border bg-white p-4 shadow-sm">
+        <AdminFilterToolbar>
+          <AdminFilterField grow>
+            <label
+              htmlFor="moderation-query"
+              className="text-xs font-medium text-muted"
+            >
+              Tìm kiếm món / quán
+            </label>
+            <div className="relative mt-1.5">
+              <OpsIcon
+                name="search"
+                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted"
+              />
+              <input
+                id="moderation-query"
+                type="search"
+                autoComplete="off"
+                placeholder="Tên món, mã sản phẩm, quán..."
+                value={query}
+                onChange={(e) => {
+                  void setFilters({ q: e.target.value, page: 1 });
+                }}
+                className={`h-10 w-full rounded-xl border border-border bg-white pr-3 pl-10 text-sm text-ink placeholder:text-muted ${focusRing}`}
+              />
+            </div>
+          </AdminFilterField>
+
+          <AdminFilterField className="min-w-[11rem]">
+            <SearchSelect
+              label="Danh mục"
+              icon="categories"
+              value={category}
+              options={categoryOptions.filter((o) => o.value !== "ALL")}
+              placeholder="Tất cả danh mục"
+              onChange={(v) => {
+                void setFilters({ category: v || "", page: 1 });
               }}
-              className={`h-10 w-full rounded-xl border border-border bg-white pr-3 pl-10 text-sm text-ink placeholder:text-muted ${focusRing}`}
             />
+          </AdminFilterField>
+
+          <AdminFilterField className="min-w-[10rem]">
+            <SearchSelect
+              label="Trạng thái"
+              icon="sliders"
+              value={modStatus}
+              options={catalogModerationStatusOptions.filter(
+                (o) => o.value !== "ALL",
+              )}
+              placeholder="Tất cả trạng thái"
+              onChange={(v) => {
+                void setFilters({ status: v || "", page: 1 });
+              }}
+            />
+          </AdminFilterField>
+
+          <div className="flex shrink-0 items-end">
+            <PreviewButton
+              onClick={() => {
+                void setFilters({
+                  category: "",
+                  status: "PENDING",
+                  q: "",
+                  page: 1,
+                });
+              }}
+            >
+              <OpsIcon name="undo" className="size-4" />
+              Đặt lại
+            </PreviewButton>
           </div>
-        </AdminFilterField>
-
-        <AdminFilterField className="min-w-[11rem]">
-          <SearchSelect
-            label="Danh mục"
-            icon="categories"
-            value={category}
-            options={categoryOptions.filter((o) => o.value !== "ALL")}
-            placeholder="Tất cả danh mục"
-            onChange={(v) => {
-              void setFilters({ category: v || "", page: 1 });
-            }}
-          />
-        </AdminFilterField>
-
-        <AdminFilterField className="min-w-[10rem]">
-          <SearchSelect
-            label="Trạng thái"
-            icon="sliders"
-            value={modStatus}
-            options={catalogModerationStatusOptions.filter(
-              (o) => o.value !== "ALL",
-            )}
-            placeholder="Tất cả trạng thái"
-            onChange={(v) => {
-              void setFilters({ status: v || "", page: 1 });
-            }}
-          />
-        </AdminFilterField>
-
-        <div className="flex shrink-0 items-end">
-          <PreviewButton
-            onClick={() => {
-              void setFilters({
-                category: "",
-                status: "PENDING",
-                q: "",
-                page: 1,
-              });
-            }}
-          >
-            <OpsIcon name="undo" className="size-4" />
-            Đặt lại
-          </PreviewButton>
-        </div>
-      </AdminFilterToolbar>
+        </AdminFilterToolbar>
+      </section>
       {forbidden ? (
         <AdminForbiddenState
           title="Không có quyền kiểm duyệt sản phẩm"

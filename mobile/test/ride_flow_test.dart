@@ -1,12 +1,17 @@
 import 'package:dealgo/core/network/api_exception.dart';
 import 'package:dealgo/features/ride/data/models/ride_models.dart';
 import 'package:dealgo/features/ride/domain/entities/ride_models.dart';
-import 'package:dealgo/features/ride/domain/entities/ride_money.dart';
+import 'package:dealgo/features/places/data/places_remote_datasource.dart';
+import 'package:dealgo/features/places/domain/place.dart';
+import 'package:dealgo/features/pricing/data/pricing_remote_datasource.dart';
+import 'package:dealgo/core/design_system/components/dealgo_primary_button.dart';
+import 'package:dealgo/features/ride/presentation/widgets/ride_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/auth_test_harness.dart';
 import 'support/fake_identity_client.dart';
+import 'support/fake_location.dart';
 import 'support/fake_ride_client.dart';
 
 const _offerId = '6f1b6c2a-1a2b-4c3d-8e9f-0123456789ab';
@@ -97,12 +102,13 @@ void main() {
       ).toJson().containsKey('agreedFareVnd'),
       isFalse,
     );
-    expect(request.pickup.lat, rideSamplePickupLat);
-    expect(request.pickup.lng, rideSamplePickupLng);
-    expect(request.pickup.label, rideSamplePickupLabel);
-    expect(request.dropoff.lat, rideSampleDropoffLat);
-    expect(request.dropoff.lng, rideSampleDropoffLng);
-    expect(request.dropoff.label, rideSampleDropoffLabel);
+    // Pickup is the device GPS fix; drop-off is the chosen place's coordinates.
+    expect(request.pickup.lat, testPickupLat);
+    expect(request.pickup.lng, testPickupLng);
+    expect(request.pickup.label, 'Vị trí hiện tại');
+    expect(request.dropoff.lat, _airport.lat);
+    expect(request.dropoff.lng, _airport.lng);
+    expect(request.dropoff.label, _airport.label);
     expect(request.accessToken, 'access-token');
     expect(request.idempotencyKey.length, inInclusiveRange(8, 200));
     expect(rides.getCalls, isNotEmpty);
@@ -159,6 +165,115 @@ void main() {
     expect(find.text('42.000đ'), findsWidgets);
   });
 
+  test('DEC-PROD-024: the selection body carries the voucher only when set', () {
+    expect(
+      const SelectRideOfferBody(offerId: 'o', voucherCode: ' dealgo10 ').toJson(),
+      {'offerId': 'o', 'voucherCode': 'DEALGO10'},
+    );
+    expect(const SelectRideOfferBody(offerId: 'o').toJson(), {'offerId': 'o'});
+    expect(
+      const SelectRideOfferBody(offerId: 'o', voucherCode: '  ').toJson(),
+      {'offerId': 'o'},
+    );
+  });
+
+  test('DEC-PROD-024: the ride view decodes the discount and the cash due', () {
+    final view = RideViewModel.fromJson({
+      ...RideViewModel.fromEntity(
+        _view(agreedFareVnd: 40000, status: RideStatus.assigned),
+      ).toJson(),
+      'discountVnd': 15000,
+      'voucherCode': 'RIDE15K',
+    }).toEntity();
+    expect(view.discountVnd, 15000);
+    expect(view.voucherCode, 'RIDE15K');
+    expect(view.cashDueVnd, 25000);
+    final legacy = RideViewModel.fromJson(
+      RideViewModel.fromEntity(_view(agreedFareVnd: 40000)).toJson()
+        ..remove('discountVnd')
+        ..remove('voucherCode'),
+    ).toEntity();
+    expect(legacy.discountVnd, 0);
+    expect(legacy.cashDueVnd, 40000);
+    expect(_view().cashDueVnd, isNull);
+  });
+
+  testWidgets('a voucher quoted on the chosen offer goes with the selection', (
+    tester,
+  ) async {
+    final offer = _offer(amountVnd: 42000);
+    final rides = _negotiatingClient(offers: [offer]);
+    rides.onSelect = (request) => _view(
+      status: RideStatus.assigned,
+      agreedFareVnd: 42000,
+      selectedOfferId: request.offerId,
+      assignedDriverId: _driverId,
+      offers: [offer],
+      discountVnd: 4200,
+      voucherCode: request.voucherCode,
+    );
+    await _openFare(tester, rides);
+    await tester.tap(find.byKey(const Key('ride-submit-fare')));
+    await tester.pumpAndSettle();
+
+    final field = find.byKey(const Key('voucher-field'));
+    await tester.ensureVisible(field);
+    await tester.enterText(field, 'dealgo10');
+    await tester.tap(find.byKey(const Key('voucher-apply')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('voucher-applied')), findsOneWidget);
+    expect(find.text('Tiền mặt trả tài xế'), findsOneWidget);
+    expect(find.text('37.800đ'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('ride-select-offer')));
+    await tester.pumpAndSettle();
+    expect(rides.selectCalls.single.voucherCode, 'DEALGO10');
+    final paid = tester.widget<RideMoneyLine>(find.byKey(const Key('ride-agreed-fare')));
+    expect(paid.amount, '37.800đ');
+    expect(find.text('Ưu đãi DEALGO10'), findsOneWidget);
+  });
+
+  testWidgets('a voucher refused at selection is dropped and the offer stays', (
+    tester,
+  ) async {
+    final offer = _offer(amountVnd: 42000);
+    final rides = _negotiatingClient(offers: [offer])
+      ..selectError = const ApiException(
+        statusCode: 422,
+        message: 'server text',
+        errorCode: 'VOUCHER_USAGE_EXHAUSTED',
+      );
+    rides.onSelect = (request) => _view(
+      status: RideStatus.assigned,
+      agreedFareVnd: 42000,
+      selectedOfferId: request.offerId,
+      assignedDriverId: _driverId,
+      offers: [offer],
+    );
+    await _openFare(tester, rides);
+    await tester.tap(find.byKey(const Key('ride-submit-fare')));
+    await tester.pumpAndSettle();
+    final field = find.byKey(const Key('voucher-field'));
+    await tester.ensureVisible(field);
+    await tester.enterText(field, 'DEALGO10');
+    await tester.tap(find.byKey(const Key('voucher-apply')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('ride-select-offer')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Bạn có thể chọn lại không kèm mã.'), findsOneWidget);
+    expect(find.textContaining('server text'), findsNothing);
+    expect(find.byKey(const Key('voucher-applied')), findsNothing);
+
+    rides.selectError = null;
+    await tester.tap(find.byKey(const Key('ride-select-offer')));
+    await tester.pumpAndSettle();
+    expect(rides.selectCalls, hasLength(2));
+    expect(rides.selectCalls.first.voucherCode, 'DEALGO10');
+    expect(rides.selectCalls.last.voucherCode, isNull);
+    expect(rides.selectCalls.last.idempotencyKey, isNot(rides.selectCalls.first.idempotencyKey));
+  });
+
   testWidgets('a failed client does not show success', (tester) async {
     final rides = _negotiatingClient()
       ..createError = const ApiException(
@@ -190,14 +305,85 @@ void main() {
       tester,
       profile: customerProfile,
       rideClient: _negotiatingClient(),
+      locationOverride: FakeLocationService.denied(),
     );
 
     await tester.tap(navLabel('Đặt'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Bản đồ đặt xe'), findsOneWidget);
-    expect(find.text('Đang tải bản đồ...'), findsOneWidget);
-    expect(find.text('Nhập địa chỉ thủ công'), findsOneWidget);
+    // No GPS fix: pickup waits for a choice and nothing is faked.
+    expect(find.text('Bạn muốn đi đâu?'), findsOneWidget);
+    expect(find.text('Chọn điểm đón'), findsOneWidget);
+    expect(find.text('Chọn điểm đến'), findsOneWidget);
+    expect(find.textContaining('mẫu'), findsNothing);
+  });
+
+  testWidgets('the place picker searches and returns real coordinates', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final rides = _negotiatingClient();
+    await pumpSignedIn(
+      tester,
+      profile: customerProfile,
+      rideClient: rides,
+      locationOverride: FakeLocationService(),
+      places: FakePlacesRemoteDataSource(
+        catalog: FakePlacesRemoteDataSource.sampleCatalog,
+      ),
+      pricing: FakePricingRemoteDataSource(fixedReferenceVnd: 42000),
+    );
+    await tester.tap(navLabel('Đặt'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('ride-dropoff-label')));
+    await tester.pumpAndSettle();
+    expect(find.text('Vị trí hiện tại của bạn'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const Key('place-search-field')),
+      'chợ hàn',
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    expect(find.text('Chợ Hàn'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('place-result-0')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Chợ Hàn, 119 Trần Phú, Hải Châu, Đà Nẵng'),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('ride-open-route-overview')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('ride-quote-reference')), findsOneWidget);
+    expect(find.text('42.000đ'), findsOneWidget);
+  });
+
+  testWidgets('denied location keeps pickup unset and explains why', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await pumpSignedIn(
+      tester,
+      profile: customerProfile,
+      rideClient: _negotiatingClient(),
+      locationOverride: FakeLocationService.denied(),
+    );
+    await tester.tap(navLabel('Đặt'));
+    await tester.pumpAndSettle();
+    expect(find.text('Chọn điểm đón'), findsOneWidget);
+    final overview = tester.widget<DealGoPrimaryButton>(
+      find.byKey(const Key('ride-open-route-overview')),
+    );
+    expect(overview.enabled, isFalse);
+
+    await tester.tap(find.byKey(const Key('ride-pickup-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('place-current-location')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('place-location-error')), findsOneWidget);
   });
 }
 
@@ -226,24 +412,24 @@ RideView _view({
   RidePoint? dropoff,
   List<RideOffer> offers = const [],
   String expiresAt = '2030-01-01T00:00:00.000Z',
+  int discountVnd = 0,
+  String? voucherCode,
 }) {
   return RideView(
+    discountVnd: discountVnd,
+    voucherCode: voucherCode,
     id: 'ride-1',
     status: status,
     pickup:
         pickup ??
         const RidePoint(
-          lat: rideSamplePickupLat,
-          lng: rideSamplePickupLng,
-          label: rideSamplePickupLabel,
+          lat: testPickupLat,
+          lng: testPickupLng,
+          label: 'Vị trí hiện tại',
         ),
     dropoff:
         dropoff ??
-        const RidePoint(
-          lat: rideSampleDropoffLat,
-          lng: rideSampleDropoffLng,
-          label: rideSampleDropoffLabel,
-        ),
+        RidePoint(lat: _airport.lat, lng: _airport.lng, label: _airport.label),
     offeredFareVnd: offeredFareVnd,
     referenceFareVnd: 40000,
     agreedFareVnd: agreedFareVnd,
@@ -265,18 +451,32 @@ RideOffer _offer({required int amountVnd}) {
   );
 }
 
+const _airport = PlaceOption(
+  name: 'Sân bay Quốc tế Đà Nẵng',
+  address: 'Nguyễn Văn Linh, Hải Châu, Đà Nẵng',
+  lat: 16.0439,
+  lng: 108.1994,
+  source: PlaceSource.recent,
+);
+
 Future<void> _openFare(WidgetTester tester, FakeRideClient rides) async {
   await tester.binding.setSurfaceSize(const Size(400, 1800));
   addTearDown(() => tester.binding.setSurfaceSize(null));
-  await pumpSignedIn(tester, profile: customerProfile, rideClient: rides);
+  await pumpSignedIn(
+    tester,
+    profile: customerProfile,
+    rideClient: rides,
+    locationOverride: FakeLocationService(),
+    places: FakePlacesRemoteDataSource(recent: [_airport]),
+    pricing: FakePricingRemoteDataSource(fixedReferenceVnd: 42000),
+  );
 
   await tester.tap(find.text('Đặt xe').hitTestable().first);
   await tester.pumpAndSettle();
-  await tester.tap(find.text('Nhập địa chỉ thủ công'));
-  await tester.pumpAndSettle();
+  expect(find.text('Vị trí hiện tại'), findsOneWidget);
 
-  await tester.ensureVisible(find.byKey(const Key('ride-suggestion-airport')));
-  await tester.tap(find.byKey(const Key('ride-suggestion-airport')));
+  await tester.ensureVisible(find.byKey(const Key('ride-suggestion-0')));
+  await tester.tap(find.byKey(const Key('ride-suggestion-0')));
   await tester.pump();
 
   final overview = find.byKey(const Key('ride-open-route-overview'));
@@ -284,17 +484,20 @@ Future<void> _openFare(WidgetTester tester, FakeRideClient rides) async {
   await tester.tap(overview);
   await tester.pumpAndSettle();
   expect(find.textContaining('hành trình'), findsWidgets);
+  expect(find.text('42.000đ'), findsOneWidget);
   final vehicle = find.byKey(const Key('ride-open-vehicle'));
   await tester.ensureVisible(vehicle);
   await tester.tap(vehicle);
   await tester.pumpAndSettle();
   expect(find.text('Chọn loại xe'), findsOneWidget);
+  expect(find.text('Từ 42.000đ'), findsOneWidget);
   await tester.tap(find.byKey(const Key('ride-confirm-vehicle')));
   await tester.pumpAndSettle();
   expect(find.text('Chi tiết giá cước'), findsOneWidget);
+  expect(find.textContaining('Toyota'), findsNothing);
   await tester.tap(find.byKey(const Key('ride-open-fare-bid')));
   await tester.pumpAndSettle();
   expect(find.text('Tự đề xuất giá chuyến'), findsOneWidget);
-  expect(find.text(rideFareRangeLabel()), findsOneWidget);
-  expect(find.text('Xe 4 chỗ'), findsOneWidget);
+  expect(find.text('Mức cho phép từ 15.000đ đến 1.000.000đ'), findsOneWidget);
+  expect(find.text('Xe máy'), findsWidgets);
 }

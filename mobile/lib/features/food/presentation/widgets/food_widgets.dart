@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
+import '../../../../core/config/api_base_url.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
-import '../../../identity/presentation/widgets/auth_widgets.dart';
 import '../../domain/entities/food_money.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../l10n/app_localizations.dart';
 
 String? currentAccessToken(BuildContext context) {
   final auth = context.read<AuthCubit>().state;
@@ -16,64 +17,12 @@ String? currentAccessToken(BuildContext context) {
   return auth.tokens.accessToken;
 }
 
-class FoodScreenHeader extends StatelessWidget {
-  const FoodScreenHeader({
-    required this.title,
-    this.subtitle,
-    this.trailing,
-    this.onBack,
-    super.key,
-  });
-
-  final String title;
-  final String? subtitle;
-  final Widget? trailing;
-  final VoidCallback? onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        DealGoSpacing.s8,
-        DealGoSpacing.s8,
-        DealGoDimensions.pageGutter,
-        DealGoSpacing.s8,
-      ),
-      child: Row(
-        children: [
-          AuthBackButton(
-            onPressed:
-                onBack ??
-                () {
-                  if (context.canPop()) {
-                    context.pop();
-                  }
-                },
-          ),
-          const SizedBox(width: DealGoSpacing.s8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: textTheme.titleMedium),
-                if (subtitle != null)
-                  Text(subtitle!, style: textTheme.bodySmall),
-              ],
-            ),
-          ),
-          ?trailing,
-        ],
-      ),
-    );
-  }
-}
-
 class FoodPanel extends StatelessWidget {
   const FoodPanel({
     required this.child,
     this.color = DealGoColors.card,
     this.padding = const EdgeInsets.all(DealGoSpacing.s16),
+    this.elevated = false,
     super.key,
   });
 
@@ -81,19 +30,125 @@ class FoodPanel extends StatelessWidget {
   final Color color;
   final EdgeInsetsGeometry padding;
 
+  /// Soft purple shadow for menu/store cards (C022/C025).
+  final bool elevated;
+
   @override
   Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(DealGoRadius.card);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(DealGoRadius.card),
+        borderRadius: radius,
         border: Border.all(
           color: color == DealGoColors.card
               ? DealGoColors.border
               : Colors.transparent,
         ),
+        boxShadow: elevated ? DealGoShadows.card : null,
       ),
       child: Padding(padding: padding, child: child),
+    );
+  }
+}
+
+/// Wide hero / cover image with solid placeholder (no gradients).
+class FoodCoverImage extends StatelessWidget {
+  const FoodCoverImage({
+    this.imageUrl,
+    this.height = 180,
+    this.badge,
+    super.key,
+  });
+
+  final String? imageUrl;
+  final double height;
+  final Widget? badge;
+
+  @override
+  Widget build(BuildContext context) {
+    final resolved = resolveMediaUrl(imageUrl);
+    final radius = BorderRadius.circular(DealGoRadius.card);
+    final placeholder = ColoredBox(
+      color: DealGoColors.amberSurface,
+      child: SizedBox(
+        height: height,
+        width: double.infinity,
+        child: const Icon(
+          DealGoIcons.food,
+          color: DealGoColors.amber,
+          size: 64,
+        ),
+      ),
+    );
+    final image = resolved == null || resolved.isEmpty
+        ? placeholder
+        : Image.network(
+            resolved,
+            height: height,
+            width: double.infinity,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stack) => placeholder,
+          );
+    return ClipRRect(
+      borderRadius: radius,
+      child: Stack(
+        children: [
+          SizedBox(height: height, width: double.infinity, child: image),
+          if (badge != null)
+            Positioned(right: DealGoSpacing.s12, bottom: DealGoSpacing.s12, child: badge!),
+        ],
+      ),
+    );
+  }
+}
+
+/// Outlined or filled meta chip used on store headings (prep / distance).
+class FoodInfoChip extends StatelessWidget {
+  const FoodInfoChip({
+    required this.label,
+    this.icon,
+    this.filled = false,
+    this.iconColor,
+    super.key,
+  });
+
+  final String label;
+  final IconData? icon;
+  final bool filled;
+  final Color? iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = filled ? DealGoColors.primary : DealGoColors.textSecondary;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: filled ? DealGoColors.subtlePurple : DealGoColors.card,
+        borderRadius: BorderRadius.circular(DealGoRadius.pill),
+        border: filled ? null : Border.all(color: DealGoColors.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: DealGoSpacing.s12,
+          vertical: DealGoSpacing.s8,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 14, color: iconColor ?? foreground),
+              const SizedBox(width: DealGoSpacing.s4),
+            ],
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: foreground,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -212,25 +267,41 @@ class FoodStatusChip extends StatelessWidget {
 }
 
 class FoodThumb extends StatelessWidget {
-  const FoodThumb({this.size = 56, super.key});
+  const FoodThumb({this.size = 56, this.imageUrl, super.key});
 
   final double size;
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    final resolved = resolveMediaUrl(imageUrl);
+    final radius = BorderRadius.circular(DealGoRadius.input);
+    final placeholder = DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF4EA),
-        borderRadius: BorderRadius.circular(12),
+        color: DealGoColors.amberSurface,
+        borderRadius: radius,
       ),
       child: SizedBox(
         width: size,
         height: size,
         child: Icon(
-          Icons.ramen_dining,
-          color: const Color(0xFFEA580C),
+          DealGoIcons.food,
+          color: DealGoColors.amber,
           size: size * 0.46,
         ),
+      ),
+    );
+    if (resolved == null || resolved.isEmpty) {
+      return placeholder;
+    }
+    return ClipRRect(
+      borderRadius: radius,
+      child: Image.network(
+        resolved,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stack) => placeholder,
       ),
     );
   }
@@ -242,6 +313,8 @@ class FoodLineSummary extends StatelessWidget {
     required this.quantity,
     required this.unitPriceVnd,
     required this.lineTotalVnd,
+    this.options = '',
+    this.imageUrl,
     super.key,
   });
 
@@ -249,6 +322,10 @@ class FoodLineSummary extends StatelessWidget {
   final int quantity;
   final int unitPriceVnd;
   final int lineTotalVnd;
+
+  /// Chosen options from the placed order (DEC-PROD-033); empty = none.
+  final String options;
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -258,7 +335,7 @@ class FoodLineSummary extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const FoodThumb(size: 44),
+          FoodThumb(size: 44, imageUrl: imageUrl),
           const SizedBox(width: DealGoSpacing.s12),
           Expanded(
             child: Column(
@@ -271,8 +348,15 @@ class FoodLineSummary extends StatelessWidget {
                     color: DealGoColors.text,
                   ),
                 ),
+                if (options.isNotEmpty)
+                  Text(
+                    options,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: DealGoColors.textSecondary,
+                    ),
+                  ),
                 Text(
-                  'x$quantity · ${formatVnd(unitPriceVnd)} / món',
+                  AppLocalizations.of(context).foodLineQtyPrice(quantity, formatVnd(unitPriceVnd)),
                   style: textTheme.bodySmall,
                 ),
               ],

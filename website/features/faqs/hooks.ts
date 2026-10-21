@@ -2,7 +2,11 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchFaqs, patchFaq } from "@/features/faqs/api";
-import type { FaqCategory, FaqStatus } from "@/features/faqs/types";
+import type {
+  FaqAudience,
+  FaqCategory,
+  FaqStatus,
+} from "@/features/faqs/types";
 
 const queryKey = ["ops", "faqs"] as const;
 
@@ -22,6 +26,7 @@ export function usePatchFaqMutation() {
       suggestedAnswer?: string;
       status?: FaqStatus;
       category?: FaqCategory;
+      audience?: FaqAudience;
       reason: string;
     }) => {
       const { id, ...rest } = input;

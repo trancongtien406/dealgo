@@ -3,12 +3,16 @@ import 'package:flutter/services.dart';
 
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/design_system/components/dealgo_card.dart';
+import '../../../../core/design_system/components/dealgo_logo.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/phone_input.dart';
+import '../../../../core/design_system/components/dealgo_icon_badge.dart';
+import 'auth_scaffold.dart';
 import 'auth_widgets.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
 
 const otpCodeLength = 6;
 
@@ -42,57 +46,33 @@ String _maskedPhone(String e164) {
 }
 
 class _OtpHeader extends StatelessWidget {
-  const _OtpHeader({required this.onBack});
+  const _OtpHeader({required this.onBack, this.isEmail = false});
 
   final VoidCallback onBack;
+  final bool isEmail;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: DealGoDimensions.pageGutter,
-        vertical: DealGoSpacing.s8,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              AuthBackButton(onPressed: onBack),
-              const SizedBox(width: DealGoSpacing.s8),
-              const Text.rich(
-                TextSpan(
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
-                  ),
-                  children: [
-                    TextSpan(
-                      text: 'Deal',
-                      style: TextStyle(color: DealGoColors.primary),
-                    ),
-                    TextSpan(
-                      text: 'Go',
-                      style: TextStyle(color: DealGoColors.brandGreen),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          TextButton(
-            onPressed: onBack,
-            style: TextButton.styleFrom(
-              foregroundColor: DealGoColors.primary,
-              textStyle: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
+    final l10n = AppLocalizations.of(context);
+    return SizedBox(
+      height: DealGoDimensions.headerHeight,
+      child: Padding(
+        padding: const EdgeInsets.only(
+          left: DealGoDimensions.pageGutter,
+          right: DealGoSpacing.s4,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const DealGoLogo.wordmark(size: 24),
+            TextButton(
+              onPressed: onBack,
+              child: Text(
+                isEmail ? l10n.actionChangeEmail : l10n.otpChangePhone,
               ),
             ),
-            child: const Text('Đổi số'),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -113,11 +93,15 @@ class OtpEntryPane extends StatelessWidget {
     required this.onBackspace,
     required this.onResend,
     required this.onConfirm,
+    this.isEmail = false,
     super.key,
   });
 
   final TextEditingController code;
+
+  /// E.164 phone, or the email address when [isEmail] is true.
   final String phone;
+  final bool isEmail;
   final ApiException? error;
   final bool submitting;
   final bool resending;
@@ -132,59 +116,68 @@ class OtpEntryPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
-    final displayPhone = formatDisplayPhone(phone);
+    final displayPhone = isEmail ? phone : formatDisplayPhone(phone);
     final waiting = remaining > Duration.zero;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _OtpHeader(onBack: onBack),
+        _OtpHeader(onBack: onBack, isEmail: isEmail),
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(
-              DealGoDimensions.pageGutter,
-              DealGoSpacing.s16,
-              DealGoDimensions.pageGutter,
-              DealGoSpacing.s8,
-            ),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.symmetric(horizontal: DealGoSpacing.s20),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(DealGoRadius.card),
-                  child: Container(
-                    constraints: const BoxConstraints(maxHeight: 160),
-                    child: Image.asset(
-                      'assets/images/hero_otp_shield.png',
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const _LockMark(),
+                SizedBox(
+                  height: 180,
+                  width: double.infinity,
+                  child: Image.asset(
+                    'assets/images/hero_otp_shield.png',
+                    fit: BoxFit.contain,
+                    excludeFromSemantics: true,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const _LockMark(),
+                  ),
+                ),
+                const SizedBox(height: DealGoSpacing.s12),
+                Semantics(
+                  header: true,
+                  child: Text.rich(
+                    TextSpan(
+                      style: textTheme.headlineMedium,
+                      children: [
+                        TextSpan(
+                          text: isEmail
+                              ? l10n.otpEmailHeadingPrefix
+                              : l10n.otpPhoneHeadingPrefix,
+                        ),
+                        TextSpan(
+                          text: isEmail
+                              ? l10n.otpEmailHeadingAccent
+                              : l10n.otpPhoneHeadingAccent,
+                          style: const TextStyle(color: DealGoColors.primary),
+                        ),
+                      ],
                     ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
-                const SizedBox(height: DealGoSpacing.s16),
-                Text(
-                  AppLocalizations.of(context).otpHeading,
-                  style: textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.3,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: DealGoSpacing.s8),
+                const SizedBox(height: DealGoSpacing.s6),
                 Text.rich(
                   TextSpan(
                     style: textTheme.bodyMedium?.copyWith(
                       color: DealGoColors.textSecondary,
                     ),
                     children: [
-                      TextSpan(
-                        text: AppLocalizations.of(context).otpBodyPrefix,
-                      ),
+                      TextSpan(text: l10n.otpEmailBodyPrefix),
                       TextSpan(
                         text: displayPhone,
                         style: const TextStyle(
-                          color: DealGoColors.primary,
+                          color: DealGoColors.text,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -192,7 +185,7 @@ class OtpEntryPane extends StatelessWidget {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: DealGoSpacing.s24),
+                const SizedBox(height: DealGoSpacing.s20),
                 _OtpBoxes(controller: code, onChanged: onChanged),
                 if (error != null) ...[
                   const SizedBox(height: DealGoSpacing.s12),
@@ -201,102 +194,91 @@ class OtpEntryPane extends StatelessWidget {
                     child: AuthErrorText(error: error!),
                   ),
                 ],
-                const SizedBox(height: DealGoSpacing.s8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        AppLocalizations.of(context).otpNotReceived,
-                        style: textTheme.bodySmall,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: submitting || resending ? null : onResend,
-                      style: TextButton.styleFrom(
-                        foregroundColor: waiting
-                            ? DealGoColors.brandGreen
-                            : DealGoColors.primary,
-                        minimumSize: const Size(
-                          DealGoDimensions.minTapTarget,
-                          DealGoDimensions.minTapTarget,
-                        ),
-                      ),
-                      child: Text(
-                        resending
-                            ? AppLocalizations.of(context).otpSending
-                            : waiting
-                            ? AppLocalizations.of(context).otpResendAfter(
-                                _waitLabel(remaining),
-                              )
-                            : AppLocalizations.of(context).actionResend,
-                      ),
-                    ),
-                  ],
-                ),
-                AuthInfoBanner(
-                  title: AppLocalizations.of(context).otpProtectTitle,
-                  message: AppLocalizations.of(context).otpProtectBody,
-                ),
                 const SizedBox(height: DealGoSpacing.s16),
-                DealGoCard(
+                Semantics(
+                  liveRegion: true,
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(
-                        Icons.smartphone_outlined,
-                        color: DealGoColors.primary,
-                      ),
-                      const SizedBox(width: DealGoSpacing.s12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      const Icon(DealGoIcons.clock, size: 16),
+                      const SizedBox(width: DealGoSpacing.s6),
+                      Text.rich(
+                        TextSpan(
+                          style: textTheme.labelMedium,
                           children: [
-                            Text(
-                              AppLocalizations.of(context).authPhoneLabel,
-                              style: textTheme.bodySmall,
+                            TextSpan(text: '${l10n.otpResendIn} '),
+                            TextSpan(
+                              text: l10n.otpSeconds(
+                                waiting ? remaining.inSeconds : 0,
+                              ),
+                              style: const TextStyle(
+                                color: DealGoColors.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                            const SizedBox(height: DealGoSpacing.s4),
-                            Text(displayPhone, style: textTheme.titleMedium),
                           ],
                         ),
-                      ),
-                      TextButton(
-                        onPressed: onBack,
-                        style: TextButton.styleFrom(
-                          foregroundColor: DealGoColors.primary,
-                          minimumSize: const Size(
-                            DealGoDimensions.minTapTarget,
-                            DealGoDimensions.minTapTarget,
-                          ),
-                        ),
-                        child: Text(AppLocalizations.of(context).actionChange),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: DealGoSpacing.s16),
-                _Keypad(
-                  enabled: !submitting,
-                  onDigit: onDigit,
-                  onBackspace: onBackspace,
-                  onSubmit: onConfirm,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: DealGoSpacing.s12,
+                    vertical: DealGoSpacing.s12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: DealGoColors.lavender,
+                    borderRadius: BorderRadius.circular(DealGoRadius.button),
+                  ),
+                  child: Row(
+                    children: [
+                      const DealGoIconBadge(
+                        DealGoIcons.lock,
+                        size: 30,
+                        circle: true,
+                      ),
+                      const SizedBox(width: DealGoSpacing.s12),
+                      Expanded(
+                        child: Text(
+                          l10n.otpShieldNote,
+                          style: textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: DealGoSpacing.s20),
+                DealGoPrimaryButton(
+                  label: l10n.otpConfirm,
+                  trailingIcon: DealGoIcons.arrowRight,
+                  enabled: canConfirm,
+                  isLoading: submitting,
+                  onPressed: onConfirm,
+                ),
+                const SizedBox(height: DealGoSpacing.s12),
+                SizedBox(
+                  width: double.infinity,
+                  child: DealGoSecondaryButton(
+                    label: resending ? l10n.otpSending : l10n.otpResendLabel,
+                    leadingIcon: DealGoIcons.sync,
+                    enabled: !submitting && !resending,
+                    onPressed: onResend,
+                  ),
+                ),
+                const AuthLegalFooter(),
+                Offstage(
+                  offstage: true,
+                  child: _Keypad(
+                    enabled: !submitting,
+                    onDigit: onDigit,
+                    onBackspace: onBackspace,
+                    onSubmit: onConfirm,
+                  ),
                 ),
               ],
             ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            DealGoDimensions.pageGutter,
-            DealGoSpacing.s8,
-            DealGoDimensions.pageGutter,
-            DealGoSpacing.s16,
-          ),
-          child: DealGoPrimaryButton(
-            label: AppLocalizations.of(context).actionVerifyContinue,
-            trailingIcon: Icons.arrow_forward,
-            isLoading: submitting,
-            enabled: canConfirm,
-            onPressed: onConfirm,
           ),
         ),
       ],
@@ -311,10 +293,12 @@ class OtpInvalidPane extends StatelessWidget {
     required this.onBack,
     required this.onChangePhone,
     required this.onRetry,
+    this.isEmail = false,
     super.key,
   });
 
   final String code;
+  final bool isEmail;
   final ApiException? error;
   final VoidCallback onBack;
   final VoidCallback onChangePhone;
@@ -327,7 +311,11 @@ class OtpInvalidPane extends StatelessWidget {
     final locked = error?.errorCode == 'AUTH_CODE_LOCKED';
     final expired = error?.errorCode == 'AUTH_CODE_EXPIRED';
     final title = expired ? l10n.otpExpiredTitle : l10n.otpInvalidTitle;
-    final detail = locked ? l10n.otpLockedBody : l10n.otpInvalidBody;
+    // Email challenges cannot be resent once locked; the user starts over.
+    final emailLocked = isEmail && locked;
+    final detail = emailLocked
+        ? l10n.otpEmailLockedBody
+        : (locked ? l10n.otpLockedBody : l10n.otpInvalidBody);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -339,7 +327,7 @@ class OtpInvalidPane extends StatelessWidget {
             child: Column(
               children: [
                 const _StatusMark(
-                  icon: Icons.close_rounded,
+                  icon: DealGoIcons.close,
                   color: DealGoColors.danger,
                   background: DealGoColors.dangerSurface,
                 ),
@@ -419,17 +407,21 @@ class OtpInvalidPane extends StatelessWidget {
             children: [
               Expanded(
                 child: DealGoSecondaryButton(
-                  label: l10n.actionChangePhone,
+                  label: isEmail
+                      ? l10n.actionChangeEmail
+                      : l10n.actionChangePhone,
                   onPressed: onChangePhone,
                 ),
               ),
-              const SizedBox(width: DealGoSpacing.s12),
-              Expanded(
-                child: DealGoPrimaryButton(
-                  label: AppLocalizations.of(context).actionRetry,
-                  onPressed: onRetry,
+              if (!emailLocked) ...[
+                const SizedBox(width: DealGoSpacing.s12),
+                Expanded(
+                  child: DealGoPrimaryButton(
+                    label: AppLocalizations.of(context).actionRetry,
+                    onPressed: onRetry,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -452,10 +444,13 @@ class OtpCooldownPane extends StatelessWidget {
     required this.onBack,
     required this.onLeave,
     required this.onContinue,
+    this.isEmail = false,
     super.key,
   });
 
+  /// E.164 phone, or the email address when [isEmail] is true.
   final String phone;
+  final bool isEmail;
   final Duration remaining;
   final VoidCallback onBack;
   final VoidCallback onLeave;
@@ -476,7 +471,7 @@ class OtpCooldownPane extends StatelessWidget {
             child: Column(
               children: [
                 const _StatusMark(
-                  icon: Icons.pie_chart_outline,
+                  icon: DealGoIcons.chartPie,
                   color: DealGoColors.amber,
                   background: DealGoColors.amberSurface,
                 ),
@@ -515,7 +510,9 @@ class OtpCooldownPane extends StatelessWidget {
                             ),
                             const SizedBox(height: DealGoSpacing.s8),
                             Text(
-                              l10n.authPhoneLabel,
+                              isEmail
+                                  ? l10n.authEmailLabel
+                                  : l10n.authPhoneLabel,
                               style: textTheme.bodySmall,
                             ),
                           ],
@@ -533,7 +530,7 @@ class OtpCooldownPane extends StatelessWidget {
                           ),
                           const SizedBox(height: DealGoSpacing.s8),
                           Text(
-                            _maskedPhone(phone),
+                            isEmail ? phone : _maskedPhone(phone),
                             style: textTheme.titleMedium,
                           ),
                         ],
@@ -644,15 +641,11 @@ class _LockMark extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Icon(Icons.lock_rounded, color: Color(0xFFF5B942), size: 40),
+            Icon(DealGoIcons.lock, color: Color(0xFFF5B942), size: 40),
             Positioned(
               right: 18,
               top: 22,
-              child: Icon(
-                Icons.key_rounded,
-                color: Color(0xFFE8A317),
-                size: 18,
-              ),
+              child: Icon(DealGoIcons.key, color: Color(0xFFE8A317), size: 18),
             ),
           ],
         ),
@@ -670,7 +663,6 @@ class _OtpBoxes extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final code = controller.text;
-    final textTheme = Theme.of(context).textTheme;
     final activeIndex = code.length >= otpCodeLength
         ? otpCodeLength - 1
         : code.length;
@@ -678,54 +670,53 @@ class _OtpBoxes extends StatelessWidget {
     return Semantics(
       label: AppLocalizations.of(context).otpFieldLabel,
       textField: true,
-      child: ExcludeSemantics(
-        child: SizedBox(
-          height: 56,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              IgnorePointer(
-                child: Row(
-                  children: [
-                    for (var index = 0; index < otpCodeLength; index++) ...[
-                      if (index > 0) const SizedBox(width: DealGoSpacing.s8),
-                      Expanded(
-                        child: _OtpBox(
-                          digit: index < code.length ? code[index] : '',
-                          highlighted: index == activeIndex,
-                          style: textTheme.titleLarge,
-                        ),
+      child: SizedBox(
+        height: 60,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            IgnorePointer(
+              child: Row(
+                children: [
+                  for (var index = 0; index < otpCodeLength; index++) ...[
+                    if (index > 0) const SizedBox(width: 8),
+                    Expanded(
+                      child: _OtpBox(
+                        digit: index < code.length ? code[index] : '',
+                        highlighted: index == activeIndex,
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
-                    ],
+                    ),
                   ],
+                ],
+              ),
+            ),
+            Positioned.fill(
+              child: TextField(
+                key: const Key('otp-field'),
+                controller: controller,
+                autofocus: true,
+                showCursor: false,
+                style: const TextStyle(color: Colors.transparent),
+                cursorColor: Colors.transparent,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(otpCodeLength),
+                ],
+                onChanged: (_) => onChanged(),
+                decoration: const InputDecoration(
+                  isCollapsed: true,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                  counterText: '',
                 ),
               ),
-              Positioned.fill(
-                child: TextField(
-                  key: const Key('otp-field'),
-                  controller: controller,
-                  readOnly: true,
-                  enableInteractiveSelection: false,
-                  showCursor: false,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(otpCodeLength),
-                  ],
-                  onChanged: (_) => onChanged(),
-                  decoration: const InputDecoration(
-                    isCollapsed: true,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    disabledBorder: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
-                    counterText: '',
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -745,34 +736,50 @@ class _OtpBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasDigit = digit.isNotEmpty;
     return Container(
-      height: 56,
+      height: 58,
       decoration: BoxDecoration(
-        color: highlighted ? Colors.white : const Color(0xFFF9FAFB),
-        borderRadius: BorderRadius.circular(DealGoRadius.input),
+        color: hasDigit
+            ? Colors.white
+            : (highlighted ? Colors.white : const Color(0xFFF8FAFC)),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: highlighted ? DealGoColors.primary : DealGoColors.border,
-          width: highlighted ? 2.0 : 1.2,
+          color: highlighted
+              ? const Color(0xFF6D28D9)
+              : (hasDigit ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0)),
+          width: highlighted ? 1.8 : 1.2,
         ),
         boxShadow: highlighted
             ? [
                 BoxShadow(
-                  color: DealGoColors.primary.withValues(alpha: 0.12),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+                  color: const Color(0xFF6D28D9).withValues(alpha: 0.12),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
                 ),
               ]
             : null,
       ),
       child: Center(
-        child: Text(
-          digit,
-          style: (style ?? const TextStyle()).copyWith(
-            color: DealGoColors.primary,
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
+        child: hasDigit
+            ? Text(
+                digit,
+                style: const TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
+              )
+            : (highlighted
+                  ? Container(
+                      width: 2,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6D28D9),
+                        borderRadius: BorderRadius.circular(1),
+                      ),
+                    )
+                  : const SizedBox.shrink()),
       ),
     );
   }
@@ -822,7 +829,7 @@ class _Keypad extends StatelessWidget {
           children: [
             Expanded(
               child: _KeypadKey(
-                icon: Icons.backspace_outlined,
+                icon: DealGoIcons.backspace,
                 keyName: 'backspace',
                 enabled: enabled,
                 onPressed: onBackspace,
@@ -839,7 +846,7 @@ class _Keypad extends StatelessWidget {
             const SizedBox(width: DealGoSpacing.s8),
             Expanded(
               child: _KeypadKey(
-                icon: Icons.check_rounded,
+                icon: DealGoIcons.check,
                 keyName: 'submit',
                 enabled: enabled,
                 onPressed: onSubmit,

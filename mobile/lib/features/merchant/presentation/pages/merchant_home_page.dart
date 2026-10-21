@@ -8,10 +8,15 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_models.dart';
 import '../../../food/domain/entities/food_money.dart';
+import '../../domain/merchant_stats.dart';
+import '../../domain/usecases/get_merchant_catalog.dart';
 import '../cubit/merchant_queue_cubit.dart';
+import '../cubit/merchant_stats_cubit.dart';
 import '../utils/merchant_routes.dart';
 import '../cubit/merchant_states.dart';
 import '../widgets/merchant_widgets.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/format/short_ref.dart';
 
 class MerchantHomePage extends StatefulWidget {
   const MerchantHomePage({super.key});
@@ -21,30 +26,68 @@ class MerchantHomePage extends StatefulWidget {
 }
 
 class _MerchantHomePageState extends State<MerchantHomePage> {
+  late final MerchantStatsCubit _stats = MerchantStatsCubit(
+    stats: context.read<MerchantStatsRepository>(),
+    catalog: context.read<GetMerchantCatalog>(),
+  );
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
+  @override
+  void dispose() {
+    _stats.close();
+    super.dispose();
+  }
+
   void _load() {
     if (!mounted) {
       return;
     }
-    unawaited(
-      context.read<MerchantQueueCubit>().load(merchantAccessToken(context)),
+    final queue = context.read<MerchantQueueCubit>();
+    queue.setTokenSource(
+      () => context.mounted ? merchantAccessToken(context) : null,
     );
+    final token = merchantAccessToken(context);
+    unawaited(queue.load(token));
+    unawaited(_stats.load(token, days: 1));
+    // DEC-PROD-043: subscribe store: even when the queue is empty.
+    unawaited(_bindStoreRoom(token));
+  }
+
+  Future<void> _bindStoreRoom(String? token) async {
+    final access = token?.trim() ?? '';
+    if (access.isEmpty || !mounted) return;
+    try {
+      final store = await context.read<GetMerchantCatalog>()(access);
+      if (!mounted) return;
+      await context.read<MerchantQueueCubit>().listenStore(
+        storeId: store.id,
+        tokenSource: () =>
+            context.mounted ? merchantAccessToken(context) : null,
+      );
+    } catch (_) {
+      // Catalog may 403 when ineligible; queue load surfaces that state.
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final queue = context.watch<MerchantQueueCubit>().state;
+    final l10n = AppLocalizations.of(context);
+    return BlocProvider.value(value: _stats, child: _body(queue, l10n));
+  }
+
+  Widget _body(MerchantQueueState queue, AppLocalizations l10n) {
     return switch (queue) {
-      MerchantQueueLoading() => const MerchantQueueLoadingView(
-        title: 'Tổng quan cửa hàng',
+      MerchantQueueLoading() => MerchantQueueLoadingView(
+        title: l10n.merchantHomeTitle,
       ),
       MerchantQueueIneligible() => MerchantIneligibleView(
-        title: 'Tổng quan cửa hàng',
+        title: l10n.merchantHomeTitle,
         onRetry: _load,
       ),
       MerchantQueueFailed(:final saved, :final syncedAt) =>
@@ -53,22 +96,33 @@ class _MerchantHomePageState extends State<MerchantHomePage> {
           syncedAt: syncedAt,
           onRetry: _load,
         ),
-      MerchantQueueReady(:final orders) => _Dashboard(orders: orders),
+      MerchantQueueReady(:final orders) => _Dashboard(
+        orders: orders,
+        onRefresh: _load,
+      ),
     };
   }
 }
 
 class _Dashboard extends StatelessWidget {
-  const _Dashboard({required this.orders});
+  const _Dashboard({required this.orders, required this.onRefresh});
 
   final List<MerchantQueueOrder> orders;
+
+  /// Re-reads stats + store after M024 so the mode chip is current.
+  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context);
     final totals = merchantQueueTotals(orders);
+    final statsState = context.watch<MerchantStatsCubit>().state;
+    final ready = statsState is MerchantStatsReady ? statsState : null;
+    final today = ready?.stats.today;
+    final store = ready?.store;
     return MerchantPageFrame(
-      title: 'Tổng quan cửa hàng',
+      title: l10n.merchantHomeTitle,
       onBack: () => merchantBack(context),
       body: ListView(
         padding: merchantPagePadding,
@@ -78,21 +132,15 @@ class _Dashboard extends StatelessWidget {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(16),
-                  child: SizedBox(
+                  child: const SizedBox(
                     width: 56,
                     height: 56,
-                    child: Image.asset(
-                      'assets/images/food_bun_bo_hue.png',
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stack) {
-                        return const ColoredBox(
-                          color: DealGoColors.subtlePurple,
-                          child: Icon(
-                            Icons.restaurant,
-                            color: DealGoColors.primary,
-                          ),
-                        );
-                      },
+                    child: ColoredBox(
+                      color: DealGoColors.subtlePurple,
+                      child: Icon(
+                        DealGoIcons.restaurant,
+                        color: DealGoColors.primary,
+                      ),
                     ),
                   ),
                 ),
@@ -101,18 +149,29 @@ class _Dashboard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Bún Bò Huế O Cô', style: textTheme.titleMedium),
                       Text(
-                        'Đà Nẵng · Chi nhánh chính',
-                        style: textTheme.bodySmall,
+                        store?.name ?? l10n.merchantHomeShopFallback,
+                        style: textTheme.titleMedium,
                       ),
+                      if (store?.addressLabel case final address?)
+                        Text(address, style: textTheme.bodySmall),
                     ],
                   ),
                 ),
-                const MerchantChip(
-                  label: 'Đang mở',
-                  tone: MerchantChipTone.green,
-                ),
+                if (store != null)
+                  MerchantChip(
+                    key: const Key('merchant-home-mode-chip'),
+                    label: switch (store.serviceMode) {
+                      StoreServiceMode.open => l10n.merchantHomeOpenChip,
+                      StoreServiceMode.busy => l10n.merchantHomeBusyChip,
+                      StoreServiceMode.paused => l10n.merchantHomePausedChip,
+                    },
+                    tone: switch (store.serviceMode) {
+                      StoreServiceMode.open => MerchantChipTone.green,
+                      StoreServiceMode.busy => MerchantChipTone.warning,
+                      StoreServiceMode.paused => MerchantChipTone.neutral,
+                    },
+                  ),
               ],
             ),
           ),
@@ -121,14 +180,14 @@ class _Dashboard extends StatelessWidget {
             children: [
               Expanded(
                 child: _StatTile(
-                  label: 'Đơn cần xác nhận',
+                  label: l10n.merchantHomeToConfirm,
                   value: merchantCountLabel(totals.placed),
                 ),
               ),
               const SizedBox(width: DealGoSpacing.s12),
               Expanded(
                 child: _StatTile(
-                  label: 'Đang chuẩn bị',
+                  label: l10n.merchantHomePreparing,
                   value: merchantCountLabel(totals.preparing),
                 ),
               ),
@@ -139,15 +198,17 @@ class _Dashboard extends StatelessWidget {
             children: [
               Expanded(
                 child: _StatTile(
-                  label: AppLocalizations.of(context).merchantHomeCompletedToday,
-                  value: merchantCountLabel(totals.ready),
+                  label: l10n.merchantHomeCompletedToday,
+                  value: today == null
+                      ? '—'
+                      : merchantCountLabel(today.deliveredCount),
                 ),
               ),
               const SizedBox(width: DealGoSpacing.s12),
               Expanded(
                 child: _StatTile(
-                  label: AppLocalizations.of(context).merchantHomeFoodToday,
-                  value: formatVnd(totals.subtotalVnd),
+                  label: l10n.merchantHomeFoodToday,
+                  value: today == null ? '—' : formatVnd(today.salesVnd),
                 ),
               ),
             ],
@@ -157,11 +218,11 @@ class _Dashboard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Đơn cần xử lý', style: textTheme.titleMedium),
+                Text(l10n.merchantQueueToHandle, style: textTheme.titleMedium),
                 const SizedBox(height: DealGoSpacing.s12),
                 if (orders.isEmpty)
                   Text(
-                    'Không có đơn đang mở trên hàng đợi.',
+                    l10n.merchantHomeNoOrders,
                     style: textTheme.bodyMedium?.copyWith(
                       color: DealGoColors.textSecondary,
                     ),
@@ -186,21 +247,19 @@ class _Dashboard extends StatelessWidget {
                 ),
                 const SizedBox(height: DealGoSpacing.s8),
                 MerchantMoneyRow(
-                  label: AppLocalizations.of(context).merchantHomeGrossFood,
-                  value: formatVnd(totals.subtotalVnd),
-                ),
-                MerchantMoneyRow(
-                  label: AppLocalizations.of(context).merchantHomePendingSettle,
-                  value: formatVnd(totals.deliveryFareVnd),
-                ),
-                MerchantMoneyRow(
-                  label: AppLocalizations.of(context).merchantHomeAvailable,
-                  value: formatVnd(
-                    totals.subtotalVnd > totals.deliveryFareVnd
-                        ? totals.subtotalVnd - totals.deliveryFareVnd
-                        : 0,
-                  ),
+                  label: l10n.merchantHomeSalesToday,
+                  value: today == null ? '—' : formatVnd(today.salesVnd),
                   emphasize: true,
+                ),
+                MerchantMoneyRow(
+                  label: l10n.merchantHomeCancelledToday,
+                  value: today == null
+                      ? '—'
+                      : merchantCountLabel(today.cancelledCount),
+                ),
+                MerchantMoneyRow(
+                  label: l10n.merchantHomeOpenOrders,
+                  value: merchantCountLabel(orders.length),
                 ),
                 const SizedBox(height: DealGoSpacing.s8),
                 MerchantNote(
@@ -221,23 +280,40 @@ class _Dashboard extends StatelessWidget {
               children: [
                 _SettingsLink(
                   key: const Key('merchant-open-accept'),
-                  icon: Icons.tune,
+                  icon: DealGoIcons.filter,
                   label: AppLocalizations.of(context).merchantAcceptTitle,
                   onTap: () => context.push(MerchantRoutes.acceptSettings),
                 ),
                 const SizedBox(height: DealGoSpacing.s8),
                 _SettingsLink(
                   key: const Key('merchant-open-hours'),
-                  icon: Icons.schedule,
+                  icon: DealGoIcons.clock,
                   label: AppLocalizations.of(context).merchantHoursTitle,
                   onTap: () => context.push(MerchantRoutes.hours),
                 ),
                 const SizedBox(height: DealGoSpacing.s8),
                 _SettingsLink(
                   key: const Key('merchant-open-busy'),
-                  icon: Icons.pause_circle_outline,
+                  icon: DealGoIcons.pause,
                   label: AppLocalizations.of(context).merchantBusyTitle,
-                  onTap: () => context.push(MerchantRoutes.busy),
+                  onTap: () async {
+                    await context.push(MerchantRoutes.busy);
+                    onRefresh();
+                  },
+                ),
+                const SizedBox(height: DealGoSpacing.s8),
+                _SettingsLink(
+                  key: const Key('merchant-open-location'),
+                  icon: DealGoIcons.pin,
+                  label: AppLocalizations.of(context).merchantLocationTitle,
+                  onTap: () => context.push(MerchantRoutes.location),
+                ),
+                const SizedBox(height: DealGoSpacing.s8),
+                _SettingsLink(
+                  key: const Key('merchant-open-history-home'),
+                  icon: DealGoIcons.history,
+                  label: AppLocalizations.of(context).merchantProductsHistory,
+                  onTap: () => context.push(MerchantRoutes.history),
                 ),
               ],
             ),
@@ -272,7 +348,10 @@ class _SettingsLink extends StatelessWidget {
             Icon(icon, color: DealGoColors.primary),
             const SizedBox(width: DealGoSpacing.s12),
             Expanded(child: Text(label)),
-            const Icon(Icons.chevron_right, color: DealGoColors.textSecondary),
+            const Icon(
+              DealGoIcons.chevronRight,
+              color: DealGoColors.textSecondary,
+            ),
           ],
         ),
       ),
@@ -320,15 +399,15 @@ class _HomeOrderRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const DecoratedBox(
+          DecoratedBox(
             decoration: BoxDecoration(
               color: DealGoColors.subtlePurple,
-              borderRadius: BorderRadius.all(Radius.circular(12)),
+              borderRadius: BorderRadius.circular(DealGoRadius.input),
             ),
-            child: SizedBox(
+            child: const SizedBox(
               width: 44,
               height: 44,
-              child: Icon(Icons.receipt_long, color: DealGoColors.primary),
+              child: Icon(DealGoIcons.receipt, color: DealGoColors.primary),
             ),
           ),
           const SizedBox(width: DealGoSpacing.s12),
@@ -336,14 +415,23 @@ class _HomeOrderRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Đơn #${order.id}', style: textTheme.titleSmall),
                 Text(
-                  '${order.lineCount} món · ${formatVnd(order.subtotalVnd)} tiền món',
+                  AppLocalizations.of(context).orderRef(shortRef(order.id)),
+                  style: textTheme.titleSmall,
+                ),
+                Text(
+                  AppLocalizations.of(context).merchantHomeOrderLine(
+                    order.lineCount,
+                    formatVnd(order.subtotalVnd),
+                  ),
                   style: textTheme.bodySmall,
                 ),
                 const SizedBox(height: DealGoSpacing.s8),
                 MerchantChip(
-                  label: merchantStatusLabel(order.status),
+                  label: merchantStatusLabel(
+                    AppLocalizations.of(context),
+                    order.status,
+                  ),
                   tone: merchantStatusTone(order.status),
                 ),
               ],
@@ -351,8 +439,8 @@ class _HomeOrderRow extends StatelessWidget {
           ),
           DecoratedBox(
             decoration: BoxDecoration(
-              color: DealGoColors.subtlePurple,
-              borderRadius: BorderRadius.circular(999),
+              color: DealGoColors.primary,
+              borderRadius: BorderRadius.circular(DealGoRadius.pill),
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(
@@ -360,9 +448,9 @@ class _HomeOrderRow extends StatelessWidget {
                 vertical: DealGoSpacing.s8,
               ),
               child: Text(
-                'Xem →',
+                AppLocalizations.of(context).merchantHomeView,
                 style: textTheme.labelSmall?.copyWith(
-                  color: DealGoColors.primary,
+                  color: DealGoColors.card,
                   fontWeight: FontWeight.w700,
                 ),
               ),

@@ -5,6 +5,7 @@ import {
 
 const FAQ_STATUSES = new Set(["DRAFT", "PUBLISHED", "ARCHIVED"]);
 const FAQ_CATEGORIES = new Set(["POLICY", "OPS", "PRODUCT", "TECH"]);
+const FAQ_AUDIENCES = new Set(["INTERNAL", "CUSTOMER", "DRIVER", "MERCHANT"]);
 
 function readReason(
   record: Record<string, unknown>,
@@ -34,6 +35,7 @@ export async function readOpsFaqCreateBody(request: Request): Promise<
         suggestedAnswer: string;
         category: string;
         status?: string;
+        audience?: string;
         sortOrder?: number;
         reason: string;
       };
@@ -84,6 +86,11 @@ export async function readOpsFaqCreateBody(request: Request): Promise<
   if (status && !FAQ_STATUSES.has(status)) {
     return { ok: false, status: 400, message: "Status không hợp lệ." };
   }
+  const audience =
+    typeof record.audience === "string" ? record.audience.trim() : undefined;
+  if (audience && !FAQ_AUDIENCES.has(audience)) {
+    return { ok: false, status: 400, message: "Đối tượng FAQ không hợp lệ." };
+  }
   const openId =
     typeof record.openId === "string" && record.openId.trim()
       ? record.openId.trim()
@@ -100,6 +107,7 @@ export async function readOpsFaqCreateBody(request: Request): Promise<
       suggestedAnswer,
       category,
       status,
+      audience,
       sortOrder,
       reason: reasonResult.reason,
     },
@@ -145,6 +153,12 @@ export async function readOpsFaqPatchBody(request: Request): Promise<
       return { ok: false, status: 400, message: "Status không hợp lệ." };
     }
     payload.status = record.status.trim();
+  }
+  if (typeof record.audience === "string") {
+    if (!FAQ_AUDIENCES.has(record.audience.trim())) {
+      return { ok: false, status: 400, message: "Đối tượng FAQ không hợp lệ." };
+    }
+    payload.audience = record.audience.trim();
   }
   if (typeof record.openId === "string") {
     payload.openId = record.openId.trim() || null;

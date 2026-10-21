@@ -59,6 +59,33 @@ describe('RoleGrantsService', () => {
     expect(rejected.status).toBe('SUSPENDED');
   });
 
+  it('does not let a user re-open a suspended grant in any environment', async () => {
+    for (const nodeEnv of ['development', 'test', 'production'] as const) {
+      const repository = new MemoryIdentityRepository();
+      const user = await repository.createUser({
+        email: null,
+        phone: `+8490777${nodeEnv.length}${nodeEnv.length}${nodeEnv.length}`,
+        displayName: 'Rider',
+      });
+      const suspended = await repository.insertGrant(
+        user.id,
+        'DRIVER',
+        'SUSPENDED',
+      );
+      const service = new RoleGrantsService(repository, configFor(nodeEnv));
+
+      await expect(
+        service.requestRole(user.id, 'DRIVER'),
+      ).rejects.toMatchObject({
+        status: 403,
+        response: { errorCode: 'ROLE_GRANT_SUSPENDED' },
+      });
+      expect(await repository.findGrantById(suspended.id)).toMatchObject({
+        status: 'SUSPENDED',
+      });
+    }
+  });
+
   it('rejects review of non-pending grants', async () => {
     const repository = new MemoryIdentityRepository();
     const user = await repository.createUser({

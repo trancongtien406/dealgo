@@ -17,6 +17,12 @@ void main() {
     client.challengeGate = gate;
     await pumpDealGo(tester, client: client);
 
+    final phoneBtn = find.byKey(const Key('auth-method-phone'));
+    if (phoneBtn.evaluate().isNotEmpty) {
+      await tester.tap(phoneBtn);
+      await tester.pumpAndSettle();
+    }
+
     await tester.enterText(find.byKey(const Key('phone-field')), '987654321');
     await tester.pump();
     await tester.ensureVisible(find.text('Tiếp tục'));
@@ -31,8 +37,11 @@ void main() {
     gate.complete();
     await tester.pumpAndSettle();
 
-    expect(find.text('Xác minh số điện thoại'), findsOneWidget);
-    expect(find.text('Xác minh và tiếp tục'), findsOneWidget);
+    expect(
+      find.text('Xác minh số điện thoại', findRichText: true),
+      findsOneWidget,
+    );
+    expect(find.text('Xác nhận'), findsOneWidget);
   });
 
   testWidgets('verify success navigates into the customer shell', (
@@ -40,7 +49,12 @@ void main() {
   ) async {
     final client = FakeIdentityClient(profile: customerProfile);
     final store = MemoryTokenStore();
-    await pumpDealGo(tester, client: client, tokenStore: store);
+    await pumpDealGo(
+      tester,
+      client: client,
+      tokenStore: store,
+      completePostAuth: true,
+    );
 
     await submitPhone(tester, '987654321');
     await submitOtp(tester, '123456');
@@ -53,6 +67,19 @@ void main() {
     await tester.tap(navLabel('Tài khoản'));
     await tester.pumpAndSettle();
     expect(find.text('+84911111111'), findsOneWidget);
+  });
+
+  testWidgets('verify success lands on profile setup when server needs it', (
+    tester,
+  ) async {
+    final client = FakeIdentityClient(profile: needsProfileSetupProfile);
+    await pumpDealGo(tester, client: client);
+
+    await submitPhone(tester, '987654321');
+    await submitOtp(tester, '123456');
+
+    expect(find.text('Hoàn thiện hồ sơ'), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
   });
 
   testWidgets('verify 401 shows the error and stays on OTP', (tester) async {
@@ -76,7 +103,12 @@ void main() {
   testWidgets('logout returns to login', (tester) async {
     final client = FakeIdentityClient(profile: customerProfile);
     final store = MemoryTokenStore();
-    await pumpDealGo(tester, client: client, tokenStore: store);
+    await pumpDealGo(
+      tester,
+      client: client,
+      tokenStore: store,
+      completePostAuth: true,
+    );
 
     await submitPhone(tester, '987654321');
     await submitOtp(tester, '123456');
@@ -86,9 +118,11 @@ void main() {
     await tester.tap(find.text('Đăng xuất'));
     await tester.pumpAndSettle();
 
+    expect(client.revokeCalls, ['access-token']);
     expect(await store.read(), isNull);
-    expect(find.text('Số điện thoại'), findsOneWidget);
-    expect(find.text('Tiếp tục'), findsOneWidget);
+    expect(find.byKey(const Key('auth-method-phone')), findsOneWidget);
+    expect(find.byKey(const Key('auth-method-passkey')), findsOneWidget);
+    expect(find.byKey(const Key('auth-method-email')), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
   });
 
@@ -96,7 +130,7 @@ void main() {
     tester,
   ) async {
     final client = FakeIdentityClient(profile: sandboxProfile);
-    await pumpDealGo(tester, client: client);
+    await pumpDealGo(tester, client: client, completePostAuth: true);
 
     await submitPhone(tester, '912345678');
     await submitOtp(tester, '123456');
@@ -108,24 +142,77 @@ void main() {
     expect(find.text('Đổi vai trò'), findsNothing);
   });
 
-  testWidgets('S003 phone login page matches shared mockup layout and components', (
-    tester,
-  ) async {
+  testWidgets('S003 login method picker matches locked layout', (tester) async {
     final client = FakeIdentityClient(profile: customerProfile);
     final store = MemoryTokenStore();
     await pumpDealGo(tester, client: client, tokenStore: store);
 
-    // Verify S003 layout elements
-    expect(find.text('Chào mừng bạn\nđến với DealGo!', findRichText: true), findsOneWidget);
-    expect(find.text('DealGo', findRichText: true), findsWidgets);
-    expect(find.text('Số điện thoại'), findsOneWidget);
-    expect(find.byKey(const Key('phone-field')), findsOneWidget);
-    expect(find.text('+84'), findsOneWidget);
     expect(
-      find.text('Mã OTP sẽ được gửi để xác minh và bảo vệ tài khoản của bạn.'),
+      find.text('Chào mừng đến với\nDealGo', findRichText: true),
       findsOneWidget,
     );
-    expect(find.text('Tiếp tục'), findsOneWidget);
+    expect(find.text('Chọn cách đăng nhập để tiếp tục.'), findsNothing);
+    expect(
+      find.text(
+        'Nhập số điện thoại để tiếp tục đặt xe,\ngọi đồ ăn và mua sắm.',
+      ),
+      findsNothing,
+    );
+    expect(find.text('Trợ giúp'), findsOneWidget);
+    expect(find.byKey(const Key('auth-method-passkey')), findsOneWidget);
+    expect(find.byKey(const Key('auth-method-phone')), findsOneWidget);
+    expect(find.byKey(const Key('auth-method-email')), findsOneWidget);
+    expect(find.text('Passkey'), findsOneWidget);
+    expect(find.text('Số điện thoại'), findsOneWidget);
+    expect(find.text('Email'), findsOneWidget);
+    expect(find.byKey(const Key('phone-field')), findsNothing);
+  });
+
+  testWidgets('phone method opens phone input page without field on /login', (
+    tester,
+  ) async {
+    await pumpDealGo(tester, client: FakeIdentityClient());
+
+    expect(find.byKey(const Key('phone-field')), findsNothing);
+    await tester.tap(find.byKey(const Key('auth-method-phone')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Đăng nhập bằng số điện thoại'), findsOneWidget);
+    expect(find.byKey(const Key('phone-field')), findsOneWidget);
+    expect(find.byKey(const Key('phone-submit-btn')), findsOneWidget);
+    expect(find.text('Chúng tôi sẽ gửi mã OTP để xác minh.'), findsOneWidget);
+  });
+
+  testWidgets('passkey sign-in starts without asking for phone or email', (
+    tester,
+  ) async {
+    final client = FakeIdentityClient(profile: customerProfile);
+    await pumpDealGo(tester, client: client);
+
+    await tester.ensureVisible(find.byKey(const Key('auth-method-passkey')));
+    await tester.tap(find.byKey(const Key('auth-method-passkey')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('passkey-signin-action')));
+    await tester.pumpAndSettle();
+
+    expect(client.passkeyOptionCalls, [true]);
+    expect(client.passkeyVerifyCalls, hasLength(1));
+    expect(find.byKey(const Key('phone-field')), findsNothing);
+  });
+
+  testWidgets('passkey sign-up creates a session without identifier fields', (
+    tester,
+  ) async {
+    final client = FakeIdentityClient(profile: customerProfile);
+    await pumpDealGo(tester, client: client);
+
+    await tester.ensureVisible(find.byKey(const Key('auth-method-passkey')));
+    await tester.tap(find.byKey(const Key('auth-method-passkey')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('passkey-signup-action')));
+    await tester.pumpAndSettle();
+
+    expect(client.passkeySignupVerifyCalls, hasLength(1));
+    expect(find.byKey(const Key('phone-field')), findsNothing);
   });
 }
-

@@ -3,13 +3,44 @@ import { OpsIcon } from "@/components/ui/ops-icons";
 import { focusRing } from "@/lib/admin-format";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api/errors";
-import { approveNotificationCampaign, type CampaignItem } from "../api";
+import {
+  approveNotificationCampaign,
+  cancelNotificationCampaign,
+  rejectNotificationCampaign,
+  submitNotificationCampaign,
+  type CampaignItem,
+} from "../api";
 import { useQueryClient } from "@tanstack/react-query";
 import { NotificationCampaignStatusChip } from "./notification-status-chip";
 
 interface NotificationsCampaignModalProps {
   campaign: CampaignItem | null;
   onClose: () => void;
+}
+
+type CampaignAction = "submit" | "approve" | "reject" | "cancel";
+
+const REASON_MIN = 5;
+
+const actionCopy: Record<CampaignAction, { done: string; failed: string }> = {
+  submit: { done: "Đã gửi duyệt chiến dịch", failed: "Không thể gửi duyệt chiến dịch." },
+  approve: { done: "Đã phê duyệt chiến dịch", failed: "Không thể phê duyệt chiến dịch." },
+  reject: { done: "Đã trả chiến dịch về bản nháp", failed: "Không thể từ chối chiến dịch." },
+  cancel: { done: "Đã huỷ chiến dịch", failed: "Không thể huỷ chiến dịch." },
+};
+
+/** Which workflow buttons a status offers (Nest notification.controller transitions). */
+export function campaignActionsFor(status: CampaignItem["status"]): CampaignAction[] {
+  switch (status) {
+    case "DRAFT":
+      return ["submit", "cancel"];
+    case "PENDING_APPROVAL":
+      return ["approve", "reject", "cancel"];
+    case "RUNNING":
+      return ["cancel"];
+    default:
+      return [];
+  }
 }
 
 export function NotificationsCampaignModal({
@@ -22,30 +53,37 @@ export function NotificationsCampaignModal({
 
   if (!campaign) return null;
 
-  const handleApprove = async () => {
-    const trimmedReason = approvalReason.trim();
-    if (trimmedReason.length < 5) {
+  const actions = campaignActionsFor(campaign.status);
+  const needsReason = actions.some((action) => action !== "submit");
+  const trimmedReason = approvalReason.trim();
+  const reasonOk = trimmedReason.length >= REASON_MIN;
+
+  const run = async (action: CampaignAction) => {
+    if (action !== "submit" && !reasonOk) {
       toast.error(
-        "Vui lòng nhập lý do phê duyệt (tối thiểu 5 ký tự) để phục vụ kiểm toán.",
+        `Vui lòng nhập lý do (tối thiểu ${REASON_MIN} ký tự) để phục vụ kiểm toán.`,
       );
       return;
     }
-
     setIsSubmitting(true);
     try {
-      await approveNotificationCampaign(campaign.code, trimmedReason);
-      toast.success(`Đã phê duyệt chiến dịch ${campaign.code}`);
+      if (action === "submit") {
+        await submitNotificationCampaign(campaign.code, trimmedReason || undefined);
+      } else if (action === "approve") {
+        await approveNotificationCampaign(campaign.code, trimmedReason);
+      } else if (action === "reject") {
+        await rejectNotificationCampaign(campaign.code, trimmedReason);
+      } else {
+        await cancelNotificationCampaign(campaign.code, trimmedReason);
+      }
+      toast.success(`${actionCopy[action].done} ${campaign.code}`);
       onClose();
       setApprovalReason("");
       void queryClient.invalidateQueries({
         queryKey: ["ops", "notifications"],
       });
     } catch (err) {
-      toast.error(
-        err instanceof ApiError
-          ? err.message
-          : "Không thể phê duyệt chiến dịch.",
-      );
+      toast.error(err instanceof ApiError ? err.message : actionCopy[action].failed);
     } finally {
       setIsSubmitting(false);
     }
@@ -92,8 +130,7 @@ export function NotificationsCampaignModal({
               Nội dung thông báo gửi người dùng
             </p>
             <p className="mt-2 text-sm font-medium leading-relaxed text-ink break-words whitespace-pre-line">
-              {campaign.body ??
-                "Nội dung thông báo hệ thống tự động từ DealGo."}
+              {campaign.body?.trim() ? campaign.body : "—"}
             </p>
           </div>
 
@@ -124,33 +161,64 @@ export function NotificationsCampaignModal({
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
-          {campaign.status === "PENDING_APPROVAL" ? (
-            <div className="w-full space-y-2">
-              <label className="block text-xs font-medium text-muted">
-                Lý do phê duyệt (Bắt buộc cho kiểm toán)
-                <textarea
-                  value={approvalReason}
-                  onChange={(event) => setApprovalReason(event.target.value)}
-                  minLength={5}
-                  maxLength={500}
-                  rows={2}
-                  placeholder="Nhập lý do hoặc mã quyết định phê duyệt chiến dịch phát hành…"
-                  className={`mt-1.5 w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-ink ${focusRing}`}
-                />
-              </label>
-              <button
-                type="button"
-                disabled={isSubmitting || approvalReason.trim().length < 5}
-                onClick={handleApprove}
-                className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-brand px-3.5 py-2 text-xs font-semibold text-white hover:bg-brand/90 cursor-pointer disabled:opacity-60"
-              >
-                <OpsIcon name="check" className="size-4" />
-                {isSubmitting
-                  ? "Đang phê duyệt…"
-                  : "Xác nhận duyệt & phát hành"}
-              </button>
-            </div>
-          ) : (
+          {needsReason ? (
+            <label className="block w-full text-xs font-medium text-muted">
+              {actions.includes("submit")
+                ? "Ghi chú (tuỳ chọn khi gửi duyệt, bắt buộc khi huỷ)"
+                : "Lý do (bắt buộc cho kiểm toán)"}
+              <textarea
+                value={approvalReason}
+                onChange={(event) => setApprovalReason(event.target.value)}
+                maxLength={500}
+                rows={2}
+                placeholder="Nhập lý do hoặc mã quyết định…"
+                className={`mt-1.5 w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-ink ${focusRing}`}
+              />
+            </label>
+          ) : null}
+          {actions.includes("cancel") ? (
+            <button
+              type="button"
+              disabled={isSubmitting || !reasonOk}
+              onClick={() => void run("cancel")}
+              className="rounded-xl border border-danger/40 px-3.5 py-2 text-xs font-semibold text-danger hover:bg-danger/5 cursor-pointer disabled:opacity-60"
+            >
+              Huỷ chiến dịch
+            </button>
+          ) : null}
+          {actions.includes("reject") ? (
+            <button
+              type="button"
+              disabled={isSubmitting || !reasonOk}
+              onClick={() => void run("reject")}
+              className="rounded-xl border border-border px-3.5 py-2 text-xs font-semibold text-ink hover:bg-canvas cursor-pointer disabled:opacity-60"
+            >
+              Từ chối (về bản nháp)
+            </button>
+          ) : null}
+          {actions.includes("submit") ? (
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => void run("submit")}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-3.5 py-2 text-xs font-semibold text-white hover:bg-brand/90 cursor-pointer disabled:opacity-60"
+            >
+              <OpsIcon name="check" className="size-4" />
+              {isSubmitting ? "Đang gửi…" : "Gửi duyệt"}
+            </button>
+          ) : null}
+          {actions.includes("approve") ? (
+            <button
+              type="button"
+              disabled={isSubmitting || !reasonOk}
+              onClick={() => void run("approve")}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-3.5 py-2 text-xs font-semibold text-white hover:bg-brand/90 cursor-pointer disabled:opacity-60"
+            >
+              <OpsIcon name="check" className="size-4" />
+              {isSubmitting ? "Đang phê duyệt…" : "Xác nhận duyệt & phát hành"}
+            </button>
+          ) : null}
+          {actions.length === 0 ? (
             <button
               type="button"
               onClick={onClose}
@@ -158,7 +226,7 @@ export function NotificationsCampaignModal({
             >
               Đóng
             </button>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

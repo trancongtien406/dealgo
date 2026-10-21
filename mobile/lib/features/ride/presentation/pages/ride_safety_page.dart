@@ -1,15 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../../core/network/api_exception.dart';
+import '../../../identity/domain/entities/auth_state.dart';
+import '../../../identity/presentation/cubit/auth_cubit.dart';
+import '../../domain/ride_share.dart';
+
+import '../../data/emergency_contacts_store.dart';
 
 import '../../../../core/design_system/components/dealgo_banner.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
+import '../../../../core/design_system/components/dealgo_dialog.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
+import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../utils/ride_routes.dart';
 import '../widgets/ride_widgets.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 /// C014 — in-trip safety center (UI only; no fake SOS backend).
 class RideSafetyPage extends StatefulWidget {
@@ -23,10 +35,63 @@ class RideSafetyPage extends StatefulWidget {
 
 class _RideSafetyPageState extends State<RideSafetyPage> {
   var _shareCopied = false;
-  final _contacts = <_EmergencyContact>[
-    const _EmergencyContact(name: 'Minh Anh', phone: '0901 234 567'),
-    const _EmergencyContact(name: 'Gia đình', phone: '0902 345 678'),
-  ];
+  var _sharing = false;
+  List<EmergencyContact> _contacts = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    EmergencyContactsStore.load().then((contacts) {
+      if (mounted) setState(() => _contacts = contacts);
+    });
+  }
+
+  Future<void> _addContact() async {
+    final l10n = AppLocalizations.of(context);
+    final name = TextEditingController();
+    final phone = TextEditingController();
+    final saved = await showDealGoDialog<bool>(
+      context: context,
+      title: l10n.rideSafetyAddContact,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          DealGoTextField(
+            label: l10n.rideSafetyContactName,
+            controller: name,
+            fieldKey: const Key('ride-safety-contact-name'),
+            textCapitalization: TextCapitalization.words,
+          ),
+          const SizedBox(height: DealGoSpacing.s12),
+          DealGoTextField(
+            label: l10n.rideSafetyContactPhone,
+            controller: phone,
+            fieldKey: const Key('ride-safety-contact-phone'),
+            keyboardType: TextInputType.phone,
+          ),
+        ],
+      ),
+      primaryLabel: l10n.actionSave,
+      secondaryLabel: l10n.actionCancel,
+      primaryKey: const Key('ride-safety-contact-save'),
+    );
+    final n = name.text.trim();
+    final p = phone.text.replaceAll(RegExp(r'[^0-9+]'), '');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      name.dispose();
+      phone.dispose();
+    });
+    if (saved != true || n.isEmpty || p.length < 9) return;
+    final next = await EmergencyContactsStore.add(
+      EmergencyContact(name: n, phone: p),
+    );
+    if (mounted) setState(() => _contacts = next);
+  }
+
+  Future<void> _removeContact(EmergencyContact contact) async {
+    final next = await EmergencyContactsStore.remove(contact.phone);
+    if (mounted) setState(() => _contacts = next);
+  }
 
   void _back() {
     if (context.canPop()) {
@@ -37,15 +102,40 @@ class _RideSafetyPageState extends State<RideSafetyPage> {
   }
 
   Future<void> _shareTrip() async {
-    final link = 'https://dealgo.app/t/${widget.rideId}';
-    await Clipboard.setData(ClipboardData(text: link));
-    if (!mounted) {
-      return;
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final auth = context.read<AuthCubit>().state;
+    if (_sharing || auth is! AuthSignedIn) return;
+    setState(() => _sharing = true);
+    try {
+      final link = await context.read<RideShareRepository>().create(
+        accessToken: auth.tokens.accessToken,
+        rideId: widget.rideId,
+      );
+      await Clipboard.setData(ClipboardData(text: link.url));
+      if (!mounted) return;
+      setState(() {
+        _sharing = false;
+        _shareCopied = true;
+      });
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.rideSafetyShareCopied)),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() => _sharing = false);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(switch (error.errorCode) {
+            'RIDE_SHARE_NOT_ACTIVE' => l10n.rideShareNotActive,
+            'RIDE_SHARE_LIMIT' => l10n.rideShareLimit,
+            _ => l10n.rideShareFailed,
+          }),
+        ),
+      );
     }
-    setState(() => _shareCopied = true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppLocalizations.of(context).rideSafetyShareCopied)),
-    );
   }
 
   @override
@@ -58,7 +148,7 @@ class _RideSafetyPageState extends State<RideSafetyPage> {
       body: SafeArea(
         child: Column(
           children: [
-            RideScreenHeader(title: l10n.rideSafetyTitle, onBack: _back),
+            DealGoAppHeader(title: l10n.rideSafetyTitle, onBack: _back),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(
@@ -88,7 +178,7 @@ class _RideSafetyPageState extends State<RideSafetyPage> {
                             ),
                             if (_shareCopied)
                               DealGoChip(
-                                label: l10n.commonSelected,
+                                label: l10n.rideShareCopiedChip,
                                 tone: DealGoChipTone.success,
                               ),
                           ],
@@ -103,6 +193,7 @@ class _RideSafetyPageState extends State<RideSafetyPage> {
                           key: const Key('ride-safety-share'),
                           label: l10n.rideSafetyShareCta,
                           onPressed: _shareTrip,
+                          isLoading: _sharing,
                         ),
                       ],
                     ),
@@ -137,21 +228,32 @@ class _RideSafetyPageState extends State<RideSafetyPage> {
                             ),
                             title: Text(contact.name),
                             subtitle: Text(contact.phone),
-                            trailing: DealGoChip(
-                              label: l10n.rideSafetyContactLocal,
-                              tone: DealGoChipTone.neutral,
+                            trailing: IconButton(
+                              tooltip: l10n.rideSafetyRemoveContact,
+                              icon: const Icon(DealGoIcons.close),
+                              onPressed: () => _removeContact(contact),
                             ),
                           ),
                         ],
+                        if (_contacts.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: DealGoSpacing.s8,
+                            ),
+                            child: Text(
+                              l10n.rideSafetyContactsEmpty,
+                              key: const Key('ride-safety-contacts-empty'),
+                              style: textTheme.bodySmall,
+                            ),
+                          ),
                         DealGoSecondaryButton(
                           key: const Key('ride-safety-add-contact'),
                           label: l10n.rideSafetyAddContact,
                           onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(l10n.rideSafetyContactsMockHint),
-                              ),
-                            );
+                            if (_contacts.length <
+                                EmergencyContactsStore.maxContacts) {
+                              _addContact();
+                            }
                           },
                         ),
                       ],
@@ -171,11 +273,4 @@ class _RideSafetyPageState extends State<RideSafetyPage> {
       ),
     );
   }
-}
-
-class _EmergencyContact {
-  const _EmergencyContact({required this.name, required this.phone});
-
-  final String name;
-  final String phone;
 }

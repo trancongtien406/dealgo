@@ -14,7 +14,6 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentActor,
-  OpsSessionGuard,
   type RequestActor,
 } from '../../identity/access-auth.guard.js';
 import {
@@ -28,11 +27,13 @@ import {
   UpdateCampaignDto,
 } from './notification.dto.js';
 import { NotificationService } from './notification.service.js';
+import { OpsPermissionGuard } from '../../identity/ops-rbac/ops-permission.guard.js';
+import { RequireOpsPermission } from '../../identity/ops-rbac/ops-permission.decorator.js';
 
 @ApiTags('ops')
 @ApiBearerAuth()
 @Controller('v1/ops/notifications')
-@UseGuards(OpsSessionGuard)
+@UseGuards(OpsPermissionGuard)
 export class NotificationController {
   constructor(private readonly notifications: NotificationService) {}
 
@@ -54,6 +55,7 @@ export class NotificationController {
     return this.notifications.listCms(query);
   }
 
+  @RequireOpsPermission('notifications.write')
   @Post('cms')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create CMS content; writes OpsAuditLog CMS_UPDATE.' })
@@ -67,6 +69,7 @@ export class NotificationController {
     return this.notifications.getCms(id);
   }
 
+  @RequireOpsPermission('notifications.write')
   @Patch('cms/:id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -81,6 +84,7 @@ export class NotificationController {
     return this.notifications.patchCms(Object.assign({}, body, { id, actorUserId: actor.userId }));
   }
 
+  @RequireOpsPermission('notifications.write')
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
@@ -97,6 +101,7 @@ export class NotificationController {
     return this.notifications.getCampaign(code);
   }
 
+  @RequireOpsPermission('notifications.write')
   @Patch(':code')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Edit a campaign. Only DRAFT campaigns are editable (409 otherwise).' })
@@ -108,6 +113,7 @@ export class NotificationController {
     return this.notifications.updateCampaign(Object.assign({}, body, { code, actorUserId: actor.userId }));
   }
 
+  @RequireOpsPermission('notifications.write')
   @Post(':code/submit')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'DRAFT → PENDING_APPROVAL.' })
@@ -119,6 +125,7 @@ export class NotificationController {
     return this.notifications.submitCampaign(code, actor.userId, body.reason);
   }
 
+  @RequireOpsPermission('notifications.write')
   @Post(':code/approve')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -133,6 +140,7 @@ export class NotificationController {
     return this.notifications.approveCampaign(code, actor.userId, body.reason);
   }
 
+  @RequireOpsPermission('notifications.write')
   @Post(':code/reject')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'PENDING_APPROVAL → DRAFT with a reviewer note (rejectionReason).' })
@@ -144,6 +152,7 @@ export class NotificationController {
     return this.notifications.rejectCampaign(code, actor.userId, body.reason);
   }
 
+  @RequireOpsPermission('notifications.write')
   @Post(':code/cancel')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'DRAFT | PENDING_APPROVAL | RUNNING → CANCELLED.' })

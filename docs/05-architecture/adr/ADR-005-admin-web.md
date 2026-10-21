@@ -15,6 +15,8 @@ related_decisions:
 
 `PROPOSED`.
 
+> Đã triển khai trong code (rà soát 2026-10-18): Route Handlers BFF trong `website/app/api/ops/*`. Trạng thái vẫn `PROPOSED` — chủ repo cần quyết định `ACCEPTED`/supersede.
+
 ## Context
 
 Admin Web tại `website/` là Next.js 16.4 và React 19.3, Tailwind CSS 4. Kênh này không phải vai trò thứ tư trong app Flutter. Mockup A001–A035 nằm ở `design/mockups/screens/admin/`.

@@ -1,3 +1,4 @@
+import { parseAccountDeletion } from "@/lib/account-deletion";
 import { personInitials, type StatusTone } from "@/lib/admin-format";
 import { areaLabelFromRegionOrCoords } from "@/lib/service-region-labels";
 import type { NestOpsDriver } from "@/features/drivers/nest-types";
@@ -66,15 +67,57 @@ export function mapNestDriverToListItem(driver: NestOpsDriver): DriverListItem {
       lat: driver.presence?.lat,
       lng: driver.presence?.lng,
     }),
-    service: "—",
-    vehicle: "—",
-    vehicleKind: "—",
-    plate: "—",
+    service: driverServiceLabel(driver.presence),
+    vehicle: driver.profile?.vehicleType?.trim() || "—",
+    vehicleKind: vehicleKindLabel(driver.profile?.vehicleType),
+    plate: driver.profile?.vehiclePlate?.trim() || "—",
     kyc: kycFromGrant(grant?.status),
     activity: activityFromPresence(driver, grant?.status),
-    rating: null,
-    trips: 0,
+    rating:
+      driver.profile && driver.profile.ratingCount > 0
+        ? driver.profile.ratingAverage
+        : null,
+    trips: countOrNull(driver.profile?.completedJobs),
+    finishedJobs: countOrNull(driver.profile?.finishedJobs),
+    completionRate:
+      typeof driver.profile?.completionRate === "number" &&
+      Number.isFinite(driver.profile.completionRate)
+        ? driver.profile.completionRate
+        : null,
+    deletion: parseAccountDeletion(driver.deletion),
   };
+}
+
+function countOrNull(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? value
+    : null;
+}
+
+/** "92%" style label; "—" when unknown. */
+export function completionRateLabel(rate: number | null): string {
+  if (rate == null) return "—";
+  return `${Math.round(rate * 100)}%`;
+}
+
+/** Services from the driver's presence toggles; "—" when never reported. */
+export function driverServiceLabel(
+  presence: NestOpsDriver["presence"],
+): string {
+  if (!presence) return "—";
+  const services = [
+    presence.rideEnabled ? "Xe" : null,
+    presence.foodEnabled ? "Đồ ăn" : null,
+  ].filter(Boolean);
+  return services.length > 0 ? services.join(" · ") : "—";
+}
+
+function vehicleKindLabel(type: string | null | undefined): string {
+  const value = type?.trim().toLowerCase();
+  if (!value) return "—";
+  if (/(car|ô tô|oto|4 chỗ|7 chỗ)/.test(value)) return "Ô tô";
+  if (/(bike|motor|xe máy|xe may|moto)/.test(value)) return "Xe máy";
+  return type!.trim();
 }
 
 function kycFromGrant(

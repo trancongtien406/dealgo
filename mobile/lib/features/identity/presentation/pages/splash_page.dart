@@ -5,15 +5,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/components/dealgo_logo.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/storage/onboarding_storage.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../identity/domain/auth_redirect.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
 
-/// Full-screen Splash Screen corresponding to Mockup S001.
-/// Displays DealGo branding, Đà Nẵng hero visual, key service highlights,
-/// an animated loading progress bar, and handles initial auto-navigation.
 class DealGoSplashScreen extends StatefulWidget {
   const DealGoSplashScreen({
     super.key,
@@ -60,7 +59,6 @@ class _DealGoSplashScreenState extends State<DealGoSplashScreen>
   Future<void> _proceed() async {
     if (!mounted) return;
 
-    // Check auth state if available in context
     try {
       final authCubit = context.read<AuthCubit>();
       final state = authCubit.state;
@@ -68,9 +66,7 @@ class _DealGoSplashScreenState extends State<DealGoSplashScreen>
         context.go('/customer');
         return;
       }
-    } catch (_) {
-      // In standalone test without BlocProvider, proceed to onboarding check
-    }
+    } catch (_) {}
 
     final hasSeenOnboarding = await _storage.hasSeenOnboarding();
     if (!mounted) return;
@@ -91,138 +87,165 @@ class _DealGoSplashScreenState extends State<DealGoSplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       backgroundColor: DealGoColors.canvas,
-      body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: DealGoSpacing.s20),
-
-            // Top Brand Section
-            const DealGoLogo.stacked(
-              size: 58,
-              subtitle: 'Đi muôn nơi · Ăn vạn món',
+      body: Stack(
+        children: [
+          Positioned(
+            top: -48,
+            left: -56,
+            child: _SoftBlob(
+              size: 200,
+              color: DealGoColors.primary.withValues(alpha: 0.06),
             ),
-
-            const SizedBox(height: DealGoSpacing.s12),
-
-            // Middle Visual Hero Section with Floating Badges
-            Expanded(
-              child: Stack(
-                alignment: Alignment.center,
-                clipBehavior: Clip.none,
-                children: [
-                  // High-fidelity Da Nang Hero Visual (Bridge, car, pho, milk tea)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: DealGoSpacing.s16),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(DealGoRadius.card),
-                      child: Image.asset(
-                        'assets/images/hero_dealgo_danang.png',
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          height: 240,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                DealGoColors.subtlePurple,
-                                DealGoColors.greenSurface,
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(DealGoRadius.card),
-                          ),
-                          child: const Center(
-                            child: Icon(
-                              Icons.location_city_rounded,
-                              size: 72,
-                              color: DealGoColors.primary,
-                            ),
-                          ),
+          ),
+          Positioned(
+            top: 210,
+            right: -70,
+            child: _SoftBlob(
+              size: 220,
+              color: DealGoColors.brandGreen.withValues(alpha: 0.05),
+            ),
+          ),
+          Positioned(
+            bottom: 80,
+            left: -40,
+            child: _SoftBlob(
+              size: 160,
+              color: DealGoColors.primary.withValues(alpha: 0.04),
+            ),
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(height: DealGoSpacing.s20),
+                DealGoLogo.stacked(size: 58, subtitle: l10n.splashTagline),
+                const SizedBox(height: DealGoSpacing.s12),
+                Expanded(
+                  child: Stack(
+                    alignment: Alignment.center,
+                    clipBehavior: Clip.none,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: DealGoSpacing.s16,
                         ),
-                      ),
-                    ),
-                  ),
-
-                  // Floating Service Badge: Đặt xe (top left)
-                  Positioned(
-                    top: 18,
-                    left: 20,
-                    child: _ServiceFloatBadge(
-                      icon: Icons.directions_car_filled_rounded,
-                      iconBgColor: DealGoColors.primary,
-                      title: 'Đặt xe',
-                      subtitle: 'Đi muôn nơi\nan toàn, tiện lợi',
-                    ),
-                  ),
-
-                  // Floating Service Badge: Đồ ăn (middle right)
-                  Positioned(
-                    bottom: 24,
-                    right: 20,
-                    child: _ServiceFloatBadge(
-                      icon: Icons.shopping_bag_rounded,
-                      iconBgColor: DealGoColors.brandGreen,
-                      title: 'Đồ ăn',
-                      subtitle: 'Hàng ngàn món\nngon mỗi ngày',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Bottom Progress Bar & Loading Message
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: DealGoDimensions.pageGutter * 2,
-                vertical: DealGoSpacing.s24,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Animated Gradient Loading Bar
-                  AnimatedBuilder(
-                    animation: _controller,
-                    builder: (context, child) {
-                      return ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          height: 5,
-                          width: double.infinity,
-                          color: DealGoColors.border.withValues(alpha: 0.5),
-                          child: FractionallySizedBox(
-                            alignment: Alignment.centerLeft,
-                            widthFactor: ((_controller.value * 0.7) + 0.3).clamp(0.0, 1.0),
-                            child: Container(
-                              decoration: const BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    DealGoColors.primary,
-                                    DealGoColors.brandGreen,
-                                  ],
+                        child: ClipRRect(
+                          borderRadius:
+                              BorderRadius.circular(DealGoRadius.card),
+                          child: Image.asset(
+                            'assets/images/hero_dealgo_danang.png',
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                              height: 240,
+                              decoration: BoxDecoration(
+                                color: DealGoColors.subtlePurple,
+                                borderRadius:
+                                    BorderRadius.circular(DealGoRadius.card),
+                              ),
+                              child: const Center(
+                                child: Icon(
+                                  DealGoIcons.city,
+                                  size: 72,
+                                  color: DealGoColors.primary,
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      );
-                    },
+                      ),
+                      Positioned(
+                        top: 20,
+                        left: 16,
+                        child: _ServiceFloatBadge(
+                          icon: DealGoIcons.car,
+                          iconBgColor: DealGoColors.primary,
+                          title: l10n.serviceRideTitle,
+                          subtitle: l10n.serviceRideBlurb,
+                        ),
+                      ),
+                      Positioned(
+                        top: 96,
+                        right: 16,
+                        child: _ServiceFloatBadge(
+                          icon: DealGoIcons.shoppingBag,
+                          iconBgColor: DealGoColors.brandGreen,
+                          title: l10n.serviceFoodTitle,
+                          subtitle: l10n.serviceFoodBlurb,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: DealGoSpacing.s12),
-                  const Text(
-                    'Đang chuẩn bị trải nghiệm của bạn...',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w500,
-                      color: DealGoColors.textSecondary,
-                    ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: DealGoDimensions.pageGutter * 2,
+                    vertical: DealGoSpacing.s24,
                   ),
-                ],
-              ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedBuilder(
+                        animation: _controller,
+                        builder: (context, child) {
+                          return ClipRRect(
+                            borderRadius:
+                                BorderRadius.circular(DealGoRadius.small),
+                            child: ColoredBox(
+                              color:
+                                  DealGoColors.border.withValues(alpha: 0.55),
+                              child: SizedBox(
+                                height: 5,
+                                width: double.infinity,
+                                child: FractionallySizedBox(
+                                  alignment: Alignment.centerLeft,
+                                  widthFactor:
+                                      ((_controller.value * 0.7) + 0.3)
+                                          .clamp(0.0, 1.0),
+                                  child: const ColoredBox(
+                                    color: DealGoColors.primary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: DealGoSpacing.s12),
+                      Text(
+                        l10n.splashPreparing,
+                        style: textTheme.labelSmall,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SoftBlob extends StatelessWidget {
+  const _SoftBlob({required this.size, required this.color});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
       ),
     );
   }
@@ -243,19 +266,17 @@ class _ServiceFloatBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(
+        horizontal: DealGoSpacing.s12,
+        vertical: DealGoSpacing.s8,
+      ),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.96),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        color: DealGoColors.card.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(DealGoRadius.card),
+        border: Border.all(color: DealGoColors.card, width: 1.5),
+        boxShadow: DealGoShadows.floating,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -274,17 +295,16 @@ class _ServiceFloatBadge extends StatelessWidget {
                 ),
               ],
             ),
-            child: Icon(icon, color: Colors.white, size: 20),
+            child: Icon(icon, color: DealGoColors.card, size: 20),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: DealGoSpacing.s12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 14,
+                style: textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: DealGoColors.text,
                 ),
@@ -292,8 +312,7 @@ class _ServiceFloatBadge extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: const TextStyle(
-                  fontSize: 11,
+                style: textTheme.labelSmall?.copyWith(
                   fontWeight: FontWeight.w500,
                   color: DealGoColors.textSecondary,
                   height: 1.25,
@@ -301,7 +320,7 @@ class _ServiceFloatBadge extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: DealGoSpacing.s8),
           Container(
             width: 26,
             height: 26,
@@ -310,7 +329,7 @@ class _ServiceFloatBadge extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: const Icon(
-              Icons.arrow_forward_rounded,
+              DealGoIcons.arrowRight,
               size: 14,
               color: DealGoColors.textSecondary,
             ),

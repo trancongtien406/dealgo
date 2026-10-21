@@ -2,16 +2,17 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, UseGuards } 
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentActor,
-  OpsSessionGuard,
   type RequestActor,
 } from '../identity/access-auth.guard.js';
 import { AuthMethodPolicyService } from '../identity/auth-method-policy.service.js';
 import { PatchAuthMethodDto } from './ops-auth-methods.dto.js';
+import { OpsPermissionGuard } from '../identity/ops-rbac/ops-permission.guard.js';
+import { RequireOpsPermission } from '../identity/ops-rbac/ops-permission.decorator.js';
 
 @ApiTags('ops')
 @ApiBearerAuth()
 @Controller('v1/ops/auth-methods')
-@UseGuards(OpsSessionGuard)
+@UseGuards(OpsPermissionGuard)
 export class OpsAuthMethodsController {
   constructor(private readonly authMethods: AuthMethodPolicyService) {}
 
@@ -24,6 +25,7 @@ export class OpsAuthMethodsController {
     return this.authMethods.list();
   }
 
+  @RequireOpsPermission('settings.write')
   @Patch(':method')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

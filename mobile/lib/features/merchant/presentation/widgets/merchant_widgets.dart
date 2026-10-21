@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+
+import '../../../../l10n/app_localizations.dart';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
@@ -10,9 +14,7 @@ import '../../../food/domain/entities/food_models.dart';
 import '../../../identity/domain/auth_redirect.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
-import '../../../identity/presentation/widgets/auth_widgets.dart';
-
-const merchantStateSubtitle = 'DealGo · Biến thể trạng thái';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
 
 String? merchantAccessToken(BuildContext context) {
   final auth = context.read<AuthCubit>().state;
@@ -33,12 +35,12 @@ void merchantBack(BuildContext context) {
   }
 }
 
-String merchantStatusLabel(String status) {
+String merchantStatusLabel(AppLocalizations l10n, String status) {
   return switch (status) {
-    'PLACED' => 'Chờ Shop xác nhận',
-    'PREPARING' => 'Đang chuẩn bị',
-    'READY' => 'Sẵn sàng giao',
-    'ASSIGNED' => 'Đã có tài xế',
+    'PLACED' => l10n.merchantStatusPlaced,
+    'PREPARING' => l10n.merchantStatusPreparing,
+    'READY' || 'READY_FOR_PICKUP' => l10n.merchantStatusReady,
+    'ASSIGNED' => l10n.merchantStatusAssigned,
     _ => status,
   };
 }
@@ -61,9 +63,9 @@ String merchantCountLabel(int value) {
   return value.toString();
 }
 
-String formatSyncClock(DateTime? time) {
+String formatSyncClock(AppLocalizations l10n, DateTime? time) {
   if (time == null) {
-    return 'Chưa đồng bộ';
+    return l10n.merchantNotSynced;
   }
   final local = time.toLocal();
   String two(int value) => value.toString().padLeft(2, '0');
@@ -125,6 +127,7 @@ class MerchantPageFrame extends StatelessWidget {
     this.subtitle,
     this.footer,
     this.onBack,
+    this.trailing,
     this.insetBottom = false,
     super.key,
   });
@@ -134,6 +137,7 @@ class MerchantPageFrame extends StatelessWidget {
   final Widget body;
   final Widget? footer;
   final VoidCallback? onBack;
+  final Widget? trailing;
   final bool insetBottom;
 
   @override
@@ -145,8 +149,15 @@ class MerchantPageFrame extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            MerchantHeader(title: title, subtitle: subtitle, onBack: onBack),
-            Expanded(child: body),
+            MerchantHeader(
+              title: title,
+              subtitle: subtitle,
+              onBack: onBack,
+              trailing: trailing,
+            ),
+            Expanded(
+              child: Material(type: MaterialType.transparency, child: body),
+            ),
             ?footer,
           ],
         ),
@@ -160,39 +171,24 @@ class MerchantHeader extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.onBack,
+    this.trailing,
     super.key,
   });
 
   final String title;
   final String? subtitle;
   final VoidCallback? onBack;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        DealGoSpacing.s8,
-        DealGoSpacing.s8,
-        DealGoDimensions.pageGutter,
-        DealGoSpacing.s8,
-      ),
-      child: Row(
-        children: [
-          AuthBackButton(onPressed: onBack ?? () => merchantBack(context)),
-          const SizedBox(width: DealGoSpacing.s8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: textTheme.titleMedium),
-                if (subtitle != null)
-                  Text(subtitle!, style: textTheme.bodySmall),
-              ],
-            ),
-          ),
-        ],
-      ),
+    final canPop = Navigator.maybeOf(context)?.canPop() ?? false;
+    return DealGoAppHeader(
+      title: title,
+      subtitle: subtitle,
+      onBack: onBack ?? (canPop ? () => merchantBack(context) : null),
+      showBack: canPop || onBack != null,
+      trailing: trailing,
     );
   }
 }
@@ -201,28 +197,32 @@ class MerchantPanel extends StatelessWidget {
   const MerchantPanel({
     required this.child,
     this.color = DealGoColors.card,
+    this.elevated = false,
+    this.borderColor,
+    this.padding = const EdgeInsets.all(DealGoSpacing.s16),
     super.key,
   });
 
   final Widget child;
   final Color color;
+  final bool elevated;
+  final Color? borderColor;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(DealGoRadius.card);
+    final side =
+        borderColor ??
+        (color == DealGoColors.card ? DealGoColors.border : Colors.transparent);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(DealGoRadius.card),
-        border: Border.all(
-          color: color == DealGoColors.card
-              ? DealGoColors.border
-              : Colors.transparent,
-        ),
+        borderRadius: radius,
+        border: Border.all(color: side),
+        boxShadow: elevated ? DealGoShadows.card : null,
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(DealGoSpacing.s16),
-        child: child,
-      ),
+      child: Padding(padding: padding, child: child),
     );
   }
 }
@@ -295,11 +295,11 @@ class MerchantHero extends StatelessWidget {
         DecoratedBox(
           decoration: BoxDecoration(
             color: background,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(DealGoRadius.input),
           ),
           child: SizedBox(
-            width: 72,
-            height: 72,
+            width: 64,
+            height: 64,
             child: Icon(icon, color: iconColor, size: 32),
           ),
         ),
@@ -485,7 +485,7 @@ class MerchantPrimaryBar extends StatelessWidget {
         label: label,
         enabled: enabled,
         isLoading: loading,
-        trailingIcon: Icons.arrow_forward,
+        trailingIcon: DealGoIcons.arrowRight,
         onPressed: onPressed,
       ),
     );
@@ -498,3 +498,77 @@ const merchantPagePadding = EdgeInsets.fromLTRB(
   DealGoDimensions.pageGutter,
   DealGoSpacing.s16,
 );
+
+/// M022/M024 radio card: tinted icon, title, hint, radio mark.
+class MerchantOptionTile extends StatelessWidget {
+  const MerchantOptionTile({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.hint,
+    required this.selected,
+    required this.onTap,
+    super.key,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String hint;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: Material(
+        color: selected ? DealGoColors.subtlePurple : DealGoColors.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(DealGoRadius.input),
+          side: BorderSide(
+            color: selected ? DealGoColors.primary : DealGoColors.border,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(DealGoRadius.input),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(DealGoSpacing.s12),
+            child: Row(
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(DealGoSpacing.s8),
+                    child: Icon(icon, color: color, size: 20),
+                  ),
+                ),
+                const SizedBox(width: DealGoSpacing.s12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: textTheme.titleSmall),
+                      Text(hint, style: textTheme.bodySmall),
+                    ],
+                  ),
+                ),
+                Icon(
+                  selected ? DealGoIcons.radioOn : DealGoIcons.radioOff,
+                  color: selected ? DealGoColors.primary : DealGoColors.border,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

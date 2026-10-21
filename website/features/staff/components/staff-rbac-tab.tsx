@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { OpsIcon } from "@/components/ui/ops-icons";
 import { focusRing } from "@/components/ui/admin-list-ui";
-import { rbacGrants, rbacRoles } from "@/features/staff/rbac-matrix";
+import { rbacRoleLabel, toRbacRows } from "@/features/staff/rbac-matrix";
+import { useRbacMatrixQuery } from "@/features/staff/hooks";
 
 import {
   AdminTable,
@@ -17,6 +18,9 @@ import {
 
 export function StaffRbacTab() {
   const [showRoleModal, setShowRoleModal] = useState(false);
+  const matrixQuery = useRbacMatrixQuery();
+  const roles = matrixQuery.data?.roles ?? [];
+  const rows = matrixQuery.data ? toRbacRows(matrixQuery.data) : [];
 
   return (
     <div role="tabpanel" className="p-4 space-y-6">
@@ -40,43 +44,62 @@ export function StaffRbacTab() {
         </button>
       </div>
 
-      <AdminTableContainer minWidth="min-w-full">
-        <AdminTable caption="Ma trận phân quyền nhân sự">
-          <AdminTableHeader>
-            <AdminTableRow>
-              <AdminTableHead>Quyền truy cập</AdminTableHead>
-              {rbacRoles.map((roleName) => (
-                <AdminTableHead key={roleName} align="center">
-                  {roleName}
-                </AdminTableHead>
-              ))}
-            </AdminTableRow>
-          </AdminTableHeader>
-          <AdminTableBody>
-            {rbacGrants.map((grant) => (
-              <AdminTableRow key={grant.permission}>
-                <AdminTableCell className="font-medium">
-                  {grant.permission}
-                </AdminTableCell>
-                {grant.marks.map((allowed, idx) => (
-                  <AdminTableCell key={rbacRoles[idx]} align="center">
-                    {allowed ? (
-                      <span className="inline-flex text-brand">
-                        <OpsIcon name="check" className="size-4" />
-                        <span className="sr-only">Có</span>
-                      </span>
-                    ) : (
-                      <span className="text-muted">
-                        —<span className="sr-only">Không</span>
-                      </span>
-                    )}
-                  </AdminTableCell>
+      {matrixQuery.isPending ? (
+        <p className="py-8 text-center text-sm text-muted" role="status">
+          Đang tải ma trận quyền…
+        </p>
+      ) : matrixQuery.isError ? (
+        <div className="rounded-xl border border-border p-4 text-sm text-muted" role="alert">
+          Không tải được ma trận quyền từ máy chủ.{" "}
+          <button
+            type="button"
+            onClick={() => void matrixQuery.refetch()}
+            className={`font-semibold text-brand hover:underline cursor-pointer ${focusRing}`}
+          >
+            Thử lại
+          </button>
+        </div>
+      ) : rows.length === 0 ? (
+        <p className="py-8 text-center text-sm text-muted">Chưa có quyền nào được cấu hình.</p>
+      ) : (
+        <AdminTableContainer minWidth="min-w-full">
+          <AdminTable caption="Ma trận phân quyền nhân sự">
+            <AdminTableHeader>
+              <AdminTableRow>
+                <AdminTableHead>Quyền truy cập</AdminTableHead>
+                {roles.map((roleName) => (
+                  <AdminTableHead key={roleName} align="center">
+                    {rbacRoleLabel(roleName)}
+                  </AdminTableHead>
                 ))}
               </AdminTableRow>
-            ))}
-          </AdminTableBody>
-        </AdminTable>
-      </AdminTableContainer>
+            </AdminTableHeader>
+            <AdminTableBody>
+              {rows.map((grant) => (
+                <AdminTableRow key={grant.permission}>
+                  <AdminTableCell className="font-medium">
+                    {grant.permission}
+                  </AdminTableCell>
+                  {grant.marks.map((allowed, idx) => (
+                    <AdminTableCell key={roles[idx]} align="center">
+                      {allowed ? (
+                        <span className="inline-flex text-brand">
+                          <OpsIcon name="check" className="size-4" />
+                          <span className="sr-only">Có</span>
+                        </span>
+                      ) : (
+                        <span className="text-muted">
+                          —<span className="sr-only">Không</span>
+                        </span>
+                      )}
+                    </AdminTableCell>
+                  ))}
+                </AdminTableRow>
+              ))}
+            </AdminTableBody>
+          </AdminTable>
+        </AdminTableContainer>
+      )}
 
       {showRoleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -98,12 +121,12 @@ export function StaffRbacTab() {
               bộ phận.
             </p>
             <div className="space-y-2">
-              {rbacRoles.map((r) => (
+              {roles.map((r) => (
                 <div
                   key={r}
                   className="flex items-center justify-between rounded-xl border border-border p-3"
                 >
-                  <span className="font-medium text-ink">{r}</span>
+                  <span className="font-medium text-ink">{rbacRoleLabel(r)}</span>
                   <span className="text-xs text-muted">Mặc định hệ thống</span>
                 </div>
               ))}

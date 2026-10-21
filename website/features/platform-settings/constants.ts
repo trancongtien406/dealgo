@@ -3,6 +3,7 @@ export const PLATFORM_SETTING_CATEGORIES = [
   { id: "FARE", label: "Cước & Trả giá" },
   { id: "DISPATCH", label: "Điều phối & SLA" },
   { id: "ZONE_PAYMENT", label: "Vùng & Thanh toán" },
+  { id: "SUPPORT", label: "Hỗ trợ khách hàng" },
 ] as const;
 
 export const PLATFORM_SETTING_SOURCES = [

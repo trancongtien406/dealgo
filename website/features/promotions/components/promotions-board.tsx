@@ -1,16 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   usePromotionsFilters,
   usePromotionsQuery,
 } from "@/features/promotions/hooks";
-import type { CampaignItem } from "@/features/promotions/api";
+import {
+  updatePromotionStatus,
+  type CampaignItem,
+} from "@/features/promotions/api";
 import {
   promotionCampaignStatusLabel,
   promotionCampaignStatusTone,
 } from "@/features/promotions/mappers";
 import type { PromotionCampaignStatus } from "@/features/promotions/types";
+import { CreatePromotionDialog } from "./create-promotion-dialog";
 import { OpsIcon } from "@/components/ui/ops-icons";
 import {
   AdminBreadcrumb,
@@ -56,6 +61,17 @@ import {
   PROMOTION_COLUMN_COUNT,
 } from "@/features/promotions/constants";
 
+function formatVnd(val?: number): string {
+  if (val === undefined || val === null) return "0 đ";
+  if (val >= 1_000_000) {
+    return `${(val / 1_000_000).toFixed(1).replace(/\.0$/, "")}M đ`;
+  }
+  if (val >= 1_000) {
+    return `${(val / 1_000).toFixed(0)}k đ`;
+  }
+  return `${val.toLocaleString("vi-VN")} đ`;
+}
+
 export function PromotionsBoard() {
   const [filters, setFilters] = usePromotionsFilters();
   const { data, isPending, isError, error, refetch } = usePromotionsQuery();
@@ -64,12 +80,15 @@ export function PromotionsBoard() {
   const [dateRange, setDateRange] = useState<DateRangeValue | undefined>(
     undefined,
   );
+  const [createOpen, setCreateOpen] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const rawItems: readonly CampaignItem[] = useMemo(
     () => data?.items ?? [],
     [data?.items],
   );
   const total = data?.total ?? 0;
+  const kpi = data?.kpi;
 
   const audience = filters.audience || null;
   const channel = filters.channel || null;
@@ -91,18 +110,26 @@ export function PromotionsBoard() {
   const lastPage = Math.max(1, Math.ceil(total / pageSize));
   const currentPage = Math.min(page, lastPage);
 
-  const runningCount = items.filter(
-    (campaign) => campaign.status === "RUNNING" || campaign.status === "ACTIVE",
-  ).length;
+  const runningCount =
+    kpi?.activeCount ??
+    items.filter(
+      (campaign) => campaign.status === "ACTIVE" || campaign.status === "RUNNING",
+    ).length;
 
-  const scheduledCount = items.filter(
-    (campaign) =>
-      campaign.status === "UPCOMING" || campaign.status === "SCHEDULED",
-  ).length;
+  const scheduledCount =
+    kpi?.scheduledCount ??
+    items.filter(
+      (campaign) =>
+        campaign.status === "SCHEDULED" || campaign.status === "UPCOMING",
+    ).length;
 
-  const endedCount = items.filter(
-    (campaign) => campaign.status === "ENDED" || campaign.status === "SENT",
-  ).length;
+  const totalCommittedBudget =
+    kpi?.totalBudgetCommitted ??
+    items.reduce((acc, c) => acc + (c.totalBudget || 0), 0);
+
+  const totalUsedCount =
+    kpi?.totalRedemptions ??
+    items.reduce((acc, c) => acc + (c.usedCount || c.used || 0), 0);
 
   const errorMessage = isError
     ? error instanceof ApiError
@@ -149,6 +176,31 @@ export function PromotionsBoard() {
     void setFilters({ limit: newSize, page: 1 });
   };
 
+  const handleStatusAction = async (
+    targetCampaign: CampaignItem,
+    newStatus: "ACTIVE" | "PAUSED" | "CANCELLED",
+  ) => {
+    setUpdatingId(targetCampaign.id);
+    try {
+      await updatePromotionStatus(targetCampaign.id, newStatus);
+      const actionName =
+        newStatus === "ACTIVE"
+          ? "kích hoạt"
+          : newStatus === "PAUSED"
+            ? "tạm dừng"
+            : "hủy";
+      toast.success(
+        `Đã ${actionName} chiến dịch ${targetCampaign.code} thành công!`,
+      );
+      void refetch();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Thao tác thất bại.";
+      toast.error(msg);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   return (
     <div className="min-w-0 space-y-5">
       {errorMessage && !forbidden && items.length > 0 ? (
@@ -169,28 +221,46 @@ export function PromotionsBoard() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-            Chiến dịch khuyến mãi &amp; thông báo
+            Quản trị Khuyến mãi &amp; Voucher
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Theo dõi phân phối chiến dịch thông báo đa kênh phục vụ tiếp thị và
-            xúc tiến thương mại.
+            Quản lý vòng đời mã giảm giá, kiểm soát ngân sách tài trợ và giới hạn
+            lượt sử dụng cho Ride và Food.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="inline-flex h-9 items-center gap-2 rounded-xl bg-brand px-3.5 text-xs font-semibold text-white shadow-sm hover:bg-brand/90 transition-colors cursor-pointer"
+          >
+            <OpsIcon name="receipt" className="size-4" />
+            Tạo voucher mới
+          </button>
           <AdminHeaderDateFilter
             value={dateRange}
             onChange={handleDateRangeChange}
             defaultPreset="all"
           />
           <ExportCsvButton
-            filename="notification-campaigns"
-            headers={["Mã", "Tên", "Kênh", "Trạng thái", "Đã tiếp cận"]}
+            filename="dealgo-promotions"
+            headers={[
+              "Mã voucher",
+              "Tên chiến dịch",
+              "Dịch vụ",
+              "Trạng thái",
+              "Đã dùng",
+              "Hạn mức",
+              "Ngân sách",
+            ]}
             rows={items.map((row) => [
               row.code,
               row.name,
               row.service,
               row.status,
-              String(row.used),
+              String(row.usedCount || row.used),
+              String(row.usageLimit || row.cap),
+              String(row.totalBudget || 0),
             ])}
           >
             <OpsIcon name="download" className="size-4" />
@@ -199,57 +269,39 @@ export function PromotionsBoard() {
         </div>
       </div>
 
-      <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-xs text-amber-900 shadow-xs">
-        <OpsIcon
-          name="alert"
-          className="size-5 shrink-0 text-amber-600 mt-0.5"
-        />
-        <div className="space-y-1">
-          <p className="font-semibold text-sm text-amber-950">
-            Mô-đun Khuyến mãi đang trong chế độ thử nghiệm (Simulated Mode)
-          </p>
-          <p className="leading-relaxed text-amber-800">
-            Dữ liệu hiện đang được ánh xạ từ Notification Campaigns
-            (Push/SMS/In-app) nhằm phục vụ phát triển giao diện vận hành trước
-            khi Promotion &amp; Voucher Engine độc lập được triển khai. Số liệu
-            phản ánh lượt tiếp cận người dùng thực tế.
-          </p>
-        </div>
-      </div>
-
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <li>
           <KpiCard
-            label="Tổng chiến dịch"
+            label="Tổng chương trình"
             value={total}
-            note="theo bộ lọc · nguồn notifications"
+            note="chiến dịch khuyến mãi trong hệ thống"
             icon="receipt"
             tone="brand"
           />
         </li>
         <li>
           <KpiCard
-            label="Đang chạy (trang)"
+            label="Đang hoạt động"
             value={runningCount}
-            note="trên trang hiện tại"
+            note="voucher sẵn sàng quy đổi"
             icon="play"
             tone="success"
           />
         </li>
         <li>
           <KpiCard
-            label="Lên lịch (trang)"
+            label="Lên lịch / Tạm dừng"
             value={scheduledCount}
-            note="trên trang hiện tại"
+            note="sắp diễn ra hoặc chờ điều chỉnh"
             icon="clock"
             tone="food"
           />
         </li>
         <li>
           <KpiCard
-            label="Đã kết thúc (trang)"
-            value={endedCount}
-            note="trên trang hiện tại"
+            label="Lượt quy đổi thực tế"
+            value={totalUsedCount}
+            note={`ngân sách cam kết: ${formatVnd(totalCommittedBudget)}`}
             icon="check"
             tone="delivery"
           />
@@ -271,12 +323,12 @@ export function PromotionsBoard() {
           </AdminFilterField>
           <AdminFilterField>
             <SearchSelect
-              label="Kênh"
+              label="Dịch vụ"
               value={channel}
               options={promotionChannelOptions.filter(
                 (option) => option.value !== "ALL",
               )}
-              placeholder="Tất cả kênh"
+              placeholder="Tất cả dịch vụ"
               onChange={handleChannelChange}
             />
           </AdminFilterField>
@@ -308,7 +360,7 @@ export function PromotionsBoard() {
                 id="promotions-search-input"
                 type="search"
                 autoComplete="off"
-                placeholder="Mã KM, mã voucher, tên chương trình..."
+                placeholder="Mã voucher, tên chương trình..."
                 value={searchQuery}
                 onChange={handleSearchChange}
                 className={`h-10 w-full rounded-xl border border-border bg-white pr-3 pl-10 text-sm text-ink placeholder:text-muted ${focusRing}`}
@@ -338,7 +390,7 @@ export function PromotionsBoard() {
         <AdminEmptyState
           icon="receipt"
           title="Không tìm thấy chiến dịch khuyến mãi"
-          description="Thử đổi bộ lọc đối tượng, kênh phát hành hoặc từ khóa tìm kiếm."
+          description="Thử đổi bộ lọc đối tượng, dịch vụ hoặc từ khóa tìm kiếm."
           action={
             <AdminResetFilterButton
               onClick={handleResetFilters}
@@ -347,14 +399,14 @@ export function PromotionsBoard() {
           }
         />
       ) : (
-        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(17rem,22rem)]">
+        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)]">
           <div className="min-w-0 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 px-1">
               <h2
                 id="promotions-table-title"
                 className="text-sm font-semibold text-ink"
               >
-                Danh sách chiến dịch
+                Danh sách chương trình voucher
               </h2>
               <div className="flex flex-wrap items-center gap-3">
                 <p className="text-sm text-muted">
@@ -389,6 +441,11 @@ export function PromotionsBoard() {
                   ) : (
                     items.map((campaign) => {
                       const isSelected = campaign.code === activeCampaign?.code;
+                      const usedCount = campaign.usedCount ?? campaign.used ?? 0;
+                      const usageLimit = campaign.usageLimit ?? campaign.cap ?? 0;
+                      const usedBudget = campaign.usedBudget ?? 0;
+                      const totalBudget = campaign.totalBudget ?? 0;
+
                       return (
                         <AdminTableRow
                           key={campaign.code}
@@ -400,20 +457,24 @@ export function PromotionsBoard() {
                           }`}
                         >
                           <AdminTableCell>
-                            <p className="font-semibold whitespace-nowrap text-brand">
+                            <span className="font-mono font-bold whitespace-nowrap text-brand">
                               {campaign.code}
-                            </p>
+                            </span>
                           </AdminTableCell>
                           <AdminTableCell>
-                            <p className="font-medium text-ink">
+                            <p className="font-semibold text-ink">
                               {campaign.name}
                             </p>
                             <p className="text-xs text-muted">
                               {campaign.condition}
                             </p>
                           </AdminTableCell>
-                          <AdminTableCell>{campaign.service}</AdminTableCell>
-                          <AdminTableCell className="text-muted">
+                          <AdminTableCell>
+                            <span className="inline-flex items-center rounded-md bg-canvas px-2 py-0.5 text-xs font-medium text-ink">
+                              {campaign.service}
+                            </span>
+                          </AdminTableCell>
+                          <AdminTableCell className="text-xs text-muted">
                             {campaign.window}
                           </AdminTableCell>
                           <AdminTableCell>
@@ -428,18 +489,34 @@ export function PromotionsBoard() {
                             className="tabular-nums"
                           >
                             <span className="font-semibold text-ink">
-                              {countFormat.format(campaign.used)}
+                              {countFormat.format(usedCount)}
+                            </span>
+                            <span className="text-xs text-muted">
+                              {" "}
+                              / {countFormat.format(usageLimit)}
                             </span>
                           </AdminTableCell>
-                          <AdminTableCell className="text-muted">
+                          <AdminTableCell
+                            align="right"
+                            className="tabular-nums text-xs"
+                          >
+                            <span className="font-medium text-ink">
+                              {formatVnd(usedBudget)}
+                            </span>
+                            <span className="text-muted">
+                              {" "}
+                              / {formatVnd(totalBudget)}
+                            </span>
+                          </AdminTableCell>
+                          <AdminTableCell className="text-xs text-muted">
                             {campaign.owner}
                           </AdminTableCell>
                           <AdminTableCell>
                             <span
                               className={
                                 isSelected
-                                  ? "font-semibold text-brand"
-                                  : "text-muted hover:text-ink"
+                                  ? "font-semibold text-brand text-xs"
+                                  : "text-muted hover:text-ink text-xs"
                               }
                             >
                               {isSelected ? "Đang chọn" : "Chi tiết"}
@@ -462,77 +539,166 @@ export function PromotionsBoard() {
               lastPage={lastPage}
             />
           </div>
+
           <div className="min-w-0 space-y-4">
             {activeCampaign ? (
-              <section className="min-w-0 rounded-2xl border border-border bg-white p-4 shadow-sm">
+              <section className="min-w-0 rounded-2xl border border-border bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-sm font-semibold text-ink">
-                    Chiến dịch đang xem
+                    Chi tiết chiến dịch
                   </h2>
                   <CampaignStatusChip
                     status={activeCampaign.status as PromotionCampaignStatus}
                   />
                 </div>
-                <p className="mt-3 text-lg font-bold text-ink">
-                  {activeCampaign.name}
-                </p>
-                <p className="mt-1 text-xs text-muted">
-                  Mã: {activeCampaign.code}
-                </p>
-                <dl className="mt-4 space-y-2.5 text-sm">
+
+                <div className="mt-3 flex items-baseline justify-between gap-2 border-b border-border pb-3">
+                  <div>
+                    <p className="text-base font-bold text-ink">
+                      {activeCampaign.name}
+                    </p>
+                    <p className="mt-0.5 font-mono text-xs font-semibold text-brand">
+                      Mã: {activeCampaign.code}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Progress Indicators */}
+                <div className="mt-4 space-y-3 rounded-xl bg-canvas p-3 text-xs">
+                  <div>
+                    <div className="flex justify-between font-medium">
+                      <span className="text-muted">Lượt đã quy đổi:</span>
+                      <span className="text-ink">
+                        {countFormat.format(activeCampaign.usedCount || activeCampaign.used || 0)}{" "}
+                        / {countFormat.format(activeCampaign.usageLimit || activeCampaign.cap || 1)}
+                      </span>
+                    </div>
+                    <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-border">
+                      <div
+                        className="h-full rounded-full bg-brand"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            Math.round(
+                              ((activeCampaign.usedCount || activeCampaign.used || 0) /
+                                (activeCampaign.usageLimit || activeCampaign.cap || 1)) *
+                                100,
+                            ),
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between font-medium">
+                      <span className="text-muted">Ngân sách đã chi:</span>
+                      <span className="text-ink">
+                        {formatVnd(activeCampaign.usedBudget || 0)} /{" "}
+                        {formatVnd(activeCampaign.totalBudget || 10000000)}
+                      </span>
+                    </div>
+                    <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-border">
+                      <div
+                        className="h-full rounded-full bg-emerald-500"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            Math.round(
+                              ((activeCampaign.usedBudget || 0) /
+                                (activeCampaign.totalBudget || 10000000)) *
+                                100,
+                            ),
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <dl className="mt-4 space-y-2.5 text-xs">
                   <div className="flex items-baseline justify-between gap-3">
-                    <dt className="min-w-0 text-muted">Mã chiến dịch</dt>
-                    <dd className="shrink-0 font-mono font-semibold text-brand">
-                      {activeCampaign.code}
-                    </dd>
+                    <dt className="text-muted">Dịch vụ</dt>
+                    <dd className="font-medium text-ink">{activeCampaign.service}</dd>
                   </div>
                   <div className="flex items-baseline justify-between gap-3">
-                    <dt className="min-w-0 text-muted">Đối tượng</dt>
-                    <dd className="shrink-0 font-semibold text-ink">
-                      {activeCampaign.service}
-                    </dd>
-                  </div>
-                  <div className="flex items-baseline justify-between gap-3">
-                    <dt className="min-w-0 text-muted">Ghi chú</dt>
+                    <dt className="text-muted">Điều kiện áp dụng</dt>
                     <dd className="max-w-[14rem] text-right font-medium text-ink">
                       {activeCampaign.condition}
                     </dd>
                   </div>
                   <div className="flex items-baseline justify-between gap-3">
-                    <dt className="min-w-0 text-muted">Thời gian</dt>
-                    <dd className="shrink-0 font-semibold text-ink">
-                      {activeCampaign.window}
-                    </dd>
+                    <dt className="text-muted">Thời gian hiệu lực</dt>
+                    <dd className="font-medium text-ink">{activeCampaign.window}</dd>
                   </div>
                   <div className="flex items-baseline justify-between gap-3">
-                    <dt className="min-w-0 text-muted">Người phụ trách</dt>
-                    <dd className="shrink-0 font-semibold text-ink">
-                      {activeCampaign.owner}
-                    </dd>
+                    <dt className="text-muted">Nguồn tài trợ</dt>
+                    <dd className="font-medium text-ink">{activeCampaign.owner}</dd>
                   </div>
+                  {activeCampaign.description ? (
+                    <div className="border-t border-border pt-2 text-muted leading-relaxed">
+                      {activeCampaign.description}
+                    </div>
+                  ) : null}
                 </dl>
-                <p className="mt-4 text-xs text-muted">
-                  Số tiếp cận được lấy từ chiến dịch notification; đây không
-                  phải dữ liệu voucher.
-                </p>
+
+                {/* Operations Actions */}
+                <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border pt-4">
+                  {activeCampaign.status === "ACTIVE" ? (
+                    <button
+                      type="button"
+                      disabled={updatingId === activeCampaign.id}
+                      onClick={() => handleStatusAction(activeCampaign, "PAUSED")}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <OpsIcon name="clock" className="size-3.5" />
+                      Tạm dừng
+                    </button>
+                  ) : activeCampaign.status === "PAUSED" ? (
+                    <button
+                      type="button"
+                      disabled={updatingId === activeCampaign.id}
+                      onClick={() => handleStatusAction(activeCampaign, "ACTIVE")}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <OpsIcon name="play" className="size-3.5" />
+                      Kích hoạt lại
+                    </button>
+                  ) : null}
+
+                  {activeCampaign.status !== "CANCELLED" &&
+                  activeCampaign.status !== "ENDED" ? (
+                    <button
+                      type="button"
+                      disabled={updatingId === activeCampaign.id}
+                      onClick={() => handleStatusAction(activeCampaign, "CANCELLED")}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 text-xs font-semibold text-rose-800 hover:bg-rose-100 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <OpsIcon name="close" className="size-3.5" />
+                      Hủy chiến dịch
+                    </button>
+                  ) : null}
+                </div>
               </section>
             ) : null}
-            <div className="rounded-2xl border border-border bg-white p-4 shadow-sm text-xs text-muted">
-              TEST_ONLY: trang này ánh xạ chiến dịch thông báo, chưa có module
-              khuyến mãi/voucher độc lập.
-            </div>
           </div>
         </div>
       )}
+
+      <CreatePromotionDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSuccess={() => void refetch()}
+      />
     </div>
   );
 }
 
 function CampaignStatusChip({ status }: { status: PromotionCampaignStatus }) {
   const label = promotionCampaignStatusLabel(status);
-  if (status === "ENDED") {
+  if (status === "ENDED" || status === "CANCELLED") {
     return (
-      <span className="inline-flex items-center rounded-full bg-canvas px-2.5 py-1 text-xs font-semibold whitespace-nowrap text-muted">
+      <span className="inline-flex items-center rounded-full bg-canvas px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap text-muted">
         {label}
       </span>
     );

@@ -143,7 +143,14 @@ export function StoresList() {
         <li>
           <KpiCard
             label="Đang bán"
-            value={stores.filter((row) => row.sale === "ACTIVE").length}
+            value={
+              stores.filter(
+                (row) =>
+                  row.sale === "ACTIVE" ||
+                  row.sale === "OPEN" ||
+                  row.sale === "BUSY",
+              ).length
+            }
             note="trên trang hiện tại"
             icon="check"
             tone="success"
@@ -163,7 +170,7 @@ export function StoresList() {
             label="Tạm ngưng"
             value={
               stores.filter(
-                (row) => row.sale === "PAUSED" || row.sale === "SUSPENDED",
+                (row) => row.sale === "PAUSED" || row.sale === "CLOSED",
               ).length
             }
             note={"trên trang hiện tại"}

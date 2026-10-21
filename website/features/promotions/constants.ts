@@ -1,11 +1,12 @@
 export const PROMOTION_TABLE_COLUMNS = [
-  { id: "code", label: "Mã chiến dịch" },
-  { id: "name", label: "Chiến dịch & nội dung" },
-  { id: "service", label: "Kênh" },
+  { id: "code", label: "Mã voucher" },
+  { id: "name", label: "Chiến dịch & điều kiện" },
+  { id: "service", label: "Dịch vụ" },
   { id: "window", label: "Hiệu lực" },
   { id: "status", label: "Trạng thái" },
-  { id: "used", label: "Đã tiếp cận", align: "right" as const },
-  { id: "owner", label: "Người tạo" },
+  { id: "used", label: "Đã dùng / Giới hạn", align: "right" as const },
+  { id: "budget", label: "Ngân sách", align: "right" as const },
+  { id: "owner", label: "Tài trợ" },
   { id: "action", label: "Xem" },
 ] as const;
 

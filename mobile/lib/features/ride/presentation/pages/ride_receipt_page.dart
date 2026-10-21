@@ -2,15 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../rating/domain/service_rating.dart';
+import '../../../rating/presentation/rate_service_card.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
+import '../../../../core/design_system/components/dealgo_state_view.dart';
+import '../../../../core/network/request_failure.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../../../core/format/date_time_format.dart';
+import '../../../shell/presentation/account_routes.dart';
 import '../../domain/entities/ride_money.dart';
 import '../../domain/entities/ride_models.dart';
 import '../../domain/entities/ride_vehicle.dart';
 import '../../domain/usecases/get_ride.dart';
 import '../cubit/ride_receipt_cubit.dart';
 import '../widgets/ride_widgets.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 class RideReceiptPage extends StatelessWidget {
   const RideReceiptPage({required this.rideId, super.key});
@@ -38,7 +46,7 @@ class _RideReceiptView extends StatefulWidget {
 class _RideReceiptPageState extends State<_RideReceiptView> {
   RideView? _ride;
   var _loading = true;
-  var _offline = false;
+  Object? _failure;
 
   @override
   void initState() {
@@ -51,7 +59,7 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
     if (token == null) {
       setState(() {
         _loading = false;
-        _offline = true;
+        _failure = sessionExpiredFailure;
       });
       return;
     }
@@ -66,15 +74,15 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
       setState(() {
         _ride = ride;
         _loading = false;
-        _offline = false;
+        _failure = null;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
         _loading = false;
-        _offline = true;
+        _failure = error;
       });
     }
   }
@@ -91,13 +99,14 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
   Widget build(BuildContext context) {
     final ride = _ride;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: DealGoColors.canvas,
       body: SafeArea(
         child: Column(
           children: [
-            RideScreenHeader(
-              title: 'Biên nhận chuyến đi',
+            DealGoAppHeader(
+              title: l10n.rideReceiptTitle,
               onBack: _back,
               trailing: Text(
                 'DealGo',
@@ -116,32 +125,11 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
                   DealGoDimensions.pageGutter,
                   DealGoSpacing.s12,
                 ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DealGoSecondaryButton(
-                            label: 'Hỗ trợ',
-                            onPressed: () {},
-                          ),
-                        ),
-                        const SizedBox(width: DealGoSpacing.s12),
-                        Expanded(
-                          child: DealGoSecondaryButton(
-                            label: 'Lưu biên nhận',
-                            onPressed: () {},
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: DealGoSpacing.s8),
-                    DealGoPrimaryButton(
-                      label: 'Đánh giá chuyến đi',
-                      trailingIcon: Icons.arrow_forward,
-                      onPressed: () {},
-                    ),
-                  ],
+                child: DealGoSecondaryButton(
+                  key: const Key('ride-receipt-help'),
+                  label: l10n.rideReceiptHelp,
+                  onPressed: () =>
+                      context.push(AccountRoutes.help('/customer/account')),
                 ),
               ),
           ],
@@ -151,23 +139,24 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
   }
 
   Widget _body(RideView? ride, TextTheme textTheme) {
+    final l10n = AppLocalizations.of(context);
     if (_loading && ride == null) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_offline && ride == null) {
-      return const Padding(
-        padding: EdgeInsets.all(DealGoDimensions.pageGutter),
-        child: RideOfflineNotice(
-          detail: 'Chưa tải được biên nhận. Giá đã chốt chưa được hiển thị.',
-        ),
+    if (_failure != null && ride == null) {
+      return DealGoStateView.failure(
+        context,
+        onRetry: _load,
+        cause: _failure,
+        message: l10n.rideReceiptOffline,
       );
     }
     if (ride == null) {
       return const SizedBox.shrink();
     }
     final agreed = ride.agreedFareVnd;
-    final voucher = agreed == null ? 0 : 4000;
-    final listed = agreed == null ? null : agreed + voucher;
+    final finishedAt = formatLocalDateTime(ride.updatedAt);
+    final completed = ride.status == RideStatus.completed;
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         DealGoDimensions.pageGutter,
@@ -176,6 +165,12 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
         DealGoSpacing.s24,
       ),
       children: [
+        if (ride.status == RideStatus.completed)
+          RateServiceCard(
+            type: RatingSubjectType.ride,
+            subjectId: ride.id,
+            hasDriver: ride.assignedDriverId != null,
+          ),
         const Center(
           child: DecoratedBox(
             decoration: BoxDecoration(
@@ -186,7 +181,7 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
               width: 72,
               height: 72,
               child: Icon(
-                Icons.check,
+                DealGoIcons.check,
                 color: DealGoColors.brandGreen,
                 size: 36,
               ),
@@ -195,22 +190,22 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
         ),
         const SizedBox(height: DealGoSpacing.s16),
         Text(
-          'Chuyến đi hoàn tất!',
+          completed ? l10n.rideReceiptDone : l10n.rideReceiptTitle,
           textAlign: TextAlign.center,
           style: textTheme.titleLarge,
         ),
         const SizedBox(height: DealGoSpacing.s4),
         Text(
-          'Cảm ơn bạn đã đồng hành cùng DealGo',
+          l10n.rideReceiptThanks,
           textAlign: TextAlign.center,
           style: textTheme.bodySmall,
         ),
         const SizedBox(height: DealGoSpacing.s12),
         if (agreed == null)
-          const RideNote(message: 'Máy chủ chưa trả giá đã chốt.')
+          RideNote(message: l10n.rideReceiptNoFare)
         else
           Text(
-            formatRideVnd(agreed),
+            formatRideVnd(rideCashAfterVoucher(agreed, ride.discountVnd)),
             key: const Key('ride-receipt-fare'),
             textAlign: TextAlign.center,
             style: textTheme.headlineSmall?.copyWith(
@@ -221,7 +216,7 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
         if (agreed != null) ...[
           const SizedBox(height: DealGoSpacing.s4),
           Text(
-            'Đã thanh toán bằng tiền mặt',
+            l10n.rideReceiptCash,
             textAlign: TextAlign.center,
             style: textTheme.bodySmall,
           ),
@@ -235,14 +230,15 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Biên nhận #${rideQuoteDisplayId(ride.id)}',
+                      l10n.rideReceiptRef(rideShortRef(ride.id)),
                       style: textTheme.titleMedium,
                     ),
                   ),
-                  const RideStatusChip(
-                    label: 'Hoàn tất',
-                    tone: RideChipTone.green,
-                  ),
+                  if (completed)
+                    RideStatusChip(
+                      label: l10n.statusCompleted,
+                      tone: RideChipTone.green,
+                    ),
                 ],
               ),
               const SizedBox(height: DealGoSpacing.s12),
@@ -251,11 +247,14 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
                 dropoff: ride.dropoff.label,
               ),
               const SizedBox(height: DealGoSpacing.s12),
-              const RideMoneyLine(label: 'Ngày', amount: '14/10/2026'),
-              const RideMoneyLine(label: 'Thời gian', amount: '14:32 – 14:45'),
-              const RideMoneyLine(
-                label: 'Phương tiện',
-                amount: 'Xe 4 chỗ • Toyota Vios',
+              if (finishedAt != null)
+                RideMoneyLine(
+                  label: l10n.rideReceiptFinishedAt,
+                  amount: finishedAt,
+                ),
+              RideMoneyLine(
+                label: l10n.rideVehicleLabel,
+                amount: l10n.rideVehicleBikeTitle,
               ),
             ],
           ),
@@ -265,24 +264,26 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const RideSectionTitle('Chi tiết thanh toán'),
+              RideSectionTitle(l10n.rideReceiptPayment),
               const SizedBox(height: DealGoSpacing.s8),
-              if (agreed != null && listed != null) ...[
+              if (agreed != null) ...[
                 RideMoneyLine(
-                  label: 'Giá chuyến được chốt',
-                  amount: formatRideVnd(listed),
-                ),
-                RideMoneyLine(
-                  label: 'Voucher DealGo',
-                  amount: '-${formatRideVnd(voucher)}',
-                ),
-                RideMoneyLine(
-                  label: 'Tổng thanh toán',
+                  label: l10n.rideAgreedFare,
                   amount: formatRideVnd(agreed),
+                ),
+                if (ride.discountVnd > 0)
+                  RideMoneyLine(
+                    label: l10n.rideVoucherLine(ride.voucherCode ?? ''),
+                    amount: formatRideVnd(-ride.discountVnd),
+                  ),
+                RideMoneyLine(
+                  key: const Key('ride-receipt-total'),
+                  label: l10n.checkoutTotalSection,
+                  amount: formatRideVnd(rideCashAfterVoucher(agreed, ride.discountVnd)),
                   emphasize: true,
                 ),
               ] else
-                const RideNote(message: 'Chưa có số tiền đã chốt từ máy chủ.'),
+                RideNote(message: l10n.rideReceiptNoFare),
             ],
           ),
         ),

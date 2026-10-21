@@ -3,6 +3,8 @@ import type { RequestActor } from '../identity/access-auth.guard.js';
 import { LEDGER_REPOSITORY, type LedgerEntityTypeName } from './ledger.constants.js';
 import { LedgerRuleError, ledgerError } from './ledger.error.js';
 import type { LedgerJournalView, LedgerRepository } from './ledger.repository.js';
+import type { PostableLedgerEvent } from './cod-journal.js';
+import type { TxHandle } from '../../shared/tx/completion-hook.js';
 
 @Injectable()
 export class LedgerService {
@@ -15,6 +17,43 @@ export class LedgerService {
   }): Promise<LedgerJournalView> {
     try {
       return await this.ledger.postCodObligation(input);
+    } catch (error) {
+      throw this.asHttp(error);
+    }
+  }
+
+  async postPromotionDiscount(input: {
+    entityType: LedgerEntityTypeName;
+    entityId: string;
+    amountVnd: number;
+  }): Promise<LedgerJournalView> {
+    try {
+      return await this.ledger.postPromotionDiscount(input);
+    } catch (error) {
+      throw this.asHttp(error);
+    }
+  }
+
+  async postDriverPlatformFee(input: {
+    entityType: LedgerEntityTypeName;
+    entityId: string;
+    amountVnd: number;
+  }): Promise<LedgerJournalView> {
+    try {
+      return await this.ledger.postDriverPlatformFee(input);
+    } catch (error) {
+      throw this.asHttp(error);
+    }
+  }
+
+  /** Posts inside the job's completion transaction; a failure rolls the completion back. */
+  async postWithin(
+    tx: TxHandle,
+    event: PostableLedgerEvent,
+    input: { entityType: LedgerEntityTypeName; entityId: string; amountVnd: number },
+  ): Promise<LedgerJournalView> {
+    try {
+      return await this.ledger.postWithin(tx, event, input);
     } catch (error) {
       throw this.asHttp(error);
     }

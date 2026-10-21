@@ -20,4 +20,7 @@ export type StoreApproval = {
   status: StoreApprovalStatus;
   saleReady: boolean;
   assignee: string;
+  documents: import("@/features/kyc/partner-review").PartnerDocument[];
+  reason: string | null;
+  issues: import("@/features/kyc/partner-review").PartnerIssue[];
 };

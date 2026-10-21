@@ -42,6 +42,18 @@ export type OpsUserListItem = {
   role?: string;
   /** Staff directory: NATIONAL | CITY | ZONE. */
   scope?: string;
+  /** Staff directory (DEC-PROD-036): can reset other ops users' passwords. */
+  superAdmin?: boolean;
+  /** S027 (DEC-PROD-037): null = active account. */
+  deletion: OpsUserDeletionView | null;
+};
+
+export type OpsUserDeletionView = {
+  /** SCHEDULED = soft-deleted, inside the grace period; PURGED = PII anonymized. */
+  status: 'SCHEDULED' | 'PURGED';
+  deletedAt: string;
+  purgeAfter: string | null;
+  purgedAt: string | null;
 };
 
 export type OpsStaffListResult = PageResult<OpsUserListItem> & {
@@ -54,6 +66,9 @@ export type OpsDriverListItem = OpsUserListItem & {
     lat: number | null;
     lng: number | null;
     serviceRegionCode: string | null;
+    /** DEC-PROD-023 service toggles (Admin "Dịch vụ" column). */
+    rideEnabled: boolean;
+    foodEnabled: boolean;
     updatedAt: string;
   } | null;
 };
@@ -344,6 +359,15 @@ function toOpsUserView(user: OpsUserDirectoryRecord): OpsUserListItem {
     })),
     ...(user.staffRole ? { role: user.staffRole } : {}),
     ...(user.scope ? { scope: user.scope } : {}),
+    ...(user.superAdmin !== undefined ? { superAdmin: user.superAdmin } : {}),
+    deletion: user.deletedAt
+      ? {
+          status: user.purgedAt ? 'PURGED' : 'SCHEDULED',
+          deletedAt: user.deletedAt.toISOString(),
+          purgeAfter: user.purgeAfter?.toISOString() ?? null,
+          purgedAt: user.purgedAt?.toISOString() ?? null,
+        }
+      : null,
   };
 }
 
@@ -358,6 +382,8 @@ function mapPresence(
     lat: presence.lat,
     lng: presence.lng,
     serviceRegionCode: presence.serviceRegionCode ?? null,
+    rideEnabled: presence.rideEnabled,
+    foodEnabled: presence.foodEnabled,
     updatedAt: presence.updatedAt.toISOString(),
   };
 }

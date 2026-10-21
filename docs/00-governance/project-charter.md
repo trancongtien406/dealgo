@@ -41,7 +41,7 @@ DealGo muốn giải quyết nhu cầu kết nối đúng người — đúng d�
 | Thị trường mục tiêu | Việt Nam; khu vực triển khai đầu tiên chưa chọn | `PROPOSED` / `TBD` |
 | Dịch vụ Ride | Đặt xe hai bánh có thương lượng giá: khách đề xuất; tài xế chấp nhận/đưa giá khác; khách chọn trước assignment | `CONFIRMED` (`DEC-PROD-005`) |
 | Dịch vụ Food | Đặt món từ cửa hàng/nhà hàng, giao đến khách | `CONFIRMED` |
-| Đăng ký/xác thực | Passkey, xác minh phone bằng SMS và email đã xác minh; Admin được phân quyền bật/tắt phương thức | `CONFIRMED` (`DEC-PROD-006`) |
+| Đăng ký/xác thực | Phone SMS, email+password đăng ký/đăng nhập, passkey; Admin bật/tắt phương thức | `CONFIRMED` (cập nhật 2026-10-18; `DEC-PROD-006` đã `SUPERSEDED`) |
 | Liên lạc dịch vụ | Chat và gọi thoại trong app theo giao dịch Ride/Food; không lộ số cá nhân | `CONFIRMED` (`DEC-PROD-007`) |
 | Mobile app | Một ứng dụng Flutter hỗ trợ Customer, Merchant, Driver | `CONFIRMED` |
 | Kênh vận hành | Admin Web có phân quyền | `BASELINE` từ hồ sơ dự án |
@@ -137,7 +137,7 @@ Các ngưỡng định lượng chỉ được điền sau khi có baseline, quy
 | `SCOPE-002` | Food — đặt món từ merchant và giao bởi driver | Có luồng customer ↔ merchant ↔ driver |
 | `SCOPE-003` | **Một** mobile Flutter có ba role | Customer / Merchant / Driver, không mặc định ba app |
 | `SCOPE-004` | Tham chiếu Grab/GrabFood/ShopeeFood cho Ride/Food và inDrive cho thương lượng Ride | Không sao chép tính năng/policy/thuật toán |
-| `SCOPE-005` | Account hỗ trợ passkey, xác minh phone qua SMS, email verified; Admin được phân quyền quản lý method | Email verified không là email OTP login độc lập; detail `OPEN-020` |
+| `SCOPE-005` | Account hỗ trợ phone SMS, email+password đăng ký/đăng nhập, passkey; Admin quản lý method | `DEC-PROD-006` đã thu hồi; detail recovery/provider `OPEN-020` |
 | `SCOPE-006` | Chat văn bản và gọi thoại in-app gắn với Ride/Food transaction | Không lộ số, voice only/no-recording baseline; policy/provider `OPEN-021` |
 
 ### 5.2. Năng lực hỗ trợ cần có giải pháp — mức đề xuất

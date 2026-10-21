@@ -169,7 +169,10 @@ export function FoodOrderDetail({ code }: { code: string }) {
             <SummaryCell label="Mã đơn hàng" hint={order.time}>
               <span className="text-base text-brand">{order.code}</span>
             </SummaryCell>
-            <SummaryCell label="Trạng thái" hint={order.store}>
+            <SummaryCell
+              label="Trạng thái"
+              hint={order.cancelledBy ?? order.store}
+            >
               <StatusChip tone={foodOrderStatusTone(order.status)} dot>
                 {foodOrderStatusLabel(order.status)}
               </StatusChip>
@@ -178,11 +181,27 @@ export function FoodOrderDetail({ code }: { code: string }) {
               <span className="text-lg tabular-nums">{vnd(order.total)}</span>
             </SummaryCell>
             <SummaryCell label="Thanh toán" hint="COD · thu khi giao">
-              <StatusChip tone="brand">Chưa thu tiền</StatusChip>
+              <StatusChip tone="brand">{order.payment}</StatusChip>
             </SummaryCell>
-            <SummaryCell label="Giao dự kiến" hint="Tài xế đã nhận việc">
-              <span className="text-lg tabular-nums">10:48–11:00</span>
-            </SummaryCell>
+            {order.cancelReason ? (
+              <SummaryCell
+                label="Lý do quán từ chối"
+                hint="Khách thấy lý do này"
+              >
+                <span className="text-sm font-semibold text-danger">
+                  {order.cancelReason}
+                </span>
+              </SummaryCell>
+            ) : (
+              <SummaryCell
+                label="Tài xế"
+                hint={order.driver ? "Đã gán tài xế" : "Chưa gán tài xế"}
+              >
+                <span className="text-sm font-semibold">
+                  {order.driver ?? "—"}
+                </span>
+              </SummaryCell>
+            )}
           </SummaryStrip>
           <div className="grid items-start gap-4 xl:grid-cols-2">
             <div className="min-w-0 space-y-4">
@@ -195,7 +214,9 @@ export function FoodOrderDetail({ code }: { code: string }) {
                   />
                   <div className="min-w-0">
                     <p className="font-semibold text-ink">{order.customer}</p>
-                    <p className="text-sm text-muted">Khách hàng</p>
+                    <p className="text-sm text-muted">
+                      {order.customerPhone ?? "Khách hàng"}
+                    </p>
                   </div>
                 </div>
                 <div className="mt-4">
@@ -236,6 +257,14 @@ export function FoodOrderDetail({ code }: { code: string }) {
                         </span>
                         <div className="min-w-0 flex-1">
                           <p className="font-medium text-ink">{line.name}</p>
+                          {line.options ? (
+                            <p
+                              className="text-sm text-ink/80"
+                              data-testid="food-line-options"
+                            >
+                              {line.options}
+                            </p>
+                          ) : null}
                           <p className="text-sm text-muted">
                             SL {line.quantity} · {vnd(line.unitPriceVnd)}/món
                           </p>
@@ -366,7 +395,8 @@ export function FoodOrderDetail({ code }: { code: string }) {
                     label={`Sơ đồ tuyến từ ${order.store} đến ${order.regionLabel || "Điểm giao"}`}
                     start={order.store}
                     end={order.regionLabel || "Điểm giao"}
-                    city={order.regionLabel || "Đà Nẵng"}
+                    from={order.pickupPoint}
+                    to={order.dropoffPoint}
                   />
                 </div>
               </DetailSection>

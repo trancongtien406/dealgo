@@ -4,6 +4,7 @@ import '../../../../core/network/api_exception.dart';
 import '../../domain/entities/history_models.dart';
 import '../../domain/usecases/list_food_history.dart';
 import '../../domain/usecases/list_ride_history.dart';
+import '../../../../core/l10n/ui_message.dart';
 
 sealed class ActivityHistoryState {
   const ActivityHistoryState({
@@ -36,7 +37,7 @@ final class ActivityHistoryFailure extends ActivityHistoryState {
     super.food,
   });
 
-  final String message;
+  final UiMessage message;
 }
 
 class ActivityHistoryCubit extends Cubit<ActivityHistoryState> {
@@ -51,7 +52,7 @@ class ActivityHistoryCubit extends Cubit<ActivityHistoryState> {
   Future<void> load({required String? accessToken}) async {
     final token = accessToken?.trim() ?? '';
     if (token.isEmpty) {
-      emit(const ActivityHistoryFailure(message: 'Vui lòng đăng nhập lại'));
+      emit(ActivityHistoryFailure(message: UiMessage((l10n) => l10n.errorSessionExpired)));
       return;
     }
     emit(ActivityHistoryLoading(rides: state.rides, food: state.food));
@@ -62,15 +63,15 @@ class ActivityHistoryCubit extends Cubit<ActivityHistoryState> {
     } on ApiException catch (error) {
       emit(
         ActivityHistoryFailure(
-          message: error.message,
+          message: UiMessage.error(error),
           rides: state.rides,
           food: state.food,
         ),
       );
-    } catch (_) {
+    } catch (error) {
       emit(
         ActivityHistoryFailure(
-          message: 'Không tải được lịch sử',
+          message: UiMessage.error(error, fallback: (l10n) => l10n.stateErrorBody),
           rides: state.rides,
           food: state.food,
         ),

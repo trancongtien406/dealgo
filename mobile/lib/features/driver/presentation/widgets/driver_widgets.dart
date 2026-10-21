@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+
+import '../../../../l10n/app_localizations.dart';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
@@ -9,7 +13,6 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../identity/domain/auth_redirect.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
-import '../../../identity/presentation/widgets/auth_widgets.dart';
 
 String? driverAccessToken(BuildContext context) {
   final auth = context.read<AuthCubit>().state;
@@ -37,6 +40,7 @@ class DriverPageFrame extends StatelessWidget {
     this.subtitle,
     this.footer,
     this.onBack,
+    this.trailing,
     this.insetBottom = false,
     super.key,
   });
@@ -46,6 +50,7 @@ class DriverPageFrame extends StatelessWidget {
   final Widget body;
   final Widget? footer;
   final VoidCallback? onBack;
+  final Widget? trailing;
   final bool insetBottom;
 
   @override
@@ -57,7 +62,12 @@ class DriverPageFrame extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            DriverHeader(title: title, subtitle: subtitle, onBack: onBack),
+            DriverHeader(
+              title: title,
+              subtitle: subtitle,
+              onBack: onBack,
+              trailing: trailing,
+            ),
             Expanded(child: body),
             ?footer,
           ],
@@ -72,39 +82,24 @@ class DriverHeader extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.onBack,
+    this.trailing,
     super.key,
   });
 
   final String title;
   final String? subtitle;
   final VoidCallback? onBack;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        DealGoSpacing.s8,
-        DealGoSpacing.s8,
-        DealGoDimensions.pageGutter,
-        DealGoSpacing.s8,
-      ),
-      child: Row(
-        children: [
-          AuthBackButton(onPressed: onBack ?? () => driverBack(context)),
-          const SizedBox(width: DealGoSpacing.s8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: textTheme.titleMedium),
-                if (subtitle != null)
-                  Text(subtitle!, style: textTheme.bodySmall),
-              ],
-            ),
-          ),
-        ],
-      ),
+    final canPop = Navigator.maybeOf(context)?.canPop() ?? false;
+    return DealGoAppHeader(
+      title: title,
+      subtitle: subtitle,
+      onBack: onBack ?? (canPop ? () => driverBack(context) : null),
+      showBack: canPop || onBack != null,
+      trailing: trailing,
     );
   }
 }
@@ -113,28 +108,32 @@ class DriverPanel extends StatelessWidget {
   const DriverPanel({
     required this.child,
     this.color = DealGoColors.card,
+    this.elevated = false,
+    this.borderColor,
+    this.padding = const EdgeInsets.all(DealGoSpacing.s16),
     super.key,
   });
 
   final Widget child;
   final Color color;
+  final bool elevated;
+  final Color? borderColor;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(DealGoRadius.card);
+    final side =
+        borderColor ??
+        (color == DealGoColors.card ? DealGoColors.border : Colors.transparent);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(DealGoRadius.card),
-        border: Border.all(
-          color: color == DealGoColors.card
-              ? DealGoColors.border
-              : Colors.transparent,
-        ),
+        borderRadius: radius,
+        border: Border.all(color: side),
+        boxShadow: elevated ? DealGoShadows.card : null,
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(DealGoSpacing.s16),
-        child: child,
-      ),
+      child: Padding(padding: padding, child: child),
     );
   }
 }
@@ -207,11 +206,11 @@ class DriverHero extends StatelessWidget {
         DecoratedBox(
           decoration: BoxDecoration(
             color: background,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(DealGoRadius.input),
           ),
           child: SizedBox(
-            width: 72,
-            height: 72,
+            width: 64,
+            height: 64,
             child: Icon(icon, color: iconColor, size: 32),
           ),
         ),
@@ -406,16 +405,14 @@ class DriverMissingJobPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    final l10n = AppLocalizations.of(context);
+    return Scaffold(
       body: DriverPageFrame(
-        title: 'Yêu cầu',
+        title: l10n.driverRequestTitle,
         insetBottom: true,
-        body: Center(child: Text('Không tìm thấy yêu cầu')),
+        onBack: () => driverBack(context),
+        body: Center(child: Text(l10n.driverRequestNotFound)),
       ),
     );
   }
 }
-
-const driverStateSubtitle = 'DealGo · Biến thể trạng thái';
-const driverAreaLabel = 'Hải Châu, Đà Nẵng';
-const driverVehicleLabel = 'Xe máy';

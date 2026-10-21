@@ -60,6 +60,7 @@ describe('transaction chat http', () => {
               PUSH_PROVIDER: 'mock',
               PARTNER_ELIGIBILITY_BYPASS: 'true',
               OTP_THROTTLE_LIMIT: '1000',
+              OTP_PHONE_LIMIT: '1000',
             }),
         }),
         ThrottlerModule.forRoot([{ ttl: 60_000, limit: 1000 }]),

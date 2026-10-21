@@ -11,15 +11,17 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CurrentActor, OpsSessionGuard, type RequestActor } from '../identity/access-auth.guard.js';
+import { CurrentActor, type RequestActor } from '../identity/access-auth.guard.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { OpsInterveneDto, OpsPageQueryDto } from './food.dto.js';
 import { FoodService } from './food.service.js';
+import { OpsPermissionGuard } from '../identity/ops-rbac/ops-permission.guard.js';
+import { RequireOpsPermission } from '../identity/ops-rbac/ops-permission.decorator.js';
 
 @ApiTags('ops')
 @ApiBearerAuth()
 @Controller('v1/ops/food-orders')
-@UseGuards(OpsSessionGuard)
+@UseGuards(OpsPermissionGuard)
 export class FoodOrderOpsController {
   constructor(
     private readonly food: FoodService,
@@ -52,6 +54,7 @@ export class FoodOrderOpsController {
     return this.ledger.getJournal('FOOD_ORDER', id);
   }
 
+  @RequireOpsPermission('orders.intervene')
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -66,6 +69,7 @@ export class FoodOrderOpsController {
     return this.food.opsCancel(actor, id, dto.reason);
   }
 
+  @RequireOpsPermission('orders.intervene')
   @Post(':id/reassign')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

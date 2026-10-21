@@ -7,6 +7,10 @@ import {
 import { formatOpsDate } from "@/lib/ops-time";
 
 export type PersonItem = {
+  id: string;
+  /** Server staffRole code (ADMIN = has Admin password login). */
+  roleCode: string;
+  superAdmin: boolean;
   name: string;
   email: string;
   letters: string;
@@ -17,6 +21,8 @@ export type PersonItem = {
 };
 
 type NestStaffRow = {
+  id?: string;
+  superAdmin?: boolean;
   displayName?: string;
   email?: string;
   createdAt?: string;
@@ -84,6 +90,9 @@ export async function GET(request: Request) {
     const roleCode = (u.role || "OPS").toUpperCase();
     const scopeCode = (u.scope || "NATIONAL").toUpperCase();
     return {
+      id: u.id ?? "",
+      roleCode,
+      superAdmin: u.superAdmin === true,
       name: u.displayName || u.email || "Staff",
       email: u.email || "staff@dealgo.vn",
       letters,

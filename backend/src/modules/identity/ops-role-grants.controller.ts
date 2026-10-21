@@ -10,13 +10,14 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { OpsSessionGuard } from './access-auth.guard.js';
 import { RoleGrantsService } from './role-grants.service.js';
+import { OpsPermissionGuard } from './ops-rbac/ops-permission.guard.js';
+import { RequireOpsPermission } from './ops-rbac/ops-permission.decorator.js';
 
 @ApiTags('identity')
 @ApiBearerAuth()
 @Controller('v1/ops/role-grants')
-@UseGuards(OpsSessionGuard)
+@UseGuards(OpsPermissionGuard)
 export class OpsRoleGrantsController {
   constructor(private readonly roleGrants: RoleGrantsService) {}
 
@@ -37,6 +38,7 @@ export class OpsRoleGrantsController {
     );
   }
 
+  @RequireOpsPermission('staff.write')
   @Post(':id/approve')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Approve a pending role grant' })
@@ -44,6 +46,7 @@ export class OpsRoleGrantsController {
     return this.roleGrants.approve(id);
   }
 
+  @RequireOpsPermission('staff.write')
   @Post(':id/reject')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reject a pending role grant' })

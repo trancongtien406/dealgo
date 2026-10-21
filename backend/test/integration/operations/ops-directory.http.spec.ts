@@ -52,6 +52,7 @@ describe('ops directory http', () => {
               JWT_ACCESS_TTL_SECONDS: '900',
               SMS_PROVIDER: 'mock',
               OTP_THROTTLE_LIMIT: '1000',
+              OTP_PHONE_LIMIT: '1000',
               PARTNER_ELIGIBILITY_BYPASS: 'true',
             }),
         }),
@@ -133,6 +134,7 @@ describe('ops directory http', () => {
       emailVerifiedAt: null,
       createdAt: expect.any(String),
       grants: [expect.objectContaining({ role: 'CUSTOMER', status: 'ACTIVE' })],
+      deletion: null,
     });
     expect(JSON.stringify(detail.body)).not.toMatch(/passwordHash|refreshToken/i);
 
@@ -193,6 +195,16 @@ describe('ops directory http', () => {
       }),
     );
     expect(listed.body.data.items.some((row: { id: string }) => row.id === store.id)).toBe(true);
+    // Admin's sale status comes from these live fields (DEC-PROD-026/027/028); they must survive
+    // the ops mapper, not just the repository.
+    expect(listed.body.data.items.find((row: { id: string }) => row.id === store.id)).toMatchObject({
+      serviceMode: 'OPEN',
+      serviceModeUntil: null,
+      openNow: true,
+      closedReason: null,
+      acceptSettings: { acceptMode: 'MANUAL', maxActiveOrders: null, defaultPrepMinutes: 15, busyExtraMinutes: 15 },
+      estimatedPrepMinutes: 15,
+    });
 
     const detail = await request(app.getHttpServer())
       .get(`/v1/ops/stores/${store.id}`)
@@ -224,18 +236,14 @@ describe('ops directory http', () => {
     phone: string;
   }> {
     phoneSerial += 1;
-    const phone = `0901${String(phoneSerial).padStart(6, '0')}`;
-    const created = await request(app.getHttpServer())
-      .post('/v1/auth/phone/challenges')
-      .send({ phone })
-      .expect(200);
-    const code = sms.sent.at(-1)?.code;
-    const verified = await request(app.getHttpServer())
-      .post(`/v1/auth/phone/challenges/${created.body.data.challengeId}/verify`)
-      .send({ code })
-      .expect(200);
-    const id = verified.body.data.user.id as string;
-    await identity.insertGrant(id, role, 'ACTIVE');
-    return { id, phone: verified.body.data.user.phone as string };
+    // Created directly: phone OTP sign-up would also add a CUSTOMER grant to every role.
+    const user = await identity.createUser({
+      phone: `+84901${String(phoneSerial).padStart(6, '0')}`,
+      email: null,
+      displayName: 'DealGo user',
+    });
+    await identity.markPhoneVerified(user.id, new Date());
+    await identity.insertGrant(user.id, role, 'ACTIVE');
+    return { id: user.id, phone: user.phone as string };
   }
 });

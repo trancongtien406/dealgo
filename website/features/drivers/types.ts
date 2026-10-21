@@ -1,3 +1,4 @@
+import type { AccountDeletionInfo } from "@/lib/account-deletion";
 export const DRIVER_KYC_STATUSES = [
   "VERIFIED",
   "NEEDS_MORE_INFO",
@@ -28,5 +29,11 @@ export type DriverListItem = {
   kyc: DriverKycStatus;
   activity: DriverActivityStatus;
   rating: number | null;
-  trips: number;
+  /** Lifetime completed rides + delivered food orders; null when the profile lookup failed. */
+  trips: number | null;
+  /** Jobs that reached a final state while assigned (completed + cancelled/failed). */
+  finishedJobs: number | null;
+  /** Completion rate 0..1; null when unknown or nothing finished yet. */
+  completionRate: number | null;
+  deletion?: AccountDeletionInfo | null;
 };

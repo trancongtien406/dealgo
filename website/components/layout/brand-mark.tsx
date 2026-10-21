@@ -24,8 +24,8 @@ export function BrandMark({
                 y2="28"
                 gradientUnits="userSpaceOnUse"
               >
-                <stop offset="0%" stop-color="#c084fc" />
-                <stop offset="100%" stop-color="#8b5cf6" />
+                <stop offset="0%" stopColor="#c084fc" />
+                <stop offset="100%" stopColor="#8b5cf6" />
               </linearGradient>
               <linearGradient
                 id="bm-go"
@@ -35,8 +35,8 @@ export function BrandMark({
                 y2="4"
                 gradientUnits="userSpaceOnUse"
               >
-                <stop offset="0%" stop-color="#34d399" />
-                <stop offset="100%" stop-color="#059669" />
+                <stop offset="0%" stopColor="#34d399" />
+                <stop offset="100%" stopColor="#059669" />
               </linearGradient>
             </defs>
 

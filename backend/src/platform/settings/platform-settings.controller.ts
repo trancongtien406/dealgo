@@ -2,16 +2,17 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Query, UseGu
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentActor,
-  OpsSessionGuard,
   type RequestActor,
 } from '../../modules/identity/access-auth.guard.js';
 import { PatchPlatformSettingDto, QueryPlatformSettingsDto } from './platform-settings.dto.js';
 import { PlatformSettingsService } from './platform-settings.service.js';
+import { OpsPermissionGuard } from '../../modules/identity/ops-rbac/ops-permission.guard.js';
+import { RequireOpsPermission } from '../../modules/identity/ops-rbac/ops-permission.decorator.js';
 
 @ApiTags('ops')
 @ApiBearerAuth()
 @Controller('v1/ops/platform-settings')
-@UseGuards(OpsSessionGuard)
+@UseGuards(OpsPermissionGuard)
 export class OpsPlatformSettingsController {
   constructor(private readonly settings: PlatformSettingsService) {}
 
@@ -24,6 +25,7 @@ export class OpsPlatformSettingsController {
     return this.settings.list(query);
   }
 
+  @RequireOpsPermission('settings.write')
   @Patch(':key')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

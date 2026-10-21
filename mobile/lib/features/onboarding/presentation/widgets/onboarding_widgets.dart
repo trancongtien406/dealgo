@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
-import '../../../identity/presentation/widgets/auth_widgets.dart';
-import '../../domain/entities/partner_onboarding.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
 
 class OnboardingScaffold extends StatelessWidget {
   const OnboardingScaffold({
@@ -24,39 +25,17 @@ class OnboardingScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     return Scaffold(
       backgroundColor: DealGoColors.canvas,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                DealGoSpacing.s8,
-                DealGoSpacing.s8,
-                DealGoDimensions.pageGutter,
-                0,
-              ),
-              child: Row(
-                children: [
-                  if (onBack != null)
-                    AuthBackButton(onPressed: onBack!)
-                  else
-                    const SizedBox(width: DealGoDimensions.minTapTarget),
-                  const SizedBox(width: DealGoSpacing.s8),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: textTheme.titleMedium,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: DealGoSpacing.s8),
-                  _RolePill(label: roleBadge),
-                ],
-              ),
+            DealGoAppHeader(
+              title: title,
+              onBack: onBack,
+              showBack: onBack != null,
+              trailing: _RolePill(label: roleBadge),
             ),
             Expanded(child: body),
             if (footer != null)
@@ -181,7 +160,7 @@ class OnboardingInfoBanner extends StatelessWidget {
   const OnboardingInfoBanner({
     required this.message,
     this.tone = OnboardingBannerTone.success,
-    this.icon = Icons.info_outline,
+    this.icon = DealGoIcons.info,
     super.key,
   });
 
@@ -326,12 +305,10 @@ class OnboardingSelectCard extends StatelessWidget {
               ),
               Icon(
                 selected
-                    ? (multiSelect
-                          ? Icons.check_circle
-                          : Icons.radio_button_checked)
+                    ? (multiSelect ? DealGoIcons.success : DealGoIcons.radioOn)
                     : (multiSelect
-                          ? Icons.circle_outlined
-                          : Icons.radio_button_off),
+                          ? DealGoIcons.radioOff
+                          : DealGoIcons.radioOff),
                 color: selected
                     ? DealGoColors.primary
                     : DealGoColors.textSecondary,
@@ -344,12 +321,16 @@ class OnboardingSelectCard extends StatelessWidget {
   }
 }
 
-class OnboardingMockField extends StatelessWidget {
+class OnboardingMockField extends StatefulWidget {
   const OnboardingMockField({
     required this.label,
     required this.value,
     this.required = false,
     this.trailing,
+    this.onChanged,
+    this.fieldKey,
+    this.hint,
+    this.keyboardType,
     super.key,
   });
 
@@ -358,166 +339,55 @@ class OnboardingMockField extends StatelessWidget {
   final bool required;
   final Widget? trailing;
 
+  /// When set the field is editable; otherwise it renders read-only.
+  final ValueChanged<String>? onChanged;
+  final Key? fieldKey;
+  final String? hint;
+  final TextInputType? keyboardType;
+
   @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text.rich(
-          TextSpan(
-            style: textTheme.labelLarge?.copyWith(fontSize: 13),
-            children: [
-              TextSpan(text: label),
-              if (required)
-                const TextSpan(
-                  text: ' *',
-                  style: TextStyle(color: DealGoColors.danger),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: DealGoSpacing.s8),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: DealGoColors.card,
-            borderRadius: BorderRadius.circular(DealGoRadius.input),
-            border: Border.all(color: DealGoColors.border),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: DealGoSpacing.s16,
-              vertical: 14,
-            ),
-            child: Row(
-              children: [
-                Expanded(child: Text(value, style: textTheme.bodyLarge)),
-                ?trailing,
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  State<OnboardingMockField> createState() => _OnboardingMockFieldState();
 }
 
-class OnboardingMockDocSlot extends StatelessWidget {
-  const OnboardingMockDocSlot({
-    required this.title,
-    required this.hint,
-    required this.attached,
-    required this.onToggle,
-    super.key,
-  });
-
-  final String title;
-  final String hint;
-  final bool attached;
-  final VoidCallback onToggle;
+class _OnboardingMockFieldState extends State<OnboardingMockField> {
+  late final TextEditingController _controller;
 
   @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Material(
-      color: DealGoColors.card,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(DealGoRadius.card),
-        side: BorderSide(
-          color: attached ? DealGoColors.brandGreen : DealGoColors.border,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(DealGoSpacing.s16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(title, style: textTheme.titleMedium),
-            const SizedBox(height: DealGoSpacing.s4),
-            Text(hint, style: textTheme.bodySmall),
-            const SizedBox(height: DealGoSpacing.s12),
-            OutlinedButton.icon(
-              onPressed: onToggle,
-              icon: Icon(
-                attached
-                    ? Icons.check_circle_outline
-                    : Icons.add_a_photo_outlined,
-              ),
-              label: Text(attached ? 'Đã đính kèm (mock)' : 'Thêm tệp mock'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: attached
-                    ? DealGoColors.brandGreen
-                    : DealGoColors.primary,
-                side: BorderSide(
-                  color: attached
-                      ? DealGoColors.brandGreen
-                      : DealGoColors.primary,
-                ),
-                minimumSize: const Size(
-                  DealGoDimensions.minTapTarget,
-                  DealGoDimensions.buttonMinHeight,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(DealGoRadius.button),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.value);
   }
-}
 
-class OnboardingRejectionList extends StatelessWidget {
-  const OnboardingRejectionList({required this.items, super.key});
+  @override
+  void didUpdateWidget(covariant OnboardingMockField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.value != oldWidget.value && widget.value != _controller.text) {
+      _controller.text = widget.value;
+    }
+  }
 
-  final List<OnboardingRejection> items;
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Column(
-      children: [
-        for (final item in items) ...[
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: DealGoColors.card,
-              borderRadius: BorderRadius.circular(DealGoRadius.card),
-              border: Border.all(color: DealGoColors.border),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(DealGoSpacing.s16),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.error, color: DealGoColors.danger),
-                  const SizedBox(width: DealGoSpacing.s12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(item.title, style: textTheme.titleMedium),
-                        const SizedBox(height: DealGoSpacing.s4),
-                        Text(item.reason, style: textTheme.bodySmall),
-                        const SizedBox(height: DealGoSpacing.s4),
-                        Text(
-                          item.code,
-                          style: textTheme.labelSmall?.copyWith(
-                            color: DealGoColors.danger,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-        ],
-      ],
+    final editable = widget.onChanged != null;
+    return DealGoTextField(
+      label: widget.label,
+      controller: _controller,
+      hint: widget.hint,
+      requiredMark: widget.required,
+      keyboardType: widget.keyboardType,
+      fieldKey: widget.fieldKey,
+      suffix: widget.trailing,
+      enabled: editable,
+      textCapitalization: editable
+          ? TextCapitalization.words
+          : TextCapitalization.none,
+      onChanged: widget.onChanged,
     );
   }
 }
@@ -539,7 +409,7 @@ class OnboardingContinueBar extends StatelessWidget {
     return DealGoPrimaryButton(
       label: label,
       enabled: enabled,
-      trailingIcon: Icons.arrow_forward,
+      trailingIcon: DealGoIcons.arrowRight,
       onPressed: onPressed,
     );
   }

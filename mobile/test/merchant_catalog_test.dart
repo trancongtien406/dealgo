@@ -1,3 +1,5 @@
+import 'package:flutter/widgets.dart';
+import 'package:dealgo/l10n/app_localizations.dart';
 import 'package:dealgo/core/network/api_exception.dart';
 import 'package:dealgo/features/food/data/datasources/dio_food_remote_datasource.dart';
 import 'package:dealgo/features/food/domain/entities/food_models.dart';
@@ -8,7 +10,6 @@ import 'package:dealgo/features/merchant/domain/usecases/create_merchant_catalog
 import 'package:dealgo/features/merchant/domain/usecases/set_merchant_item_availability.dart';
 import 'package:dealgo/features/merchant/presentation/cubit/merchant_catalog_cubit.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 
 MerchantCatalogCubit _catalogCubit(FakeMerchantOrdersClient orders) {
   final repo = MerchantOrdersRepositoryImpl(orders);
@@ -184,7 +185,11 @@ void main() {
       );
       final state = cubit.state as MerchantCatalogReady;
       expect(state.store.items.single.available, isTrue);
-      expect(state.actionError, 'Not store owner');
+      expect((state.actionError!.error! as ApiException).message, 'Not store owner');
+      expect(
+        state.actionError!.resolve(lookupAppLocalizations(const Locale('vi'))),
+        'Tài khoản không quản lý cửa hàng này.',
+      );
       await cubit.close();
     });
   });

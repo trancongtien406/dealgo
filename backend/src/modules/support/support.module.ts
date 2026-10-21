@@ -12,12 +12,13 @@ import {
   type OpsFaqRepository,
 } from './ops-faq.repository.js';
 import { OpsFaqService } from './ops-faq.service.js';
+import { HelpFaqsController } from './help-faqs.controller.js';
 import { OpsFaqsController } from './ops-faqs.controller.js';
 import { OPS_FAQ_REPOSITORY } from './support.constants.js';
 
 @Module({
   imports: [PrismaModule, IdentityModule, AuditModule],
-  controllers: [OpsDisputesController, OpsFaqsController],
+  controllers: [OpsDisputesController, OpsFaqsController, HelpFaqsController],
   providers: [
     OpsDisputesService,
     OpsFaqService,

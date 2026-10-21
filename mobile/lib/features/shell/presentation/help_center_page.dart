@@ -1,44 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/design_system/components/dealgo_bottom_bar.dart';
 import '../../../core/design_system/components/dealgo_card.dart';
 import '../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../core/design_system/components/dealgo_skeleton.dart';
+import '../../../core/design_system/components/dealgo_state_view.dart';
+import '../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
+
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../../support/domain/help_faq.dart';
+import '../../support/domain/support_ticket.dart';
+import 'account_routes.dart';
 import 'account_widgets.dart';
+import '../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../core/design_system/components/dealgo_app_header.dart';
 
 enum _HelpTopic { ride, food, payment, account }
 
-class _Faq {
-  const _Faq({
-    required this.question,
-    required this.answer,
-    required this.topic,
-  });
-
-  final String question;
-  final String answer;
-  final _HelpTopic topic;
+/// Help audience for the shell the page is opened from (DEC-PROD-021).
+String helpAudienceFor(String shellPath) {
+  if (shellPath.startsWith('/driver')) return 'DRIVER';
+  if (shellPath.startsWith('/merchant')) return 'MERCHANT';
+  return 'CUSTOMER';
 }
 
-const _faqs = <_Faq>[
-  _Faq(
-    question: 'Làm thế nào để hủy chuyến?',
-    answer: 'Mẫu trên máy: ứng dụng chưa gửi yêu cầu hủy.',
-    topic: _HelpTopic.ride,
-  ),
-  _Faq(
-    question: 'Tôi chưa nhận được đơn hàng',
-    answer: 'Mẫu trên máy: chưa có trạng thái đơn từ máy chủ.',
-    topic: _HelpTopic.food,
-  ),
-  _Faq(
-    question: 'Khi nào nhận được tiền hoàn?',
-    answer: 'Mẫu trên máy: thời điểm hoàn tiền do máy chủ quyết định.',
-    topic: _HelpTopic.payment,
-  ),
-];
-
 class HelpCenterPage extends StatefulWidget {
-  const HelpCenterPage({super.key});
+  const HelpCenterPage({required this.shellPath, super.key});
+
+  final String shellPath;
 
   @override
   State<HelpCenterPage> createState() => _HelpCenterPageState();
@@ -48,7 +41,14 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
   final TextEditingController _query = TextEditingController();
   final Set<String> _open = <String>{};
   _HelpTopic? _topic;
-  var _keptLocal = false;
+  List<HelpFaq>? _faqs;
+  Object? _failure;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   @override
   void dispose() {
@@ -56,11 +56,37 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
     super.dispose();
   }
 
-  bool _visible(_Faq faq) {
-    final topic = _topic;
-    if (topic != null && faq.topic != topic) {
-      return false;
+  Future<void> _load() async {
+    HelpFaqRepository? repository;
+    try {
+      repository = context.read<HelpFaqRepository>();
+    } on Object {
+      repository = null;
     }
+    if (repository == null) {
+      setState(() => _faqs = const []);
+      return;
+    }
+    setState(() {
+      _failure = null;
+      _faqs = null;
+    });
+    try {
+      final items = await repository.list(
+        audience: helpAudienceFor(widget.shellPath),
+      );
+      if (mounted) setState(() => _faqs = items);
+    } on Object catch (error) {
+      if (mounted) {
+        setState(() {
+          _failure = error;
+          _faqs = const [];
+        });
+      }
+    }
+  }
+
+  bool _visible(HelpFaq faq) {
     final query = _query.text.trim().toLowerCase();
     if (query.isEmpty) {
       return true;
@@ -69,54 +95,84 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
         faq.answer.toLowerCase().contains(query);
   }
 
-  void _toggle(String question) {
+  void _toggle(String id) {
     setState(() {
-      if (!_open.add(question)) {
-        _open.remove(question);
+      if (!_open.add(id)) {
+        _open.remove(id);
       }
     });
   }
 
+  SupportCategory get _categoryForTopic => switch (_topic) {
+    _HelpTopic.ride => SupportCategory.ride,
+    _HelpTopic.food => SupportCategory.food,
+    _HelpTopic.payment => SupportCategory.payment,
+    _HelpTopic.account => SupportCategory.account,
+    null => SupportCategory.other,
+  };
+
+  void _openTickets() =>
+      context.push(AccountRoutes.supportTickets(widget.shellPath));
+
+  Future<void> _createTicket() async {
+    final created = await context.push<bool>(
+      AccountRoutes.supportTicketNew(widget.shellPath),
+      extra: _categoryForTopic,
+    );
+    if (created == true && mounted) {
+      _openTickets();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final faqs = _faqs;
     final visible = [
-      for (final faq in _faqs)
+      for (final faq in faqs ?? const <HelpFaq>[])
         if (_visible(faq)) faq,
     ];
     final textTheme = Theme.of(context).textTheme;
     return Scaffold(
       backgroundColor: DealGoColors.canvas,
+      extendBody: true,
       body: SafeArea(
+        bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const AccountScreenHeader(title: 'Trung tâm hỗ trợ'),
+            DealGoAppHeader(
+              title: l10n.helpTitle,
+              actions: IconButton(
+                key: const Key('help-open-tickets'),
+                tooltip: l10n.helpMyTickets,
+                onPressed: _openTickets,
+                icon: const Icon(DealGoIcons.headset, color: DealGoColors.text),
+              ),
+            ),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(
                   DealGoDimensions.pageGutter,
                   DealGoSpacing.s16,
                   DealGoDimensions.pageGutter,
-                  DealGoSpacing.s16,
+                  DealGoSpacing.s24 +
+                      DealGoDimensions.buttonMinHeight +
+                      DealGoSpacing.s48,
                 ),
                 children: [
                   const _SupportBanner(),
                   const SizedBox(height: DealGoSpacing.s16),
-                  TextField(
+                  DealGoTextField(
+                    label: l10n.helpSearchHint,
+                    showLabel: false,
                     controller: _query,
                     textInputAction: TextInputAction.search,
                     onChanged: (_) => setState(() {}),
-                    decoration: accountFieldDecoration(
-                      context,
-                      hint: 'Tìm câu trả lời hoặc hướng dẫn...',
-                      prefix: const Icon(
-                        Icons.search,
-                        color: DealGoColors.textSecondary,
-                      ),
-                    ),
+                    prefixIcon: DealGoIcons.search,
                   ),
                   const SizedBox(height: DealGoSpacing.s20),
-                  Text('Bạn cần hỗ trợ về?', style: textTheme.titleMedium),
+                  Text(l10n.helpTopicsTitle, style: textTheme.titleMedium),
                   const SizedBox(height: DealGoSpacing.s12),
                   _TopicGrid(
                     selected: _topic,
@@ -126,61 +182,104 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
                   ),
                   const SizedBox(height: DealGoSpacing.s20),
                   AccountSectionHeader(
-                    title: 'Câu hỏi thường gặp',
+                    title: l10n.helpFaqTitle,
                     action: TextButton(
-                      onPressed: () => setState(() => _topic = null),
-                      child: const AccountLinkText('Xem tất cả'),
+                      onPressed: () => setState(() {
+                        _query.clear();
+                        _open.clear();
+                      }),
+                      child: AccountLinkText(l10n.helpSeeAll),
                     ),
                   ),
                   const SizedBox(height: DealGoSpacing.s12),
-                  Text(
-                    'Câu trả lời là mẫu trên máy, chưa được gửi tới bộ phận hỗ trợ.',
-                    style: textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: DealGoSpacing.s12),
-                  if (visible.isEmpty)
+                  if (faqs == null)
+                    const DealGoSkeletonList(
+                      key: Key('help-faq-loading'),
+                      itemCount: 3,
+                      padding: EdgeInsets.zero,
+                    )
+                  else if (_failure != null)
+                    DealGoStateView.failure(
+                      context,
+                      key: const Key('help-faq-error'),
+                      onRetry: _load,
+                      cause: _failure,
+                      message: l10n.helpFaqLoadFailed,
+                      compact: true,
+                    )
+                  else if (faqs.isEmpty)
+                    DealGoStateView(
+                      key: const Key('help-faq-empty'),
+                      art: DealGoStateArt.noMessages,
+                      title: l10n.helpFaqEmpty,
+                      compact: true,
+                    )
+                  else if (visible.isEmpty)
                     Text(
-                      'Không có hướng dẫn mẫu cho từ khóa này.',
+                      AppLocalizations.of(context).helpNoResults,
                       style: textTheme.bodyMedium,
                     )
                   else
                     for (final faq in visible) ...[
                       _FaqCard(
+                        key: Key('help-faq-${faq.id}'),
                         faq: faq,
-                        open: _open.contains(faq.question),
-                        onTap: () => _toggle(faq.question),
+                        open: _open.contains(faq.id),
+                        onTap: () => _toggle(faq.id),
                       ),
                       const SizedBox(height: DealGoSpacing.s12),
                     ],
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                DealGoDimensions.pageGutter,
-                DealGoSpacing.s8,
-                DealGoDimensions.pageGutter,
-                DealGoSpacing.s12,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_keptLocal) ...[
-                    Text(
-                      'Bản nháp này chưa được gửi.',
-                      style: textTheme.bodySmall,
+                  const SizedBox(height: DealGoSpacing.s8),
+                  DealGoCard(
+                    key: const Key('help-still-need'),
+                    onTap: _openTickets,
+                    child: Row(
+                      children: [
+                        const AccountToneIcon(
+                          icon: DealGoIcons.headset,
+                          background: DealGoColors.subtlePurple,
+                          foreground: DealGoColors.primary,
+                        ),
+                        const SizedBox(width: DealGoSpacing.s12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                l10n.helpStillNeedTitle,
+                                style: textTheme.titleMedium?.copyWith(
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                l10n.helpStillNeedBody,
+                                style: textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          DealGoIcons.chevronRight,
+                          color: DealGoColors.textSecondary,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: DealGoSpacing.s8),
-                  ],
-                  DealGoPrimaryButton(
-                    label: 'Tạo yêu cầu hỗ trợ mới',
-                    trailingIcon: Icons.arrow_forward,
-                    onPressed: () => setState(() => _keptLocal = true),
                   ),
+                  const SizedBox(height: DealGoSpacing.s8),
+                  Text(l10n.helpAnswersNote, style: textTheme.bodySmall),
                 ],
               ),
             ),
           ],
+        ),
+      ),
+      bottomNavigationBar: DealGoBottomBar(
+        child: DealGoPrimaryButton(
+          key: const Key('help-create-ticket'),
+          label: l10n.helpCreateTicket,
+          trailingIcon: DealGoIcons.arrowRight,
+          onPressed: _createTicket,
         ),
       ),
     );
@@ -196,11 +295,7 @@ class _SupportBanner extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(DealGoRadius.card),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
-        ),
+        color: DealGoColors.primary,
       ),
       child: Padding(
         padding: const EdgeInsets.all(DealGoSpacing.s16),
@@ -221,7 +316,7 @@ class _SupportBanner extends StatelessWidget {
                         vertical: DealGoSpacing.s4,
                       ),
                       child: Text(
-                        'DealGo Support',
+                        AppLocalizations.of(context).helpBannerBadge,
                         style: textTheme.labelSmall?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
@@ -231,7 +326,7 @@ class _SupportBanner extends StatelessWidget {
                   ),
                   const SizedBox(height: DealGoSpacing.s12),
                   Text(
-                    'Chúng mình có thể giúp gì cho bạn?',
+                    AppLocalizations.of(context).helpSubtitle,
                     style: textTheme.titleMedium?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w800,
@@ -239,7 +334,7 @@ class _SupportBanner extends StatelessWidget {
                   ),
                   const SizedBox(height: DealGoSpacing.s8),
                   Text(
-                    'Hỗ trợ bạn trên mọi hành trình và đơn hàng.',
+                    AppLocalizations.of(context).helpBannerBody,
                     style: textTheme.bodySmall?.copyWith(
                       color: Colors.white.withValues(alpha: 0.9),
                     ),
@@ -256,11 +351,7 @@ class _SupportBanner extends StatelessWidget {
               child: const SizedBox(
                 width: 56,
                 height: 56,
-                child: Icon(
-                  Icons.headset_mic_outlined,
-                  color: Colors.white,
-                  size: 28,
-                ),
+                child: Icon(DealGoIcons.headset, color: Colors.white, size: 28),
               ),
             ),
           ],
@@ -278,6 +369,7 @@ class _TopicGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       children: [
         Row(
@@ -286,9 +378,9 @@ class _TopicGrid extends StatelessWidget {
               child: _TopicCard(
                 topic: _HelpTopic.ride,
                 selected: selected == _HelpTopic.ride,
-                icon: Icons.directions_car_outlined,
-                title: 'Đặt xe',
-                subtitle: 'Chuyến đi và tài xế',
+                icon: DealGoIcons.car,
+                title: l10n.helpTopicRide,
+                subtitle: l10n.helpTopicRideSub,
                 onSelected: onSelected,
               ),
             ),
@@ -297,9 +389,9 @@ class _TopicGrid extends StatelessWidget {
               child: _TopicCard(
                 topic: _HelpTopic.food,
                 selected: selected == _HelpTopic.food,
-                icon: Icons.restaurant_outlined,
-                title: 'Đồ ăn',
-                subtitle: 'Đơn hàng và quán',
+                icon: DealGoIcons.restaurant,
+                title: l10n.helpTopicFood,
+                subtitle: l10n.helpTopicFoodSub,
                 onSelected: onSelected,
               ),
             ),
@@ -312,9 +404,9 @@ class _TopicGrid extends StatelessWidget {
               child: _TopicCard(
                 topic: _HelpTopic.payment,
                 selected: selected == _HelpTopic.payment,
-                icon: Icons.account_balance_wallet_outlined,
-                title: 'Thanh toán',
-                subtitle: 'Giao dịch & hoàn tiền',
+                icon: DealGoIcons.wallet,
+                title: l10n.helpTopicPayment,
+                subtitle: l10n.helpTopicPaymentSub,
                 onSelected: onSelected,
               ),
             ),
@@ -323,9 +415,9 @@ class _TopicGrid extends StatelessWidget {
               child: _TopicCard(
                 topic: _HelpTopic.account,
                 selected: selected == _HelpTopic.account,
-                icon: Icons.shield_outlined,
-                title: 'Tài khoản',
-                subtitle: 'Đăng nhập và bảo mật',
+                icon: DealGoIcons.shieldPlain,
+                title: l10n.helpTopicAccount,
+                subtitle: l10n.helpTopicAccountSub,
                 onSelected: onSelected,
               ),
             ),
@@ -373,7 +465,7 @@ class _TopicCard extends StatelessWidget {
           if (selected) ...[
             const SizedBox(height: DealGoSpacing.s8),
             Text(
-              'Đang xem',
+              AppLocalizations.of(context).helpTopicSelected,
               style: textTheme.labelSmall?.copyWith(
                 color: DealGoColors.primary,
                 fontWeight: FontWeight.w600,
@@ -387,9 +479,14 @@ class _TopicCard extends StatelessWidget {
 }
 
 class _FaqCard extends StatelessWidget {
-  const _FaqCard({required this.faq, required this.open, required this.onTap});
+  const _FaqCard({
+    required this.faq,
+    required this.open,
+    required this.onTap,
+    super.key,
+  });
 
-  final _Faq faq;
+  final HelpFaq faq;
   final bool open;
   final VoidCallback onTap;
 
@@ -404,7 +501,7 @@ class _FaqCard extends StatelessWidget {
           Row(
             children: [
               const AccountToneIcon(
-                icon: Icons.help_outline,
+                icon: DealGoIcons.help,
                 background: DealGoColors.subtlePurple,
                 foreground: DealGoColors.primary,
               ),
@@ -416,7 +513,7 @@ class _FaqCard extends StatelessWidget {
                 ),
               ),
               Icon(
-                open ? Icons.expand_less : Icons.chevron_right,
+                open ? DealGoIcons.expandLess : DealGoIcons.chevronRight,
                 color: DealGoColors.textSecondary,
               ),
             ],

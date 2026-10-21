@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -33,6 +34,17 @@ CustomTransitionPage<void> dealgoFadeSlidePage({
           child: child,
         ),
       );
+    },
+  );
+}
+
+/// App-wide route transitions: light fade-forward on Android, native slide on
+/// iOS. Reduced-motion users get the platform's own handling.
+abstract final class DealGoPageTransitions {
+  static const PageTransitionsTheme theme = PageTransitionsTheme(
+    builders: {
+      TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+      TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
     },
   );
 }

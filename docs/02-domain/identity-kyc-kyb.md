@@ -44,6 +44,7 @@ related_decisions:
   - DEC-PROD-002
   - DEC-PROD-006
   - DEC-PROD-007
+  - DEC-PROD-008
   - OPEN-001
   - OPEN-005
   - OPEN-006
@@ -195,8 +196,8 @@ flowchart TD
 
 | ID | Hành vi cần đặc tả | Điều kiện tối thiểu | Acceptance có thể kiểm thử |
 |---|---|---|---|
-| `IDN-CUS-001` | Tạo Account, xác minh phone/email và liên kết passkey. | `DEC-PROD-006`; provider/flow detail `OPEN-008/020`. | Một account duy nhất; contact verification riêng; passkey challenge server validated. |
-| `IDN-CUS-002` | Verify phone bằng SMS challenge; verify email ownership. | SMS OTP one-time/expiry/rate-limit; email verification link không tạo email-OTP login. | Sai/hết hạn/replay không verify; không lộ secret trong log/analytics. |
+| `IDN-CUS-001` | Tạo Account qua phone SMS, email+password hoặc passkey-first. | provider/flow detail `OPEN-008/020`. | Passkey-first không hỏi phone/email; tạo một CUSTOMER account contact-less, challenge được server xác minh; contact liên kết sau. |
+| `IDN-CUS-002` | Verify phone bằng SMS challenge; đăng ký/đăng nhập email+password; verify email ownership khi cần. | SMS OTP one-time/expiry/rate-limit; email+password hash (argon2) phát hành session. | Sai/hết hạn/replay không verify; không lộ secret trong log/analytics. |
 | `IDN-CUS-003` | Quản lý phiên và thu hồi session. | Backend kiểm token/lifecycle. | Revoke/disable chặn mutating request, cả refresh/realtime. |
 | `IDN-CUS-004` | Chuyển active role và xem role có sẵn. | Không tạo RoleGrant mới. | Đổi tab không cho phép hành động Driver chưa approved. |
 | `IDN-CUS-005` | Đề nghị xem/sửa/xóa dữ liệu theo quy định. | Luồng privacy case và legal holds. | Có receipt/ticket, xử lý theo policy không xóa bằng chứng còn phải giữ hợp pháp. |
@@ -206,17 +207,19 @@ flowchart TD
 
 | Method | Vai trò trong MVP | Invariants |
 |---|---|---|
-| Passkey | Phương thức đăng nhập ưu tiên; user có thể đăng ký nhiều passkey trên thiết bị/provider khác nhau. | Server tạo/verifies one-time challenge; kiểm RP ID/origin, signature, user/account binding và user verification theo policy. Private key không rời authenticator. |
+| Passkey | Phương thức đăng nhập/đăng ký ưu tiên; dùng discoverable credential nên không yêu cầu phone/email trước ceremony. User có thể đăng ký nhiều passkey trên thiết bị/provider khác nhau. | Server tạo/verifies one-time challenge; credential ID ánh xạ Account, kiểm RP ID/origin/signature/user verification. Passkey không đọc hoặc tự cung cấp số điện thoại. Private key không rời authenticator. |
 | Phone + SMS | Xác minh phone; SMS OTP là sign-in/recovery fallback được đánh dấu restricted, có expiry, one-time use, rate limit, anti-enumeration và risk checks. | SIM swap/recycled number risk; đổi số/recovery cần step-up và notification; không coi SMS là phishing-resistant. |
 | Email | Contact/account identifier đã verified; có thể dùng để nhận thông báo bảo mật và link xác minh địa chỉ. | Email OTP/link không là phương thức đăng nhập độc lập theo baseline; không cho email-only takeover/recovery. |
 
-**Enrollment/linking:** User tạo Account rồi chứng minh ít nhất một contact; có thể liên kết passkey và verified contacts sau khi re-auth. Không bắt buộc phải có cả SMS và email để tạo tài khoản nếu policy/flow được duyệt cho phép; bảng chính xác per-role là `OPEN-020`. Email dùng làm identifier không tự chứng minh người dùng sở hữu session.
+**Enrollment/linking:** User tạo Account bằng phone SMS, email+password hoặc passkey-first. Passkey-first tạo CUSTOMER account với `phone = null`, `email = null`; profile/contact được bổ sung sau session khi workflow yêu cầu. Có thể liên kết thêm method sau khi đã có session. Không bắt buộc SMS/email để tạo tài khoản.
 
 **Admin controls:** `SECURITY_ADMIN` được quản lý method policy platform-wide/per environment và disable method cụ thể của account khi có case/grounds; `OPS_CONFIG_MANAGER` chỉ quản lý rollout/global availability nếu được grant riêng. Mọi thao tác cần step-up, scope, reason, actor, timestamp, before/after/version và audit. Thay đổi global có preview blast radius + dual approval theo policy. Disable một method chặn enroll/sign-in mới; xóa credential, revoke sessions, account suspension là các action riêng.
 
 **Lockout guard:** Không cho tắt mọi phương thức đang khả dụng cho một account hoặc toàn hệ thống theo thao tác thường. Nếu sự cố buộc khóa tất cả, dùng emergency account lock/suspend có recovery/support path, thông báo người bị ảnh hưởng và incident record. Khi tắt một phương thức toàn hệ thống, giữ nguyên passkey/alternate paths; không xóa credential history.
 
-**Email/SMS caveat:** NIST SP 800-63B-4 không chấp nhận email làm out-of-band authenticator và coi PSTN/SMS là restricted; DealGo dùng passkey làm ưu tiên, SMS chỉ là fallback có đánh giá risk, email là verified contact/identifier. Cần rà soát assurance requirement khi chốt `OPEN-020`.
+**Email/SMS note:** Passkey vẫn là phương thức ưu tiên khi thiết bị hỗ trợ; SMS và email+password là phương thức đăng nhập đầy đủ theo yêu cầu sản phẩm 2026-10-18. Cần rà soát assurance khi chốt `OPEN-020`.
+
+> **Đã triển khai trong code (2026-10-18), chưa phải policy chốt `OPEN-020`:** OTP phone không tạo Account trước khi verify; verify lần đầu tạo/khớp Account và cấp `CUSTOMER` `ACTIVE` ở mọi môi trường. Đăng ký email+password hai bước giống phone: `POST /v1/auth/email/register` lưu challenge pending (mật khẩu đã hash, OTP 6 số hash, TTL 10 phút, tối đa 5 lần sai tính trên cả challenge — gửi lại không reset, đạt ngưỡng thì khóa và không gửi lại được, phải bắt đầu challenge mới; gửi lại sau 60 giây, tối đa 5 lần gửi, 5 challenge/email/giờ — theo `DEC-PROD-008`) và gửi OTP qua `MailSender`; Account + credential + `CUSTOMER` `ACTIVE` + session chỉ được tạo ở `…/register/:id/verify` (email verified). Email đã có Account nhận cùng phản hồi, chủ email nhận thư báo thay vì mã. Quên mật khẩu: `POST /v1/auth/email/password-resets` luôn trả 202 (không lộ email tồn tại), token one-time TTL 30 phút, confirm đổi mật khẩu và thu hồi session Customer. Đăng nhập email chỉ cho email đã verify. Account cũ chưa verify: đăng nhập đúng mật khẩu → 403 `AUTH_EMAIL_NOT_VERIFIED` kèm `details` `{challengeId, expiresAt, resendAvailableAt}` và OTP kích hoạt qua email (challenge `ACTIVATE_EXISTING`, cùng giới hạn); verify qua cùng `…/register/:id/verify` → đánh dấu email verified, đảm bảo `CUSTOMER` (giữ nguyên nếu đang `SUSPENDED`), trả session. Sai mật khẩu → 401, không gửi mã. Quên mật khẩu vẫn kích hoạt được.
 
 **Không tự yêu cầu CCCD/selfie cho mọi Customer**: thu thập có điều kiện, mục đích phù hợp, tối thiểu hóa dữ liệu và xem xét rủi ro. KYC customer nâng cao chỉ khi có nhu cầu pháp lý/nghiệp vụ được phê duyệt.
 
@@ -714,7 +717,7 @@ Không triển khai `check → external API → grant role` ở ngoài transacti
 | `TC-IDN-010` | data subject submits request | support privacy flow | request tracked, review retention/legal hold |
 | `TC-IDN-037` | valid passkey registration/auth challenge | enroll/sign in | server validates one-time challenge, RP ID/origin/signature; no private key stored server-side |
 | `TC-IDN-038` | SMS OTP replay, expired, brute-force or recycled phone risk | verify/login/recovery | deny/rate-limit; no enumeration or secret logging |
-| `TC-IDN-039` | email is verified but no other authentication proof | attempt email-only sign-in/recovery | deny; email remains contact/identifier only |
+| `TC-IDN-039` | email+password credential exists, email verified | sign-in with correct email/password | issue customer session; unverified email → 403 `AUTH_EMAIL_NOT_VERIFIED` + activation challenge (OTP emailed), verify → session |
 | `TC-IDN-040` | Admin disables active method | account signs in/enrolls/recover | method denied; alternate path retained; audit records scope and reason |
 | `TC-IDN-041` | Admin attempts to disable last auth path | ordinary method toggle | block or route to emergency lock/recovery with approvals |
 | `TC-IDN-042` | unauthorized Admin or stale policy version | toggle global/account method | deny/stale conflict; no config mutation |

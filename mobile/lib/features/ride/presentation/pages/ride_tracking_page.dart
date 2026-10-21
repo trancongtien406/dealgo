@@ -3,11 +3,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/components/dealgo_chip.dart';
+import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/maps/map_lat_lng.dart';
-import '../../../../core/maps/map_port.dart';
+import '../../../live_location/domain/driver_location.dart';
+import '../../../live_location/presentation/live_driver_map.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../chat/presentation/cubit/chat_cubit.dart';
@@ -18,11 +20,14 @@ import '../../../voice/domain/entities/voice_models.dart';
 import '../../../voice/presentation/widgets/voice_call_sheet.dart';
 import '../../domain/entities/ride_money.dart';
 import '../../domain/entities/ride_models.dart';
-import '../../domain/entities/ride_vehicle.dart';
+import '../../../driver_card/domain/driver_card.dart';
+import '../../../driver_card/presentation/driver_card_tile.dart';
 import '../../domain/usecases/get_ride.dart';
 import '../utils/ride_routes.dart';
 import '../cubit/ride_tracking_cubit.dart';
 import '../widgets/ride_widgets.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 class RideTrackingPage extends StatelessWidget {
   const RideTrackingPage({required this.rideId, super.key});
@@ -84,13 +89,12 @@ class _RideTrackingView extends StatelessWidget {
           builder: (context, state) {
             final ride = state.ride;
             final loading = state is RideTrackingLoading && ride == null;
-            final offline = state is RideTrackingOffline;
             final busy = state.busy;
             if (loading) {
               return Column(
                 children: [
-                  RideScreenHeader(
-                    title: 'Theo dõi tài xế',
+                  DealGoAppHeader(
+                    title: AppLocalizations.of(context).rideTrackTitle,
                     onBack: () => _back(context),
                   ),
                   const Expanded(
@@ -99,7 +103,24 @@ class _RideTrackingView extends StatelessWidget {
                 ],
               );
             }
-            if (offline) {
+            if (state is RideTrackingOffline && ride == null) {
+              return Column(
+                children: [
+                  DealGoAppHeader(
+                    title: AppLocalizations.of(context).rideTrackTitle,
+                    onBack: () => _back(context),
+                  ),
+                  Expanded(
+                    child: DealGoStateView.failure(
+                      context,
+                      onRetry: () => context.read<RideTrackingCubit>().refresh(),
+                      cause: state.cause,
+                    ),
+                  ),
+                ],
+              );
+            }
+            if (state is RideTrackingOffline) {
               return _TrackingOffline(
                 ride: ride,
                 busy: busy,
@@ -121,6 +142,14 @@ class _RideTrackingView extends StatelessWidget {
     );
   }
 }
+
+/// Statuses in which the customer sees the driver's live position.
+const _rideTrackingStatuses = {
+  RideStatus.assigned,
+  RideStatus.driverEnRoute,
+  RideStatus.driverArrived,
+  RideStatus.inTrip,
+};
 
 class _TrackingLive extends StatelessWidget {
   const _TrackingLive({
@@ -146,38 +175,31 @@ class _TrackingLive extends StatelessWidget {
     final openReceipt = current == null || agreed == null
         ? null
         : () => context.push(RideRoutes.receipt(current.id));
+    final l10n = AppLocalizations.of(context);
     final title = current == null
-        ? 'Theo dõi tài xế'
+        ? l10n.rideTrackTitle
         : switch (current.status) {
-            RideStatus.assigned => 'Tài xế đang đến đón',
-            RideStatus.negotiating => 'Đang chờ tài xế nhận chuyến',
-            RideStatus.expired => 'Chuyến đã hết hạn',
-            RideStatus.cancelled => 'Chuyến đã hủy',
+            RideStatus.assigned => l10n.rideTrackAssigned,
+            RideStatus.driverEnRoute => l10n.rideTrackAssigned,
+            RideStatus.driverArrived => l10n.rideTrackArrived,
+            RideStatus.inTrip => l10n.rideTrackInTrip,
+            RideStatus.completed => l10n.rideTrackCompleted,
+            RideStatus.negotiating => l10n.rideTrackNegotiating,
+            RideStatus.expired => l10n.rideTrackExpired,
+            RideStatus.cancelled => l10n.rideTrackCancelled,
           };
-    final driverId = current?.assignedDriverId;
-    final driverName = () {
-      if (driverId == null || driverId.isEmpty) {
-        return 'Nguyễn Văn Hùng';
-      }
-      if (driverId == 'driver-hung' || driverId.contains('hung')) {
-        return 'Nguyễn Văn Hùng';
-      }
-      return 'Tài xế $driverId';
-    }();
-    final pickupCode = current == null ? '7294' : ridePickupCode(current.id);
-    final quoteId = current == null
-        ? 'Q-CAR-0007'
-        : rideQuoteDisplayId(current.id);
+    // DEC-PROD-017: issued by the backend, only on the customer's own ride.
+    final pickupCode = current?.pickupCode;
     return Column(
       children: [
-        RideScreenHeader(
+        DealGoAppHeader(
           title: title,
           onBack: onBack,
           trailing: IconButton(
             key: const Key('ride-tracking-retry'),
-            tooltip: 'Tải lại',
+            tooltip: l10n.actionReload,
             onPressed: busy ? null : onRefresh,
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(DealGoIcons.refresh, color: DealGoColors.text),
           ),
         ),
         Expanded(
@@ -197,39 +219,37 @@ class _TrackingLive extends StatelessWidget {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        context.read<MapPort>().buildMap(
-                          center: const MapLatLng(
-                            lat: rideSamplePickupLat,
-                            lng: rideSamplePickupLng,
+                        LiveDriverMap(
+                          job: TrackedJob.ride,
+                          id: current.id,
+                          tracking:
+                              current.assignedDriverId != null &&
+                              _rideTrackingStatuses.contains(current.status),
+                          center: MapLatLng(
+                            lat: current.pickup.lat,
+                            lng: current.pickup.lng,
                           ),
-                          markers: const [
+                          markers: [
                             MapLatLng(
-                              lat: rideSamplePickupLat,
-                              lng: rideSamplePickupLng,
+                              lat: current.pickup.lat,
+                              lng: current.pickup.lng,
                             ),
                             MapLatLng(
-                              lat: rideSampleDropoffLat,
-                              lng: rideSampleDropoffLng,
+                              lat: current.dropoff.lat,
+                              lng: current.dropoff.lng,
                             ),
                           ],
                         ),
+                        // Live driver position (DEC-PROD-031); no ETA is
+                        // invented from it.
                         Positioned(
                           top: DealGoSpacing.s12,
                           left: DealGoSpacing.s12,
                           child: DealGoChip(
-                            label: AppLocalizations.of(context)
-                                .rideTrackingEtaChip,
+                            key: const Key('ride-tracking-status-chip'),
+                            label: title,
                             tone: DealGoChipTone.neutral,
-                            leading: const Icon(Icons.directions_car, size: 14),
-                          ),
-                        ),
-                        Positioned(
-                          bottom: DealGoSpacing.s12,
-                          right: DealGoSpacing.s12,
-                          child: DealGoChip(
-                            label: AppLocalizations.of(context)
-                                .rideTrackingMovingChip,
-                            selected: true,
+                            leading: const Icon(DealGoIcons.car, size: 14),
                           ),
                         ),
                       ],
@@ -241,68 +261,42 @@ class _TrackingLive extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const RideSectionTitle('Tài xế đã nhận chuyến'),
+                      RideSectionTitle(l10n.rideDriverAssignedTitle),
                       const SizedBox(height: DealGoSpacing.s12),
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            backgroundColor: DealGoColors.subtlePurple,
-                            child: Text(
-                              driverName.substring(0, 1).toUpperCase(),
-                              style: const TextStyle(
-                                color: DealGoColors.primary,
-                                fontWeight: FontWeight.w800,
+                      DriverCardTile(
+                        job: DriverCardJob.ride,
+                        jobId: current.id,
+                        accessToken: rideAccessToken(context) ?? '',
+                        assigned: current.assignedDriverId != null,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton.filled(
+                              key: const Key('ride-open-voice'),
+                              tooltip: AppLocalizations.of(context).voiceCall,
+                              onPressed: busy ? null : onOpenVoice,
+                              style: IconButton.styleFrom(
+                                backgroundColor: DealGoColors.primary,
+                              ),
+                              icon: const Icon(
+                                DealGoIcons.phone,
+                                color: DealGoColors.card,
                               ),
                             ),
-                          ),
-                          const SizedBox(width: DealGoSpacing.s12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  driverName,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleMedium,
+                            const SizedBox(width: DealGoSpacing.s8),
+                            IconButton.outlined(
+                              key: const Key('ride-open-chat'),
+                              onPressed: busy ? null : onOpenChat,
+                              style: IconButton.styleFrom(
+                                foregroundColor: DealGoColors.primary,
+                                side: const BorderSide(
+                                  color: DealGoColors.primary,
                                 ),
-                                Text(
-                                  '⭐ 4,9 · Toyota Vios · Xe 4 chỗ',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                                const SizedBox(height: DealGoSpacing.s8),
-                                const RideStatusChip(
-                                  label: '43A-567.89',
-                                  tone: RideChipTone.purple,
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton.filled(
-                            key: const Key('ride-open-voice'),
-                            tooltip: AppLocalizations.of(context).voiceCall,
-                            onPressed: busy ? null : onOpenVoice,
-                            style: IconButton.styleFrom(
-                              backgroundColor: DealGoColors.primary,
-                            ),
-                            icon: const Icon(
-                              Icons.call_outlined,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(width: DealGoSpacing.s8),
-                          IconButton.outlined(
-                            key: const Key('ride-open-chat'),
-                            onPressed: busy ? null : onOpenChat,
-                            style: IconButton.styleFrom(
-                              foregroundColor: DealGoColors.primary,
-                              side: const BorderSide(
-                                color: DealGoColors.primary,
                               ),
+                              icon: const Icon(DealGoIcons.chat),
                             ),
-                            icon: const Icon(Icons.chat_bubble_outline),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -312,7 +306,7 @@ class _TrackingLive extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const RideSectionTitle('Thông tin chuyến đi'),
+                      RideSectionTitle(l10n.rideTripInfo),
                       const SizedBox(height: DealGoSpacing.s12),
                       RideStopList(
                         pickup: current.pickup.label,
@@ -320,71 +314,89 @@ class _TrackingLive extends StatelessWidget {
                       ),
                       const SizedBox(height: DealGoSpacing.s12),
                       RideMoneyLine(
-                        label: 'Giá đã chốt · $quoteId',
+                        label: l10n.rideAgreedFare,
                         amount: agreed == null ? '—' : formatRideVnd(agreed),
-                        emphasize: agreed != null,
+                        emphasize: agreed != null && current.discountVnd == 0,
                       ),
+                      if (agreed != null && current.discountVnd > 0) ...[
+                        RideMoneyLine(
+                          label: l10n.rideVoucherLine(
+                            current.voucherCode ?? '',
+                          ),
+                          amount: formatRideVnd(-current.discountVnd),
+                        ),
+                        RideMoneyLine(
+                          key: const Key('ride-cash-due'),
+                          label: l10n.rideCashDueLabel,
+                          amount: formatRideVnd(
+                            rideCashAfterVoucher(agreed, current.discountVnd),
+                          ),
+                          emphasize: true,
+                        ),
+                      ],
                     ],
                   ),
                 ),
-                const SizedBox(height: DealGoSpacing.s12),
-                RidePanel(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const RideSectionTitle('Mã đón khách'),
-                      Text(
-                        'Chỉ cung cấp mã khi xe đến đúng biển số',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      const SizedBox(height: DealGoSpacing.s12),
-                      InkWell(
-                        key: const Key('ride-open-pickup-code'),
-                        onTap: () =>
-                            context.push(RideRoutes.pickupCode(current.id)),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                pickupCode.split('').join(' '),
-                                key: const Key('ride-pickup-code'),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineMedium
-                                    ?.copyWith(fontWeight: FontWeight.w800),
-                              ),
-                            ),
-                            const DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: DealGoColors.greenSurface,
-                                shape: BoxShape.circle,
-                              ),
-                              child: SizedBox(
-                                width: 36,
-                                height: 36,
-                                child: Icon(
-                                  Icons.check,
-                                  color: DealGoColors.brandGreen,
-                                  size: 20,
+                if (pickupCode != null) ...[
+                  const SizedBox(height: DealGoSpacing.s12),
+                  RidePanel(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        RideSectionTitle(l10n.ridePickupCodeTitle),
+                        Text(
+                          l10n.ridePickupCodeHint,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: DealGoSpacing.s12),
+                        InkWell(
+                          key: const Key('ride-open-pickup-code'),
+                          onTap: () =>
+                              context.push(RideRoutes.pickupCode(current.id)),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  pickupCode.split('').join(' '),
+                                  key: const Key('ride-pickup-code'),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineMedium
+                                      ?.copyWith(fontWeight: FontWeight.w800),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton(
-                          onPressed: () =>
-                              context.push(RideRoutes.pickupCode(current.id)),
-                          child: Text(
-                            AppLocalizations.of(context).ridePickupCodeTitle,
+                              const DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: DealGoColors.greenSurface,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: SizedBox(
+                                  width: 36,
+                                  height: 36,
+                                  child: Icon(
+                                    DealGoIcons.check,
+                                    color: DealGoColors.brandGreen,
+                                    size: 20,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                    ],
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton(
+                            onPressed: () =>
+                                context.push(RideRoutes.pickupCode(current.id)),
+                            child: Text(
+                              AppLocalizations.of(context).ridePickupCodeTitle,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ],
             ],
           ),
@@ -431,7 +443,7 @@ class _TrackingLive extends StatelessWidget {
                 const SizedBox(height: DealGoSpacing.s8),
                 DealGoPrimaryButton(
                   key: const Key('ride-open-receipt'),
-                  label: 'Xem biên nhận',
+                  label: AppLocalizations.of(context).rideViewReceipt,
                   enabled: !busy,
                   onPressed: openReceipt,
                 ),
@@ -461,13 +473,10 @@ class _TrackingOffline extends StatelessWidget {
   Widget build(BuildContext context) {
     final current = ride;
     final agreed = current?.agreedFareVnd;
+    final l10n = AppLocalizations.of(context);
     return Column(
       children: [
-        RideScreenHeader(
-          title: 'Theo dõi tài xế',
-          subtitle: 'DealGo · Biến thể trạng thái',
-          onBack: onBack,
-        ),
+        DealGoAppHeader(title: l10n.rideTrackTitle, onBack: onBack),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(
@@ -477,12 +486,12 @@ class _TrackingOffline extends StatelessWidget {
               DealGoSpacing.s16,
             ),
             children: [
-              const RideStateHero(
-                icon: Icons.wifi_off,
+              RideStateHero(
+                icon: DealGoIcons.offline,
                 iconColor: DealGoColors.warning,
                 background: DealGoColors.amberSurface,
-                title: 'Tạm mất kết nối vị trí',
-                message: 'Thông tin đang hiển thị là lần tải cuối, không phải vị trí trực tiếp.',
+                title: l10n.rideOfflineTitle,
+                message: l10n.rideOfflineBody,
               ),
               const SizedBox(height: DealGoSpacing.s16),
               if (current != null)
@@ -490,32 +499,37 @@ class _TrackingOffline extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const RideSectionTitle('Thông tin chuyến'),
+                      RideSectionTitle(l10n.rideTripSummary),
                       const SizedBox(height: DealGoSpacing.s8),
                       RideMoneyLine(
-                        label: 'Điểm đón',
+                        label: l10n.ridePickup,
                         amount: current.pickup.label,
                       ),
                       RideMoneyLine(
-                        label: 'Điểm đến',
+                        label: l10n.rideDropoff,
                         amount: current.dropoff.label,
                       ),
-                      const RideMoneyLine(
-                        label: 'Phương tiện',
-                        amount: rideVehicleLabel,
+                      RideMoneyLine(
+                        label: l10n.rideVehicleLabel,
+                        amount: l10n.rideVehicleBikeTitle,
                       ),
                       if (agreed != null)
                         RideMoneyLine(
-                          label: 'Giá đã chốt',
+                          label: l10n.rideAgreedFare,
                           amount: formatRideVnd(agreed),
+                        ),
+                      if (agreed != null && current.discountVnd > 0)
+                        RideMoneyLine(
+                          label: l10n.rideCashDueLabel,
+                          amount: formatRideVnd(
+                            rideCashAfterVoucher(agreed, current.discountVnd),
+                          ),
                         ),
                     ],
                   ),
                 ),
               const SizedBox(height: DealGoSpacing.s12),
-              const RideNote(
-                message: 'Không suy ra tài xế đã tới điểm đón khi lần tải này thất bại.',
-              ),
+              RideNote(message: l10n.rideOfflineNote),
             ],
           ),
         ),

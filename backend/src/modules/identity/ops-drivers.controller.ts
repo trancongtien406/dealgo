@@ -1,16 +1,18 @@
 import { Controller, Get, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { OpsSessionGuard } from './access-auth.guard.js';
+import { OpsPermissionGuard } from './ops-rbac/ops-permission.guard.js';
+import { RequireOpsPermission } from './ops-rbac/ops-permission.decorator.js';
 import { OpsUsersPageQueryDto } from './ops-users.dto.js';
 import { OpsUsersService } from './ops-users.service.js';
 
 @ApiTags('ops')
 @ApiBearerAuth()
 @Controller('v1/ops/drivers')
-@UseGuards(OpsSessionGuard)
+@UseGuards(OpsPermissionGuard)
 export class OpsDriversController {
   constructor(private readonly users: OpsUsersService) {}
 
+  @RequireOpsPermission('drivers.read')
   @Get()
   @ApiOperation({
     summary: 'Ops paginated drivers (users with DRIVER role grant + presence summary)',
@@ -26,6 +28,7 @@ export class OpsDriversController {
     });
   }
 
+  @RequireOpsPermission('drivers.read')
   @Get(':id')
   @ApiOperation({
     summary: 'Ops driver detail (safe fields + presence; no credentials or session tokens)',

@@ -43,7 +43,7 @@ Architecture remediation + WO2 + **WO3 (P0 missing screens)**:
 - [x] `PushPort` + `FakePush` / `FcmPush`; soft-fail when Firebase absent
 - [x] `VoiceClient` → voice-session; Cubit + sheet (LiveKit SDK later)
 - [x] Voice button next to chat on ride/food tracking
-- [x] `MapPort` + placeholder; soft-fail without `MAPS_API_KEY`
+- [x] `MapPort` + placeholder; live raster tiles via `MAP_TILE_URL` (flutter_map), soft-fail otherwise
 - [x] `DriverDutyCubit` posts presence on online/offline
 - [x] Customer activity history list endpoints when present
 - [x] Firebase options placeholder + safe bootstrap
@@ -72,7 +72,7 @@ Architecture remediation + WO2 + **WO3 (P0 missing screens)**:
 - [x] ARB vi/en expanded; high-traffic strings localized
 - [x] `customer_home_widgets` split into hero/services/sections
 - [x] WO3 P0 screens: C008, C012, C014, C016, C035, D031, D034, M022–M024, M028
-- [ ] Remaining P0 partials (D023 OTP enter, C036 invoice, driver lifecycle fidelity, M027 editor, KYC/KYB depth, maps)
+- [ ] Remaining P0 partials (D023 OTP enter, C036 invoice, driver lifecycle fidelity, M027/M025 photo+DnD done 13f, KYC/KYB depth, maps)
 - [ ] Remaining hardcoded VN on low-traffic / domain marketing copy
 
 ## Vi phạm / gaps còn lại
@@ -82,7 +82,7 @@ Architecture remediation + WO2 + **WO3 (P0 missing screens)**:
 | Med | Real Google Maps / Mapbox SDK not linked (placeholder until key-fill) |
 | Med | Production Firebase / `flutterfire configure` / APNs not done — FCM shell only |
 | Med | LiveKit room join SDK not linked (token + room name stub) |
-| Med | Remaining P0 PARTIAL/MISSING: D023, C036, D021–D030 fidelity, M017/M019, M027, KYC/KYB steps, D036/M021 soft |
+| Med | Remaining P0 PARTIAL/MISSING: D023, C036, D021–D030 fidelity, M017/M019, KYC/KYB steps, D036/M021 soft |
 | Med | God-page debt reduced further (home widgets split); other pages still ≥500 LOC; residual VN hardcodes |
 | Med | OS app_links / universal links not registered (parser + hook shell only) |
 | Med | Motion applied to few routes; most screens still default Material transitions |

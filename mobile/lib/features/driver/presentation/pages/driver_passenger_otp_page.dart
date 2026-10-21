@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/components/dealgo_banner.dart';
@@ -7,17 +8,18 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../ride/domain/entities/ride_models.dart';
 import '../../../ride/domain/entities/ride_money.dart';
-import '../../../ride/domain/entities/ride_vehicle.dart';
+import '../../../ride/domain/params/ride_driver_action.dart';
+import '../../domain/usecases/advance_driver_ride.dart';
+import '../utils/driver_action_runner.dart';
 import '../utils/driver_routes.dart';
+import '../widgets/driver_contact_actions.dart';
 import '../widgets/driver_widgets.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/format/short_ref.dart';
 
 /// D023 — passenger OTP entry for driver before trip start.
 class DriverPassengerOtpPage extends StatefulWidget {
-  const DriverPassengerOtpPage({
-    required this.rideId,
-    this.ride,
-    super.key,
-  });
+  const DriverPassengerOtpPage({required this.rideId, this.ride, super.key});
 
   final String rideId;
   final OpenRide? ride;
@@ -26,7 +28,8 @@ class DriverPassengerOtpPage extends StatefulWidget {
   State<DriverPassengerOtpPage> createState() => _DriverPassengerOtpPageState();
 }
 
-class _DriverPassengerOtpPageState extends State<DriverPassengerOtpPage> {
+class _DriverPassengerOtpPageState extends State<DriverPassengerOtpPage>
+    with DriverActionRunner {
   final TextEditingController _code = TextEditingController();
   var _wrong = false;
   var _confirmed = false;
@@ -46,23 +49,39 @@ class _DriverPassengerOtpPageState extends State<DriverPassengerOtpPage> {
     });
   }
 
-  void _confirm() {
-    final expected = ridePickupCode(widget.rideId);
-    if (_code.text.length != _otpLength || _code.text != expected) {
+  /// The code is checked by the backend only (DEC-PROD-017); the app never
+  /// knows the expected value.
+  Future<void> _confirm() async {
+    final code = _code.text;
+    if (code.length != _otpLength) {
       setState(() {
         _wrong = true;
         _confirmed = false;
       });
       return;
     }
-    setState(() {
-      _wrong = false;
-      _confirmed = true;
-    });
-    context.push(DriverRoutes.active(widget.rideId), extra: {
-      'ride': widget.ride,
-      'phase': 'onTrip',
-    });
+    setState(() => _wrong = false);
+    final advance = context.read<AdvanceDriverRide>();
+    final ok = await runDriverAction(
+      (token) => advance(
+        accessToken: token,
+        rideId: widget.rideId,
+        action: RideDriverAction.start,
+        pickupCode: code,
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
+    if (!ok) {
+      setState(() => _confirmed = false);
+      return;
+    }
+    setState(() => _confirmed = true);
+    context.push(
+      DriverRoutes.active(widget.rideId),
+      extra: {'ride': widget.ride, 'phase': 'onTrip'},
+    );
   }
 
   @override
@@ -80,7 +99,8 @@ class _DriverPassengerOtpPageState extends State<DriverPassengerOtpPage> {
         secondaryLabel: l10n.actionBack,
         primaryLabel: l10n.driverOtpConfirm,
         primaryKey: const Key('driver-otp-confirm'),
-        primaryEnabled: _code.text.length == _otpLength,
+        primaryEnabled: _code.text.length == _otpLength && !actionBusy,
+        primaryLoading: actionBusy,
         onSecondary: () => driverBack(context),
         onPrimary: _confirm,
       ),
@@ -95,7 +115,7 @@ class _DriverPassengerOtpPageState extends State<DriverPassengerOtpPage> {
           Row(
             children: [
               Text(
-                'DEALGO DRIVER · D023',
+                l10n.rideRef(shortRef(widget.rideId)),
                 style: textTheme.labelSmall?.copyWith(
                   color: DealGoColors.primary,
                   fontWeight: FontWeight.w700,
@@ -128,11 +148,14 @@ class _DriverPassengerOtpPageState extends State<DriverPassengerOtpPage> {
                 Row(
                   children: [
                     const Icon(
-                      Icons.verified_user,
+                      DealGoIcons.shield,
                       color: DealGoColors.brandGreen,
                     ),
                     const SizedBox(width: DealGoSpacing.s8),
-                    Text(l10n.driverOtpVerifyTitle, style: textTheme.titleMedium),
+                    Text(
+                      l10n.driverOtpVerifyTitle,
+                      style: textTheme.titleMedium,
+                    ),
                   ],
                 ),
                 const SizedBox(height: DealGoSpacing.s8),
@@ -213,58 +236,36 @@ class _DriverPassengerOtpPageState extends State<DriverPassengerOtpPage> {
                   children: [
                     const CircleAvatar(
                       backgroundColor: DealGoColors.subtlePurple,
-                      child: Text(
-                        'T',
-                        style: TextStyle(
-                          color: DealGoColors.primary,
-                          fontWeight: FontWeight.w800,
-                        ),
+                      child: Icon(
+                        DealGoIcons.user,
+                        color: DealGoColors.primary,
                       ),
                     ),
                     const SizedBox(width: DealGoSpacing.s12),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Trần Minh Anh', style: textTheme.titleMedium),
-                          Text(
-                            'Khách hàng · 4.9 ★',
-                            style: textTheme.bodySmall,
-                          ),
-                        ],
+                      child: Text(
+                        l10n.driverPassenger,
+                        style: textTheme.titleMedium,
                       ),
                     ),
-                    IconButton.outlined(
-                      onPressed: () {},
-                      icon: const Icon(Icons.phone_outlined),
-                      color: DealGoColors.primary,
-                    ),
-                    IconButton.outlined(
-                      onPressed: () {},
-                      icon: const Icon(Icons.chat_bubble_outline),
-                      color: DealGoColors.primary,
-                    ),
+                    DriverContactActions(resourceId: widget.rideId),
                   ],
                 ),
                 const SizedBox(height: DealGoSpacing.s16),
                 DriverStop(
                   color: DealGoColors.brandGreen,
-                  label: 'Điểm đón',
-                  value: ride?.pickup.label ?? '123 Nguyễn Văn Linh, Hải Châu',
+                  label: l10n.driverPickupLabel,
+                  value: ride?.pickup.label ?? '—',
                 ),
                 const SizedBox(height: DealGoSpacing.s12),
                 DriverStop(
                   color: DealGoColors.danger,
-                  label: 'Điểm đến',
-                  value: ride?.dropoff.label ?? '302 Trần Phú, Hải Châu',
+                  label: l10n.driverDropoffLabel,
+                  value: ride?.dropoff.label ?? '—',
                 ),
                 const SizedBox(height: DealGoSpacing.s12),
                 DriverMoneyRow(
-                  label: 'Loại xe',
-                  value: 'Xe máy · Honda Vision',
-                ),
-                DriverMoneyRow(
-                  label: 'Giá đã chốt',
+                  label: l10n.driverAgreedFare,
                   value: ride == null
                       ? '—'
                       : formatRideVnd(ride.offeredFareVnd),
@@ -283,15 +284,19 @@ class _DriverPassengerOtpPageState extends State<DriverPassengerOtpPage> {
             tone: DealGoBannerTone.warning,
             message: l10n.driverOtpPrivacy,
           ),
+          if (actionError != null) ...[
+            const SizedBox(height: DealGoSpacing.s12),
+            DriverNote(message: actionError!),
+          ],
           if (_wrong) ...[
             const SizedBox(height: DealGoSpacing.s12),
             DriverNote(message: l10n.driverOtpWrong),
           ],
           if (_confirmed) ...[
             const SizedBox(height: DealGoSpacing.s12),
-            const DriverNote(
+            DriverNote(
               tone: DriverNoteTone.green,
-              message: 'OTP khớp — chuyển sang chuyến đang chạy (mock).',
+              message: l10n.driverOtpMatched,
             ),
           ],
         ],

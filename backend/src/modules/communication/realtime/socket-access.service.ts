@@ -84,6 +84,9 @@ export class SocketAccessService {
     if (room.kind === 'ride') {
       return this.rides.canSubscribe(userId, room.id);
     }
+    if (room.kind === 'store') {
+      return this.food.canSubscribeStore(userId, room.id);
+    }
     return this.food.canSubscribe(userId, room.id);
   }
 }

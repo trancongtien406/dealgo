@@ -1,8 +1,12 @@
 import { apiFetch } from "@/lib/api/client";
 import { apiPaths } from "@/lib/api/paths";
 import type { ListQuery, PaginatedList } from "@/lib/api/pagination";
+import { parseRbacMatrix, type RbacMatrix } from "@/features/staff/rbac-matrix";
 
 export type PersonItem = {
+  id: string;
+  roleCode: string;
+  superAdmin: boolean;
   name: string;
   email: string;
   letters: string;
@@ -120,6 +124,43 @@ export async function rejectRoleGrant(id: string): Promise<OpsRoleGrant> {
   };
 }
 
+/** DEC-PROD-045: role → permission matrix from Nest (no static copy). */
+export async function fetchRbacMatrix(): Promise<RbacMatrix> {
+  const res = await apiFetch<{ success: boolean; data: unknown }>(apiPaths.opsStaffRbacMatrix());
+  return parseRbacMatrix(res.data);
+}
+
+export type StaffSelf = { id: string; superAdmin: boolean };
+
+export async function fetchStaffMe(): Promise<StaffSelf> {
+  const res = await apiFetch<{ success: boolean; data: StaffSelf }>(
+    apiPaths.opsStaffMe(),
+  );
+  return { id: res.data.id, superAdmin: res.data.superAdmin === true };
+}
+
+export async function resetStaffPassword(
+  id: string,
+  body: { newPassword: string; reason: string },
+): Promise<{ userId: string; sessionsRevoked: boolean }> {
+  const res = await apiFetch<{
+    success: boolean;
+    data: { userId: string; sessionsRevoked: boolean };
+  }>(apiPaths.opsStaffPasswordReset(id), { method: "POST", body });
+  return res.data;
+}
+
+export async function setStaffSuperAdmin(
+  id: string,
+  body: { superAdmin: boolean; reason: string },
+): Promise<{ userId: string; superAdmin: boolean }> {
+  const res = await apiFetch<{
+    success: boolean;
+    data: { userId: string; superAdmin: boolean };
+  }>(apiPaths.opsStaffSuperAdmin(id), { method: "POST", body });
+  return res.data;
+}
+
 export type StaffAuditLogItem = {
   time: string;
   actor: string;
@@ -157,4 +198,16 @@ export async function fetchStaffAuditLogs(): Promise<StaffAuditLogItem[]> {
   } catch {
     return [];
   }
+}
+
+
+export async function setStaffRole(
+  id: string,
+  body: { staffRole: string; reason: string },
+): Promise<{ userId: string; staffRole: string }> {
+  const res = await apiFetch<{
+    success: boolean;
+    data: { userId: string; staffRole: string };
+  }>(apiPaths.opsStaffRole(id), { method: "POST", body });
+  return res.data;
 }

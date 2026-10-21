@@ -10,8 +10,9 @@ import type {
 const saleLabels: Record<StoreSaleStatus, string> = {
   ACTIVE: "Đang mở",
   OPEN: "Đang mở",
-  CLOSED: "Tạm đóng",
-  PAUSED: "Tạm đóng",
+  CLOSED: "Ngoài giờ mở cửa",
+  PAUSED: "Tạm ngưng nhận đơn",
+  BUSY: "Bếp đang bận",
   PENDING_APPROVAL: "Chờ duyệt",
   SUSPENDED: "Tạm khóa",
 };
@@ -19,7 +20,8 @@ const saleTones: Record<StoreSaleStatus, StatusTone> = {
   ACTIVE: "success",
   OPEN: "success",
   CLOSED: "food",
-  PAUSED: "food",
+  PAUSED: "danger",
+  BUSY: "food",
   PENDING_APPROVAL: "food",
   SUSPENDED: "danger",
 };
@@ -67,13 +69,35 @@ export function mapNestStoreToListItem(store: NestOpsStore): StoreListItem {
     }),
     orders: store.itemCount,
     rating: null,
-    sale: mapSaleStatus(store.sale),
+    sale: storeSaleFromNest(store),
     kyb: mapKybStatus(store.kyb),
+    serviceModeUntil: store.serviceModeUntil ?? null,
+    acceptSummary: storeAcceptSummary(store),
+    prepMinutes: store.estimatedPrepMinutes ?? null,
   };
+}
+
+/** "Thủ công" / "Tự động", plus the kitchen cap when one is set. */
+export function storeAcceptSummary(store: Pick<NestOpsStore, "acceptSettings">): string | null {
+  const settings = store.acceptSettings;
+  if (!settings) return null;
+  const mode = settings.acceptMode === "AUTO" ? "Tự động" : "Thủ công";
+  return settings.maxActiveOrders != null
+    ? `${mode} · tối đa ${settings.maxActiveOrders} đơn đang xử lý`
+    : `${mode} · không giới hạn đơn`;
 }
 
 function shortId(id: string): string {
   return id.slice(0, 8);
+}
+
+/** Live intake state from the backend (DEC-PROD-026/027); falls back to the legacy `sale` field. */
+export function storeSaleFromNest(store: NestOpsStore): StoreSaleStatus | null {
+  if (store.closedReason === "PAUSED" || store.serviceMode === "PAUSED") return "PAUSED";
+  if (store.openNow === false) return "CLOSED";
+  if (store.serviceMode === "BUSY") return "BUSY";
+  if (store.openNow === true) return "OPEN";
+  return mapSaleStatus(store.sale);
 }
 
 function mapSaleStatus(raw: string | null | undefined): StoreSaleStatus | null {

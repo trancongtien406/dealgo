@@ -14,7 +14,7 @@ class RoleGrantModel {
     if (role is! String || status is! String) {
       throw const ApiException(
         statusCode: 200,
-        message: 'Phản hồi không hợp lệ',
+        message: 'Invalid response',
         errorCode: 'INVALID_RESPONSE',
       );
     }
@@ -34,13 +34,23 @@ class UserProfileModel {
     required this.phoneVerifiedAt,
     required this.emailVerifiedAt,
     required this.grants,
+    this.displayName = '',
+    this.dateOfBirth,
+    this.gender,
+    this.avatarUrl,
+    this.needsProfileSetup = false,
   });
 
   final String id;
   final String? phone;
   final String? email;
+  final String displayName;
+  final String? dateOfBirth;
+  final String? gender;
+  final String? avatarUrl;
   final String? phoneVerifiedAt;
   final String? emailVerifiedAt;
+  final bool needsProfileSetup;
   final List<RoleGrantModel> grants;
 
   factory UserProfileModel.fromJson(Map<String, Object?> json) {
@@ -48,7 +58,7 @@ class UserProfileModel {
     if (id is! String || id.isEmpty) {
       throw const ApiException(
         statusCode: 200,
-        message: 'Phản hồi không hợp lệ',
+        message: 'Invalid response',
         errorCode: 'INVALID_RESPONSE',
       );
     }
@@ -56,8 +66,13 @@ class UserProfileModel {
       id: id,
       phone: _nullableString(json['phone']),
       email: _nullableString(json['email']),
+      displayName: _nullableString(json['displayName']) ?? '',
+      dateOfBirth: _nullableString(json['dateOfBirth']),
+      gender: _nullableString(json['gender']),
+      avatarUrl: _nullableString(json['avatarUrl']),
       phoneVerifiedAt: _nullableString(json['phoneVerifiedAt']),
       emailVerifiedAt: _nullableString(json['emailVerifiedAt']),
+      needsProfileSetup: json['needsProfileSetup'] == true,
       grants: _decodeGrants(json['grants']),
     );
   }
@@ -67,8 +82,13 @@ class UserProfileModel {
       'id': id,
       'phone': phone,
       'email': email,
+      'displayName': displayName,
+      'dateOfBirth': dateOfBirth,
+      'gender': gender,
+      'avatarUrl': avatarUrl,
       'phoneVerifiedAt': phoneVerifiedAt,
       'emailVerifiedAt': emailVerifiedAt,
+      'needsProfileSetup': needsProfileSetup,
       'grants': [for (final grant in grants) grant.toJson()],
     };
   }
@@ -78,8 +98,13 @@ class UserProfileModel {
       id: entity.id,
       phone: entity.phone,
       email: entity.email,
+      displayName: entity.displayName,
+      dateOfBirth: entity.dateOfBirth,
+      gender: entity.gender,
+      avatarUrl: entity.avatarUrl,
       phoneVerifiedAt: entity.phoneVerifiedAt,
       emailVerifiedAt: entity.emailVerifiedAt,
+      needsProfileSetup: entity.needsProfileSetup,
       grants: [
         for (final grant in entity.grants)
           RoleGrantModel(role: grant.role, status: grant.status),
@@ -92,11 +117,14 @@ class UserProfileModel {
       id: id,
       phone: phone,
       email: email,
+      displayName: displayName,
+      dateOfBirth: dateOfBirth,
+      gender: gender,
+      avatarUrl: avatarUrl,
       phoneVerifiedAt: phoneVerifiedAt,
       emailVerifiedAt: emailVerifiedAt,
-      grants: List.unmodifiable([
-        for (final grant in grants) grant.toEntity(),
-      ]),
+      needsProfileSetup: needsProfileSetup,
+      grants: List.unmodifiable([for (final grant in grants) grant.toEntity()]),
     );
   }
 

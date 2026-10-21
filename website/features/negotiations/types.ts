@@ -14,6 +14,9 @@ export type NegotiationOffer = {
   kind: string;
   status: string;
   expiresAt: string;
+  /** Driver display name (real name, masked phone or short id). */
+  driverLabel: string;
+  driverPlate: string | null;
 };
 
 export type NegotiationSession = {
@@ -27,4 +30,7 @@ export type NegotiationSession = {
   expires: string;
   expiresDate: string;
   status: NegotiationSessionStatus;
+  customerPhone: string | null;
+  pickupPoint: { lat: number; lng: number } | null;
+  dropoffPoint: { lat: number; lng: number } | null;
 };

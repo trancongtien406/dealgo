@@ -5,13 +5,13 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
-import '../../../identity/presentation/widgets/auth_widgets.dart';
 import '../../domain/entities/food_models.dart';
 import '../../domain/entities/food_money.dart';
 import '../cubit/food_cart_cubit.dart';
 import '../utils/food_routes.dart';
 import '../widgets/food_widgets.dart';
-import 'food_item_options_sheet.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 class FoodItemOptionsArgs {
   const FoodItemOptionsArgs({required this.store, required this.item});
@@ -25,8 +25,7 @@ void openFoodItemOptions({
   required FoodStoreDetail store,
   required FoodMenuItem item,
 }) {
-  final groups = foodOptionGroupsForItem(item.id);
-  if (groups.isEmpty) {
+  if (item.optionGroups.isEmpty) {
     context.read<FoodCartCubit>().addItem(
       storeId: store.id,
       storeName: store.name,
@@ -40,7 +39,8 @@ void openFoodItemOptions({
   );
 }
 
-/// C026 — full-page item options (preferred over thin sheet).
+/// C026 — full-page item options. Groups, bounds and surcharges come from the
+/// store catalog (DEC-PROD-033); the server re-prices the choice at placement.
 class FoodItemOptionsPage extends StatefulWidget {
   const FoodItemOptionsPage({required this.args, super.key});
 
@@ -51,97 +51,43 @@ class FoodItemOptionsPage extends StatefulWidget {
 }
 
 class _FoodItemOptionsPageState extends State<FoodItemOptionsPage> {
-  late final List<FoodOptionGroup> _groups = foodOptionGroupsForItem(
-    widget.args.item.id,
-  );
-  late final Map<String, Set<String>> _selected = {
-    for (final group in _groups)
-      group.id: {
-        if (group.required && group.choices.isNotEmpty) group.choices.first.id,
-      },
-  };
+  late List<FoodOptionGroup> _groups = widget.args.item.optionGroups;
+  late FoodOptionSelection _selection = FoodOptionSelection.initial(_groups);
 
-  int get _extras {
-    var total = 0;
-    for (final group in _groups) {
-      final picked = _selected[group.id] ?? const <String>{};
-      for (final choice in group.choices) {
-        if (picked.contains(choice.id)) {
-          total += choice.extraVnd;
-        }
-      }
-    }
-    return total;
-  }
+  int get _unitPrice => widget.args.item.priceVnd + _selection.extrasVnd;
 
-  int get _unitPrice => widget.args.item.priceVnd + _extras;
-
-  String get _displayName {
-    final parts = <String>[widget.args.item.name];
-    for (final group in _groups) {
-      final picked = _selected[group.id] ?? const <String>{};
-      for (final choice in group.choices) {
-        if (picked.contains(choice.id) &&
-            !(group.required &&
-                choice == group.choices.first &&
-                choice.extraVnd == 0)) {
-          parts.add(choice.label);
-        }
-      }
-    }
-    return parts.join(' · ');
-  }
-
-  String get _lineId {
-    final tokens = <String>[widget.args.item.id];
-    for (final group in _groups) {
-      final picked = [...(_selected[group.id] ?? const <String>{})]..sort();
-      tokens.add('${group.id}:${picked.join('+')}');
-    }
-    return tokens.join('|');
-  }
-
-  bool get _canAdd {
-    for (final group in _groups) {
-      if (group.required && (_selected[group.id]?.isEmpty ?? true)) {
-        return false;
-      }
-    }
-    return widget.args.item.available;
-  }
+  bool get _canAdd => widget.args.item.available && _selection.isComplete;
 
   void _toggle(FoodOptionGroup group, FoodOptionChoice choice) {
-    setState(() {
-      final current = {...(_selected[group.id] ?? <String>{})};
-      if (group.multi) {
-        if (current.contains(choice.id)) {
-          current.remove(choice.id);
-        } else {
-          current.add(choice.id);
-        }
-      } else {
-        current
-          ..clear()
-          ..add(choice.id);
-      }
-      _selected[group.id] = current;
-    });
+    setState(() => _selection = _selection.toggle(group, choice));
   }
 
   void _add() {
     if (!_canAdd) {
       return;
     }
+    final item = widget.args.item;
     context.read<FoodCartCubit>().addConfiguredItem(
       storeId: widget.args.store.id,
       storeName: widget.args.store.name,
-      lineId: _lineId,
-      name: _displayName,
+      lineId: _selection.lineId(item.id),
+      name: [item.name, ..._selection.labels].join(' · '),
       unitPriceVnd: _unitPrice,
-      catalogItemId: widget.args.item.id,
+      catalogItemId: item.id,
+      optionIds: _selection.optionIds,
+      imageUrl: item.imageUrl,
     );
     if (context.canPop()) {
       context.pop();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant FoodItemOptionsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.args.item != widget.args.item) {
+      _groups = widget.args.item.optionGroups;
+      _selection = FoodOptionSelection.initial(_groups);
     }
   }
 
@@ -155,41 +101,17 @@ class _FoodItemOptionsPageState extends State<FoodItemOptionsPage> {
       body: SafeArea(
         child: Column(
           children: [
-            FoodScreenHeader(
-              title: l10n.foodItemOptionsTitle,
-              trailing: const DealGoWordmark(),
-            ),
+            DealGoAppHeader(title: l10n.foodItemOptionsTitle),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(
                   DealGoDimensions.pageGutter,
                   0,
                   DealGoDimensions.pageGutter,
-                  DealGoSpacing.s16,
+                  DealGoSpacing.s24 + DealGoDimensions.buttonMinHeight,
                 ),
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(DealGoRadius.card),
-                    child: Image.asset(
-                      'assets/images/food_bun_bo_special.png',
-                      height: 180,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stack) {
-                        return const ColoredBox(
-                          color: Color(0xFFFFF4EA),
-                          child: SizedBox(
-                            height: 180,
-                            child: Icon(
-                              Icons.ramen_dining,
-                              color: Color(0xFFEA580C),
-                              size: 64,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+                  FoodCoverImage(imageUrl: item.imageUrl, height: 200),
                   const SizedBox(height: DealGoSpacing.s16),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -199,25 +121,24 @@ class _FoodItemOptionsPageState extends State<FoodItemOptionsPage> {
                       ),
                       Text(
                         formatVnd(item.priceVnd),
-                        style: textTheme.titleMedium?.copyWith(
+                        style: textTheme.titleLarge?.copyWith(
                           color: DealGoColors.primary,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: DealGoSpacing.s4),
-                  Text(
-                    l10n.foodItemOptionsRating,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: DealGoColors.amber,
+                  if (item.soldCount > 0) ...[
+                    const SizedBox(height: DealGoSpacing.s8),
+                    Text(
+                      l10n.merchantProductsSoldCount('${item.soldCount}'),
+                      style: textTheme.bodySmall,
                     ),
-                  ),
-                  const SizedBox(height: DealGoSpacing.s8),
-                  Text(
-                    l10n.foodItemOptionsDescription,
-                    style: textTheme.bodySmall,
-                  ),
+                  ],
+                  if ((item.description ?? '').trim().isNotEmpty) ...[
+                    const SizedBox(height: DealGoSpacing.s8),
+                    Text(item.description!.trim(), style: textTheme.bodySmall),
+                  ],
                   const SizedBox(height: DealGoSpacing.s16),
                   if (_groups.isEmpty)
                     FoodNote(
@@ -228,8 +149,15 @@ class _FoodItemOptionsPageState extends State<FoodItemOptionsPage> {
                     for (final group in _groups) ...[
                       _OptionSection(
                         group: group,
-                        selected: _selected[group.id] ?? const {},
+                        selection: _selection,
                         onToggle: (choice) => _toggle(group, choice),
+                        onSetQuantity: (choice, q) => setState(
+                          () => _selection = _selection.setQuantity(
+                            group,
+                            choice,
+                            q,
+                          ),
+                        ),
                       ),
                       const SizedBox(height: DealGoSpacing.s12),
                     ],
@@ -239,7 +167,7 @@ class _FoodItemOptionsPageState extends State<FoodItemOptionsPage> {
             DecoratedBox(
               decoration: const BoxDecoration(
                 color: DealGoColors.card,
-                border: Border(top: BorderSide(color: DealGoColors.border)),
+                boxShadow: DealGoShadows.floating,
               ),
               child: SafeArea(
                 top: false,
@@ -262,7 +190,7 @@ class _FoodItemOptionsPageState extends State<FoodItemOptionsPage> {
                           ),
                           Text(
                             formatVnd(_unitPrice),
-                            style: textTheme.titleMedium?.copyWith(
+                            style: textTheme.titleLarge?.copyWith(
                               color: DealGoColors.primary,
                               fontWeight: FontWeight.w800,
                             ),
@@ -274,7 +202,7 @@ class _FoodItemOptionsPageState extends State<FoodItemOptionsPage> {
                         child: DealGoPrimaryButton(
                           key: const Key('food-options-add'),
                           label: l10n.foodItemOptionsAdd,
-                          trailingIcon: Icons.arrow_forward,
+                          trailingIcon: DealGoIcons.arrowRight,
                           enabled: _canAdd,
                           onPressed: _add,
                         ),
@@ -294,70 +222,106 @@ class _FoodItemOptionsPageState extends State<FoodItemOptionsPage> {
 class _OptionSection extends StatelessWidget {
   const _OptionSection({
     required this.group,
-    required this.selected,
+    required this.selection,
     required this.onToggle,
+    required this.onSetQuantity,
   });
 
   final FoodOptionGroup group;
-  final Set<String> selected;
+  final FoodOptionSelection selection;
   final ValueChanged<FoodOptionChoice> onToggle;
+  final void Function(FoodOptionChoice choice, int quantity) onSetQuantity;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final l10n = AppLocalizations.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: DealGoColors.card,
-        borderRadius: BorderRadius.circular(DealGoRadius.card),
-        border: Border.all(color: DealGoColors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(DealGoSpacing.s16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(group.title, style: textTheme.titleMedium),
-                ),
-                Text(
+    final anyQty = group.choices.any((c) => c.maxQuantity > 1);
+    final chipStyle = !group.multi && !anyQty && group.choices.length <= 4;
+    final sideBySide = chipStyle && group.choices.length <= 2;
+    return FoodPanel(
+      elevated: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text(group.title, style: textTheme.titleMedium)),
+              Text(
+                [
                   group.required
                       ? l10n.foodItemOptionsRequired
                       : l10n.foodItemOptionsOptional,
-                  style: textTheme.labelSmall?.copyWith(
-                    color: group.required
-                        ? DealGoColors.primary
-                        : DealGoColors.textSecondary,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  if (group.multi) l10n.foodItemOptionsUpTo(group.maxSelect),
+                ].join(' · '),
+                style: textTheme.labelSmall?.copyWith(
+                  color: DealGoColors.textSecondary,
+                  fontWeight: FontWeight.w700,
                 ),
-              ],
-            ),
-            const SizedBox(height: DealGoSpacing.s12),
-            if (!group.multi &&
-                group.choices.length <= 4 &&
-                group.id != 'topping')
-              Wrap(
-                spacing: DealGoSpacing.s8,
-                runSpacing: DealGoSpacing.s8,
-                children: [
-                  for (final choice in group.choices)
-                    _ChoiceTile(
-                      label: choice.label,
-                      extra: choice.extraVnd == 0
-                          ? '+ 0đ'
-                          : '+${formatVnd(choice.extraVnd)}',
-                      selected: selected.contains(choice.id),
-                      onTap: () => onToggle(choice),
-                    ),
-                ],
-              )
-            else
-              for (final choice in group.choices) ...[
+              ),
+            ],
+          ),
+          const SizedBox(height: DealGoSpacing.s12),
+          if (chipStyle)
+            sideBySide
+                ? Row(
+                    children: [
+                      for (var i = 0; i < group.choices.length; i++) ...[
+                        if (i > 0) const SizedBox(width: DealGoSpacing.s8),
+                        Expanded(
+                          child: _ChoiceTile(
+                            key: Key('food-option-${group.choices[i].id}'),
+                            label: group.choices[i].label,
+                            extra: group.choices[i].available
+                                ? '+${formatVnd(group.choices[i].extraVnd)}'
+                                : l10n.foodItemOptionsSoldOut,
+                            selected:
+                                selection.quantityOf(
+                                  group.id,
+                                  group.choices[i].id,
+                                ) >
+                                0,
+                            onTap: group.choices[i].available
+                                ? () => onToggle(group.choices[i])
+                                : null,
+                            expanded: true,
+                          ),
+                        ),
+                      ],
+                    ],
+                  )
+                : Wrap(
+                    spacing: DealGoSpacing.s8,
+                    runSpacing: DealGoSpacing.s8,
+                    children: [
+                      for (final choice in group.choices)
+                        _ChoiceTile(
+                          key: Key('food-option-${choice.id}'),
+                          label: choice.label,
+                          extra: choice.available
+                              ? '+${formatVnd(choice.extraVnd)}'
+                              : l10n.foodItemOptionsSoldOut,
+                          selected:
+                              selection.quantityOf(group.id, choice.id) > 0,
+                          onTap: choice.available
+                              ? () => onToggle(choice)
+                              : null,
+                        ),
+                    ],
+                  )
+          else
+            for (final choice in group.choices) ...[
+              if (choice.maxQuantity > 1)
+                _QtyOptionRow(
+                  key: Key('food-option-${choice.id}'),
+                  choice: choice,
+                  quantity: selection.quantityOf(group.id, choice.id),
+                  onSetQuantity: (q) => onSetQuantity(choice, q),
+                )
+              else
                 InkWell(
-                  onTap: () => onToggle(choice),
+                  key: Key('food-option-${choice.id}'),
+                  onTap: choice.available ? () => onToggle(choice) : null,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       vertical: DealGoSpacing.s8,
@@ -365,19 +329,28 @@ class _OptionSection extends StatelessWidget {
                     child: Row(
                       children: [
                         Icon(
-                          selected.contains(choice.id)
-                              ? Icons.radio_button_checked
-                              : Icons.radio_button_off,
-                          color: selected.contains(choice.id)
+                          selection.quantityOf(group.id, choice.id) > 0
+                              ? DealGoIcons.radioOn
+                              : DealGoIcons.radioOff,
+                          color: selection.quantityOf(group.id, choice.id) > 0
                               ? DealGoColors.primary
                               : DealGoColors.textSecondary,
                         ),
                         const SizedBox(width: DealGoSpacing.s12),
-                        Expanded(child: Text(choice.label)),
+                        Expanded(
+                          child: Text(
+                            choice.label,
+                            style: choice.available
+                                ? null
+                                : const TextStyle(
+                                    color: DealGoColors.textSecondary,
+                                  ),
+                          ),
+                        ),
                         Text(
-                          choice.extraVnd == 0
-                              ? '+ 0đ'
-                              : '+${formatVnd(choice.extraVnd)}',
+                          choice.available
+                              ? '+${formatVnd(choice.extraVnd)}'
+                              : l10n.foodItemOptionsSoldOut,
                           style: textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
@@ -386,9 +359,72 @@ class _OptionSection extends StatelessWidget {
                     ),
                   ),
                 ),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
+class _QtyOptionRow extends StatelessWidget {
+  const _QtyOptionRow({
+    super.key,
+    required this.choice,
+    required this.quantity,
+    required this.onSetQuantity,
+  });
+
+  final FoodOptionChoice choice;
+  final int quantity;
+  final ValueChanged<int> onSetQuantity;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: DealGoSpacing.s8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  choice.label,
+                  style: choice.available
+                      ? null
+                      : const TextStyle(color: DealGoColors.textSecondary),
+                ),
+                Text(
+                  choice.available
+                      ? '+${formatVnd(choice.extraVnd)}'
+                      : l10n.foodItemOptionsSoldOut,
+                  style: textTheme.bodySmall,
+                ),
               ],
-          ],
-        ),
+            ),
+          ),
+          IconButton(
+            key: Key('food-option-qty-dec-${choice.id}'),
+            onPressed: !choice.available || quantity <= 0
+                ? null
+                : () => onSetQuantity(quantity - 1),
+            icon: const Icon(Icons.remove_circle_outline),
+          ),
+          Text(
+            '$quantity',
+            key: Key('food-option-qty-${choice.id}'),
+            style: textTheme.titleMedium,
+          ),
+          IconButton(
+            key: Key('food-option-qty-inc-${choice.id}'),
+            onPressed: !choice.available || quantity >= choice.maxQuantity
+                ? null
+                : () => onSetQuantity(quantity + 1),
+            icon: const Icon(Icons.add_circle_outline),
+          ),
+        ],
       ),
     );
   }
@@ -400,55 +436,64 @@ class _ChoiceTile extends StatelessWidget {
     required this.extra,
     required this.selected,
     required this.onTap,
+    this.expanded = false,
+    super.key,
   });
 
   final String label;
   final String extra;
   final bool selected;
-  final VoidCallback onTap;
+  final bool expanded;
+
+  /// Null when the choice is sold out.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final body = Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: DealGoSpacing.s12,
+        vertical: DealGoSpacing.s12,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: textTheme.bodyMedium?.copyWith(
+              color: onTap == null
+                  ? DealGoColors.textSecondary
+                  : selected
+                  ? DealGoColors.primary
+                  : DealGoColors.text,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          Text(
+            extra,
+            style: textTheme.bodySmall?.copyWith(
+              color: selected
+                  ? DealGoColors.primary
+                  : DealGoColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
     return Material(
       color: selected ? DealGoColors.subtlePurple : DealGoColors.card,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(DealGoRadius.input),
         side: BorderSide(
           color: selected ? DealGoColors.primary : DealGoColors.border,
-          width: selected ? 1.4 : 1,
+          width: selected ? 1.6 : 1,
         ),
       ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(DealGoRadius.input),
-        child: SizedBox(
-          width: 140,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: DealGoSpacing.s12,
-              vertical: DealGoSpacing.s12,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: selected ? DealGoColors.primary : DealGoColors.text,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Text(
-                  extra,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: DealGoColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+        child: expanded ? body : SizedBox(width: 140, child: body),
       ),
     );
   }

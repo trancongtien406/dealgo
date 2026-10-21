@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import 'customer_home_widgets.dart';
+import 'customer_tab_bar.dart';
 
 class CustomerHomePage extends StatefulWidget {
   const CustomerHomePage({super.key});
@@ -44,40 +45,36 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      bottom: false,
+      bottom: dealGoSafeAreaBottom(context),
       child: ListView(
         controller: _scroll,
-        padding: const EdgeInsets.fromLTRB(
+        padding: EdgeInsets.fromLTRB(
           DealGoDimensions.pageGutter,
           DealGoSpacing.s8,
           DealGoDimensions.pageGutter,
-          DealGoSpacing.s24,
+          customerShellBottomClearance(context),
         ),
         children: [
           const HomeHeader(),
           const SizedBox(height: DealGoSpacing.s16),
-          const HomeSearch(),
+          HomeSearch(onBook: _openBook),
           const SizedBox(height: DealGoSpacing.s16),
-          HeroBanner(onExplore: _explore),
+          HeroBanner(
+            onExplore: _explore,
+            onBook: _openBook,
+            onFood: _openShop,
+          ),
           const SizedBox(height: DealGoSpacing.s16),
           ServiceRow(key: _servicesKey, onBook: _openBook, onFood: _openShop),
           const SizedBox(height: DealGoSpacing.s16),
           QuickBookCard(onBook: _openBook),
-          const SizedBox(height: DealGoSpacing.s20),
-          SectionTitle(
-            title: 'Mua hàng nổi bật',
-            action: AppLocalizations.of(context).actionSeeAll,
-            onAction: _openShop,
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          CategoryRow(onOpen: _openShop),
-          const SizedBox(height: DealGoSpacing.s16),
-          StoreRow(onOpen: _openShop),
-          const SizedBox(height: DealGoSpacing.s16),
+          const SizedBox(height: DealGoSpacing.s24),
+          FeaturedShoppingCard(onOpen: _openShop),
+          const SizedBox(height: DealGoSpacing.s24),
           const VoucherBanner(),
-          const SizedBox(height: DealGoSpacing.s16),
+          const SizedBox(height: DealGoSpacing.s24),
           SectionTitle(
-            title: 'Đơn hàng & chuyến đi gần đây',
+            title: AppLocalizations.of(context).homeRecentTitle,
             action: AppLocalizations.of(context).actionSeeAll,
             onAction: () => context.go('/customer/trips'),
           ),

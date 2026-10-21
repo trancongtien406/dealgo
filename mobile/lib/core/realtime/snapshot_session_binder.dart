@@ -8,10 +8,7 @@ import 'snapshot_realtime.dart';
 /// Connects [SnapshotRealtime] when the user signs in and disconnects on
 /// sign-out. Room subscribe/unsubscribe remains owned by feature bindings.
 class SnapshotSessionBinder {
-  SnapshotSessionBinder({
-    required this._authCubit,
-    required this._realtime,
-  });
+  SnapshotSessionBinder({required this._authCubit, required this._realtime});
 
   final AuthCubit _authCubit;
   final SnapshotRealtime _realtime;

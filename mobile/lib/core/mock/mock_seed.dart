@@ -6,7 +6,8 @@ import '../../features/ride/domain/params/submit_ride_offer_params.dart';
 import 'fake_food_client.dart';
 import 'fake_identity_client.dart';
 import 'fake_ride_client.dart';
-import 'merchant_kitchen_lines.dart';
+import 'mock_order_lines.dart';
+import 'food_option_groups.dart';
 
 const mockStoreBunBo = 'store-bun-bo';
 const mockStoreMart = 'store-coopmart';
@@ -84,8 +85,18 @@ FoodOrderDetail _mockFoodOrderDetail(String orderId) {
 }
 
 const mockFoodStores = <FoodStoreSummary>[
-  FoodStoreSummary(id: mockStoreBunBo, name: 'Bún Bò Huế Ô Cồ'),
-  FoodStoreSummary(id: mockStoreMart, name: 'Co.opmart Đà Nẵng'),
+  FoodStoreSummary(
+    id: mockStoreBunBo,
+    name: 'Bún Bò Huế Ô Cồ',
+    category: 'noodles',
+    distanceKm: 1.2,
+  ),
+  FoodStoreSummary(
+    id: mockStoreMart,
+    name: 'Co.opmart Đà Nẵng',
+    category: 'mart',
+    distanceKm: 2.4,
+  ),
 ];
 
 const mockFoodDetails = <String, FoodStoreDetail>{
@@ -98,6 +109,7 @@ const mockFoodDetails = <String, FoodStoreDetail>{
         name: 'Bún bò đặc biệt',
         priceVnd: 45000,
         available: true,
+        optionGroups: mockBunOptionGroups,
       ),
       FoodMenuItem(
         id: mockItemTra,
@@ -166,6 +178,8 @@ const mockReadyFoodJobs = <ReadyFoodJob>[
   ReadyFoodJob(
     id: 'food-ready-1',
     storeId: mockStoreBunBo,
+    storeName: 'Bún Bò Huế O Xuân',
+    storeAddress: 'Quận Hải Châu, Đà Nẵng',
     deliveryFareVnd: 25000,
     subtotalVnd: 90000,
     totalVnd: 115000,

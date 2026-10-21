@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import 'app/dealgo_app.dart';
+import 'core/auth/token_store.dart';
 import 'core/config/app_env.dart';
 import 'core/mock/mock_seed.dart';
 import 'core/push/fcm_push.dart';
@@ -22,6 +23,7 @@ Future<void> main() async {
         identityClient: mocks.identity,
         foodClient: mocks.food,
         rideClient: mocks.ride,
+        tokenStore: MemoryTokenStore(),
       ),
     );
     return;

@@ -1,3 +1,5 @@
+import 'package:dealgo/features/pricing/data/pricing_remote_datasource.dart';
+import 'package:dealgo/features/places/data/places_remote_datasource.dart';
 import 'package:dealgo/features/food/domain/entities/food_models.dart';
 import 'package:dealgo/features/identity/domain/entities/user_profile.dart';
 import 'package:dealgo/features/ride/domain/entities/ride_vehicle.dart';
@@ -28,25 +30,28 @@ const _merchantProfile = UserProfile(
 );
 
 void main() {
-  test('ride quote display helpers stay stable for mock UI', () {
-    expect(rideQuoteDisplayId('ride-1'), 'Q-CAR-IDE1');
-    expect(ridePickupCode('ride-track').length, 4);
+  test('ride short reference is the tail of the real id', () {
+    expect(rideShortRef('3f9a1c2e-0000-4000-8000-00000abc1234'), '#BC1234');
+    expect(rideShortRef(''), '#—');
   });
 
   testWidgets('vehicle picker appears before fare', (tester) async {
     await tester.binding.setSurfaceSize(const Size(400, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final rides = FakeRideClient();
-    await pumpSignedIn(tester, profile: customerProfile, rideClient: rides);
+    await pumpSignedIn(
+      tester,
+      profile: customerProfile,
+      rideClient: rides,
+      places: FakePlacesRemoteDataSource(
+        recent: FakePlacesRemoteDataSource.sampleRecent,
+      ),
+    );
 
     await tester.tap(find.text('Đặt xe').hitTestable().first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Nhập địa chỉ thủ công'));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const Key('ride-suggestion-airport')),
-    );
-    await tester.tap(find.byKey(const Key('ride-suggestion-airport')));
+    await tester.ensureVisible(find.byKey(const Key('ride-suggestion-0')));
+    await tester.tap(find.byKey(const Key('ride-suggestion-0')));
     await tester.pump();
     await tester.tap(find.byKey(const Key('ride-open-route-overview')));
     await tester.pumpAndSettle();
@@ -54,9 +59,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Chọn loại xe'), findsOneWidget);
+    // Only motorbike rides are dispatched; no unsupported car classes.
     expect(find.text('Xe máy'), findsWidgets);
-    expect(find.text('Xe 4 chỗ'), findsWidgets);
-    expect(find.text('Xe 7 chỗ'), findsOneWidget);
+    expect(find.text('Xe 4 chỗ'), findsNothing);
+    expect(find.text('Xe 7 chỗ'), findsNothing);
     expect(find.text('Tự đề xuất giá chuyến'), findsNothing);
   });
 
@@ -66,7 +72,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Thông báo tài xế'), findsOneWidget);
-    expect(find.text('Có yêu cầu chở khách gần bạn'), findsOneWidget);
+    // Real inbox (no sample driver notices).
+    expect(find.textContaining('Mẫu tài xế'), findsNothing);
     expect(find.text('Tài xế đã đến gần bạn'), findsNothing);
     expect(find.text('Ưu đãi mới dành cho bạn'), findsNothing);
   });
@@ -99,7 +106,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Đơn đang chuẩn bị'), findsOneWidget);
-    expect(find.text('Trạng thái bếp'), findsOneWidget);
+    // No invented kitchen timers or per-item status.
+    expect(find.text('Trạng thái bếp'), findsNothing);
+    expect(find.text('13:30'), findsNothing);
     expect(find.text('Món cần chuẩn bị'), findsOneWidget);
     expect(find.byKey(const Key('merchant-ready')), findsOneWidget);
   });
@@ -143,7 +152,12 @@ void main() {
               ),
             ],
           );
-    await pumpSignedIn(tester, profile: customerProfile, foodClient: food);
+    await pumpSignedIn(
+      tester,
+      profile: customerProfile,
+      foodClient: food,
+      pricing: FakePricingRemoteDataSource(deliveryFareVnd: 25000),
+    );
     await tester.tap(navLabel('Mua hàng'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('food-store-card-store-bun-bo')));
@@ -157,6 +171,7 @@ void main() {
     }
     await tester.tap(find.text('Xem giỏ hàng'));
     await tester.pumpAndSettle();
+    await chooseDeliveryAddress(tester);
     await tester.tap(find.text('Tiếp tục thanh toán'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('food-place-order')));

@@ -34,16 +34,19 @@ class SnapshotBinding {
     await realtime.connect(accessToken: token);
     await realtime.subscribe(room);
     _snapshots ??= realtime.snapshots.listen((hint) {
-      if (hint.aggregateId == _aggregateId) {
+      if (_matches(hint)) {
         onInvalidate();
       }
     });
     _reconnects ??= realtime.reconnects.listen((_) => onInvalidate());
   }
 
-  String get _aggregateId => switch (room) {
-    RideSnapshotRoom(:final rideId) => rideId,
-    FoodSnapshotRoom(:final orderId) => orderId,
+  bool _matches(SnapshotHint hint) => switch (room) {
+    RideSnapshotRoom(:final rideId) => hint.aggregateId == rideId,
+    FoodSnapshotRoom(:final orderId) => hint.aggregateId == orderId,
+    StoreSnapshotRoom(:final storeId) =>
+      hint.aggregateType == 'FoodOrder' &&
+      (hint.storeId == null || hint.storeId == storeId),
   };
 
   Future<void> stop() async {

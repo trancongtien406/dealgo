@@ -2,12 +2,14 @@ import 'package:dealgo/features/driver/presentation/utils/driver_routes.dart';
 import 'package:dealgo/features/food/domain/entities/food_models.dart';
 import 'package:dealgo/features/identity/domain/entities/user_profile.dart';
 import 'package:dealgo/features/ride/domain/entities/ride_models.dart';
-import 'package:dealgo/features/ride/domain/entities/ride_vehicle.dart';
+import 'package:dealgo/features/driver/presentation/pages/driver_ride_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:dealgo/core/navigation/external_navigator.dart';
 import 'support/auth_test_harness.dart';
+import 'support/fake_external_navigator.dart';
 import 'support/fake_food_client.dart';
 import 'support/fake_ride_client.dart';
 
@@ -30,13 +32,6 @@ const _merchantProfile = UserProfile(
 );
 
 void main() {
-  test('ridePickupCode is stable 4 digits for OTP UI', () {
-    final code = ridePickupCode('DG-R26001');
-    expect(code.length, 4);
-    expect(int.tryParse(code), isNotNull);
-    expect(ridePickupCode('DG-R26001'), code);
-  });
-
   testWidgets('driver services page opens from home config', (tester) async {
     await pumpSignedIn(
       tester,
@@ -46,9 +41,11 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('driver-go-online')));
     await tester.pumpAndSettle();
-    expect(find.text('Online'), findsOneWidget);
+    expect(find.text('Trực tuyến'), findsOneWidget);
 
-    final router = GoRouter.of(tester.element(find.byKey(const Key('driver-go-offline'))));
+    final router = GoRouter.of(
+      tester.element(find.byKey(const Key('driver-go-offline'))),
+    );
     router.push(DriverRoutes.services);
     await tester.pumpAndSettle();
 
@@ -58,7 +55,7 @@ void main() {
     expect(find.byKey(const Key('driver-services-food')), findsOneWidget);
   });
 
-  testWidgets('driver can open active ride demo after offer', (tester) async {
+  testWidgets('driver opens pickup navigation once the customer selects the offer', (tester) async {
     final ride = const OpenRide(
       id: 'ride-open-1',
       status: 'NEGOTIATING',
@@ -71,7 +68,7 @@ void main() {
     );
     final rides = FakeRideClient()
       ..openRides = [ride]
-      ..onOffer = (request) => RideView(
+      ..onOffer = ((request) => RideView(
         id: ride.id,
         status: RideStatus.negotiating,
         pickup: ride.pickup,
@@ -92,16 +89,31 @@ void main() {
             expiresAt: ride.expiresAt,
           ),
         ],
+      ))
+      ..onGet = (id) => RideView(
+        id: ride.id,
+        status: RideStatus.assigned,
+        pickup: ride.pickup,
+        dropoff: ride.dropoff,
+        offeredFareVnd: ride.offeredFareVnd,
+        referenceFareVnd: ride.referenceFareVnd,
+        agreedFareVnd: ride.offeredFareVnd,
+        assignedDriverId: 'driver-1',
+        selectedOfferId: 'offer-1',
+        expiresAt: ride.expiresAt,
+        offers: const [],
       );
+    final nav = FakeExternalNavigator();
     await pumpSignedIn(
       tester,
       profile: _driverProfile,
       rideClient: rides,
       foodClient: FakeFoodClient(),
+      externalNavigator: nav,
     );
     await tester.tap(find.byKey(const Key('driver-go-online')));
     await tester.pumpAndSettle();
-    await tester.tap(navLabel('Công việc'));
+    await tester.tap(navLabel('Việc nhận'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('driver-ride-ride-open-1')));
     await tester.pumpAndSettle();
@@ -109,11 +121,18 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('driver-submit-offer')));
     await tester.pumpAndSettle();
+    await tester.pump(driverOfferPollInterval);
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('driver-open-active-ride')));
     await tester.pumpAndSettle();
 
     expect(find.text('Điều hướng đón khách'), findsOneWidget);
     expect(find.byKey(const Key('driver-active-arrived')), findsOneWidget);
+    // DEC-PROD-035: real map + hand-off to the pickup point.
+    expect(find.byKey(const Key('driver-active-map')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('driver-nav-waze')));
+    await tester.pumpAndSettle();
+    expect(nav.calls, [(NavigationApp.waze, 16.0544, 108.2022)]);
   });
 
   testWidgets('merchant placed order shows reject + accept footer', (

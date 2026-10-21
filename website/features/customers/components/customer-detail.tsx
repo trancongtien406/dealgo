@@ -16,6 +16,8 @@ import {
   customerStatusTone,
 } from "@/features/customers/mappers";
 import { OpsIcon } from "@/components/ui/ops-icons";
+import { AccountDeletionCard } from "@/features/account-deletion/components/account-deletion-card";
+import { accountDeletionLabel } from "@/lib/account-deletion";
 import {
   AdminBreadcrumb,
   Avatar,
@@ -184,6 +186,11 @@ export function CustomerDetail({ code }: { code: string }) {
                     <StatusChip tone={customerStatusTone(customer.status)}>
                       {customerStatusLabel(customer.status)}
                     </StatusChip>
+                    {customer.deletion ? (
+                      <StatusChip tone={customer.deletion.status === "PURGED" ? "danger" : "food"}>
+                        {accountDeletionLabel(customer.deletion)}
+                      </StatusChip>
+                    ) : null}
                     <StatusChip tone="delivery">
                       Đã xác thực điện thoại
                     </StatusChip>
@@ -198,6 +205,11 @@ export function CustomerDetail({ code }: { code: string }) {
           </div>
           <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
             <div className="min-w-0 space-y-4">
+              <AccountDeletionCard
+                userId={customer.code}
+                name={customer.name}
+                deletion={customer.deletion}
+              />
               <DetailSection
                 id="customer-account"
                 title="Thông tin tài khoản"

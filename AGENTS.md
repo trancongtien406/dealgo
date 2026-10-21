@@ -21,7 +21,7 @@
 |---|---|
 | `mobile/` | Flutter app (scaffold; chưa khóa state management / DI bằng ADR) |
 | `website/` | Admin Web — Next.js 16, React 19, Tailwind v4 |
-| `backend/` | NestJS 11 scaffold — **chưa** có ORM/DB/queue đã phê duyệt |
+| `backend/` | NestJS 12 API + worker — Prisma 7/PostgreSQL, Redis, BullMQ, Socket.IO đã có trong code; ADR liên quan vẫn `PROPOSED` |
 | `docs/` | Hồ sơ sản phẩm/kỹ thuật — nguồn chuẩn cho scope và quyết định |
 | `design/` | Mockup màn hình (`mockups/`) và thư viện asset UI (`assets/batch01`, `assets/batch02`) |
 | `.ai-coding-team/` | Orchestrator, 7 specialist (canonical) + contracts |
@@ -44,13 +44,13 @@ Stack rules dự án **không** phụ thuộc `~/.cursor/rules` global. Globs Cu
 
 ## 4. Công nghệ — scaffold ≠ đã phê duyệt
 
-Hiện có scaffold:
+Hiện có trong code:
 
-- Flutter trong `mobile/`
-- Next.js trong `website/`
-- NestJS trong `backend/`
+- Flutter trong `mobile/` (go_router + Bloc)
+- Next.js trong `website/` (BFF Route Handlers)
+- NestJS trong `backend/` (Prisma + PostgreSQL, Redis, BullMQ, Socket.IO)
 
-**Chưa** được Charter/ADR khóa: Prisma, PostgreSQL, Redis, Kafka, Bloc/Provider, FCM, cổng thanh toán, v.v.
+Các lựa chọn trên **đã triển khai trong code** nhưng ADR-001…006 vẫn `PROPOSED`; **chưa** được Charter/ADR khóa. Kafka, FCM production, cổng thanh toán thật, v.v. cũng chưa chốt.
 
 - Được đề xuất kèm trade-off và đánh dấu `PROPOSAL`.
 - Không cài hàng loạt dependency “chuẩn production” chỉ vì rule stack đề cập.
@@ -89,5 +89,7 @@ Hiện có scaffold:
 - Kiểm tra mobile: `flutter doctor -v`, `flutter pub get`, `flutter analyze`, `flutter test` trong `mobile/`. APK debug: `flutter build apk --debug`. `mobile/android/gradle.properties` đặt heap Gradle `-Xmx8G`.
 - Nếu `/dev/kvm` có mặt, script cài thêm user vào group sở hữu thiết bị. `emulator -accel-check` chỉ có ý nghĩa khi thiết bị đó tồn tại. Không tự boot emulator.
 - `flutter doctor` có thể báo thiếu ninja và GTK cho Linux desktop. Android toolchain không dùng các gói đó.
+- Node ghim theo `.nvmrc` (**24**, cùng file CI đọc qua `node-version-file`); script cài vào `/opt/node-v24`.
 - Admin Web (`website/`) cổng **3000**. API (`backend/`) cổng **3001** vì cả hai scaffold mặc định cổng 3000. `GET /` trả về `DealGo API`.
-- Không có database hay secret. Cài dependency bằng `npm ci` trong `backend/` và `website/`.
+- Start script chạy Postgres + Redis (Docker Compose cổng 5433 nếu có Docker, ngược lại service local cổng 5432), `prisma migrate deploy`, `npm run seed`, rồi API (tmux `dealgo-api`), worker từ `dist` (tmux `dealgo-worker`) và Admin Web (tmux `dealgo-admin`). Không có secret thật; dùng giá trị dev trong `.env.example`.
+- `npm run start:worker:dev` (tsx) không boot được vì tsx bỏ decorator metadata; dùng `npm run build && npm run start:worker`.

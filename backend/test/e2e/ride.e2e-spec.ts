@@ -1,4 +1,6 @@
+import { MemoryRidePickupCodeStore, RIDE_PICKUP_CODE_STORE } from '../../src/modules/ride/ride-pickup-code.js';
 import { randomUUID } from 'node:crypto';
+import { EARNINGS_REPOSITORY, MemoryEarningsRepository } from '../../src/modules/earnings/index.js';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -36,6 +38,10 @@ describe('Ride End-to-End Flow (e2e)', () => {
       .useValue(new MemoryRideRepository())
       .overrideProvider(PLATFORM_SETTINGS_REPOSITORY)
       .useValue(new MemoryPlatformSettingsRepository())
+      .overrideProvider(RIDE_PICKUP_CODE_STORE)
+      .useValue(new MemoryRidePickupCodeStore())
+      .overrideProvider(EARNINGS_REPOSITORY)
+      .useValue(new MemoryEarningsRepository())
       .overrideProvider(LEDGER_REPOSITORY)
       .useValue(new MemoryLedgerRepository())
       .overrideProvider(PAYMENT_REPOSITORY)
@@ -152,10 +158,17 @@ describe('Ride End-to-End Flow (e2e)', () => {
       .expect(200);
     expect(arrivedRes.body.data.status).toBe('DRIVER_ARRIVED');
 
-    // 6. Driver starts trip
+    // 6. Customer reads the server-issued pickup code; driver starts trip with it
+    const customerView = await request(app.getHttpServer())
+      .get(`/v1/rides/${rideId}`)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    const pickupCode = customerView.body.data.pickupCode as string;
+    expect(pickupCode).toMatch(/^\d{4}$/);
     const startRes = await request(app.getHttpServer())
       .post(`/v1/rides/${rideId}/start`)
       .set('Authorization', `Bearer ${driver.token}`)
+      .send({ pickupCode })
       .expect(200);
     expect(startRes.body.data.status).toBe('IN_TRIP');
 

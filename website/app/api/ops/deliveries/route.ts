@@ -5,6 +5,7 @@ import {
   parsePositiveInt,
 } from "@/lib/api/ops-bff-response";
 import { serviceRegionLabel } from "@/lib/service-region-labels";
+import { fetchOpsPeople, type OpsPeopleMap } from "@/lib/api/ops-people";
 
 type NestFoodStatus =
   | "PLACED"
@@ -25,10 +26,26 @@ type NestFoodOrder = {
   status: NestFoodStatus;
   deliveryFareVnd: number;
   totalVnd: number;
-  dropoff?: { label?: string };
+  dropoff?: { lat?: number; lng?: number; label?: string };
+  pickup?: { lat?: number; lng?: number; label?: string | null } | null;
   assignedDriverId: string | null;
   lines?: Array<{ name: string; quantity: number }>;
 };
+
+type GeoPoint = { lat: number; lng: number };
+
+function point(
+  value: { lat?: number; lng?: number } | null | undefined,
+): GeoPoint | null {
+  if (!value) return null;
+  const { lat, lng } = value;
+  return typeof lat === "number" &&
+    typeof lng === "number" &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lng)
+    ? { lat, lng }
+    : null;
+}
 
 type DeliveryStatus =
   "WAITING_DRIVER" | "PICKED_UP" | "DELIVERING" | "COMPLETED" | "FAILED";
@@ -43,6 +60,8 @@ type DeliveryItem = {
   status: DeliveryStatus;
   time: string;
   regionLabel: string;
+  pickupPoint: GeoPoint | null;
+  dropoffPoint: GeoPoint | null;
 };
 
 const INFLIGHT_STATUSES: NestFoodStatus[] = [
@@ -85,7 +104,7 @@ function shortId(id: string): string {
   return id.slice(0, 8);
 }
 
-function mapOrder(order: NestFoodOrder): DeliveryItem {
+function mapOrder(order: NestFoodOrder, people: OpsPeopleMap): DeliveryItem {
   const cargo =
     order.lines && order.lines.length > 0
       ? order.lines.map((l) => `${l.name} x${l.quantity}`).join(", ")
@@ -99,7 +118,8 @@ function mapOrder(order: NestFoodOrder): DeliveryItem {
     cargo,
     fee: order.deliveryFareVnd ?? order.totalVnd ?? 0,
     driver: order.assignedDriverId
-      ? `TX · ${shortId(order.assignedDriverId)}`
+      ? people[order.assignedDriverId]?.displayName?.trim() ||
+        `TX · ${shortId(order.assignedDriverId)}`
       : null,
     status: mapDeliveryStatus(order.status),
     time: "—",
@@ -107,6 +127,8 @@ function mapOrder(order: NestFoodOrder): DeliveryItem {
       serviceRegionLabel(order.serviceRegionCode) ??
       order.serviceRegionCode ??
       "—",
+    pickupPoint: point(order.pickup),
+    dropoffPoint: point(order.dropoff),
   };
 }
 
@@ -157,7 +179,10 @@ export async function GET(request: Request) {
   };
 
   const nestItems = upstream.items ?? [];
-  const items = nestItems.map(mapOrder);
+  const people = await fetchOpsPeople(
+    nestItems.map((order) => order.assignedDriverId),
+  );
+  const items = nestItems.map((order) => mapOrder(order, people));
 
   return NextResponse.json({
     success: true,

@@ -4,6 +4,7 @@ export const NOTIFICATION_CAMPAIGN_STATUSES = [
   "RUNNING",
   "PENDING_APPROVAL",
   "DRAFT",
+  "CANCELLED",
 ] as const;
 export type NotificationCampaignStatus =
   (typeof NOTIFICATION_CAMPAIGN_STATUSES)[number];

@@ -8,10 +8,14 @@ import { ConfigService } from '@nestjs/config';
 import { Queue, Worker } from 'bullmq';
 import type { AppEnv } from '../platform/config/env.js';
 import { OutboxRelayService } from '../modules/communication/outbox/outbox-relay.service.js';
+import { AccountDeletionService } from '../modules/account-deletion/account-deletion.service.js';
+import { OrphanUploadCleanupService } from './orphan-upload-cleanup.service.js';
 import { RideExpiryService } from './ride-expiry.service.js';
 
 const RIDE_EXPIRY_JOB = 'ride-expiry';
 const OUTBOX_RELAY_JOB = 'outbox-relay';
+const UPLOAD_ORPHAN_JOB = 'upload-orphan-cleanup';
+const ACCOUNT_PURGE_JOB = 'account-purge';
 const QUEUE_NAME = 'dealgo-workers';
 
 /**
@@ -31,7 +35,13 @@ export class WorkersBootstrap implements OnModuleInit, OnModuleDestroy {
     private readonly config: ConfigService<AppEnv, true>,
     private readonly rideExpiry: RideExpiryService,
     private readonly outboxRelay: OutboxRelayService,
+    private readonly orphanUploads: OrphanUploadCleanupService,
+    private readonly accountDeletion: AccountDeletionService,
   ) {}
+
+  private purgeIntervalMs(): number {
+    return this.config.get('ACCOUNT_PURGE_INTERVAL_MS', { infer: true });
+  }
 
   async onModuleInit(): Promise<void> {
     const nodeEnv = this.config.get('NODE_ENV', { infer: true });
@@ -42,9 +52,10 @@ export class WorkersBootstrap implements OnModuleInit, OnModuleDestroy {
     const redisUrl = this.config.get('REDIS_URL', { infer: true });
     const rideIntervalMs = this.config.get('RIDE_EXPIRY_INTERVAL_MS', { infer: true });
     const outboxIntervalMs = this.config.get('OUTBOX_RELAY_INTERVAL_MS', { infer: true });
+    const orphanIntervalMs = this.config.get('UPLOAD_ORPHAN_CLEANUP_INTERVAL_MS', { infer: true });
 
     if (redisUrl) {
-      const started = await this.startBullMq(redisUrl, rideIntervalMs, outboxIntervalMs);
+      const started = await this.startBullMq(redisUrl, rideIntervalMs, outboxIntervalMs, orphanIntervalMs);
       if (started) {
         return;
       }
@@ -72,7 +83,7 @@ export class WorkersBootstrap implements OnModuleInit, OnModuleDestroy {
       });
     }
 
-    this.startIntervals(rideIntervalMs, outboxIntervalMs);
+    this.startIntervals(rideIntervalMs, outboxIntervalMs, orphanIntervalMs);
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -90,6 +101,7 @@ export class WorkersBootstrap implements OnModuleInit, OnModuleDestroy {
     redisUrl: string,
     rideIntervalMs: number,
     outboxIntervalMs: number,
+    orphanIntervalMs: number,
   ): Promise<boolean> {
     try {
       const connection = parseRedisConnection(redisUrl);
@@ -116,6 +128,26 @@ export class WorkersBootstrap implements OnModuleInit, OnModuleDestroy {
           jobId: OUTBOX_RELAY_JOB,
         },
       );
+      await this.queue.add(
+        UPLOAD_ORPHAN_JOB,
+        {},
+        {
+          repeat: { every: orphanIntervalMs },
+          removeOnComplete: 20,
+          removeOnFail: 20,
+          jobId: UPLOAD_ORPHAN_JOB,
+        },
+      );
+      await this.queue.add(
+        ACCOUNT_PURGE_JOB,
+        {},
+        {
+          repeat: { every: this.purgeIntervalMs() },
+          removeOnComplete: 20,
+          removeOnFail: 20,
+          jobId: ACCOUNT_PURGE_JOB,
+        },
+      );
 
       this.worker = new Worker(
         QUEUE_NAME,
@@ -126,6 +158,14 @@ export class WorkersBootstrap implements OnModuleInit, OnModuleDestroy {
           }
           if (job.name === OUTBOX_RELAY_JOB) {
             await this.outboxRelay.relayOnce();
+            return;
+          }
+          if (job.name === UPLOAD_ORPHAN_JOB) {
+            await this.orphanUploads.runOnce();
+            return;
+          }
+          if (job.name === ACCOUNT_PURGE_JOB) {
+            await this.accountDeletion.purgeDue();
           }
         },
         { connection },
@@ -152,7 +192,17 @@ export class WorkersBootstrap implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private startIntervals(rideIntervalMs: number, outboxIntervalMs: number): void {
+  private startIntervals(rideIntervalMs: number, outboxIntervalMs: number, orphanIntervalMs: number): void {
+    this.intervals.push(
+      setInterval(() => {
+        void this.accountDeletion.purgeDue().catch((error: unknown) => {
+          this.logger.warn({
+            msg: 'workers.account_purge_failed',
+            error: error instanceof Error ? error.message : 'unknown',
+          });
+        });
+      }, this.purgeIntervalMs()),
+    );
     this.intervals.push(
       setInterval(() => {
         void this.rideExpiry.runOnce().catch((error: unknown) => {
@@ -172,6 +222,16 @@ export class WorkersBootstrap implements OnModuleInit, OnModuleDestroy {
           });
         });
       }, outboxIntervalMs),
+    );
+    this.intervals.push(
+      setInterval(() => {
+        void this.orphanUploads.runOnce().catch((error: unknown) => {
+          this.logger.warn({
+            msg: 'workers.upload_orphan_cleanup_failed',
+            error: error instanceof Error ? error.message : 'unknown',
+          });
+        });
+      }, orphanIntervalMs),
     );
     for (const timer of this.intervals) {
       timer.unref?.();

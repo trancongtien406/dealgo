@@ -389,11 +389,11 @@ Client/API phải phân biệt `initial`, `loading`, `success`, `empty`, `valida
 #### `FR-CORE-016` — Account đăng ký và quản lý nhiều phương thức xác thực an toàn.
 - **Nguồn:** `UC-CORE-016` · **Phạm vi:** `PROPOSED_P0` · **Phụ thuộc:** `DEC-PROD-006`, `OPEN-008/020`.
 - **Actor / trigger:** Account holder / đăng ký, liên kết, xác thực hoặc khôi phục truy cập.
-- **Yêu cầu:** Hỗ trợ passkey theo WebAuthn/platform credential; xác minh số phone bằng SMS; email được xác minh và gắn làm contact/account identifier. Phone SMS OTP có rate limit, expiry, one-time use và risk checks. Email verification không được biến thành email OTP đăng nhập độc lập. Người dùng có thể liên kết passkey và các contact methods vào cùng Account sau khi chứng minh quyền kiểm soát.
+- **Yêu cầu:** Passkey là luồng ưu tiên: discoverable credential cho phép đăng nhập không nhập phone/email và cho phép tạo Account CUSTOMER mới bằng passkey. Passkey không cung cấp số điện thoại; contact được lấy từ hồ sơ Account sau đăng nhập hoặc liên kết sau onboarding. Đồng thời hỗ trợ phone SMS và email+password như fallback đầy đủ. Phone SMS OTP có rate limit, expiry, one-time use và risk checks. `DEC-PROD-006` cũ đã SUPERSEDED; áp dụng `DEC-PROD-046`.
 - **Kết quả chấp nhận:** Server xác minh challenge/passkey assertion, RP ID/origin, account binding, proof freshness và trạng thái method; method bị admin disable không thể enroll/authenticate.
 - **Failure/Recovery:** OTP sai/hết hạn, replay, challenge reused, method disabled hoặc recovery risk cao không tạo session; hướng dẫn fallback/recovery mà không tiết lộ tài khoản.
 **Acceptance criteria:**
-1. `AC-FR-CORE-016-01` — Đăng ký với một hoặc nhiều method hợp lệ tạo một Account duy nhất; email/phone được lưu ở trạng thái verified riêng.
+1. `AC-FR-CORE-016-01` — Nhấn đăng nhập passkey mở account chooser của hệ điều hành và phát hành session mà không hỏi identifier; đăng ký passkey-first tạo đúng một Account CUSTOMER với phone/email null cho tới khi được liên kết, còn email/phone được lưu ở trạng thái verified riêng.
 2. `AC-FR-CORE-016-02` — Sai chữ ký/challenge/origin/RP ID, SMS OTP hết hạn/replay/rate limit hoặc method disabled đều bị từ chối server-side; không log secret.
 3. `AC-FR-CORE-016-03` — Đổi/mất phone hoặc passkey yêu cầu re-auth/risk-based recovery; admin không thể vô ý disable phương thức cuối cùng mà không mở recovery/lockout workflow có audit.
 
@@ -1280,4 +1280,3 @@ Nguồn nghiên cứu chỉ xác nhận **phương pháp đặc tả**, không t
 | 0.1.0 | 2026-10-11 | Tạo FRS 67 FR / 201 AC, trace UC, failure cases, open-policy gates. |
 
 **Tiếp theo theo master index:** `docs/01-product/non-functional-requirements.md` (11/69), tập trung NFR, reliability, security, performance, realtime/latency, privacy, accessibility và giới hạn đo lường; không tự đặt SLO production khi `OPEN-007` chưa chốt.
-

@@ -32,7 +32,7 @@ void main() {
     expect(entryPathFor(multiRoleProfile.activeAppRoles), '/roles');
   });
 
-  test('redirect sends signed-out users to login and signed-in users home', () {
+  test('redirect sends signed-out users to login and signed-in through gates', () {
     const restoring = AuthRestoring();
     const signedOut = AuthSignedOut();
     final customer = AuthSignedIn(tokens: _tokens, profile: customerProfile);
@@ -41,8 +41,12 @@ void main() {
 
     expect(authRedirect(restoring, Uri.parse('/customer')), '/login');
     expect(authRedirect(restoring, Uri.parse('/login')), isNull);
+    expect(authRedirect(restoring, Uri.parse('/login/phone')), isNull);
+    expect(authRedirect(restoring, Uri.parse('/login/email')), isNull);
     expect(authRedirect(signedOut, Uri.parse('/customer')), '/login');
     expect(authRedirect(signedOut, Uri.parse('/login')), isNull);
+    expect(authRedirect(signedOut, Uri.parse('/login/phone')), isNull);
+    expect(authRedirect(signedOut, Uri.parse('/login/email')), isNull);
     expect(
       authRedirect(
         signedOut,
@@ -51,14 +55,111 @@ void main() {
       isNull,
     );
     expect(authRedirect(signedOut, Uri.parse('/login/otp')), '/login');
-    expect(authRedirect(customer, Uri.parse('/login')), '/customer');
-    expect(authRedirect(sandbox, Uri.parse('/login/otp')), '/customer');
-    expect(authRedirect(sandbox, Uri.parse('/merchant')), '/customer');
-    expect(authRedirect(many, Uri.parse('/login')), '/customer');
-    expect(authRedirect(many, Uri.parse('/roles')), isNull);
-    expect(authRedirect(many, Uri.parse('/driver/jobs')), isNull);
-    expect(authRedirect(customer, Uri.parse('/roles')), isNull);
-    expect(authRedirect(customer, Uri.parse('/driver')), '/customer');
+
+    expect(
+      authRedirect(
+        customer,
+        Uri.parse('/login'),
+        profileSetupCompleted: false,
+      ),
+      AuthRoutes.profileSetup,
+    );
+    expect(
+      authRedirect(
+        customer,
+        Uri.parse('/login/phone'),
+        profileSetupCompleted: true,
+      ),
+      '/customer',
+    );
+    expect(
+      authRedirect(
+        customer,
+        Uri.parse('/login'),
+        profileSetupCompleted: true,
+      ),
+      '/customer',
+    );
+    expect(
+      authRedirect(
+        sandbox,
+        Uri.parse('/login/otp'),
+        profileSetupCompleted: true,
+      ),
+      '/customer',
+    );
+    expect(
+      authRedirect(
+        sandbox,
+        Uri.parse('/merchant'),
+        profileSetupCompleted: true,
+      ),
+      '/customer',
+    );
+    expect(
+      authRedirect(
+        many,
+        Uri.parse('/login'),
+        profileSetupCompleted: true,
+      ),
+      '/roles',
+    );
+    expect(
+      authRedirect(
+        many,
+        Uri.parse('/roles'),
+        profileSetupCompleted: true,
+      ),
+      isNull,
+    );
+    expect(
+      authRedirect(
+        many,
+        Uri.parse('/driver/jobs'),
+        profileSetupCompleted: true,
+      ),
+      isNull,
+    );
+    expect(
+      authRedirect(
+        customer,
+        Uri.parse('/roles'),
+        profileSetupCompleted: true,
+      ),
+      isNull,
+    );
+    expect(
+      authRedirect(
+        customer,
+        Uri.parse('/driver'),
+        profileSetupCompleted: true,
+      ),
+      '/customer',
+    );
+    expect(
+      authRedirect(
+        customer,
+        Uri.parse(AuthRoutes.profileSetup),
+        profileSetupCompleted: false,
+      ),
+      isNull,
+    );
+    expect(
+      authRedirect(
+        customer,
+        Uri.parse(AuthRoutes.permissions),
+        profileSetupCompleted: true,
+      ),
+      '/customer',
+    );
+    expect(
+      authRedirect(
+        customer,
+        Uri.parse('/customer'),
+        profileSetupCompleted: false,
+      ),
+      AuthRoutes.profileSetup,
+    );
   });
 
   test('error envelope keeps the API errorCode', () {

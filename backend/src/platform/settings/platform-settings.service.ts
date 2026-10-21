@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import type { AppEnv } from '../config/env.js';
 import {
   PLATFORM_SETTING_SPECS,
+  UPLOAD_SNIFFABLE_TYPES,
   isPlatformSettingKey,
   specForKey,
   type PlatformSettingKey,
@@ -13,6 +14,7 @@ import {
   PLATFORM_SETTINGS_REPOSITORY,
 } from './platform-settings.constants.js';
 import { settingsError } from './platform-settings.error.js';
+import { PLATFORM_SETTING_SEED_DEFAULTS } from './platform-settings.seed.js';
 import type {
   PlatformSettingRecord,
   PlatformSettingsRepository,
@@ -28,7 +30,27 @@ export type PlatformSettingView = {
   updatedByUserId: string | null;
 };
 
-function categorizeSettingKey(key: string): 'FARE' | 'DISPATCH' | 'ZONE_PAYMENT' {
+function categorizeSettingKey(key: string): 'FARE' | 'DISPATCH' | 'ZONE_PAYMENT' | 'SUPPORT' {
+  if (
+    key.startsWith('SUPPORT_') ||
+    key.startsWith('UPLOAD_') ||
+    key.startsWith('ACCOUNT_') ||
+    key.startsWith('AUTH_')
+  ) {
+    return 'SUPPORT';
+  }
+  if (key.startsWith('PLATFORM_FEE') || key === 'VOUCHER_SHARED_PLATFORM_PERCENT') {
+    return 'FARE';
+  }
+  if (
+    key === 'RATING_STORE_MIN_COUNT' ||
+    key === 'RATING_WINDOW_DAYS' ||
+    key === 'RIDE_PICKUP_CODE_MAX_ATTEMPTS' ||
+    key.startsWith('FOOD_DELIVERY_CODE') ||
+    key === 'FOOD_HANDOVER_CODE_REQUIRED'
+  ) {
+    return 'DISPATCH';
+  }
   if (
     key.startsWith('RIDE_MIN') ||
     key.startsWith('RIDE_MAX') ||
@@ -165,6 +187,11 @@ export class PlatformSettingsService {
     return raw;
   }
 
+  /** JSON boolean settings (spec.boolean); anything but `true` reads as false. */
+  async getBoolean(key: PlatformSettingKey): Promise<boolean> {
+    return (await this.getJson<unknown>(key)) === true;
+  }
+
   async getJson<T = unknown>(key: PlatformSettingKey): Promise<T> {
     const raw = await this.resolveRaw(key);
     const source = raw ?? this.envDefaultString(key);
@@ -219,7 +246,9 @@ export class PlatformSettingsService {
     }
     const defaults = PLATFORM_SETTING_SPECS.map((spec) => ({
       key: spec.key,
-      value: this.envDefaultString(spec.key),
+      value: spec.seeded
+        ? (PLATFORM_SETTING_SEED_DEFAULTS[spec.key] ?? '')
+        : this.envDefaultString(spec.key),
       valueType: spec.valueType,
     })).filter((row) => row.value !== '');
     await this.repo.ensureDefaults(defaults);
@@ -254,6 +283,28 @@ export class PlatformSettingsService {
         return String(this.config.get('MAX_CONCURRENT_JOBS_PER_DRIVER', { infer: true }));
       case 'PAYMENT_METHODS_ENABLED':
         return this.config.get('PAYMENT_METHODS_ENABLED', { infer: true });
+      case 'RATING_WINDOW_DAYS':
+      case 'PLATFORM_FEE_RIDE_PERCENT':
+      case 'PLATFORM_FEE_FOOD_PERCENT':
+      case 'VOUCHER_SHARED_PLATFORM_PERCENT':
+      case 'RIDE_PICKUP_CODE_MAX_ATTEMPTS':
+      case 'FOOD_DELIVERY_CODE_REQUIRED':
+      case 'FOOD_DELIVERY_CODE_MAX_ATTEMPTS':
+      case 'FOOD_HANDOVER_CODE_REQUIRED':
+      case 'SUPPORT_TICKET_MAX_OPEN_PER_USER':
+      case 'SUPPORT_PUBLIC_TICKETS_PER_CONTACT_PER_DAY':
+      case 'SUPPORT_TICKET_TEXT_MAX_CHARS':
+      case 'RATING_STORE_MIN_COUNT':
+      case 'UPLOAD_MAX_FILE_KB':
+      case 'MENU_ITEM_MAX_IMAGES':
+      case 'UPLOAD_ALLOWED_TYPES':
+      case 'UPLOAD_ORPHAN_MAX_AGE_HOURS':
+      case 'ACCOUNT_DELETION_GRACE_DAYS':
+      case 'AUTH_PASSWORD_RESET_CODE_TTL_MINUTES':
+      case 'AUTH_PASSWORD_RESET_MAX_ATTEMPTS':
+      case 'AUTH_PASSWORD_RESET_MAX_PER_HOUR':
+        // Seeded by migration/seed (PLATFORM_SETTING_SEED_DEFAULTS); no env bootstrap.
+        return PLATFORM_SETTING_SEED_DEFAULTS[key] ?? '';
       default: {
         const _exhaustive: never = key;
         return _exhaustive;
@@ -282,12 +333,30 @@ export class PlatformSettingsService {
       } catch {
         throw settingsError(400, 'PLATFORM_SETTING_INVALID', `${key} must be valid JSON`);
       }
+      if (spec.boolean && typeof parsed !== 'boolean') {
+        throw settingsError(400, 'PLATFORM_SETTING_INVALID', `${key} must be true or false`);
+      }
       if (key === 'PAYMENT_METHODS_ENABLED') {
         if (!Array.isArray(parsed) || !parsed.every((x) => typeof x === 'string' && x.length > 0)) {
           throw settingsError(
             400,
             'PLATFORM_SETTING_INVALID',
             'PAYMENT_METHODS_ENABLED must be a JSON array of non-empty strings',
+          );
+        }
+      }
+      if (key === 'UPLOAD_ALLOWED_TYPES') {
+        const allowed = UPLOAD_SNIFFABLE_TYPES as readonly string[];
+        if (
+          !Array.isArray(parsed) ||
+          parsed.length === 0 ||
+          !parsed.every((x) => typeof x === 'string' && allowed.includes(x)) ||
+          new Set(parsed).size !== parsed.length
+        ) {
+          throw settingsError(
+            400,
+            'PLATFORM_SETTING_INVALID',
+            `UPLOAD_ALLOWED_TYPES must be a non-empty JSON array of distinct values from ${allowed.join(', ')}`,
           );
         }
       }
@@ -307,10 +376,16 @@ export class PlatformSettingsService {
     if (spec.max !== undefined && n > spec.max) {
       throw settingsError(400, 'PLATFORM_SETTING_INVALID', `${key} must be <= ${spec.max}`);
     }
-    if (
-      key !== 'DRIVER_SEARCH_RADIUS_KM' &&
-      !Number.isInteger(n)
-    ) {
+    if (spec.maxDecimals !== undefined) {
+      const decimals = trimmed.includes('.') ? trimmed.split('.')[1].replace(/0+$/, '').length : 0;
+      if (!/^-?\d+(\.\d+)?$/.test(trimmed) || decimals > spec.maxDecimals) {
+        throw settingsError(
+          400,
+          'PLATFORM_SETTING_INVALID',
+          `${key} allows at most ${spec.maxDecimals} decimal places`,
+        );
+      }
+    } else if (key !== 'DRIVER_SEARCH_RADIUS_KM' && !Number.isInteger(n)) {
       throw settingsError(400, 'PLATFORM_SETTING_INVALID', `${key} must be an integer`);
     }
     return String(n);

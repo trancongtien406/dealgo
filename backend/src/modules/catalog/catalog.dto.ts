@@ -1,3 +1,4 @@
+import { IsString, MaxLength, MinLength } from 'class-validator';
 import {
   OpsCatalogCategoriesQueryDto,
   OpsCatalogModerationQueryDto,
@@ -10,3 +11,10 @@ export {
   CatalogCategoriesQueryDto as OpsCatalogCategoriesQueryDto,
   CatalogModerationQueryDto as OpsCatalogModerationQueryDto,
 };
+
+export class RenameCatalogCategoryDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(64)
+  name!: string;
+}

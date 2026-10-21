@@ -1,16 +1,18 @@
 import { Controller, Get, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { OpsSessionGuard } from './access-auth.guard.js';
+import { OpsPermissionGuard } from './ops-rbac/ops-permission.guard.js';
+import { RequireOpsPermission } from './ops-rbac/ops-permission.decorator.js';
 import { OpsUsersPageQueryDto } from './ops-users.dto.js';
 import { OpsUsersService } from './ops-users.service.js';
 
 @ApiTags('ops')
 @ApiBearerAuth()
 @Controller('v1/ops/customers')
-@UseGuards(OpsSessionGuard)
+@UseGuards(OpsPermissionGuard)
 export class OpsCustomersController {
   constructor(private readonly users: OpsUsersService) {}
 
+  @RequireOpsPermission('customers.read')
   @Get()
   @ApiOperation({ summary: 'Ops paginated customers (users with CUSTOMER role grant)' })
   list(@Query() query: OpsUsersPageQueryDto) {
@@ -22,6 +24,7 @@ export class OpsCustomersController {
     });
   }
 
+  @RequireOpsPermission('customers.read')
   @Get(':id')
   @ApiOperation({
     summary: 'Ops customer detail (safe fields; no credentials or session tokens)',
@@ -30,6 +33,7 @@ export class OpsCustomersController {
     return this.users.getCustomer(id);
   }
 
+  @RequireOpsPermission('customers.read')
   @Get(':id/activities')
   @ApiOperation({
     summary: 'Ops customer activities by tab (rides, food orders, deliveries, payments, notes)',

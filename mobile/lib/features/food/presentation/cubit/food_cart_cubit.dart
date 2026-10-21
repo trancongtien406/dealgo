@@ -10,6 +10,8 @@ class FoodCartLine {
     required this.unitPriceVnd,
     required this.quantity,
     this.catalogItemId,
+    this.optionIds = const [],
+    this.imageUrl,
   });
 
   final String itemId;
@@ -18,17 +20,23 @@ class FoodCartLine {
   final int quantity;
   final String? catalogItemId;
 
+  /// DEC-PROD-033 — chosen option ids sent with the order line.
+  final List<String> optionIds;
+  final String? imageUrl;
+
   String get placeItemId => catalogItemId ?? itemId;
 
   int get lineTotalVnd => unitPriceVnd * quantity;
 
-  FoodCartLine copyWith({String? name, int? unitPriceVnd, int? quantity}) {
+  FoodCartLine copyWith({String? name, int? unitPriceVnd, int? quantity, String? imageUrl}) {
     return FoodCartLine(
       itemId: itemId,
       name: name ?? this.name,
       unitPriceVnd: unitPriceVnd ?? this.unitPriceVnd,
       quantity: quantity ?? this.quantity,
       catalogItemId: catalogItemId,
+      optionIds: optionIds,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 
@@ -39,12 +47,27 @@ class FoodCartLine {
         other.name == name &&
         other.unitPriceVnd == unitPriceVnd &&
         other.quantity == quantity &&
-        other.catalogItemId == catalogItemId;
+        other.catalogItemId == catalogItemId &&
+        _sameIds(other.optionIds, optionIds);
   }
 
   @override
-  int get hashCode =>
-      Object.hash(itemId, name, unitPriceVnd, quantity, catalogItemId);
+  int get hashCode => Object.hash(
+    itemId,
+    name,
+    unitPriceVnd,
+    quantity,
+    catalogItemId,
+    Object.hashAll(optionIds),
+  );
+}
+
+bool _sameIds(List<String> a, List<String> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }
 
 class FoodCartState {
@@ -57,6 +80,8 @@ class FoodCartState {
     required this.dropoffLat,
     required this.dropoffLng,
     required this.idempotencyKey,
+    this.voucherCode,
+    this.voucherDiscountVnd = 0,
   });
 
   factory FoodCartState.initial() {
@@ -64,10 +89,10 @@ class FoodCartState {
       storeId: null,
       storeName: null,
       lines: const [],
-      deliveryFareVnd: foodDefaultDeliveryFareVnd,
-      dropoffLabel: foodDefaultDropoffLabel,
-      dropoffLat: foodDefaultDropoffLat,
-      dropoffLng: foodDefaultDropoffLng,
+      deliveryFareVnd: null,
+      dropoffLabel: '',
+      dropoffLat: null,
+      dropoffLng: null,
       idempotencyKey: createFoodIdempotencyKey(),
     );
   }
@@ -75,25 +100,39 @@ class FoodCartState {
   final String? storeId;
   final String? storeName;
   final List<FoodCartLine> lines;
-  final int deliveryFareVnd;
+
+  /// Server quote (`POST /v1/food/quote`); null until store and drop-off
+  /// are known. Placement recomputes it, so this is for display only.
+  final int? deliveryFareVnd;
   final String dropoffLabel;
-  final double dropoffLat;
-  final double dropoffLng;
+  final double? dropoffLat;
+  final double? dropoffLng;
+
+  bool get hasDropoff =>
+      dropoffLat != null && dropoffLng != null && dropoffLabel.isNotEmpty;
   final String idempotencyKey;
+
+  /// Code quoted by `POST /v1/promotions/validate`; sent with the order.
+  final String? voucherCode;
+
+  /// Quoted discount for display only. The server recomputes it at placement.
+  final int voucherDiscountVnd;
 
   int get itemCount => lines.fold(0, (sum, line) => sum + line.quantity);
 
   int get subtotalVnd => lines.fold(0, (sum, line) => sum + line.lineTotalVnd);
 
-  int get previewTotalVnd => subtotalVnd + deliveryFareVnd;
+  int get previewTotalVnd {
+    final total = subtotalVnd + (deliveryFareVnd ?? 0) - voucherDiscountVnd;
+    return total < 0 ? 0 : total;
+  }
 
   bool get canCheckout {
-    final label = dropoffLabel.trim();
     return storeId != null &&
         lines.isNotEmpty &&
-        label.isNotEmpty &&
-        label.length <= 160 &&
-        deliveryFareInRange(deliveryFareVnd);
+        hasDropoff &&
+        dropoffLabel.length <= 160 &&
+        deliveryFareVnd != null;
   }
 
   FoodCartState copyWith({
@@ -101,19 +140,36 @@ class FoodCartState {
     String? storeName,
     List<FoodCartLine>? lines,
     int? deliveryFareVnd,
+    bool clearDeliveryFare = false,
     String? dropoffLabel,
+    double? dropoffLat,
+    double? dropoffLng,
     String? idempotencyKey,
     bool clearStore = false,
+    String? voucherCode,
+    int? voucherDiscountVnd,
+    bool clearVoucher = false,
   }) {
+    // Any change to what is being bought invalidates the quoted discount.
+    final dropVoucher =
+        clearVoucher || clearStore || lines != null || idempotencyKey != null;
+    // The delivery quote depends on the store; another store needs a new one.
+    final storeChanged =
+        clearStore || (storeId != null && storeId != this.storeId);
     return FoodCartState(
       storeId: clearStore ? null : storeId ?? this.storeId,
       storeName: clearStore ? null : storeName ?? this.storeName,
       lines: lines ?? this.lines,
-      deliveryFareVnd: deliveryFareVnd ?? this.deliveryFareVnd,
+      deliveryFareVnd: clearDeliveryFare || storeChanged
+          ? null
+          : deliveryFareVnd ?? this.deliveryFareVnd,
       dropoffLabel: dropoffLabel ?? this.dropoffLabel,
-      dropoffLat: dropoffLat,
-      dropoffLng: dropoffLng,
+      dropoffLat: dropoffLat ?? this.dropoffLat,
+      dropoffLng: dropoffLng ?? this.dropoffLng,
       idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+      voucherCode: voucherCode ?? (dropVoucher ? null : this.voucherCode),
+      voucherDiscountVnd:
+          voucherDiscountVnd ?? (dropVoucher ? 0 : this.voucherDiscountVnd),
     );
   }
 
@@ -127,7 +183,9 @@ class FoodCartState {
         other.dropoffLabel == dropoffLabel &&
         other.dropoffLat == dropoffLat &&
         other.dropoffLng == dropoffLng &&
-        other.idempotencyKey == idempotencyKey;
+        other.idempotencyKey == idempotencyKey &&
+        other.voucherCode == voucherCode &&
+        other.voucherDiscountVnd == voucherDiscountVnd;
   }
 
   @override
@@ -140,6 +198,8 @@ class FoodCartState {
     dropoffLat,
     dropoffLng,
     idempotencyKey,
+    voucherCode,
+    voucherDiscountVnd,
   );
 }
 
@@ -173,6 +233,7 @@ class FoodCartCubit extends Cubit<FoodCartState> {
       name: item.name,
       unitPriceVnd: item.priceVnd,
       catalogItemId: item.id,
+      imageUrl: item.imageUrl,
     );
   }
 
@@ -183,6 +244,8 @@ class FoodCartCubit extends Cubit<FoodCartState> {
     required String name,
     required int unitPriceVnd,
     String? catalogItemId,
+    List<String> optionIds = const [],
+    String? imageUrl,
   }) {
     if (unitPriceVnd < 0 || storeId.isEmpty || lineId.isEmpty) {
       return;
@@ -193,6 +256,8 @@ class FoodCartCubit extends Cubit<FoodCartState> {
       unitPriceVnd: unitPriceVnd,
       quantity: 1,
       catalogItemId: catalogItemId,
+      optionIds: List.unmodifiable(optionIds),
+      imageUrl: imageUrl,
     );
     if (state.storeId != null && state.storeId != storeId) {
       emit(
@@ -286,26 +351,31 @@ class FoodCartCubit extends Cubit<FoodCartState> {
     );
   }
 
+  /// Stores the server delivery quote for the current store and drop-off.
   void setDeliveryFare(int amount) {
-    final next = clampDeliveryFare(amount);
-    if (next == state.deliveryFareVnd) {
+    if (amount == state.deliveryFareVnd) {
       return;
     }
-    emit(
-      state.copyWith(
-        deliveryFareVnd: next,
-        idempotencyKey: createFoodIdempotencyKey(),
-      ),
-    );
+    emit(state.copyWith(deliveryFareVnd: amount));
   }
 
-  void setDropoffLabel(String label) {
-    if (label == state.dropoffLabel) {
+  /// New drop-off from the place picker; the old fare quote no longer applies.
+  void setDropoff({
+    required String label,
+    required double lat,
+    required double lng,
+  }) {
+    if (label == state.dropoffLabel &&
+        lat == state.dropoffLat &&
+        lng == state.dropoffLng) {
       return;
     }
     emit(
       state.copyWith(
         dropoffLabel: label,
+        dropoffLat: lat,
+        dropoffLng: lng,
+        clearDeliveryFare: true,
         idempotencyKey: createFoodIdempotencyKey(),
       ),
     );
@@ -323,7 +393,17 @@ class FoodCartCubit extends Cubit<FoodCartState> {
         continue;
       }
       if (line.catalogItemId != null && line.catalogItemId != line.itemId) {
-        lines.add(line);
+        // Configured line: re-price from the live option groups; drop it when
+        // the choice is no longer valid (the server would refuse it anyway).
+        final delta = foodOptionDelta(item.optionGroups, line.optionIds);
+        if (delta == null) {
+          continue;
+        }
+        lines.add(line.copyWith(unitPriceVnd: item.priceVnd + delta));
+        continue;
+      }
+      if (item.optionGroups.any((group) => group.required)) {
+        // A plain line for a dish that now needs a choice cannot be placed.
         continue;
       }
       lines.add(line.copyWith(name: item.name, unitPriceVnd: item.priceVnd));
@@ -336,6 +416,15 @@ class FoodCartCubit extends Cubit<FoodCartState> {
         idempotencyKey: createFoodIdempotencyKey(),
       ),
     );
+  }
+
+  /// Stores (or clears, with null) the voucher quote shown at checkout.
+  void applyVoucher({String? code, int discountVnd = 0}) {
+    if (code == null || code.isEmpty) {
+      emit(state.copyWith(clearVoucher: true));
+      return;
+    }
+    emit(state.copyWith(voucherCode: code, voucherDiscountVnd: discountVnd));
   }
 
   void rotateIdempotencyKey() {
@@ -354,9 +443,14 @@ bool foodCatalogPriceDrift(FoodStoreDetail store, FoodCartState cart) {
       return true;
     }
     if (line.catalogItemId != null && line.catalogItemId != line.itemId) {
+      final delta = foodOptionDelta(item.optionGroups, line.optionIds);
+      if (delta == null || item.priceVnd + delta != line.unitPriceVnd) {
+        return true;
+      }
       continue;
     }
-    if (item.priceVnd != line.unitPriceVnd) {
+    if (item.priceVnd != line.unitPriceVnd ||
+        item.optionGroups.any((group) => group.required)) {
       return true;
     }
   }

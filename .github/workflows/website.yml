@@ -4,12 +4,14 @@ on:
   pull_request:
     paths:
       - 'website/**'
+      - '.nvmrc'
       - '.github/workflows/website.yml'
   push:
     branches:
       - main
     paths:
       - 'website/**'
+      - '.nvmrc'
       - '.github/workflows/website.yml'
 
 defaults:
@@ -28,7 +30,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: website/package-lock.json
 
@@ -45,4 +47,3 @@ jobs:
         run: npm run build
         env:
           NEXT_PUBLIC_APP_ENV: ci
-          NEXT_PUBLIC_NEST_API_URL: http://127.0.0.1:3001

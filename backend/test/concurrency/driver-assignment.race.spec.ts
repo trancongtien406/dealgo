@@ -2,6 +2,8 @@
  * Concurrent ride selection against Postgres.
  * Skips when DATABASE_URL is unset (default unit suite uses memory repos).
  */
+import { randomUUID } from 'node:crypto';
+import { uniqueTestPhone } from './test-phone.js';
 import { INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
@@ -37,7 +39,6 @@ class ManualClock implements RideClock {
 describePg('ride select race (postgres)', () => {
   let app: INestApplication;
   let sms: MockSmsSender;
-  let phoneSerial = Number(String(Date.now()).slice(-6));
   let prisma: PrismaService;
 
   beforeAll(async () => {
@@ -56,6 +57,7 @@ describePg('ride select race (postgres)', () => {
               PUSH_PROVIDER: 'mock',
               PARTNER_ELIGIBILITY_BYPASS: 'true',
               OTP_THROTTLE_LIMIT: '1000',
+              OTP_PHONE_LIMIT: '1000',
               RIDE_OFFER_TTL_SECONDS: '60',
               RIDE_MIN_FARE_VND: '10000',
               RIDE_MAX_FARE_VND: '500000',
@@ -89,8 +91,7 @@ describePg('ride select race (postgres)', () => {
   });
 
   async function login(): Promise<{ token: string; userId: string }> {
-    phoneSerial += 1;
-    const phone = `098${String(phoneSerial).padStart(7, '0')}`;
+    const phone = uniqueTestPhone('098');
     const created = await request(app.getHttpServer())
       .post('/v1/auth/phone/challenges')
       .send({ phone })
@@ -114,7 +115,7 @@ describePg('ride select race (postgres)', () => {
     await ensureGrant(identity, driverA.userId, 'DRIVER');
     await ensureGrant(identity, driverB.userId, 'DRIVER');
 
-    const suffix = `${Date.now()}-${phoneSerial}`;
+    const suffix = `${Date.now()}-${randomUUID().slice(0, 8)}`;
     const created = await request(app.getHttpServer())
       .post('/v1/rides')
       .set('Authorization', `Bearer ${customer.token}`)

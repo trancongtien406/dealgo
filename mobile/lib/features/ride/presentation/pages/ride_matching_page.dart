@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/network/api_error_l10n.dart';
-import '../../../../core/network/api_exception.dart';
+import '../../../../core/network/request_failure.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
+import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/ride_money.dart';
@@ -15,6 +15,8 @@ import '../cubit/ride_matching_cubit.dart';
 import '../utils/ride_routes.dart';
 import '../cubit/ride_session.dart';
 import '../widgets/ride_widgets.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 class RideMatchingPage extends StatelessWidget {
   const RideMatchingPage({required this.rideId, this.clock, super.key});
@@ -49,8 +51,8 @@ class _RideMatchingPageState extends State<_RideMatchingView> {
   var _loading = true;
   var _busy = false;
   var _offline = false;
+  Object? _failure;
   var _openedTracking = false;
-  String? _message;
 
   DateTime get _now => (widget.clock ?? DateTime.now)();
 
@@ -69,13 +71,12 @@ class _RideMatchingPageState extends State<_RideMatchingView> {
       setState(() {
         _loading = false;
         _offline = false;
-        _message = sessionExpiredMessage(context);
+        _failure = sessionExpiredFailure;
       });
       return;
     }
     setState(() {
       _busy = true;
-      _message = null;
     });
     try {
       final ride = await context.read<RideMatchingCubit>().load(
@@ -100,8 +101,9 @@ class _RideMatchingPageState extends State<_RideMatchingView> {
         _loading = false;
         _busy = false;
         _offline = false;
+        _failure = null;
       });
-      if (ride.status == RideStatus.assigned && !_openedTracking) {
+      if (ride.status.hasDriver && !_openedTracking) {
         _openedTracking = true;
         await context.push(RideRoutes.tracking(ride.id));
       }
@@ -112,10 +114,8 @@ class _RideMatchingPageState extends State<_RideMatchingView> {
       setState(() {
         _loading = false;
         _busy = false;
-        _offline = true;
-        _message = error is ApiException
-            ? null
-            : AppLocalizations.of(context).errorLoadFailed;
+        _failure = error;
+        _offline = requestFailureIsOffline(error);
       });
     }
   }
@@ -123,10 +123,7 @@ class _RideMatchingPageState extends State<_RideMatchingView> {
   void _editTrip(RideView ride) {
     context.push(
       RideRoutes.fare,
-      extra: RidePlaces(
-        pickupLabel: ride.pickup.label,
-        dropoffLabel: ride.dropoff.label,
-      ),
+      extra: RidePlaces(pickup: ride.pickup, dropoff: ride.dropoff),
     );
   }
 
@@ -154,7 +151,7 @@ class _RideMatchingPageState extends State<_RideMatchingView> {
     if (_loading && ride == null) {
       return Column(
         children: [
-          RideScreenHeader(title: 'Đang nhận báo giá', onBack: _back),
+          DealGoAppHeader(title: AppLocalizations.of(context).rideMatchingReceiving, onBack: _back),
           const Expanded(child: Center(child: CircularProgressIndicator())),
         ],
       );
@@ -162,29 +159,13 @@ class _RideMatchingPageState extends State<_RideMatchingView> {
     if (ride == null) {
       return Column(
         children: [
-          RideScreenHeader(
-            title: 'Đang tìm tài xế',
-            subtitle: 'DealGo · Biến thể trạng thái',
-            onBack: _back,
-          ),
+          DealGoAppHeader(title: AppLocalizations.of(context).rideMatchingSearching, onBack: _back),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
-              child: _offline
-                  ? const RideOfflineNotice(
-                      detail:
-                          'Chưa tải được yêu cầu. Chuyến chưa đổi trạng thái.',
-                    )
-                  : Text(
-                      _message ?? AppLocalizations.of(context).errorLoadFailed,
-                    ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
-            child: DealGoSecondaryButton(
-              label: AppLocalizations.of(context).actionRetry,
-              onPressed: _load,
+            child: DealGoStateView.failure(
+              context,
+              onRetry: _load,
+              cause: _failure,
+              message: AppLocalizations.of(context).rideMatchingLoadFailed,
             ),
           ),
         ],
@@ -202,7 +183,7 @@ class _RideMatchingPageState extends State<_RideMatchingView> {
         onRetry: () => _editTrip(ride),
       );
     }
-    if (ride.status == RideStatus.assigned) {
+    if (ride.status.hasDriver) {
       return _AssignedHandoff(
         onBack: _back,
         onOpen: () => context.push(RideRoutes.tracking(ride.id)),
@@ -244,7 +225,7 @@ class _MatchingWait extends StatelessWidget {
     final offers = onOpenOffers;
     return Column(
       children: [
-        RideScreenHeader(title: 'Đang nhận báo giá', onBack: onBack),
+        DealGoAppHeader(title: AppLocalizations.of(context).rideMatchingReceiving, onBack: onBack),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(
@@ -258,7 +239,7 @@ class _MatchingWait extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const RideSectionTitle('Yêu cầu đang mở'),
+                    RideSectionTitle(AppLocalizations.of(context).driverOpenRequests),
                     const SizedBox(height: DealGoSpacing.s12),
                     RideStopList(
                       pickup: ride.pickup.label,
@@ -267,8 +248,8 @@ class _MatchingWait extends StatelessWidget {
                     const SizedBox(height: DealGoSpacing.s12),
                     Row(
                       children: [
-                        const RideStatusChip(
-                          label: 'Đã gửi đề xuất',
+                        RideStatusChip(
+                          label: AppLocalizations.of(context).rideMatchingSent,
                           tone: RideChipTone.green,
                         ),
                         const Spacer(),
@@ -288,13 +269,13 @@ class _MatchingWait extends StatelessWidget {
               const _VehicleMark(),
               const SizedBox(height: DealGoSpacing.s16),
               Text(
-                'Đang chờ tài xế chào giá...',
+                AppLocalizations.of(context).rideMatchingWaiting,
                 textAlign: TextAlign.center,
                 style: textTheme.titleMedium,
               ),
               const SizedBox(height: DealGoSpacing.s8),
               Text(
-                'Những báo giá phù hợp sẽ xuất hiện để bạn so sánh và tự chọn tài xế.',
+                AppLocalizations.of(context).rideMatchingWaitingHint,
                 textAlign: TextAlign.center,
                 style: textTheme.bodyMedium?.copyWith(
                   color: DealGoColors.textSecondary,
@@ -306,18 +287,18 @@ class _MatchingWait extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     RideMoneyLine(
-                      label: 'Trạng thái',
+                      label: AppLocalizations.of(context).rideStatusLabel,
                       amount: ride.status.wire,
                     ),
                     if (ride.offers.isEmpty) ...[
                       const SizedBox(height: DealGoSpacing.s8),
                       Text(
-                        'Chưa có tài xế chào giá',
+                        AppLocalizations.of(context).rideNoOffersTitle,
                         style: textTheme.titleMedium,
                       ),
                       const SizedBox(height: DealGoSpacing.s4),
                       Text(
-                        'Trong khu vực này chưa có báo giá hợp lệ cho yêu cầu hiện tại.',
+                        AppLocalizations.of(context).rideNoOffersMessage,
                         style: textTheme.bodyMedium?.copyWith(
                           color: DealGoColors.textSecondary,
                         ),
@@ -327,22 +308,22 @@ class _MatchingWait extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: DealGoSpacing.s16),
-              const RidePanel(
+              RidePanel(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    RideSectionTitle('Tiến trình'),
-                    SizedBox(height: DealGoSpacing.s12),
+                    RideSectionTitle(AppLocalizations.of(context).rideProgress),
+                    const SizedBox(height: DealGoSpacing.s12),
                     _MatchStep(
-                      label: 'Đã gửi yêu cầu thành công',
+                      label: AppLocalizations.of(context).rideProgressSent,
                       tone: _StepTone.done,
                     ),
                     _MatchStep(
-                      label: 'Đang nhận báo giá từ tài xế',
+                      label: AppLocalizations.of(context).rideProgressReceiving,
                       tone: _StepTone.current,
                     ),
                     _MatchStep(
-                      label: 'Chờ bạn chọn và xác nhận',
+                      label: AppLocalizations.of(context).rideProgressChoose,
                       tone: _StepTone.pending,
                     ),
                   ],
@@ -350,14 +331,14 @@ class _MatchingWait extends StatelessWidget {
               ),
               if (offline) ...[
                 const SizedBox(height: DealGoSpacing.s12),
-                const RideOfflineNotice(
+                RideOfflineNotice(
                   detail:
-                      'Chưa làm mới được yêu cầu. Trạng thái chuyến chưa đổi.',
+                      AppLocalizations.of(context).rideMatchingRefreshFailed,
                 ),
               ],
               if (offers != null) ...[
                 const SizedBox(height: DealGoSpacing.s12),
-                DealGoSecondaryButton(label: 'Xem báo giá', onPressed: offers),
+                DealGoSecondaryButton(label: AppLocalizations.of(context).rideViewOffers, onPressed: offers),
               ],
             ],
           ),
@@ -371,7 +352,7 @@ class _MatchingWait extends StatelessWidget {
           ),
           child: DealGoSecondaryButton(
             key: const Key('ride-cancel-search'),
-            label: 'Hủy tìm kiếm',
+            label: AppLocalizations.of(context).rideCancelSearch,
             enabled: !busy,
             onPressed: onCancel,
           ),
@@ -400,11 +381,7 @@ class _MatchingTimeout extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        RideScreenHeader(
-          title: 'Đang tìm tài xế',
-          subtitle: 'DealGo · Biến thể trạng thái',
-          onBack: onBack,
-        ),
+        DealGoAppHeader(title: AppLocalizations.of(context).rideMatchingSearching, onBack: onBack),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(
@@ -414,19 +391,19 @@ class _MatchingTimeout extends StatelessWidget {
               DealGoSpacing.s16,
             ),
             children: [
-              const RideStateHero(
-                icon: Icons.timelapse,
+              RideStateHero(
+                icon: DealGoIcons.timer,
                 iconColor: DealGoColors.warning,
                 background: DealGoColors.amberSurface,
-                title: 'Chưa tìm được tài xế',
-                message: 'Đã hết khoảng thời gian ghép chuyến thử nghiệm. Chưa có tài xế nào nhận yêu cầu.',
+                title: AppLocalizations.of(context).rideTimeoutTitle,
+                message: AppLocalizations.of(context).rideTimeoutMessage,
               ),
               const SizedBox(height: DealGoSpacing.s16),
               RidePanel(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const RideSectionTitle('Hành trình đang chọn'),
+                    RideSectionTitle(AppLocalizations.of(context).rideCurrentRoute),
                     const SizedBox(height: DealGoSpacing.s12),
                     RideStopList(
                       pickup: ride.pickup.label,
@@ -440,23 +417,23 @@ class _MatchingTimeout extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const RideSectionTitle('Giá đề xuất đang dùng'),
+                    RideSectionTitle(AppLocalizations.of(context).rideCurrentOfferedFare),
                     const SizedBox(height: DealGoSpacing.s8),
                     RideMoneyLine(
-                      label: 'Giá đề xuất',
+                      label: AppLocalizations.of(context).rideOfferedFare,
                       amount: formatRideVnd(ride.offeredFareVnd),
                       emphasize: true,
                     ),
-                    const RideMoneyLine(
-                      label: 'Phương tiện',
-                      amount: rideVehicleLabel,
+                    RideMoneyLine(
+                      label: AppLocalizations.of(context).kycStepVehicle,
+                      amount: AppLocalizations.of(context).rideVehicleMotorbike,
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: DealGoSpacing.s12),
-              const RideNote(
-                message: 'Yêu cầu cũ được đánh dấu TIMEOUT; nhấn thử lại tạo yêu cầu mới có idempotency key.',
+              RideNote(
+                message: AppLocalizations.of(context).rideTimeoutNote,
               ),
             ],
           ),
@@ -469,8 +446,8 @@ class _MatchingTimeout extends StatelessWidget {
             DealGoSpacing.s12,
           ),
           child: RideDualActions(
-            secondaryLabel: 'Sửa hành trình',
-            primaryLabel: 'Tìm lại tài xế',
+            secondaryLabel: AppLocalizations.of(context).rideEditRoute,
+            primaryLabel: AppLocalizations.of(context).rideFindAgain,
             enabled: !busy,
             onSecondary: onEdit,
             onPrimary: onRetry,
@@ -491,19 +468,19 @@ class _AssignedHandoff extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        RideScreenHeader(title: 'Đang nhận báo giá', onBack: onBack),
-        const Expanded(
+        DealGoAppHeader(title: AppLocalizations.of(context).rideMatchingReceiving, onBack: onBack),
+        Expanded(
           child: Padding(
-            padding: EdgeInsets.all(DealGoDimensions.pageGutter),
+            padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
             child: Text(
-              'Tài xế đã nhận chuyến. Mở màn theo dõi để xem giá đã chốt.',
+              AppLocalizations.of(context).rideAssignedNote,
             ),
           ),
         ),
         Padding(
           padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
           child: DealGoSecondaryButton(
-            label: 'Theo dõi chuyến',
+            label: AppLocalizations.of(context).rideTrack,
             onPressed: onOpen,
           ),
         ),
@@ -521,11 +498,11 @@ class _CancelledMatch extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        RideScreenHeader(title: 'Đang nhận báo giá', onBack: onBack),
-        const Expanded(
+        DealGoAppHeader(title: AppLocalizations.of(context).rideMatchingReceiving, onBack: onBack),
+        Expanded(
           child: Padding(
-            padding: EdgeInsets.all(DealGoDimensions.pageGutter),
-            child: Text('Yêu cầu đã hủy. Đề xuất không còn hiệu lực.'),
+            padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
+            child: Text(AppLocalizations.of(context).rideCancelledNote),
           ),
         ),
       ],
@@ -540,16 +517,16 @@ class _VehicleMark extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        DecoratedBox(
+        const DecoratedBox(
           decoration: BoxDecoration(
             color: DealGoColors.subtlePurple,
             shape: BoxShape.circle,
           ),
-          child: const SizedBox(
+          child: SizedBox(
             width: 96,
             height: 96,
             child: Icon(
-              Icons.two_wheeler,
+              DealGoIcons.motorbike,
               color: DealGoColors.primary,
               size: 42,
             ),
@@ -557,7 +534,7 @@ class _VehicleMark extends StatelessWidget {
         ),
         const SizedBox(height: DealGoSpacing.s8),
         Text(
-          rideVehicleLabel,
+          AppLocalizations.of(context).rideVehicleMotorbike,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: DealGoColors.textSecondary,
             fontWeight: FontWeight.w700,
@@ -579,9 +556,9 @@ class _MatchStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (icon, color) = switch (tone) {
-      _StepTone.done => (Icons.check_circle, DealGoColors.brandGreen),
-      _StepTone.current => (Icons.circle, DealGoColors.primary),
-      _StepTone.pending => (Icons.circle_outlined, DealGoColors.textSecondary),
+      _StepTone.done => (DealGoIcons.success, DealGoColors.brandGreen),
+      _StepTone.current => (DealGoIcons.circle, DealGoColors.primary),
+      _StepTone.pending => (DealGoIcons.radioOff, DealGoColors.textSecondary),
     };
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: DealGoSpacing.s8),

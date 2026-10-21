@@ -5,9 +5,7 @@ import '../../../ride/domain/params/submit_ride_offer_params.dart';
 import '../../domain/usecases/submit_driver_ride_offer.dart';
 
 class DriverOfferCubit extends Cubit<int> {
-  DriverOfferCubit({required SubmitDriverRideOffer submitDriverRideOffer})
-    : _submitDriverRideOffer = submitDriverRideOffer,
-      super(0);
+  DriverOfferCubit({required this._submitDriverRideOffer}) : super(0);
 
   final SubmitDriverRideOffer _submitDriverRideOffer;
 

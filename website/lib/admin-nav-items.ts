@@ -15,6 +15,7 @@ export type AdminNavHref =
   | "/settlements"
   | "/refunds"
   | "/disputes"
+  | "/support-tickets"
   | "/promotions"
   | "/catalog"
   | "/reports"
@@ -162,9 +163,10 @@ export const adminNavSections: readonly AdminNavSection[] = [
         label: "Khiếu nại & KM",
         icon: "alert",
         href: "/disputes",
-        keywords: ["disputes", "promotions"],
+        keywords: ["disputes", "promotions", "support", "hỗ trợ", "ticket"],
         children: [
           { label: "Khiếu nại", href: "/disputes", badge: "Ưu tiên" },
+          { label: "Yêu cầu hỗ trợ", href: "/support-tickets" },
           { label: "Khuyến mãi", href: "/promotions", badge: "Thử nghiệm" },
         ],
       },

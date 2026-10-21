@@ -11,15 +11,17 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { OpsSessionGuard, CurrentActor, type RequestActor } from '../identity/access-auth.guard.js';
+import { CurrentActor, type RequestActor } from '../identity/access-auth.guard.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { OpsInterveneDto, RidePageQueryDto } from './ride.dto.js';
 import { RideService } from './ride.service.js';
+import { OpsPermissionGuard } from '../identity/ops-rbac/ops-permission.guard.js';
+import { RequireOpsPermission } from '../identity/ops-rbac/ops-permission.decorator.js';
 
 @ApiTags('ops')
 @ApiBearerAuth()
 @Controller('v1/ops/rides')
-@UseGuards(OpsSessionGuard)
+@UseGuards(OpsPermissionGuard)
 export class RideOpsController {
   constructor(
     private readonly rides: RideService,
@@ -49,6 +51,7 @@ export class RideOpsController {
     return this.ledger.getJournal('RIDE', id);
   }
 
+  @RequireOpsPermission('rides.intervene')
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -63,6 +66,7 @@ export class RideOpsController {
     return this.rides.opsCancel(actor, id, dto.reason);
   }
 
+  @RequireOpsPermission('rides.intervene')
   @Post(':id/reassign')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

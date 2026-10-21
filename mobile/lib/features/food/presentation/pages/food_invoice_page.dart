@@ -3,15 +3,23 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/components/dealgo_banner.dart';
+import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../identity/domain/entities/auth_state.dart';
+import '../../../identity/presentation/cubit/auth_cubit.dart';
+import '../../domain/entities/food_models.dart';
 import '../../domain/entities/food_money.dart';
 import '../../domain/usecases/get_food_order.dart';
 import '../cubit/food_tracking_cubit.dart';
 import '../widgets/food_widgets.dart';
+import '../../../rating/domain/service_rating.dart';
+import '../../../rating/presentation/rate_service_card.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 /// C036 — food order invoice / receipt (separate from live tracking C033).
 class FoodInvoicePage extends StatelessWidget {
@@ -57,7 +65,7 @@ class _FoodInvoiceView extends StatelessWidget {
             if (order == null && state is FoodTrackingLoading) {
               return Column(
                 children: [
-                  FoodScreenHeader(
+                  DealGoAppHeader(
                     title: l10n.foodInvoiceTitle,
                     onBack: () => _back(context),
                   ),
@@ -67,10 +75,28 @@ class _FoodInvoiceView extends StatelessWidget {
                 ],
               );
             }
+            if (order == null) {
+              return Column(
+                children: [
+                  DealGoAppHeader(
+                    title: l10n.foodInvoiceTitle,
+                    onBack: () => _back(context),
+                  ),
+                  Expanded(
+                    child: DealGoStateView.failure(
+                      context,
+                      onRetry: () =>
+                          context.read<FoodTrackingCubit>().refresh(),
+                      cause: state is FoodTrackingOffline ? state.cause : null,
+                    ),
+                  ),
+                ],
+              );
+            }
             final current = order;
             return Column(
               children: [
-                FoodScreenHeader(
+                DealGoAppHeader(
                   title: l10n.foodInvoiceTitle,
                   onBack: () => _back(context),
                 ),
@@ -83,6 +109,11 @@ class _FoodInvoiceView extends StatelessWidget {
                       DealGoSpacing.s16,
                     ),
                     children: [
+                      if (current.status == 'DELIVERED')
+                        RateServiceCard(
+                          type: RatingSubjectType.foodOrder,
+                          subjectId: current.id,
+                        ),
                       FoodPanel(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -113,19 +144,15 @@ class _FoodInvoiceView extends StatelessWidget {
                               label: l10n.foodInvoiceDeliveredChip,
                               tone: DealGoChipTone.success,
                             ),
-                            if (current != null) ...[
-                              const SizedBox(height: DealGoSpacing.s12),
-                              FoodMoneyRow(
-                                label: l10n.foodInvoiceStore,
-                                amount: current.lines.isEmpty
-                                    ? '—'
-                                    : current.lines.first.name,
-                              ),
-                              FoodMoneyRow(
-                                label: l10n.foodInvoiceRecipient,
-                                amount: l10n.foodInvoiceRecipientSample,
-                              ),
-                            ],
+                            const SizedBox(height: DealGoSpacing.s12),
+                            FoodMoneyRow(
+                              label: l10n.foodInvoiceStore,
+                              amount: current.storeName ?? '—',
+                            ),
+                            FoodMoneyRow(
+                              label: l10n.foodInvoiceRecipient,
+                              amount: _recipient(context, current),
+                            ),
                           ],
                         ),
                       ),
@@ -139,7 +166,7 @@ class _FoodInvoiceView extends StatelessWidget {
                               style: textTheme.titleMedium,
                             ),
                             const SizedBox(height: DealGoSpacing.s12),
-                            if (current == null || current.lines.isEmpty)
+                            if (current.lines.isEmpty)
                               Text(
                                 l10n.foodInvoiceItemsEmpty,
                                 style: textTheme.bodySmall,
@@ -149,7 +176,7 @@ class _FoodInvoiceView extends StatelessWidget {
                                 Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const FoodThumb(size: 48),
+                                    FoodThumb(size: 48, imageUrl: line.imageUrl),
                                     const SizedBox(width: DealGoSpacing.s12),
                                     Expanded(
                                       child: Column(
@@ -160,6 +187,18 @@ class _FoodInvoiceView extends StatelessWidget {
                                             line.name,
                                             style: textTheme.titleSmall,
                                           ),
+                                          if (line.options.isNotEmpty)
+                                            Text(
+                                              line.optionsSummary,
+                                              key: const Key(
+                                                'food-invoice-line-options',
+                                              ),
+                                              style: textTheme.bodySmall
+                                                  ?.copyWith(
+                                                    color: DealGoColors
+                                                        .textSecondary,
+                                                  ),
+                                            ),
                                           Text(
                                             'x${line.quantity} · ${formatVnd(line.unitPriceVnd)}',
                                             style: textTheme.bodySmall,
@@ -193,11 +232,11 @@ class _FoodInvoiceView extends StatelessWidget {
                             const SizedBox(height: DealGoSpacing.s12),
                             FoodMoneyRow(
                               label: l10n.foodInvoiceSubtotal,
-                              amount: formatVnd(current?.subtotalVnd ?? 0),
+                              amount: formatVnd(current.subtotalVnd),
                             ),
                             FoodMoneyRow(
                               label: l10n.foodInvoiceDelivery,
-                              amount: formatVnd(current?.deliveryFareVnd ?? 0),
+                              amount: formatVnd(current.deliveryFareVnd),
                             ),
                             FoodMoneyRow(
                               label: l10n.foodInvoiceDiscount,
@@ -206,7 +245,7 @@ class _FoodInvoiceView extends StatelessWidget {
                             const Divider(height: DealGoSpacing.s24),
                             FoodMoneyRow(
                               label: l10n.foodInvoiceCodTotal,
-                              amount: formatVnd(current?.totalVnd ?? 0),
+                              amount: formatVnd(current.totalVnd),
                               emphasize: true,
                             ),
                             FoodMoneyRow(
@@ -220,7 +259,7 @@ class _FoodInvoiceView extends StatelessWidget {
                       DealGoBanner(
                         tone: DealGoBannerTone.info,
                         message: l10n.foodInvoiceCodNote(
-                          formatVnd(current?.totalVnd ?? 0),
+                          formatVnd(current.totalVnd),
                         ),
                       ),
                     ],
@@ -236,7 +275,7 @@ class _FoodInvoiceView extends StatelessWidget {
                   child: DealGoPrimaryButton(
                     key: const Key('food-invoice-rate'),
                     label: l10n.foodInvoiceRateCta,
-                    trailingIcon: Icons.arrow_forward,
+                    trailingIcon: DealGoIcons.arrowRight,
                     onPressed: () {},
                   ),
                 ),
@@ -247,4 +286,11 @@ class _FoodInvoiceView extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The signed-in customer's name, else the delivery address label.
+String _recipient(BuildContext context, FoodOrderDetail order) {
+  final auth = context.read<AuthCubit>().state;
+  final name = auth is AuthSignedIn ? auth.profile.displayName.trim() : '';
+  return name.isNotEmpty ? name : order.dropoff.label;
 }

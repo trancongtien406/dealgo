@@ -20,6 +20,8 @@ related_decisions:
 
 `PROPOSED`. Không chọn nhà cung cấp nào thành hợp đồng thương mại. Mỗi cổng có adapter `mock` chạy không cần key, và adapter thật chỉ bật khi đủ biến môi trường.
 
+> Đã triển khai trong code (rà soát 2026-10-18): adapter mock/thật trong `backend/src/integrations/*`. Trạng thái vẫn `PROPOSED` — chủ repo cần quyết định `ACCEPTED`/supersede.
+
 ## Context
 
 `OPEN-008` chưa chốt vendor. Sản phẩm vẫn cần passkey, SMS, email, bản đồ, push, thanh toán và thoại. Chủ dự án yêu cầu thiết kế để sau này chỉ điền key.

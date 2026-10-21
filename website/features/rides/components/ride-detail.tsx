@@ -169,7 +169,7 @@ export function RideDetail({ code }: { code: string }) {
             <SummaryCell label="Hành trình" hint={ride.seats}>
               {ride.pickup} → {ride.dropoff}
             </SummaryCell>
-            <SummaryCell label="Trạng thái">
+            <SummaryCell label="Trạng thái" hint={ride.cancelledBy ?? undefined}>
               <StatusChip tone={rideStatusTone(ride.status)} dot>
                 {rideStatusLabel(ride.status)}
               </StatusChip>
@@ -262,9 +262,17 @@ export function RideDetail({ code }: { code: string }) {
                 <MoneyLines
                   rows={[
                     { label: "Giá đã chốt / báo giá", amount: ride.price },
+                    ...(ride.discountVnd > 0
+                      ? [
+                          {
+                            label: `Voucher ${ride.voucherCode ?? ""} (DealGo tài trợ)`.trim(),
+                            amount: -ride.discountVnd,
+                          },
+                        ]
+                      : []),
                   ]}
-                  totalLabel="Tổng khách thanh toán (snapshot)"
-                  total={ride.price}
+                  totalLabel="Tiền mặt khách trả tài xế"
+                  total={ride.cashDueVnd}
                 />
               </DetailSection>
             </div>
@@ -284,7 +292,8 @@ export function RideDetail({ code }: { code: string }) {
                     label={`Sơ đồ tuyến từ ${ride.pickup} đến ${ride.dropoff}`}
                     start={ride.pickupArea || ride.pickup}
                     end={ride.dropoffArea || ride.dropoff}
-                    city="Đà Nẵng"
+                    from={ride.pickupPoint}
+                    to={ride.dropoffPoint}
                   />
                   <RouteStats
                     items={[

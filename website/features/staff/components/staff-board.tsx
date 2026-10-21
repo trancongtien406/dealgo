@@ -10,7 +10,17 @@ import {
   staffStatusLabel,
   staffStatusTone,
 } from "@/features/staff/mappers";
-import { useStaffQuery } from "@/features/staff/hooks";
+import {
+  useSetStaffRoleMutation,
+  useSetStaffSuperAdminMutation,
+  useStaffMeQuery,
+  useStaffQuery,
+} from "@/features/staff/hooks";
+import type { PersonItem } from "@/features/staff/api";
+import { canResetStaffPassword } from "@/lib/api/ops-password-reset-body";
+import { canChangeSuperAdmin } from "@/lib/api/ops-reason-body";
+import { ReasonDialog } from "@/components/ui/reason-dialog";
+import { StaffPasswordResetDialog } from "@/features/staff/components/staff-password-reset-dialog";
 import { OpsIcon } from "@/components/ui/ops-icons";
 import {
   AdminBreadcrumb,
@@ -83,6 +93,13 @@ export function StaffBoard() {
     scope,
   });
   const forbidden = isError && isForbiddenError(error);
+  const { data: me } = useStaffMeQuery();
+  const [resetTarget, setResetTarget] = useState<PersonItem | null>(null);
+  const [superAdminTarget, setSuperAdminTarget] = useState<PersonItem | null>(null);
+  const [roleTarget, setRoleTarget] = useState<PersonItem | null>(null);
+  const [pendingRole, setPendingRole] = useState<string>("SUPPORT");
+  const superAdminMutation = useSetStaffSuperAdminMutation();
+  const roleMutation = useSetStaffRoleMutation();
 
   const pagedPeople = data?.items ?? [];
   const total = data?.total ?? pagedPeople.length;
@@ -235,10 +252,8 @@ export function StaffBoard() {
         </li>
       </ul>
 
-      {/* Pending Role Grants Section */}
       <StaffPendingGrants />
 
-      {/* Main Tabs Section */}
       <section className="min-w-0 overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
         <div className="px-4 pt-4">
           <PreviewTabs
@@ -406,6 +421,14 @@ export function StaffBoard() {
                                     <p className="truncate text-xs text-muted">
                                       {person.email}
                                     </p>
+                                    {person.superAdmin ? (
+                                      <span
+                                        data-testid="staff-super-admin-badge"
+                                        className="mt-0.5 inline-flex rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-semibold text-brand"
+                                      >
+                                        Super-admin
+                                      </span>
+                                    ) : null}
                                   </div>
                                 </div>
                               </AdminTableCell>
@@ -424,17 +447,36 @@ export function StaffBoard() {
                               </AdminTableCell>
                               <AdminTableCell>{person.seen}</AdminTableCell>
                               <AdminTableCell>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    toast.info(
-                                      `Đang mở thiết lập phân quyền cho ${person.name} (${person.email})`,
-                                    )
-                                  }
-                                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-brand hover:bg-brand/10 cursor-pointer"
-                                >
-                                  Phân quyền
-                                </button>
+                                {me?.superAdmin ? (
+                                  <button
+                                    type="button"
+                                    data-testid="staff-assign-role"
+                                    onClick={() => setRoleTarget(person)}
+                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-brand hover:bg-brand/10 cursor-pointer"
+                                  >
+                                    Phân quyền
+                                  </button>
+                                ) : null}
+                                {canResetStaffPassword(me, person) ? (
+                                  <button
+                                    type="button"
+                                    data-testid="staff-reset-password"
+                                    onClick={() => setResetTarget(person)}
+                                    className="ml-1 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-danger hover:bg-danger/10 cursor-pointer"
+                                  >
+                                    Đặt lại mật khẩu
+                                  </button>
+                                ) : null}
+                                {canChangeSuperAdmin(me, person) ? (
+                                  <button
+                                    type="button"
+                                    data-testid="staff-super-admin-toggle"
+                                    onClick={() => setSuperAdminTarget(person)}
+                                    className="ml-1 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-ink hover:bg-canvas cursor-pointer"
+                                  >
+                                    {person.superAdmin ? "Thu hồi super-admin" : "Cấp super-admin"}
+                                  </button>
+                                ) : null}
                               </AdminTableCell>
                             </AdminTableRow>
                           );
@@ -462,11 +504,10 @@ export function StaffBoard() {
         )}
 
         {activeTab === "Vai trò & quyền" && <StaffRbacTab />}
-        {activeTab === "Phạm vi truy cập" && <StaffScopesTab />}
+        {activeTab === "Phạm vi truy cập" && <StaffScopesTab total={total} />}
         {activeTab === "Lịch sử thay đổi" && <StaffAuditTab />}
       </section>
 
-      {/* Security controls panel */}
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(16rem,22rem)]">
         <section className="min-w-0 rounded-2xl border border-border bg-white p-4 shadow-sm">
           <h2 className="text-base font-semibold text-ink">
@@ -516,6 +557,69 @@ export function StaffBoard() {
           </div>
         </section>
       </div>
+      <StaffPasswordResetDialog
+        person={resetTarget}
+        onClose={() => setResetTarget(null)}
+      />
+      <ReasonDialog
+        open={roleTarget !== null}
+        title={roleTarget ? `Gán vai trò ops — ${roleTarget.name}` : "Gán vai trò ops"}
+        description={`Chọn role rồi nhập lý do. Hiện tại: ${roleTarget?.role ?? "—"}. Super-admin bypass mọi permission.`}
+        confirmLabel="Gán vai trò"
+        tone="brand"
+        testId="staff-role-dialog"
+        onClose={() => setRoleTarget(null)}
+        onSubmit={async (reason) => {
+          if (!roleTarget) return;
+          const staffRole =
+            typeof window !== "undefined"
+              ? window.prompt(
+                  "Nhập role: ADMIN | SUPPORT | OPERATIONS | FINANCE",
+                  pendingRole,
+                )
+              : pendingRole;
+          if (
+            !staffRole ||
+            !["ADMIN", "SUPPORT", "OPERATIONS", "FINANCE"].includes(staffRole)
+          ) {
+            throw new Error("Role không hợp lệ");
+          }
+          setPendingRole(staffRole);
+          await roleMutation.mutateAsync({
+            id: roleTarget.id,
+            staffRole,
+            reason,
+          });
+          toast.success(`Đã gán ${staffRole} cho ${roleTarget.name}.`);
+        }}
+      />
+      <ReasonDialog
+        open={superAdminTarget !== null}
+        title={superAdminTarget?.superAdmin ? "Thu hồi quyền super-admin" : "Cấp quyền super-admin"}
+        description={
+          superAdminTarget?.superAdmin
+            ? `${superAdminTarget.name} sẽ không còn đặt lại mật khẩu hay phân quyền super-admin được. Hệ thống luôn giữ ít nhất một super-admin.`
+            : `${superAdminTarget?.name ?? ""} sẽ được đặt lại mật khẩu nhân sự khác và cấp/thu hồi super-admin.`
+        }
+        confirmLabel={superAdminTarget?.superAdmin ? "Thu hồi" : "Cấp quyền"}
+        tone={superAdminTarget?.superAdmin ? "danger" : "brand"}
+        testId="staff-super-admin-dialog"
+        onClose={() => setSuperAdminTarget(null)}
+        onSubmit={async (reason) => {
+          if (!superAdminTarget) return;
+          const grant = !superAdminTarget.superAdmin;
+          await superAdminMutation.mutateAsync({
+            id: superAdminTarget.id,
+            superAdmin: grant,
+            reason,
+          });
+          toast.success(
+            grant
+              ? `Đã cấp super-admin cho ${superAdminTarget.name}.`
+              : `Đã thu hồi super-admin của ${superAdminTarget.name}.`,
+          );
+        }}
+      />
     </div>
   );
 }

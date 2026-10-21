@@ -8,11 +8,9 @@ import '../../domain/usecases/place_food_order.dart';
 
 class FoodCheckoutCubit extends Cubit<int> {
   FoodCheckoutCubit({
-    required GetFoodStore getFoodStore,
-    required PlaceFoodOrder placeFoodOrder,
-  }) : _getFoodStore = getFoodStore,
-       _placeFoodOrder = placeFoodOrder,
-       super(0);
+    required this._getFoodStore,
+    required this._placeFoodOrder,
+  }) : super(0);
 
   final GetFoodStore _getFoodStore;
   final PlaceFoodOrder _placeFoodOrder;

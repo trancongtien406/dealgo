@@ -4,12 +4,14 @@ on:
   pull_request:
     paths:
       - 'backend/**'
+      - '.nvmrc'
       - '.github/workflows/backend.yml'
   push:
     branches:
       - main
     paths:
       - 'backend/**'
+      - '.nvmrc'
       - '.github/workflows/backend.yml'
 
 defaults:
@@ -29,7 +31,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
@@ -38,6 +40,13 @@ jobs:
 
       - name: Prisma generate
         run: npx prisma generate
+
+      # tsconfig.json covers src, test, prisma and scripts (vitest does not type-check).
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
 
       - name: Test
         run: npm test
@@ -93,7 +102,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: backend/package-lock.json
 

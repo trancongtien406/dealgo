@@ -1,3 +1,4 @@
+import { enrichOpsDriverPayload } from "@/lib/api/ops-people";
 import { fetchOpsUpstream } from "@/lib/api/ops-upstream";
 import {
   jsonFromOpsUpstream,
@@ -29,5 +30,11 @@ export async function GET(request: Request) {
       ...(kyc ? { kyc } : {}),
     },
   });
+  if (result.ok) {
+    return jsonFromOpsUpstream({
+      ...result,
+      data: await enrichOpsDriverPayload(result.data),
+    });
+  }
   return jsonFromOpsUpstream(result);
 }

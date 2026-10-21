@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/network/request_failure.dart';
 import '../../../../core/realtime/snapshot_binding.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
 import '../../domain/entities/food_models.dart';
@@ -34,21 +35,20 @@ final class FoodTrackingReady extends FoodTrackingState {
 }
 
 final class FoodTrackingOffline extends FoodTrackingState {
-  const FoodTrackingOffline({this.order, this.busy = false});
+  const FoodTrackingOffline({this.order, this.busy = false, this.cause});
 
   @override
   final FoodOrderDetail? order;
 
   @override
   final bool busy;
+
+  final Object? cause;
 }
 
 class FoodTrackingCubit extends Cubit<FoodTrackingState> {
-  FoodTrackingCubit({
-    required GetFoodOrder getFoodOrder,
-    required this.realtime,
-  }) : _getFoodOrder = getFoodOrder,
-       super(const FoodTrackingLoading());
+  FoodTrackingCubit({required this._getFoodOrder, required this.realtime})
+    : super(const FoodTrackingLoading());
 
   final GetFoodOrder _getFoodOrder;
   final SnapshotRealtime realtime;
@@ -87,7 +87,7 @@ class FoodTrackingCubit extends Cubit<FoodTrackingState> {
       return;
     }
     if (token == null || token.isEmpty) {
-      emit(FoodTrackingOffline(order: state.order));
+      emit(FoodTrackingOffline(order: state.order, cause: sessionExpiredFailure));
       return;
     }
     _inFlight = true;
@@ -105,11 +105,11 @@ class FoodTrackingCubit extends Cubit<FoodTrackingState> {
         return;
       }
       emit(FoodTrackingReady(order));
-    } catch (_) {
+    } catch (error) {
       if (isClosed) {
         return;
       }
-      emit(FoodTrackingOffline(order: previous));
+      emit(FoodTrackingOffline(order: previous, cause: error));
     } finally {
       _inFlight = false;
     }

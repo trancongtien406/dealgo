@@ -1,3 +1,6 @@
+import { cancellationCountsAgainstDriver } from '../../shared/cancel-actor.js';
+import type { CancelActorName } from '../../shared/cancel-actor.js';
+import type { DriverJobCounts } from '../../shared/driver-job-counts.js';
 import { randomUUID } from 'node:crypto';
 import {
   getServiceRegion,
@@ -14,6 +17,7 @@ export type RideStatusName =
   | 'COMPLETED'
   | 'CANCELLED'
   | 'EXPIRED';
+export type { CancelActorName };
 export type RideOfferKindName = 'ACCEPT' | 'COUNTER';
 export type RideOfferStatusName = 'PENDING' | 'SELECTED' | 'LOST';
 
@@ -49,12 +53,37 @@ export type RideSnapshot = {
   offeredFareVnd: number;
   referenceFareVnd: number;
   agreedFareVnd: number | null;
+  /** DEC-PROD-024: voucher discount reserved at offer selection (0 when none). */
+  discountVnd: number;
+  voucherCode: string | null;
+  /** Internal funding snapshot; never published to clients. */
+  voucherSponsor: RideVoucherSponsor | null;
+  cancelledBy: CancelActorName | null;
   assignedDriverId: string | null;
   selectedOfferId: string | null;
   expiresAt: Date;
   updatedAt: Date;
   offers: RideOfferSnapshot[];
 };
+
+export type RideVoucherSponsor = 'PLATFORM' | 'MERCHANT' | 'SHARED';
+
+export type RideVoucherApplied = {
+  code: string;
+  discountVnd: number;
+  sponsor: RideVoucherSponsor;
+};
+
+/** Driver history window: finished jobs, newest first. */
+export type DriverHistoryWindow = {
+  /** Inclusive upper bound on updatedAt (cursor). */
+  before?: Date;
+  /** Inclusive lower bound on updatedAt. */
+  since?: Date;
+  limit: number;
+};
+
+export const DRIVER_HISTORY_RIDE_STATUSES = ['COMPLETED', 'CANCELLED'] as const;
 
 export type LedgerOutcome =
   | { error: RideRuleCode; ride?: undefined }
@@ -89,6 +118,8 @@ export type SelectInput = {
   now: Date;
   /** Max concurrent capacity checked by repositories before assignment. */
   maxConcurrentJobs?: number;
+  /** DEC-PROD-024: optional voucher redeemed in the same transaction as the selection. */
+  voucherCode?: string;
 };
 
 export type CancelInput = {
@@ -146,6 +177,10 @@ type RideRow = {
   offeredFareVnd: number;
   referenceFareVnd: number;
   agreedFareVnd: number | null;
+  discountVnd: number;
+  voucherCode: string | null;
+  voucherSponsor: RideVoucherSponsor | null;
+  cancelledBy: CancelActorName | null;
   status: RideStatusName;
   loadedStatus: RideStatusName | null;
   assignedDriverId: string | null;
@@ -251,6 +286,10 @@ export class RideLedger {
       offeredFareVnd: input.offeredFareVnd,
       referenceFareVnd: input.referenceFareVnd,
       agreedFareVnd: null,
+      discountVnd: 0,
+      voucherCode: null,
+      voucherSponsor: null,
+      cancelledBy: null,
       status: 'NEGOTIATING',
       loadedStatus: null,
       assignedDriverId: null,
@@ -424,6 +463,30 @@ export class RideLedger {
     return { ride: this.snapshot(ride) };
   }
 
+  /** True when this customer key already selected an offer (replays must not redeem again). */
+  hasSelection(customerId: string, idempotencyKey: string): boolean {
+    return this.selections.has(selectionKey(customerId, idempotencyKey));
+  }
+
+  /** Amount the ride would be agreed at if `offerId` were selected now (voucher quote). */
+  offerAmount(rideId: string, offerId: string): number | null {
+    const offer = this.offers.get(offerId);
+    return offer && offer.rideId === rideId ? offer.amountVnd : null;
+  }
+
+  /** DEC-PROD-024: snapshot the voucher reserved for an assigned ride. */
+  applyVoucher(rideId: string, voucher: RideVoucherApplied): RideSnapshot | null {
+    const ride = this.rides.get(rideId);
+    if (!ride || ride.agreedFareVnd === null) {
+      return null;
+    }
+    ride.discountVnd = Math.min(Math.max(0, voucher.discountVnd), ride.agreedFareVnd);
+    ride.voucherCode = voucher.code;
+    ride.voucherSponsor = voucher.sponsor;
+    this.dirtyRideIds.add(ride.id);
+    return this.snapshot(ride);
+  }
+
   cancel(input: CancelInput): LedgerOutcome {
     const ride = this.rides.get(input.rideId);
     if (!ride || ride.customerId !== input.customerId) {
@@ -432,6 +495,7 @@ export class RideLedger {
     this.expireIfDue(ride, input.now);
     if (ride.status === 'NEGOTIATING' || PRE_TRIP.has(ride.status)) {
       ride.status = 'CANCELLED';
+      ride.cancelledBy = 'CUSTOMER';
       ride.updatedAt = input.now;
       this.dirtyRideIds.add(ride.id);
       return { ride: this.snapshot(ride) };
@@ -449,6 +513,7 @@ export class RideLedger {
       return { error: 'RIDE_NOT_CANCELLABLE' };
     }
     ride.status = 'CANCELLED';
+    ride.cancelledBy = 'OPS';
     ride.updatedAt = input.now;
     this.dirtyRideIds.add(ride.id);
     return { ride: this.snapshot(ride) };
@@ -474,6 +539,10 @@ export class RideLedger {
     }
     ride.assignedDriverId = null;
     ride.agreedFareVnd = null;
+    // The reserved voucher is released by the repository; the next selection may apply one again.
+    ride.discountVnd = 0;
+    ride.voucherCode = null;
+    ride.voucherSponsor = null;
     ride.status = 'NEGOTIATING';
     ride.updatedAt = input.now;
     this.dirtyRideIds.add(ride.id);
@@ -501,6 +570,49 @@ export class RideLedger {
       items: rows.slice(start, start + limit).map((ride) => this.snapshot(ride)),
       total,
     };
+  }
+
+  /** COMPLETED vs all terminal rides per assigned driver (DEC-PROD-034). */
+  countFinishedForDrivers(driverIds: readonly string[]): Map<string, DriverJobCounts> {
+    const wanted = new Set(driverIds);
+    const statuses: readonly string[] = DRIVER_HISTORY_RIDE_STATUSES;
+    const counts = new Map<string, DriverJobCounts>();
+    for (const ride of this.rides.values()) {
+      const driverId = ride.assignedDriverId;
+      if (
+        !driverId ||
+        !wanted.has(driverId) ||
+        !statuses.includes(ride.status) ||
+        !cancellationCountsAgainstDriver(ride.status, ride.cancelledBy)
+      ) {
+        continue;
+      }
+      const current = counts.get(driverId) ?? { completed: 0, finished: 0 };
+      current.finished += 1;
+      if (ride.status === 'COMPLETED') {
+        current.completed += 1;
+      }
+      counts.set(driverId, current);
+    }
+    return counts;
+  }
+
+  listFinishedForDriver(driverId: string, window: DriverHistoryWindow): RideSnapshot[] {
+    const statuses: readonly string[] = DRIVER_HISTORY_RIDE_STATUSES;
+    return [...this.rides.values()]
+      .filter(
+        (ride) =>
+          ride.assignedDriverId === driverId &&
+          statuses.includes(ride.status) &&
+          (!window.before || ride.updatedAt.getTime() <= window.before.getTime()) &&
+          (!window.since || ride.updatedAt.getTime() >= window.since.getTime()),
+      )
+      .sort(
+        (left, right) =>
+          right.updatedAt.getTime() - left.updatedAt.getTime() || right.id.localeCompare(left.id),
+      )
+      .slice(0, window.limit)
+      .map((ride) => this.snapshot(ride));
   }
 
   markEnRoute(input: DriverLifecycleInput): LedgerOutcome {
@@ -679,6 +791,10 @@ export class RideLedger {
       offeredFareVnd: ride.offeredFareVnd,
       referenceFareVnd: ride.referenceFareVnd,
       agreedFareVnd: ride.agreedFareVnd,
+      discountVnd: ride.discountVnd,
+      voucherCode: ride.voucherCode,
+      voucherSponsor: ride.voucherSponsor,
+      cancelledBy: ride.cancelledBy,
       assignedDriverId: ride.assignedDriverId,
       selectedOfferId: ride.selectedOfferId,
       expiresAt: new Date(ride.expiresAt),
@@ -707,6 +823,10 @@ export function rideRowFromRecord(input: {
   offeredFareVnd: number;
   referenceFareVnd: number;
   agreedFareVnd: number | null;
+  discountVnd?: number;
+  voucherCode?: string | null;
+  voucherSponsor?: RideVoucherSponsor | null;
+  cancelledBy?: CancelActorName | null;
   status: RideStatusName;
   assignedDriverId: string | null;
   selectedOfferId: string | null;
@@ -715,7 +835,14 @@ export function rideRowFromRecord(input: {
   createdAt: Date;
   updatedAt: Date;
 }): RideRow {
-  return { ...input, loadedStatus: input.status };
+  return {
+    ...input,
+    discountVnd: input.discountVnd ?? 0,
+    voucherCode: input.voucherCode ?? null,
+    voucherSponsor: input.voucherSponsor ?? null,
+    cancelledBy: input.cancelledBy ?? null,
+    loadedStatus: input.status,
+  };
 }
 
 export type { OfferRow, RideRow, SelectionRow };

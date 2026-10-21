@@ -1,23 +1,28 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/config/app_env.dart';
-import '../../../../core/design_system/components/dealgo_logo.dart';
-import '../../../../core/design_system/components/dealgo_primary_button.dart';
-import '../../../../core/design_system/components/dealgo_secondary_button.dart';
+import '../../../../core/design_system/components/dealgo_icon_badge.dart';
+import '../../../../core/design_system/components/dealgo_pressable.dart';
+import '../../../../core/design_system/components/dealgo_state_view.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../domain/auth_redirect.dart';
+import '../../domain/entities/auth_method_policy.dart';
 import '../../domain/entities/auth_state.dart';
-import '../../domain/phone_input.dart';
+import '../../domain/usecases/get_auth_methods.dart';
 import '../cubit/auth_cubit.dart';
 import '../cubit/phone_auth_cubit.dart';
+import '../widgets/auth_scaffold.dart';
 import '../widgets/auth_widgets.dart';
+import '../../../../core/l10n/api_error_text.dart';
 
-/// Screen S003: Welcome & Phone Login
-/// Corresponding to Mockup design/mockups/new/S003.png
+/// S003 — sign-in method picker (layout locked: methods first, no inline
+/// phone field on `/login`).
 class PhoneLoginPage extends StatefulWidget {
   const PhoneLoginPage({super.key});
 
@@ -26,23 +31,35 @@ class PhoneLoginPage extends StatefulWidget {
 }
 
 class _PhoneLoginPageState extends State<PhoneLoginPage> {
-  final TextEditingController _phone = TextEditingController();
+  List<AuthMethodPolicy> _policies = const [
+    AuthMethodPolicy(method: AuthMethodPolicy.passkey, enabled: true),
+    AuthMethodPolicy(method: AuthMethodPolicy.phoneSms, enabled: true),
+    AuthMethodPolicy(method: AuthMethodPolicy.email, enabled: true),
+  ];
 
   @override
-  void dispose() {
-    _phone.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _fetchPolicies();
   }
 
-  bool get _phoneReady => e164FromNationalInput(_phone.text) != null;
-
-  void _submit() {
-    final phone = e164FromNationalInput(_phone.text);
-    if (phone == null) {
-      return;
+  Future<void> _fetchPolicies() async {
+    try {
+      final getMethods = context.read<GetAuthMethods>();
+      final list = await getMethods();
+      if (mounted) {
+        setState(() => _policies = list);
+      }
+    } catch (_) {
+      // Keep default enabled policies when the catalog request fails.
     }
-    unawaited(context.read<PhoneAuthCubit>().createPhoneChallenge(phone));
   }
+
+  bool get _isPasskeyEnabled => _policies.any((p) => p.isPasskey && p.enabled);
+
+  bool get _isPhoneEnabled => _policies.any((p) => p.isPhoneSms && p.enabled);
+
+  bool get _isEmailEnabled => _policies.any((p) => p.isEmail && p.enabled);
 
   void _enterMockDemo() {
     if (!useMockData) {
@@ -51,364 +68,177 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
     unawaited(context.read<PhoneAuthCubit>().enterMockDemo());
   }
 
+  Future<void> _showPasskeyActions(BuildContext context) async {
+    final action = await showModalBottomSheet<_PasskeyAction>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (sheetContext) => const _PasskeyActionSheet(),
+    );
+    if (!context.mounted || action == null) {
+      return;
+    }
+    final cubit = context.read<PhoneAuthCubit>();
+    if (action == _PasskeyAction.signIn) {
+      await cubit.signInWithPasskey();
+    } else {
+      await cubit.signUpWithPasskey();
+    }
+  }
+
+  List<Widget> _methodTiles(BuildContext context, AppLocalizations l10n) {
+    final tiles = <Widget>[
+      if (_isPhoneEnabled)
+        _AuthMethodTile(
+          key: const Key('auth-method-phone'),
+          icon: DealGoIcons.phone,
+          label: l10n.authPhoneLabel,
+          onTap: () => context.push(AuthRoutes.phoneLogin),
+        ),
+      if (_isEmailEnabled)
+        _AuthMethodTile(
+          key: const Key('auth-method-email'),
+          icon: DealGoIcons.mail,
+          label: l10n.authEmailLabel,
+          onTap: () => context.push(AuthRoutes.emailLogin),
+        ),
+      if (_isPasskeyEnabled)
+        _AuthMethodTile(
+          key: const Key('auth-method-passkey'),
+          icon: DealGoIcons.fingerprint,
+          label: l10n.authMethodPasskey,
+          onTap: () => unawaited(_showPasskeyActions(context)),
+        ),
+    ];
+    if (tiles.isEmpty) {
+      return [
+        DealGoStateView(
+          key: const Key('auth-methods-empty'),
+          art: DealGoStateArt.security,
+          title: l10n.authMethodsEmptyTitle,
+          message: l10n.authMethodsEmptyBody,
+          compact: true,
+        ),
+      ];
+    }
+    return [
+      for (var i = 0; i < tiles.length; i++) ...[
+        if (i > 0) const SizedBox(height: DealGoSpacing.s12),
+        tiles[i],
+      ],
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final restoring = context.watch<AuthCubit>().state is AuthRestoring;
     if (restoring) {
       return const SessionRestoringPage();
     }
+    final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
 
     return BlocConsumer<PhoneAuthCubit, PhoneAuthState>(
-      listenWhen: (previous, next) =>
-          next is PhoneAuthChallengeReady &&
-          previous is PhoneAuthSubmittingChallenge,
+      listenWhen: (previous, current) =>
+          current is PhoneAuthError && current.phase == PhoneAuthPhase.passkey,
       listener: (context, state) {
-        if (state is! PhoneAuthChallengeReady) {
-          return;
+        if (state is PhoneAuthError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                apiErrorText(AppLocalizations.of(context), state.error),
+              ),
+            ),
+          );
+          context.read<PhoneAuthCubit>().clearError();
         }
-        final location = Uri(
-          path: '/login/otp',
-          queryParameters: {
-            'challengeId': state.challengeId,
-            'phone': state.phone,
-          },
-        ).toString();
-        unawaited(context.push(location));
       },
-      builder: (context, phoneAuth) {
-        final submitting = isPhoneAuthBusy(phoneAuth);
-        final error = phoneAuth is PhoneAuthError &&
-                (phoneAuth.phase == PhoneAuthPhase.challenge ||
-                    phoneAuth.phase == PhoneAuthPhase.mockDemo)
-            ? phoneAuth.error
-            : null;
-
-        return Scaffold(
-          backgroundColor: DealGoColors.canvas,
-          body: SafeArea(
-            child: Column(
-              children: [
-                // Top Bar: DealGo Wordmark & Help button
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: DealGoDimensions.pageGutter,
-                    vertical: DealGoSpacing.s8,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const DealGoLogo.wordmark(size: 26),
-                      TextButton(
-                        onPressed: () {
-                          // Opens help center or displays quick modal
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Trung tâm trợ giúp DealGo: 1900 xxxx'),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        },
-                        style: TextButton.styleFrom(
-                          foregroundColor: DealGoColors.primary,
-                          textStyle: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        child: const Text('Trợ giúp'),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Main Form Content
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
+      builder: (context, authState) {
+        return AuthScaffold(
+          onLogoDoubleTap: _enterMockDemo,
+          padBody: false,
+          body: Column(
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final height = (constraints.maxWidth * 560 / 767).clamp(
+                    220.0,
+                    300.0,
+                  );
+                  return Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: DealGoDimensions.pageGutter,
+                      horizontal: DealGoSpacing.s16,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // Hero Visual (Da Nang scenic graphic)
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(DealGoRadius.card),
-                          child: Container(
-                            constraints: const BoxConstraints(maxHeight: 200),
-                            child: Image.asset(
-                              'assets/images/hero_dealgo_danang.png',
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) => Container(
-                                height: 160,
-                                decoration: BoxDecoration(
-                                  color: DealGoColors.subtlePurple,
-                                  borderRadius: BorderRadius.circular(DealGoRadius.card),
-                                ),
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.travel_explore_rounded,
-                                    size: 64,
-                                    color: DealGoColors.primary,
-                                  ),
-                                ),
-                              ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(DealGoRadius.card),
+                      child: ColoredBox(
+                        color: DealGoColors.lavender,
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: height,
+                          child: Image.asset(
+                            'assets/images/hero_dealgo_danang.png',
+                            fit: BoxFit.contain,
+                            alignment: Alignment.center,
+                            filterQuality: FilterQuality.high,
+                            excludeFromSemantics: true,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const ColoredBox(
+                              color: DealGoColors.subtlePurple,
                             ),
                           ),
                         ),
-
-                        const SizedBox(height: DealGoSpacing.s16),
-
-                        // Headline
-                        Text.rich(
-                          const TextSpan(
-                            style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w800,
-                              color: DealGoColors.text,
-                              height: 1.25,
-                              letterSpacing: -0.5,
-                            ),
-                            children: [
-                              TextSpan(text: 'Chào mừng bạn\nđến với '),
-                              TextSpan(
-                                text: 'DealGo!',
-                                style: TextStyle(color: DealGoColors.primary),
-                              ),
-                            ],
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-
-                        const SizedBox(height: DealGoSpacing.s8),
-
-                        const Text(
-                          'Nhập số điện thoại để tiếp tục đặt xe,\ngọi đồ ăn và mua sắm.',
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w400,
-                            color: DealGoColors.textSecondary,
-                            height: 1.45,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-
-                        const SizedBox(height: DealGoSpacing.s20),
-
-                        // Phone label
-                        const Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'Số điện thoại',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: DealGoColors.text,
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: DealGoSpacing.s8),
-
-                        // Phone Input Field with VN Flag & +84
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(DealGoRadius.button),
-                            border: Border.all(
-                              color: DealGoColors.border,
-                              width: 1.2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.04),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          child: Row(
-                            children: [
-                              const _VietnamFlagBadge(),
-                              const SizedBox(width: 8),
-                              const Text(
-                                '+84',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: DealGoColors.text,
-                                ),
-                              ),
-                              const Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                                size: 18,
-                                color: DealGoColors.textSecondary,
-                              ),
-                              const SizedBox(width: 10),
-                              Container(
-                                width: 1,
-                                height: 24,
-                                color: DealGoColors.border,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: TextField(
-                                  key: const Key('phone-field'),
-                                  controller: _phone,
-                                  enabled: !submitting,
-                                  keyboardType: TextInputType.phone,
-                                  textInputAction: TextInputAction.done,
-                                  inputFormatters: [
-                                    FilteringTextInputFormatter.allow(RegExp(r'[0-9\s]')),
-                                    LengthLimitingTextInputFormatter(14),
-                                  ],
-                                  onChanged: (_) => setState(() {}),
-                                  onSubmitted: (_) => _submit(),
-                                  style: const TextStyle(
-                                    fontSize: 15.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: DealGoColors.text,
-                                  ),
-                                  decoration: InputDecoration(
-                                    hintText: 'Nhập số điện thoại',
-                                    hintStyle: TextStyle(
-                                      fontSize: 14.5,
-                                      fontWeight: FontWeight.w400,
-                                      color: DealGoColors.textSecondary.withValues(alpha: 0.7),
-                                    ),
-                                    border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        if (error != null) ...[
-                          const SizedBox(height: DealGoSpacing.s12),
-                          AuthErrorText(error: error),
-                        ],
-
-                        const SizedBox(height: DealGoSpacing.s12),
-
-                        // Security lock hint
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: DealGoSpacing.s20,
+                ),
+                child: Column(
+                  children: [
+                    const SizedBox(height: DealGoSpacing.s16),
+                    Semantics(
+                      header: true,
+                      child: Text.rich(
+                        TextSpan(
+                          style: textTheme.headlineMedium,
                           children: [
-                            const Icon(
-                              Icons.lock_outline_rounded,
-                              size: 16,
-                              color: DealGoColors.textSecondary,
+                            TextSpan(text: '${l10n.authWelcomeTo}\n'),
+                            TextSpan(
+                              text: 'Deal',
+                              style: textTheme.headlineLarge?.copyWith(
+                                color: DealGoColors.primary,
+                              ),
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Mã OTP sẽ được gửi để xác minh và bảo vệ tài khoản của bạn.',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w400,
-                                  color: DealGoColors.textSecondary.withValues(alpha: 0.85),
-                                  height: 1.35,
-                                ),
+                            TextSpan(
+                              text: 'Go',
+                              style: textTheme.headlineLarge?.copyWith(
+                                color: DealGoColors.brandGreen,
                               ),
                             ),
                           ],
                         ),
-
-                        const SizedBox(height: DealGoSpacing.s20),
-
-                        // Primary Action Button: Tiếp tục
-                        DealGoPrimaryButton(
-                          label: 'Tiếp tục',
-                          trailingIcon: Icons.arrow_forward_rounded,
-                          isLoading: submitting,
-                          enabled: _phoneReady && !submitting,
-                          onPressed: _submit,
-                        ),
-
-                        const SizedBox(height: DealGoSpacing.s12),
-
-                        // Alternate login buttons (Email, Passkey)
-                        _AlternateAuthButton(
-                          icon: Icons.mail_outline_rounded,
-                          label: 'Đăng nhập bằng Email',
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Đăng nhập bằng Email sẽ hỗ trợ ở bản tới'),
-                              ),
-                            );
-                          },
-                        ),
-
-                        const SizedBox(height: DealGoSpacing.s8),
-
-                        _AlternateAuthButton(
-                          icon: Icons.key_rounded,
-                          label: 'Dùng Passkey',
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Đăng nhập bằng Passkey sẽ hỗ trợ ở bản tới'),
-                              ),
-                            );
-                          },
-                        ),
-
-                        if (useMockData) ...[
-                          const SizedBox(height: DealGoSpacing.s8),
-                          DealGoSecondaryButton(
-                            key: const Key('mock-demo-enter'),
-                            label: 'Vào nhanh chế độ Demo (Mock)',
-                            enabled: !submitting,
-                            onPressed: _enterMockDemo,
-                          ),
-                        ],
-
-                        const SizedBox(height: DealGoSpacing.s16),
-
-                        // Legal Terms Notice
-                        Text.rich(
-                          const TextSpan(
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: DealGoColors.textSecondary,
-                              height: 1.45,
-                            ),
-                            children: [
-                              TextSpan(text: 'Bằng việc tiếp tục, bạn đồng ý với '),
-                              TextSpan(
-                                text: 'Điều khoản',
-                                style: TextStyle(
-                                  color: DealGoColors.primary,
-                                  fontWeight: FontWeight.w600,
-                                  decoration: TextDecoration.underline,
-                                ),
-                              ),
-                              TextSpan(text: '\nvà '),
-                              TextSpan(
-                                text: 'Chính sách quyền riêng tư',
-                                style: TextStyle(
-                                  color: DealGoColors.primary,
-                                  fontWeight: FontWeight.w600,
-                                  decoration: TextDecoration.underline,
-                                ),
-                              ),
-                              TextSpan(text: '.'),
-                            ],
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-
-                        const SizedBox(height: DealGoSpacing.s16),
-                      ],
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: DealGoSpacing.s8),
+                    Text(
+                      l10n.onbSlide1Body,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: DealGoColors.textSecondary,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: DealGoSpacing.s24),
+                    ..._methodTiles(context, l10n),
+                    const AuthLegalFooter(),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
@@ -416,62 +246,96 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
   }
 }
 
-class _VietnamFlagBadge extends StatelessWidget {
-  const _VietnamFlagBadge();
+enum _PasskeyAction { signIn, signUp }
+
+class _PasskeyActionSheet extends StatelessWidget {
+  const _PasskeyActionSheet();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 26,
-      height: 26,
-      decoration: const BoxDecoration(
-        color: Color(0xFFDA251D),
-        shape: BoxShape.circle,
+    final l10n = AppLocalizations.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        DealGoSpacing.s20,
+        DealGoSpacing.s4,
+        DealGoSpacing.s20,
+        DealGoSpacing.s24,
       ),
-      child: const Center(
-        child: Icon(Icons.star_rounded, color: Color(0xFFFFE14A), size: 14),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Center(
+            child: DealGoIconBadge(DealGoIcons.fingerprint, size: 52),
+          ),
+          const SizedBox(height: DealGoSpacing.s12),
+          Text(
+            l10n.authMethodPasskey,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: DealGoSpacing.s20),
+          _AuthMethodTile(
+            key: const Key('passkey-signin-action'),
+            icon: DealGoIcons.fingerprint,
+            label: l10n.passkeySignIn,
+            onTap: () => Navigator.pop(context, _PasskeyAction.signIn),
+          ),
+          const SizedBox(height: DealGoSpacing.s12),
+          _AuthMethodTile(
+            key: const Key('passkey-signup-action'),
+            icon: DealGoIcons.add,
+            label: l10n.passkeySignUp,
+            onTap: () => Navigator.pop(context, _PasskeyAction.signUp),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _AlternateAuthButton extends StatelessWidget {
-  const _AlternateAuthButton({
+class _AuthMethodTile extends StatelessWidget {
+  const _AuthMethodTile({
     required this.icon,
     required this.label,
-    required this.onPressed,
+    required this.onTap,
+    super.key,
   });
 
   final IconData icon;
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: DealGoColors.border, width: 1.2),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(DealGoRadius.button),
-          ),
-          backgroundColor: Colors.white,
+    return DealGoPressable(
+      onTap: onTap,
+      semanticLabel: label,
+      child: Container(
+        height: 60,
+        padding: const EdgeInsets.symmetric(horizontal: DealGoSpacing.s12),
+        decoration: BoxDecoration(
+          color: DealGoColors.card,
+          borderRadius: BorderRadius.circular(DealGoRadius.button),
+          border: Border.all(color: DealGoColors.border),
+          boxShadow: DealGoShadows.card,
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 18, color: DealGoColors.primary),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w600,
-                color: DealGoColors.text,
+            DealGoIconBadge(icon, size: 38),
+            const SizedBox(width: DealGoSpacing.s12),
+            Expanded(
+              child: ExcludeSemantics(
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
               ),
+            ),
+            const Icon(
+              DealGoIcons.chevronRight,
+              color: DealGoColors.textTertiary,
+              size: 20,
             ),
           ],
         ),

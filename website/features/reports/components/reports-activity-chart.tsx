@@ -273,17 +273,36 @@ function HourlyTrend({
             </g>
           );
         })}
-        {hourLabels.map((hour, index) => (
-          <text
-            key={`${hour}-${index}`}
-            x={calculateXCoordinate(index, plotWidth, hourLabels.length)}
-            y={CHART_CONFIG.height - 6}
-            textAnchor="middle"
-            className="fill-muted text-[11px]"
-          >
-            {hour}
-          </text>
-        ))}
+        {hourLabels.map((hour, index) => {
+          const x = calculateXCoordinate(index, plotWidth, hourLabels.length);
+          const step = Math.max(1, Math.ceil(hourLabels.length / 7));
+          const isVisible =
+            hourLabels.length <= 8 ||
+            index % step === 0 ||
+            index === hourLabels.length - 1;
+          return (
+            <g key={`${hour}-${index}`}>
+              <line
+                x1={x}
+                x2={x}
+                y1={baseline}
+                y2={baseline + 4}
+                className="stroke-border"
+                strokeWidth="1"
+              />
+              {isVisible ? (
+                <text
+                  x={x}
+                  y={CHART_CONFIG.height - 6}
+                  textAnchor="middle"
+                  className="fill-muted text-[11px] font-medium tabular-nums"
+                >
+                  {hour}
+                </text>
+              ) : null}
+            </g>
+          );
+        })}
         {chartSeries.map((seriesItem) => {
           const points = seriesItem.shape.map((value, index) => ({
             x: calculateXCoordinate(index, plotWidth, hourLabels.length),

@@ -4,6 +4,9 @@ export type OpsFaqSeed = {
   suggestedAnswer: string;
   category: 'POLICY' | 'OPS' | 'PRODUCT' | 'TECH';
   sortOrder: number;
+  /** Defaults: INTERNAL / DRAFT. */
+  audience?: 'INTERNAL' | 'CUSTOMER' | 'DRIVER' | 'MERCHANT';
+  status?: 'DRAFT' | 'PUBLISHED';
 };
 
 /**

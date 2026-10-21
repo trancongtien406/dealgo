@@ -50,7 +50,8 @@ export class PrismaService implements DatabasePing, OnModuleDestroy {
       {
         connectionString: databaseUrl,
         connectionTimeoutMillis: PING_TIMEOUT_MS,
-        max: 2,
+        // Per process: API and worker each open their own pool.
+        max: this.config.get('DATABASE_POOL_MAX', { infer: true }),
       },
       {
         // An idle pg client emits 'error'. Without a listener Node crashes the process.

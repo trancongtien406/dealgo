@@ -18,6 +18,8 @@ type ErrorBody = {
   timestamp: string;
   path: string;
   requestId: string;
+  /** Machine-readable extras, only when the thrower attached a `details` object. */
+  details?: Record<string, unknown>;
 };
 
 const STATUS_ERROR_CODES: Readonly<Record<number, string>> = {
@@ -26,6 +28,7 @@ const STATUS_ERROR_CODES: Readonly<Record<number, string>> = {
   [HttpStatus.FORBIDDEN]: 'FORBIDDEN',
   [HttpStatus.NOT_FOUND]: 'NOT_FOUND',
   [HttpStatus.CONFLICT]: 'CONFLICT',
+  [HttpStatus.PAYLOAD_TOO_LARGE]: 'PAYLOAD_TOO_LARGE',
   [HttpStatus.UNPROCESSABLE_ENTITY]: 'UNPROCESSABLE_ENTITY',
   [HttpStatus.TOO_MANY_REQUESTS]: 'TOO_MANY_REQUESTS',
 };
@@ -49,7 +52,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       requestId,
     );
 
-    if (!(exception instanceof HttpException)) {
+    if (!(exception instanceof HttpException) && readBodyParserStatus(exception) === null) {
       if (exception instanceof Error) {
         const sanitizedMessage = sanitizeLogMessage(exception.message);
         const sanitizedStack = exception.stack ? sanitizeLogMessage(exception.stack) : undefined;
@@ -71,11 +74,29 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       const statusCode = exception.getStatus();
       const { message, errorCode } = readHttpException(exception, statusCode);
+      const details = readDetails(exception);
       return {
         success: false,
         statusCode,
         message,
         errorCode,
+        timestamp,
+        path,
+        requestId,
+        ...(details ? { details } : {}),
+      };
+    }
+
+    const parserStatus = readBodyParserStatus(exception);
+    if (parserStatus !== null) {
+      return {
+        success: false,
+        statusCode: parserStatus,
+        message:
+          parserStatus === HttpStatus.PAYLOAD_TOO_LARGE
+            ? 'Request body is too large'
+            : 'Request body could not be parsed',
+        errorCode: errorCodeForStatus(parserStatus),
         timestamp,
         path,
         requestId,
@@ -118,6 +139,18 @@ function readHttpException(
   return { message: exception.message, errorCode: errorCodeForStatus(statusCode) };
 }
 
+function readDetails(exception: HttpException): Record<string, unknown> | undefined {
+  const response = exception.getResponse();
+  if (typeof response !== 'object' || response === null) {
+    return undefined;
+  }
+  const details = (response as { details?: unknown }).details;
+  if (typeof details !== 'object' || details === null || Array.isArray(details)) {
+    return undefined;
+  }
+  return details as Record<string, unknown>;
+}
+
 function normalizeMessage(message: unknown, fallback: string): string {
   if (typeof message === 'string' && message.trim() !== '') {
     return message;
@@ -129,6 +162,27 @@ function normalizeMessage(message: unknown, fallback: string): string {
     }
   }
   return fallback;
+}
+
+/**
+ * Express body-parser rejects oversized or malformed bodies before Nest sees the request.
+ * Its errors are client errors (http-errors: `expose`, 4xx `status`, `type`), not 500s.
+ */
+function readBodyParserStatus(exception: unknown): number | null {
+  if (!(exception instanceof Error)) {
+    return null;
+  }
+  const candidate = exception as Error & { expose?: unknown; status?: unknown; type?: unknown };
+  if (
+    candidate.expose === true &&
+    typeof candidate.type === 'string' &&
+    typeof candidate.status === 'number' &&
+    candidate.status >= 400 &&
+    candidate.status < 500
+  ) {
+    return candidate.status;
+  }
+  return null;
 }
 
 function errorCodeForStatus(statusCode: number): string {

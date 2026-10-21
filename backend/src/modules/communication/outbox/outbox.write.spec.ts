@@ -6,7 +6,7 @@ describe('outbox.write helpers', () => {
     expect(shouldEmitRideStatus('EXPIRED')).toBe(true);
     expect(shouldEmitRideStatus('NEGOTIATING')).toBe(false);
     expect(shouldEmitFoodStatus('DELIVERED')).toBe(true);
-    expect(shouldEmitFoodStatus('PLACED')).toBe(false);
+    expect(shouldEmitFoodStatus('PLACED')).toBe(true); // DEC-PROD-041 store room
   });
 
   it('builds stable idempotent event keys', () => {

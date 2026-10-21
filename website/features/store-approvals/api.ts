@@ -10,6 +10,12 @@ import { apiFetch } from "@/lib/api/client";
 import { apiPaths } from "@/lib/api/paths";
 import type { ListQuery, PaginatedList } from "@/lib/api/pagination";
 import { formatOpsDate } from "@/lib/ops-time";
+import {
+  businessTypeLabel,
+  mapPartnerDocuments,
+  mapPartnerIssues,
+  registrationSubjectLabel,
+} from "@/features/kyc/partner-review";
 
 export type FetchStoreApprovalsParams = ListQuery & {
   status?: string | null;
@@ -31,10 +37,12 @@ export function mapNestToStoreApproval(
       ? (app.metadata as Record<string, unknown>)
       : {};
   const name =
+    metaString(meta, "shopName") ||
     metaString(meta, "storeName") ||
     metaString(meta, "name") ||
     `Cửa hàng ${app.id.slice(0, 8)}`;
   const owner =
+    metaString(meta, "representativeName") ||
     metaString(meta, "ownerName") ||
     metaString(meta, "owner") ||
     "Chủ cửa hàng";
@@ -54,17 +62,27 @@ export function mapNestToStoreApproval(
     code: app.id,
     initials,
     name,
-    category: metaString(meta, "category") || "Đang cập nhật",
+    category:
+      businessTypeLabel(metaString(meta, "businessType") ?? "") ||
+      metaString(meta, "category") ||
+      "Đang cập nhật",
     owner,
     phoneMasked: metaString(meta, "phoneMasked") || phone || "—",
-    address: metaString(meta, "address") || "Chưa cập nhật",
+    address:
+      metaString(meta, "shopAddress") || metaString(meta, "address") || "Chưa cập nhật",
     area:
       metaString(meta, "area") || metaString(meta, "city") || "Đang cập nhật",
-    registrationType: metaString(meta, "registrationType") || "Chưa cập nhật",
+    registrationType:
+      registrationSubjectLabel(metaString(meta, "registrationSubject") ?? "") ||
+      metaString(meta, "registrationType") ||
+      "Chưa cập nhật",
     submittedAt: formatOpsDate(app.submittedAt),
     status,
     saleReady: app.status === "APPROVED",
     assignee: metaString(meta, "assignee") || "Chưa phân công",
+    documents: mapPartnerDocuments(app),
+    reason: app.reason,
+    issues: mapPartnerIssues(app),
   };
 }
 
@@ -117,13 +135,14 @@ export async function approveStoreApplication(
 export async function rejectStoreApplication(
   id: string,
   reason: string,
+  issues: Array<{ section: string; note: string }> = [],
 ): Promise<StoreApproval> {
   const envelope = await apiFetch<{
     success: boolean;
     data: NestPartnerApplicationView;
   }>(apiPaths.opsPartnerApplicationReject(id), {
     method: "POST",
-    body: { reason },
+    body: issues.length > 0 ? { reason, issues } : { reason },
   });
   return mapNestToStoreApproval(envelope.data);
 }

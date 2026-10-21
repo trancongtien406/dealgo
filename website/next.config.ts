@@ -2,6 +2,33 @@ import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/**
+ * The browser only calls same-origin Route Handlers (the BFF talks to Nest
+ * server-side), so production needs no API origin here. NEXT_PUBLIC_API_BASE_URL
+ * is added only when set, for future direct browser calls (e.g. realtime).
+ */
+function connectSources(): string {
+  const sources = ["'self'", "https:", "wss:"];
+  if (isDev) {
+    sources.push(
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "http://127.0.0.1:3001",
+      "ws:",
+    );
+  }
+  const publicApi = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  if (publicApi) {
+    try {
+      const origin = new URL(publicApi).origin;
+      sources.push(origin, origin.replace(/^http/, "ws"));
+    } catch {
+      // An invalid optional origin must not break every response header.
+    }
+  }
+  return `connect-src ${[...new Set(sources)].join(" ")}`;
+}
+
 const securityHeaders = [
   {
     key: "X-Frame-Options",
@@ -33,7 +60,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      "connect-src 'self' http://localhost:3000 http://localhost:3001 http://127.0.0.1:3001 ws: wss: https:",
+      connectSources(),
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",

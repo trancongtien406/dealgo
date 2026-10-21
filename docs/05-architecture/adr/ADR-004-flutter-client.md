@@ -15,6 +15,8 @@ related_decisions:
 
 `PROPOSED`.
 
+> Đã triển khai trong code (rà soát 2026-10-18): `go_router` + `flutter_bloc` trong `mobile/pubspec.yaml`. Trạng thái vẫn `PROPOSED` — chủ repo cần quyết định `ACCEPTED`/supersede.
+
 ## Context
 
 Một app Flutter cho Customer, Merchant và Driver. `mobile/` hiện chỉ có `lib/main.dart`. Cần điều hướng theo vai trò và state machine cho báo giá, chuyến và đơn.

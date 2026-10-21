@@ -3,6 +3,7 @@ import '../../../food/domain/entities/food_models.dart';
 import '../../../ride/data/datasources/ride_remote_datasource.dart';
 import '../../../ride/domain/entities/ride_models.dart';
 import '../../../ride/domain/params/submit_ride_offer_params.dart';
+import '../../../ride/domain/params/ride_driver_action.dart';
 import 'driver_jobs_remote_datasource.dart';
 
 class DefaultDriverJobsClient implements DriverJobsClient {
@@ -34,5 +35,37 @@ class DefaultDriverJobsClient implements DriverJobsClient {
     required String orderId,
   }) {
     return food.claimOrder(accessToken: accessToken, orderId: orderId);
+  }
+
+  @override
+  Future<RideView> advanceRide({
+    required String accessToken,
+    required String rideId,
+    required RideDriverAction action,
+    String? pickupCode,
+  }) async {
+    final model = await rides.advanceRide(
+      accessToken: accessToken,
+      rideId: rideId,
+      action: action,
+      pickupCode: pickupCode,
+    );
+    return model.toEntity();
+  }
+
+  @override
+  Future<ClaimedFoodDelivery> advanceDelivery({
+    required String accessToken,
+    required String orderId,
+    required FoodDeliveryAction action,
+    /// DEC-PROD-036: handover code (pickup) or delivery code (deliver).
+    String? code,
+  }) {
+    return food.advanceDelivery(
+      accessToken: accessToken,
+      orderId: orderId,
+      action: action,
+      code: code,
+    );
   }
 }

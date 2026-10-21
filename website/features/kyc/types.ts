@@ -10,6 +10,7 @@ export type KycStatus = (typeof KYC_STATUSES)[number];
 
 export type KycCase = {
   code: string;
+  role: import("@/features/kyc/nest-types").NestPartnerRole;
   initials: string;
   name: string;
   submittedAt: string;
@@ -21,4 +22,10 @@ export type KycCase = {
   status: KycStatus;
   activity: string;
   activated: boolean;
+  /** Applicant-entered fields for review, label → value (bank number masked). */
+  details: Array<[string, string]>;
+  documents: import("@/features/kyc/partner-review").PartnerDocument[];
+  reason: string | null;
+  issues: import("@/features/kyc/partner-review").PartnerIssue[];
+  reviewedAt: string | null;
 };

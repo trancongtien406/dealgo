@@ -1,5 +1,9 @@
 abstract final class FoodRoutes {
   static const search = '/customer/food/search';
+
+  /// Food search opened with a query (home search, DEC-PROD-030).
+  static String searchFor(String query) =>
+      '$search?q=${Uri.encodeQueryComponent(query)}';
   static const category = '/customer/food/category';
 
   static String store(String storeId) {

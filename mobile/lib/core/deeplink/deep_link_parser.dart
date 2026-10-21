@@ -9,7 +9,9 @@ class DeepLinkParser {
   /// Returns a go_router location (path + query) or null when unrecognized.
   String? parse(Uri uri) {
     if (uri.scheme == appScheme) {
-      final path = uri.path.isEmpty ? '/${uri.host}' : '/${uri.host}${uri.path}';
+      final path = uri.path.isEmpty
+          ? '/${uri.host}'
+          : '/${uri.host}${uri.path}';
       final normalized = path.replaceAll(RegExp(r'/+'), '/');
       if (normalized == '/') {
         return null;

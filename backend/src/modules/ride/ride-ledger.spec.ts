@@ -81,7 +81,6 @@ describe('RideLedger Domain Logic', () => {
         rideId,
         driverId: 'cust-1',
         amountVnd: 55_000,
-        kind: 'COUNTER',
         expiresAt: future,
         now,
       });
@@ -91,7 +90,6 @@ describe('RideLedger Domain Logic', () => {
         rideId,
         driverId: 'driver-1',
         amountVnd: 52_000,
-        kind: 'COUNTER',
         expiresAt: future,
         now,
       });
@@ -104,7 +102,6 @@ describe('RideLedger Domain Logic', () => {
         rideId,
         driverId: 'driver-1',
         amountVnd: 53_000,
-        kind: 'COUNTER',
         expiresAt: future,
         now,
       });
@@ -116,7 +113,6 @@ describe('RideLedger Domain Logic', () => {
         rideId,
         driverId: 'driver-2',
         amountVnd: 54_000,
-        kind: 'COUNTER',
         expiresAt: future,
         maxRounds: 1,
         now,
@@ -130,7 +126,6 @@ describe('RideLedger Domain Logic', () => {
         rideId: 'non-existent',
         driverId: 'driver-1',
         amountVnd: 50_000,
-        kind: 'ACCEPT',
         expiresAt: future,
         now,
       });
@@ -147,7 +142,6 @@ describe('RideLedger Domain Logic', () => {
         rideId: ride.id,
         driverId: 'driver-1',
         amountVnd: 52_000,
-        kind: 'COUNTER',
         expiresAt: future,
         now,
       });
@@ -155,7 +149,6 @@ describe('RideLedger Domain Logic', () => {
         rideId: ride.id,
         driverId: 'driver-2',
         amountVnd: 50_000,
-        kind: 'ACCEPT',
         expiresAt: future,
         now,
       }).ride!;
@@ -189,7 +182,6 @@ describe('RideLedger Domain Logic', () => {
         rideId: ride.id,
         driverId: 'driver-1',
         amountVnd: 50_000,
-        kind: 'ACCEPT',
         expiresAt: future,
         now,
       }).ride!.offers[0];
@@ -213,7 +205,6 @@ describe('RideLedger Domain Logic', () => {
         rideId: ride.id,
         driverId: 'driver-1',
         amountVnd: 50_000,
-        kind: 'ACCEPT',
         expiresAt: future,
         now,
       }).ride!.offers[0];
@@ -281,7 +272,6 @@ describe('RideLedger Domain Logic', () => {
         rideId: ride.id,
         driverId: 'driver-1',
         amountVnd: 50_000,
-        kind: 'ACCEPT',
         expiresAt: future,
         now,
       }).ride!.offers[0];
@@ -312,7 +302,6 @@ describe('RideLedger Domain Logic', () => {
         rideId: ride.id,
         driverId: 'driver-1',
         amountVnd: 50_000,
-        kind: 'ACCEPT',
         expiresAt: future,
         now,
       }).ride!.offers[0];

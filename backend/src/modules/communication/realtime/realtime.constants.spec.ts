@@ -1,7 +1,7 @@
 import { parseSnapshotRoom, roomForAggregate } from './realtime.constants.js';
 
 describe('realtime.constants', () => {
-  it('parses ride and food rooms with UUID ids', () => {
+  it('parses ride, food and store rooms with UUID ids', () => {
     const rideId = '11111111-1111-4111-8111-111111111111';
     const foodId = '22222222-2222-4222-8222-222222222222';
     expect(parseSnapshotRoom(`ride:${rideId}`)).toEqual({
@@ -13,6 +13,12 @@ describe('realtime.constants', () => {
       kind: 'food',
       id: foodId,
       room: `food:${foodId}`,
+    });
+    const storeId = '33333333-3333-4333-8333-333333333333';
+    expect(parseSnapshotRoom(`store:${storeId}`)).toEqual({
+      kind: 'store',
+      id: storeId,
+      room: `store:${storeId}`,
     });
   });
 

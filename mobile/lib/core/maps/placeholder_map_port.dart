@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../design_system/tokens/dealgo_tokens.dart';
 import 'map_lat_lng.dart';
 import 'map_port.dart';
+import '../design_system/icons/dealgo_icons.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Soft-fail map when `USE_MOCK_DATA` or no `MAPS_API_KEY`.
 class PlaceholderMapPort implements MapPort {
@@ -12,9 +14,15 @@ class PlaceholderMapPort implements MapPort {
   Widget buildMap({
     required MapLatLng center,
     List<MapLatLng> markers = const [],
+    MapLatLng? driver,
     Key? key,
   }) {
-    return PlaceholderMapView(key: key, center: center, markers: markers);
+    return PlaceholderMapView(
+      key: key,
+      center: center,
+      markers: markers,
+      driver: driver,
+    );
   }
 }
 
@@ -23,138 +31,142 @@ class PlaceholderMapView extends StatelessWidget {
   const PlaceholderMapView({
     required this.center,
     this.markers = const [],
-    this.areaLabel = 'Hải Châu · Đà Nẵng',
+    this.driver,
+    this.areaLabel,
     super.key,
   });
 
   final MapLatLng center;
   final List<MapLatLng> markers;
-  final String areaLabel;
+
+  /// Live driver position; the stub only shows that one is known.
+  final MapLatLng? driver;
+
+  /// Optional caller-provided place name; the stub never invents one.
+  final String? areaLabel;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context);
     return Semantics(
-      label: 'Bản đồ minh họa · $areaLabel · tâm $center',
+      label: [l10n.mapIllustrative, ?areaLabel].join(' · '),
       child: ColoredBox(
-      key: const Key('map-placeholder'),
-      color: const Color(0xFFE7EEF5),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          const CustomPaint(painter: _StubMapPainter()),
-          Positioned(
-            left: DealGoSpacing.s12,
-            top: DealGoSpacing.s12,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: DealGoColors.card,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: DealGoColors.border),
-                boxShadow: [
-                  BoxShadow(
-                    color: DealGoColors.text.withValues(alpha: 0.06),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: DealGoSpacing.s8,
-                  vertical: DealGoSpacing.s4,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.place,
-                      color: DealGoColors.danger,
-                      size: 14,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      areaLabel,
-                      style: textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
+        key: const Key('map-placeholder'),
+        color: const Color(0xFFE7EEF5),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            const CustomPaint(painter: _StubMapPainter()),
+            if (areaLabel case final area?)
+              Positioned(
+                left: DealGoSpacing.s12,
+                top: DealGoSpacing.s12,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: DealGoColors.card,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: DealGoColors.border),
+                    boxShadow: [
+                      BoxShadow(
+                        color: DealGoColors.text.withValues(alpha: 0.06),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: DealGoSpacing.s8,
+                      vertical: DealGoSpacing.s4,
                     ),
-                  ],
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          DealGoIcons.pinFilled,
+                          color: DealGoColors.danger,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          area,
+                          style: textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-          const Positioned(
-            left: 18,
-            top: 52,
-            child: _MapMark(label: 'HẢI CHÂU'),
-          ),
-          const Positioned(
-            right: 24,
-            top: 36,
-            child: _MapMark(label: 'SÔNG HÀN'),
-          ),
-          if (markers.isEmpty)
-            const Align(
-              alignment: Alignment(0, -0.05),
-              child: _MapPin(color: DealGoColors.primary),
-            )
-          else ...[
-            const Align(
-              alignment: Alignment(-0.25, -0.15),
-              child: _MapPin(color: DealGoColors.brandGreen),
-            ),
-            if (markers.length > 1)
+            if (markers.isEmpty)
               const Align(
-                alignment: Alignment(0.35, 0.35),
-                child: _MapPin(color: DealGoColors.danger),
+                alignment: Alignment(0, -0.05),
+                child: _MapPin(color: DealGoColors.primary),
+              )
+            else ...[
+              const Align(
+                alignment: Alignment(-0.25, -0.15),
+                child: _MapPin(color: DealGoColors.brandGreen),
               ),
-          ],
-          Positioned(
-            right: DealGoSpacing.s12,
-            bottom: DealGoSpacing.s12,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: DealGoColors.card.withValues(alpha: 0.92),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: DealGoColors.border),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: DealGoSpacing.s8,
-                  vertical: DealGoSpacing.s4,
+              if (markers.length > 1)
+                const Align(
+                  alignment: Alignment(0.35, 0.35),
+                  child: _MapPin(color: DealGoColors.danger),
                 ),
-                child: Text(
-                  'Bản đồ minh họa',
-                  style: textTheme.labelSmall?.copyWith(
-                    color: DealGoColors.textSecondary,
-                    fontWeight: FontWeight.w700,
+            ],
+            if (driver != null)
+              const Align(
+                key: Key('map-placeholder-driver'),
+                alignment: Alignment(0.05, 0.1),
+                child: _DriverBadge(),
+              ),
+            Positioned(
+              right: DealGoSpacing.s12,
+              bottom: DealGoSpacing.s12,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: DealGoColors.card.withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: DealGoColors.border),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: DealGoSpacing.s8,
+                    vertical: DealGoSpacing.s4,
+                  ),
+                  child: Text(
+                    l10n.mapIllustrative,
+                    style: textTheme.labelSmall?.copyWith(
+                      color: DealGoColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _MapMark extends StatelessWidget {
-  const _MapMark({required this.label});
-
-  final String label;
+class _DriverBadge extends StatelessWidget {
+  const _DriverBadge();
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      label,
-      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-        color: const Color(0xFF5B7C99),
-        fontWeight: FontWeight.w800,
-        letterSpacing: 0.4,
+    return Container(
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(
+        color: DealGoColors.primary,
+        shape: BoxShape.circle,
+        border: Border.all(color: DealGoColors.card, width: 2),
       ),
+      child: const Icon(DealGoIcons.motorbike, size: 16, color: Colors.white),
     );
   }
 }
@@ -182,7 +194,7 @@ class _MapPin extends StatelessWidget {
       child: SizedBox(
         width: 28,
         height: 28,
-        child: Icon(Icons.circle, color: color, size: 12),
+        child: Icon(DealGoIcons.circle, color: color, size: 12),
       ),
     );
   }

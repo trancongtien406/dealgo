@@ -7,6 +7,7 @@ import '../config/api_base_url.dart';
 import 'api_envelope.dart';
 import 'api_exception.dart';
 import 'api_paths.dart';
+import 'dio_log.dart';
 import 'dio_mapper.dart';
 
 const skipAuthRefreshExtra = 'dealgo.skipAuthRefresh';
@@ -14,29 +15,46 @@ const skipAuthRefreshExtra = 'dealgo.skipAuthRefresh';
 typedef SessionRefreshed = Future<void> Function(StoredTokens tokens);
 typedef SessionUnauthorized = Future<void> Function();
 
+BaseOptions _dealGoBaseOptions(String baseUrl) {
+  return BaseOptions(
+    baseUrl: normalizeBaseUrl(baseUrl),
+    connectTimeout: const Duration(seconds: 15),
+    receiveTimeout: const Duration(seconds: 15),
+    sendTimeout: const Duration(seconds: 15),
+    headers: const {
+      Headers.acceptHeader: Headers.jsonContentType,
+      Headers.contentTypeHeader: Headers.jsonContentType,
+    },
+    responseType: ResponseType.json,
+  );
+}
+
 /// Shared DealGo API client. Feature Dio*Clients must receive this instance.
 Dio createDealGoDio({
   String? baseUrl,
   required TokenStore tokenStore,
   required SessionRefreshed onSessionRefreshed,
   required SessionUnauthorized onUnauthorized,
+  bool? enableLogging,
 }) {
-  final dio = Dio(
-    BaseOptions(
-      baseUrl: normalizeBaseUrl(baseUrl ?? apiBaseUrl),
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 15),
-      sendTimeout: const Duration(seconds: 15),
-      headers: const {
-        Headers.acceptHeader: Headers.jsonContentType,
-        Headers.contentTypeHeader: Headers.jsonContentType,
-      },
-      responseType: ResponseType.json,
-    ),
-  );
+  final resolvedBase = normalizeBaseUrl(baseUrl ?? apiBaseUrl);
+  final dio = Dio(_dealGoBaseOptions(resolvedBase));
+  // Refresh/retry must not share the auth QueuedInterceptor: while onError is
+  // awaiting, another request's onError is queued behind it and deadlocks.
+  final refreshDio = Dio(_dealGoBaseOptions(resolvedBase));
+
+  final logInterceptor = createDealGoLogInterceptor(enabled: enableLogging);
+  if (logInterceptor != null) {
+    dio.interceptors.add(logInterceptor);
+    final refreshLog = createDealGoLogInterceptor(enabled: enableLogging);
+    if (refreshLog != null) {
+      refreshDio.interceptors.add(refreshLog);
+    }
+  }
   dio.interceptors.add(
     _DealGoAuthInterceptor(
       dio: dio,
+      refreshDio: refreshDio,
       tokenStore: tokenStore,
       onSessionRefreshed: onSessionRefreshed,
       onUnauthorized: onUnauthorized,
@@ -48,17 +66,24 @@ Dio createDealGoDio({
 class _DealGoAuthInterceptor extends QueuedInterceptor {
   _DealGoAuthInterceptor({
     required this.dio,
+    required this.refreshDio,
     required this.tokenStore,
     required this.onSessionRefreshed,
     required this.onUnauthorized,
   });
 
   final Dio dio;
+  final Dio refreshDio;
   final TokenStore tokenStore;
   final SessionRefreshed onSessionRefreshed;
   final SessionUnauthorized onUnauthorized;
 
   Future<StoredTokens?>? _refreshFlight;
+
+  void _syncRefreshClient() {
+    refreshDio.options.baseUrl = dio.options.baseUrl;
+    refreshDio.httpClientAdapter = dio.httpClientAdapter;
+  }
 
   @override
   Future<void> onRequest(
@@ -102,7 +127,8 @@ class _DealGoAuthInterceptor extends QueuedInterceptor {
       final request = err.requestOptions;
       request.headers['Authorization'] = 'Bearer ${next.accessToken}';
       request.extra['dealgo.authRetried'] = true;
-      final response = await dio.fetch<Object?>(request);
+      _syncRefreshClient();
+      final response = await refreshDio.fetch<Object?>(request);
       handler.resolve(response);
     } on DioException catch (refreshError) {
       await onUnauthorized();
@@ -132,7 +158,8 @@ class _DealGoAuthInterceptor extends QueuedInterceptor {
       return null;
     }
     try {
-      final response = await dio.post<Object?>(
+      _syncRefreshClient();
+      final response = await refreshDio.post<Object?>(
         ApiPaths.sessionsRefresh,
         data: {'refreshToken': refresh},
         options: Options(extra: {skipAuthRefreshExtra: true}),
@@ -146,7 +173,7 @@ class _DealGoAuthInterceptor extends QueuedInterceptor {
           refreshToken.isEmpty) {
         throw const ApiException(
           statusCode: 200,
-          message: 'Phản hồi không hợp lệ',
+          message: 'Invalid response',
           errorCode: 'INVALID_RESPONSE',
         );
       }

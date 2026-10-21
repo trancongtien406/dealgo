@@ -4,6 +4,7 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../core/network/api_paths.dart';
 import '../../../../core/network/dio_mapper.dart';
 import '../../domain/params/create_ride_params.dart';
+import '../../domain/params/ride_driver_action.dart';
 import '../../domain/params/select_ride_offer_params.dart';
 import '../../domain/params/submit_ride_offer_params.dart';
 import '../models/ride_models.dart';
@@ -71,7 +72,10 @@ class DioRideRemoteDataSource implements RideRemoteDataSource {
     return _send(
       () => dio.post<Object?>(
         ApiPaths.rideSelection(request.rideId),
-        data: SelectRideOfferBody(offerId: request.offerId).toJson(),
+        data: SelectRideOfferBody(
+          offerId: request.offerId,
+          voucherCode: request.voucherCode,
+        ).toJson(),
         options: _auth(request.accessToken, request.idempotencyKey),
       ),
     );
@@ -85,6 +89,22 @@ class DioRideRemoteDataSource implements RideRemoteDataSource {
     return _send(
       () => dio.post<Object?>(
         ApiPaths.rideCancel(rideId),
+        options: _bearer(accessToken),
+      ),
+    );
+  }
+
+  @override
+  Future<RideViewModel> advanceRide({
+    required String accessToken,
+    required String rideId,
+    required RideDriverAction action,
+    String? pickupCode,
+  }) {
+    return _send(
+      () => dio.post<Object?>(
+        ApiPaths.rideDriverAction(rideId, action.pathSegment),
+        data: pickupCode == null ? null : {'pickupCode': pickupCode},
         options: _bearer(accessToken),
       ),
     );

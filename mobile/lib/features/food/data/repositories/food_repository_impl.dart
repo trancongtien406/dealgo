@@ -8,8 +8,12 @@ class FoodRepositoryImpl implements FoodRepository {
   final FoodRemoteDataSource _remote;
 
   @override
-  Future<List<FoodStoreSummary>> listStores(String accessToken) {
-    return _remote.listStores(accessToken);
+  Future<List<FoodStoreSummary>> listStores(
+    String accessToken, {
+    double? lat,
+    double? lng,
+  }) {
+    return _remote.listStores(accessToken, lat: lat, lng: lng);
   }
 
   @override
@@ -49,6 +53,21 @@ class FoodRepositoryImpl implements FoodRepository {
   }
 
   @override
+  Future<MerchantOrderUpdate> rejectOrder({
+    required String accessToken,
+    required String orderId,
+    required FoodRejectReason reason,
+    String? note,
+  }) {
+    return _remote.rejectOrder(
+      accessToken: accessToken,
+      orderId: orderId,
+      reason: reason,
+      note: note,
+    );
+  }
+
+  @override
   Future<MerchantOrderUpdate> markOrderReady({
     required String accessToken,
     required String orderId,
@@ -62,6 +81,14 @@ class FoodRepositoryImpl implements FoodRepository {
     required String orderId,
   }) {
     return _remote.claimOrder(accessToken: accessToken, orderId: orderId);
+  }
+
+  @override
+  Future<ClaimedFoodDelivery> cancelOrder({
+    required String accessToken,
+    required String orderId,
+  }) {
+    return _remote.cancelOrder(accessToken: accessToken, orderId: orderId);
   }
 
   @override
@@ -90,12 +117,35 @@ class FoodRepositoryImpl implements FoodRepository {
     required String itemId,
     String? name,
     int? priceVnd,
+    bool? available,
+    String? description,
+    int? prepMinutes,
+    String? imageUrl,
+    String? menuCategoryId,
   }) {
     return _remote.updateMerchantItem(
       accessToken: accessToken,
       itemId: itemId,
       name: name,
       priceVnd: priceVnd,
+      available: available,
+      description: description,
+      prepMinutes: prepMinutes,
+      imageUrl: imageUrl,
+      menuCategoryId: menuCategoryId,
+    );
+  }
+
+  @override
+  Future<FoodMenuItem> replaceMerchantItemOptions({
+    required String accessToken,
+    required String itemId,
+    required List<FoodOptionGroup> groups,
+  }) {
+    return _remote.replaceMerchantItemOptions(
+      accessToken: accessToken,
+      itemId: itemId,
+      groups: groups,
     );
   }
 

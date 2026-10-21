@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/network/request_failure.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_models.dart';
 import '../widgets/merchant_widgets.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/format/short_ref.dart';
 
 class MerchantQueueLoadingView extends StatelessWidget {
   const MerchantQueueLoadingView({required this.title, super.key});
@@ -15,7 +18,7 @@ class MerchantQueueLoadingView extends StatelessWidget {
     return MerchantPageFrame(
       title: title,
       onBack: () => merchantBack(context),
-      body: const Center(child: Text('Đang tải đơn hàng')),
+      body: Center(child: Text(AppLocalizations.of(context).merchantLoadingOrders)),
     );
   }
 }
@@ -32,9 +35,9 @@ class MerchantIneligibleView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return MerchantPageFrame(
       title: title,
-      subtitle: merchantStateSubtitle,
       onBack: () => merchantBack(context),
       footer: MerchantPrimaryBar(
         buttonKey: const Key('merchant-retry-queue'),
@@ -43,18 +46,16 @@ class MerchantIneligibleView extends StatelessWidget {
       ),
       body: ListView(
         padding: merchantPagePadding,
-        children: const [
+        children: [
           MerchantHero(
-            icon: Icons.priority_high,
+            icon: DealGoIcons.alert,
             iconColor: DealGoColors.danger,
             background: DealGoColors.dangerSurface,
-            title: 'Cửa hàng chưa được phép nhận đơn',
-            message: 'Máy chủ từ chối hàng đợi vì vai trò cửa hàng chưa hoạt động. Đây không phải hàng đợi trống.',
+            title: l10n.merchantIneligibleTitle,
+            message: l10n.merchantIneligibleMessage,
           ),
-          SizedBox(height: DealGoSpacing.s16),
-          MerchantNote(
-            message: 'Không có bước tải hồ sơ trên màn này. Quyền nhận đơn do máy chủ quyết định.',
-          ),
+          const SizedBox(height: DealGoSpacing.s16),
+          MerchantNote(message: l10n.merchantIneligibleNote),
         ],
       ),
     );
@@ -68,50 +69,27 @@ class MerchantQueueEmptyView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context);
     return MerchantPageFrame(
-      title: 'Đơn hàng của Shop',
-      subtitle: merchantStateSubtitle,
+      title: l10n.merchantQueueTitle,
       onBack: () => merchantBack(context),
       footer: MerchantPrimaryBar(
         buttonKey: const Key('merchant-check-orders'),
-        label: 'Kiểm tra cài đặt nhận đơn',
+        label: l10n.merchantReloadOrders,
         onPressed: onCheck,
       ),
       body: ListView(
         padding: merchantPagePadding,
         children: [
-          const MerchantHero(
-            icon: Icons.crop_square_rounded,
+          MerchantHero(
+            icon: DealGoIcons.square,
             iconColor: DealGoColors.brandGreen,
             background: DealGoColors.greenSurface,
-            title: 'Chưa có đơn mới',
-            message: 'Cửa hàng đang mở và sẵn sàng nhận đơn. Đơn mới sẽ xuất hiện tại đây.',
-          ),
-          const SizedBox(height: DealGoSpacing.s24),
-          MerchantPanel(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Trạng thái cửa hàng', style: textTheme.titleMedium),
-                const SizedBox(height: DealGoSpacing.s12),
-                const MerchantChip(
-                  label: 'Đang mở',
-                  tone: MerchantChipTone.green,
-                ),
-                const SizedBox(height: DealGoSpacing.s16),
-                const MerchantMoneyRow(
-                  label: 'Chế độ nhận đơn',
-                  value: 'Tự động / thủ công',
-                ),
-                const MerchantMoneyRow(label: 'Đơn chờ xác nhận', value: '0'),
-              ],
-            ),
+            title: l10n.merchantNoNewOrders,
+            message: l10n.merchantNoNewOrdersBody,
           ),
           const SizedBox(height: DealGoSpacing.s12),
-          const MerchantNote(
-            message: 'Empty khác với lỗi tải đơn. Có thể bật thông báo để không bỏ lỡ đơn mới.',
-          ),
+          MerchantNote(message: l10n.merchantNoNewOrdersNote),
         ],
       ),
     );
@@ -123,12 +101,14 @@ class MerchantQueueErrorView extends StatefulWidget {
     required this.saved,
     required this.syncedAt,
     required this.onRetry,
+    this.cause,
     super.key,
   });
 
   final List<MerchantQueueOrder> saved;
   final DateTime? syncedAt;
   final VoidCallback onRetry;
+  final Object? cause;
 
   @override
   State<MerchantQueueErrorView> createState() => _MerchantQueueErrorViewState();
@@ -140,12 +120,23 @@ class _MerchantQueueErrorViewState extends State<MerchantQueueErrorView> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context);
+    final kind = requestFailureKind(widget.cause);
+    final title = switch (kind) {
+      RequestFailureKind.offline => l10n.merchantOrdersLoadFailed,
+      RequestFailureKind.permission => l10n.apiErrForbidden,
+      RequestFailureKind.error => l10n.stateErrorTitle,
+    };
+    final message = switch (kind) {
+      RequestFailureKind.offline => l10n.merchantOrdersLoadFailedBody,
+      RequestFailureKind.permission => l10n.apiErrRoleNotActive,
+      RequestFailureKind.error => l10n.stateErrorBody,
+    };
     return MerchantPageFrame(
-      title: 'Đơn hàng của Shop',
-      subtitle: merchantStateSubtitle,
+      title: l10n.merchantQueueTitle,
       onBack: () => merchantBack(context),
       footer: MerchantFooter(
-        secondaryLabel: 'Xem đơn đã lưu',
+        secondaryLabel: l10n.merchantViewSavedOrders,
         primaryLabel: AppLocalizations.of(context).actionRetry,
         primaryKey: const Key('merchant-retry-queue'),
         onSecondary: () => setState(() => _showSaved = true),
@@ -154,55 +145,55 @@ class _MerchantQueueErrorViewState extends State<MerchantQueueErrorView> {
       body: ListView(
         padding: merchantPagePadding,
         children: [
-          const MerchantHero(
-            icon: Icons.priority_high,
+          MerchantHero(
+            icon: DealGoIcons.alert,
             iconColor: DealGoColors.danger,
             background: DealGoColors.dangerSurface,
-            title: 'Không tải được đơn hàng',
-            message: 'Máy chủ chưa phản hồi hoặc kết nối không ổn định. Danh sách đơn hiện tại có thể chưa mới nhất.',
+            title: title,
+            message: message,
           ),
           const SizedBox(height: DealGoSpacing.s24),
           MerchantPanel(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Kết nối', style: textTheme.titleMedium),
+                Text(l10n.merchantConnection, style: textTheme.titleMedium),
                 const SizedBox(height: DealGoSpacing.s12),
-                const MerchantChip(
-                  label: 'Tải dữ liệu thất bại',
+                MerchantChip(
+                  label: l10n.merchantLoadFailedChip,
                   tone: MerchantChipTone.warning,
                 ),
                 const SizedBox(height: DealGoSpacing.s16),
                 MerchantMoneyRow(
-                  label: 'Đồng bộ gần nhất',
-                  value: formatSyncClock(widget.syncedAt),
-                ),
-                const MerchantMoneyRow(
-                  label: 'Chế độ cửa hàng',
-                  value: 'Không tự đổi',
+                  label: l10n.merchantLastSynced,
+                  value: formatSyncClock(l10n, widget.syncedAt),
                 ),
               ],
             ),
           ),
           const SizedBox(height: DealGoSpacing.s12),
-          const MerchantNote(
-            message: 'Không coi lỗi mạng là "0 đơn"; không tự chuyển sang chế độ tạm đóng.',
-          ),
+          MerchantNote(message: l10n.merchantLoadFailedNote),
           if (_showSaved) ...[
             const SizedBox(height: DealGoSpacing.s16),
             if (widget.saved.isEmpty)
-              Text('Chưa có đơn đã lưu trên máy.', style: textTheme.bodyMedium)
+              Text(l10n.merchantNoSavedOrders, style: textTheme.bodyMedium)
             else ...[
-              Text('Đơn đã lưu', style: textTheme.titleMedium),
+              Text(l10n.merchantSavedOrders, style: textTheme.titleMedium),
               const SizedBox(height: DealGoSpacing.s8),
               for (final order in widget.saved) ...[
                 MerchantPanel(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Đơn #${order.id}', style: textTheme.titleMedium),
+                      Text(
+                        l10n.orderRef(shortRef(order.id)),
+                        style: textTheme.titleMedium,
+                      ),
                       const SizedBox(height: DealGoSpacing.s4),
-                      Text(order.status, style: textTheme.bodySmall),
+                      Text(
+                        merchantStatusLabel(l10n, order.status),
+                        style: textTheme.bodySmall,
+                      ),
                       Text(order.dropoff.label, style: textTheme.bodyMedium),
                     ],
                   ),

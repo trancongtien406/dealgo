@@ -4,6 +4,7 @@ import type { OpsFaqSeed } from './ops-faq.seed.js';
 
 export type OpsFaqStatusName = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 export type OpsFaqCategoryName = 'POLICY' | 'OPS' | 'PRODUCT' | 'TECH';
+export type FaqAudienceName = 'INTERNAL' | 'CUSTOMER' | 'DRIVER' | 'MERCHANT';
 
 export type OpsFaqRecord = {
   id: string;
@@ -12,6 +13,7 @@ export type OpsFaqRecord = {
   suggestedAnswer: string;
   status: OpsFaqStatusName;
   category: OpsFaqCategoryName;
+  audience: FaqAudienceName;
   sortOrder: number;
   createdAt: Date;
   updatedAt: Date;
@@ -25,6 +27,7 @@ export type CreateOpsFaqInput = {
   suggestedAnswer: string;
   status?: OpsFaqStatusName;
   category: OpsFaqCategoryName;
+  audience?: FaqAudienceName;
   sortOrder?: number;
   actorUserId: string;
   reason: string;
@@ -37,6 +40,7 @@ export type PatchOpsFaqInput = {
   suggestedAnswer?: string;
   status?: OpsFaqStatusName;
   category?: OpsFaqCategoryName;
+  audience?: FaqAudienceName;
   sortOrder?: number;
   actorUserId: string;
   reason: string;
@@ -44,6 +48,8 @@ export type PatchOpsFaqInput = {
 
 export interface OpsFaqRepository {
   list(status?: OpsFaqStatusName): Promise<OpsFaqRecord[]>;
+  /** PUBLISHED entries for one in-app audience, in display order. */
+  listPublished(audience: FaqAudienceName): Promise<OpsFaqRecord[]>;
   findById(id: string): Promise<OpsFaqRecord | null>;
   create(input: CreateOpsFaqInput): Promise<OpsFaqRecord>;
   patch(input: PatchOpsFaqInput): Promise<OpsFaqRecord | null>;
@@ -68,6 +74,10 @@ export class MemoryOpsFaqRepository implements OpsFaqRepository {
     return rows.sort((a, b) => a.sortOrder - b.sortOrder || a.openId?.localeCompare(b.openId ?? '') || 0);
   }
 
+  async listPublished(audience: FaqAudienceName): Promise<OpsFaqRecord[]> {
+    return (await this.list('PUBLISHED')).filter((r) => r.audience === audience);
+  }
+
   async findById(id: string): Promise<OpsFaqRecord | null> {
     return this.byId.get(id) ?? null;
   }
@@ -80,6 +90,7 @@ export class MemoryOpsFaqRepository implements OpsFaqRepository {
       suggestedAnswer: input.suggestedAnswer,
       status: input.status ?? 'DRAFT',
       category: input.category,
+      audience: input.audience ?? 'INTERNAL',
       sortOrder: input.sortOrder ?? 0,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -109,6 +120,7 @@ export class MemoryOpsFaqRepository implements OpsFaqRepository {
       suggestedAnswer: input.suggestedAnswer ?? current.suggestedAnswer,
       status: input.status ?? current.status,
       category: input.category ?? current.category,
+      audience: input.audience ?? current.audience,
       sortOrder: input.sortOrder ?? current.sortOrder,
       updatedAt: new Date(),
       updatedByUserId: input.actorUserId,
@@ -138,8 +150,9 @@ export class MemoryOpsFaqRepository implements OpsFaqRepository {
         openId: seed.openId,
         question: seed.question,
         suggestedAnswer: seed.suggestedAnswer,
-        status: 'DRAFT',
+        status: seed.status ?? 'DRAFT',
         category: seed.category,
+        audience: seed.audience ?? 'INTERNAL',
         sortOrder: seed.sortOrder,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -162,6 +175,15 @@ export class PrismaOpsFaqRepository implements OpsFaqRepository {
     return rows.map(mapFaq);
   }
 
+  async listPublished(audience: FaqAudienceName): Promise<OpsFaqRecord[]> {
+    const rows = await this.db.opsFaqEntry.findMany({
+      where: { status: 'PUBLISHED', audience },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+      take: 100,
+    });
+    return rows.map(mapFaq);
+  }
+
   async findById(id: string): Promise<OpsFaqRecord | null> {
     const row = await this.db.opsFaqEntry.findUnique({ where: { id } });
     return row ? mapFaq(row) : null;
@@ -177,6 +199,7 @@ export class PrismaOpsFaqRepository implements OpsFaqRepository {
           suggestedAnswer: input.suggestedAnswer,
           status: input.status ?? 'DRAFT',
           category: input.category,
+          audience: input.audience ?? 'INTERNAL',
           sortOrder: input.sortOrder ?? 0,
           createdByUserId: input.actorUserId,
           updatedByUserId: input.actorUserId,
@@ -211,6 +234,7 @@ export class PrismaOpsFaqRepository implements OpsFaqRepository {
           suggestedAnswer: input.suggestedAnswer,
           status: input.status,
           category: input.category,
+          audience: input.audience,
           sortOrder: input.sortOrder,
           updatedByUserId: input.actorUserId,
         },
@@ -260,8 +284,9 @@ export class PrismaOpsFaqRepository implements OpsFaqRepository {
           openId: seed.openId,
           question: seed.question,
           suggestedAnswer: seed.suggestedAnswer,
-          status: 'DRAFT',
+          status: seed.status ?? 'DRAFT',
           category: seed.category,
+          audience: seed.audience ?? 'INTERNAL',
           sortOrder: seed.sortOrder,
         },
       });
@@ -276,6 +301,7 @@ function mapFaq(row: {
   suggestedAnswer: string;
   status: string;
   category: string;
+  audience: string;
   sortOrder: number;
   createdAt: Date;
   updatedAt: Date;
@@ -289,6 +315,7 @@ function mapFaq(row: {
     suggestedAnswer: row.suggestedAnswer,
     status: row.status as OpsFaqStatusName,
     category: row.category as OpsFaqCategoryName,
+    audience: row.audience as FaqAudienceName,
     sortOrder: row.sortOrder,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

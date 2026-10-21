@@ -12,6 +12,7 @@ import { IDENTITY_REPOSITORY, MAIL_SENDER, SMS_SENDER } from '../../../src/modul
 import { MemoryIdentityRepository } from '../../../src/modules/identity/identity.repository.js';
 import { IdentityModule } from '../../../src/modules/identity/identity.module.js';
 import { MockMailSender } from '../../../src/integrations/email/mail-sender.js';
+import { PasswordHasher } from '../../../src/platform/security/password-hasher.js';
 import { OpsAuthService } from '../../../src/modules/identity/ops-auth.service.js';
 import { MockSmsSender } from '../../../src/integrations/sms/sms-sender.js';
 
@@ -77,6 +78,7 @@ describe('identity http', () => {
       .post('/v1/auth/phone/challenges')
       .send({ phone: '0901234567' })
       .expect(200);
+    expect(await repository.findUserByPhone('+84901234567')).toBeNull();
 
     const code = sms.sent.at(-1)?.code;
     expect(code).toMatch(/^\d{6}$/);
@@ -112,10 +114,24 @@ describe('identity http', () => {
       .get('/v1/me')
       .set('Authorization', `Bearer ${verified.body.data.accessToken}`)
       .expect(200);
-    expect(profile.body.data.phoneVerifiedAt).toEqual(expect.any(String));
-    expect(profile.body.data.grants).toEqual([]);
+    expect(profile.body.data).toMatchObject({
+      id: verified.body.data.user.id,
+      phone: '+84901234567',
+      email: null,
+      displayName: 'DealGo user',
+      dateOfBirth: null,
+      gender: null,
+      avatarUrl: null,
+      phoneVerifiedAt: expect.any(String),
+      emailVerifiedAt: null,
+      needsProfileSetup: true,
+      grants: [{ role: 'CUSTOMER', status: 'ACTIVE' }],
+    });
 
-    await repository.insertGrant(verified.body.data.user.id, 'CUSTOMER', 'SUSPENDED');
+    const customerGrant = (await repository.listGrants(verified.body.data.user.id)).find(
+      (grant) => grant.role === 'CUSTOMER',
+    );
+    await repository.updateGrantStatus(customerGrant!.id, 'SUSPENDED');
     await repository.insertGrant(verified.body.data.user.id, 'DRIVER', 'ACTIVE');
     const filtered = await request(app.getHttpServer())
       .get('/v1/me')
@@ -187,6 +203,42 @@ describe('identity http', () => {
     expect(successor.body.errorCode).toBe('AUTH_REFRESH_REUSED');
   });
 
+  it('caps SMS OTP sends per phone number (DEC-PROD-044)', async () => {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await request(app.getHttpServer())
+        .post('/v1/auth/phone/challenges')
+        .send({ phone: '+84909990001' })
+        .expect(200);
+    }
+    // Same number written differently is still the same number.
+    await request(app.getHttpServer())
+      .post('/v1/auth/phone/challenges')
+      .send({ phone: '0909990001' })
+      .expect(429);
+    await request(app.getHttpServer())
+      .post('/v1/auth/phone/challenges')
+      .send({ phone: '+84909990002' })
+      .expect(200);
+  });
+
+  it('throttles Admin login per email, not per IP (DEC-PROD-044)', async () => {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await request(app.getHttpServer())
+        .post('/v1/ops/sessions')
+        .send({ email: 'Brute@DealGo.test', password: `guess-${attempt}-password` })
+        .expect(401);
+    }
+    await request(app.getHttpServer())
+      .post('/v1/ops/sessions')
+      .send({ email: 'brute@dealgo.test', password: 'guess-final-password' })
+      .expect(429);
+    // Another operator behind the same website IP is not locked out.
+    await request(app.getHttpServer())
+      .post('/v1/ops/sessions')
+      .send({ email: 'someone-else@dealgo.test', password: 'whatever-password' })
+      .expect(401);
+  });
+
   it('rejects unknown and wrong ops passwords the same way and accepts the bootstrap operator', async () => {
     const unknown = await request(app.getHttpServer())
       .post('/v1/ops/sessions')
@@ -229,6 +281,93 @@ describe('identity http', () => {
       success: false,
       statusCode: 401,
       errorCode: 'UNAUTHORIZED',
+    });
+  });
+
+  it('patches profile fields, starts email verification, (avatar upload: avatar.http.spec)', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/v1/auth/phone/challenges')
+      .send({ phone: '+84907777777' })
+      .expect(200);
+    const code = sms.sent.at(-1)?.code;
+    const verified = await request(app.getHttpServer())
+      .post(`/v1/auth/phone/challenges/${created.body.data.challengeId}/verify`)
+      .send({ code })
+      .expect(200);
+    const token = verified.body.data.accessToken as string;
+
+    const patched = await request(app.getHttpServer())
+      .patch('/v1/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        displayName: 'Le Thi C',
+        gender: 'FEMALE',
+        dateOfBirth: '1998-03-15T00:00:00.000Z',
+        email: 'c@dealgo.test',
+      })
+      .expect(200);
+
+    expect(patched.body.data).toMatchObject({
+      displayName: 'Le Thi C',
+      gender: 'FEMALE',
+      dateOfBirth: '1998-03-15T00:00:00.000Z',
+      email: null,
+      needsProfileSetup: false,
+      pendingEmailVerification: {
+        verificationId: expect.any(String),
+        expiresAt: expect.any(String),
+      },
+    });
+    expect(mail.sent.at(-1)?.email).toBe('c@dealgo.test');
+
+    const me = await request(app.getHttpServer())
+      .get('/v1/me')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(me.body.data.avatarUrl).toBeNull();
+    expect(me.body.data.needsProfileSetup).toBe(false);
+  });
+
+  it('starts identifierless passkey sign-in and contact-less sign-up', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/v1/auth/phone/challenges')
+      .send({ phone: '+84908888888' })
+      .expect(200);
+    const code = sms.sent.at(-1)?.code;
+    const verified = await request(app.getHttpServer())
+      .post(`/v1/auth/phone/challenges/${created.body.data.challengeId}/verify`)
+      .send({ code })
+      .expect(200);
+    const userId = verified.body.data.user.id as string;
+
+    await repository.setEmailVerified(userId, 'passkey@dealgo.test', new Date());
+    await repository.savePasskey({
+      userId,
+      credentialId: 'cred-email-1',
+      publicKey: new Uint8Array([1, 2, 3, 4]),
+      counter: 0,
+      transports: ['internal'],
+      deviceType: 'platform',
+      backedUp: false,
+    });
+
+    const authentication = await request(app.getHttpServer())
+      .post('/v1/auth/passkeys/authentication/options')
+      .send({})
+      .expect(200);
+    expect(authentication.body.data.challenge).toEqual(expect.any(String));
+    expect(authentication.body.data.ceremonyId).toEqual(expect.any(String));
+    expect(authentication.body.data).not.toHaveProperty('allowCredentials');
+
+    const signup = await request(app.getHttpServer())
+      .post('/v1/auth/passkeys/signup/options')
+      .send({})
+      .expect(200);
+    expect(signup.body.data.challenge).toEqual(expect.any(String));
+    expect(signup.body.data.ceremonyId).toEqual(expect.any(String));
+    expect(signup.body.data.authenticatorSelection).toMatchObject({
+      residentKey: 'required',
+      userVerification: 'required',
     });
   });
 
@@ -292,11 +431,13 @@ describe('identity http', () => {
       .expect(200);
     const token = verified.body.data.accessToken as string;
 
-    const empty = await request(app.getHttpServer())
+    const initial = await request(app.getHttpServer())
       .get('/v1/me/role-grants')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
-    expect(empty.body.data).toEqual({ grants: [] });
+    expect(initial.body.data).toEqual({
+      grants: [{ id: expect.any(String), role: 'CUSTOMER', status: 'ACTIVE' }],
+    });
 
     const requested = await request(app.getHttpServer())
       .post('/v1/me/role-grants')
@@ -403,5 +544,183 @@ describe('identity http', () => {
       .send({ role: 'OPS' })
       .expect(400);
     expect(invalidRole.body.errorCode).toBe('VALIDATION_ERROR');
+
+    const reopen = await request(app.getHttpServer())
+      .post('/v1/me/role-grants')
+      .set('Authorization', `Bearer ${customerToken}`)
+      .send({ role: 'DRIVER' })
+      .expect(403);
+    expect(reopen.body.errorCode).toBe('ROLE_GRANT_SUSPENDED');
+  });
+
+  it('signs up with email only after the emailed OTP is verified', async () => {
+    const server = app.getHttpServer();
+    const started = await request(server)
+      .post('/v1/auth/email/register')
+      .send({ email: 'Signup@DealGo.test', password: 'password123', displayName: 'Signup' })
+      .expect(200);
+    expect(started.body.data).toEqual({
+      challengeId: expect.any(String),
+      expiresAt: expect.any(String),
+      resendAvailableAt: expect.any(String),
+    });
+    expect(await repository.findUserByEmail('signup@dealgo.test')).toBeNull();
+    const code = mail.signupCodes.at(-1)!.code;
+    expect(JSON.stringify(started.body)).not.toContain(code);
+
+    const earlyLogin = await request(server)
+      .post('/v1/auth/email/login')
+      .send({ email: 'signup@dealgo.test', password: 'password123' })
+      .expect(401);
+    expect(earlyLogin.body.errorCode).toBe('AUTH_INVALID_CREDENTIALS');
+
+    const cooldown = await request(server)
+      .post(`/v1/auth/email/register/${started.body.data.challengeId}/resend`)
+      .expect(429);
+    expect(cooldown.body.errorCode).toBe('AUTH_OTP_RESEND_COOLDOWN');
+
+    const wrong = await request(server)
+      .post(`/v1/auth/email/register/${started.body.data.challengeId}/verify`)
+      .send({ code: code === '000000' ? '111111' : '000000' })
+      .expect(401);
+    expect(wrong.body.errorCode).toBe('AUTH_CODE_INVALID');
+
+    const verified = await request(server)
+      .post(`/v1/auth/email/register/${started.body.data.challengeId}/verify`)
+      .send({ code })
+      .expect(200);
+    expect(verified.body.data).toEqual({
+      accessToken: expect.any(String),
+      refreshToken: expect.any(String),
+      expiresIn: 900,
+      user: { id: expect.any(String), phone: null, email: 'signup@dealgo.test' },
+    });
+    const user = await repository.findUserByEmail('signup@dealgo.test');
+    expect(user?.emailVerifiedAt).toBeInstanceOf(Date);
+    expect(await repository.listGrants(user!.id)).toEqual([
+      expect.objectContaining({ role: 'CUSTOMER', status: 'ACTIVE' }),
+    ]);
+
+    await request(server)
+      .post('/v1/auth/email/login')
+      .send({ email: 'signup@dealgo.test', password: 'password123' })
+      .expect(200);
+
+    const again = await request(server)
+      .post('/v1/auth/email/register')
+      .send({ email: 'signup@dealgo.test', password: 'other-password' })
+      .expect(200);
+    expect(Object.keys(again.body.data).sort()).toEqual(Object.keys(started.body.data).sort());
+    expect(mail.signupAccountExists.at(-1)).toBe('signup@dealgo.test');
+
+    await request(server)
+      .post('/v1/auth/email/register/not-a-uuid/verify')
+      .send({ code })
+      .expect(400);
+  });
+
+  it('resets a forgotten password with an emailed 6-digit code (DEC-PROD-045)', async () => {
+    const server = app.getHttpServer();
+    const started = await request(server)
+      .post('/v1/auth/email/register')
+      .send({ email: 'forgot@dealgo.test', password: 'password123' })
+      .expect(200);
+    await request(server)
+      .post(`/v1/auth/email/register/${started.body.data.challengeId}/verify`)
+      .send({ code: mail.signupCodes.at(-1)!.code })
+      .expect(200);
+
+    const unknown = await request(server)
+      .post('/v1/auth/email/password-resets')
+      .send({ email: 'nobody-here@dealgo.test' })
+      .expect(200);
+    const sentBefore = mail.passwordResets.length;
+    const real = await request(server)
+      .post('/v1/auth/email/password-resets')
+      .send({ email: 'Forgot@DealGo.test' })
+      .expect(200);
+    expect(Object.keys(real.body.data).sort()).toEqual(Object.keys(unknown.body.data).sort());
+    expect(mail.passwordResets).toHaveLength(sentBefore + 1);
+    const code = mail.passwordResets.at(-1)!.code;
+    expect(JSON.stringify(real.body)).not.toContain(code);
+
+    // The retired link-token body is rejected by validation.
+    await request(server)
+      .post(`/v1/auth/email/password-resets/${real.body.data.challengeId}/confirm`)
+      .send({ token: 'x'.repeat(43), password: 'brand-new-password' })
+      .expect(400);
+    const cooldown = await request(server)
+      .post(`/v1/auth/email/password-resets/${real.body.data.challengeId}/resend`)
+      .expect(429);
+    expect(cooldown.body.errorCode).toBe('AUTH_OTP_RESEND_COOLDOWN');
+    const wrong = await request(server)
+      .post(`/v1/auth/email/password-resets/${real.body.data.challengeId}/confirm`)
+      .send({ code: code === '000000' ? '111111' : '000000', password: 'brand-new-password' })
+      .expect(401);
+    expect(wrong.body.errorCode).toBe('AUTH_CODE_INVALID');
+    await request(server)
+      .post(`/v1/auth/email/password-resets/${real.body.data.challengeId}/confirm`)
+      .send({ code, password: 'brand-new-password' })
+      .expect(200);
+    await request(server)
+      .post('/v1/auth/email/login')
+      .send({ email: 'forgot@dealgo.test', password: 'brand-new-password' })
+      .expect(200);
+  });
+
+  it('activates a never-verified email account with an OTP sent on login', async () => {
+    const server = app.getHttpServer();
+    const legacy = await repository.createUser({
+      email: 'legacy@dealgo.test',
+      phone: null,
+      displayName: 'Legacy',
+    });
+    await repository.saveCustomerCredential(
+      legacy.id,
+      await app.get(PasswordHasher).hash('password123'),
+    );
+    const sentBefore = mail.signupCodes.length;
+
+    const wrongPassword = await request(server)
+      .post('/v1/auth/email/login')
+      .send({ email: 'legacy@dealgo.test', password: 'wrong-password' })
+      .expect(401);
+    expect(wrongPassword.body).not.toHaveProperty('details');
+    expect(mail.signupCodes).toHaveLength(sentBefore);
+
+    const blocked = await request(server)
+      .post('/v1/auth/email/login')
+      .send({ email: 'legacy@dealgo.test', password: 'password123' })
+      .expect(403);
+    expect(blocked.body).toMatchObject({
+      success: false,
+      errorCode: 'AUTH_EMAIL_NOT_VERIFIED',
+      details: {
+        challengeId: expect.any(String),
+        expiresAt: expect.any(String),
+        resendAvailableAt: expect.any(String),
+      },
+    });
+    const code = mail.signupCodes.at(-1)!.code;
+    expect(JSON.stringify(blocked.body)).not.toContain(code);
+
+    const verified = await request(server)
+      .post(`/v1/auth/email/register/${blocked.body.details.challengeId}/verify`)
+      .send({ code })
+      .expect(200);
+    expect(verified.body.data.user).toEqual({
+      id: legacy.id,
+      phone: null,
+      email: 'legacy@dealgo.test',
+    });
+    expect((await repository.findUserById(legacy.id))?.emailVerifiedAt).toBeInstanceOf(Date);
+    expect(await repository.listGrants(legacy.id)).toEqual([
+      expect.objectContaining({ role: 'CUSTOMER', status: 'ACTIVE' }),
+    ]);
+
+    await request(server)
+      .post('/v1/auth/email/login')
+      .send({ email: 'legacy@dealgo.test', password: 'password123' })
+      .expect(200);
   });
 });

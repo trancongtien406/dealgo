@@ -13,9 +13,31 @@ import { argon2id, hash as argon2Hash } from 'argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.js';
 import { OPS_FAQ_SEEDS } from '../src/modules/support/ops-faq.seed.js';
+import { INITIAL_PROMOTION_SEED } from '../src/modules/promotion/promotion.seed.js';
+import { PLATFORM_SETTING_SEED_DEFAULTS } from '../src/platform/settings/platform-settings.seed.js';
+import {
+  specForKey,
+  type PlatformSettingKey,
+} from '../src/platform/settings/platform-settings.catalog.js';
 
 const LOCAL_DATABASE_URL =
   'postgresql://dealgo:dealgo_dev@127.0.0.1:5433/dealgo?schema=public';
+
+export const DEFAULT_SEED_PASSWORD =
+  process.env.SEED_USER_PASSWORD?.trim() ||
+  process.env.OPS_BOOTSTRAP_PASSWORD?.trim() ||
+  'change-me-dev-only';
+
+const passwordHashCache = new Map<string, Promise<string>>();
+
+function getPasswordHash(password: string): Promise<string> {
+  let existing = passwordHashCache.get(password);
+  if (!existing) {
+    existing = argon2Hash(password, { type: argon2id });
+    passwordHashCache.set(password, existing);
+  }
+  return existing;
+}
 
 // Landmarks for realistic map pins and routing
 const HCM = {
@@ -53,6 +75,7 @@ type SeedCounts = {
   platformSettings: number;
   authMethodPolicies: number;
   opsFaqs: number;
+  promotions: number;
 };
 
 function loadDotEnv(): void {
@@ -100,6 +123,9 @@ async function upsertUser(
     displayName: string;
     phoneVerified?: boolean;
     emailVerified?: boolean;
+    password?: string | null;
+    /** App email login uses customer_credentials; Admin uses ops_credentials. */
+    passwordTarget?: 'customer' | 'ops';
   },
 ): Promise<{ id: string; created: boolean }> {
   const email = input.email ? normalizeEmail(input.email) : null;
@@ -111,7 +137,11 @@ async function upsertUser(
   }
 
   const now = new Date();
+  let userId: string;
+  let created = false;
+
   if (existing) {
+    userId = existing.id;
     await db.user.update({
       where: { id: existing.id },
       data: {
@@ -126,30 +156,52 @@ async function upsertUser(
           : existing.emailVerifiedAt,
       },
     });
-    return { id: existing.id, created: false };
+  } else {
+    const createdUser = await db.user.create({
+      data: {
+        email,
+        phone: input.phone,
+        displayName: input.displayName,
+        phoneVerifiedAt: input.phoneVerified ? now : null,
+        emailVerifiedAt: input.emailVerified ? now : null,
+      },
+    });
+    userId = createdUser.id;
+    created = true;
   }
 
-  const created = await db.user.create({
-    data: {
-      email,
-      phone: input.phone,
-      displayName: input.displayName,
-      phoneVerifiedAt: input.phoneVerified ? now : null,
-      emailVerifiedAt: input.emailVerified ? now : null,
-    },
-  });
-  return { id: created.id, created: true };
+  const password =
+    input.password === undefined ? DEFAULT_SEED_PASSWORD : input.password;
+  if (password) {
+    const passwordHash = await getPasswordHash(password);
+    if (input.passwordTarget === 'ops') {
+      await db.opsCredential.upsert({
+        where: { userId },
+        create: { userId, passwordHash },
+        update: { passwordHash },
+      });
+    } else {
+      await db.customerCredential.upsert({
+        where: { userId },
+        create: { userId, passwordHash },
+        update: { passwordHash },
+      });
+    }
+  }
+
+  return { id: userId, created };
 }
 
 async function ensureGrant(
   db: PrismaClient,
   userId: string,
   role: 'CUSTOMER' | 'DRIVER' | 'MERCHANT' | 'OPS',
+  status: 'ACTIVE' | 'PENDING' | 'SUSPENDED' = 'ACTIVE',
 ): Promise<void> {
   await db.roleGrant.upsert({
     where: { userId_role: { userId, role } },
-    create: { userId, role, status: 'ACTIVE' },
-    update: { status: 'ACTIVE' },
+    create: { userId, role, status },
+    update: { status },
   });
 }
 
@@ -158,21 +210,69 @@ async function ensureOpsOperator(db: PrismaClient): Promise<string> {
     process.env.OPS_BOOTSTRAP_EMAIL?.trim() || 'ops@localhost',
   );
   const password =
-    process.env.OPS_BOOTSTRAP_PASSWORD?.trim() || 'change-me-dev-only';
+    process.env.OPS_BOOTSTRAP_PASSWORD?.trim() || DEFAULT_SEED_PASSWORD;
   const { id } = await upsertUser(db, {
     email,
     phone: null,
     displayName: 'DealGo Ops Admin',
     emailVerified: true,
+    password,
+    passwordTarget: 'ops',
   });
-  const passwordHash = await argon2Hash(password, { type: argon2id });
-  await db.opsCredential.upsert({
-    where: { userId: id },
-    create: { userId: id, passwordHash },
-    update: { passwordHash },
-  });
-  await ensureGrant(db, id, 'OPS');
+  await ensureGrant(db, id, 'OPS', 'ACTIVE');
+  // DEC-PROD-036: the bootstrap operator is the super-admin (resets other ops passwords).
+  await db.opsCredential.update({ where: { userId: id }, data: { superAdmin: true } });
   return id;
+}
+
+/** DEC-PROD-033 demo: size + topping on a milk tea; only created when the dish has none. */
+const DEMO_ITEM_OPTIONS: Record<
+  string,
+  Array<{ name: string; minSelect: number; maxSelect: number; options: Array<{ name: string; priceDeltaVnd: number }> }>
+> = {
+  'Trà sữa Phúc Long truyền thống': [
+    {
+      name: 'Size',
+      minSelect: 1,
+      maxSelect: 1,
+      options: [
+        { name: 'M', priceDeltaVnd: 0 },
+        { name: 'L', priceDeltaVnd: 10_000 },
+      ],
+    },
+    {
+      name: 'Topping',
+      minSelect: 0,
+      maxSelect: 2,
+      options: [
+        { name: 'Trân châu', priceDeltaVnd: 8_000 },
+        { name: 'Thạch đào', priceDeltaVnd: 8_000 },
+        { name: 'Kem cheese', priceDeltaVnd: 12_000 },
+      ],
+    },
+  ],
+};
+
+async function ensureDemoItemOptions(db: PrismaClient, storeId: string): Promise<void> {
+  for (const [itemName, groups] of Object.entries(DEMO_ITEM_OPTIONS)) {
+    const item = await db.foodItem.findFirst({ where: { storeId, name: itemName } });
+    if (!item) continue;
+    if ((await db.foodOptionGroup.count({ where: { itemId: item.id } })) > 0) continue;
+    for (const [position, group] of groups.entries()) {
+      await db.foodOptionGroup.create({
+        data: {
+          itemId: item.id,
+          name: group.name,
+          minSelect: group.minSelect,
+          maxSelect: group.maxSelect,
+          position,
+          options: {
+            create: group.options.map((option, index) => ({ ...option, position: index })),
+          },
+        },
+      });
+    }
+  }
 }
 
 async function ensureStoreWithMenu(
@@ -183,6 +283,7 @@ async function ensureStoreWithMenu(
   lng: number,
   category: string,
   items: ReadonlyArray<{ name: string; priceVnd: number }>,
+  addressLabel: string | null = null,
 ): Promise<{ storeId: string; itemIds: string[]; menuItemsCreated: number }> {
   const existing = await db.foodStore.findFirst({
     where: { ownerId, name },
@@ -194,11 +295,11 @@ async function ensureStoreWithMenu(
     storeId = existing.id;
     await db.foodStore.update({
       where: { id: storeId },
-      data: { lat, lng, category },
+      data: { lat, lng, category, addressLabel },
     });
   } else {
     const created = await db.foodStore.create({
-      data: { ownerId, name, lat, lng, category },
+      data: { ownerId, name, lat, lng, category, addressLabel },
     });
     storeId = created.id;
   }
@@ -270,6 +371,8 @@ async function upsertRide(
       where: { id: existing.id },
       data: {
         status: input.status,
+        // DEC-PROD-035: seed cancellations are the customer's.
+        cancelledBy: input.status === 'CANCELLED' ? 'CUSTOMER' : null,
         pickupLat: input.pickup.lat,
         pickupLng: input.pickup.lng,
         pickupLabel: input.pickup.label,
@@ -294,6 +397,8 @@ async function upsertRide(
       customerId: input.customerId,
       idempotencyKey: input.idempotencyKey,
       status: input.status,
+      // DEC-PROD-035: seed cancellations are the customer's.
+      cancelledBy: input.status === 'CANCELLED' ? 'CUSTOMER' : null,
       pickupLat: input.pickup.lat,
       pickupLng: input.pickup.lng,
       pickupLabel: input.pickup.label,
@@ -367,6 +472,17 @@ async function upsertFoodOrder(
     0,
   );
   const totalVnd = subtotalVnd + input.deliveryFareVnd;
+  // DEC-PROD-034: same pickup snapshot the app writes at placement.
+  const store = await db.foodStore.findUnique({
+    where: { id: input.storeId },
+    select: { lat: true, lng: true, addressLabel: true },
+  });
+  const hasPoint = store?.lat != null && store?.lng != null;
+  const pickup = {
+    pickupLat: hasPoint ? store!.lat : null,
+    pickupLng: hasPoint ? store!.lng : null,
+    pickupLabel: hasPoint ? (store!.addressLabel?.slice(0, 200) ?? null) : null,
+  };
 
   const existing = await db.foodOrder.findUnique({
     where: {
@@ -384,12 +500,15 @@ async function upsertFoodOrder(
       data: {
         storeId: input.storeId,
         status: input.status,
+        // DEC-PROD-035: seed cancellations are the customer's.
+        cancelledBy: input.status === 'CANCELLED' ? 'CUSTOMER' : null,
         deliveryFareVnd: input.deliveryFareVnd,
         subtotalVnd,
         totalVnd,
         dropoffLat: input.dropoff.lat,
         dropoffLng: input.dropoff.lng,
         dropoffLabel: input.dropoff.label,
+        ...pickup,
         assignedDriverId: input.assignedDriverId,
         ...(input.updatedAt ? { updatedAt: input.updatedAt } : {}),
         lines: {
@@ -411,12 +530,15 @@ async function upsertFoodOrder(
       storeId: input.storeId,
       idempotencyKey: input.idempotencyKey,
       status: input.status,
+      // DEC-PROD-035: seed cancellations are the customer's.
+      cancelledBy: input.status === 'CANCELLED' ? 'CUSTOMER' : null,
       deliveryFareVnd: input.deliveryFareVnd,
       subtotalVnd,
       totalVnd,
       dropoffLat: input.dropoff.lat,
       dropoffLng: input.dropoff.lng,
       dropoffLabel: input.dropoff.label,
+      ...pickup,
       assignedDriverId: input.assignedDriverId,
       ...(input.updatedAt ? { updatedAt: input.updatedAt } : {}),
       lines: {
@@ -457,23 +579,9 @@ async function upsertPartnerApplication(
       role: input.role,
       status: input.status,
       metadata: input.metadata as any,
-      documents: [
-        {
-          label: 'Ảnh chụp căn cước công dân mặt trước',
-          storageKey: `mock://seed/${input.userId}/${input.role}/id_front.jpg`,
-          contentType: 'image/jpeg',
-        },
-        {
-          label: 'Ảnh chụp căn cước công dân mặt sau',
-          storageKey: `mock://seed/${input.userId}/${input.role}/id_back.jpg`,
-          contentType: 'image/jpeg',
-        },
-        {
-          label: 'Giấy phép lái xe / Đăng ký kinh doanh',
-          storageKey: `mock://seed/${input.userId}/${input.role}/license.jpg`,
-          contentType: 'image/jpeg',
-        },
-      ],
+      // Seed rows carry document metadata only (no stored bytes): Admin shows them as
+      // "không có tệp". Real uploads go through POST /v1/me/partner-applications.
+      documents: seedDocumentRefs(input.userId, input.role),
       submittedAt,
       reviewedAt,
       reviewedBy: input.reviewedBy ?? null,
@@ -589,7 +697,7 @@ async function ensureAuthPolicies(db: PrismaClient): Promise<number> {
 }
 
 async function ensurePlatformSettings(db: PrismaClient): Promise<number> {
-  const settings = [
+  const settings: Array<{ key: string; value: string; valueType: 'string' | 'number' | 'json' }> = [
     { key: 'DRIVER_SEARCH_RADIUS_KM', value: '5', valueType: 'number' },
     { key: 'RIDE_OFFER_TTL_SECONDS', value: '30', valueType: 'number' },
     { key: 'RIDE_NEGOTIATION_MAX_ROUNDS', value: '3', valueType: 'number' },
@@ -605,7 +713,13 @@ async function ensurePlatformSettings(db: PrismaClient): Promise<number> {
       value: '["COD","SANDBOX"]',
       valueType: 'json',
     },
-  ] as const;
+    // Rating window + platform fees: shared with the migration and the settings service.
+    ...Object.entries(PLATFORM_SETTING_SEED_DEFAULTS).map(([key, value]) => ({
+      key,
+      value: value ?? '',
+      valueType: specForKey(key as PlatformSettingKey).valueType,
+    })),
+  ];
 
   for (const s of settings) {
     await db.platformSetting.upsert({
@@ -640,6 +754,29 @@ async function ensureFaqs(db: PrismaClient): Promise<number> {
       });
       created += 1;
     }
+  }
+  return created;
+}
+
+async function ensurePromotions(db: PrismaClient): Promise<number> {
+  let created = 0;
+  for (const seed of INITIAL_PROMOTION_SEED) {
+    const existing = await db.promotion.findUnique({ where: { code: seed.code } });
+    if (existing) {
+      continue;
+    }
+    const { id: _sampleId, ...campaign } = seed;
+    await db.promotion.create({
+      data: {
+        ...campaign,
+        maxDiscountAmount: campaign.maxDiscountAmount ?? null,
+        startDate: new Date(campaign.startDate),
+        endDate: new Date(campaign.endDate),
+        createdAt: new Date(campaign.createdAt),
+        updatedAt: new Date(campaign.updatedAt),
+      },
+    });
+    created += 1;
   }
   return created;
 }
@@ -714,14 +851,74 @@ async function main(): Promise<void> {
     platformSettings: 0,
     authMethodPolicies: 0,
     opsFaqs: 0,
+    promotions: 0,
   };
 
   try {
     await db.$queryRaw`SELECT 1`;
 
-    // 1. Ops operator
+    // 1. Ops operator and staff directory
     const opsId = await ensureOpsOperator(db);
     counts.opsUsers = 1;
+
+    const opsStaffList = [
+      {
+        email: 'minh@dealgo.vn',
+        phone: '+84908000001',
+        displayName: 'Trần Quang Minh (Quản trị)',
+        password: DEFAULT_SEED_PASSWORD,
+        status: 'ACTIVE' as const,
+      },
+      {
+        email: 'support.hoa@seed.dealgo.local',
+        phone: '+84908000002',
+        displayName: 'Nguyễn Thu Hòa (CSKH)',
+        password: DEFAULT_SEED_PASSWORD,
+        status: 'ACTIVE' as const,
+      },
+      {
+        email: 'finance.nam@seed.dealgo.local',
+        phone: '+84908000003',
+        displayName: 'Lê Hoàng Nam (Tài chính)',
+        password: DEFAULT_SEED_PASSWORD,
+        status: 'ACTIVE' as const,
+      },
+      {
+        email: 'ops.hcm@seed.dealgo.local',
+        phone: '+84908000004',
+        displayName: 'Võ Quốc Huy (Vận hành HCM)',
+        password: DEFAULT_SEED_PASSWORD,
+        status: 'ACTIVE' as const,
+      },
+      {
+        email: 'ops.pending@seed.dealgo.local',
+        phone: '+84908000005',
+        displayName: 'Đỗ Văn Khang (Đang mời)',
+        password: DEFAULT_SEED_PASSWORD,
+        status: 'PENDING' as const,
+      },
+      {
+        email: 'ops.suspended@seed.dealgo.local',
+        phone: '+84908000006',
+        displayName: 'Hoàng Thị Tuyết (Tạm đình chỉ)',
+        password: DEFAULT_SEED_PASSWORD,
+        status: 'SUSPENDED' as const,
+      },
+    ];
+
+    for (const staff of opsStaffList) {
+      const { id } = await upsertUser(db, {
+        email: staff.email,
+        phone: staff.phone,
+        displayName: staff.displayName,
+        emailVerified: true,
+        phoneVerified: true,
+        password: staff.password,
+        passwordTarget: 'ops',
+      });
+      await ensureGrant(db, id, 'OPS', staff.status);
+      counts.opsUsers += 1;
+    }
 
     // 2. Customers
     const customers = [
@@ -729,36 +926,43 @@ async function main(): Promise<void> {
         phone: '+84902000001',
         email: 'customer.an@seed.dealgo.local',
         displayName: 'Nguyễn Văn An',
+        password: DEFAULT_SEED_PASSWORD,
       },
       {
         phone: '+84902000002',
         email: 'customer.binh@seed.dealgo.local',
         displayName: 'Trần Thị Bình',
+        password: DEFAULT_SEED_PASSWORD,
       },
       {
         phone: '+84902000003',
         email: 'customer.chi@seed.dealgo.local',
         displayName: 'Lê Minh Chi',
+        password: DEFAULT_SEED_PASSWORD,
       },
       {
         phone: '+84902000004',
         email: 'customer.duy@seed.dealgo.local',
         displayName: 'Vũ Quốc Duy',
+        password: DEFAULT_SEED_PASSWORD,
       },
       {
         phone: '+84902000005',
         email: 'customer.hoa@seed.dealgo.local',
         displayName: 'Đặng Mai Hoa',
+        password: DEFAULT_SEED_PASSWORD,
       },
       {
         phone: '+84902000006',
         email: 'customer.khoa@seed.dealgo.local',
         displayName: 'Bùi Anh Khoa',
+        password: DEFAULT_SEED_PASSWORD,
       },
       {
         phone: '+84902000007',
         email: 'customer.lan@seed.dealgo.local',
         displayName: 'Phan Tuyết Lan',
+        password: DEFAULT_SEED_PASSWORD,
       },
     ] as const;
 
@@ -780,6 +984,7 @@ async function main(): Promise<void> {
         phone: '+84903000001',
         email: 'driver.dung@seed.dealgo.local',
         displayName: 'Phạm Văn Dũng',
+        password: DEFAULT_SEED_PASSWORD,
         online: true,
         lat: HCM.benThanh.lat,
         lng: HCM.benThanh.lng,
@@ -788,6 +993,7 @@ async function main(): Promise<void> {
         phone: '+84903000002',
         email: 'driver.em@seed.dealgo.local',
         displayName: 'Hoàng Thị Em',
+        password: DEFAULT_SEED_PASSWORD,
         online: true,
         lat: DNG.dragonBridge.lat,
         lng: DNG.dragonBridge.lng,
@@ -796,6 +1002,7 @@ async function main(): Promise<void> {
         phone: '+84903000003',
         email: 'driver.phong@seed.dealgo.local',
         displayName: 'Võ Quốc Phong',
+        password: DEFAULT_SEED_PASSWORD,
         online: true,
         lat: DNG.myKhe.lat,
         lng: DNG.myKhe.lng,
@@ -804,6 +1011,7 @@ async function main(): Promise<void> {
         phone: '+84903000004',
         email: 'driver.hai@seed.dealgo.local',
         displayName: 'Nguyễn Văn Hải',
+        password: DEFAULT_SEED_PASSWORD,
         online: true,
         lat: HCM.nguyenHue.lat,
         lng: HCM.nguyenHue.lng,
@@ -812,6 +1020,7 @@ async function main(): Promise<void> {
         phone: '+84903000005',
         email: 'driver.mai@seed.dealgo.local',
         displayName: 'Lê Thị Mai',
+        password: DEFAULT_SEED_PASSWORD,
         online: false,
         lat: HCM.phuNhuan.lat,
         lng: HCM.phuNhuan.lng,
@@ -820,6 +1029,7 @@ async function main(): Promise<void> {
         phone: '+84903000006',
         email: 'driver.tam@seed.dealgo.local',
         displayName: 'Trần Văn Tám',
+        password: DEFAULT_SEED_PASSWORD,
         online: false,
         lat: DNG.sonTra.lat,
         lng: DNG.sonTra.lng,
@@ -832,6 +1042,7 @@ async function main(): Promise<void> {
         phone: driver.phone,
         email: driver.email,
         displayName: driver.displayName,
+        password: driver.password,
         phoneVerified: true,
         emailVerified: true,
       });
@@ -860,7 +1071,9 @@ async function main(): Promise<void> {
         phone: '+84901110001',
         email: 'merchant.bunbo@seed.dealgo.local',
         displayName: 'Bún Bò Huế Gia Truyền',
+        password: DEFAULT_SEED_PASSWORD,
         storeName: 'Bún Bò Huế — Nguyễn Huệ',
+        addressLabel: 'Đường Nguyễn Huệ, Quận 1, TP.HCM',
         category: 'pho',
         lat: HCM.nguyenHue.lat,
         lng: HCM.nguyenHue.lng,
@@ -874,7 +1087,9 @@ async function main(): Promise<void> {
         phone: '+84904000001',
         email: 'merchant.coffee@seed.dealgo.local',
         displayName: 'Cà Phê Sài Gòn',
+        password: DEFAULT_SEED_PASSWORD,
         storeName: 'Cà Phê Sài Gòn — Bitexco',
+        addressLabel: 'Tòa Bitexco, Hải Triều, Quận 1, TP.HCM',
         category: 'cafe',
         lat: HCM.bitexco.lat,
         lng: HCM.bitexco.lng,
@@ -888,7 +1103,9 @@ async function main(): Promise<void> {
         phone: '+84905110001',
         email: 'merchant.comtam@seed.dealgo.local',
         displayName: 'Cơm Tấm Ba Ghiền',
+        password: DEFAULT_SEED_PASSWORD,
         storeName: 'Cơm Tấm Ba Ghiền — Quận 1',
+        addressLabel: 'Quận 1, TP.HCM',
         category: 'rice',
         lat: HCM.district1.lat,
         lng: HCM.district1.lng,
@@ -903,7 +1120,9 @@ async function main(): Promise<void> {
         phone: '+84906110001',
         email: 'merchant.phuclong@seed.dealgo.local',
         displayName: 'Trà Sữa Phúc Long',
+        password: DEFAULT_SEED_PASSWORD,
         storeName: 'Trà Sữa Phúc Long — Thảo Điền',
+        addressLabel: 'Thảo Điền, TP. Thủ Đức, TP.HCM',
         category: 'cafe',
         lat: HCM.thaoDien.lat,
         lng: HCM.thaoDien.lng,
@@ -918,7 +1137,9 @@ async function main(): Promise<void> {
         phone: '+84907110001',
         email: 'merchant.miquang@seed.dealgo.local',
         displayName: 'Mì Quảng Bà Mua',
+        password: DEFAULT_SEED_PASSWORD,
         storeName: 'Mì Quảng Bà Mua — Hải Châu Đà Nẵng',
+        addressLabel: 'Quận Hải Châu, Đà Nẵng',
         category: 'noodles',
         lat: DNG.hanMarket.lat,
         lng: DNG.hanMarket.lng,
@@ -943,6 +1164,7 @@ async function main(): Promise<void> {
         phone: merchant.phone,
         email: merchant.email,
         displayName: merchant.displayName,
+        password: merchant.password,
         phoneVerified: true,
         emailVerified: true,
       });
@@ -957,8 +1179,10 @@ async function main(): Promise<void> {
         merchant.lng,
         merchant.category,
         merchant.items,
+        merchant.addressLabel,
       );
       storeIds.push(store.storeId);
+      await ensureDemoItemOptions(db, store.storeId);
       storeMenus.push({
         storeId: store.storeId,
         itemIds: store.itemIds,
@@ -1454,6 +1678,14 @@ async function main(): Promise<void> {
       counts.partnerApplications += 1;
     }
 
+    // Drop ops password rows on app-only users left by older seed builds that
+    // wrote every password into ops_credentials instead of customer_credentials.
+    await db.opsCredential.deleteMany({
+      where: {
+        user: { roleGrants: { none: { role: 'OPS' } } },
+      },
+    });
+
     // 9. Auth method policies
     counts.authMethodPolicies = await ensureAuthPolicies(db);
 
@@ -1463,6 +1695,9 @@ async function main(): Promise<void> {
     // 11. Ops FAQs
     counts.opsFaqs = await ensureFaqs(db);
 
+    // 12. Promotion campaigns (sample data; never seeded by the API at runtime)
+    counts.promotions = await ensurePromotions(db);
+
     console.log(
       JSON.stringify(
         {
@@ -1471,6 +1706,14 @@ async function main(): Promise<void> {
           opsEmail: normalizeEmail(
             process.env.OPS_BOOTSTRAP_EMAIL?.trim() || 'ops@localhost',
           ),
+          defaultPassword: DEFAULT_SEED_PASSWORD,
+          staffAccounts: [
+            { email: 'ops@localhost', role: 'ADMIN', password: DEFAULT_SEED_PASSWORD },
+            { email: 'minh@dealgo.vn', role: 'ADMIN', password: DEFAULT_SEED_PASSWORD },
+            { email: 'support.hoa@seed.dealgo.local', role: 'SUPPORT', password: DEFAULT_SEED_PASSWORD },
+            { email: 'finance.nam@seed.dealgo.local', role: 'FINANCE', password: DEFAULT_SEED_PASSWORD },
+            { email: 'ops.hcm@seed.dealgo.local', role: 'OPS', password: DEFAULT_SEED_PASSWORD },
+          ],
         },
         null,
         2,
@@ -1485,3 +1728,19 @@ main().catch((error: unknown) => {
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
 });
+
+function seedDocumentRefs(userId: string, role: 'DRIVER' | 'MERCHANT') {
+  const kinds =
+    role === 'DRIVER'
+      ? (['ID_FRONT', 'ID_BACK', 'SELFIE', 'LICENSE', 'VEHICLE_REG'] as const)
+      : (['BUSINESS_LICENSE', 'REP_ID_FRONT', 'REP_ID_BACK'] as const);
+  const uploadedAt = new Date(Date.now() - 2 * 3600_000).toISOString();
+  return kinds.map((kind) => ({
+    key: `mock://seed/${userId}/${role}/${kind.toLowerCase()}.jpg`,
+    kind,
+    label: kind,
+    contentType: 'image/jpeg',
+    sizeBytes: 0,
+    uploadedAt,
+  }));
+}

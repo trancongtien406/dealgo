@@ -1,3 +1,4 @@
+import { parseAccountDeletion } from "@/lib/account-deletion";
 import { personInitials, type StatusTone } from "@/lib/admin-format";
 import type { NestOpsCustomer } from "@/features/customers/nest-types";
 import type {
@@ -45,6 +46,7 @@ export function mapNestCustomerToListItem(
     spend: 0,
     status: customerStatusFromGrants(customer),
     time: formatOpsClock(customer.createdAt),
+    deletion: parseAccountDeletion(customer.deletion),
   };
 }
 

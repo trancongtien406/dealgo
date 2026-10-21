@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../tokens/dealgo_tokens.dart';
 import 'dealgo_illustration.dart';
 import 'dealgo_primary_button.dart';
+import '../icons/dealgo_icons.dart';
 
 enum DealGoBannerTone { info, warning, offline, empty }
 
@@ -43,9 +44,7 @@ class DealGoBanner extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (asset != null) ...[
-              Center(
-                child: DealGoIllustration(asset, width: 96, height: 96),
-              ),
+              Center(child: DealGoIllustration(asset, width: 96, height: 96)),
               const SizedBox(height: DealGoSpacing.s12),
             ],
             Row(
@@ -65,7 +64,8 @@ class DealGoBanner extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                      if (title != null) const SizedBox(height: DealGoSpacing.s4),
+                      if (title != null)
+                        const SizedBox(height: DealGoSpacing.s4),
                       Text(
                         message,
                         style: textTheme.bodyMedium?.copyWith(
@@ -88,37 +88,32 @@ class DealGoBanner extends StatelessWidget {
     );
   }
 
-  static ({
-    Color background,
-    Color foreground,
-    Color border,
-    IconData icon,
-  })
+  static ({Color background, Color foreground, Color border, IconData icon})
   _toneColors(DealGoBannerTone tone) {
     return switch (tone) {
       DealGoBannerTone.info => (
         background: DealGoColors.greenSurface,
         foreground: DealGoColors.brandGreen,
         border: DealGoColors.brandGreen.withValues(alpha: 0.2),
-        icon: Icons.info_outline,
+        icon: DealGoIcons.info,
       ),
       DealGoBannerTone.warning => (
         background: DealGoColors.amberSurface,
         foreground: DealGoColors.warning,
         border: DealGoColors.warning.withValues(alpha: 0.2),
-        icon: Icons.warning_amber_outlined,
+        icon: DealGoIcons.warning,
       ),
       DealGoBannerTone.offline => (
         background: DealGoColors.dangerSurface,
         foreground: DealGoColors.danger,
         border: DealGoColors.danger.withValues(alpha: 0.2),
-        icon: Icons.wifi_off_outlined,
+        icon: DealGoIcons.offline,
       ),
       DealGoBannerTone.empty => (
         background: DealGoColors.canvas,
         foreground: DealGoColors.textSecondary,
         border: DealGoColors.border,
-        icon: Icons.inbox_outlined,
+        icon: DealGoIcons.inbox,
       ),
     };
   }

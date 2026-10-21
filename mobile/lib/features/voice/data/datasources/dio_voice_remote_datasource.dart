@@ -60,7 +60,7 @@ VoiceSession decodeVoiceSession(Object? body) {
   if (room == null || room.isEmpty || token == null || token.isEmpty) {
     throw const ApiException(
       statusCode: 200,
-      message: 'Phiên thoại không hợp lệ',
+      message: 'Invalid voice session',
       errorCode: 'INVALID_VOICE_SESSION',
     );
   }

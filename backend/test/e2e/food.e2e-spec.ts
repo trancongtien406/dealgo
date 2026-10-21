@@ -1,4 +1,7 @@
+import { MemoryRidePickupCodeStore, RIDE_PICKUP_CODE_STORE } from '../../src/modules/ride/ride-pickup-code.js';
+import { FOOD_ORDER_CODE_STORE, MemoryFoodOrderCodeStore } from '../../src/modules/food-order/food-order-code.js';
 import { randomUUID } from 'node:crypto';
+import { EARNINGS_REPOSITORY, MemoryEarningsRepository } from '../../src/modules/earnings/index.js';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -36,6 +39,12 @@ describe('Food End-to-End Flow (e2e)', () => {
       .useValue(new MemoryFoodRepository())
       .overrideProvider(PLATFORM_SETTINGS_REPOSITORY)
       .useValue(new MemoryPlatformSettingsRepository())
+      .overrideProvider(FOOD_ORDER_CODE_STORE)
+      .useValue(new MemoryFoodOrderCodeStore())
+      .overrideProvider(RIDE_PICKUP_CODE_STORE)
+      .useValue(new MemoryRidePickupCodeStore())
+      .overrideProvider(EARNINGS_REPOSITORY)
+      .useValue(new MemoryEarningsRepository())
       .overrideProvider(LEDGER_REPOSITORY)
       .useValue(new MemoryLedgerRepository())
       .overrideProvider(PAYMENT_REPOSITORY)
@@ -179,10 +188,17 @@ describe('Food End-to-End Flow (e2e)', () => {
       .expect(200);
     expect(pickupRes.body.data.status).toBe('PICKED_UP');
 
-    // 8. Driver delivers order
+    // 8. Customer reads the delivery code (DEC-PROD-036); driver delivers with it
+    const tracking = await request(app.getHttpServer())
+      .get(`/v1/food/orders/${orderId}`)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    const deliveryCode = tracking.body.data.deliveryCode as string;
+    expect(deliveryCode).toMatch(/^\d{4}$/);
     const deliverRes = await request(app.getHttpServer())
       .post(`/v1/food/orders/${orderId}/deliver`)
       .set('Authorization', `Bearer ${driver.token}`)
+      .send({ deliveryCode })
       .expect(200);
     expect(deliverRes.body.data.status).toBe('DELIVERED');
   });

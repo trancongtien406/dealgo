@@ -26,7 +26,10 @@ export class OpsAuthService implements OnModuleInit {
       return;
     }
     try {
-      await this.ensureOperator(email, password, this.config.get('NODE_ENV', { infer: true }));
+      // DEC-PROD-036: the env bootstrap operator is the super-admin.
+      await this.ensureOperator(email, password, this.config.get('NODE_ENV', { infer: true }), {
+        superAdmin: true,
+      });
     } catch (err) {
       this.logger.warn({
         msg: 'ops.bootstrap_skipped',
@@ -39,6 +42,7 @@ export class OpsAuthService implements OnModuleInit {
     rawEmail: string,
     password: string,
     nodeEnv: AppEnv['NODE_ENV'],
+    options: { superAdmin?: boolean } = {},
   ): Promise<UserRecord> {
     if (nodeEnv === 'production' && password === DEV_OPS_BOOTSTRAP_PASSWORD) {
       throw new Error(
@@ -56,6 +60,9 @@ export class OpsAuthService implements OnModuleInit {
       });
       await this.repository.saveOpsCredential(user.id, await this.passwords.hash(password));
       await this.ensureActiveOpsGrant(user.id);
+      if (options.superAdmin) {
+        await this.repository.setOpsSuperAdmin(user.id, true);
+      }
       return user;
     }
 
@@ -64,6 +71,9 @@ export class OpsAuthService implements OnModuleInit {
       await this.repository.saveOpsCredential(existing.id, await this.passwords.hash(password));
     }
     await this.ensureActiveOpsGrant(existing.id);
+    if (options.superAdmin) {
+      await this.repository.setOpsSuperAdmin(existing.id, true);
+    }
     return existing;
   }
 

@@ -59,8 +59,9 @@ Sơ đồ **chỉ thể hiện trách nhiệm nghiệp vụ**, không phải thi
 | `DEC-PROD-002` | **Một ứng dụng mobile** hỗ trợ Customer, Merchant và Driver. | `CONFIRMED` | Trao đổi sản phẩm với chủ dự án. |
 | `DEC-PROD-003` | Tham khảo Grab/GrabFood/ShopeeFood cho luồng Ride/Food, không sao chép giao diện hay logic nội bộ. | `CONFIRMED` | Định hướng nghiên cứu. |
 | `DEC-PROD-005` | Ride có thương lượng giá: khách đề xuất, tài xế chấp nhận/đưa giá khác, khách chọn trước khi assignment. | `CONFIRMED` | Yêu cầu chủ dự án; mức sàn/trần, vòng, timeout, phí thuộc `OPEN-003/019`. |
-| `DEC-PROD-006` | Đăng ký/xác thực passkey, phone SMS và email đã xác minh; Admin được phân quyền quản lý phương thức. | `CONFIRMED` | Email không là OTP đăng nhập độc lập; recovery/provider `OPEN-020`. |
+| `DEC-PROD-006` | **SUPERSEDED** — trước đây hạn chế email login; đã thu hồi. Auth: SMS + email/password + passkey. | `SUPERSEDED` | Email+password đăng ký/đăng nhập bình thường (2026-10-18). |
 | `DEC-PROD-007` | Chat và gọi thoại trong app theo giao dịch Ride/Food. | `CONFIRMED` | Không lộ số cá nhân; no-recording/no-video baseline; policy/provider `OPEN-021`. |
+| `DEC-PROD-008` | Đăng ký email bắt buộc OTP qua email trước khi tạo tài khoản; tài khoản email cũ chưa xác thực kích hoạt bằng OTP khi đăng nhập. | `CONFIRMED` | Yêu cầu chủ dự án 2026-10-18; thông số chi tiết trong [decisions-and-assumptions.md](./decisions-and-assumptions.md). |
 | `DEC-PROD-004` | Cần tài liệu đủ để triển khai thực tế, gồm UI/UX, domain, backend, mobile, kiểm thử, bảo mật, vận hành. | `CONFIRMED` | Định hướng bộ hồ sơ DealGo. |
 
 ### 2.2. Các quyết định cần xác nhận trước khi khóa đặc tả liên quan

@@ -5,8 +5,14 @@ import '../../../../core/network/api_exception.dart';
 import '../../../identity/domain/entities/app_role.dart';
 import '../../../identity/domain/entities/user_profile.dart';
 import '../../domain/entities/partner_application.dart';
+import '../../domain/entities/partner_documents.dart';
 import '../../domain/entities/partner_onboarding.dart';
+import '../../domain/usecases/get_my_partner_application.dart';
 import '../../domain/usecases/submit_partner_application.dart';
+import '../document_image_source.dart';
+import 'partner_document_draft.dart';
+
+export 'partner_document_draft.dart' show PartnerSubmitError;
 
 enum DriverKycStep {
   services,
@@ -20,6 +26,10 @@ enum DriverKycStep {
   review,
 }
 
+/// Default vehicle type; DealGo is motorbike-only (stored as display text
+/// because the customer-facing driver card shows it verbatim).
+const driverDefaultVehicleType = 'Xe máy';
+
 class DriverKycState {
   const DriverKycState({
     required this.status,
@@ -29,14 +39,21 @@ class DriverKycState {
     required this.fullName,
     required this.birthDate,
     required this.address,
-    required this.idAttached,
-    required this.selfieAttached,
-    required this.licenseAttached,
-    required this.bankAttached,
+    required this.idNumber,
+    required this.licenseClass,
+    required this.licenseNumber,
     required this.vehiclePlate,
     required this.vehicleType,
-    required this.rejections,
+    required this.vehicleBrand,
+    required this.vehicleModel,
+    required this.bankName,
+    required this.bankAccountNumber,
+    required this.bankAccountHolder,
+    required this.documents,
+    required this.issues,
     required this.seeded,
+    this.reason,
+    this.loading = false,
     this.submitting = false,
     this.submitError,
   });
@@ -47,16 +64,21 @@ class DriverKycState {
       step: DriverKycStep.services,
       rideService: true,
       foodService: true,
-      fullName: 'NGUYỄN VĂN A',
-      birthDate: '01/01/1995',
-      address: 'Đà Nẵng, Việt Nam',
-      idAttached: false,
-      selfieAttached: false,
-      licenseAttached: false,
-      bankAttached: false,
-      vehiclePlate: '43B1-123.45',
-      vehicleType: 'Xe máy',
-      rejections: driverDemoRejections,
+      fullName: '',
+      birthDate: '',
+      address: '',
+      idNumber: '',
+      licenseClass: 'A1',
+      licenseNumber: '',
+      vehiclePlate: '',
+      vehicleType: driverDefaultVehicleType,
+      vehicleBrand: '',
+      vehicleModel: '',
+      bankName: '',
+      bankAccountNumber: '',
+      bankAccountHolder: '',
+      documents: PartnerDocumentDraft(),
+      issues: [],
       seeded: false,
     );
   }
@@ -68,15 +90,26 @@ class DriverKycState {
   final String fullName;
   final String birthDate;
   final String address;
-  final bool idAttached;
-  final bool selfieAttached;
-  final bool licenseAttached;
-  final bool bankAttached;
+  final String idNumber;
+  final String licenseClass;
+  final String licenseNumber;
   final String vehiclePlate;
   final String vehicleType;
-  final List<OnboardingRejection> rejections;
+  final String vehicleBrand;
+  final String vehicleModel;
+  final String bankName;
+  final String bankAccountNumber;
+  final String bankAccountHolder;
+  final PartnerDocumentDraft documents;
+
+  /// Sections ops asked to fix on the last review (server data).
+  final List<PartnerReviewIssue> issues;
+  final String? reason;
   final bool seeded;
+  final bool loading;
   final bool submitting;
+
+  /// A [PartnerSubmitError] code or a server `errorCode`.
   final String? submitError;
 
   int get stepNumber => DriverKycStep.values.indexOf(step) + 1;
@@ -84,7 +117,42 @@ class DriverKycState {
 
   bool get canContinueServices => rideService || foodService;
 
-  bool get canContinueDocs => idAttached && licenseAttached;
+  bool get canContinuePersonal =>
+      fullName.trim().length >= 2 &&
+      birthDate.trim().isNotEmpty &&
+      address.trim().isNotEmpty;
+
+  bool get canContinueIdentity => documents.hasAll(const [
+    PartnerDocumentKind.idFront,
+    PartnerDocumentKind.idBack,
+  ]);
+
+  bool get canContinueIdNumber => RegExp(r'^\d{9,12}$').hasMatch(idNumber);
+
+  bool get canContinueSelfie => documents.has(PartnerDocumentKind.selfie);
+
+  bool get canContinueLicense =>
+      documents.has(PartnerDocumentKind.license) &&
+      licenseNumber.trim().length >= 6;
+
+  bool get canContinueVehicle => vehiclePlate.trim().length >= 5;
+
+  bool get canContinueVehicleStep =>
+      canContinueVehicle && documents.has(PartnerDocumentKind.vehicleReg);
+
+  bool get canContinueBank =>
+      bankName.trim().length >= 2 &&
+      RegExp(r'^\d{6,20}$').hasMatch(bankAccountNumber) &&
+      bankAccountHolder.trim().length >= 2;
+
+  bool get canSubmit =>
+      canContinueServices &&
+      canContinuePersonal &&
+      canContinueIdentity &&
+      canContinueSelfie &&
+      canContinueLicense &&
+      canContinueVehicleStep &&
+      canContinueBank;
 
   DriverKycState copyWith({
     PartnerApplicationStatus? status,
@@ -94,14 +162,22 @@ class DriverKycState {
     String? fullName,
     String? birthDate,
     String? address,
-    bool? idAttached,
-    bool? selfieAttached,
-    bool? licenseAttached,
-    bool? bankAttached,
+    String? idNumber,
+    String? licenseClass,
+    String? licenseNumber,
     String? vehiclePlate,
     String? vehicleType,
-    List<OnboardingRejection>? rejections,
+    String? vehicleBrand,
+    String? vehicleModel,
+    String? bankName,
+    String? bankAccountNumber,
+    String? bankAccountHolder,
+    PartnerDocumentDraft? documents,
+    List<PartnerReviewIssue>? issues,
+    String? reason,
+    bool clearReason = false,
     bool? seeded,
+    bool? loading,
     bool? submitting,
     String? submitError,
     bool clearSubmitError = false,
@@ -114,14 +190,21 @@ class DriverKycState {
       fullName: fullName ?? this.fullName,
       birthDate: birthDate ?? this.birthDate,
       address: address ?? this.address,
-      idAttached: idAttached ?? this.idAttached,
-      selfieAttached: selfieAttached ?? this.selfieAttached,
-      licenseAttached: licenseAttached ?? this.licenseAttached,
-      bankAttached: bankAttached ?? this.bankAttached,
+      idNumber: idNumber ?? this.idNumber,
+      licenseClass: licenseClass ?? this.licenseClass,
+      licenseNumber: licenseNumber ?? this.licenseNumber,
       vehiclePlate: vehiclePlate ?? this.vehiclePlate,
       vehicleType: vehicleType ?? this.vehicleType,
-      rejections: rejections ?? this.rejections,
+      vehicleBrand: vehicleBrand ?? this.vehicleBrand,
+      vehicleModel: vehicleModel ?? this.vehicleModel,
+      bankName: bankName ?? this.bankName,
+      bankAccountNumber: bankAccountNumber ?? this.bankAccountNumber,
+      bankAccountHolder: bankAccountHolder ?? this.bankAccountHolder,
+      documents: documents ?? this.documents,
+      issues: issues ?? this.issues,
+      reason: clearReason ? null : (reason ?? this.reason),
       seeded: seeded ?? this.seeded,
+      loading: loading ?? this.loading,
       submitting: submitting ?? this.submitting,
       submitError: clearSubmitError ? null : (submitError ?? this.submitError),
     );
@@ -130,14 +213,17 @@ class DriverKycState {
 
 class DriverKycCubit extends Cubit<DriverKycState> {
   DriverKycCubit({
-    SubmitPartnerApplication? submitPartnerApplication,
+    this._submitPartnerApplication,
+    this._getMyPartnerApplication,
     this._accessToken,
     bool? useMock,
-  }) : _submitPartnerApplication = submitPartnerApplication,
-       _useMock = useMock ?? useMockData,
+  }) : _useMock = useMock ?? useMockData,
        super(DriverKycState.initial());
 
+  static const role = 'DRIVER';
+
   final SubmitPartnerApplication? _submitPartnerApplication;
+  final GetMyPartnerApplication? _getMyPartnerApplication;
   final String? Function()? _accessToken;
   final bool _useMock;
 
@@ -152,7 +238,114 @@ class DriverKycCubit extends Cubit<DriverKycState> {
       'REJECTED' => PartnerApplicationStatus.rejected,
       _ => PartnerApplicationStatus.draft,
     };
-    emit(state.copyWith(status: status, seeded: true));
+    final name = profile.displayName.trim();
+    emit(
+      state.copyWith(
+        status: status,
+        seeded: true,
+        fullName: state.fullName.isEmpty && name.isNotEmpty ? name : null,
+        bankAccountHolder: state.bankAccountHolder.isEmpty && name.isNotEmpty
+            ? name.toUpperCase()
+            : null,
+      ),
+    );
+  }
+
+  /// Loads the server application: status, review reason/issues, stored
+  /// documents, and previously entered fields.
+  Future<void> refresh() async {
+    final load = _getMyPartnerApplication;
+    final token = _accessToken?.call()?.trim() ?? '';
+    if (_useMock || load == null || token.isEmpty || state.loading) {
+      return;
+    }
+    emit(state.copyWith(loading: true));
+    try {
+      final view = await load(accessToken: token, role: role);
+      if (isClosed) {
+        return;
+      }
+      if (view == null) {
+        emit(state.copyWith(loading: false));
+        return;
+      }
+      _applyView(view);
+    } catch (_) {
+      if (!isClosed) {
+        emit(state.copyWith(loading: false));
+      }
+    }
+  }
+
+  void _applyView(PartnerApplicationView view) {
+    final m = view.metadata;
+    String keep(String current, String key) =>
+        current.trim().isNotEmpty ? current : (metadataText(m, key) ?? current);
+    emit(
+      state.copyWith(
+        status: partnerStatusFromServer(view.status),
+        loading: false,
+        reason: view.reason,
+        clearReason: view.reason == null,
+        issues: view.issues,
+        documents: state.documents.synced(view.storedKinds),
+        rideService: m['rideService'] is bool ? m['rideService'] as bool : null,
+        foodService: m['foodService'] is bool ? m['foodService'] as bool : null,
+        fullName: keep(state.fullName, 'fullName'),
+        birthDate: keep(state.birthDate, 'birthDate'),
+        address: keep(state.address, 'address'),
+        idNumber: keep(state.idNumber, 'idNumber'),
+        licenseClass: metadataText(m, 'licenseClass'),
+        licenseNumber: keep(state.licenseNumber, 'licenseNumber'),
+        vehiclePlate: keep(state.vehiclePlate, 'vehiclePlate'),
+        vehicleBrand: keep(state.vehicleBrand, 'vehicleBrand'),
+        vehicleModel: keep(state.vehicleModel, 'vehicleModel'),
+        bankName: keep(state.bankName, 'bankName'),
+        bankAccountNumber: keep(state.bankAccountNumber, 'bankAccountNumber'),
+        bankAccountHolder: metadataText(m, 'bankAccountHolder'),
+      ),
+    );
+  }
+
+  void setFullName(String value) => emit(state.copyWith(fullName: value));
+
+  void setBirthDate(String value) => emit(state.copyWith(birthDate: value));
+
+  void setAddress(String value) => emit(state.copyWith(address: value));
+
+  void setIdNumber(String value) =>
+      emit(state.copyWith(idNumber: value.replaceAll(RegExp(r'\D'), '')));
+
+  void setLicenseClass(String value) =>
+      emit(state.copyWith(licenseClass: value));
+
+  void setLicenseNumber(String value) =>
+      emit(state.copyWith(licenseNumber: value.trim()));
+
+  void setVehiclePlate(String value) =>
+      emit(state.copyWith(vehiclePlate: value.toUpperCase()));
+
+  void setVehicleBrand(String value) =>
+      emit(state.copyWith(vehicleBrand: value));
+
+  void setVehicleModel(String value) =>
+      emit(state.copyWith(vehicleModel: value));
+
+  void setBankName(String value) => emit(state.copyWith(bankName: value));
+
+  void setBankAccountNumber(String value) => emit(
+    state.copyWith(bankAccountNumber: value.replaceAll(RegExp(r'\D'), '')),
+  );
+
+  void setBankAccountHolder(String value) =>
+      emit(state.copyWith(bankAccountHolder: value.toUpperCase()));
+
+  void attachDocument(String kind, PickedDocumentImage image) {
+    emit(state.copyWith(documents: state.documents.attach(kind, image)));
+  }
+
+  void removeDocument(String kind) {
+    emit(state.copyWith(documents: state.documents.detach(kind)));
   }
 
   void startDraft() {
@@ -160,10 +353,6 @@ class DriverKycCubit extends Cubit<DriverKycState> {
       state.copyWith(
         status: PartnerApplicationStatus.draft,
         step: DriverKycStep.services,
-        idAttached: false,
-        selfieAttached: false,
-        licenseAttached: false,
-        bankAttached: false,
         clearSubmitError: true,
       ),
     );
@@ -197,43 +386,54 @@ class DriverKycCubit extends Cubit<DriverKycState> {
     emit(state.copyWith(step: DriverKycStep.values[index - 1]));
   }
 
-  void toggleIdAttached() {
-    emit(state.copyWith(idAttached: !state.idAttached));
-  }
-
-  void toggleSelfieAttached() {
-    emit(state.copyWith(selfieAttached: !state.selfieAttached));
-  }
-
-  void toggleLicenseAttached() {
-    emit(state.copyWith(licenseAttached: !state.licenseAttached));
-  }
-
-  void toggleBankAttached() {
-    emit(state.copyWith(bankAttached: !state.bankAttached));
-  }
-
-  Future<void> submit() => _submitApplication();
-
-  void simulateReject() {
-    emit(state.copyWith(status: PartnerApplicationStatus.rejected));
-  }
-
-  void beginResubmit() {
+  /// Opens the flow at the step for [section] (or the first flagged one) and
+  /// requires re-capturing every flagged document.
+  void beginResubmit([String? section]) {
+    final sections = [for (final issue in state.issues) issue.section];
+    final target = section ?? (sections.isEmpty ? null : sections.first);
     emit(
       state.copyWith(
         status: PartnerApplicationStatus.draft,
-        step: DriverKycStep.identity,
-        idAttached: false,
-        selfieAttached: false,
-        licenseAttached: false,
-        bankAttached: false,
+        step: stepForSection(target),
+        documents: state.documents.flag(sections),
         clearSubmitError: true,
       ),
     );
   }
 
+  static DriverKycStep stepForSection(String? section) {
+    return switch (section) {
+      'PERSONAL' => DriverKycStep.personal,
+      'ID_CARD' => DriverKycStep.identity,
+      'SELFIE' => DriverKycStep.selfie,
+      'LICENSE' => DriverKycStep.license,
+      'VEHICLE' => DriverKycStep.vehicle,
+      'BANK' => DriverKycStep.bank,
+      _ => DriverKycStep.services,
+    };
+  }
+
+  Future<void> submit() => _submitApplication();
+
   Future<void> resubmit() => _submitApplication();
+
+  Map<String, Object?> _metadata() => {
+    'rideService': state.rideService,
+    'foodService': state.foodService,
+    'fullName': state.fullName.trim(),
+    'birthDate': state.birthDate.trim(),
+    'address': state.address.trim(),
+    'idNumber': state.idNumber,
+    'licenseClass': state.licenseClass,
+    'licenseNumber': state.licenseNumber,
+    'vehiclePlate': state.vehiclePlate.trim(),
+    'vehicleType': state.vehicleType,
+    'vehicleBrand': state.vehicleBrand.trim(),
+    'vehicleModel': state.vehicleModel.trim(),
+    'bankName': state.bankName.trim(),
+    'bankAccountNumber': state.bankAccountNumber,
+    'bankAccountHolder': state.bankAccountHolder.trim(),
+  };
 
   Future<void> _submitApplication() async {
     if (state.submitting) {
@@ -244,6 +444,12 @@ class DriverKycCubit extends Cubit<DriverKycState> {
       emit(
         state.copyWith(
           status: PartnerApplicationStatus.pending,
+          documents: state.documents.synced({
+            ...state.documents.stored,
+            ...state.documents.picked.keys,
+          }),
+          issues: const [],
+          clearReason: true,
           clearSubmitError: true,
         ),
       );
@@ -251,7 +457,7 @@ class DriverKycCubit extends Cubit<DriverKycState> {
     }
     final token = _accessToken?.call()?.trim() ?? '';
     if (token.isEmpty) {
-      emit(state.copyWith(submitError: 'Phiên đăng nhập không còn hiệu lực'));
+      emit(state.copyWith(submitError: PartnerSubmitError.sessionExpired));
       return;
     }
     emit(state.copyWith(submitting: true, clearSubmitError: true));
@@ -259,18 +465,11 @@ class DriverKycCubit extends Cubit<DriverKycState> {
       final view = await submit(
         SubmitPartnerApplicationRequest(
           accessToken: token,
-          role: 'DRIVER',
-          metadata: {
-            'rideService': state.rideService,
-            'foodService': state.foodService,
-            'fullName': state.fullName,
-            'birthDate': state.birthDate,
-            'address': state.address,
-            'vehiclePlate': state.vehiclePlate,
-            'vehicleType': state.vehicleType,
-            'idAttached': state.idAttached,
-            'licenseAttached': state.licenseAttached,
-          },
+          role: role,
+          metadata: _metadata(),
+          documents: state.documents.uploads(
+            PartnerDocumentKind.driverRequired,
+          ),
         ),
       );
       if (isClosed) {
@@ -278,8 +477,11 @@ class DriverKycCubit extends Cubit<DriverKycState> {
       }
       emit(
         state.copyWith(
-          status: _mapStatus(view.status),
+          status: partnerStatusFromServer(view.status),
           submitting: false,
+          documents: state.documents.synced(view.storedKinds),
+          issues: view.issues,
+          clearReason: true,
           clearSubmitError: true,
         ),
       );
@@ -287,7 +489,7 @@ class DriverKycCubit extends Cubit<DriverKycState> {
       if (isClosed) {
         return;
       }
-      emit(state.copyWith(submitting: false, submitError: error.message));
+      emit(state.copyWith(submitting: false, submitError: error.errorCode));
     } catch (_) {
       if (isClosed) {
         return;
@@ -295,19 +497,9 @@ class DriverKycCubit extends Cubit<DriverKycState> {
       emit(
         state.copyWith(
           submitting: false,
-          submitError: 'Không thể kết nối máy chủ',
+          submitError: PartnerSubmitError.network,
         ),
       );
     }
   }
-}
-
-PartnerApplicationStatus _mapStatus(String status) {
-  return switch (status.toUpperCase()) {
-    'APPROVED' => PartnerApplicationStatus.active,
-    'SUBMITTED' => PartnerApplicationStatus.pending,
-    'REJECTED' => PartnerApplicationStatus.rejected,
-    'DRAFT' => PartnerApplicationStatus.draft,
-    _ => PartnerApplicationStatus.pending,
-  };
 }

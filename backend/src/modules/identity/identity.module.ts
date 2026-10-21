@@ -1,8 +1,9 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { resolvePersistenceRepository, PrismaModule, PrismaService } from '../../platform/database/index.js';
 import type { AppEnv } from '../../platform/config/index.js';
 import { AccessAuthGuard, CustomerSessionGuard, OpsSessionGuard } from './access-auth.guard.js';
+import { OpsPermissionGuard } from './ops-rbac/ops-permission.guard.js';
 import { AuthMethodPolicyService } from './auth-method-policy.service.js';
 import {
   MemoryAuthMethodPolicyRepository,
@@ -15,6 +16,7 @@ import {
   type DriverPresenceRepository,
 } from './driver-presence.repository.js';
 import { DriverPresenceService } from './driver-presence.service.js';
+import { EmailPasswordAuthService } from './email-password-auth.service.js';
 import { EmailVerificationService } from './email-verification.service.js';
 import {
   AUTH_METHOD_POLICY_REPOSITORY,
@@ -32,8 +34,11 @@ import { OpsDriversController } from './ops-drivers.controller.js';
 import { OpsStaffController } from './ops-staff.controller.js';
 import { OpsRoleGrantsController } from './ops-role-grants.controller.js';
 import { OpsSessionsController } from './ops-sessions.controller.js';
+import { OpsStaffSecurityService } from './ops-staff-security.service.js';
 import { OpsUsersService } from './ops-users.service.js';
 import { PasskeyService } from './passkey.service.js';
+import { PasswordResetService } from './password-reset.service.js';
+import { PlatformSettingsModule } from '../../platform/settings/platform-settings.module.js';
 import { PasswordHasher } from '../../platform/security/index.js';
 import { PhoneAuthService } from './phone-auth.service.js';
 import { PrismaAuthMethodPolicyRepository } from './auth-method-prisma.repository.js';
@@ -45,7 +50,8 @@ import { SessionService } from './session.service.js';
 import { MockSmsSender, UnavailableSmsSender, type SmsSender } from '../../integrations/sms/sms-sender.js';
 
 @Module({
-  imports: [PrismaModule],
+  // forwardRef: PlatformSettingsModule imports this module for its ops guards.
+  imports: [PrismaModule, forwardRef(() => PlatformSettingsModule)],
   controllers: [
     AuthController,
     OpsSessionsController,
@@ -152,23 +158,30 @@ import { MockSmsSender, UnavailableSmsSender, type SmsSender } from '../../integ
     SessionService,
     PhoneAuthService,
     EmailVerificationService,
+    EmailPasswordAuthService,
     PasskeyService,
+    PasswordResetService,
     OpsAuthService,
     CurrentUserService,
     RoleGrantsService,
     OpsUsersService,
+    OpsStaffSecurityService,
     DriverPresenceService,
     AuthMethodPolicyService,
     AccessAuthGuard,
     CustomerSessionGuard,
     OpsSessionGuard,
+    OpsPermissionGuard,
   ],
   exports: [
     IDENTITY_REPOSITORY,
+    SMS_SENDER,
+    PasswordHasher,
     AUTH_METHOD_POLICY_REPOSITORY,
     AccessAuthGuard,
     CustomerSessionGuard,
     OpsSessionGuard,
+    OpsPermissionGuard,
     DriverPresenceService,
     AuthMethodPolicyService,
   ],

@@ -37,7 +37,16 @@ export class SessionService {
     private readonly config: ConfigService<AppEnv, true>,
   ) {}
 
-  async issue(user: UserRecord, channel: SessionChannelName): Promise<SessionResult> {
+  async issue(
+    user: UserRecord,
+    channel: SessionChannelName,
+    device?: { deviceLabel?: string | null; userAgent?: string | null; ipAddress?: string | null },
+  ): Promise<SessionResult> {
+    if (user.deletedAt) {
+      // S027 (DEC-PROD-037): a deleted account never gets a session again; during the grace
+      // period only support/Admin can restore it.
+      throw authError(403, 'ACCOUNT_DELETED', 'This account has been deleted');
+    }
     const refreshToken = randomSecret();
     const now = new Date();
     const refreshTtl = this.config.get('JWT_REFRESH_TTL_SECONDS', { infer: true });
@@ -47,6 +56,9 @@ export class SessionService {
       channel: storedChannel(channel),
       refreshTokenHash: hashRefreshToken(refreshToken),
       expiresAt: new Date(now.getTime() + refreshTtl * 1000),
+      deviceLabel: device?.deviceLabel ?? null,
+      userAgent: device?.userAgent ?? null,
+      ipAddress: device?.ipAddress ?? null,
     });
     return this.toResult(user, session.id, channel, refreshToken, now);
   }
@@ -74,9 +86,10 @@ export class SessionService {
     }
 
     const user = await this.repository.findUserById(result.session.userId);
-    if (!user) {
+    if (!user || user.deletedAt) {
       throw authError(401, 'AUTH_REFRESH_INVALID', 'Refresh token is invalid');
     }
+    await this.repository.touchSessionMeta(result.session.id, {}, now);
     return this.toResult(
       user,
       result.session.id,

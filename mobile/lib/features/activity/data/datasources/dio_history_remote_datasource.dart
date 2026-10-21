@@ -75,9 +75,9 @@ List<HistoryItem> decodeHistoryList(Object? body, {required HistoryKind kind}) {
       HistoryKind.ride =>
         (asJsonMap(map['dropoff'])?['label'] as String?) ??
             (map['title'] as String?) ??
-            'Chuyến $id',
+            '',
       HistoryKind.food =>
-        (map['storeName'] as String?) ?? (map['title'] as String?) ?? 'Đơn $id',
+        (map['storeName'] as String?) ?? (map['title'] as String?) ?? '',
     };
     final meta =
         (map['createdAt'] as String?) ??

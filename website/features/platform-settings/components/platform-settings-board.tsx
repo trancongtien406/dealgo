@@ -34,16 +34,19 @@ import {
   PLATFORM_SETTING_CATEGORIES,
   PLATFORM_SETTING_SOURCES,
 } from "../constants";
-import { categorizeSetting, getSettingIcon } from "../mappers";
+import {
+  BOOLEAN_SETTING_KEYS,
+  categorizeSetting,
+  getSettingIcon,
+  validateSettingValue,
+} from "../mappers";
 
 export function PlatformSettingsBoard() {
-  // Filter & Search states
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<CategoryKey>("ALL");
   const [sourceFilter, setSourceFilter] =
     useState<PlatformSettingSourceFilter>("ALL");
 
-  // Server-side filtered query
   const { data, isPending, isError, error, refetch } = usePlatformSettingsQuery(
     {
       q: searchQuery,
@@ -52,7 +55,6 @@ export function PlatformSettingsBoard() {
     },
   );
 
-  // Global counts for KPI summary
   const { data: allData } = usePlatformSettingsQuery();
 
   const forbidden = isError && isForbiddenError(error);
@@ -84,6 +86,11 @@ export function PlatformSettingsBoard() {
 
   const requestSave = () => {
     if (!draft || patchMutation.isPending) {
+      return;
+    }
+    const invalid = validateSettingValue(draft.key, editValue);
+    if (invalid) {
+      setBanner(invalid);
       return;
     }
     const trimmedReason = reason.trim();
@@ -168,7 +175,6 @@ export function PlatformSettingsBoard() {
         </div>
       </div>
 
-      {/* KPI Summary Cards */}
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <li className="h-full">
           <KpiCard
@@ -210,10 +216,8 @@ export function PlatformSettingsBoard() {
         </li>
       </ul>
 
-      {/* Filter & Search Toolbar */}
       <div className="rounded-2xl border border-border bg-white p-4 shadow-sm space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Category Tabs */}
           <div className="flex flex-wrap gap-1 rounded-xl bg-canvas p-1 border border-border">
             {PLATFORM_SETTING_CATEGORIES.map((tab) => {
               const active = activeCategory === tab.id;
@@ -234,7 +238,6 @@ export function PlatformSettingsBoard() {
             })}
           </div>
 
-          {/* Source Filter Chips */}
           <div className="flex items-center gap-1.5 text-xs">
             <span className="text-muted font-medium mr-1">Nguồn:</span>
             {PLATFORM_SETTING_SOURCES.map((src) => {
@@ -259,7 +262,6 @@ export function PlatformSettingsBoard() {
           </div>
         </div>
 
-        {/* Search input */}
         <div className="relative">
           <OpsIcon
             name="search"
@@ -356,7 +358,6 @@ export function PlatformSettingsBoard() {
           }
         />
       ) : (
-        /* Grid of Redesigned Settings Cards */
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {rows.map((row) => {
             const category = categorizeSetting(row.key);
@@ -394,7 +395,6 @@ export function PlatformSettingsBoard() {
                     {row.hint}
                   </p>
 
-                  {/* Formatted Value Box */}
                   <div className="rounded-xl border border-border/80 bg-canvas/80 p-3">
                     <div className="flex items-center justify-between text-xs text-muted">
                       <span>Giá trị hiện tại</span>
@@ -478,13 +478,43 @@ export function PlatformSettingsBoard() {
               <span className="text-xs font-semibold text-ink uppercase tracking-wide">
                 Giá trị tham số mới
               </span>
-              <textarea
-                value={editValue}
-                onChange={(event) => setEditValue(event.target.value)}
-                rows={3}
-                placeholder="Nhập giá trị mới..."
-                className={`w-full rounded-xl border border-border bg-canvas/30 px-3 py-2 font-mono text-sm text-ink ${focusRing}`}
-              />
+              {BOOLEAN_SETTING_KEYS.has(draft.key) ? (
+                <div
+                  role="radiogroup"
+                  aria-label="Giá trị tham số mới"
+                  className="flex gap-2"
+                >
+                  {(
+                    [
+                      ["true", "Bật"],
+                      ["false", "Tắt"],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="radio"
+                      aria-checked={editValue.trim() === value}
+                      onClick={() => setEditValue(value)}
+                      className={`inline-flex h-10 flex-1 items-center justify-center rounded-xl border text-sm font-semibold cursor-pointer ${
+                        editValue.trim() === value
+                          ? "border-brand bg-brand/10 text-brand"
+                          : "border-border bg-white text-ink"
+                      } ${focusRing}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <textarea
+                  value={editValue}
+                  onChange={(event) => setEditValue(event.target.value)}
+                  rows={3}
+                  placeholder="Nhập giá trị mới..."
+                  className={`w-full rounded-xl border border-border bg-canvas/30 px-3 py-2 font-mono text-sm text-ink ${focusRing}`}
+                />
+              )}
             </label>
 
             <label className="block space-y-1.5">

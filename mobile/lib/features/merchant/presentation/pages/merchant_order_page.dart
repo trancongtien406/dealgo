@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 
-import '../../../../core/mock/merchant_kitchen_lines.dart';
+import '../utils/merchant_kitchen_lines.dart';
+import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_models.dart';
@@ -9,21 +11,27 @@ import '../../../food/domain/entities/food_money.dart';
 import '../../domain/usecases/accept_merchant_order.dart';
 import '../../domain/usecases/get_merchant_order.dart';
 import '../../domain/usecases/mark_merchant_order_ready.dart';
+import '../../domain/usecases/reject_merchant_order.dart';
+import '../../../food/presentation/widgets/food_reject_reason.dart';
+import '../../../../core/realtime/snapshot_realtime.dart';
 import '../cubit/merchant_order_cubit.dart';
 import '../cubit/merchant_queue_cubit.dart';
 import '../cubit/merchant_states.dart';
 import '../widgets/merchant_widgets.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/format/short_ref.dart';
 
 class MerchantMissingOrderPage extends StatelessWidget {
   const MerchantMissingOrderPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    final l10n = AppLocalizations.of(context);
+    return Scaffold(
       body: MerchantPageFrame(
-        title: 'Đơn hàng',
+        title: l10n.merchantOrderTitle,
         insetBottom: true,
-        body: Center(child: Text('Không tìm thấy đơn')),
+        body: Center(child: Text(l10n.merchantOrderNotFound)),
       ),
     );
   }
@@ -41,9 +49,15 @@ class MerchantOrderPage extends StatelessWidget {
         getMerchantOrder: context.read<GetMerchantOrder>(),
         acceptMerchantOrder: context.read<AcceptMerchantOrder>(),
         markMerchantOrderReady: context.read<MarkMerchantOrderReady>(),
+        rejectMerchantOrder: context.read<RejectMerchantOrder>(),
         queue: context.read<MerchantQueueCubit>(),
         order: order,
-      )..loadLines(merchantAccessToken(context)),
+        realtime: context.read<SnapshotRealtime>(),
+      )
+        ..loadLines(merchantAccessToken(context))
+        ..startAutoRefresh(
+          () => context.mounted ? merchantAccessToken(context) : null,
+        ),
       child: const _MerchantOrderView(),
     );
   }
@@ -89,22 +103,20 @@ class _MerchantOrderView extends StatelessWidget {
         order: view.order,
         kitchenLines: view.kitchenLines,
         busy: view.busy,
-        message: view.message,
+        message: view.message?.resolve(AppLocalizations.of(context)),
         handoffDone: view.handoffDone,
+        handoverCode: view.handoverCode,
         onAccept: () => cubit.accept(merchantAccessToken(context)),
+        onReject: (reason, note) => cubit.reject(
+          merchantAccessToken(context),
+          reason: reason,
+          note: note,
+        ),
         onReady: () => cubit.markReady(merchantAccessToken(context)),
         onHandoff: cubit.markHandoffDone,
       ),
     );
   }
-}
-
-String merchantHandoffCode(String orderId) {
-  var hash = 0;
-  for (final unit in orderId.codeUnits) {
-    hash = (hash * 31 + unit) & 0x7fffffff;
-  }
-  return '${(hash % 9000) + 1000}';
 }
 
 class _Detail extends StatelessWidget {
@@ -115,6 +127,8 @@ class _Detail extends StatelessWidget {
     required this.message,
     required this.handoffDone,
     required this.onAccept,
+    this.handoverCode,
+    required this.onReject,
     required this.onReady,
     required this.onHandoff,
   });
@@ -124,25 +138,31 @@ class _Detail extends StatelessWidget {
   final bool busy;
   final String? message;
   final bool handoffDone;
+  final String? handoverCode;
   final VoidCallback onAccept;
+  final Future<bool> Function(FoodRejectReason reason, String? note) onReject;
   final VoidCallback onReady;
   final VoidCallback onHandoff;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final ready = order.status == 'READY' || order.status == 'READY_FOR_PICKUP';
+    // ASSIGNED = a driver claimed the ready order and is coming to collect it.
+    final ready = order.status == 'READY' ||
+        order.status == 'READY_FOR_PICKUP' ||
+        order.status == 'ASSIGNED';
     final preparing = order.status == 'PREPARING';
     final l10n = AppLocalizations.of(context);
     final isPlaced = order.status == 'PLACED';
     final title = switch (order.status) {
-      'PLACED' => 'Chi tiết đơn mới',
-      'PREPARING' => 'Đơn đang chuẩn bị',
-      'READY' || 'READY_FOR_PICKUP' => 'Bàn giao cho tài xế',
-      _ => 'Chi tiết đơn',
+      'PLACED' => l10n.merchantOrderTitleNew,
+      'PREPARING' => l10n.merchantOrderTitlePreparing,
+      'READY' || 'READY_FOR_PICKUP' || 'ASSIGNED' =>
+        l10n.merchantOrderTitleReady,
+      _ => l10n.merchantOrderTitle,
     };
     final lines = kitchenLines;
-    final code = merchantHandoffCode(order.id);
+    final placedAt = DateTime.tryParse(order.createdAt)?.toLocal();
     final Widget? footer;
     if (isPlaced) {
       footer = MerchantFooter(
@@ -156,7 +176,7 @@ class _Detail extends StatelessWidget {
       );
     } else if (preparing) {
       footer = MerchantPrimaryBar(
-        label: 'Đã chuẩn bị xong',
+        label: l10n.merchantMarkReady,
         buttonKey: const Key('merchant-ready'),
         enabled: !busy,
         loading: busy,
@@ -164,7 +184,7 @@ class _Detail extends StatelessWidget {
       );
     } else if (ready && !handoffDone) {
       footer = MerchantPrimaryBar(
-        label: 'Đã bàn giao hàng',
+        label: l10n.merchantMarkHandedOver,
         buttonKey: const Key('merchant-handoff'),
         enabled: !busy,
         loading: busy,
@@ -186,26 +206,30 @@ class _Detail extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(switch (order.status) {
-                  'PLACED' => 'Đơn chờ xác nhận',
-                  'PREPARING' => 'Đơn đã nhận',
-                  'READY' || 'READY_FOR_PICKUP' => 'Đơn đã sẵn sàng',
-                  _ => 'Đơn của Shop',
+                  'PLACED' => l10n.merchantOrderHeadNew,
+                  'PREPARING' => l10n.merchantOrderHeadPreparing,
+                  'READY' || 'READY_FOR_PICKUP' => l10n.merchantOrderHeadReady,
+                  _ => l10n.merchantOrderTitle,
                 }, style: textTheme.titleMedium),
                 const SizedBox(height: DealGoSpacing.s8),
                 Row(
                   children: [
                     Expanded(
                       child: Text(
-                        'Đơn #${order.id}',
+                        AppLocalizations.of(context)
+                            .orderRef(shortRef(order.id)),
                         style: textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
-                    const MerchantChip(
-                      label: 'v1 · Dữ liệu đồng bộ',
-                      tone: MerchantChipTone.neutral,
-                    ),
+                    if (placedAt != null)
+                      MerchantChip(
+                        label: l10n.merchantOrderPlacedAt(
+                          DateFormat('HH:mm · dd/MM').format(placedAt),
+                        ),
+                        tone: MerchantChipTone.neutral,
+                      ),
                   ],
                 ),
                 if (isPlaced) ...[
@@ -214,12 +238,9 @@ class _Detail extends StatelessWidget {
                     children: [
                       const CircleAvatar(
                         backgroundColor: DealGoColors.subtlePurple,
-                        child: Text(
-                          'M',
-                          style: TextStyle(
-                            color: DealGoColors.primary,
-                            fontWeight: FontWeight.w800,
-                          ),
+                        child: Icon(
+                          DealGoIcons.user,
+                          color: DealGoColors.primary,
                         ),
                       ),
                       const SizedBox(width: DealGoSpacing.s12),
@@ -227,7 +248,10 @@ class _Detail extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Trần Thị Mai', style: textTheme.titleMedium),
+                            Text(
+                              order.customerName ?? l10n.merchantOrderCustomer,
+                              style: textTheme.titleMedium,
+                            ),
                             Text(
                               order.dropoff.label,
                               style: textTheme.bodySmall,
@@ -238,8 +262,8 @@ class _Detail extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: DealGoSpacing.s8),
-                  const MerchantChip(
-                    label: 'NEW · Chờ Shop xác nhận',
+                  MerchantChip(
+                    label: l10n.merchantOrderNewChip,
                     tone: MerchantChipTone.warning,
                   ),
                 ] else ...[
@@ -249,20 +273,21 @@ class _Detail extends StatelessWidget {
                     runSpacing: DealGoSpacing.s8,
                     children: [
                       MerchantChip(
-                        label: ready ? 'READY_FOR_PICKUP' : order.status,
+                        label: merchantStatusLabel(l10n, order.status),
                         tone: merchantStatusTone(order.status),
                       ),
-                      MerchantChip(
-                        label: merchantStatusLabel(order.status),
-                        tone: merchantStatusTone(order.status),
-                      ),
+                      if (order.customerName case final name?)
+                        MerchantChip(
+                          label: l10n.merchantOrderCustomerName(name),
+                          tone: MerchantChipTone.neutral,
+                        ),
+                      if (order.driverName case final name?)
+                        MerchantChip(
+                          label: l10n.merchantOrderDriverName(name),
+                          tone: MerchantChipTone.green,
+                        ),
                     ],
                   ),
-                ],
-                if (preparing) ...[
-                  const SizedBox(height: DealGoSpacing.s12),
-                  const MerchantMoneyRow(label: 'Giờ bắt đầu', value: '13:30'),
-                  const MerchantMoneyRow(label: 'Dự kiến xong', value: '13:45'),
                 ],
               ],
             ),
@@ -273,7 +298,10 @@ class _Detail extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(l10n.merchantOrderItemsTitle, style: textTheme.titleMedium),
+                  Text(
+                    l10n.merchantOrderItemsTitle,
+                    style: textTheme.titleMedium,
+                  ),
                   for (final line in lines) ...[
                     const SizedBox(height: DealGoSpacing.s8),
                     Row(
@@ -289,8 +317,20 @@ class _Detail extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(line.name, style: textTheme.titleMedium),
+                              if (line.options.isNotEmpty)
+                                Text(
+                                  line.options,
+                                  key: const Key('merchant-line-options'),
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: DealGoColors.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               Text(
-                                'x${line.qty} · ${formatVnd(line.unitPriceVnd)} / món',
+                                l10n.merchantLineQty(
+                                  line.qty,
+                                  formatVnd(line.unitPriceVnd),
+                                ),
                                 style: textTheme.bodySmall,
                               ),
                             ],
@@ -315,7 +355,10 @@ class _Detail extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Món cần chuẩn bị', style: textTheme.titleMedium),
+                  Text(
+                    l10n.merchantItemsToPrepare,
+                    style: textTheme.titleMedium,
+                  ),
                   for (final line in lines) ...[
                     const SizedBox(height: DealGoSpacing.s8),
                     Row(
@@ -331,8 +374,20 @@ class _Detail extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(line.name, style: textTheme.titleMedium),
+                              if (line.options.isNotEmpty)
+                                Text(
+                                  line.options,
+                                  key: const Key('merchant-line-options'),
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: DealGoColors.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               Text(
-                                'x${line.qty} · ${formatVnd(line.unitPriceVnd)} / món',
+                                l10n.merchantLineQty(
+                                  line.qty,
+                                  formatVnd(line.unitPriceVnd),
+                                ),
                                 style: textTheme.bodySmall,
                               ),
                             ],
@@ -351,42 +406,9 @@ class _Detail extends StatelessWidget {
               ),
             ),
             const SizedBox(height: DealGoSpacing.s12),
-            MerchantPanel(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Trạng thái bếp', style: textTheme.titleMedium),
-                  const SizedBox(height: DealGoSpacing.s8),
-                  for (final line in lines) ...[
-                    Row(
-                      children: [
-                        Icon(
-                          line.kitchen == 'Đã xong'
-                              ? Icons.check_circle
-                              : Icons.circle,
-                          size: 18,
-                          color: line.kitchen == 'Đã xong'
-                              ? DealGoColors.brandGreen
-                              : DealGoColors.amber,
-                        ),
-                        const SizedBox(width: DealGoSpacing.s8),
-                        Expanded(
-                          child: Text(
-                            '${line.name} · ${line.kitchen}',
-                            style: textTheme.bodyMedium,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: DealGoSpacing.s8),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: DealGoSpacing.s12),
-            const MerchantNote(
+            MerchantNote(
               tone: MerchantNoteTone.green,
-              message: 'Chỉ đánh dấu READY_FOR_PICKUP khi đã đủ món và có thể bàn giao.',
+              message: l10n.merchantReadyHint,
             ),
           ],
           if (ready) ...[
@@ -395,36 +417,21 @@ class _Detail extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Tài xế nhận món', style: textTheme.titleMedium),
-                  const SizedBox(height: DealGoSpacing.s12),
+                  Text(l10n.merchantDriverTitle, style: textTheme.titleMedium),
+                  const SizedBox(height: DealGoSpacing.s8),
                   Row(
                     children: [
-                      const CircleAvatar(
-                        backgroundColor: DealGoColors.subtlePurple,
-                        child: Text(
-                          'A',
-                          style: TextStyle(
-                            color: DealGoColors.primary,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
+                      const Icon(
+                        DealGoIcons.motorbike,
+                        color: DealGoColors.primary,
                       ),
                       const SizedBox(width: DealGoSpacing.s12),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Trần Minh Anh', style: textTheme.titleMedium),
-                            Text(
-                              'Honda Vision · xe máy · 43H1-123.45',
-                              style: textTheme.bodySmall,
-                            ),
-                          ],
+                        child: Text(
+                          // Masked by the server once a driver has claimed it.
+                          order.driverName ?? l10n.merchantDriverWaiting,
+                          style: textTheme.bodyMedium,
                         ),
-                      ),
-                      const MerchantChip(
-                        label: 'Xác minh hợp lệ',
-                        tone: MerchantChipTone.green,
                       ),
                     ],
                   ),
@@ -437,23 +444,47 @@ class _Detail extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Đối chiếu khi giao', style: textTheme.titleMedium),
+                  Text(l10n.merchantHandoffTitle, style: textTheme.titleMedium),
                   const SizedBox(height: DealGoSpacing.s8),
+                  if (handoverCode case final code?) ...[
+                    Row(
+                      key: const Key('merchant-handover-code-row'),
+                      children: [
+                        Expanded(
+                          child: Text(
+                            l10n.merchantHandoverCodeLabel,
+                            style: textTheme.bodyMedium,
+                          ),
+                        ),
+                        Text(
+                          code,
+                          key: const Key('merchant-handover-code'),
+                          style: textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 4,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      l10n.merchantHandoverCodeHint,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: DealGoColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: DealGoSpacing.s8),
+                  ],
                   MerchantMoneyRow(
-                    label: 'Mã bàn giao',
-                    value: code,
+                    label: l10n.merchantOrderRefLabel,
+                    value: shortRef(order.id),
                     emphasize: true,
                   ),
                   MerchantMoneyRow(
-                    label: 'Số túi',
-                    value: '${order.lineCount > 1 ? 2 : 1} túi',
+                    label: l10n.merchantLineCountLabel,
+                    value: '${order.lineCount}',
                   ),
                   MerchantMoneyRow(
-                    label: 'Tổng số món',
-                    value: '${order.lineCount} món',
-                  ),
-                  MerchantMoneyRow(
-                    label: 'Số tiền COD',
+                    label: l10n.merchantHandoffCodLabel,
                     value: formatVnd(order.subtotalVnd),
                     emphasize: true,
                   ),
@@ -464,8 +495,8 @@ class _Detail extends StatelessWidget {
             MerchantNote(
               tone: MerchantNoteTone.green,
               message: handoffDone
-                  ? 'Đã xác nhận bàn giao mã $code trên máy (mock). Tài xế cần xác nhận PICKED_UP.'
-                  : 'Shop xác nhận đã bàn giao cùng mã $code; tài xế phải xác nhận nhận đủ hàng để chuyển sang PICKED_UP.',
+                  ? l10n.merchantHandoffDoneNote
+                  : l10n.merchantHandoffNote,
             ),
           ],
           if (!preparing) ...[
@@ -480,11 +511,11 @@ class _Detail extends StatelessWidget {
                   ),
                   const SizedBox(height: DealGoSpacing.s8),
                   MerchantMoneyRow(
-                    label: 'Tiền món',
+                    label: l10n.merchantFoodValueLabel,
                     value: formatVnd(order.subtotalVnd),
                   ),
                   MerchantMoneyRow(
-                    label: 'Phí giao',
+                    label: l10n.merchantDeliveryFeeLabel,
                     value: formatVnd(order.deliveryFareVnd),
                   ),
                   MerchantMoneyRow(
@@ -523,34 +554,20 @@ class _Detail extends StatelessWidget {
   }
 
   Future<void> _confirmReject(BuildContext context) async {
-    final l10n = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
+    final choice = await showDialog<({FoodRejectReason reason, String? note})>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(l10n.merchantRejectConfirmTitle),
-          content: Text(l10n.merchantRejectConfirmBody),
-          actions: [
-            TextButton(
-              key: const Key('merchant-reject-keep'),
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(l10n.merchantRejectKeep),
-            ),
-            TextButton(
-              key: const Key('merchant-reject-confirm'),
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(l10n.merchantRejectConfirmCta),
-            ),
-          ],
-        );
-      },
+      builder: (context) => const MerchantRejectDialog(),
     );
-    if (confirmed != true || !context.mounted) {
+    if (choice == null || !context.mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(l10n.merchantRejectDone)),
-    );
+    final l10n = AppLocalizations.of(context);
+    final rejected = await onReject(choice.reason, choice.note);
+    if (!rejected || !context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(l10n.merchantRejectDone)));
     merchantBack(context);
   }
 }
@@ -564,14 +581,14 @@ class _Conflict extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context);
     return MerchantPageFrame(
-      title: 'Xác nhận đơn Shop',
-      subtitle: merchantStateSubtitle,
+      title: l10n.merchantConflictTitle,
       insetBottom: true,
       onBack: () => merchantBack(context),
       footer: MerchantFooter(
-        secondaryLabel: 'Về danh sách đơn',
-        primaryLabel: 'Xem trạng thái mới',
+        secondaryLabel: l10n.merchantBackToOrders,
+        primaryLabel: l10n.merchantConflictRefresh,
         primaryKey: const Key('merchant-refresh-conflict'),
         onSecondary: () => merchantBack(context),
         onPrimary: () => onReload(),
@@ -579,33 +596,34 @@ class _Conflict extends StatelessWidget {
       body: ListView(
         padding: merchantPagePadding,
         children: [
-          const MerchantHero(
-            icon: Icons.swap_horiz,
+          MerchantHero(
+            icon: DealGoIcons.swapHoriz,
             iconColor: DealGoColors.amber,
             background: DealGoColors.amberSurface,
-            title: 'Đơn đã được xử lý',
-            message:
-                'Một nhân viên khác hoặc hệ thống đã xử lý đơn này trước bạn.',
+            title: l10n.merchantConflictHeadline,
+            message: l10n.merchantConflictBody,
           ),
           const SizedBox(height: DealGoSpacing.s24),
           MerchantPanel(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Đơn hàng đang xử lý', style: textTheme.titleMedium),
+                Text(l10n.merchantConflictOrder, style: textTheme.titleMedium),
                 const SizedBox(height: DealGoSpacing.s8),
-                MerchantMoneyRow(label: 'Mã đơn', value: '#${order.id}'),
-                MerchantMoneyRow(label: 'Cửa hàng', value: order.storeId),
                 MerchantMoneyRow(
-                  label: 'Tiền món',
+                  label: l10n.merchantOrderRefLabel,
+                  value: shortRef(order.id),
+                ),
+                MerchantMoneyRow(
+                  label: l10n.merchantFoodValueLabel,
                   value: formatVnd(order.subtotalVnd),
                 ),
                 MerchantMoneyRow(
-                  label: 'Phí giao',
+                  label: l10n.merchantDeliveryFeeLabel,
                   value: formatVnd(order.deliveryFareVnd),
                 ),
                 MerchantMoneyRow(
-                  label: 'Tổng',
+                  label: l10n.merchantTotalLabel,
                   value: formatVnd(order.totalVnd),
                   emphasize: true,
                 ),
@@ -613,11 +631,99 @@ class _Conflict extends StatelessWidget {
             ),
           ),
           const SizedBox(height: DealGoSpacing.s12),
-          const MerchantNote(
-            message: 'Không gửi lại thao tác xác nhận cũ; cập nhật trạng thái mới nhất từ máy chủ.',
-          ),
+          MerchantNote(message: l10n.merchantConflictNote),
         ],
       ),
+    );
+  }
+}
+
+/// Reason picker shown before a store declines an order (DEC-PROD-021).
+class MerchantRejectDialog extends StatefulWidget {
+  const MerchantRejectDialog({super.key});
+
+  @override
+  State<MerchantRejectDialog> createState() => _MerchantRejectDialogState();
+}
+
+class _MerchantRejectDialogState extends State<MerchantRejectDialog> {
+  FoodRejectReason? _reason;
+  final _note = TextEditingController();
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  bool get _valid {
+    final reason = _reason;
+    if (reason == null) return false;
+    return reason != FoodRejectReason.other || _note.text.trim().isNotEmpty;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    return AlertDialog(
+      title: Text(l10n.merchantRejectConfirmTitle),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.merchantRejectConfirmBody, style: textTheme.bodySmall),
+            const SizedBox(height: DealGoSpacing.s8),
+            Text(l10n.merchantRejectReasonTitle, style: textTheme.labelLarge),
+            RadioGroup<FoodRejectReason>(
+              groupValue: _reason,
+              onChanged: (value) => setState(() => _reason = value),
+              child: Column(
+                children: [
+                  for (final reason in FoodRejectReason.values)
+                    RadioListTile<FoodRejectReason>(
+                      key: Key('merchant-reject-reason-${reason.wire}'),
+                      value: reason,
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(foodRejectReasonLabel(l10n, reason)),
+                    ),
+                ],
+              ),
+            ),
+            DealGoTextField(
+              label: _reason == FoodRejectReason.other
+                  ? l10n.merchantRejectNoteRequired
+                  : l10n.merchantRejectNoteOptional,
+              controller: _note,
+              fieldKey: const Key('merchant-reject-note'),
+              maxLength: foodRejectNoteMax,
+              maxLines: 2,
+              onChanged: (_) => setState(() {}),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          key: const Key('merchant-reject-keep'),
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.merchantRejectKeep),
+        ),
+        TextButton(
+          key: const Key('merchant-reject-confirm'),
+          onPressed: _valid
+              ? () {
+                  final note = _note.text.trim();
+                  Navigator.of(
+                    context,
+                  ).pop((reason: _reason!, note: note.isEmpty ? null : note));
+                }
+              : null,
+          child: Text(l10n.merchantRejectConfirmCta),
+        ),
+      ],
     );
   }
 }

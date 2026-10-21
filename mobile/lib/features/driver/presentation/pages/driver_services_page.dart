@@ -4,10 +4,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../onboarding/presentation/cubit/driver_kyc_cubit.dart';
 import '../cubit/driver_duty_cubit.dart';
+import '../cubit/driver_services_cubit.dart';
 import '../widgets/driver_widgets.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
 
-/// D017 — service toggles / duty configuration (local mock persistence).
+/// D017 — services the driver takes while online (DEC-PROD-023). Toggles are stored on the
+/// server (driver presence); the vehicle comes from the driver's KYC application.
 class DriverServicesPage extends StatefulWidget {
   const DriverServicesPage({super.key});
 
@@ -16,16 +20,31 @@ class DriverServicesPage extends StatefulWidget {
 }
 
 class _DriverServicesPageState extends State<DriverServicesPage> {
-  var _rideOn = true;
-  var _foodOn = true;
-  var _saved = false;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      context.read<DriverServicesCubit>().load();
+      context.read<DriverKycCubit>().refresh();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
     final online = context.watch<DriverDutyCubit>().state;
-    final approvedCount = (_rideOn ? 1 : 0) + (_foodOn ? 1 : 0);
+    final services = context.watch<DriverServicesCubit>().state;
+    final kyc = context.watch<DriverKycCubit>().state;
+    final prefs = services.prefs;
+    final onCount = (prefs.rideEnabled ? 1 : 0) + (prefs.foodEnabled ? 1 : 0);
+    final vehicleName = [kyc.vehicleBrand.trim(), kyc.vehicleModel.trim()]
+        .where((part) => part.isNotEmpty)
+        .join(' ');
+    final plate = kyc.vehiclePlate.trim();
 
     return Scaffold(
       body: DriverPageFrame(
@@ -41,8 +60,10 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
           child: DealGoPrimaryButton(
             key: const Key('driver-services-save'),
             label: l10n.driverServicesSave,
-            trailingIcon: Icons.arrow_forward,
-            onPressed: () => setState(() => _saved = true),
+            trailingIcon: DealGoIcons.arrowRight,
+            isLoading: services.status == DriverServicesStatus.saving,
+            enabled: services.status != DriverServicesStatus.loading,
+            onPressed: () => context.read<DriverServicesCubit>().save(),
           ),
         ),
         body: ListView(
@@ -63,12 +84,12 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
             ),
             const SizedBox(height: DealGoSpacing.s16),
             DriverPanel(
-              color: DealGoColors.greenSurface,
+              color: online ? DealGoColors.greenSurface : DealGoColors.amberSurface,
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.check_circle,
-                    color: DealGoColors.brandGreen,
+                  Icon(
+                    online ? DealGoIcons.success : DealGoIcons.bolt,
+                    color: online ? DealGoColors.brandGreen : DealGoColors.amber,
                   ),
                   const SizedBox(width: DealGoSpacing.s12),
                   Expanded(
@@ -76,11 +97,11 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          l10n.driverServicesOnlineTitle,
+                          online ? l10n.driverServicesOnlineTitle : l10n.driverServicesOfflineTitle,
                           style: textTheme.titleMedium,
                         ),
                         Text(
-                          l10n.driverServicesOnlineBody,
+                          online ? l10n.driverServicesOnlineBody : l10n.driverServicesOfflineBody,
                           style: textTheme.bodySmall,
                         ),
                       ],
@@ -122,7 +143,7 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
                   ),
                 ),
                 Text(
-                  l10n.driverServicesCount(approvedCount),
+                  l10n.driverServicesCount(onCount),
                   style: textTheme.labelLarge?.copyWith(
                     color: DealGoColors.primary,
                     fontWeight: FontWeight.w700,
@@ -136,28 +157,36 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
                 children: [
                   _ServiceRow(
                     key: const Key('driver-services-ride'),
-                    icon: Icons.two_wheeler,
+                    icon: DealGoIcons.motorbike,
                     iconColor: DealGoColors.primary,
                     title: l10n.driverServicesRideTitle,
                     subtitle: l10n.driverServicesRideBody,
-                    approvedLabel: l10n.driverServicesApprovedChip,
-                    value: _rideOn,
-                    onChanged: (value) => setState(() => _rideOn = value),
+                    registered: kyc.rideService != false,
+                    value: prefs.rideEnabled,
+                    onChanged: services.busy
+                        ? null
+                        : (value) => context.read<DriverServicesCubit>().setRide(value),
                   ),
                   const Divider(height: 1),
                   _ServiceRow(
                     key: const Key('driver-services-food'),
-                    icon: Icons.storefront_outlined,
+                    icon: DealGoIcons.store,
                     iconColor: DealGoColors.brandGreen,
                     title: l10n.driverServicesFoodTitle,
                     subtitle: l10n.driverServicesFoodBody,
-                    approvedLabel: l10n.driverServicesApprovedChip,
-                    value: _foodOn,
-                    onChanged: (value) => setState(() => _foodOn = value),
+                    registered: kyc.foodService != false,
+                    value: prefs.foodEnabled,
+                    onChanged: services.busy
+                        ? null
+                        : (value) => context.read<DriverServicesCubit>().setFood(value),
                   ),
                 ],
               ),
             ),
+            if (onCount == 0) ...[
+              const SizedBox(height: DealGoSpacing.s12),
+              DriverNote(message: l10n.driverServicesNoneOn),
+            ],
             const SizedBox(height: DealGoSpacing.s12),
             DriverPanel(
               child: Column(
@@ -172,7 +201,7 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
                         ),
                       ),
                       DriverChip(
-                        label: l10n.driverServicesVehicleInUse,
+                        label: l10n.rideVehicleMotorbike,
                         tone: DriverChipTone.neutral,
                       ),
                     ],
@@ -181,20 +210,23 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
                   Row(
                     children: [
                       const Icon(
-                        Icons.two_wheeler,
+                        DealGoIcons.motorbike,
                         color: DealGoColors.brandGreen,
                       ),
                       const SizedBox(width: DealGoSpacing.s12),
                       Expanded(
+                        key: const Key('driver-services-vehicle'),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Honda Vision · 2023',
+                              vehicleName.isNotEmpty ? vehicleName : l10n.rideVehicleMotorbike,
                               style: textTheme.titleMedium,
                             ),
                             Text(
-                              'Biển số 43H1-123.45',
+                              plate.isNotEmpty
+                                  ? l10n.driverVehiclePlate(plate)
+                                  : l10n.driverVehicleUnknown,
                               style: textTheme.bodySmall,
                             ),
                           ],
@@ -210,25 +242,10 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          l10n.driverServicesAreaSection,
-                          style: textTheme.titleMedium,
-                        ),
-                      ),
-                      Text(
-                        l10n.driverServicesAreaEdit,
-                        style: textTheme.labelLarge?.copyWith(
-                          color: DealGoColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    l10n.driverServicesAreaSection,
+                    style: textTheme.titleMedium,
                   ),
-                  const SizedBox(height: DealGoSpacing.s8),
-                  Text(driverAreaLabel, style: textTheme.bodyMedium),
                   const SizedBox(height: DealGoSpacing.s12),
                   DecoratedBox(
                     decoration: BoxDecoration(
@@ -240,7 +257,7 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
                       child: Row(
                         children: [
                           const Icon(
-                            Icons.place_outlined,
+                            DealGoIcons.pin,
                             color: DealGoColors.primary,
                           ),
                           const SizedBox(width: DealGoSpacing.s8),
@@ -264,11 +281,19 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
                 color: DealGoColors.textSecondary,
               ),
             ),
-            if (_saved) ...[
+            if (services.status == DriverServicesStatus.saved) ...[
               const SizedBox(height: DealGoSpacing.s12),
-              const DriverNote(
+              DriverNote(
+                key: const Key('driver-services-saved'),
                 tone: DriverNoteTone.green,
-                message: 'Đã lưu cấu hình trên máy (mock). Quyền nhận việc vẫn do máy chủ xét.',
+                message: l10n.driverServicesSaved,
+              ),
+            ],
+            if (services.status == DriverServicesStatus.failed) ...[
+              const SizedBox(height: DealGoSpacing.s12),
+              DriverNote(
+                key: const Key('driver-services-failed'),
+                message: l10n.driverServicesSaveFailed,
               ),
             ],
           ],
@@ -284,7 +309,7 @@ class _ServiceRow extends StatelessWidget {
     required this.iconColor,
     required this.title,
     required this.subtitle,
-    required this.approvedLabel,
+    required this.registered,
     required this.value,
     required this.onChanged,
     super.key,
@@ -294,9 +319,11 @@ class _ServiceRow extends StatelessWidget {
   final Color iconColor;
   final String title;
   final String subtitle;
-  final String approvedLabel;
+
+  /// False only when the KYC application says the driver did not apply for this service.
+  final bool registered;
   final bool value;
-  final ValueChanged<bool> onChanged;
+  final ValueChanged<bool>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -325,7 +352,12 @@ class _ServiceRow extends StatelessWidget {
                 Text(title, style: textTheme.titleMedium),
                 Text(subtitle, style: textTheme.bodySmall),
                 const SizedBox(height: DealGoSpacing.s8),
-                DriverChip(label: approvedLabel, tone: DriverChipTone.green),
+                DriverChip(
+                  label: registered
+                      ? AppLocalizations.of(context).driverServicesApprovedChip
+                      : AppLocalizations.of(context).driverServicesNotRegistered,
+                  tone: registered ? DriverChipTone.green : DriverChipTone.neutral,
+                ),
               ],
             ),
           ),

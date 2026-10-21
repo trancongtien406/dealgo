@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/design_system/components/dealgo_tab_bar.dart';
+import '../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../l10n/app_localizations.dart';
 import 'customer_tab_bar.dart';
 import 'shell_tab.dart';
@@ -19,17 +20,19 @@ class RoleShell extends StatelessWidget {
   bool get _customerBookBar =>
       tabs.length == 5 && tabs[2].path == '/customer/book';
 
-  bool get _hideBookBar =>
-      _customerBookBar && navigationShell.currentIndex == 2;
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final customerBar = _customerBookBar;
+    // Full-screen booking — hide shell chrome while on “Đặt”.
+    final hideCustomerBar =
+        customerBar && navigationShell.currentIndex == 2;
     return Scaffold(
+      backgroundColor: DealGoColors.canvas,
       body: navigationShell,
-      bottomNavigationBar: _hideBookBar
+      bottomNavigationBar: hideCustomerBar
           ? null
-          : _customerBookBar
+          : customerBar
           ? CustomerTabBar(navigationShell: navigationShell, tabs: tabs)
           : DealGoTabBar(
               selectedIndex: navigationShell.currentIndex,

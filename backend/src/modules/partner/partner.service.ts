@@ -1,21 +1,27 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import type { AppEnv } from '../../platform/config/env.js';
+import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { IDENTITY_REPOSITORY } from '../identity/identity.constants.js';
 import {
   UniqueConflictError,
   type IdentityRepository,
 } from '../identity/identity.repository.js';
-import { KYC_STORAGE, PARTNER_REPOSITORY } from './partner.constants.js';
+import {
+  PARTNER_DOCUMENT_KINDS,
+  PARTNER_ISSUE_SECTIONS,
+  PARTNER_REPOSITORY,
+  PARTNER_REQUIRED_DOCUMENTS,
+} from './partner.constants.js';
 import type {
   OpsPartnerApplicationQueryDto,
+  PartnerReviewIssueDto,
   SubmitPartnerApplicationDto,
 } from './partner.dto.js';
 import { partnerError } from './partner.error.js';
-import type { KycStorage } from '../../integrations/object-storage/mock-kyc-storage.js';
+import { DocumentStoreService } from '../../platform/storage/document-store.service.js';
 import { maskPhone } from '../../shared/privacy/pii-mask.js';
 import type {
   PartnerApplicationRecord,
+  PartnerDocumentRef,
+  PartnerReviewIssue,
   PartnerRepository,
   PartnerRoleName,
   PartnerStatusName,
@@ -26,14 +32,10 @@ export type PartnerApplicationView = {
   role: PartnerRoleName;
   status: PartnerStatusName;
   metadata: Record<string, unknown>;
-  documents: Array<{
-    key: string;
-    label: string;
-    contentType: string;
-    sizeBytes: number;
-    uploadedAt: string;
-  }>;
+  documents: PartnerDocumentView[];
   reason: string | null;
+  /** Sections ops asked the applicant to fix (empty for approvals and plain rejections). */
+  issues: PartnerReviewIssue[];
   reviewedBy: string | null;
   reviewedAt: string | null;
   submittedAt: string | null;
@@ -41,18 +43,24 @@ export type PartnerApplicationView = {
   updatedAt: string;
 };
 
-/**
- * Rejection policy: REJECTED sets (or keeps) the matching RoleGrant at SUSPENDED.
- * APPROVED upserts/updates the matching RoleGrant to ACTIVE.
- * This matches ops role-grant reject semantics (no REJECTED grant status in schema).
- */
+export type PartnerDocumentView = {
+  /** Position in `documents`; ops download with GET .../documents/:index. */
+  index: number;
+  kind: string | null;
+  label: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+  /** False for legacy metadata-only refs that have no stored bytes. */
+  hasFile: boolean;
+};
+
 @Injectable()
 export class PartnerService {
   constructor(
     @Inject(PARTNER_REPOSITORY) private readonly partners: PartnerRepository,
     @Inject(IDENTITY_REPOSITORY) private readonly identity: IdentityRepository,
-    @Inject(KYC_STORAGE) private readonly storage: KycStorage,
-    private readonly config: ConfigService<AppEnv, true>,
+    private readonly documents: DocumentStoreService,
   ) {}
 
   async listMine(userId: string): Promise<{ applications: PartnerApplicationView[] }> {
@@ -69,7 +77,6 @@ export class PartnerService {
   }
 
   async submit(userId: string, dto: SubmitPartnerApplicationDto): Promise<PartnerApplicationView> {
-    this.assertStorageAllowed();
     const existing = await this.partners.findByUserAndRole(userId, dto.role);
     if (existing?.status === 'APPROVED') {
       throw partnerError(
@@ -86,18 +93,92 @@ export class PartnerService {
       );
     }
 
+    const uploads = dto.documents ?? [];
+    const allowedKinds = PARTNER_DOCUMENT_KINDS[dto.role] as readonly string[];
+    const seen = new Set<string>();
+    for (const upload of uploads) {
+      if (!allowedKinds.includes(upload.kind)) {
+        throw partnerError(400, 'VALIDATION_ERROR', `Document kind ${upload.kind} is not valid for ${dto.role}`);
+      }
+      if (seen.has(upload.kind)) {
+        throw partnerError(400, 'VALIDATION_ERROR', `Document kind ${upload.kind} is sent twice`);
+      }
+      seen.add(upload.kind);
+    }
+    // A resubmission only re-sends the documents ops flagged; the rest stay on file.
+    const kept = (existing?.documents ?? []).filter(
+      (doc) => doc.kind && allowedKinds.includes(doc.kind) && !seen.has(doc.kind) && hasStoredFile(doc),
+    );
+    const onFile = new Set([...seen, ...kept.map((doc) => doc.kind!)]);
+    const missing = (PARTNER_REQUIRED_DOCUMENTS[dto.role] as readonly string[]).filter(
+      (kind) => !onFile.has(kind),
+    );
+    if (missing.length > 0) {
+      throw new HttpException(
+        {
+          message: `Missing required documents: ${missing.join(', ')}`,
+          errorCode: 'PARTNER_DOCUMENTS_REQUIRED',
+          details: { missing },
+        },
+        400,
+      );
+    }
+
     const applicationId = existing?.id ?? cryptoRandomId();
-    const documents = await this.storage.storeDocuments(applicationId, dto.documents ?? []);
+    const stored = await this.documents.storeAll(
+      `partner-applications/${applicationId}`,
+      uploads.map((upload) => ({
+        label: upload.label?.trim() || upload.kind,
+        contentType: upload.contentType,
+        contentBase64: upload.contentBase64,
+      })),
+    );
+    const fresh: PartnerDocumentRef[] = stored.map((ref, index) => ({
+      ...ref,
+      kind: uploads[index]!.kind,
+    }));
+    const order = PARTNER_DOCUMENT_KINDS[dto.role] as readonly string[];
+    const documents = [...kept, ...fresh].sort(
+      (a, b) => order.indexOf(a.kind ?? '') - order.indexOf(b.kind ?? ''),
+    );
     const now = new Date();
-    const saved = await this.partners.upsertSubmit({
-      id: applicationId,
-      userId,
-      role: dto.role,
-      metadata: sanitizeMetadata(dto.metadata),
-      documents,
-      now,
-    });
+    let saved;
+    try {
+      saved = await this.partners.upsertSubmit({
+        id: applicationId,
+        userId,
+        role: dto.role,
+        metadata: sanitizeMetadata(dto.metadata),
+        documents,
+        now,
+      });
+    } catch (error) {
+      await this.documents.discard(fresh);
+      throw error;
+    }
+    // Files the new upload replaced are no longer referenced by any application.
+    await this.documents.discard(
+      (existing?.documents ?? []).filter((doc) => doc.kind && seen.has(doc.kind) && hasStoredFile(doc)),
+    );
     return toView(saved);
+  }
+
+  /** Ops-only: bytes of one stored document for review. */
+  async readDocumentForOps(
+    applicationId: string,
+    index: number,
+  ): Promise<{ body: Buffer; contentType: string; filename: string }> {
+    const existing = await this.partners.findById(applicationId);
+    const doc = existing?.documents[index];
+    if (!existing || !doc) {
+      throw partnerError(404, 'PARTNER_DOCUMENT_NOT_FOUND', 'Document not found');
+    }
+    const file = await this.documents.read(doc);
+    if (!file) {
+      throw partnerError(404, 'PARTNER_DOCUMENT_NOT_FOUND', 'Document file is not stored');
+    }
+    const ext = doc.key.includes('.') ? doc.key.slice(doc.key.lastIndexOf('.') + 1) : 'bin';
+    return { ...file, filename: `${(doc.kind ?? 'document').toLowerCase()}-${index}.${ext}` };
   }
 
   async listForOps(query?: OpsPartnerApplicationQueryDto | PartnerStatusName): Promise<{
@@ -140,11 +221,12 @@ export class PartnerService {
       id: existing.id,
       status: 'APPROVED',
       reason: null,
+      reviewIssues: [],
       reviewedBy: reviewerId,
       now,
     });
     if (!updated) {
-      throw partnerError(404, 'PARTNER_APPLICATION_NOT_FOUND', 'Partner application not found');
+      throw notSubmittedError();
     }
     await this.ensureGrant(existing.userId, existing.role, 'ACTIVE');
     return toView(updated);
@@ -154,22 +236,40 @@ export class PartnerService {
     applicationId: string,
     reviewerId: string,
     reason: string,
+    issues: readonly PartnerReviewIssueDto[] = [],
   ): Promise<PartnerApplicationView> {
     const existing = await this.requireSubmitted(applicationId);
     const trimmed = reason.trim();
     if (!trimmed) {
       throw partnerError(400, 'VALIDATION_ERROR', 'Rejection reason is required');
     }
+    const sections = PARTNER_ISSUE_SECTIONS[existing.role] as readonly string[];
+    const reviewIssues: PartnerReviewIssue[] = [];
+    for (const issue of issues) {
+      const note = issue.note.trim();
+      if (!sections.includes(issue.section) || !note) {
+        throw partnerError(
+          400,
+          'VALIDATION_ERROR',
+          `Issue section must be one of ${sections.join(', ')} with a note`,
+        );
+      }
+      if (reviewIssues.some((row) => row.section === issue.section)) {
+        throw partnerError(400, 'VALIDATION_ERROR', `Issue section ${issue.section} is repeated`);
+      }
+      reviewIssues.push({ section: issue.section, note: note.slice(0, 300) });
+    }
     const now = new Date();
     const updated = await this.partners.review({
       id: existing.id,
       status: 'REJECTED',
       reason: trimmed.slice(0, 500),
+      reviewIssues,
       reviewedBy: reviewerId,
       now,
     });
     if (!updated) {
-      throw partnerError(404, 'PARTNER_APPLICATION_NOT_FOUND', 'Partner application not found');
+      throw notSubmittedError();
     }
     await this.ensureGrant(existing.userId, existing.role, 'SUSPENDED');
     return toView(updated);
@@ -181,11 +281,7 @@ export class PartnerService {
       throw partnerError(404, 'PARTNER_APPLICATION_NOT_FOUND', 'Partner application not found');
     }
     if (existing.status !== 'SUBMITTED') {
-      throw partnerError(
-        409,
-        'PARTNER_APPLICATION_NOT_SUBMITTED',
-        'Only submitted applications can be reviewed',
-      );
+      throw notSubmittedError();
     }
     return existing;
   }
@@ -215,18 +311,6 @@ export class PartnerService {
       await this.identity.updateGrantStatus(existing.id, status);
     }
   }
-
-  private assertStorageAllowed(): void {
-    const provider = this.config.get('KYC_STORAGE_PROVIDER', { infer: true });
-    const nodeEnv = this.config.get('NODE_ENV', { infer: true });
-    if (nodeEnv === 'production' && (provider === 'mock' || provider === undefined)) {
-      throw partnerError(
-        503,
-        'KYC_STORAGE_UNAVAILABLE',
-        'KYC storage is not configured for production',
-      );
-    }
-  }
 }
 
 function toView(row: PartnerApplicationRecord): PartnerApplicationView {
@@ -243,8 +327,17 @@ function toView(row: PartnerApplicationRecord): PartnerApplicationView {
     role: row.role,
     status: row.status,
     metadata,
-    documents: row.documents,
+    documents: row.documents.map((doc, index) => ({
+      index,
+      kind: doc.kind ?? null,
+      label: doc.label,
+      contentType: doc.contentType,
+      sizeBytes: doc.sizeBytes,
+      uploadedAt: doc.uploadedAt,
+      hasFile: hasStoredFile(doc),
+    })),
     reason: row.reason,
+    issues: row.reviewIssues.map((issue) => ({ ...issue })),
     reviewedBy: row.reviewedBy,
     reviewedAt: row.reviewedAt?.toISOString() ?? null,
     submittedAt: row.submittedAt?.toISOString() ?? null,
@@ -270,6 +363,19 @@ function sanitizeMetadata(metadata: Record<string, unknown>): Record<string, unk
     }
   }
   return result;
+}
+
+function notSubmittedError(): HttpException {
+  return partnerError(
+    409,
+    'PARTNER_APPLICATION_NOT_SUBMITTED',
+    'Only submitted applications can be reviewed',
+  );
+}
+
+/** Pre-DEC-PROD-020 refs were `mock://`/`s3://` URIs without stored bytes. */
+function hasStoredFile(doc: PartnerDocumentRef): boolean {
+  return !doc.key.includes('://');
 }
 
 function cryptoRandomId(): string {

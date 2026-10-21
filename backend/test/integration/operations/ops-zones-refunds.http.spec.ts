@@ -84,6 +84,7 @@ describe('ops zones / refunds / catalog categories http', () => {
               SMS_PROVIDER: 'mock',
               EMAIL_PROVIDER: 'mock',
               OTP_THROTTLE_LIMIT: '1000',
+              OTP_PHONE_LIMIT: '1000',
               DRIVER_SEARCH_RADIUS_KM: '5',
               RIDE_OFFER_TTL_SECONDS: '60',
               RIDE_MIN_FARE_VND: '10000',

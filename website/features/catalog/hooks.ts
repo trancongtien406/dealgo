@@ -1,8 +1,9 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchCatalogCategories,
+  renameCatalogCategory,
   type FetchCatalogCategoriesParams,
 } from "@/features/catalog/api";
 
@@ -25,5 +26,16 @@ export function useCatalogCategoriesQuery(
   return useQuery({
     queryKey: catalogQueryKeys.list(params),
     queryFn: () => fetchCatalogCategories(params),
+  });
+}
+
+export function useRenameCatalogCategoryMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ code, name }: { code: string; name: string }) =>
+      renameCatalogCategory(code, name),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: catalogQueryKeys.all });
+    },
   });
 }

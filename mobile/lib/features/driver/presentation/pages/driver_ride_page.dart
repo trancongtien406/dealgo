@@ -1,18 +1,29 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../l10n/app_localizations.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../ride/domain/entities/ride_models.dart';
 import '../../../ride/domain/entities/ride_money.dart';
+import '../../../ride/domain/params/get_ride_params.dart';
 import '../../../ride/domain/params/submit_ride_offer_params.dart';
+import '../../../ride/domain/usecases/get_ride.dart';
 import '../../domain/usecases/submit_driver_ride_offer.dart';
 import '../cubit/driver_offer_cubit.dart';
 import '../utils/driver_routes.dart';
 import '../widgets/driver_widgets.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/format/short_ref.dart';
+import '../../../../core/l10n/api_error_text.dart';
+import '../../../../core/realtime/snapshot_binding.dart';
+import '../../../../core/realtime/snapshot_realtime.dart';
 
 class DriverRideDetailPage extends StatelessWidget {
   const DriverRideDetailPage({required this.ride, super.key});
@@ -21,14 +32,15 @@ class DriverRideDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       body: DriverPageFrame(
-        title: 'Chi tiết yêu cầu chở khách',
+        title: l10n.driverRideDetailTitle,
         insetBottom: true,
         onBack: () => driverBack(context),
         footer: DriverFooter(
-          secondaryLabel: 'Bỏ qua',
-          primaryLabel: 'Chào giá',
+          secondaryLabel: l10n.actionSkip,
+          primaryLabel: l10n.driverMakeOffer,
           primaryKey: const Key('driver-open-offer'),
           onSecondary: () => driverBack(context),
           onPrimary: () =>
@@ -46,22 +58,22 @@ class DriverRideDetailPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const DriverChip(
-                    label: 'Chở khách · Xe máy',
+                  DriverChip(
+                    label: l10n.driverRideChip,
                     tone: DriverChipTone.green,
                   ),
                   const SizedBox(height: DealGoSpacing.s12),
-                  Text('Đơn #${ride.id}'),
+                  Text(AppLocalizations.of(context).rideRef(shortRef(ride.id))),
                   const SizedBox(height: DealGoSpacing.s12),
                   DriverStop(
                     color: DealGoColors.brandGreen,
-                    label: 'Điểm đón',
+                    label: l10n.driverPickupLabel,
                     value: ride.pickup.label,
                   ),
                   const SizedBox(height: DealGoSpacing.s12),
                   DriverStop(
                     color: DealGoColors.danger,
-                    label: 'Điểm đến',
+                    label: l10n.driverDropoffLabel,
                     value: ride.dropoff.label,
                   ),
                 ],
@@ -72,25 +84,25 @@ class DriverRideDetailPage extends StatelessWidget {
               child: Column(
                 children: [
                   DriverMoneyRow(
-                    label: 'Giá khách đề xuất',
+                    label: l10n.driverCustomerFare,
                     value: formatRideVnd(ride.offeredFareVnd),
                     emphasize: true,
                   ),
                   DriverMoneyRow(
-                    label: 'Giá tham chiếu',
+                    label: l10n.driverReferenceFare,
                     value: formatRideVnd(ride.referenceFareVnd),
                   ),
                   DriverMoneyRow(
-                    label: 'Số chào giá',
+                    label: l10n.driverOfferCount,
                     value: '${ride.offerCount}',
                   ),
                 ],
               ),
             ),
             const SizedBox(height: DealGoSpacing.s12),
-            const DriverNote(
+            DriverNote(
               tone: DriverNoteTone.green,
-              message: 'Cùng số tiền với giá khách là ACCEPT. Số khác là COUNTER. Server mới chốt giá chuyến.',
+              message: AppLocalizations.of(context).driverCounterNote,
             ),
           ],
         ),
@@ -107,10 +119,9 @@ class DriverOfferPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) =>
-          DriverOfferCubit(
-            submitDriverRideOffer: context.read<SubmitDriverRideOffer>(),
-          ),
+      create: (context) => DriverOfferCubit(
+        submitDriverRideOffer: context.read<SubmitDriverRideOffer>(),
+      ),
       child: _DriverOfferView(ride: ride),
     );
   }
@@ -132,11 +143,76 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
   var _submitting = false;
   String? _error;
   int? _sentAmount;
+  var _selection = DriverOfferSelection.waiting;
+  Timer? _poll;
+  SnapshotBinding? _binding;
 
   @override
   void dispose() {
+    _stopWatching();
     _amount.dispose();
     super.dispose();
+  }
+
+  /// After the offer is sent, follow the ride until the customer picks a driver:
+  /// the server keeps a non-negotiating ride readable only for its assigned driver.
+  /// DEC-PROD-025: the `ride:<id>` socket hint (ASSIGNED/CANCELLED/EXPIRED) triggers an
+  /// immediate REST check; a slow poll stays as the safety net when the socket is down.
+  void _startWatching() {
+    _stopWatching();
+    _poll = Timer.periodic(driverOfferPollInterval, (_) => _checkSelection());
+    SnapshotRealtime? realtime;
+    try {
+      realtime = context.read<SnapshotRealtime>();
+    } catch (_) {
+      realtime = null;
+    }
+    if (realtime == null) {
+      return;
+    }
+    final binding = SnapshotBinding(
+      realtime: realtime,
+      room: RideSnapshotRoom(widget.ride.id),
+      onInvalidate: _checkSelection,
+    );
+    _binding = binding;
+    binding.start(accessToken: driverAccessToken(context)).catchError((Object _) {});
+  }
+
+  void _stopWatching() {
+    _poll?.cancel();
+    _poll = null;
+    final binding = _binding;
+    _binding = null;
+    binding?.stop().catchError((Object _) {});
+  }
+
+  Future<void> _checkSelection() async {
+    final token = driverAccessToken(context);
+    if (token == null || token.isEmpty) {
+      return;
+    }
+    DriverOfferSelection next;
+    try {
+      final view = await context.read<GetRide>()(
+        GetRideParams(accessToken: token, rideId: widget.ride.id),
+      );
+      next = driverOfferSelectionFor(view.status);
+    } on ApiException catch (error) {
+      if (error.statusCode != 404) {
+        return;
+      }
+      next = DriverOfferSelection.lost;
+    } catch (_) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    if (next != DriverOfferSelection.waiting) {
+      _stopWatching();
+    }
+    setState(() => _selection = next);
   }
 
   Future<void> _submit() async {
@@ -144,13 +220,15 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
       return;
     }
     final amount = parseRideFareInput(_amount.text);
-    if (amount == null || !rideFareAllowed(amount)) {
-      setState(() => _error = rideFareRangeLabel());
+    // Fare bounds are admin settings checked by the server
+    // (RIDE_FARE_OUT_OF_RANGE); the app only rejects non-amounts.
+    if (amount == null || amount <= 0) {
+      setState(() => _error = AppLocalizations.of(context).rideFareInvalid);
       return;
     }
     final token = driverAccessToken(context);
     if (token == null || token.isEmpty) {
-      setState(() => _error = 'Phiên đăng nhập không còn hiệu lực');
+      setState(() => _error = AppLocalizations.of(context).errorSessionExpired);
       return;
     }
     setState(() {
@@ -172,13 +250,14 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
         _submitting = false;
         _sentAmount = amount;
       });
+      _startWatching();
     } on ApiException catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
         _submitting = false;
-        _error = error.message;
+        _error = apiErrorText(AppLocalizations.of(context), error);
       });
     } catch (_) {
       if (!mounted) {
@@ -186,7 +265,7 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
       }
       setState(() {
         _submitting = false;
-        _error = 'Không gửi được báo giá';
+        _error = AppLocalizations.of(context).driverOfferSendFailed;
       });
     }
   }
@@ -194,13 +273,14 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context);
     final ride = widget.ride;
     final amount = parseRideFareInput(_amount.text);
     final sent = _sentAmount;
     return Scaffold(
       body: DriverPageFrame(
-        title: 'Thương lượng giá chuyến',
-        subtitle: driverVehicleLabel,
+        title: l10n.driverOfferTitle,
+        subtitle: l10n.rideVehicleMotorbike,
         insetBottom: true,
         onBack: () => driverBack(context),
         footer: sent == null
@@ -213,8 +293,8 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
                 ),
                 child: DealGoPrimaryButton(
                   key: const Key('driver-submit-offer'),
-                  label: 'Gửi báo giá',
-                  trailingIcon: Icons.arrow_forward,
+                  label: l10n.driverSendOffer,
+                  trailingIcon: DealGoIcons.arrowRight,
                   isLoading: _submitting,
                   enabled: !_submitting,
                   onPressed: _submit,
@@ -233,14 +313,20 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Báo giá của khách', style: textTheme.titleMedium),
+                  Text(l10n.driverCustomerRequest, style: textTheme.titleMedium),
                   const SizedBox(height: DealGoSpacing.s12),
-                  Text('Đơn #${ride.id}', style: textTheme.bodySmall),
+                  Text(
+                    AppLocalizations.of(context).rideRef(shortRef(ride.id)),
+                    style: textTheme.bodySmall,
+                  ),
                   DriverMoneyRow(
-                    label: 'Phí đề nghị',
+                    label: l10n.driverCustomerFare,
                     value: formatRideVnd(ride.offeredFareVnd),
                   ),
-                  const DriverMoneyRow(label: 'Phương tiện', value: 'Xe máy'),
+                  DriverMoneyRow(
+                    label: l10n.driverVehicle,
+                    value: l10n.rideVehicleMotorbike,
+                  ),
                 ],
               ),
             ),
@@ -250,7 +336,7 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Đã gửi báo giá', style: textTheme.titleMedium),
+                    Text(l10n.driverOfferSent, style: textTheme.titleMedium),
                     const SizedBox(height: DealGoSpacing.s8),
                     Text(
                       formatRideVnd(sent),
@@ -261,10 +347,16 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
                     ),
                     const SizedBox(height: DealGoSpacing.s8),
                     DriverChip(
-                      label: sent == ride.offeredFareVnd
-                          ? 'ACCEPT · Chờ khách chọn'
-                          : 'COUNTER · Chờ khách chọn',
-                      tone: DriverChipTone.green,
+                      label: switch (_selection) {
+                        DriverOfferSelection.waiting => sent == ride.offeredFareVnd
+                            ? l10n.driverOfferWaitingAccept
+                            : l10n.driverOfferWaitingCounter,
+                        DriverOfferSelection.selected => l10n.driverOfferChosen,
+                        DriverOfferSelection.lost => l10n.driverOfferLost,
+                      },
+                      tone: _selection == DriverOfferSelection.lost
+                          ? DriverChipTone.danger
+                          : DriverChipTone.green,
                     ),
                   ],
                 ),
@@ -274,20 +366,26 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
                 color: const Color(0xFF1E1B4B),
                 child: Row(
                   children: [
-                    const Icon(Icons.navigation, color: Colors.white),
+                    const Icon(DealGoIcons.navigation, color: Colors.white),
                     const SizedBox(width: DealGoSpacing.s12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Sẵn sàng điều hướng đón khách',
+                            _selection == DriverOfferSelection.selected
+                                ? l10n.driverReadyToNavigate
+                                : l10n.driverWaitingForCustomer,
                             style: textTheme.titleMedium?.copyWith(
                               color: Colors.white,
                             ),
                           ),
                           Text(
-                            'Khi khách chọn báo giá, mở lộ trình đón (D021). Demo có thể mở ngay.',
+                            switch (_selection) {
+                              DriverOfferSelection.waiting => l10n.driverWaitingForCustomerBody,
+                              DriverOfferSelection.selected => l10n.driverReadyToNavigateBody,
+                              DriverOfferSelection.lost => l10n.driverOfferLostBody,
+                            },
                             style: textTheme.bodySmall?.copyWith(
                               color: Colors.white70,
                             ),
@@ -299,45 +397,38 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
                 ),
               ),
               const SizedBox(height: DealGoSpacing.s12),
-              DealGoPrimaryButton(
-                key: const Key('driver-open-active-ride'),
-                label: 'Mở điều hướng đón (demo)',
-                trailingIcon: Icons.arrow_forward,
-                onPressed: () => context.push(
-                  DriverRoutes.active(ride.id),
-                  extra: ride,
+              if (_selection == DriverOfferSelection.selected)
+                DealGoPrimaryButton(
+                  key: const Key('driver-open-active-ride'),
+                  label: l10n.driverOpenPickupNavigation,
+                  trailingIcon: DealGoIcons.arrowRight,
+                  onPressed: () => context.pushReplacement(
+                    DriverRoutes.active(ride.id),
+                    extra: ride,
+                  ),
+                )
+              else if (_selection == DriverOfferSelection.lost)
+                DealGoPrimaryButton(
+                  key: const Key('driver-offer-back-to-jobs'),
+                  label: l10n.driverBackToJobs,
+                  onPressed: () => context.go('/driver/jobs'),
                 ),
-              ),
             ] else ...[
               DriverPanel(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Chào giá của bạn', style: textTheme.titleMedium),
+                    Text(l10n.driverYourOffer, style: textTheme.titleMedium),
                     const SizedBox(height: DealGoSpacing.s12),
-                    TextField(
-                      key: const Key('driver-offer-amount'),
+                    DealGoTextField(
+                      label: l10n.driverYourOffer,
+                      showLabel: false,
                       controller: _amount,
+                      fieldKey: const Key('driver-offer-amount'),
                       keyboardType: TextInputType.number,
                       textAlign: TextAlign.center,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      style: textTheme.headlineSmall?.copyWith(
-                        color: DealGoColors.primary,
-                        fontWeight: FontWeight.w800,
-                      ),
-                      decoration: InputDecoration(
-                        suffixText: 'đ',
-                        filled: true,
-                        fillColor: DealGoColors.canvas,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                            DealGoRadius.input,
-                          ),
-                          borderSide: const BorderSide(
-                            color: DealGoColors.border,
-                          ),
-                        ),
-                      ),
+                      suffix: Text(l10n.currencySuffixVnd),
                       onChanged: (_) => setState(() {}),
                     ),
                     const SizedBox(height: DealGoSpacing.s8),
@@ -353,23 +444,23 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
                 child: Column(
                   children: [
                     DriverMoneyRow(
-                      label: 'Giá gửi lên',
+                      label: l10n.driverOfferAmount,
                       value: amount == null ? '—' : formatRideVnd(amount),
                       emphasize: true,
                     ),
                     DriverMoneyRow(
-                      label: 'Hình thức',
+                      label: l10n.driverOfferKind,
                       value: amount == ride.offeredFareVnd
-                          ? 'ACCEPT'
-                          : 'COUNTER',
+                          ? l10n.driverOfferKindAccept
+                          : l10n.driverOfferKindCounter,
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: DealGoSpacing.s12),
-              const DriverNote(
+              DriverNote(
                 tone: DriverNoteTone.green,
-                message: 'Giá khác giá khách đề xuất được ghi nhận là COUNTER. Đúng giá khách đề xuất được ghi nhận là ACCEPT.',
+                message: l10n.driverOfferKindNote,
               ),
             ],
             if (_error != null) ...[
@@ -383,12 +474,24 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
   }
 
   String _hint(int? amount, int offered) {
-    if (amount == null || !rideFareAllowed(amount)) {
-      return rideFareRangeLabel();
+    if (amount == null || amount <= 0) {
+      return AppLocalizations.of(context).rideFareInvalid;
     }
     if (amount == offered) {
-      return 'Chưa đổi báo giá khi khách chưa đồng ý.';
+      return AppLocalizations.of(context).driverOfferHintSame;
     }
-    return 'Khác giá khách đề xuất. Gửi lên được ghi nhận là COUNTER.';
+    return AppLocalizations.of(context).driverOfferHintCounter;
   }
 }
+
+/// Safety-net poll while waiting for the customer's choice; the socket hint is the fast path.
+const driverOfferPollInterval = Duration(seconds: 15);
+
+enum DriverOfferSelection { waiting, selected, lost }
+
+/// Still negotiating → wait; the ride moved on and is still readable → it is ours.
+DriverOfferSelection driverOfferSelectionFor(RideStatus status) => switch (status) {
+  RideStatus.negotiating => DriverOfferSelection.waiting,
+  RideStatus.cancelled || RideStatus.expired => DriverOfferSelection.lost,
+  _ => DriverOfferSelection.selected,
+};

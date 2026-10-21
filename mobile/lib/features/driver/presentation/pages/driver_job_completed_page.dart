@@ -1,24 +1,86 @@
-import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'dart:async';
 
-import '../../../../core/design_system/components/dealgo_banner.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+
 import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../../core/design_system/components/dealgo_skeleton.dart';
+import '../../../../core/design_system/components/dealgo_state_view.dart';
+import '../../../../core/network/request_failure.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/format/short_ref.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../driver_history/domain/driver_history.dart';
+import '../../../food/domain/entities/food_money.dart';
+import '../../../identity/domain/entities/auth_state.dart';
+import '../../../identity/presentation/cubit/auth_cubit.dart';
 import '../widgets/driver_widgets.dart';
 
-/// D034 — completed job detail (fixture amounts for layout only).
-class DriverJobCompletedPage extends StatelessWidget {
-  const DriverJobCompletedPage({required this.jobId, super.key});
+/// D034 — finished job detail from the driver's real history (fare, platform
+/// fee snapshot, net earnings). [item] is passed when opened from the history
+/// list; otherwise the page looks the job up in the latest history page.
+class DriverJobCompletedPage extends StatefulWidget {
+  const DriverJobCompletedPage({required this.jobId, this.item, super.key});
 
   final String jobId;
+  final DriverHistoryItem? item;
+
+  @override
+  State<DriverJobCompletedPage> createState() => _DriverJobCompletedPageState();
+}
+
+class _DriverJobCompletedPageState extends State<DriverJobCompletedPage> {
+  DriverHistoryItem? _item;
+  var _loading = false;
+  Object? _failure;
+
+  @override
+  void initState() {
+    super.initState();
+    _item = widget.item;
+    if (_item == null) unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    final auth = context.read<AuthCubit>().state;
+    if (auth is! AuthSignedIn) {
+      setState(() {
+        _loading = false;
+        _failure = sessionExpiredFailure;
+      });
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _failure = null;
+    });
+    try {
+      final page = await context.read<DriverHistoryRepository>().list(
+        accessToken: auth.tokens.accessToken,
+        limit: 50,
+      );
+      if (!mounted) return;
+      setState(() {
+        _item = page.items.where((i) => i.id == widget.jobId).firstOrNull;
+        _loading = false;
+      });
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _failure = error;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final textTheme = Theme.of(context).textTheme;
-
+    final item = _item;
     return DriverPageFrame(
       title: l10n.driverJobCompletedTitle,
       onBack: () => driverBack(context),
@@ -32,77 +94,136 @@ class DriverJobCompletedPage extends StatelessWidget {
         child: DealGoPrimaryButton(
           key: const Key('driver-completed-back-jobs'),
           label: l10n.driverBackToJobs,
-          trailingIcon: Icons.arrow_forward,
+          trailingIcon: DealGoIcons.arrowRight,
           onPressed: () => context.go('/driver/jobs'),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          DealGoDimensions.pageGutter,
-          DealGoSpacing.s8,
-          DealGoDimensions.pageGutter,
-          DealGoSpacing.s16,
-        ),
-        children: [
-          DriverPanel(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${l10n.driverJobIdLabel} $jobId',
-                        style: textTheme.titleMedium,
-                      ),
-                    ),
-                    DealGoChip(
-                      label: l10n.statusCompleted,
-                      tone: DealGoChipTone.success,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: DealGoSpacing.s12),
-                Text(l10n.driverCompletedRouteSample, style: textTheme.bodyMedium),
-                const SizedBox(height: DealGoSpacing.s8),
-                Text(
-                  l10n.driverCompletedTimeSample,
-                  style: textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          DriverPanel(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(l10n.driverCompletedEarningsTitle, style: textTheme.titleMedium),
-                const SizedBox(height: DealGoSpacing.s8),
-                DriverMoneyRow(
-                  label: l10n.driverCompletedFareLabel,
-                  value: '45.000đ',
-                  emphasize: true,
-                ),
-                DriverMoneyRow(
-                  label: l10n.driverCompletedBonusLabel,
-                  value: '—',
-                ),
-                const SizedBox(height: DealGoSpacing.s8),
-                Text(
-                  l10n.driverCompletedEarningsHint,
-                  style: textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          DealGoBanner(
-            tone: DealGoBannerTone.info,
-            message: l10n.driverCompletedFixtureHint,
-          ),
-        ],
+      body: _loading
+          ? const DealGoSkeletonList(itemCount: 3)
+          : _failure != null && item == null
+          ? DealGoStateView.failure(
+              context,
+              key: const Key('driver-completed-missing'),
+              onRetry: _load,
+              cause: _failure,
+              message: l10n.errorLoadFailed,
+            )
+          : item == null
+          ? DealGoStateView(
+              key: const Key('driver-completed-missing'),
+              art: DealGoStateArt.noOrders,
+              title: l10n.driverCompletedNotFound,
+              message: l10n.driverCompletedNotFoundHint,
+              actionLabel: l10n.actionRetry,
+              onAction: _load,
+            )
+          : _Detail(item: item),
+    );
+  }
+}
+
+class _Detail extends StatelessWidget {
+  const _Detail({required this.item});
+
+  final DriverHistoryItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final isRide = item.kind == DriverJobKind.ride;
+    final done = item.outcome == DriverJobOutcome.completed;
+    final from = item.pickupLabel ?? item.storeName;
+    final percent = item.feePercent;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        DealGoDimensions.pageGutter,
+        DealGoSpacing.s8,
+        DealGoDimensions.pageGutter,
+        DealGoSpacing.s16,
       ),
+      children: [
+        DriverPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      isRide
+                          ? l10n.rideRef(shortRef(item.id))
+                          : l10n.orderRef(shortRef(item.id)),
+                      key: const Key('driver-completed-ref'),
+                      style: textTheme.titleMedium,
+                    ),
+                  ),
+                  DealGoChip(
+                    label: switch (item.outcome) {
+                      DriverJobOutcome.completed => l10n.statusCompleted,
+                      DriverJobOutcome.cancelled =>
+                        l10n.drvHistOutcomeCancelled,
+                      DriverJobOutcome.failed => l10n.drvHistOutcomeFailed,
+                    },
+                    tone: done ? DealGoChipTone.success : DealGoChipTone.danger,
+                  ),
+                ],
+              ),
+              const SizedBox(height: DealGoSpacing.s12),
+              Text(
+                from == null
+                    ? item.dropoffLabel
+                    : '$from → ${item.dropoffLabel}',
+                style: textTheme.bodyMedium,
+              ),
+              const SizedBox(height: DealGoSpacing.s8),
+              Text(
+                DateFormat(
+                  'HH:mm · dd/MM/yyyy',
+                  locale,
+                ).format(item.finishedAt),
+                style: textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: DealGoSpacing.s12),
+        DriverPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.driverCompletedEarningsTitle,
+                style: textTheme.titleMedium,
+              ),
+              const SizedBox(height: DealGoSpacing.s8),
+              DriverMoneyRow(
+                label: l10n.driverCompletedFareLabel,
+                value: formatVnd(item.fareVnd),
+              ),
+              DriverMoneyRow(
+                label: percent == null
+                    ? l10n.driverCompletedFeeLabel
+                    : l10n.driverCompletedFeePercentLabel(
+                        NumberFormat('#,##0.##', locale).format(percent),
+                      ),
+                value: formatVnd(item.feeVnd),
+              ),
+              DriverMoneyRow(
+                label: l10n.driverCompletedNetLabel,
+                value: formatVnd(item.earningsVnd),
+                emphasize: true,
+              ),
+              const SizedBox(height: DealGoSpacing.s8),
+              Text(
+                l10n.driverCompletedEarningsHint,
+                style: textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

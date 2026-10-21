@@ -14,8 +14,7 @@ class DealGoTabDestination {
   final IconData selectedIcon;
 }
 
-/// Standard role bottom nav (merchant / driver). Customer elevated “Đặt” stays
-/// in [CustomerTabBar] — Material Icons are temporary until brand tab assets land.
+/// Role bottom nav. The selected tab is a static plate, not a sliding one.
 class DealGoTabBar extends StatelessWidget {
   const DealGoTabBar({
     required this.destinations,
@@ -28,30 +27,84 @@ class DealGoTabBar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
 
+  static const double barHeight = 64;
+
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: DealGoColors.card,
-        border: Border(top: BorderSide(color: DealGoColors.border)),
-      ),
-      child: NavigationBar(
-        selectedIndex: selectedIndex,
-        onDestinationSelected: onDestinationSelected,
-        backgroundColor: DealGoColors.card,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        shadowColor: Colors.transparent,
-        indicatorColor: DealGoColors.subtlePurple,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: [
-          for (final tab in destinations)
-            NavigationDestination(
-              icon: Icon(tab.icon, color: DealGoColors.textSecondary),
-              selectedIcon: Icon(tab.selectedIcon, color: DealGoColors.primary),
-              label: tab.label,
+    final bottom = MediaQuery.paddingOf(context).bottom;
+    final selected = selectedIndex.clamp(0, destinations.length - 1);
+    final textTheme = Theme.of(context).textTheme;
+
+    return Material(
+      color: DealGoColors.card,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: DealGoColors.border)),
+        ),
+        child: SizedBox(
+          height: barHeight + bottom,
+          child: Padding(
+            padding: EdgeInsets.only(bottom: bottom),
+            child: Row(
+              children: [
+                for (var i = 0; i < destinations.length; i++)
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => onDestinationSelected(i),
+                      splashColor: Colors.transparent,
+                      highlightColor: Colors.transparent,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 6,
+                        ),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: selected == i
+                                ? DealGoColors.subtlePurple
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(
+                              DealGoRadius.input,
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                selected == i
+                                    ? destinations[i].selectedIcon
+                                    : destinations[i].icon,
+                                size: 22,
+                                color: selected == i
+                                    ? DealGoColors.primary
+                                    : DealGoColors.textSecondary,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                destinations[i].label,
+                                maxLines: 1,
+                                softWrap: false,
+                                overflow: TextOverflow.fade,
+                                style: textTheme.labelSmall?.copyWith(
+                                  color: selected == i
+                                      ? DealGoColors.primary
+                                      : DealGoColors.textSecondary,
+                                  fontWeight: selected == i
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
-        ],
+          ),
+        ),
       ),
     );
   }

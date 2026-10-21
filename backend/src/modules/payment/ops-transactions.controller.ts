@@ -2,8 +2,9 @@ import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { OpsSessionGuard } from '../identity/access-auth.guard.js';
 import { OpsTransactionsService } from './ops-transactions.service.js';
+import { OpsPermissionGuard } from '../identity/ops-rbac/ops-permission.guard.js';
+import { RequireOpsPermission } from '../identity/ops-rbac/ops-permission.decorator.js';
 
 export class OpsTransactionPageQueryDto {
   @IsOptional()
@@ -39,10 +40,11 @@ export class OpsTransactionPageQueryDto {
 @ApiTags('ops')
 @ApiBearerAuth()
 @Controller('v1/ops/transactions')
-@UseGuards(OpsSessionGuard)
+@UseGuards(OpsPermissionGuard)
 export class OpsTransactionsController {
   constructor(private readonly transactions: OpsTransactionsService) {}
 
+  @RequireOpsPermission('transactions.read')
   @Get()
   @ApiOperation({
     summary: 'Ops paginated transactions with server-side filters (q, status, service, payment)',

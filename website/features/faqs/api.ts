@@ -1,5 +1,10 @@
 import { mapNestFaq } from "@/features/faqs/mappers";
-import type { FaqCategory, FaqRow, FaqStatus } from "@/features/faqs/types";
+import type {
+  FaqAudience,
+  FaqCategory,
+  FaqRow,
+  FaqStatus,
+} from "@/features/faqs/types";
 import { apiFetch } from "@/lib/api/client";
 import { apiPaths } from "@/lib/api/paths";
 
@@ -19,6 +24,7 @@ export async function patchFaq(
     suggestedAnswer?: string;
     status?: FaqStatus;
     category?: FaqCategory;
+    audience?: FaqAudience;
     reason: string;
   },
 ): Promise<FaqRow> {

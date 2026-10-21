@@ -1,18 +1,22 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../live_location/presentation/driver_location_reporter.dart';
 import '../../../presence/domain/params/set_presence_params.dart';
 import '../../../presence/domain/usecases/set_presence.dart';
 
 class DriverDutyCubit extends Cubit<bool> {
   DriverDutyCubit({
-    SetPresence? setPresence,
-    String? Function()? accessToken,
-  }) : _setPresence = setPresence,
-       _accessToken = accessToken,
+    this._setPresence,
+    this._accessToken,
+    DriverLocationReporter? locationReporter,
+  }) : _reporter = locationReporter,
        super(false);
 
   final SetPresence? _setPresence;
   final String? Function()? _accessToken;
+
+  /// DEC-PROD-031: reports the driver's position while online.
+  final DriverLocationReporter? _reporter;
 
   Future<void> connect() async {
     if (state) {
@@ -20,6 +24,7 @@ class DriverDutyCubit extends Cubit<bool> {
     }
     emit(true);
     await _postPresence(online: true);
+    _reporter?.start();
   }
 
   Future<void> disconnect() async {
@@ -27,7 +32,14 @@ class DriverDutyCubit extends Cubit<bool> {
       return;
     }
     emit(false);
+    _reporter?.stop();
     await _postPresence(online: false);
+  }
+
+  @override
+  Future<void> close() {
+    _reporter?.stop();
+    return super.close();
   }
 
   Future<void> _postPresence({required bool online}) async {
@@ -37,9 +49,7 @@ class DriverDutyCubit extends Cubit<bool> {
       return;
     }
     try {
-      await setPresence(
-        SetPresenceParams(accessToken: token, online: online),
-      );
+      await setPresence(SetPresenceParams(accessToken: token, online: online));
     } catch (_) {
       // Soft-fail: local duty toggle remains authoritative for UI.
     }

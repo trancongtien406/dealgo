@@ -7,6 +7,9 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../domain/entities/ride_money.dart';
 import '../../domain/entities/ride_models.dart';
 import '../widgets/ride_widgets.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 class RideConfirmPage extends StatefulWidget {
   const RideConfirmPage({required this.args, super.key});
@@ -47,12 +50,12 @@ class _RideConfirmPageState extends State<RideConfirmPage> {
         body: SafeArea(
           child: Column(
             children: [
-              RideScreenHeader(title: 'Xác nhận chuyến xe', onBack: _back),
-              const Expanded(
+              DealGoAppHeader(title: AppLocalizations.of(context).rideConfirmTitle, onBack: _back),
+              Expanded(
                 child: Padding(
-                  padding: EdgeInsets.all(DealGoDimensions.pageGutter),
+                  padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
                   child: Text(
-                    'Máy chủ chưa trả giá đã chốt. Không hiển thị giá khách tự tính.',
+                    AppLocalizations.of(context).rideConfirmNoAgreed,
                   ),
                 ),
               ),
@@ -97,11 +100,7 @@ class _FareChanged extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            RideScreenHeader(
-              title: 'Xác nhận giá mới',
-              subtitle: 'DealGo · Biến thể trạng thái',
-              onBack: onBack,
-            ),
+            DealGoAppHeader(title: AppLocalizations.of(context).rideConfirmNewPrice, onBack: onBack),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(
@@ -111,19 +110,19 @@ class _FareChanged extends StatelessWidget {
                   DealGoSpacing.s16,
                 ),
                 children: [
-                  const RideStateHero(
-                    icon: Icons.priority_high,
+                  RideStateHero(
+                    icon: DealGoIcons.alert,
                     iconColor: DealGoColors.warning,
                     background: DealGoColors.amberSurface,
-                    title: 'Giá chuyến vừa thay đổi',
-                    message: 'Điều kiện chuyến thay đổi nên phiên báo giá cũ không còn hợp lệ. Bạn cần thấy rõ giá máy chủ đã chốt.',
+                    title: AppLocalizations.of(context).rideFareChangedTitle,
+                    message: AppLocalizations.of(context).rideFareChangedMessage,
                   ),
                   const SizedBox(height: DealGoSpacing.s16),
                   RidePanel(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const RideSectionTitle('Hành trình đang chọn'),
+                        RideSectionTitle(AppLocalizations.of(context).rideCurrentRoute),
                         const SizedBox(height: DealGoSpacing.s12),
                         RideStopList(
                           pickup: ride.pickup.label,
@@ -137,18 +136,18 @@ class _FareChanged extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const RideSectionTitle('So sánh hai phiên giá'),
+                        RideSectionTitle(AppLocalizations.of(context).rideCompareFares),
                         const SizedBox(height: DealGoSpacing.s8),
                         RideMoneyLine(
-                          label: 'Giá trên dòng bạn chọn',
+                          label: AppLocalizations.of(context).rideFareYouPicked,
                           amount: formatRideVnd(tappedAmountVnd),
                         ),
                         RideMoneyLine(
-                          label: 'Giá máy chủ đã chốt',
+                          label: AppLocalizations.of(context).rideAgreedFare,
                           amount: formatRideVnd(agreedFareVnd),
                         ),
                         RideMoneyLine(
-                          label: 'Chênh lệch',
+                          label: AppLocalizations.of(context).rideFareDifference,
                           amount: formatRideVndDelta(delta),
                           emphasize: true,
                         ),
@@ -156,8 +155,8 @@ class _FareChanged extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: DealGoSpacing.s12),
-                  const RideNote(
-                    message: 'Không tự đổi số tiền khách thanh toán. Giá hiệu lực là số máy chủ đã chốt.',
+                  RideNote(
+                    message: AppLocalizations.of(context).rideFareChangedNote,
                   ),
                 ],
               ),
@@ -173,7 +172,7 @@ class _FareChanged extends StatelessWidget {
                 children: [
                   Expanded(
                     child: DealGoSecondaryButton(
-                      label: 'Quay lại',
+                      label: AppLocalizations.of(context).actionBack,
                       onPressed: onBack,
                     ),
                   ),
@@ -181,7 +180,7 @@ class _FareChanged extends StatelessWidget {
                   Expanded(
                     child: DealGoPrimaryButton(
                       key: const Key('ride-ack-fare'),
-                      label: 'Đồng ý ${formatRideVnd(agreedFareVnd)}',
+                      label: AppLocalizations.of(context).rideAcceptAmount(formatRideVnd(agreedFareVnd)),
                       onPressed: onAccept,
                     ),
                   ),
@@ -208,14 +207,14 @@ class _Confirmed extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final driver = ride.assignedDriverId ?? 'Tài xế';
+    final driver = ride.assignedDriverId ?? AppLocalizations.of(context).kycRoleBadge;
     final initial = driver.isEmpty ? '?' : driver.substring(0, 1).toUpperCase();
     return Scaffold(
       backgroundColor: DealGoColors.canvas,
       body: SafeArea(
         child: Column(
           children: [
-            RideScreenHeader(title: 'Xác nhận chuyến xe', onBack: onBack),
+            DealGoAppHeader(title: AppLocalizations.of(context).rideConfirmTitle, onBack: onBack),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(
@@ -229,7 +228,7 @@ class _Confirmed extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const RideSectionTitle('Hành trình đã chọn'),
+                        RideSectionTitle(AppLocalizations.of(context).rideChosenRoute),
                         const SizedBox(height: DealGoSpacing.s12),
                         RideStopList(
                           pickup: ride.pickup.label,
@@ -263,7 +262,7 @@ class _Confirmed extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: Theme.of(context).textTheme.titleMedium,
                               ),
-                              const Text(rideVehicleLabel),
+                              Text(AppLocalizations.of(context).rideVehicleMotorbike),
                             ],
                           ),
                         ),
@@ -275,56 +274,64 @@ class _Confirmed extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const RideSectionTitle('Báo giá được chốt'),
+                        RideSectionTitle(AppLocalizations.of(context).rideOfferAgreed),
                         const SizedBox(height: DealGoSpacing.s8),
-                        const RideStatusChip(
-                          label: 'Còn hiệu lực',
+                        RideStatusChip(
+                          label: AppLocalizations.of(context).rideStillValid,
                           tone: RideChipTone.green,
                         ),
                         const SizedBox(height: DealGoSpacing.s8),
                         RideMoneyLine(
-                          label: 'Cước chuyến',
+                          label: AppLocalizations.of(context).rideFare,
                           amount: formatRideVnd(agreedFareVnd),
                         ),
+                        if (ride.discountVnd > 0)
+                          RideMoneyLine(
+                            label: AppLocalizations.of(context)
+                                .rideVoucherLine(ride.voucherCode ?? ''),
+                            amount: formatRideVnd(-ride.discountVnd),
+                          ),
                         RideMoneyLine(
                           key: const Key('ride-agreed-fare'),
-                          label: 'Khách thanh toán',
-                          amount: formatRideVnd(agreedFareVnd),
+                          label: AppLocalizations.of(context).rideCustomerPays,
+                          amount: formatRideVnd(
+                            rideCashAfterVoucher(agreedFareVnd, ride.discountVnd),
+                          ),
                           emphasize: true,
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: DealGoSpacing.s12),
-                  const RidePanel(
+                  RidePanel(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        RideSectionTitle('Phương thức thanh toán'),
-                        SizedBox(height: DealGoSpacing.s8),
+                        RideSectionTitle(AppLocalizations.of(context).ridePaymentMethod),
+                        const SizedBox(height: DealGoSpacing.s8),
                         Row(
                           children: [
-                            Icon(
-                              Icons.payments_outlined,
+                            const Icon(
+                              DealGoIcons.cash,
                               color: DealGoColors.brandGreen,
                             ),
-                            SizedBox(width: DealGoSpacing.s8),
+                            const SizedBox(width: DealGoSpacing.s8),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Tiền mặt',
-                                    style: TextStyle(
+                                    AppLocalizations.of(context).paymentHistoryCash,
+                                    style: const TextStyle(
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
-                                  Text('Chỉ thu tiền khi chuyến đi hoàn tất'),
+                                  Text(AppLocalizations.of(context).rideCashNote),
                                 ],
                               ),
                             ),
                             RideStatusChip(
-                              label: 'Đã chọn',
+                              label: AppLocalizations.of(context).commonSelected,
                               tone: RideChipTone.green,
                             ),
                           ],
@@ -333,8 +340,8 @@ class _Confirmed extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: DealGoSpacing.s12),
-                  const RideNote(
-                    message: 'Nếu giá thay đổi, DealGo yêu cầu bạn xem và xác nhận lại trước khi áp dụng.',
+                  RideNote(
+                    message: AppLocalizations.of(context).rideConfirmPriceNote,
                   ),
                 ],
               ),
@@ -347,7 +354,9 @@ class _Confirmed extends StatelessWidget {
                 DealGoSpacing.s12,
               ),
               child: DealGoPrimaryButton(
-                label: 'Đã ghi nhận ${formatRideVnd(agreedFareVnd)}',
+                label: AppLocalizations.of(context).rideRecordedAmount(
+                  formatRideVnd(rideCashAfterVoucher(agreedFareVnd, ride.discountVnd)),
+                ),
                 onPressed: onBack,
               ),
             ),

@@ -36,8 +36,15 @@ export function useApproveStoreMutation() {
 export function useRejectStoreMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
-      rejectStoreApplication(id, reason),
+    mutationFn: ({
+      id,
+      reason,
+      issues,
+    }: {
+      id: string;
+      reason: string;
+      issues?: Array<{ section: string; note: string }>;
+    }) => rejectStoreApplication(id, reason, issues ?? []),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: storeApprovalsQueryKey });
     },

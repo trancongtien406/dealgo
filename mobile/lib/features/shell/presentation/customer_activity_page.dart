@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/design_system/components/dealgo_banner.dart';
 import '../../../core/design_system/components/dealgo_card.dart';
+import '../../../core/design_system/components/dealgo_chip.dart';
+import '../../../core/design_system/components/dealgo_state_view.dart';
+import '../../../core/design_system/components/dealgo_skeleton.dart';
+import '../../../core/design_system/components/dealgo_refresh.dart';
 import '../../../core/design_system/components/dealgo_segmented_control.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../core/network/connectivity_service.dart';
+import '../../../core/network/request_failure.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../activity/domain/entities/history_models.dart';
 import '../../activity/domain/usecases/list_food_history.dart';
@@ -14,9 +18,13 @@ import '../../activity/domain/usecases/list_ride_history.dart';
 import '../../activity/presentation/cubit/activity_history_cubit.dart';
 import '../../identity/domain/entities/auth_state.dart';
 import '../../identity/presentation/cubit/auth_cubit.dart';
-import '../../identity/presentation/widgets/auth_widgets.dart';
 import '../../ride/domain/entities/ride_money.dart';
 import 'account_widgets.dart';
+import 'customer_tab_bar.dart';
+import '../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../core/format/date_time_format.dart';
+import '../../../core/format/short_ref.dart';
+import '../../../core/design_system/components/dealgo_app_header.dart';
 
 enum _ActivityFilter { all, rides, food, shopping }
 
@@ -54,39 +62,22 @@ class _CustomerActivityViewState extends State<_CustomerActivityView> {
     return ColoredBox(
       color: DealGoColors.canvas,
       child: SafeArea(
-        bottom: false,
+        bottom: dealGoSafeAreaBottom(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Material(
-              color: DealGoColors.card,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  DealGoSpacing.s8,
-                  DealGoSpacing.s8,
-                  DealGoDimensions.pageGutter,
-                  DealGoSpacing.s8,
-                ),
-                child: Row(
-                  children: [
-                    AuthBackButton(
-                      onPressed: () {
-                        if (context.canPop()) {
-                          context.pop();
-                        } else {
-                          context.go('/customer');
-                        }
-                      },
-                    ),
-                    const SizedBox(width: DealGoSpacing.s8),
-                    Expanded(
-                      child: Text(
-                        'Hoạt động của tôi',
-                        style: textTheme.titleMedium,
-                      ),
-                    ),
-                    const DealGoWordmark(),
-                  ],
+            DealGoAppHeader(
+              title: AppLocalizations.of(context).accountActivity,
+              showBack: false,
+              actions: BlocBuilder<ActivityHistoryCubit, ActivityHistoryState>(
+                builder: (context, state) => IconButton(
+                  key: const Key('activity-refresh'),
+                  tooltip: AppLocalizations.of(context).actionRefresh,
+                  onPressed: state.busy ? null : () => _reload(context),
+                  icon: const Icon(
+                    DealGoIcons.refresh,
+                    color: DealGoColors.text,
+                  ),
                 ),
               ),
             ),
@@ -97,8 +88,9 @@ class _CustomerActivityViewState extends State<_CustomerActivityView> {
                 if (snapshot.data ?? true) {
                   return const SizedBox.shrink();
                 }
-                return const Padding(
-                  padding: EdgeInsets.fromLTRB(
+                final l10n = AppLocalizations.of(context);
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(
                     DealGoDimensions.pageGutter,
                     DealGoSpacing.s8,
                     DealGoDimensions.pageGutter,
@@ -106,8 +98,8 @@ class _CustomerActivityViewState extends State<_CustomerActivityView> {
                   ),
                   child: DealGoBanner(
                     tone: DealGoBannerTone.offline,
-                    title: 'Bạn đang offline',
-                    message: 'Lịch sử hoạt động có thể chưa cập nhật.',
+                    title: l10n.bannerOfflineTitle,
+                    message: l10n.activityOfflineBody,
                   ),
                 );
               },
@@ -115,117 +107,90 @@ class _CustomerActivityViewState extends State<_CustomerActivityView> {
             Expanded(
               child: BlocBuilder<ActivityHistoryCubit, ActivityHistoryState>(
                 builder: (context, state) {
+                  final l10n = AppLocalizations.of(context);
                   final history = _visibleHistory(state);
-                  return ListView(
-                    padding: const EdgeInsets.fromLTRB(
-                      DealGoDimensions.pageGutter,
-                      DealGoSpacing.s16,
-                      DealGoDimensions.pageGutter,
-                      DealGoSpacing.s24,
-                    ),
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Hoạt động của bạn',
-                                  style: textTheme.titleMedium,
-                                ),
-                                Text(
-                                  'Theo dõi đơn hàng và chuyến đi',
-                                  style: textTheme.bodySmall,
-                                ),
-                              ],
+                  final initialLoad =
+                      state.busy && state.rides.isEmpty && state.food.isEmpty;
+                  return DealGoRefresh(
+                    onRefresh: () => _reload(context),
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.fromLTRB(
+                        DealGoDimensions.pageGutter,
+                        DealGoSpacing.s12,
+                        DealGoDimensions.pageGutter,
+                        customerShellBottomClearance(context),
+                      ),
+                      children: [
+                        DealGoSegmentedControl(
+                          value: _filter.name,
+                          scrollable: false,
+                          onChanged: (id) => setState(
+                            () => _filter = _ActivityFilter.values.firstWhere(
+                              (e) => e.name == id,
                             ),
                           ),
-                          IconButton(
-                            key: const Key('activity-refresh'),
-                            tooltip: 'Tải lại',
-                            onPressed: state.busy
-                                ? null
-                                : () {
-                                    final auth = context
-                                        .read<AuthCubit>()
-                                        .state;
-                                    final token = auth is AuthSignedIn
-                                        ? auth.tokens.accessToken
-                                        : null;
-                                    context.read<ActivityHistoryCubit>().load(
-                                      accessToken: token,
-                                    );
-                                  },
-                            icon: state.busy
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.refresh),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: DealGoSpacing.s12),
-                      Builder(
-                        builder: (context) {
-                          final l10n = AppLocalizations.of(context);
-                          return DealGoSegmentedControl(
-                            value: _filter.name,
-                            onChanged: (id) => setState(
-                              () => _filter = _ActivityFilter.values
-                                  .firstWhere((e) => e.name == id),
+                          items: [
+                            DealGoSegmentItem(id: 'all', label: l10n.filterAll),
+                            DealGoSegmentItem(
+                              id: 'rides',
+                              label: l10n.filterRides,
                             ),
-                            items: [
-                              DealGoSegmentItem(
-                                id: 'all',
-                                label: l10n.filterAll,
-                              ),
-                              DealGoSegmentItem(
-                                id: 'rides',
-                                label: l10n.filterRides,
-                              ),
-                              DealGoSegmentItem(
-                                id: 'food',
-                                label: l10n.filterFood,
-                              ),
-                              DealGoSegmentItem(
-                                id: 'shopping',
-                                label: l10n.filterShopping,
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      if (state is ActivityHistoryFailure) ...[
-                        const SizedBox(height: DealGoSpacing.s12),
-                        DealGoCard(child: Text(state.message)),
-                      ],
-                      const SizedBox(height: DealGoSpacing.s20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Lịch sử gần đây',
-                              style: textTheme.titleMedium,
+                            DealGoSegmentItem(
+                              id: 'food',
+                              label: l10n.filterFood,
                             ),
+                            DealGoSegmentItem(
+                              id: 'shopping',
+                              label: l10n.filterShopping,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: DealGoSpacing.s16),
+                        if (initialLoad)
+                          const DealGoSkeletonList(
+                            itemCount: 4,
+                            padding: EdgeInsets.zero,
+                          )
+                        else if (state is ActivityHistoryFailure &&
+                            history.isEmpty)
+                          DealGoStateView.failure(
+                            context,
+                            onRetry: () => _reload(context),
+                            cause: state.message.error,
+                            message: state.message.resolve(l10n),
+                            compact: true,
+                          )
+                        else if (history.isEmpty)
+                          DealGoStateView(
+                            art: DealGoStateArt.noOrders,
+                            title: l10n.activityEmptyTitle,
+                            message: l10n.activityEmptyBody,
+                            compact: true,
+                          )
+                        else ...[
+                          if (state is ActivityHistoryFailure) ...[
+                            DealGoBanner(
+                              tone: requestFailureKind(state.message.error) ==
+                                      RequestFailureKind.offline
+                                  ? DealGoBannerTone.offline
+                                  : DealGoBannerTone.warning,
+                              message: state.message.resolve(l10n),
+                            ),
+                            const SizedBox(height: DealGoSpacing.s12),
+                          ],
+                          Text(
+                            l10n.activityRecent,
+                            style: textTheme.titleMedium,
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: DealGoSpacing.s12),
-                      if (history.isEmpty)
-                        const DealGoCard(
-                          child: Text('Chưa có hoạt động trong nhóm này.'),
-                        )
-                      else
-                        for (final item in history) ...[
-                          _HistoryCard(item: item),
                           const SizedBox(height: DealGoSpacing.s12),
+                          for (final item in history) ...[
+                            _HistoryCard(item: item),
+                            const SizedBox(height: DealGoSpacing.s12),
+                          ],
                         ],
-                    ],
+                      ],
+                    ),
                   );
                 },
               ),
@@ -234,6 +199,12 @@ class _CustomerActivityViewState extends State<_CustomerActivityView> {
         ),
       ),
     );
+  }
+
+  Future<void> _reload(BuildContext context) {
+    final auth = context.read<AuthCubit>().state;
+    final token = auth is AuthSignedIn ? auth.tokens.accessToken : null;
+    return context.read<ActivityHistoryCubit>().load(accessToken: token);
   }
 
   List<HistoryItem> _visibleHistory(ActivityHistoryState state) {
@@ -264,11 +235,11 @@ class _HistoryCard extends StatelessWidget {
       child: Row(
         children: [
           AccountToneIcon(
-            icon: isRide ? Icons.two_wheeler : Icons.ramen_dining,
+            icon: isRide ? DealGoIcons.motorbike : DealGoIcons.food,
             background: isRide
                 ? DealGoColors.dangerSurface
-                : const Color(0xFFFFF4EA),
-            foreground: isRide ? DealGoColors.danger : const Color(0xFFEA580C),
+                : DealGoColors.amberSurface,
+            foreground: isRide ? DealGoColors.danger : DealGoColors.amber,
           ),
           const SizedBox(width: DealGoSpacing.s12),
           Expanded(
@@ -276,30 +247,23 @@ class _HistoryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.title,
+                  historyTitle(AppLocalizations.of(context), item),
                   style: textTheme.titleMedium?.copyWith(fontSize: 15),
                 ),
                 const SizedBox(height: 2),
-                Text(item.meta, style: textTheme.bodySmall),
+                Text(
+                  formatLocalDateTime(item.meta) ?? item.meta,
+                  style: textTheme.bodySmall,
+                ),
                 const SizedBox(height: DealGoSpacing.s4),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: DealGoColors.greenSurface,
-                    borderRadius: BorderRadius.circular(999),
+                DealGoChip(
+                  label: historyStatusLabel(
+                    AppLocalizations.of(context),
+                    item.status,
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: DealGoSpacing.s8,
-                      vertical: 2,
-                    ),
-                    child: Text(
-                      item.status.isEmpty ? '—' : item.status,
-                      style: textTheme.labelSmall?.copyWith(
-                        color: DealGoColors.brandGreen,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
+                  tone: historyStatusIsBad(item.status)
+                      ? DealGoChipTone.danger
+                      : DealGoChipTone.success,
                 ),
               ],
             ),
@@ -309,10 +273,46 @@ class _HistoryCard extends StatelessWidget {
             style: textTheme.titleMedium?.copyWith(
               color: DealGoColors.primary,
               fontSize: 15,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
       ),
     );
   }
+}
+
+bool historyStatusIsBad(String status) =>
+    const {'CANCELLED', 'EXPIRED', 'FAILED', 'REJECTED'}.contains(status);
+
+/// Maps backend ride/food status codes to customer-facing copy.
+/// The server title (destination or store name), or the short reference when it has none.
+String historyTitle(AppLocalizations l10n, HistoryItem item) {
+  if (item.title.isNotEmpty) {
+    return item.title;
+  }
+  return item.kind == HistoryKind.ride
+      ? l10n.rideRef(shortRef(item.id))
+      : l10n.orderRef(shortRef(item.id));
+}
+
+String historyStatusLabel(AppLocalizations l10n, String status) {
+  return switch (status) {
+    'COMPLETED' || 'DELIVERED' => l10n.statusCompleted,
+    'CANCELLED' => l10n.statusCancelled,
+    'EXPIRED' => l10n.statusExpired,
+    'FAILED' => l10n.statusFailed,
+    'REJECTED' => l10n.statusRejected,
+    'NEGOTIATING' || 'PLACED' => l10n.statusPending,
+    'ASSIGNED' ||
+    'DRIVER_EN_ROUTE' ||
+    'DRIVER_ARRIVED' ||
+    'IN_TRIP' ||
+    'ACCEPTED' ||
+    'PREPARING' ||
+    'READY' ||
+    'PICKED_UP' => l10n.statusInProgress,
+    '' => '—',
+    _ => l10n.statusInProgress,
+  };
 }

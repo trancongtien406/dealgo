@@ -6,6 +6,8 @@ import { PushModule } from '../../../integrations/push/index.js';
 import { RealtimeModule } from '../realtime/index.js';
 import { RideModule } from '../../ride/index.js';
 import { FoodModule } from '../../food-order/index.js';
+import { InboxModule } from '../inbox/index.js';
+import { AccountSettingsModule } from '../../account-settings/index.js';
 import { OutboxRelayService } from './outbox-relay.service.js';
 import { OUTBOX_REPOSITORY } from './outbox.constants.js';
 import { MemoryOutboxRepository, type OutboxRepository } from './outbox.repository.js';
@@ -18,6 +20,8 @@ import { PrismaOutboxRepository } from './outbox-prisma.repository.js';
     RealtimeModule,
     RideModule,
     FoodModule,
+    InboxModule,
+    AccountSettingsModule,
   ],
   providers: [
     OutboxRelayService,

@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/network/request_failure.dart';
+import '../../../../core/realtime/snapshot_binding.dart';
+import '../../../../core/realtime/snapshot_realtime.dart';
 import '../../../food/domain/entities/food_models.dart';
 import '../../domain/usecases/list_merchant_order_queue.dart';
 
@@ -23,27 +28,70 @@ final class MerchantQueueIneligible extends MerchantQueueState {
 }
 
 final class MerchantQueueFailed extends MerchantQueueState {
-  const MerchantQueueFailed({required this.saved, required this.syncedAt});
+  const MerchantQueueFailed({
+    required this.saved,
+    required this.syncedAt,
+    this.cause,
+  });
 
   final List<MerchantQueueOrder> saved;
   final DateTime? syncedAt;
+  final Object? cause;
 }
 
 class MerchantQueueCubit extends Cubit<MerchantQueueState> {
-  MerchantQueueCubit({required ListMerchantOrderQueue listMerchantOrderQueue})
-    : _listMerchantOrderQueue = listMerchantOrderQueue,
-      super(const MerchantQueueLoading());
+  MerchantQueueCubit({
+    required ListMerchantOrderQueue listMerchantOrderQueue,
+    this.realtime,
+  }) : _listMerchantOrderQueue = listMerchantOrderQueue,
+       super(const MerchantQueueLoading());
 
   final ListMerchantOrderQueue _listMerchantOrderQueue;
+  final SnapshotRealtime? realtime;
   var _generation = 0;
   DateTime? _syncedAt;
+  SnapshotBinding? _storeBinding;
+  String? Function()? _tokenSource;
+
+  void setTokenSource(String? Function() tokenSource) {
+    _tokenSource = tokenSource;
+  }
+
+  /// Subscribe to store:{id} for new/status events; REST reload on each hint.
+  Future<void> listenStore({
+    required String storeId,
+    required String? Function() tokenSource,
+  }) async {
+    _tokenSource = tokenSource;
+    final rt = realtime;
+    final token = tokenSource()?.trim() ?? '';
+    if (rt == null || token.isEmpty || storeId.isEmpty) {
+      return;
+    }
+    await _storeBinding?.stop();
+    final binding = SnapshotBinding(
+      realtime: rt,
+      room: StoreSnapshotRoom(storeId),
+      onInvalidate: () {
+        unawaited(load(tokenSource()));
+      },
+    );
+    _storeBinding = binding;
+    await binding.start(accessToken: token);
+  }
 
   Future<void> load(String? accessToken) async {
     final generation = ++_generation;
     final saved = _ordersOf(state);
     final token = accessToken?.trim() ?? '';
     if (token.isEmpty) {
-      emit(MerchantQueueFailed(saved: saved, syncedAt: _syncedAt));
+      emit(
+        MerchantQueueFailed(
+          saved: saved,
+          syncedAt: _syncedAt,
+          cause: sessionExpiredFailure,
+        ),
+      );
       return;
     }
     emit(const MerchantQueueLoading());
@@ -54,6 +102,12 @@ class MerchantQueueCubit extends Cubit<MerchantQueueState> {
       }
       _syncedAt = DateTime.now();
       emit(MerchantQueueReady(List.unmodifiable(queue)));
+      if (_storeBinding == null && queue.isNotEmpty && _tokenSource != null) {
+        await listenStore(
+          storeId: queue.first.storeId,
+          tokenSource: _tokenSource!,
+        );
+      }
     } on ApiException catch (error) {
       if (isClosed || generation != _generation) {
         return;
@@ -62,12 +116,12 @@ class MerchantQueueCubit extends Cubit<MerchantQueueState> {
         emit(const MerchantQueueIneligible());
         return;
       }
-      emit(MerchantQueueFailed(saved: saved, syncedAt: _syncedAt));
-    } catch (_) {
+      emit(MerchantQueueFailed(saved: saved, syncedAt: _syncedAt, cause: error));
+    } catch (error) {
       if (isClosed || generation != _generation) {
         return;
       }
-      emit(MerchantQueueFailed(saved: saved, syncedAt: _syncedAt));
+      emit(MerchantQueueFailed(saved: saved, syncedAt: _syncedAt, cause: error));
     }
   }
 
@@ -84,6 +138,13 @@ class MerchantQueueCubit extends Cubit<MerchantQueueState> {
         ]),
       ),
     );
+  }
+
+  @override
+  Future<void> close() async {
+    await _storeBinding?.stop();
+    _storeBinding = null;
+    return super.close();
   }
 }
 

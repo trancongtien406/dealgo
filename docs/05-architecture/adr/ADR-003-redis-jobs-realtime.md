@@ -15,6 +15,8 @@ related_decisions:
 
 `PROPOSED`.
 
+> Đã triển khai trong code (rà soát 2026-10-18): Redis, BullMQ worker (`backend/src/workers/`) và Socket.IO + Redis adapter. Trạng thái vẫn `PROPOSED` — chủ repo cần quyết định `ACCEPTED`/supersede.
+
 ## Context
 
 Cần khoá ngắn hạn, presence tài xế, rate limit, job nền (hết hạn offer, gửi thông báo) và đẩy trạng thái tới app. Kafka chưa có số liệu tải để biện minh.

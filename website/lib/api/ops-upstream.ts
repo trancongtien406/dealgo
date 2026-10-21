@@ -464,3 +464,73 @@ function publicErrorCode(payload: unknown): string | undefined {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
+
+export type OpsBinaryResult =
+  | { ok: true; body: ArrayBuffer; contentType: string; disposition: string | null }
+  | { ok: false; status: number; message: string };
+
+/** Content types the BFF will relay from upload downloads (anything else is refused). */
+const RELAYED_BINARY_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+]);
+
+/**
+ * Server-only GET of a binary Nest `/v1/ops/*` resource (KYC documents, ticket
+ * attachments). Uses the ops access cookie; on a missing/expired access token it
+ * refreshes once like fetchOpsUpstream. The body is relayed only for upload types.
+ */
+export async function fetchOpsUpstreamBinary(path: string): Promise<OpsBinaryResult> {
+  const baseUrl = nestApiBaseUrl();
+  if (!baseUrl) {
+    return { ok: false, status: 500, message: "Cấu hình API không hợp lệ." };
+  }
+  const jar = await cookies();
+  let token = jar.get(OPS_ACCESS_COOKIE)?.value;
+  const url = new URL(path.replace(/^\//, ""), `${baseUrl}/`);
+  const send = (accessToken: string) =>
+    fetch(url, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
+      redirect: "error",
+      signal: AbortSignal.timeout(20_000),
+    });
+  try {
+    if (!token) {
+      token = (await refreshFromCookie(baseUrl, jar))?.accessToken;
+    }
+    if (!token) {
+      return { ok: false, status: 401, message: "Chưa đăng nhập." };
+    }
+    let upstream = await send(token);
+    if (upstream.status === 401) {
+      const refreshed = await refreshFromCookie(baseUrl, jar);
+      if (refreshed) {
+        upstream = await send(refreshed.accessToken);
+      }
+    }
+    if (!upstream.ok) {
+      const payload: unknown = await upstream.json().catch(() => null);
+      return {
+        ok: false,
+        status: upstream.status,
+        message: publicUpstreamMessage(upstream.status, payload),
+      };
+    }
+    const contentType = (upstream.headers.get("content-type") ?? "").split(";")[0]!.trim();
+    if (!RELAYED_BINARY_TYPES.has(contentType)) {
+      return { ok: false, status: 502, message: "Phản hồi máy chủ không hợp lệ." };
+    }
+    return {
+      ok: true,
+      body: await upstream.arrayBuffer(),
+      contentType,
+      disposition: upstream.headers.get("content-disposition"),
+    };
+  } catch {
+    return { ok: false, status: 502, message: "Không thể kết nối máy chủ. Thử lại." };
+  }
+}

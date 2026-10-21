@@ -1,0 +1,48 @@
+import type { INestApplication } from '@nestjs/common';
+import { json, type RequestHandler } from 'express';
+import { UPLOAD_MAX_FILE_KB_CEILING } from '../settings/platform-settings.catalog.js';
+
+export const AVATAR_UPLOAD_PATH = '/v1/me/avatar';
+
+/** Merchant menu item photo upload (POST .../items/:id/image). */
+export const MENU_ITEM_IMAGE_JSON_LIMIT = '3mb';
+
+// UploadAvatarDto accepts up to 2,000,000 base64 characters; leave room for JSON framing.
+export const AVATAR_JSON_LIMIT = '3mb';
+
+/** Base64 length of one file at the highest UPLOAD_MAX_FILE_KB an admin can set. */
+export const UPLOAD_BASE64_MAX_CHARS = Math.ceil((UPLOAD_MAX_FILE_KB_CEILING * 1024 * 4) / 3) + 4;
+
+/** KYC/KYB submissions carry up to PARTNER_MAX_DOCUMENTS_PER_REQUEST files. */
+export const PARTNER_APPLICATION_PATH = '/v1/me/partner-applications';
+export const PARTNER_APPLICATION_JSON_LIMIT = '45mb';
+
+/** Ticket create/reply carry up to SUPPORT_MAX_ATTACHMENTS files. */
+export const SUPPORT_TICKET_UPLOAD_PATHS = ['/v1/support/tickets', '/v1/ops/support-tickets'];
+export const SUPPORT_TICKET_JSON_LIMIT = '24mb';
+
+/**
+ * Larger JSON limits for upload routes only; every other route keeps Nest's default
+ * (100kb). Must run before `app.init()`/`listen()` so it precedes the global parser,
+ * which then skips bodies that are already parsed. The per-file cap is enforced by
+ * DocumentStoreService from admin settings; these limits only bound memory.
+ */
+export function registerRouteBodyParsers(app: INestApplication): void {
+  app.use(AVATAR_UPLOAD_PATH, wrap(json({ limit: AVATAR_JSON_LIMIT })));
+  // Express path-to-regexp: menu item image upload under merchant catalog.
+  app.use(
+    '/v1/food/merchant/items/:itemId/image',
+    wrap(json({ limit: MENU_ITEM_IMAGE_JSON_LIMIT })),
+  );
+  app.use(PARTNER_APPLICATION_PATH, wrap(json({ limit: PARTNER_APPLICATION_JSON_LIMIT })));
+  const ticketParser = wrap(json({ limit: SUPPORT_TICKET_JSON_LIMIT }));
+  for (const path of SUPPORT_TICKET_UPLOAD_PATHS) {
+    app.use(path, ticketParser);
+  }
+}
+
+// Wrapped because Nest skips its global parser when a middleware named `jsonParser`
+// is already mounted, which would leave other routes without JSON parsing.
+function wrap(parser: RequestHandler): RequestHandler {
+  return (req, res, next) => parser(req, res, next);
+}

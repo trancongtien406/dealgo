@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/network/api_error_l10n.dart';
+import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/usecases/list_food_order_chat_messages.dart';
@@ -9,6 +10,7 @@ import '../../domain/usecases/list_ride_chat_messages.dart';
 import '../../domain/usecases/send_food_order_chat_message.dart';
 import '../../domain/usecases/send_ride_chat_message.dart';
 import '../cubit/chat_cubit.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
 
 Future<void> showTransactionChatSheet({
   required BuildContext context,
@@ -111,7 +113,7 @@ class _TransactionChatSheetState extends State<TransactionChatSheet> {
                   ),
                   IconButton(
                     onPressed: () => Navigator.of(context).maybePop(),
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(DealGoIcons.close),
                   ),
                 ],
               ),
@@ -126,9 +128,8 @@ class _TransactionChatSheetState extends State<TransactionChatSheet> {
                     context,
                     state.sendError!,
                   );
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text(message)));
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text(message)));
                   context.read<ChatCubit>().clearSendError();
                 },
                 builder: (context, state) {
@@ -141,10 +142,7 @@ class _TransactionChatSheetState extends State<TransactionChatSheet> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            localizedFailureMessage(
-                              context,
-                              state.loadError!,
-                            ),
+                            localizedFailureMessage(context, state.loadError!),
                           ),
                           const SizedBox(height: 12),
                           TextButton(
@@ -205,14 +203,12 @@ class _TransactionChatSheetState extends State<TransactionChatSheet> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: TextField(
+                      child: DealGoTextField(
+                        label: l10n.chatInputHint,
+                        showLabel: false,
+                        hint: l10n.chatInputHint,
                         controller: _controller,
-                        minLines: 1,
                         maxLines: 4,
-                        decoration: InputDecoration(
-                          hintText: l10n.chatInputHint,
-                          border: const OutlineInputBorder(),
-                        ),
                         textInputAction: TextInputAction.send,
                         onSubmitted: (_) => _send(),
                       ),
@@ -230,7 +226,7 @@ class _TransactionChatSheetState extends State<TransactionChatSheet> {
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : const Icon(Icons.send),
+                              : const Icon(DealGoIcons.send),
                         );
                       },
                     ),

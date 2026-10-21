@@ -174,9 +174,7 @@ export async function fetchSupportConfig(): Promise<SupportConfig> {
       if (res?.data) {
         return res.data;
       }
-    } catch {
-      // Fallback below
-    }
+    } catch {}
     return { ...publicSupportConfig };
   }
 
@@ -201,13 +199,9 @@ export async function fetchSupportConfig(): Promise<SupportConfig> {
         if (parsed && parsed.categories) {
           return parsed;
         }
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
-  } catch {
-    // fallback
-  }
+  } catch {}
 
   return { ...publicSupportConfig };
 }

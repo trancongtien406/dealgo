@@ -6,7 +6,10 @@ import {
   catalogStatusLabel,
   catalogStatusTone,
 } from "@/features/catalog/mappers";
-import { useCatalogCategoriesQuery } from "@/features/catalog/hooks";
+import {
+  useCatalogCategoriesQuery,
+  useRenameCatalogCategoryMutation,
+} from "@/features/catalog/hooks";
 import type { CatalogCategory } from "@/features/catalog/types";
 import { fetchCatalogModeration } from "@/features/catalog-moderation/api";
 import { OpsIcon } from "@/components/ui/ops-icons";
@@ -62,6 +65,7 @@ export function CatalogBoard() {
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [foodExpanded, setFoodExpanded] = useState(true);
 
+  const rename = useRenameCatalogCategoryMutation();
   const { data, isPending, isError, error, refetch } =
     useCatalogCategoriesQuery({
       page,
@@ -497,6 +501,17 @@ export function CatalogBoard() {
                                 setServiceFocus("food");
                                 setSelectedCode(row.code);
                               }}
+                              onRename={(target) => {
+                                const next = window.prompt(
+                                  "Tên ngành hàng mới",
+                                  target.name,
+                                );
+                                if (!next || next.trim() === target.name) return;
+                                rename.mutate({
+                                  code: target.code,
+                                  name: next.trim(),
+                                });
+                              }}
                             />
                           ))
                         )}
@@ -605,11 +620,13 @@ function CategoryRow({
   index,
   selected,
   onSelect,
+  onRename,
 }: {
   row: CatalogCategory;
   index: number;
   selected: boolean;
   onSelect: () => void;
+  onRename: (row: CatalogCategory) => void;
 }) {
   return (
     <AdminTableRow
@@ -636,13 +653,23 @@ function CategoryRow({
         </StatusChip>
       </AdminTableCell>
       <AdminTableCell onClick={(event) => event.stopPropagation()}>
-        <PreviewLink
-          href={`/stores?q=${encodeURIComponent(row.name)}`}
-          compact
-          tone="ghost"
-        >
-          Chi tiết
-        </PreviewLink>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className={`${focusRing} rounded-md px-2 py-1 text-xs font-medium text-brand hover:bg-brand/5`}
+            onClick={() => onRename(row)}
+            data-testid={`catalog-rename-${row.code}`}
+          >
+            Đổi tên
+          </button>
+          <PreviewLink
+            href={`/stores?q=${encodeURIComponent(row.name)}`}
+            compact
+            tone="ghost"
+          >
+            Chi tiết
+          </PreviewLink>
+        </div>
       </AdminTableCell>
     </AdminTableRow>
   );

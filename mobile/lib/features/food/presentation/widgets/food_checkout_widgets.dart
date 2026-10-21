@@ -3,17 +3,22 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/design_system/components/dealgo_bottom_bar.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/domain/phone_input.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
 import '../../domain/entities/food_models.dart';
 import '../../domain/entities/food_money.dart';
 import '../../domain/params/place_food_order_params.dart';
+import '../../../promotion/domain/entities/voucher_quote.dart';
+import '../../../promotion/presentation/widgets/voucher_field.dart';
 import '../cubit/food_cart_cubit.dart';
 import 'food_widgets.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
 
 class CheckoutBody extends StatelessWidget {
   const CheckoutBody({required this.phase, super.key});
@@ -56,7 +61,8 @@ class CheckoutActions extends StatelessWidget {
       CheckoutRejected() => _PlaceButton(onSubmit: onSubmit),
       CheckoutOffline() => _OfflineButtons(onRetry: onRetry),
       CheckoutRepriced(:final nextTotalVnd) => _RepriceButtons(
-        label: 'Đồng ý ${formatVnd(nextTotalVnd)}',
+        label: AppLocalizations.of(context)
+            .checkoutAcceptTotal(formatVnd(nextTotalVnd)),
         onAccept: onAccept,
       ),
       _ => null,
@@ -64,18 +70,7 @@ class CheckoutActions extends StatelessWidget {
     if (child == null || busy && phase is! CheckoutOffline) {
       return const SizedBox.shrink();
     }
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          DealGoDimensions.pageGutter,
-          DealGoSpacing.s12,
-          DealGoDimensions.pageGutter,
-          DealGoSpacing.s12,
-        ),
-        child: child,
-      ),
-    );
+    return DealGoBottomBar(child: child);
   }
 }
 
@@ -89,8 +84,9 @@ class _PlaceButton extends StatelessWidget {
     final cart = context.watch<FoodCartCubit>().state;
     return DealGoPrimaryButton(
       key: const Key('food-place-order'),
-      label: 'Đặt hàng · ${formatVnd(cart.previewTotalVnd)}',
-      trailingIcon: Icons.arrow_forward,
+      label: AppLocalizations.of(context)
+          .checkoutPlaceTotal(formatVnd(cart.previewTotalVnd)),
+      trailingIcon: DealGoIcons.arrowRight,
       enabled: cart.canCheckout,
       onPressed: () => onSubmit(),
     );
@@ -108,7 +104,7 @@ class _OfflineButtons extends StatelessWidget {
       children: [
         Expanded(
           child: DealGoSecondaryButton(
-            label: 'Quay về giỏ hàng',
+            label: AppLocalizations.of(context).checkoutBackToCart,
             onPressed: () => _leave(context),
           ),
         ),
@@ -116,7 +112,7 @@ class _OfflineButtons extends StatelessWidget {
         Expanded(
           child: DealGoPrimaryButton(
             key: const Key('food-retry-order'),
-            label: 'Thử đặt lại',
+            label: AppLocalizations.of(context).checkoutRetry,
             onPressed: onRetry,
           ),
         ),
@@ -137,7 +133,7 @@ class _RepriceButtons extends StatelessWidget {
       children: [
         Expanded(
           child: DealGoSecondaryButton(
-            label: 'Quay lại giỏ',
+            label: AppLocalizations.of(context).checkoutBackToCartShort,
             onPressed: () => _leave(context),
           ),
         ),
@@ -167,8 +163,9 @@ class _Receipt extends StatelessWidget {
   Widget build(BuildContext context) {
     final cart = context.watch<FoodCartCubit>().state;
     final subtotal = order?.subtotalVnd ?? cart.subtotalVnd;
-    final delivery = order?.deliveryFareVnd ?? cart.deliveryFareVnd;
+    final delivery = order?.deliveryFareVnd ?? cart.deliveryFareVnd ?? 0;
     final total = order?.totalVnd ?? cart.previewTotalVnd;
+    final discount = order?.discountVnd ?? cart.voucherDiscountVnd;
     final lines = order == null
         ? [
             for (final line in cart.lines)
@@ -177,6 +174,7 @@ class _Receipt extends StatelessWidget {
                 quantity: line.quantity,
                 unit: line.unitPriceVnd,
                 total: line.lineTotalVnd,
+                options: '',
               ),
           ]
         : [
@@ -186,13 +184,17 @@ class _Receipt extends StatelessWidget {
                 quantity: line.quantity,
                 unit: line.unitPriceVnd,
                 total: line.lineTotalVnd,
+                options: line.optionsSummary,
               ),
           ];
     final shownLines = lines.isEmpty && order == null ? lines : lines;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context);
     final profile = context.watch<AuthCubit>().state;
     final phone = profile is AuthSignedIn ? profile.profile.phone : null;
-    final recipient = phone == null ? 'Người nhận' : formatDisplayPhone(phone);
+    final recipient = phone == null
+        ? AppLocalizations.of(context).checkoutRecipient
+        : formatDisplayPhone(phone);
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         DealGoDimensions.pageGutter,
@@ -209,14 +211,17 @@ class _Receipt extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Người nhận và địa chỉ', style: textTheme.titleMedium),
+              Text(
+                AppLocalizations.of(context).checkoutRecipientAddress,
+                style: textTheme.titleMedium,
+              ),
               const SizedBox(height: DealGoSpacing.s12),
               Row(
                 children: [
                   const CircleAvatar(
                     radius: 20,
                     backgroundColor: DealGoColors.subtlePurple,
-                    child: Icon(Icons.person, color: DealGoColors.primary),
+                    child: Icon(DealGoIcons.user, color: DealGoColors.primary),
                   ),
                   const SizedBox(width: DealGoSpacing.s12),
                   Expanded(
@@ -244,7 +249,10 @@ class _Receipt extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Danh sách món', style: textTheme.titleMedium),
+              Text(
+                AppLocalizations.of(context).checkoutItems,
+                style: textTheme.titleMedium,
+              ),
               if ((cart.storeName ?? '').isNotEmpty) ...[
                 const SizedBox(height: DealGoSpacing.s8),
                 Text(
@@ -261,24 +269,63 @@ class _Receipt extends StatelessWidget {
                   quantity: line.quantity,
                   unitPriceVnd: line.unit,
                   lineTotalVnd: line.total,
+                  options: line.options,
                 ),
             ],
           ),
         ),
+        if (order == null && !placed) ...[
+          const SizedBox(height: DealGoSpacing.s16),
+          FoodPanel(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l10n.voucherLabel, style: textTheme.titleMedium),
+                const SizedBox(height: DealGoSpacing.s12),
+                VoucherField(
+                  service: VoucherService.food,
+                  orderAmountVnd: subtotal,
+                  deliveryFeeVnd: delivery,
+                  storeId: cart.storeId,
+                  accessToken: () => currentAccessToken(context),
+                  formatAmount: formatVnd,
+                  initialCode: cart.voucherCode,
+                  onQuote: (quote) =>
+                      context.read<FoodCartCubit>().applyVoucher(
+                        code: quote != null && quote.valid ? quote.code : null,
+                        discountVnd: quote?.discountVnd ?? 0,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: DealGoSpacing.s16),
         FoodPanel(
           color: DealGoColors.subtlePurple,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Tổng thanh toán', style: textTheme.titleMedium),
+              Text(
+                AppLocalizations.of(context).checkoutTotalSection,
+                style: textTheme.titleMedium,
+              ),
               const SizedBox(height: DealGoSpacing.s8),
-              FoodMoneyRow(label: 'Tiền món', amount: formatVnd(subtotal)),
-              FoodMoneyRow(label: 'Phí giao', amount: formatVnd(delivery)),
-              const FoodMoneyRow(label: 'Giảm giá', amount: '0đ'),
+              FoodMoneyRow(
+                label: AppLocalizations.of(context).checkoutSubtotal,
+                amount: formatVnd(subtotal),
+              ),
+              FoodMoneyRow(
+                label: AppLocalizations.of(context).checkoutDeliveryFee,
+                amount: formatVnd(delivery),
+              ),
+              FoodMoneyRow(
+                label: AppLocalizations.of(context).checkoutDiscount,
+                amount: discount > 0 ? '-${formatVnd(discount)}' : formatVnd(0),
+              ),
               const Divider(height: 24),
               FoodMoneyRow(
-                label: 'Tổng COD',
+                label: AppLocalizations.of(context).checkoutCodTotal,
                 amount: formatVnd(total),
                 emphasize: true,
               ),
@@ -290,21 +337,24 @@ class _Receipt extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Thanh toán', style: textTheme.titleMedium),
+              Text(
+                AppLocalizations.of(context).checkoutPayment,
+                style: textTheme.titleMedium,
+              ),
               const SizedBox(height: DealGoSpacing.s8),
-              const DecoratedBox(
-                decoration: BoxDecoration(
+              DecoratedBox(
+                decoration: const BoxDecoration(
                   color: DealGoColors.amberSurface,
                   borderRadius: BorderRadius.all(Radius.circular(999)),
                 ),
                 child: Padding(
-                  padding: EdgeInsets.symmetric(
+                  padding: const EdgeInsets.symmetric(
                     horizontal: DealGoSpacing.s12,
                     vertical: DealGoSpacing.s4,
                   ),
                   child: Text(
-                    'COD · Chưa thu tiền',
-                    style: TextStyle(
+                    AppLocalizations.of(context).checkoutCodUncollected,
+                    style: const TextStyle(
                       color: DealGoColors.warning,
                       fontWeight: FontWeight.w700,
                       fontSize: 13,
@@ -315,8 +365,8 @@ class _Receipt extends StatelessWidget {
               const SizedBox(height: DealGoSpacing.s8),
               Text(
                 placed
-                    ? 'Máy chủ đã ghi nhận đơn. Chưa thu COD.'
-                    : 'Không ghi thanh toán thành công tại bước đặt đơn.',
+                    ? AppLocalizations.of(context).checkoutPlacedNote
+                    : AppLocalizations.of(context).checkoutPayLaterNote,
                 style: textTheme.bodySmall,
               ),
             ],
@@ -341,20 +391,20 @@ class _SubmittingBody extends StatelessWidget {
         const SizedBox(height: DealGoSpacing.s24),
         const Center(
           child: FoodStateIcon(
-            icon: Icons.more_horiz,
+            icon: DealGoIcons.more,
             background: Color(0xFFE8F1FF),
             foreground: Color(0xFF2563EB),
           ),
         ),
         const SizedBox(height: DealGoSpacing.s16),
         Text(
-          'Đơn đang được xử lý',
+          AppLocalizations.of(context).checkoutProcessingTitle,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: DealGoSpacing.s8),
         Text(
-          'Đã gửi yêu cầu tạo đơn; đang chờ máy chủ xác nhận kết quả. Vui lòng không đặt lại.',
+          AppLocalizations.of(context).checkoutProcessingBody,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodySmall,
         ),
@@ -364,7 +414,7 @@ class _SubmittingBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Yêu cầu đang chờ',
+                AppLocalizations.of(context).checkoutPendingRequest,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: DealGoSpacing.s8),
@@ -389,18 +439,21 @@ class _SubmittingBody extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: DealGoSpacing.s12),
-              FoodMoneyRow(label: 'Giỏ hàng', amount: _draftCode(attempt)),
               FoodMoneyRow(
-                label: 'Số tiền dự kiến',
+                label: AppLocalizations.of(context).checkoutCartRef,
+                amount: _draftCode(attempt),
+              ),
+              FoodMoneyRow(
+                label: AppLocalizations.of(context).checkoutExpectedAmount,
                 amount: formatVnd(preview),
               ),
             ],
           ),
         ),
         const SizedBox(height: DealGoSpacing.s16),
-        const FoodNote(
+        FoodNote(
           tone: FoodNoteTone.amber,
-          message: 'Nút đặt hàng được khóa tạm thời. Retry tự động phải cùng idempotency key.',
+          message: AppLocalizations.of(context).checkoutLockedNote,
         ),
       ],
     );
@@ -420,20 +473,20 @@ class _OfflineBody extends StatelessWidget {
         const SizedBox(height: DealGoSpacing.s24),
         const Center(
           child: FoodStateIcon(
-            icon: Icons.wifi_off,
+            icon: DealGoIcons.offline,
             background: DealGoColors.dangerSurface,
             foreground: DealGoColors.danger,
           ),
         ),
         const SizedBox(height: DealGoSpacing.s16),
         Text(
-          'Bạn đang ngoại tuyến',
+          AppLocalizations.of(context).checkoutOfflineTitle,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: DealGoSpacing.s8),
         Text(
-          'Chưa thể gửi đơn đến hệ thống. Giỏ hàng vẫn được giữ trên thiết bị.',
+          AppLocalizations.of(context).checkoutOfflineBody,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodySmall,
         ),
@@ -443,24 +496,30 @@ class _OfflineBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Giỏ hàng chưa gửi',
+                AppLocalizations.of(context).checkoutUnsentCart,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: DealGoSpacing.s8),
-              FoodMoneyRow(label: 'Giỏ hàng', amount: _draftCode(attempt)),
               FoodMoneyRow(
-                label: 'Tổng dự kiến',
+                label: AppLocalizations.of(context).checkoutCartRef,
+                amount: _draftCode(attempt),
+              ),
+              FoodMoneyRow(
+                label: AppLocalizations.of(context).checkoutExpectedTotal,
                 amount: formatVnd(attempt.previewTotalVnd),
                 emphasize: true,
               ),
-              const FoodMoneyRow(label: 'Thanh toán', amount: 'COD · Chưa thu'),
+              FoodMoneyRow(
+                label: AppLocalizations.of(context).checkoutPayment,
+                amount: AppLocalizations.of(context).checkoutCodShort,
+              ),
             ],
           ),
         ),
         const SizedBox(height: DealGoSpacing.s16),
-        const FoodNote(
+        FoodNote(
           tone: FoodNoteTone.amber,
-          message: 'Không hiển thị mã đơn chính thức và không tạo đơn cho tới khi máy chủ xác nhận.',
+          message: AppLocalizations.of(context).checkoutOfflineNote,
         ),
       ],
     );
@@ -486,20 +545,20 @@ class _RepricedBody extends StatelessWidget {
         const SizedBox(height: DealGoSpacing.s24),
         const Center(
           child: FoodStateIcon(
-            icon: Icons.priority_high,
+            icon: DealGoIcons.alert,
             background: DealGoColors.warningSurface,
             foreground: DealGoColors.warning,
           ),
         ),
         const SizedBox(height: DealGoSpacing.s16),
         Text(
-          'Giá giỏ hàng đã thay đổi',
+          AppLocalizations.of(context).checkoutRepricedTitle,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: DealGoSpacing.s8),
         Text(
-          'Cửa hàng cập nhật giá hoặc phí giao, cần xác nhận lại tổng tiền trước khi gửi đơn.',
+          AppLocalizations.of(context).checkoutRepricedBody,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodySmall,
         ),
@@ -509,31 +568,31 @@ class _RepricedBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Đối chiếu thay đổi',
+                AppLocalizations.of(context).checkoutCompare,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: DealGoSpacing.s8),
               FoodMoneyRow(
-                label: 'Tổng giá trước',
+                label: AppLocalizations.of(context).checkoutPreviousTotal,
                 amount: formatVnd(phase.previousTotalVnd),
               ),
               if (serverSubtotal != null)
                 FoodMoneyRow(
-                  label: 'Tiền món',
+                  label: AppLocalizations.of(context).checkoutSubtotal,
                   amount: formatVnd(serverSubtotal),
                 ),
               if (serverDelivery != null && fareDelta != 0)
                 FoodMoneyRow(
-                  label: 'Phí giao tăng',
+                  label: AppLocalizations.of(context).checkoutDeliveryIncrease,
                   amount: formatVndDelta(fareDelta),
                 )
               else if (serverDelivery != null)
                 FoodMoneyRow(
-                  label: 'Phí giao',
+                  label: AppLocalizations.of(context).checkoutDeliveryFee,
                   amount: formatVnd(serverDelivery),
                 ),
               FoodMoneyRow(
-                label: 'Tổng giá mới',
+                label: AppLocalizations.of(context).checkoutNewTotal,
                 amount: formatVnd(serverTotal),
                 emphasize: true,
               ),
@@ -544,8 +603,8 @@ class _RepricedBody extends StatelessWidget {
         FoodNote(
           tone: FoodNoteTone.amber,
           message: order == null
-              ? 'Giỏ hàng là bản nháp; chỉ tạo đơn sau khi khách đồng ý phiên giá mới.'
-              : 'Máy chủ đã ghi nhận đơn theo giá mới. Chưa thu COD.',
+              ? AppLocalizations.of(context).checkoutRepricedDraftNote
+              : AppLocalizations.of(context).checkoutRepricedPlacedNote,
         ),
       ],
     );
@@ -562,27 +621,36 @@ class CheckoutHeldAttempt {
 
   factory CheckoutHeldAttempt.fromCart(FoodCartState cart, String token) {
     final storeId = cart.storeId;
-    if (storeId == null) {
-      throw StateError('Cart has no store');
+    if (storeId == null ||
+        cart.dropoffLat == null ||
+        cart.dropoffLng == null ||
+        cart.deliveryFareVnd == null) {
+      throw StateError('Cart is not ready for checkout');
     }
     return CheckoutHeldAttempt(
       subtotalVnd: cart.subtotalVnd,
       previewTotalVnd: cart.previewTotalVnd,
-      storeName: cart.storeName ?? 'Quán DealGo',
+      storeName: cart.storeName ?? '',
       request: PlaceFoodRequest(
         accessToken: token,
         idempotencyKey: cart.idempotencyKey,
         storeId: storeId,
         items: [
           for (final line in cart.lines)
-            FoodOrderItem(itemId: line.placeItemId, quantity: line.quantity),
+            FoodOrderItem(
+              itemId: line.placeItemId,
+              quantity: line.quantity,
+              optionIds: line.optionIds,
+            ),
         ],
         dropoff: FoodDropoff(
-          lat: cart.dropoffLat,
-          lng: cart.dropoffLng,
+          lat: cart.dropoffLat!,
+          lng: cart.dropoffLng!,
           label: cart.dropoffLabel.trim(),
         ),
-        deliveryFareVnd: cart.deliveryFareVnd,
+        // Display quote only; the server recomputes the fee at placement.
+        deliveryFareVnd: cart.deliveryFareVnd!,
+        voucherCode: cart.voucherCode,
       ),
     );
   }
@@ -599,18 +667,23 @@ int foodCatalogSubtotal(FoodCartState cart, FoodStoreDetail store) {
   for (final line in cart.lines) {
     final item = byId[line.placeItemId];
     if (item != null && item.available) {
-      subtotal += item.priceVnd * line.quantity;
+      final delta = foodOptionDelta(item.optionGroups, line.optionIds) ?? 0;
+      subtotal += (item.priceVnd + delta) * line.quantity;
     }
   }
   return subtotal;
 }
 
-CheckoutPhase checkoutFailurePhase(Object error, CheckoutHeldAttempt attempt) {
+CheckoutPhase checkoutFailurePhase(
+  Object error,
+  CheckoutHeldAttempt attempt,
+  AppLocalizations l10n,
+) {
   if (_unreachable(error)) {
     return CheckoutOffline(attempt);
   }
   if (error is ApiException) {
-    return CheckoutRejected(_messageFor(error));
+    return CheckoutRejected(_messageFor(error, l10n));
   }
   return CheckoutOffline(attempt);
 }
@@ -622,14 +695,17 @@ bool _unreachable(Object error) {
   return true;
 }
 
-String _messageFor(ApiException error) {
-  return switch (error.errorCode) {
-    'FOOD_ORDER_ALREADY_OPEN' => 'Bạn đang có một đơn đồ ăn chưa kết thúc.',
-    'FOOD_ITEM_UNAVAILABLE' => 'Một món vừa hết. Hãy chọn lại thực đơn.',
-    'FOOD_DELIVERY_FARE_OUT_OF_RANGE' =>
-      'Phí giao phải từ 5.000đ đến 100.000đ.',
-    'FOOD_STORE_NOT_FOUND' => 'Không tìm thấy cửa hàng.',
-    _ => 'Không gửi được đơn. Giỏ hàng vẫn còn trên máy.',
+String _messageFor(ApiException error, AppLocalizations l10n) {
+  final code = error.errorCode;
+  if (code.startsWith('VOUCHER_')) {
+    return l10n.checkoutVoucherRejected;
+  }
+  return switch (code) {
+    'FOOD_ORDER_ALREADY_OPEN' => l10n.checkoutErrOrderOpen,
+    'FOOD_ITEM_UNAVAILABLE' => l10n.checkoutErrItemUnavailable,
+    'FOOD_DELIVERY_FARE_OUT_OF_RANGE' => l10n.checkoutErrFareRange,
+    'FOOD_STORE_NOT_FOUND' => l10n.checkoutErrStoreNotFound,
+    _ => l10n.checkoutErrGeneric,
   };
 }
 

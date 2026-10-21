@@ -18,7 +18,7 @@ Future<T?> showDealGoSheet<T>({
     barrierColor: Colors.black.withValues(alpha: reduce ? 0.45 : 0.32),
     sheetAnimationStyle: reduce
         ? AnimationStyle.noAnimation
-        : AnimationStyle(
+        : const AnimationStyle(
             duration: DealGoMotion.medium,
             reverseDuration: DealGoMotion.fast,
             curve: DealGoMotion.standard,

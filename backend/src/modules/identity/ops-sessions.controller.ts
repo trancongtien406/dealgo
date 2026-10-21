@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Headers, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Headers, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import type { AppEnv } from '../../platform/config/env.js';
@@ -6,6 +7,7 @@ import { OpsLoginDto } from './auth.dto.js';
 import { accessSecret, verifyAccessToken } from '../../platform/security/token-crypto.js';
 import { OpsAuthService } from './ops-auth.service.js';
 import { SessionService } from './session.service.js';
+import { OPS_LOGIN_LIMIT, OPS_LOGIN_WINDOW_MS, OpsLoginThrottlerGuard } from './ops-login-throttler.guard.js';
 
 @ApiTags('identity')
 @Controller('v1/ops')
@@ -18,7 +20,9 @@ export class OpsSessionsController {
 
   @Post('sessions')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Ops email/password login' })
+  @UseGuards(OpsLoginThrottlerGuard)
+  @Throttle({ default: { limit: OPS_LOGIN_LIMIT, ttl: OPS_LOGIN_WINDOW_MS } })
+  @ApiOperation({ summary: 'Ops email/password login (5 attempts per email per 5 minutes)' })
   login(@Body() body: OpsLoginDto) {
     return this.opsAuth.login(body.email, body.password);
   }

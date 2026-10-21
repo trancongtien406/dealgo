@@ -1,3 +1,4 @@
+import 'package:dealgo/features/pricing/data/pricing_remote_datasource.dart';
 import 'package:dealgo/features/food/data/datasources/dio_food_remote_datasource.dart';
 import 'package:dealgo/features/food/data/datasources/food_remote_datasource.dart';
 import 'package:dealgo/features/food/data/models/place_food_order_body.dart';
@@ -17,9 +18,9 @@ const _bunId = 'item-bun';
 
 void main() {
   test(
-    'store list reads the array payload and orders keep server subtotal',
+    'store list reads array or items payload and orders keep server subtotal',
     () {
-      final stores = decodeFoodStoreList({
+      final legacy = decodeFoodStoreList({
         'success': true,
         'statusCode': 200,
         'message': 'OK',
@@ -27,7 +28,25 @@ void main() {
           {'id': _storeId, 'name': 'Bún Bò Huế', 'ownerId': 'owner'},
         ],
       });
-      expect(stores.single.name, 'Bún Bò Huế');
+      expect(legacy.single.name, 'Bún Bò Huế');
+
+      final paged = decodeFoodStoreList({
+        'success': true,
+        'statusCode': 200,
+        'message': 'OK',
+        'data': {
+          'items': [
+            {
+              'id': _storeId,
+              'name': 'Bún Bò Huế',
+              'ownerId': 'owner',
+              'distanceKm': 1.2,
+            },
+          ],
+        },
+      });
+      expect(paged.single.name, 'Bún Bò Huế');
+      expect(paged.single.distanceKm, 1.2);
 
       final order = decodePlacedFoodOrder({
         'success': true,
@@ -154,7 +173,10 @@ void main() {
     expect(food.placeCalls, hasLength(1));
     final request = food.placeCalls.single;
     expect(request.deliveryFareVnd, 25000);
-    expect(PlaceFoodOrderBody.fromParams(request).toJson().containsKey('totalVnd'), isFalse);
+    expect(
+      PlaceFoodOrderBody.fromParams(request).toJson().containsKey('totalVnd'),
+      isFalse,
+    );
     expect(request.idempotencyKey.length, inInclusiveRange(8, 200));
     expect(request.items.single.quantity, 1);
   });
@@ -227,7 +249,12 @@ FakeFoodClient _catalogClient() {
 }
 
 Future<void> _openCheckout(WidgetTester tester, FakeFoodClient food) async {
-  await pumpSignedIn(tester, profile: customerProfile, foodClient: food);
+  await pumpSignedIn(
+    tester,
+    profile: customerProfile,
+    foodClient: food,
+    pricing: FakePricingRemoteDataSource(deliveryFareVnd: 25000),
+  );
   await tester.tap(navLabel('Mua hàng'));
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const Key('food-store-card-$_storeId')));
@@ -241,6 +268,7 @@ Future<void> _openCheckout(WidgetTester tester, FakeFoodClient food) async {
   }
   await tester.tap(find.text('Xem giỏ hàng'));
   await tester.pumpAndSettle();
+  await chooseDeliveryAddress(tester);
   await tester.tap(find.text('Tiếp tục thanh toán'));
   await tester.pumpAndSettle();
   expect(find.text('60.000đ'), findsWidgets);

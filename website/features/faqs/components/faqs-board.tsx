@@ -16,8 +16,13 @@ import {
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/components/ui/toast";
 import { useFaqsQuery, usePatchFaqMutation } from "@/features/faqs/hooks";
-import { faqCategoryLabel, faqStatusLabel } from "@/features/faqs/mappers";
-import type { FaqRow, FaqStatus } from "@/features/faqs/types";
+import {
+  FAQ_AUDIENCE_OPTIONS,
+  faqAudienceLabel,
+  faqCategoryLabel,
+  faqStatusLabel,
+} from "@/features/faqs/mappers";
+import type { FaqAudience, FaqRow, FaqStatus } from "@/features/faqs/types";
 import { FAQ_FILTER_TABS } from "@/features/faqs/constants";
 import { ApiError, isForbiddenError } from "@/lib/api/errors";
 
@@ -30,6 +35,7 @@ export function FaqsBoard() {
   const patchMutation = usePatchFaqMutation();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [answer, setAnswer] = useState("");
+  const [audience, setAudience] = useState<FaqAudience>("INTERNAL");
   const [reason, setReason] = useState("");
   const [banner, setBanner] = useState<string | null>(null);
   const [confirmPublish, setConfirmPublish] = useState(false);
@@ -40,6 +46,7 @@ export function FaqsBoard() {
     setConfirmPublish(false);
     setActiveId(row.id);
     setAnswer(row.suggestedAnswer);
+    setAudience(row.audience);
     setReason("");
   };
 
@@ -57,6 +64,7 @@ export function FaqsBoard() {
       {
         id: activeId,
         suggestedAnswer: answer,
+        audience,
         status,
         reason: trimmedReason,
       },
@@ -65,7 +73,11 @@ export function FaqsBoard() {
           setActiveId(null);
           setConfirmPublish(false);
           toast.success(
-            status === "PUBLISHED" ? "Đã xuất bản FAQ nội bộ." : "Đã lưu FAQ.",
+            status === "PUBLISHED"
+              ? audience === "INTERNAL"
+                ? "Đã xuất bản FAQ nội bộ."
+                : "Đã xuất bản FAQ lên trợ giúp trong app."
+              : "Đã lưu FAQ.",
           );
         },
         onError: (error) => {
@@ -111,29 +123,35 @@ export function FaqsBoard() {
       <ConfirmDialog
         open={confirmPublish}
         title="Xác nhận xuất bản FAQ"
-        description="Nội dung câu hỏi và câu trả lời sẽ được cập nhật công khai trên trung tâm trợ giúp."
+        description={
+          audience === "INTERNAL"
+            ? "FAQ nội bộ chỉ nhân viên vận hành thấy."
+            : `Câu hỏi và câu trả lời sẽ hiện công khai trong mục Trợ giúp của app cho: ${faqAudienceLabel(audience)}.`
+        }
         confirmLabel="Xuất bản"
         tone="brand"
         pending={patchMutation.isPending}
         onClose={() => setConfirmPublish(false)}
         onConfirm={() => save("PUBLISHED")}
       />
-      <div className="flex flex-wrap gap-2">
-        {FAQ_FILTER_TABS.map((tab) => (
-          <button
-            key={tab.value}
-            type="button"
-            className={`h-9 rounded-full border px-3 text-sm font-medium ${
-              filter === tab.value
-                ? "border-brand bg-brand/10 text-brand"
-                : "border-border bg-white text-ink"
-            } ${focusRing}`}
-            onClick={() => setFilter(tab.value)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <section className="min-w-0 rounded-2xl border border-border bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap gap-2">
+          {FAQ_FILTER_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              className={`h-9 rounded-full border px-3 text-sm font-medium ${
+                filter === tab.value
+                  ? "border-brand bg-brand/10 text-brand"
+                  : "border-border bg-white text-ink"
+              } ${focusRing}`}
+              onClick={() => setFilter(tab.value)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </section>
       {banner ? (
         <p
           className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger"
@@ -206,6 +224,7 @@ export function FaqsBoard() {
                       <StatusChip tone="brand">{row.openId}</StatusChip>
                     ) : null}
                     <QuietChip>{faqCategoryLabel(row.category)}</QuietChip>
+                    <QuietChip>{faqAudienceLabel(row.audience)}</QuietChip>
                     <StatusChip
                       tone={row.status === "PUBLISHED" ? "success" : "food"}
                     >
@@ -241,6 +260,22 @@ export function FaqsBoard() {
             <h2 className="text-lg font-semibold text-ink">
               Sửa câu trả lời gợi ý
             </h2>
+            <label className="block text-sm font-medium text-ink">
+              Hiển thị cho
+              <select
+                value={audience}
+                onChange={(event) =>
+                  setAudience(event.target.value as FaqAudience)
+                }
+                className={`mt-1 block h-10 w-full rounded-xl border border-border bg-white px-3 text-sm ${focusRing}`}
+              >
+                {FAQ_AUDIENCE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <textarea
               value={answer}
               onChange={(event) => setAnswer(event.target.value)}
@@ -277,7 +312,9 @@ export function FaqsBoard() {
                 disabled={patchMutation.isPending}
                 onClick={requestPublish}
               >
-                Xuất bản nội bộ
+                {audience === "INTERNAL"
+                  ? "Xuất bản nội bộ"
+                  : "Xuất bản lên app"}
               </button>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/network/request_failure.dart';
 import '../../../../core/realtime/snapshot_binding.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
 import '../../domain/entities/ride_models.dart';
@@ -34,13 +35,15 @@ final class RideTrackingReady extends RideTrackingState {
 }
 
 final class RideTrackingOffline extends RideTrackingState {
-  const RideTrackingOffline({this.ride, this.busy = false});
+  const RideTrackingOffline({this.ride, this.busy = false, this.cause});
 
   @override
   final RideView? ride;
 
   @override
   final bool busy;
+
+  final Object? cause;
 }
 
 /// Owns snapshot subscription; invalidate always refreshes via REST GET.
@@ -86,7 +89,9 @@ class RideTrackingCubit extends Cubit<RideTrackingState> {
       return;
     }
     if (token == null || token.isEmpty) {
-      emit(RideTrackingOffline(ride: state.ride));
+      emit(
+        RideTrackingOffline(ride: state.ride, cause: sessionExpiredFailure),
+      );
       return;
     }
     _inFlight = true;
@@ -104,11 +109,11 @@ class RideTrackingCubit extends Cubit<RideTrackingState> {
         return;
       }
       emit(RideTrackingReady(ride));
-    } catch (_) {
+    } catch (error) {
       if (isClosed) {
         return;
       }
-      emit(RideTrackingOffline(ride: previous));
+      emit(RideTrackingOffline(ride: previous, cause: error));
     } finally {
       _inFlight = false;
     }

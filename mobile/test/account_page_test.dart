@@ -1,6 +1,8 @@
 import 'package:dealgo/features/identity/domain/entities/user_profile.dart';
-import 'package:flutter/widgets.dart';
+import 'package:dealgo/features/places/data/places_remote_datasource.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 import 'support/auth_test_harness.dart';
 import 'support/fake_identity_client.dart';
@@ -27,8 +29,9 @@ void main() {
 
     await tester.tap(find.text('Ưu đãi của tôi'));
     await tester.pumpAndSettle();
-    expect(find.text('+84911111111'), findsOneWidget);
-    expect(navLabel('Tài khoản'), findsOneWidget);
+    // Real voucher list (fake promotion client seeds DEALGO10).
+    expect(find.byKey(const Key('voucher-DEALGO10')), findsOneWidget);
+    expect(find.text('Giảm 10%, tối đa 20.000đ'), findsOneWidget);
   });
 
   testWidgets('merchant account tab shows the shop role', (tester) async {
@@ -51,9 +54,7 @@ void main() {
     expect(find.text('Khách hàng'), findsNothing);
   });
 
-  testWidgets('opening addresses shows the saved-address title', (
-    tester,
-  ) async {
+  testWidgets('opening addresses shows the empty address book', (tester) async {
     await pumpSignedIn(tester, profile: customerProfile);
     await tester.tap(navLabel('Tài khoản'));
     await tester.pumpAndSettle();
@@ -61,50 +62,54 @@ void main() {
     await tester.tap(find.text('Địa chỉ đã lưu'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Địa chỉ của tôi'), findsOneWidget);
     expect(find.text('Địa chỉ đã lưu'), findsWidgets);
-
-    await tester.enterText(
-      find.byKey(const Key('address-label-field')),
-      'Nhà riêng',
-    );
-    await tester.tap(find.byKey(const Key('address-label-add')));
-    await tester.pump();
-    await tester.enterText(
-      find.byKey(const Key('address-label-field')),
-      'Công ty',
-    );
-    await tester.tap(find.byKey(const Key('address-label-add')));
-    await tester.pump();
-
-    expect(find.byKey(const Key('saved-label-0')), findsOneWidget);
-    expect(find.byKey(const Key('saved-label-1')), findsOneWidget);
-    expect(find.text('Nhà riêng'), findsOneWidget);
-    expect(find.text('Công ty'), findsOneWidget);
-    expect(find.byKey(const Key('address-label-field')), findsNothing);
-    expect(find.text('Đã lưu'), findsNothing);
+    expect(find.text('Chưa có địa chỉ nào'), findsOneWidget);
+    expect(find.byKey(const Key('address-add')), findsOneWidget);
   });
 
   testWidgets('an empty place search shows the empty copy', (tester) async {
-    await pumpSignedIn(tester, profile: customerProfile);
-    await tester.tap(navLabel('Tài khoản'));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Địa chỉ đã lưu'));
-    await tester.tap(find.text('Địa chỉ đã lưu'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Thêm địa chỉ mới'));
+    await pumpSignedIn(
+      tester,
+      profile: customerProfile,
+      places: FakePlacesRemoteDataSource(
+        catalog: FakePlacesRemoteDataSource.sampleCatalog,
+      ),
+    );
+    GoRouter.of(tester.element(find.byType(Scaffold).first))
+        .push('/customer/places/pick');
     await tester.pumpAndSettle();
 
-    expect(find.text('Tìm kiếm địa điểm'), findsOneWidget);
+    expect(find.text('Vị trí hiện tại của bạn'), findsOneWidget);
     await tester.enterText(
       find.byKey(const Key('place-search-field')),
       'Đà Nẵng, đường không tồn tại 9999',
     );
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
 
     expect(find.text('Không tìm thấy địa điểm'), findsOneWidget);
-    expect(find.text('Đà Nẵng, đường không tồn tại 9999'), findsOneWidget);
-    expect(find.text('Sân bay Quốc tế Đà Nẵng'), findsNothing);
+    expect(find.text('Cầu Rồng'), findsNothing);
+  });
+
+  testWidgets('place search reports an unavailable provider', (tester) async {
+    await pumpSignedIn(
+      tester,
+      profile: customerProfile,
+      places: FakePlacesRemoteDataSource(available: false),
+    );
+    GoRouter.of(tester.element(find.byType(Scaffold).first))
+        .push('/customer/places/pick');
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('place-search-field')), 'cầu');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Tìm kiếm địa điểm đang tạm ngưng. Hãy dùng vị trí hiện tại hoặc địa chỉ đã lưu.',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('help center shows the support title', (tester) async {
@@ -127,8 +132,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Thông báo'), findsOneWidget);
-    expect(find.text('Tài xế đã đến gần bạn'), findsOneWidget);
-    expect(find.text('Đã đánh dấu đã đọc'), findsNothing);
+    // Test overrides use an empty inbox: no hardcoded samples leak in.
+    expect(find.text('Chưa có thông báo'), findsOneWidget);
+    expect(find.text('Tài xế đã đến gần bạn'), findsNothing);
   });
 }
 

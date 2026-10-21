@@ -1,3 +1,4 @@
+import { enrichOpsFoodOrderPayload } from "@/lib/api/ops-people";
 import { fetchOpsUpstream } from "@/lib/api/ops-upstream";
 import {
   jsonFromOpsUpstream,
@@ -39,5 +40,11 @@ export async function GET(request: Request) {
     path: "/v1/ops/food-orders",
     searchParams: upstreamParams,
   });
+  if (result.ok) {
+    return jsonFromOpsUpstream({
+      ...result,
+      data: await enrichOpsFoodOrderPayload(result.data),
+    });
+  }
   return jsonFromOpsUpstream(result);
 }

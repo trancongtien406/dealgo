@@ -15,7 +15,6 @@ import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import {
   CurrentActor,
-  OpsSessionGuard,
   type RequestActor,
 } from '../identity/access-auth.guard.js';
 import {
@@ -24,6 +23,8 @@ import {
   PatchOpsZoneDto,
 } from './service-zones.dto.js';
 import { OpsZonesService } from './service-zones.service.js';
+import { OpsPermissionGuard } from '../identity/ops-rbac/ops-permission.guard.js';
+import { RequireOpsPermission } from '../identity/ops-rbac/ops-permission.decorator.js';
 
 class OpsZonesRulesQueryDto {
   @IsOptional()
@@ -47,7 +48,7 @@ class OpsZonesRulesQueryDto {
 @ApiTags('ops')
 @ApiBearerAuth()
 @Controller('v1/ops/zones')
-@UseGuards(OpsSessionGuard)
+@UseGuards(OpsPermissionGuard)
 export class OpsZonesController {
   constructor(private readonly zones: OpsZonesService) {}
 
@@ -60,6 +61,7 @@ export class OpsZonesController {
     return this.zones.listZones({ status: query.status });
   }
 
+  @RequireOpsPermission('zones.write')
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
@@ -70,6 +72,7 @@ export class OpsZonesController {
     return this.zones.createZone(body, actor.userId);
   }
 
+  @RequireOpsPermission('zones.write')
   @Patch(':code')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

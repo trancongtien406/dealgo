@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import type { AppEnv } from '../../platform/config/env.js';
 import { authError } from './auth-error.js';
 import { AuthMethodPolicyService } from './auth-method-policy.service.js';
+import { ensureActiveCustomerGrant } from './customer-grant.js';
 import { IDENTITY_REPOSITORY, MAX_PHONE_ATTEMPTS, PHONE_CHALLENGE_TTL_MS, SMS_SENDER } from './identity.constants.js';
 import { UniqueConflictError, type IdentityRepository, type UserRecord } from './identity.repository.js';
 import { normalizePhone } from './phone-number.js';
@@ -27,11 +28,12 @@ export class PhoneAuthService {
       throw authError(400, 'VALIDATION_ERROR', 'Phone must be a valid E.164 number');
     }
 
-    const user = await this.findOrCreateByPhone(phone);
+    // Unknown phones get no user row until the OTP proves ownership (see verify).
+    const existing = await this.repository.findUserByPhone(phone);
     const code = randomOtpCode();
     const expiresAt = new Date(Date.now() + PHONE_CHALLENGE_TTL_MS);
     const challenge = await this.repository.createPhoneChallenge({
-      userId: user.id,
+      userId: existing?.id ?? null,
       phone,
       codeHash: hashOneTimeSecret(code, this.pepper()),
       expiresAt,
@@ -67,7 +69,18 @@ export class PhoneAuthService {
       throw authError(401, 'AUTH_CODE_INVALID', 'Verification code is invalid');
     }
 
-    const user = await this.repository.markPhoneVerified(challenge.userId, new Date());
+    const owner = challenge.userId
+      ? await this.repository.findUserById(challenge.userId)
+      : await this.findOrCreateByPhone(challenge.phone);
+    if (!owner) {
+      throw authError(401, 'AUTH_CODE_INVALID', 'Verification code is invalid');
+    }
+    // First successful OTP completes sign-up, including accounts left unverified by
+    // the former flow that created the user at challenge time.
+    if (!owner.phoneVerifiedAt) {
+      await ensureActiveCustomerGrant(this.repository, owner.id);
+    }
+    const user = await this.repository.markPhoneVerified(owner.id, new Date());
     return this.sessions.issue(user, 'customer');
   }
 
