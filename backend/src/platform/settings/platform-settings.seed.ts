@@ -73,7 +73,7 @@ export const PLATFORM_SETTING_SEED_DEFAULTS: Readonly<Partial<Record<PlatformSet
     // (DEC-PROD-061) Negotiation rounds, cancellations, push, food cash model.
     RIDE_MAX_LIVE_OFFERS_PER_RIDE: '0',
     RIDE_MAX_FARE_RAISES_PER_RIDE: '3',
-    // (DEC-PROD-035 r25) One cached route per phase; throttled deviation re-route only.
+    // (DEC-PROD-035) One cached route per phase; throttled deviation re-route only.
     ROUTE_OFF_ROUTE_THRESHOLD_M: '150',
     ROUTE_REROUTE_MIN_INTERVAL_SECONDS: '120',
     CUSTOMER_CANCEL_LIMIT_COUNT: '3',
@@ -82,7 +82,7 @@ export const PLATFORM_SETTING_SEED_DEFAULTS: Readonly<Partial<Record<PlatformSet
     DRIVER_CANCEL_RATE_WINDOW_DAYS: '7',
     DRIVER_CANCEL_RATE_WARN_PERCENT: '20',
     RIDE_REQUEST_PUSH_ENABLED: 'true',
-    // r26: spoken "DealGo, có cuốc mới" sound on new ride / food job / merchant order pushes.
+    // Spoken "DealGo, có cuốc mới" sound on new ride / food job / merchant order pushes.
     NEW_JOB_CUSTOM_SOUND_ENABLED: 'true',
     // DEC-PROD-007: in-app voice calls between customer and assigned driver.
     VOICE_CALLS_ENABLED: 'true',
