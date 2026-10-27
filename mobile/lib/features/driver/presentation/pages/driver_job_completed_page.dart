@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/design_system/components/dealgo_info_tip.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
@@ -18,6 +19,7 @@ import '../../../driver_history/domain/driver_history.dart';
 import '../../../food/domain/entities/food_money.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
+import '../../../ride/presentation/widgets/ride_negotiation_ui.dart';
 import '../widgets/driver_widgets.dart';
 
 /// D034 — finished job detail from the driver's real history (fare, platform
@@ -136,6 +138,7 @@ class _Detail extends StatelessWidget {
     final done = item.outcome == DriverJobOutcome.completed;
     final from = item.pickupLabel ?? item.storeName;
     final percent = item.feePercent;
+    final negotiation = maybeRideNegotiation(context);
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         DealGoDimensions.pageGutter,
@@ -205,7 +208,9 @@ class _Detail extends StatelessWidget {
               DriverMoneyRow(
                 label: percent == null
                     ? l10n.driverCompletedFeeLabel
-                    : l10n.driverCompletedFeePercentLabel(
+                    : (isRide
+                          ? l10n.driverCompletedFeePercentLabel
+                          : l10n.driverCompletedFoodFeePercentLabel)(
                         NumberFormat('#,##0.##', locale).format(percent),
                       ),
                 value: formatVnd(item.feeVnd),
@@ -215,14 +220,24 @@ class _Detail extends StatelessWidget {
                 value: formatVnd(item.earningsVnd),
                 emphasize: true,
               ),
-              const SizedBox(height: DealGoSpacing.s8),
-              Text(
-                l10n.driverCompletedEarningsHint,
-                style: textTheme.bodySmall,
+              Align(
+                alignment: Alignment.centerRight,
+                child: DealGoInfoTip(message: l10n.driverCompletedEarningsHint),
               ),
             ],
           ),
         ),
+        // Two-way rating — the driver rates the customer.
+        if (isRide && done && negotiation != null) ...[
+          const SizedBox(height: DealGoSpacing.s12),
+          DriverPanel(
+            child: RateCustomerPanel(
+              client: negotiation,
+              rideId: item.id,
+              accessToken: () => driverAccessToken(context) ?? '',
+            ),
+          ),
+        ],
       ],
     );
   }

@@ -15,7 +15,7 @@ related_decisions:
 
 `PROPOSED`.
 
-> Đã triển khai trong code (rà soát 2026-10-18): Route Handlers BFF trong `website/app/api/ops/*`. Trạng thái vẫn `PROPOSED` — chủ repo cần quyết định `ACCEPTED`/supersede.
+**Hiện trạng trong code:** Route Handlers BFF trong `website/app/api/ops/*`. Quyết định chờ chủ dự án chuyển sang `ACCEPTED` hoặc thay thế.
 
 ## Context
 

@@ -6,9 +6,12 @@ import 'package:dealgo/features/identity/domain/entities/user_profile.dart';
 import 'package:dealgo/features/ride/data/models/ride_models.dart';
 import 'package:dealgo/features/ride/domain/entities/ride_models.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:dealgo/core/navigation/external_navigator.dart';
+
 import 'support/auth_test_harness.dart';
 import 'support/fake_external_navigator.dart';
 import 'support/fake_food_client.dart';
@@ -101,6 +104,48 @@ void main() {
     });
   });
 
+  for (final (status, title) in [
+    ('ASSIGNED', 'Đang tới quán'),
+    ('PICKED_UP', 'Giao tới khách'),
+  ]) {
+    testWidgets('relaunch on /driver/food/:id loads a $status order by id', (
+      tester,
+    ) async {
+      final food = FakeFoodClient()
+        ..onGetOrder = (id) => FoodOrderDetail(
+          id: id,
+          status: status,
+          subtotalVnd: 90000,
+          deliveryFareVnd: 15000,
+          totalVnd: 105000,
+          dropoff: const FoodDropoff(
+            lat: 16.1,
+            lng: 108.2,
+            label: '456 Trần Hưng Đạo',
+          ),
+          lines: const [],
+          assignedDriverId: 'driver-1',
+          storeName: 'Bún chả cá',
+          pickup: const FoodDropoff(
+            lat: 16.06,
+            lng: 108.22,
+            label: '12 Bạch Đằng',
+          ),
+        );
+      await _openDriver(tester, rides: FakeRideClient(), food: food);
+      expect(find.byKey(const Key('driver-go-online')), findsOneWidget);
+      GoRouter.of(tester.element(find.byType(Scaffold).first))
+          .go('/driver/food/order-9');
+      await tester.pumpAndSettle();
+      expect(find.text(title), findsWidgets);
+      expect(find.textContaining('Không tìm thấy yêu cầu'), findsNothing);
+      // Back on duty (presence + location reporter).
+      GoRouter.of(tester.element(find.byType(Scaffold).first)).go('/driver');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('driver-go-online')), findsNothing);
+    });
+  }
+
   testWidgets('offline toggle does not request jobs', (tester) async {
     final rides = FakeRideClient();
     final food = FakeFoodClient();
@@ -137,11 +182,54 @@ void main() {
     expect(find.textContaining('Xe máy'), findsWidgets);
   });
 
+  testWidgets('ride ref never wraps mid-word beside the chips', (tester) async {
+    // Sim (402pt): "Chuyến #1573" broke mid-word beside the two chips. The
+    // ref is now a single unwrapped line that scales down to fit. (Test fonts
+    // are much wider than device fonts, so assert the layout contract.)
+    final rides = FakeRideClient()..openRides = [_openRide()];
+    await _openDriver(tester, rides: rides, food: FakeFoodClient());
+    await _connectAndOpenJobs(tester);
+
+    final ref = find.byKey(const Key('driver-ride-ref-ride-open-1'));
+    final text = tester.widget<Text>(ref);
+    expect(text.maxLines, 1);
+    expect(text.softWrap, isFalse);
+    final fit = tester.widget<FittedBox>(
+      find.ancestor(of: ref, matching: find.byType(FittedBox)).first,
+    );
+    expect(fit.fit, BoxFit.scaleDown);
+    expect(
+      tester.renderObject<RenderParagraph>(ref).didExceedMaxLines,
+      isFalse,
+    );
+  });
+
+  testWidgets('one-tap accept sends the customer price', (tester) async {
+    final ride = _openRide();
+    final rides = FakeRideClient()
+      ..openRides = [ride]
+      ..onOffer = ((request) => _offeredView(ride, request.amountVnd))
+      ..onGet = ((_) => _offeredView(ride, ride.offeredFareVnd));
+    final food = FakeFoodClient();
+    await _openDriver(tester, rides: rides, food: food);
+    await _connectAndOpenJobs(tester);
+
+    await tester.tap(find.byKey(const Key('driver-ride-ride-open-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('driver-quick-accept')));
+    await tester.pumpAndSettle();
+
+    expect(rides.offerCalls, hasLength(1));
+    expect(rides.offerCalls.single.amountVnd, ride.offeredFareVnd);
+  });
+
   testWidgets('posting an offer sends amountVnd', (tester) async {
     final ride = _openRide();
     final rides = FakeRideClient()
       ..openRides = [ride]
-      ..onOffer = (request) => _offeredView(ride, request.amountVnd);
+      ..onOffer = ((request) => _offeredView(ride, request.amountVnd))
+      // Snapshot GET right after the socket subscribe (DEC-PROD-031 rev).
+      ..onGet = ((_) => _offeredView(ride, 45000));
     final food = FakeFoodClient();
     await _openDriver(tester, rides: rides, food: food);
     await _connectAndOpenJobs(tester);
@@ -195,43 +283,57 @@ void main() {
     expect(find.text('Bún chả cá · 12 Bạch Đằng'), findsOneWidget);
   });
 
-  testWidgets('claimed food job offers Google Maps / Waze and reports a failed hand-off', (
-    tester,
-  ) async {
-    final food = FakeFoodClient()
-      ..readyOrders = [
-        _readyJob(
-          pickup: const FoodDropoff(lat: 16.06, lng: 108.22, label: '12 Bạch Đằng'),
-        ),
-      ]
-      ..claimed = const ClaimedFoodDelivery(id: 'food-job-1', status: 'ASSIGNED');
-    final nav = FakeExternalNavigator(result: false);
-    await pumpSignedIn(
-      tester,
-      profile: _driverProfile,
-      rideClient: FakeRideClient(),
-      foodClient: food,
-      externalNavigator: nav,
-    );
-    await _connectAndOpenJobs(tester);
-    await tester.tap(find.byKey(const Key('driver-food-food-job-1')));
-    await tester.pumpAndSettle();
-    // Not before the claim.
-    expect(find.byKey(const Key('driver-nav-buttons')), findsNothing);
-    await tester.tap(find.byKey(const Key('driver-claim-job')));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'claimed food job offers Google Maps / Waze and reports a failed hand-off',
+    (tester) async {
+      final food = FakeFoodClient()
+        ..readyOrders = [
+          _readyJob(
+            pickup: const FoodDropoff(
+              lat: 16.06,
+              lng: 108.22,
+              label: '12 Bạch Đằng',
+            ),
+          ),
+        ]
+        ..claimed = const ClaimedFoodDelivery(
+          id: 'food-job-1',
+          status: 'ASSIGNED',
+        );
+      final nav = FakeExternalNavigator(result: false);
+      await pumpSignedIn(
+        tester,
+        profile: _driverProfile,
+        rideClient: FakeRideClient(),
+        foodClient: food,
+        externalNavigator: nav,
+      );
+      await _connectAndOpenJobs(tester);
+      await tester.tap(find.byKey(const Key('driver-food-food-job-1')));
+      await tester.pumpAndSettle();
+      // Not before the claim.
+      expect(find.byKey(const Key('driver-nav-buttons')), findsNothing);
+      await tester.tap(find.byKey(const Key('driver-claim-job')));
+      await tester.pumpAndSettle();
 
-    final google = find.byKey(const Key('driver-nav-google'));
-    await tester.ensureVisible(google);
-    await tester.pumpAndSettle();
-    await tester.tap(google);
-    await tester.pumpAndSettle();
-    expect(nav.calls, [(NavigationApp.googleMaps, 16.06, 108.22)]);
-    expect(
-      find.text('Không mở được ứng dụng chỉ đường. Hãy đi theo bản đồ trong app.'),
-      findsOneWidget,
-    );
-  });
+      final navOpen = find.byKey(const Key('driver-nav-open'));
+      await tester.ensureVisible(navOpen);
+      await tester.pumpAndSettle();
+      await tester.tap(navOpen);
+      await tester.pumpAndSettle();
+      expect(find.text('Đến quán lấy món'), findsOneWidget);
+      final google = find.byKey(const Key('driver-nav-google'));
+      await tester.tap(google);
+      await tester.pumpAndSettle();
+      expect(nav.calls, [(NavigationApp.googleMaps, 16.06, 108.22)]);
+      expect(
+        find.text(
+          'Không mở được ứng dụng chỉ đường. Kiểm tra Google Maps hoặc Waze trên máy.',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('pickup and delivery ask for the server codes (DEC-PROD-036)', (
     tester,
@@ -239,10 +341,17 @@ void main() {
     final food = FakeFoodClient()
       ..readyOrders = [
         _readyJob(
-          pickup: const FoodDropoff(lat: 16.06, lng: 108.22, label: '12 Bạch Đằng'),
+          pickup: const FoodDropoff(
+            lat: 16.06,
+            lng: 108.22,
+            label: '12 Bạch Đằng',
+          ),
         ),
       ]
-      ..claimed = const ClaimedFoodDelivery(id: 'food-job-1', status: 'ASSIGNED')
+      ..claimed = const ClaimedFoodDelivery(
+        id: 'food-job-1',
+        status: 'ASSIGNED',
+      )
       ..expectedHandoverCode = '2891'
       ..expectedDeliveryCode = '4821';
     await pumpSignedIn(
@@ -257,12 +366,13 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('driver-claim-job')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('driver-arrived-pickup')));
-    await tester.pumpAndSettle();
 
     Future<void> enter(String code) async {
       expect(find.byKey(const Key('driver-food-code-sheet')), findsOneWidget);
-      await tester.enterText(find.byKey(const Key('driver-food-code-input')), code);
+      await tester.enterText(
+        find.byKey(const Key('driver-food-code-input')),
+        code,
+      );
       await tester.pump();
       await tester.tap(find.byKey(const Key('driver-food-code-submit')));
       await tester.pumpAndSettle();
@@ -271,17 +381,15 @@ void main() {
     // Handover: the store's code is asked for, a wrong one is flagged.
     await tester.tap(find.byKey(const Key('driver-food-pickup')));
     await tester.pumpAndSettle();
-    expect(find.text('Mã bàn giao'), findsOneWidget);
+    expect(find.text('Mã bàn giao'), findsWidgets);
     await enter('1111');
     expect(find.text('Mã chưa đúng, kiểm tra lại.'), findsOneWidget);
     await enter('2891');
     expect(find.byKey(const Key('driver-food-code-sheet')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('driver-food-deliver')));
-    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('driver-food-complete')));
     await tester.pumpAndSettle();
-    expect(find.text('Mã giao hàng'), findsOneWidget);
+    expect(find.text('Mã giao hàng'), findsWidgets);
     await enter('4821');
     expect(find.byKey(const Key('driver-food-home')), findsOneWidget);
     expect(food.submittedCodes, [
@@ -293,12 +401,17 @@ void main() {
     ]);
   });
 
-  testWidgets('a locked delivery code shows the support message', (tester) async {
+  testWidgets('a locked delivery code shows the support message', (
+    tester,
+  ) async {
     await tester.binding.setSurfaceSize(const Size(400, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final food = FakeFoodClient()
       ..readyOrders = [_readyJob()]
-      ..claimed = const ClaimedFoodDelivery(id: 'food-job-1', status: 'ASSIGNED');
+      ..claimed = const ClaimedFoodDelivery(
+        id: 'food-job-1',
+        status: 'ASSIGNED',
+      );
     await pumpSignedIn(
       tester,
       profile: _driverProfile,
@@ -311,11 +424,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('driver-claim-job')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('driver-arrived-pickup')));
-    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('driver-food-pickup')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('driver-food-deliver')));
     await tester.pumpAndSettle();
     food.advanceError = const ApiException(
       statusCode: 423,

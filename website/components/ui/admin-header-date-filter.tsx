@@ -60,6 +60,20 @@ function calculateRangeForPreset(key: PeriodPresetKey): DateRangeValue {
   return { from: null, to: null };
 }
 
+/** The preset whose range equals `range`, else "custom" (or "all" when both ends are open). */
+export function presetForRange(
+  preferred: PeriodPresetKey,
+  range: DateRangeValue,
+): PeriodPresetKey {
+  const same = (key: PeriodPresetKey) => {
+    const r = calculateRangeForPreset(key);
+    return (r.from ?? null) === (range.from ?? null) && (r.to ?? null) === (range.to ?? null);
+  };
+  if (preferred !== "custom" && same(preferred)) return preferred;
+  if (!range.from && !range.to) return "all";
+  return PERIOD_PRESETS.find((p) => same(p.key))?.key ?? "custom";
+}
+
 export interface AdminHeaderDateFilterProps {
   value?: DateRangeValue;
   onChange?: (range: DateRangeValue, label: string) => void;
@@ -122,11 +136,14 @@ export function AdminHeaderDateFilter({
   }, [open]);
 
   const currentRange = value ?? internalRange;
+  // A controlled value changed elsewhere (filter panel, reset, URL) no longer matches the
+  // chosen preset: show the real range instead of a stale preset label.
+  const shownPreset = presetForRange(activePreset, currentRange);
 
   // Determine button display label
   let displayLabel: string;
-  if (activePreset !== "custom") {
-    const presetObj = PERIOD_PRESETS.find((p) => p.key === activePreset);
+  if (shownPreset !== "custom") {
+    const presetObj = PERIOD_PRESETS.find((p) => p.key === shownPreset);
     displayLabel = presetObj ? presetObj.label : "Hôm nay";
   } else if (currentRange.from && currentRange.to) {
     if (currentRange.from === currentRange.to) {
@@ -236,7 +253,7 @@ export function AdminHeaderDateFilter({
 
           <div className="space-y-0.5">
             {PERIOD_PRESETS.map((preset) => {
-              const isSelected = activePreset === preset.key;
+              const isSelected = shownPreset === preset.key;
               return (
                 <button
                   key={preset.key}
@@ -274,7 +291,7 @@ export function AdminHeaderDateFilter({
               role="menuitem"
               onClick={() => handleSelectPreset("custom")}
               className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-brand hover:bg-brand/5 transition-colors cursor-pointer ${
-                activePreset === "custom" ? "bg-brand/10 font-semibold" : ""
+                shownPreset === "custom" ? "bg-brand/10 font-semibold" : ""
               }`}
             >
               <OpsIcon name="sliders" className="size-3.5" />

@@ -34,6 +34,11 @@ void main() {
     cubit.nextStep();
     expect(cubit.state.step, DriverKycStep.ocrConfirm);
 
+    // Fail closed: draft must pick a catalog class before submit (DG-DEC-VEH-001).
+    expect(cubit.state.hasSelectedVehicleClass, isFalse);
+    cubit.setVehicleClass(code: 'MOTORBIKE', name: 'Xe máy');
+    expect(cubit.state.hasSelectedVehicleClass, isTrue);
+
     await cubit.submit();
     expect(cubit.state.status, PartnerApplicationStatus.pending);
     expect(cubit.state.documents.stored, {
@@ -69,7 +74,7 @@ void main() {
     await tester.ensureVisible(find.text('Tiếp tục'));
     await tester.tap(find.text('Tiếp tục'));
     await tester.pumpAndSettle();
-    await tester.tap(navLabel('Tài khoản'));
+    await tester.tap(navLabel('Tôi'));
     await tester.pumpAndSettle();
 
     expect(find.text('Hồ sơ đối tác tài xế'), findsOneWidget);
@@ -89,7 +94,7 @@ void main() {
     await pumpSignedIn(tester, profile: pendingPartnerProfile);
     expect(find.byType(CustomerTabBar), findsOneWidget);
 
-    await tester.tap(navLabel('Tài khoản'));
+    await tester.tap(navLabel('Tôi'));
     await tester.pumpAndSettle();
     expect(find.text('Hồ sơ đối tác tài xế'), findsOneWidget);
 
@@ -107,7 +112,7 @@ void main() {
     await pumpSignedIn(tester, profile: customerProfile);
     expect(find.byType(CustomerTabBar), findsOneWidget);
 
-    await tester.tap(navLabel('Tài khoản'));
+    await tester.tap(navLabel('Tôi'));
     await tester.pumpAndSettle();
 
     expect(find.text('Hồ sơ đối tác tài xế'), findsOneWidget);

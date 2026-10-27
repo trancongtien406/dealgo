@@ -1,8 +1,7 @@
 import 'ride_models.dart';
 import '../../../../core/format/short_ref.dart';
 
-/// Ride being booked after the vehicle step. DealGo only dispatches
-/// motorbikes today, so there is no vehicle choice to carry yet.
+/// Ride being booked after the customer picks a vehicle class.
 class RideBookingDraft {
   const RideBookingDraft({required this.places});
 

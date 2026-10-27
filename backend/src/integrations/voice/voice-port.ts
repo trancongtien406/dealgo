@@ -21,6 +21,8 @@ export type VoiceSessionView = {
 };
 
 export interface VoicePort {
+  /** False when no provider is configured: the call API answers VOICE_UNAVAILABLE. */
+  readonly available: boolean;
   createSession(input: CreateVoiceSessionInput): Promise<VoiceSessionView>;
 }
 
@@ -33,6 +35,8 @@ export class UnavailableVoiceError extends Error {
 
 @Injectable()
 export class UnavailableVoicePort implements VoicePort {
+  readonly available = false;
+
   async createSession(): Promise<VoiceSessionView> {
     throw new UnavailableVoiceError();
   }
@@ -43,6 +47,8 @@ export class UnavailableVoicePort implements VoicePort {
  */
 @Injectable()
 export class MockVoicePort implements VoicePort {
+  readonly available = true;
+
   constructor(private readonly nodeEnv: 'development' | 'test' | 'production') {}
 
   async createSession(input: CreateVoiceSessionInput): Promise<VoiceSessionView> {
@@ -82,6 +88,8 @@ export type LiveKitCredentials = {
  */
 @Injectable()
 export class LiveKitVoicePort implements VoicePort {
+  readonly available = true;
+
   constructor(private readonly credentials: LiveKitCredentials) {}
 
   async createSession(input: CreateVoiceSessionInput): Promise<VoiceSessionView> {

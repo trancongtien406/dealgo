@@ -89,9 +89,7 @@ class RideTrackingCubit extends Cubit<RideTrackingState> {
       return;
     }
     if (token == null || token.isEmpty) {
-      emit(
-        RideTrackingOffline(ride: state.ride, cause: sessionExpiredFailure),
-      );
+      emit(RideTrackingOffline(ride: state.ride, cause: sessionExpiredFailure));
       return;
     }
     _inFlight = true;

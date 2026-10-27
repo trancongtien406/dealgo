@@ -11,12 +11,16 @@ import { OutboxRelayService } from '../modules/communication/outbox/outbox-relay
 import { AccountDeletionService } from '../modules/account-deletion/account-deletion.service.js';
 import { OrphanUploadCleanupService } from './orphan-upload-cleanup.service.js';
 import { RideExpiryService } from './ride-expiry.service.js';
+import { ChatRetentionService } from './chat-retention.service.js';
+import { WorkerHeartbeatService } from './worker-heartbeat.service.js';
 
 const RIDE_EXPIRY_JOB = 'ride-expiry';
 const OUTBOX_RELAY_JOB = 'outbox-relay';
 const UPLOAD_ORPHAN_JOB = 'upload-orphan-cleanup';
 const ACCOUNT_PURGE_JOB = 'account-purge';
 const QUEUE_NAME = 'dealgo-workers';
+const HEARTBEAT_JOB = 'worker-heartbeat';
+const CHAT_RETENTION_JOB = 'chat-retention';
 
 /**
  * Starts BullMQ repeatable jobs when REDIS_URL is reachable.
@@ -37,7 +41,25 @@ export class WorkersBootstrap implements OnModuleInit, OnModuleDestroy {
     private readonly outboxRelay: OutboxRelayService,
     private readonly orphanUploads: OrphanUploadCleanupService,
     private readonly accountDeletion: AccountDeletionService,
+    private readonly heartbeat: WorkerHeartbeatService,
+    private readonly chatRetention: ChatRetentionService,
   ) {}
+
+  /** Jobs added after the original four (DEC-PROD-053/056): name → interval + handler. */
+  private extraJobs(): { name: string; every: number; run: () => Promise<unknown> }[] {
+    return [
+      {
+        name: HEARTBEAT_JOB,
+        every: this.config.get('WORKER_HEARTBEAT_INTERVAL_MS', { infer: true }),
+        run: () => this.heartbeat.runOnce(),
+      },
+      {
+        name: CHAT_RETENTION_JOB,
+        every: this.config.get('CHAT_RETENTION_PURGE_INTERVAL_MS', { infer: true }),
+        run: () => this.chatRetention.runOnce(),
+      },
+    ];
+  }
 
   private purgeIntervalMs(): number {
     return this.config.get('ACCOUNT_PURGE_INTERVAL_MS', { infer: true });
@@ -138,6 +160,13 @@ export class WorkersBootstrap implements OnModuleInit, OnModuleDestroy {
           jobId: UPLOAD_ORPHAN_JOB,
         },
       );
+      for (const job of this.extraJobs()) {
+        await this.queue.add(
+          job.name,
+          {},
+          { repeat: { every: job.every }, removeOnComplete: 20, removeOnFail: 20, jobId: job.name },
+        );
+      }
       await this.queue.add(
         ACCOUNT_PURGE_JOB,
         {},
@@ -166,6 +195,11 @@ export class WorkersBootstrap implements OnModuleInit, OnModuleDestroy {
           }
           if (job.name === ACCOUNT_PURGE_JOB) {
             await this.accountDeletion.purgeDue();
+            return;
+          }
+          const extra = this.extraJobs().find((candidate) => candidate.name === job.name);
+          if (extra) {
+            await extra.run();
           }
         },
         { connection },
@@ -178,6 +212,7 @@ export class WorkersBootstrap implements OnModuleInit, OnModuleDestroy {
         });
       });
       this.logger.log({ msg: 'workers.bullmq_started', queue: QUEUE_NAME });
+      void this.heartbeat.runOnce().catch(() => undefined);
       return true;
     } catch (error) {
       this.logger.warn({
@@ -193,6 +228,21 @@ export class WorkersBootstrap implements OnModuleInit, OnModuleDestroy {
   }
 
   private startIntervals(rideIntervalMs: number, outboxIntervalMs: number, orphanIntervalMs: number): void {
+    for (const job of this.extraJobs()) {
+      this.intervals.push(
+        setInterval(() => {
+          void job.run().catch((error: unknown) => {
+            this.logger.warn({
+              msg: 'workers.job_failed',
+              job: job.name,
+              error: error instanceof Error ? error.message : 'unknown',
+            });
+          });
+        }, job.every),
+      );
+    }
+    void this.heartbeat.runOnce().catch(() => undefined);
+
     this.intervals.push(
       setInterval(() => {
         void this.accountDeletion.purgeDue().catch((error: unknown) => {

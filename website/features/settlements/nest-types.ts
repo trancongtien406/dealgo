@@ -3,7 +3,7 @@
 export type NestSettlementEntityType = "RIDE" | "FOOD_ORDER";
 
 export type NestSettlementBatch = {
-  /** UTC calendar day YYYY-MM-DD — sandbox grouping, not a payout batch. */
+  /** Vietnam business day (Asia/Ho_Chi_Minh) YYYY-MM-DD — COD journal grouping, not a payout batch. */
   day: string;
   journalCount: number;
   totalAmountVnd: number;

@@ -26,6 +26,10 @@ export class UpdateNotificationPrefsDto {
   @IsOptional()
   @IsBoolean()
   news?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  newJobSound?: boolean;
 }
 
 export class ChangePasswordDto {

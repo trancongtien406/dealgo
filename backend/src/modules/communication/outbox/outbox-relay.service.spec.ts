@@ -100,6 +100,38 @@ describe('OutboxRelayService', () => {
     );
   });
 
+  it('Each recipient gets its own role and tap path', async () => {
+    const repo = new MemoryOutboxRepository();
+    repo.seed({
+      id: 'msg-campaign',
+      eventKey: 'Ride:r9:status:ASSIGNED',
+      aggregateType: 'Ride',
+      aggregateId: 'r9',
+      eventType: 'Ride.status.ASSIGNED',
+      payload: { status: 'ASSIGNED' },
+      createdAt: new Date('2026-10-14T00:00:00.000Z'),
+      attempts: 0,
+    });
+    const push = { send: vi.fn().mockResolvedValue(undefined) };
+    const rides = {
+      participantRoles: vi.fn().mockResolvedValue({ customerId: 'cust-1', driverId: 'drv-1' }),
+    };
+    const relay = new OutboxRelayService(repo, { emitSnapshot: vi.fn() } as never, push as never, rides as never);
+    await expect(relay.relayOnce(10, new Date('2026-10-14T00:03:00.000Z'))).resolves.toBe(1);
+    expect(push.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'cust-1',
+        data: expect.objectContaining({ role: 'CUSTOMER', path: '/customer/ride/tracking/r9' }),
+      }),
+    );
+    expect(push.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'drv-1',
+        data: expect.objectContaining({ role: 'DRIVER', path: '/driver/rides/r9/active' }),
+      }),
+    );
+  });
+
   it('fails fast and keeps row uncompleted when required provider is missing', async () => {
     const repo = new MemoryOutboxRepository();
     repo.seed({

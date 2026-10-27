@@ -196,7 +196,10 @@ class _RideOfferDetailViewState extends State<_RideOfferDetailView> {
                                 ),
                                 const SizedBox(height: DealGoSpacing.s12),
                                 DealGoChip(
-                                  label: rideOfferKindLabel(AppLocalizations.of(context), offer.kind),
+                                  label: rideOfferKindLabel(
+                                    AppLocalizations.of(context),
+                                    offer.kind,
+                                  ),
                                   tone: offer.kind == RideOfferKind.accept
                                       ? DealGoChipTone.success
                                       : DealGoChipTone.neutral,

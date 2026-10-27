@@ -36,7 +36,10 @@ class OfflineOffers extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        DealGoAppHeader(title: AppLocalizations.of(context).rideDriverOffers, onBack: onBack),
+        DealGoAppHeader(
+          title: AppLocalizations.of(context).rideDriverOffers,
+          onBack: onBack,
+        ),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
@@ -67,6 +70,7 @@ class EmptyOffers extends StatelessWidget {
     required this.onRetry,
     required this.onChangeFare,
     required this.onCancel,
+    this.onRaiseFare,
     super.key,
   });
 
@@ -79,11 +83,17 @@ class EmptyOffers extends StatelessWidget {
   final VoidCallback onChangeFare;
   final VoidCallback onCancel;
 
+  /// Raise the fare in place (null hides the button).
+  final VoidCallback? onRaiseFare;
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        DealGoAppHeader(title: AppLocalizations.of(context).rideDriverOffers, onBack: onBack),
+        DealGoAppHeader(
+          title: AppLocalizations.of(context).rideDriverOffers,
+          onBack: onBack,
+        ),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(
@@ -105,7 +115,9 @@ class EmptyOffers extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    RideSectionTitle(AppLocalizations.of(context).rideCurrentRoute),
+                    RideSectionTitle(
+                      AppLocalizations.of(context).rideCurrentRoute,
+                    ),
                     const SizedBox(height: DealGoSpacing.s12),
                     RideStopList(
                       pickup: ride.pickup.label,
@@ -119,7 +131,9 @@ class EmptyOffers extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    RideSectionTitle(AppLocalizations.of(context).rideCurrentQuoteFare),
+                    RideSectionTitle(
+                      AppLocalizations.of(context).rideCurrentQuoteFare,
+                    ),
                     const SizedBox(height: DealGoSpacing.s8),
                     RideMoneyLine(
                       label: AppLocalizations.of(context).rideTripCode,
@@ -134,17 +148,23 @@ class EmptyOffers extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: DealGoSpacing.s12),
-              RideNote(
-                message: AppLocalizations.of(context).rideNoOffersHint,
-              ),
+              RideNote(message: AppLocalizations.of(context).rideNoOffersHint),
               if (offline) ...[
                 const SizedBox(height: DealGoSpacing.s12),
-                RideOfflineNotice(detail: AppLocalizations.of(context).rideListRefreshFailed),
+                RideOfflineNotice(
+                  detail: AppLocalizations.of(context).rideListRefreshFailed,
+                ),
               ],
               if (message != null) ...[
                 const SizedBox(height: DealGoSpacing.s12),
                 RideNote(message: message!),
               ],
+              if (onRaiseFare != null)
+                TextButton(
+                  key: const Key('ride-raise-fare'),
+                  onPressed: busy ? null : onRaiseFare,
+                  child: Text(AppLocalizations.of(context).rideRaiseFare),
+                ),
               TextButton(
                 key: const Key('ride-empty-open-cancel'),
                 onPressed: busy
@@ -233,8 +253,7 @@ class BlockedOffers extends StatelessWidget {
     if (block.taken) {
       return _QuoteState(
         title: AppLocalizations.of(context).rideOfferTakenTitle,
-        message:
-            AppLocalizations.of(context).rideOfferTakenMessage,
+        message: AppLocalizations.of(context).rideOfferTakenMessage,
         icon: DealGoIcons.swapHoriz,
         iconColor: DealGoColors.warning,
         background: DealGoColors.amberSurface,
@@ -243,8 +262,7 @@ class BlockedOffers extends StatelessWidget {
         badge: AppLocalizations.of(context).rideOfferUnavailable,
         quoteLabel: AppLocalizations.of(context).ridePreviousOffer,
         quoteAmount: formatRideVnd(amount),
-        note:
-            AppLocalizations.of(context).rideOfferTakenNote,
+        note: AppLocalizations.of(context).rideOfferTakenNote,
         onBack: onBack,
         secondaryLabel: AppLocalizations.of(context).rideRefreshList,
         primaryLabel: AppLocalizations.of(context).rideSeeOtherDrivers,
@@ -313,7 +331,10 @@ class _QuoteState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        DealGoAppHeader(title: AppLocalizations.of(context).rideOfferList, onBack: onBack),
+        DealGoAppHeader(
+          title: AppLocalizations.of(context).rideOfferList,
+          onBack: onBack,
+        ),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(
@@ -335,7 +356,9 @@ class _QuoteState extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    RideSectionTitle(AppLocalizations.of(context).rideCurrentRoute),
+                    RideSectionTitle(
+                      AppLocalizations.of(context).rideCurrentRoute,
+                    ),
                     const SizedBox(height: DealGoSpacing.s12),
                     RideStopList(
                       pickup: ride.pickup.label,
@@ -357,9 +380,7 @@ class _QuoteState extends StatelessWidget {
                     const SizedBox(height: DealGoSpacing.s8),
                     RideStatusChip(
                       label: badge,
-                      tone: taken
-                          ? RideChipTone.warning
-                          : RideChipTone.danger,
+                      tone: taken ? RideChipTone.warning : RideChipTone.danger,
                     ),
                     const SizedBox(height: DealGoSpacing.s8),
                     RideMoneyLine(
@@ -453,6 +474,8 @@ class OfferList extends StatelessWidget {
     required this.onSelectOffer,
     required this.onConfirm,
     required this.onCancel,
+    this.onRaiseFare,
+    this.onDeclineSelected,
     this.onVoucherQuote,
     this.voucherCode,
     this.voucherDiscountVnd = 0,
@@ -471,6 +494,12 @@ class OfferList extends StatelessWidget {
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
 
+  /// Raise the fare while drivers are still bidding.
+  final VoidCallback? onRaiseFare;
+
+  /// Turn the selected price down (the driver may re-offer).
+  final VoidCallback? onDeclineSelected;
+
   /// DEC-PROD-024: voucher quoted on the selected offer and redeemed with the selection.
   final ValueChanged<VoucherQuote?>? onVoucherQuote;
   final String? voucherCode;
@@ -486,7 +515,10 @@ class OfferList extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     return Column(
       children: [
-        DealGoAppHeader(title: AppLocalizations.of(context).rideDriverOffers, onBack: onBack),
+        DealGoAppHeader(
+          title: AppLocalizations.of(context).rideDriverOffers,
+          onBack: onBack,
+        ),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(
@@ -500,7 +532,9 @@ class OfferList extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    RideSectionTitle(AppLocalizations.of(context).rideRouteAndFare),
+                    RideSectionTitle(
+                      AppLocalizations.of(context).rideRouteAndFare,
+                    ),
                     const SizedBox(height: DealGoSpacing.s12),
                     RideStopList(
                       pickup: ride.pickup.label,
@@ -520,7 +554,8 @@ class OfferList extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      AppLocalizations.of(context).rideOffersCount(offers.length),
+                      AppLocalizations.of(context)
+                          .rideOffersCount(offers.length),
                       style: textTheme.titleMedium,
                     ),
                   ),
@@ -570,9 +605,6 @@ class OfferList extends StatelessWidget {
                 ),
                 const SizedBox(height: DealGoSpacing.s12),
               ],
-              RideNote(
-                message: AppLocalizations.of(context).rideOffersNote,
-              ),
               if (onVoucherQuote != null && selected != null) ...[
                 const SizedBox(height: DealGoSpacing.s12),
                 RidePanel(
@@ -595,7 +627,10 @@ class OfferList extends StatelessWidget {
                         RideMoneyLine(
                           label: l10n.rideCashDueLabel,
                           amount: formatRideVnd(
-                            rideCashAfterVoucher(selected.amountVnd, voucherDiscountVnd),
+                            rideCashAfterVoucher(
+                              selected.amountVnd,
+                              voucherDiscountVnd,
+                            ),
                           ),
                           emphasize: true,
                         ),
@@ -603,7 +638,9 @@ class OfferList extends StatelessWidget {
                       const SizedBox(height: DealGoSpacing.s8),
                       Text(
                         l10n.rideVoucherNote,
-                        style: textTheme.bodySmall?.copyWith(color: DealGoColors.textSecondary),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: DealGoColors.textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -619,6 +656,24 @@ class OfferList extends StatelessWidget {
                 const SizedBox(height: DealGoSpacing.s12),
                 RideNote(message: message!),
               ],
+              if (onRaiseFare != null || onDeclineSelected != null)
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  children: [
+                    if (onDeclineSelected != null && selected != null)
+                      TextButton(
+                        key: const Key('ride-decline-offer'),
+                        onPressed: busy ? null : onDeclineSelected,
+                        child: Text(l10n.rideDeclineOffer),
+                      ),
+                    if (onRaiseFare != null)
+                      TextButton(
+                        key: const Key('ride-raise-fare'),
+                        onPressed: busy ? null : onRaiseFare,
+                        child: Text(l10n.rideRaiseFare),
+                      ),
+                  ],
+                ),
               TextButton(
                 key: const Key('ride-offers-open-cancel'),
                 onPressed: busy

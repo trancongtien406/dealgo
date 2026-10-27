@@ -70,3 +70,14 @@ String? resolveTileUrlTemplate(String template, {required String apiKey}) {
   }
   return trimmed;
 }
+
+/// Single web domain for universal/app links and passkeys (DEC-PROD-058). Must
+/// match backend WEBAUTHN_RP_ID, the iOS associated domains and the Android
+/// intent-filter host (`dealgoAppLinkHost` in android/gradle.properties).
+const appLinkHost = String.fromEnvironment(
+  'APP_LINK_HOST',
+  defaultValue: 'dealgo.vn',
+);
+
+/// Path prefix the app claims on [appLinkHost]; the rest stays on the website.
+const appLinkPathPrefix = '/app';

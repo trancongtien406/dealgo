@@ -11,6 +11,7 @@ describe('RideLedger Domain Logic', () => {
     pickup: { lat: 10.762622, lng: 106.660172, label: 'District 1, HCMC' },
     dropoff: { lat: 10.776889, lng: 106.700806, label: 'Ben Thanh, HCMC' },
     offeredFareVnd: 50_000,
+    vehicleClassCode: 'MOTORBIKE',
     referenceFareVnd: 48_000,
     expiresAt: future,
     now,
@@ -114,10 +115,61 @@ describe('RideLedger Domain Logic', () => {
         driverId: 'driver-2',
         amountVnd: 54_000,
         expiresAt: future,
-        maxRounds: 1,
+        maxLiveOffers: 1,
         now,
       });
-      expect(capped.error).toBe('RIDE_NEGOTIATION_ROUNDS_EXCEEDED');
+      expect(capped.error).toBe('RIDE_LIVE_OFFERS_FULL');
+    });
+
+    it('Caps customer fare raises and gives every driver a fresh edit round', () => {
+      const ledger = new RideLedger();
+      const rideId = ledger.create(baseInput).ride!.id;
+      ledger.offer({ rideId, driverId: 'driver-1', amountVnd: 60_000, expiresAt: future, now });
+      const edited = ledger.offer({
+        rideId,
+        driverId: 'driver-1',
+        amountVnd: 59_000,
+        expiresAt: future,
+        maxEdits: 1,
+        now,
+      });
+      expect(edited.error).toBeUndefined();
+      expect(edited.ride?.offers[0].editCount).toBe(1);
+      const blocked = ledger.offer({
+        rideId,
+        driverId: 'driver-1',
+        amountVnd: 58_000,
+        expiresAt: future,
+        maxEdits: 1,
+        now,
+      });
+      expect(blocked.error).toBe('RIDE_OFFER_EDIT_LIMIT');
+
+      const raised = ledger.raiseFare({
+        rideId,
+        customerId: 'cust-1',
+        amountVnd: 55_000,
+        now,
+        windowExpiresAt: future,
+        maxRaises: 1,
+      });
+      expect(raised.error).toBeUndefined();
+      expect(raised.ride?.fareRaiseCount).toBe(1);
+      expect(raised.ride?.offers[0].editCount).toBe(0);
+      const again = ledger.raiseFare({
+        rideId,
+        customerId: 'cust-1',
+        amountVnd: 56_000,
+        now,
+        windowExpiresAt: future,
+        maxRaises: 1,
+      });
+      expect(again.error).toBe('RIDE_FARE_RAISE_LIMIT');
+    });
+
+    it('Lists customer cancellations only after a driver was assigned', () => {
+      const ledger = new RideLedger();
+      expect(ledger.customerCancelTimes('cust-1', new Date(0))).toEqual([]);
     });
 
     it('rejects offer on non-existent or expired ride', () => {

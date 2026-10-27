@@ -664,7 +664,8 @@ class _CartBar extends StatelessWidget {
             child: DealGoPrimaryButton(
               label: AppLocalizations.of(context).foodViewCart,
               trailingIcon: DealGoIcons.arrowRight,
-              onPressed: () => context.push(FoodRoutes.cart),
+              // One review screen: store → checkout (cart page merged).
+              onPressed: () => context.push(FoodRoutes.checkout),
             ),
           ),
         ],

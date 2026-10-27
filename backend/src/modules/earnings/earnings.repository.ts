@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { EarningEntityType } from './earnings.constants.js';
 import type { TxHandle } from '../../shared/tx/completion-hook.js';
+import type { BalanceAdjustment, BalanceAdjustmentInput, DriverBalance } from './driver-balance.js';
 
 export type JobEarning = {
   id: string;
@@ -29,10 +30,58 @@ export interface EarningsRepository {
   findMany(
     subjects: { entityType: EarningEntityType; entityId: string }[],
   ): Promise<Map<string, JobEarning>>;
+  /** Idempotent per (kind, refType, refId, driverId), inside the caller's transaction. */
+  adjustWithin(tx: TxHandle, input: BalanceAdjustmentInput): Promise<void>;
+  /** Fees + adjustments since the last settlement. */
+  balanceOf(driverId: string): Promise<DriverBalance>;
+  listAdjustments(driverId: string, limit: number): Promise<BalanceAdjustment[]>;
+  /** Jobs the driver dropped (DRIVER/SYSTEM cancels) vs completed, since `since`. */
+  jobOutcomesSince(driverId: string, since: Date): Promise<{ cancelled: number; completed: number }>;
 }
 
 export class MemoryEarningsRepository implements EarningsRepository {
   private readonly rows = new Map<string, JobEarning>();
+  private readonly adjustments = new Map<string, BalanceAdjustment>();
+
+  async adjustWithin(_tx: TxHandle, input: BalanceAdjustmentInput): Promise<void> {
+    const key = `${input.kind}:${input.refType}:${input.refId}:${input.driverId}`;
+    if (!this.adjustments.has(key)) {
+      this.adjustments.set(key, { ...input, id: randomUUID(), createdAt: new Date() });
+    }
+  }
+
+  /** Memory mode has no settlements: the balance is everything ever accrued. */
+  async balanceOf(driverId: string): Promise<DriverBalance> {
+    let feesVnd = 0;
+    for (const row of this.rows.values()) {
+      if (row.driverId === driverId) feesVnd += row.feeVnd;
+    }
+    let adjustmentsVnd = 0;
+    for (const row of this.adjustments.values()) {
+      if (row.driverId === driverId) adjustmentsVnd += row.amountVnd;
+    }
+    return { feesVnd, adjustmentsVnd, amountVnd: feesVnd + adjustmentsVnd, settledThrough: null };
+  }
+
+  /** Test hook: memory has no cancellation table, so tests seed dropped jobs here. */
+  readonly droppedJobs: { driverId: string; at: Date }[] = [];
+
+  async jobOutcomesSince(driverId: string, since: Date): Promise<{ cancelled: number; completed: number }> {
+    const after = (at: Date) => at.getTime() >= since.getTime();
+    return {
+      cancelled: this.droppedJobs.filter((row) => row.driverId === driverId && after(row.at)).length,
+      completed: [...this.rows.values()].filter((row) => row.driverId === driverId && after(row.completedAt))
+        .length,
+    };
+  }
+
+  async listAdjustments(driverId: string, limit: number): Promise<BalanceAdjustment[]> {
+    return [...this.adjustments.values()]
+      .filter((row) => row.driverId === driverId)
+      .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime())
+      .slice(0, limit)
+      .map((row) => ({ ...row }));
+  }
 
   async recordIfAbsent(input: NewJobEarning): Promise<JobEarning> {
     const key = earningKey(input.entityType, input.entityId);

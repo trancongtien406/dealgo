@@ -97,6 +97,13 @@ const PRICING_RULE_SPECS: ReadonlyArray<{
   },
 ];
 
+/** Settings that only seed `ride_vehicle_classes` on first boot (Not live prices). */
+const SEED_ONLY_RIDE_PRICE_KEYS: ReadonlySet<PlatformSettingKey> = new Set([
+  'RIDE_MIN_FARE_VND',
+  'RIDE_MAX_FARE_VND',
+  'RIDE_REFERENCE_VND_PER_KM',
+]);
+
 const OPEN_RIDE_STATUSES = [
   'NEGOTIATING',
   'ASSIGNED',
@@ -204,7 +211,13 @@ export class OpsZonesService {
     const byKey = new Map(settings.map((s) => [s.key, s]));
     const zoneLabel = activeServiceRegionsLabel();
 
-    let rules: OpsPricingRuleItem[] = PRICING_RULE_SPECS.map((spec) => {
+    // Ride prices live on the vehicle classes (the RIDE_* settings only seed the classes
+    // on first boot), so the live per-class values replace those rows when the DB is up.
+    const classRules = await this.vehicleClassRules(zoneLabel);
+    const specs = classRules
+      ? PRICING_RULE_SPECS.filter((spec) => !SEED_ONLY_RIDE_PRICE_KEYS.has(spec.key))
+      : PRICING_RULE_SPECS;
+    let rules: OpsPricingRuleItem[] = specs.map((spec) => {
       const row = byKey.get(spec.key);
       return {
         code: spec.code,
@@ -217,6 +230,10 @@ export class OpsZonesService {
         updatedAt: row?.updatedAt ?? null,
       };
     });
+
+    if (classRules) {
+      rules = [...classRules, ...rules];
+    }
 
     if (options.q?.trim()) {
       const q = options.q.trim().toLowerCase();
@@ -238,6 +255,62 @@ export class OpsZonesService {
       limit: safeLimit,
       total,
     };
+  }
+
+  /** Live Ride price rows per enabled vehicle class; null when there is no DB (memory mode). */
+  private async vehicleClassRules(zone: string): Promise<OpsPricingRuleItem[] | null> {
+    const db = this.prisma.db();
+    if (!db) {
+      return null;
+    }
+    let classes: Array<{
+      code: string;
+      name: string;
+      baseFareVnd: number;
+      perKmVnd: number;
+      minFareVnd: number;
+      maxFareVnd: number;
+      updatedAt: Date;
+    }>;
+    try {
+      classes = await db.rideVehicleClass.findMany({
+        where: { enabled: true },
+        orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
+        select: {
+          code: true,
+          name: true,
+          baseFareVnd: true,
+          perKmVnd: true,
+          minFareVnd: true,
+          maxFareVnd: true,
+          updatedAt: true,
+        },
+      });
+    } catch (error) {
+      this.logger.warn(`vehicle class pricing rows unavailable: ${String(error)}`);
+      return null;
+    }
+    if (classes.length === 0) {
+      return null;
+    }
+    return classes.flatMap((vehicle) => {
+      const row = (suffix: string, name: string, value: number, unit: string) => ({
+        code: `RIDE_${vehicle.code}_${suffix}`,
+        name: `${name} · ${vehicle.name}`,
+        service: 'RIDE' as const,
+        zone,
+        status: 'ACTIVE' as const,
+        value: String(value),
+        unit,
+        updatedAt: vehicle.updatedAt.toISOString(),
+      });
+      return [
+        row('MIN_FARE_VND', 'Giá sàn chuyến xe', vehicle.minFareVnd, 'VND'),
+        row('MAX_FARE_VND', 'Giá trần chuyến xe', vehicle.maxFareVnd, 'VND'),
+        row('BASE_FARE_VND', 'Giá mở cửa', vehicle.baseFareVnd, 'VND'),
+        row('PER_KM_VND', 'Giá tham chiếu theo km', vehicle.perKmVnd, 'VND/km'),
+      ];
+    });
   }
 
   private async loadZones(): Promise<OpsZoneItem[]> {

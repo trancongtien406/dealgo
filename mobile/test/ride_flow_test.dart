@@ -56,7 +56,9 @@ void main() {
         pickup: RidePointModel.fromEntity(ride.pickup),
         dropoff: RidePointModel.fromEntity(ride.dropoff),
         offeredFareVnd: 42000,
+        vehicleClassCode: 'MOTORBIKE',
       ).toJson();
+      expect(json['vehicleClassCode'], 'MOTORBIKE');
       expect(json['offeredFareVnd'], 42000);
       expect(json.containsKey('agreedFareVnd'), isFalse);
       expect(rideNegotiationExpired(ride, DateTime.utc(2029)), isFalse);
@@ -88,6 +90,7 @@ void main() {
     final rides = _negotiatingClient();
     await _openFare(tester, rides);
 
+    await tester.ensureVisible(find.byKey(const Key('ride-submit-fare')));
     await tester.tap(find.byKey(const Key('ride-submit-fare')));
     await tester.pumpAndSettle();
 
@@ -99,9 +102,11 @@ void main() {
         pickup: RidePointModel.fromEntity(request.pickup),
         dropoff: RidePointModel.fromEntity(request.dropoff),
         offeredFareVnd: request.offeredFareVnd,
+        vehicleClassCode: request.vehicleClassCode,
       ).toJson().containsKey('agreedFareVnd'),
       isFalse,
     );
+    expect(request.vehicleClassCode, 'MOTORBIKE');
     // Pickup is the device GPS fix; drop-off is the chosen place's coordinates.
     expect(request.pickup.lat, testPickupLat);
     expect(request.pickup.lng, testPickupLng);
@@ -112,12 +117,13 @@ void main() {
     expect(request.accessToken, 'access-token');
     expect(request.idempotencyKey.length, inInclusiveRange(8, 200));
     expect(rides.getCalls, isNotEmpty);
-    expect(find.text('NEGOTIATING'), findsWidgets);
+    expect(find.text('Đang thương lượng'), findsWidgets);
     expect(find.textContaining('Xe 4 chỗ'), findsNothing);
   });
 
   testWidgets('an empty offer list shows the empty state', (tester) async {
     await _openFare(tester, _negotiatingClient());
+    await tester.ensureVisible(find.byKey(const Key('ride-submit-fare')));
     await tester.tap(find.byKey(const Key('ride-submit-fare')));
     await tester.pumpAndSettle();
 
@@ -146,10 +152,13 @@ void main() {
       );
     };
     await _openFare(tester, rides);
+    await tester.ensureVisible(find.byKey(const Key('ride-submit-fare')));
     await tester.tap(find.byKey(const Key('ride-submit-fare')));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('ride-select-offer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('ride-offer-confirm')));
     await tester.pumpAndSettle();
 
     expect(rides.selectCalls, hasLength(1));
@@ -165,17 +174,25 @@ void main() {
     expect(find.text('42.000đ'), findsWidgets);
   });
 
-  test('DEC-PROD-024: the selection body carries the voucher only when set', () {
-    expect(
-      const SelectRideOfferBody(offerId: 'o', voucherCode: ' dealgo10 ').toJson(),
-      {'offerId': 'o', 'voucherCode': 'DEALGO10'},
-    );
-    expect(const SelectRideOfferBody(offerId: 'o').toJson(), {'offerId': 'o'});
-    expect(
-      const SelectRideOfferBody(offerId: 'o', voucherCode: '  ').toJson(),
-      {'offerId': 'o'},
-    );
-  });
+  test(
+    'DEC-PROD-024: the selection body carries the voucher only when set',
+    () {
+      expect(
+        const SelectRideOfferBody(
+          offerId: 'o',
+          voucherCode: ' dealgo10 ',
+        ).toJson(),
+        {'offerId': 'o', 'voucherCode': 'DEALGO10'},
+      );
+      expect(const SelectRideOfferBody(offerId: 'o').toJson(), {
+        'offerId': 'o',
+      });
+      expect(
+        const SelectRideOfferBody(offerId: 'o', voucherCode: '  ').toJson(),
+        {'offerId': 'o'},
+      );
+    },
+  );
 
   test('DEC-PROD-024: the ride view decodes the discount and the cash due', () {
     final view = RideViewModel.fromJson({
@@ -213,6 +230,7 @@ void main() {
       voucherCode: request.voucherCode,
     );
     await _openFare(tester, rides);
+    await tester.ensureVisible(find.byKey(const Key('ride-submit-fare')));
     await tester.tap(find.byKey(const Key('ride-submit-fare')));
     await tester.pumpAndSettle();
 
@@ -227,8 +245,12 @@ void main() {
 
     await tester.tap(find.byKey(const Key('ride-select-offer')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('ride-offer-confirm')));
+    await tester.pumpAndSettle();
     expect(rides.selectCalls.single.voucherCode, 'DEALGO10');
-    final paid = tester.widget<RideMoneyLine>(find.byKey(const Key('ride-agreed-fare')));
+    final paid = tester.widget<RideMoneyLine>(
+      find.byKey(const Key('ride-agreed-fare')),
+    );
     expect(paid.amount, '37.800đ');
     expect(find.text('Ưu đãi DEALGO10'), findsOneWidget);
   });
@@ -251,6 +273,7 @@ void main() {
       offers: [offer],
     );
     await _openFare(tester, rides);
+    await tester.ensureVisible(find.byKey(const Key('ride-submit-fare')));
     await tester.tap(find.byKey(const Key('ride-submit-fare')));
     await tester.pumpAndSettle();
     final field = find.byKey(const Key('voucher-field'));
@@ -261,17 +284,27 @@ void main() {
 
     await tester.tap(find.byKey(const Key('ride-select-offer')));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Bạn có thể chọn lại không kèm mã.'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('ride-offer-confirm')));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Bạn có thể chọn lại không kèm mã.'),
+      findsOneWidget,
+    );
     expect(find.textContaining('server text'), findsNothing);
     expect(find.byKey(const Key('voucher-applied')), findsNothing);
 
     rides.selectError = null;
     await tester.tap(find.byKey(const Key('ride-select-offer')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('ride-offer-confirm')));
+    await tester.pumpAndSettle();
     expect(rides.selectCalls, hasLength(2));
     expect(rides.selectCalls.first.voucherCode, 'DEALGO10');
     expect(rides.selectCalls.last.voucherCode, isNull);
-    expect(rides.selectCalls.last.idempotencyKey, isNot(rides.selectCalls.first.idempotencyKey));
+    expect(
+      rides.selectCalls.last.idempotencyKey,
+      isNot(rides.selectCalls.first.idempotencyKey),
+    );
   });
 
   testWidgets('a failed client does not show success', (tester) async {
@@ -283,6 +316,7 @@ void main() {
       );
     await _openFare(tester, rides);
 
+    await tester.ensureVisible(find.byKey(const Key('ride-submit-fare')));
     await tester.tap(find.byKey(const Key('ride-submit-fare')));
     await tester.pumpAndSettle();
 
@@ -311,8 +345,11 @@ void main() {
     await tester.tap(navLabel('Đặt'));
     await tester.pumpAndSettle();
 
-    // No GPS fix: pickup waits for a choice and nothing is faked.
+    // Destination-first: dropoff picker opens; dismiss to reach the map.
     expect(find.text('Bạn muốn đi đâu?'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('header-back')));
+    await tester.pumpAndSettle();
+    // No GPS fix: pickup waits for a choice and nothing is faked.
     expect(find.text('Chọn điểm đón'), findsOneWidget);
     expect(find.text('Chọn điểm đến'), findsOneWidget);
     expect(find.textContaining('mẫu'), findsNothing);
@@ -337,8 +374,8 @@ void main() {
     await tester.tap(navLabel('Đặt'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('ride-dropoff-label')));
-    await tester.pumpAndSettle();
+    // Dropoff picker already open (destination-first).
+    expect(find.text('Bạn muốn đi đâu?'), findsOneWidget);
     expect(find.text('Vị trí hiện tại của bạn'), findsOneWidget);
     await tester.enterText(
       find.byKey(const Key('place-search-field')),
@@ -350,14 +387,16 @@ void main() {
     await tester.tap(find.byKey(const Key('place-result-0')));
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('Chợ Hàn, 119 Trần Phú, Hải Châu, Đà Nẵng'),
-      findsOneWidget,
+    // Map sheet → CTA → class+fare (inDrive confirm step, no silent skip).
+    expect(find.byKey(const Key('ride-open-route-overview')), findsOneWidget);
+    await tester.ensureVisible(
+      find.byKey(const Key('ride-open-route-overview')),
     );
     await tester.tap(find.byKey(const Key('ride-open-route-overview')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('ride-quote-reference')), findsOneWidget);
-    expect(find.text('42.000đ'), findsOneWidget);
+    expect(find.text('Đề xuất của bạn'), findsOneWidget);
+    expect(find.byKey(const Key('ride-vehicle-bike')), findsOneWidget);
+    expect(find.text('42.000đ'), findsWidgets);
   });
 
   testWidgets('denied location keeps pickup unset and explains why', (
@@ -372,6 +411,9 @@ void main() {
       locationOverride: FakeLocationService.denied(),
     );
     await tester.tap(navLabel('Đặt'));
+    await tester.pumpAndSettle();
+    expect(find.text('Bạn muốn đi đâu?'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('header-back')));
     await tester.pumpAndSettle();
     expect(find.text('Chọn điểm đón'), findsOneWidget);
     final overview = tester.widget<DealGoPrimaryButton>(
@@ -471,33 +513,30 @@ Future<void> _openFare(WidgetTester tester, FakeRideClient rides) async {
     pricing: FakePricingRemoteDataSource(fixedReferenceVnd: 42000),
   );
 
-  await tester.tap(find.text('Đặt xe').hitTestable().first);
+  await tester.tap(navLabel('Đặt'));
   await tester.pumpAndSettle();
-  expect(find.text('Vị trí hiện tại'), findsOneWidget);
-
-  await tester.ensureVisible(find.byKey(const Key('ride-suggestion-0')));
-  await tester.tap(find.byKey(const Key('ride-suggestion-0')));
+  // Destination-first: dropoff place picker opens on book-tab entry.
+  expect(find.text('Bạn muốn đi đâu?'), findsOneWidget);
+  await tester.tap(find.text(_airport.name));
+  await tester.pumpAndSettle();
+  // Map sheet with A/B — tap CTA to class+fare (no silent auto-advance).
+  expect(find.text('Chọn xe & đề xuất giá'), findsOneWidget);
+  await tester.ensureVisible(find.byKey(const Key('ride-open-route-overview')));
+  await tester.tap(find.byKey(const Key('ride-open-route-overview')));
+  await tester.pumpAndSettle();
+  // Sheet may start partially collapsed — drag up / ensureVisible.
+  final fareSheet = find.text('Đề xuất của bạn');
+  expect(fareSheet, findsOneWidget);
+  await tester.ensureVisible(fareSheet);
+  await tester.pumpAndSettle();
+  expect(find.text('42.000đ'), findsWidgets);
+  expect(find.byKey(const Key('ride-vehicle-bike')), findsOneWidget);
+  expect(find.byKey(const Key('ride-vehicle-CAR_4')), findsOneWidget);
+  expect(find.byKey(const Key('ride-vehicle-CAR_7')), findsOneWidget);
+  expect(find.byKey(const Key('ride-fare-plus')), findsOneWidget);
+  expect(find.byKey(const Key('ride-submit-fare')), findsOneWidget);
+  await tester.tap(find.byKey(const Key('ride-vehicle-bike')));
   await tester.pump();
-
-  final overview = find.byKey(const Key('ride-open-route-overview'));
-  await tester.ensureVisible(overview);
-  await tester.tap(overview);
-  await tester.pumpAndSettle();
-  expect(find.textContaining('hành trình'), findsWidgets);
-  expect(find.text('42.000đ'), findsOneWidget);
-  final vehicle = find.byKey(const Key('ride-open-vehicle'));
-  await tester.ensureVisible(vehicle);
-  await tester.tap(vehicle);
-  await tester.pumpAndSettle();
-  expect(find.text('Chọn loại xe'), findsOneWidget);
-  expect(find.text('Từ 42.000đ'), findsOneWidget);
-  await tester.tap(find.byKey(const Key('ride-confirm-vehicle')));
-  await tester.pumpAndSettle();
-  expect(find.text('Chi tiết giá cước'), findsOneWidget);
-  expect(find.textContaining('Toyota'), findsNothing);
-  await tester.tap(find.byKey(const Key('ride-open-fare-bid')));
-  await tester.pumpAndSettle();
-  expect(find.text('Tự đề xuất giá chuyến'), findsOneWidget);
-  expect(find.text('Mức cho phép từ 15.000đ đến 1.000.000đ'), findsOneWidget);
   expect(find.text('Xe máy'), findsWidgets);
+  expect(find.textContaining('Toyota'), findsNothing);
 }

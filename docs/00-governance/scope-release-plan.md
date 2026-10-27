@@ -36,7 +36,7 @@ related_decisions:
 >
 > **Tài liệu tiền đề:** [README](./README.md) và [Project Charter](./project-charter.md). **Nguồn chuẩn của phạm vi và cách phân chia release** là tài liệu này; đặc tả yêu cầu nằm ở `01-product/*`, quy tắc nghiệp vụ ở `02-domain/*`, trình tự ở `03-workflows/*` và kế hoạch task chi tiết ở `10-ai-execution/*`.
 >
-> **Điểm chốt đã có:** DealGo là **một ứng dụng Flutter với Customer, Merchant, Driver**; MVP gồm **Ride hai bánh + Food**. Có Admin Web phục vụ vận hành theo baseline dự án. Không biến MVP thành chỉ một vertical, cũng không mặc định có ba ứng dụng mobile riêng.
+> **Điểm chốt đã có:** DealGo là **một ứng dụng Flutter với Customer, Merchant, Driver**; MVP gồm **Ride (xe máy, ô tô) + Food**. Có Admin Web phục vụ vận hành theo baseline dự án. Không biến MVP thành chỉ một vertical, cũng không mặc định có ba ứng dụng mobile riêng.
 
 ## 1. Mục tiêu của tài liệu
 
@@ -90,7 +90,7 @@ Tài liệu trả lời các câu hỏi ở **cấp release**, không đi vào p
 
 | ID đã dùng ở Charter | Phạm vi | Kênh | Quyết định |
 |---|---|---|---|
-| `SCOPE-001` | **Ride:** khách gửi giá đề xuất; tài xế chấp nhận hoặc phản hồi giá; khách chọn một offer trước khi phân công xe hai bánh. | Customer + Driver mobile | `CONFIRMED` (`DEC-PROD-005`) |
+| `SCOPE-001` | **Ride (xe máy và ô tô per `DG-DEC-VEH-001`):** khách gửi giá đề xuất; tài xế chấp nhận hoặc phản hồi giá; khách chọn một offer trước khi phân công. | Customer + Driver mobile | `CONFIRMED` (`DEC-PROD-005` + `DG-DEC-VEH-001`) |
 | `SCOPE-002` | **Food:** khách đặt món, Merchant thực hiện, Driver giao. | Customer + Merchant + Driver mobile | `CONFIRMED` |
 | `SCOPE-003` | **Một app Flutter** hỗ trợ ba vai trò; không tách thành ba app mặc định. | Mobile | `CONFIRMED` |
 | `SCOPE-004` | Tham chiếu Grab/GrabFood/ShopeeFood cho dịch vụ và inDrive cho thương lượng giá Ride. | Nghiên cứu | `CONFIRMED` |
@@ -132,7 +132,7 @@ Tài liệu trả lời các câu hỏi ở **cấp release**, không đi vào p
 
 | Capability | Minimum observable outcome | Depends on |
 |---|---|---|
-| `CAP-RIDE-01` Booking entry | Customer chọn Ride hai bánh, pickup/dropoff hợp lệ, xem route/giá tham khảo và nhập giá đề xuất. | CORE-01/02/04/07; `DEC-PROD-005`. |
+| `CAP-RIDE-01` Booking entry | Customer chọn Ride (xe máy, ô tô), pickup/dropoff hợp lệ, xem route/giá tham khảo và nhập giá đề xuất. | CORE-01/02/04/07; `DEC-PROD-005`. |
 | `CAP-RIDE-02` Submit & negotiate | Tạo request/negotiation idempotent; tài xế chấp nhận hoặc counter; khách chọn một offer trước assignment. | CORE-06, `OPEN-003/004/019`. |
 | `CAP-RIDE-03` Search & assign | Trạng thái searching → assigned/failed/cancelled có ý nghĩa; một tài xế hợp lệ được gán. | CORE-05, OPEN-004. |
 | `CAP-RIDE-04` Driver & pickup | Driver nhận thông tin cần thiết, đến điểm đón; Customer thấy tài xế/chuyến theo quyền. | Role authorization, tracking & privacy. |
@@ -216,7 +216,7 @@ Tài liệu trả lời các câu hỏi ở **cấp release**, không đi vào p
 
 | ID | Hạng mục | Trạng thái mặc định |
 |---|---|---|
-| `CAP-P2-01` Gọi xe ô tô / taxi / nhiều loại phương tiện khác | `OUT_OF_SCOPE` |
+| `CAP-P2-01` Taxi subtypes / thêm loại phương tiện *ngoài* catalog Ride MOTORBIKE+CAR | `OUT_OF_SCOPE` (vehicle-scope MOTORBIKE+CAR is in-scope per `DG-DEC-VEH-001` 2026-10-23; this ID no longer means “no cars”) |
 | `CAP-P2-02` Giao kiện hàng độc lập với Food | `OUT_OF_SCOPE` |
 | `CAP-P2-03` Đi chợ, thương mại điện tử tổng hợp, du lịch | `OUT_OF_SCOPE` |
 | `CAP-P2-04` Ride/Delivery multi-stop, pooling, batch nhiều order | `OUT_OF_SCOPE` |
@@ -312,7 +312,7 @@ flowchart TD
 
 ### 12.1. G0 / R0 — Business baseline ready
 
-- [ ] Ride hai bánh và Food đều có actor, entry/exit, success/failure criteria.
+- [ ] Ride (xe máy, ô tô) và Food đều có actor, entry/exit, success/failure criteria.
 - [ ] Phạm vi và nhãn `CONFIRMED/PROPOSED/TBD` được Product Owner xem xét.
 - [ ] Quy tắc liên quan tiền, an toàn, quyền và eligibility có owner, decision backlog và điểm chặn.
 - [ ] Danh sách R0–R5 được liên kết với inventory capability IDs.

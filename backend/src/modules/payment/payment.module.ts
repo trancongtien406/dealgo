@@ -5,6 +5,9 @@ import type { AppEnv } from '../../platform/config/index.js';
 import { IdentityModule } from '../identity/index.js';
 import { SupportModule } from '../support/index.js';
 import { MomoPaymentPort } from '../../integrations/payment-gateways/index.js';
+import { CashOnlyPaymentPort } from '../../integrations/payment-gateways/cash-only-payment.port.js';
+import { isCashOnlyPaymentProvider } from '../../platform/config/env.js';
+
 import { UnavailablePaymentPort, type PaymentPort } from './payment-port.js';
 import { PAYMENT_PORT, PAYMENT_REPOSITORY } from './payment.constants.js';
 import { PaymentWebhookController } from './payment-webhook.controller.js';
@@ -75,9 +78,13 @@ function hasMomoKeys(config: ConfigService<AppEnv, true>): boolean {
             );
           }
         }
+        if (isCashOnlyPaymentProvider(provider)) {
+          return new CashOnlyPaymentPort(repository);
+        }
         if (provider === 'sandbox' || provider === undefined) {
           return new SandboxPaymentPort(repository);
         }
+
         if (provider === 'vnpay' && hasVnpayKeys(config)) {
           return new VnpayPaymentPort(
             {

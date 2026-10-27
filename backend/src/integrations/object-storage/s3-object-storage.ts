@@ -57,7 +57,11 @@ export class S3ObjectStorage implements ObjectStorage {
       signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) {
-      throw new Error(`S3 PUT failed with HTTP ${response.status}`);
+      const detail = await response.text().catch(() => '');
+      const code = /<Code>([^<]+)<\/Code>/.exec(detail)?.[1];
+      throw new Error(
+        `S3 PUT failed with HTTP ${response.status}${code ? ` ${code}` : ''}`,
+      );
     }
   }
 

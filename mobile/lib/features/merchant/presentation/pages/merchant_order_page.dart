@@ -3,10 +3,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../utils/merchant_kitchen_lines.dart';
+import '../widgets/merchant_order_change_sheet.dart';
 import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_models.dart';
+import '../../../../core/network/api_exception.dart';
 import '../../../food/domain/entities/food_money.dart';
 import '../../domain/usecases/accept_merchant_order.dart';
 import '../../domain/usecases/get_merchant_order.dart';
@@ -18,6 +20,7 @@ import '../cubit/merchant_order_cubit.dart';
 import '../cubit/merchant_queue_cubit.dart';
 import '../cubit/merchant_states.dart';
 import '../widgets/merchant_widgets.dart';
+import '../../../../core/design_system/components/handover_ref_badge.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/format/short_ref.dart';
 
@@ -45,19 +48,20 @@ class MerchantOrderPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => MerchantOrderCubit(
-        getMerchantOrder: context.read<GetMerchantOrder>(),
-        acceptMerchantOrder: context.read<AcceptMerchantOrder>(),
-        markMerchantOrderReady: context.read<MarkMerchantOrderReady>(),
-        rejectMerchantOrder: context.read<RejectMerchantOrder>(),
-        queue: context.read<MerchantQueueCubit>(),
-        order: order,
-        realtime: context.read<SnapshotRealtime>(),
-      )
-        ..loadLines(merchantAccessToken(context))
-        ..startAutoRefresh(
-          () => context.mounted ? merchantAccessToken(context) : null,
-        ),
+      create: (context) =>
+          MerchantOrderCubit(
+              getMerchantOrder: context.read<GetMerchantOrder>(),
+              acceptMerchantOrder: context.read<AcceptMerchantOrder>(),
+              markMerchantOrderReady: context.read<MarkMerchantOrderReady>(),
+              rejectMerchantOrder: context.read<RejectMerchantOrder>(),
+              queue: context.read<MerchantQueueCubit>(),
+              order: order,
+              realtime: context.read<SnapshotRealtime>(),
+            )
+            ..loadLines(merchantAccessToken(context))
+            ..startAutoRefresh(
+              () => context.mounted ? merchantAccessToken(context) : null,
+            ),
       child: const _MerchantOrderView(),
     );
   }
@@ -83,6 +87,12 @@ class _MerchantOrderView extends StatelessWidget {
         body: MerchantQueueErrorView(
           saved: saved,
           syncedAt: syncedAt,
+          // Network banner is offline-only; pass a stable cause so copy matches.
+          cause: const ApiException(
+            statusCode: 0,
+            message: '',
+            errorCode: 'NETWORK_ERROR',
+          ),
           onRetry: () {
             cubit.clearNetworkBanner();
             cubit.reload(merchantAccessToken(context));
@@ -106,6 +116,17 @@ class _MerchantOrderView extends StatelessWidget {
         message: view.message?.resolve(AppLocalizations.of(context)),
         handoffDone: view.handoffDone,
         handoverCode: view.handoverCode,
+        pendingChange: view.pendingChange,
+        onEditOrder: () async {
+          final change = await showMerchantOrderChangeSheet(
+            context,
+            orderId: view.order.id,
+            lines: view.kitchenLines,
+          );
+          if (change != null && context.mounted) {
+            await cubit.changeProposed(change, merchantAccessToken(context));
+          }
+        },
         onAccept: () => cubit.accept(merchantAccessToken(context)),
         onReject: (reason, note) => cubit.reject(
           merchantAccessToken(context),
@@ -128,6 +149,8 @@ class _Detail extends StatelessWidget {
     required this.handoffDone,
     required this.onAccept,
     this.handoverCode,
+    this.pendingChange,
+    required this.onEditOrder,
     required this.onReject,
     required this.onReady,
     required this.onHandoff,
@@ -139,6 +162,8 @@ class _Detail extends StatelessWidget {
   final String? message;
   final bool handoffDone;
   final String? handoverCode;
+  final FoodOrderChange? pendingChange;
+  final VoidCallback onEditOrder;
   final VoidCallback onAccept;
   final Future<bool> Function(FoodRejectReason reason, String? note) onReject;
   final VoidCallback onReady;
@@ -148,7 +173,8 @@ class _Detail extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     // ASSIGNED = a driver claimed the ready order and is coming to collect it.
-    final ready = order.status == 'READY' ||
+    final ready =
+        order.status == 'READY' ||
         order.status == 'READY_FOR_PICKUP' ||
         order.status == 'ASSIGNED';
     final preparing = order.status == 'PREPARING';
@@ -157,8 +183,9 @@ class _Detail extends StatelessWidget {
     final title = switch (order.status) {
       'PLACED' => l10n.merchantOrderTitleNew,
       'PREPARING' => l10n.merchantOrderTitlePreparing,
-      'READY' || 'READY_FOR_PICKUP' || 'ASSIGNED' =>
-        l10n.merchantOrderTitleReady,
+      'READY' ||
+      'READY_FOR_PICKUP' ||
+      'ASSIGNED' => l10n.merchantOrderTitleReady,
       _ => l10n.merchantOrderTitle,
     };
     final lines = kitchenLines;
@@ -178,7 +205,7 @@ class _Detail extends StatelessWidget {
       footer = MerchantPrimaryBar(
         label: l10n.merchantMarkReady,
         buttonKey: const Key('merchant-ready'),
-        enabled: !busy,
+        enabled: !busy && pendingChange == null,
         loading: busy,
         onPressed: onReady,
       );
@@ -223,6 +250,8 @@ class _Detail extends StatelessWidget {
                         ),
                       ),
                     ),
+                    HandoverRefBadge(orderId: order.id, dense: true),
+                    const SizedBox(width: DealGoSpacing.s8),
                     if (placedAt != null)
                       MerchantChip(
                         label: l10n.merchantOrderPlacedAt(
@@ -537,6 +566,27 @@ class _Detail extends StatelessWidget {
               ),
             ),
           ],
+          if (isPlaced || preparing) ...[
+            const SizedBox(height: DealGoSpacing.s12),
+            if (pendingChange case final change?)
+              MerchantNote(
+                key: const Key('merchant-change-pending'),
+                message: l10n.merchantChangePending(
+                  formatVnd(change.newTotalVnd),
+                  DateFormat('HH:mm').format(change.expiresAt.toLocal()),
+                ),
+              )
+            else if (lines.any((line) => line.id != null))
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: const Key('merchant-edit-order'),
+                  onPressed: busy ? null : onEditOrder,
+                  icon: const Icon(DealGoIcons.edit),
+                  label: Text(l10n.merchantEditOrder),
+                ),
+              ),
+          ],
           if (!preparing && !ready) ...[
             const SizedBox(height: DealGoSpacing.s12),
             MerchantNote(
@@ -681,7 +731,7 @@ class _MerchantRejectDialogState extends State<MerchantRejectDialog> {
               onChanged: (value) => setState(() => _reason = value),
               child: Column(
                 children: [
-                  for (final reason in FoodRejectReason.values)
+                  for (final reason in FoodRejectReason.storeChoices)
                     RadioListTile<FoodRejectReason>(
                       key: Key('merchant-reject-reason-${reason.wire}'),
                       value: reason,

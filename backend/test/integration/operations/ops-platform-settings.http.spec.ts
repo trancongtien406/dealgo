@@ -1,3 +1,4 @@
+import { seedVehicleClassOnDriverGrant } from '../../support/driver-class-fixture.js';
 import { INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
@@ -127,6 +128,7 @@ describe('ops platform settings + faqs http', () => {
     app.useGlobalFilters(new HttpExceptionFilter());
     app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
     await app.init();
+    seedVehicleClassOnDriverGrant(app, identity);
     await app.get(OpsAuthService).ensureOperator(OPS_EMAIL, OPS_PASSWORD, 'test');
 
     const loggedIn = await request(app.getHttpServer())
@@ -214,8 +216,13 @@ describe('ops platform settings + faqs http', () => {
     const byKey = new Map(
       (listed.body.data as Array<{ key: string; value: string }>).map((r) => [r.key, r.value]),
     );
-    expect(byKey.get('PLATFORM_FEE_RIDE_PERCENT')).toBe('0');
-    expect(byKey.get('PLATFORM_FEE_FOOD_PERCENT')).toBe('0');
+    // Commissions per service, all FARE-category and seeded at 0 % (OPEN-003).
+    expect(byKey.get('RIDE_COMMISSION_BIKE_PERCENT')).toBe('0');
+    expect(byKey.get('RIDE_COMMISSION_CAR_PERCENT')).toBe('0');
+    expect(byKey.get('FOOD_DRIVER_COMMISSION_PERCENT')).toBe('0');
+    expect(byKey.get('FOOD_MERCHANT_COMMISSION_PERCENT')).toBe('20');
+    expect(byKey.get('MERCHANT_SETTLEMENT_CYCLE_DAYS')).toBe('7');
+    expect(byKey.has('PLATFORM_FEE_RIDE_PERCENT')).toBe(false);
     const service = app.get(PlatformSettingsService);
     expect(await service.getNumber('RATING_WINDOW_DAYS')).toBe(7);
 
@@ -225,25 +232,29 @@ describe('ops platform settings + faqs http', () => {
         .set('Authorization', `Bearer ${token}`)
         .send({ value, reason: 'fee policy TEST_ONLY' });
     for (const bad of ['-1', '100.5', '12.345', 'abc', '1e1']) {
-      const res = await patch('PLATFORM_FEE_RIDE_PERCENT', bad).expect(400);
+      const res = await patch('RIDE_COMMISSION_CAR_PERCENT', bad).expect(400);
       expect(res.body.errorCode).toBe('PLATFORM_SETTING_INVALID');
     }
     await patch('RATING_WINDOW_DAYS', '2.5').expect(400);
     await patch('RATING_WINDOW_DAYS', '0').expect(400);
 
-    const ok = await patch('PLATFORM_FEE_RIDE_PERCENT', '12.50').expect(200);
+    await patch('PLATFORM_FEE_RIDE_PERCENT', '10').expect(404);
+    await patch('MERCHANT_SETTLEMENT_CYCLE_DAYS', '0').expect(400);
+    await patch('MERCHANT_SETTLEMENT_CYCLE_DAYS', '32').expect(400);
+    const ok = await patch('RIDE_COMMISSION_BIKE_PERCENT', '12.50').expect(200);
     expect(ok.body.data).toMatchObject({ value: '12.5', source: 'db' });
     expect(settingsRepo.audits.at(-1)).toEqual(
       expect.objectContaining({
         reason: 'fee policy TEST_ONLY',
         metadata: expect.objectContaining({
-          key: 'PLATFORM_FEE_RIDE_PERCENT',
+          key: 'RIDE_COMMISSION_BIKE_PERCENT',
           value: '12.5',
           previousValue: '0',
         }),
       }),
     );
-    expect(await service.getNumber('PLATFORM_FEE_RIDE_PERCENT')).toBe(12.5);
+    expect(await service.getNumber('RIDE_COMMISSION_BIKE_PERCENT')).toBe(12.5);
+    expect(await service.getNumber('RIDE_COMMISSION_CAR_PERCENT')).toBe(0);
     await patch('RATING_WINDOW_DAYS', '14').expect(200);
     expect(await service.getNumber('RATING_WINDOW_DAYS')).toBe(14);
   });
@@ -344,14 +355,14 @@ describe('ops platform settings + faqs http', () => {
       .post('/v1/rides')
       .set('Authorization', `Bearer ${customerNear.token}`)
       .set('Idempotency-Key', `radius-near-${Date.now()}`)
-      .send({ pickup: origin, dropoff: nearDrop, offeredFareVnd: 30_000 })
+      .send({ pickup: origin, dropoff: nearDrop, offeredFareVnd: 30_000, vehicleClassCode: 'MOTORBIKE'})
       .expect(200);
 
     await request(app.getHttpServer())
       .post('/v1/rides')
       .set('Authorization', `Bearer ${customerFar.token}`)
       .set('Idempotency-Key', `radius-far-${Date.now()}`)
-      .send({ pickup: farPickup, dropoff: farDrop, offeredFareVnd: 30_000 })
+      .send({ pickup: farPickup, dropoff: farDrop, offeredFareVnd: 30_000, vehicleClassCode: 'MOTORBIKE'})
       .expect(200);
 
     await request(app.getHttpServer())

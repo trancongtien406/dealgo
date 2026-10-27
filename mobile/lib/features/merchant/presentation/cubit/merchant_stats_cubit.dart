@@ -16,14 +16,30 @@ final class MerchantStatsLoading extends MerchantStatsState {
 }
 
 final class MerchantStatsReady extends MerchantStatsState {
-  const MerchantStatsReady({required this.stats, this.store, this.rating});
+  const MerchantStatsReady({
+    required this.stats,
+    this.store,
+    this.rating,
+    this.reviews,
+    this.reviewsFailure,
+    this.statement,
+  });
 
   final MerchantStats stats;
+
+  /// Commission statement for the same window; null when it failed to load.
+  final MerchantStatement? statement;
   final FoodStoreDetail? store;
 
   /// Public store rating; [StoreRating.average] stays null below the
   /// RATING_STORE_MIN_COUNT threshold.
   final StoreRating? rating;
+
+  /// Newest reviews for [store]. Null when the store id is unavailable.
+  final StoreReviews? reviews;
+
+  /// Review-list load error. The stats figures still render.
+  final Object? reviewsFailure;
 }
 
 final class MerchantStatsIneligible extends MerchantStatsState {
@@ -59,6 +75,19 @@ class MerchantStatsCubit extends Cubit<MerchantStatsState> {
       final stats = await _stats.stats(accessToken: token, days: days);
       FoodStoreDetail? store;
       StoreRating? rating;
+      StoreReviews? reviews;
+      Object? reviewsFailure;
+      MerchantStatement? statement;
+      try {
+        final range = statementRange(days, DateTime.now());
+        statement = await _stats.statement(
+          accessToken: token,
+          from: range.$1,
+          to: range.$2,
+        );
+      } catch (_) {
+        // The statement is an extra card; sales figures still render.
+      }
       try {
         store = await _catalog?.call(token);
         if (store != null) {
@@ -70,10 +99,31 @@ class MerchantStatsCubit extends Cubit<MerchantStatsState> {
       } catch (_) {
         // Name and rating are decoration; the figures still render.
       }
+      final ratings = _ratings;
+      final storeId = store?.id;
+      if (ratings != null && storeId != null && storeId.isNotEmpty) {
+        try {
+          reviews = await ratings.storeReviews(
+            accessToken: token,
+            storeId: storeId,
+          );
+        } catch (error) {
+          reviewsFailure = error;
+        }
+      }
       if (isClosed || generation != _generation) {
         return;
       }
-      emit(MerchantStatsReady(stats: stats, store: store, rating: rating));
+      emit(
+        MerchantStatsReady(
+          stats: stats,
+          store: store,
+          rating: rating,
+          reviews: reviews,
+          reviewsFailure: reviewsFailure,
+          statement: statement,
+        ),
+      );
     } on ApiException catch (error) {
       if (isClosed || generation != _generation) {
         return;
@@ -89,4 +139,13 @@ class MerchantStatsCubit extends Cubit<MerchantStatsState> {
       }
     }
   }
+}
+
+/// `[from, to]` Vietnam days covering the last [days] days including today.
+(String, String) statementRange(int days, DateTime now) {
+  final vn = now.toUtc().add(const Duration(hours: 7));
+  String key(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  final span = days.clamp(1, 31);
+  return (key(vn.subtract(Duration(days: span - 1))), key(vn));
 }

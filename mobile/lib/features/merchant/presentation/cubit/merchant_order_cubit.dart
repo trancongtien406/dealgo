@@ -30,7 +30,11 @@ final class MerchantOrderViewReady extends MerchantOrderViewState {
     this.handoffDone = false,
     this.message,
     this.handoverCode,
+    this.pendingChange,
   });
+
+  /// Edit waiting for the customer; "ready" is blocked meanwhile.
+  final FoodOrderChange? pendingChange;
 
   /// DEC-PROD-036: store-only code the driver enters at pickup (when the setting is on).
   final String? handoverCode;
@@ -54,6 +58,8 @@ final class MerchantOrderViewReady extends MerchantOrderViewState {
     bool clearMessage = false,
     String? handoverCode,
     bool clearHandoverCode = false,
+    FoodOrderChange? pendingChange,
+    bool clearPendingChange = false,
   }) {
     return MerchantOrderViewReady(
       order: order ?? this.order,
@@ -66,6 +72,9 @@ final class MerchantOrderViewReady extends MerchantOrderViewState {
       handoverCode: clearHandoverCode
           ? null
           : (handoverCode ?? this.handoverCode),
+      pendingChange: clearPendingChange
+          ? null
+          : (pendingChange ?? this.pendingChange),
     );
   }
 }
@@ -198,6 +207,8 @@ class MerchantOrderCubit extends Cubit<MerchantOrderViewState> {
           kitchenLines: kitchenLinesFromDetail(detail),
           handoverCode: detail.handoverCode,
           clearHandoverCode: detail.handoverCode == null,
+          pendingChange: detail.pendingChange,
+          clearPendingChange: detail.pendingChange?.pending != true,
         ),
       );
       _syncAutoRefresh();
@@ -227,6 +238,15 @@ class MerchantOrderCubit extends Cubit<MerchantOrderViewState> {
 
   Future<void> markReady(String? accessToken) {
     return _mutate(accessToken, _markMerchantOrderReady.call);
+  }
+
+  /// After the store sent an edit: show it as pending right away, then refetch.
+  Future<void> changeProposed(
+    FoodOrderChange change,
+    String? accessToken,
+  ) async {
+    emit(_ready.copyWith(pendingChange: change, clearMessage: true));
+    await loadLines(accessToken);
   }
 
   void markHandoffDone() {

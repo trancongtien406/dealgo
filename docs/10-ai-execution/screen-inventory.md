@@ -1,10 +1,10 @@
 ---
 doc_id: DG-AI-010
 title: "DealGo — Screen inventory (design ↔ routes)"
-version: "2.1.0"
+version: "2.2.0"
 status: "ACTIVE"
 owner: "UI Designer"
-last_updated: "2026-10-25"
+last_updated: "2026-10-26"
 related:
   - ../DealGo_MD_File_List.md
   - ../01-product/product-requirements.md
@@ -15,11 +15,11 @@ related:
 
 # Screen inventory — design mockups ↔ implementation
 
-> **Reality pass 2.0 (round 12d).** Re-audited against code, not against earlier plans:
+> **Sources audited against code:**
 > mobile routes in `mobile/lib/app/router/app_router.dart` + `features/**/utils/*_routes.dart` + `shell/presentation/account_routes.dart`;
 > Admin routes in `website/app/**/page.tsx` and the `/api/ops/*` BFF → Nest `v1/ops/*` controllers.
 > Mockups: `design/mockups/screens/{customer,driver,merchant,admin,shared}` (C001–C048, D001–D045, M001–M044, A001–A035, S001–S028).
-> Since 1.0.0 the mobile app no longer runs on fixtures: every live route below reads/writes Nest (fake clients only in tests / `useMockData`).
+> Every live route below reads/writes Nest; fake clients exist only in tests and when `USE_MOCK_DATA` is set.
 > **Do not invent fees or OPEN-* policies** from mockup copy (illustrative prices are design fixtures).
 
 ## Status legend
@@ -34,9 +34,9 @@ related:
 
 ## Platform facts that apply to many rows
 
-- **Maps:** `MapPort` — `TileMapPort` (flutter_map over `MAP_TILE_URL` raster tiles) when configured, otherwise `PlaceholderMapView` chrome. Admin monitor/detail maps read `NEXT_PUBLIC_MAPBOX_TOKEN` only for tiles (no hardcoded token) and fall back to the non-map view (DEC-PROD-031/032); road routes come from Nest `GET /v1/ops/routing/route` (`ROUTING_PROVIDER`, straight line when unconfigured, DEC-PROD-045).
-- **Live updates:** ride/food tracking poll + realtime driver location; driver presence via duty cubit.
-- **Payments:** COD only (MVP). No card/wallet rails.
+- **Maps:** `MapPort` — `TileMapPort` (flutter_map; Mapbox raster from `MAPS_API_KEY`, or `MAP_TILE_URL` override) when configured, otherwise `PlaceholderMapView` chrome. With a Mapbox source the user picks a map style (Chuẩn `streets-v12` / Vệ tinh `satellite-streets-v12` / Tối `dark-v11`) from a compact layers button; the choice is saved (`map_style` pref) and applies to every live map, switching only the tile URL (attribution adds © Maxar for satellite). A custom `MAP_TILE_URL` has a single look and shows no switcher. Admin monitor/detail maps read `NEXT_PUBLIC_MAPBOX_TOKEN` only for tiles (no hardcoded token) and fall back to the non-map view (DEC-PROD-031/032); road routes come from Nest `GET /v1/ops/routing/route` (`ROUTING_PROVIDER`, straight line when unconfigured, DEC-PROD-045).
+- **Live updates:** driver location is **pushed** via Socket.IO `ride-location:`/`food-location:` rooms (REST snapshot only on open/reconnect, DEC-PROD-031); status and offers via `ride:`/`food:` snapshot rooms — no offer polling. Driver GPS cadence follows the server policy per mode (client default before the first reply: 15 s / 50 m / 60 s keep-alive). Markers: pickup dot, dropoff pin, top-down vehicle icon per class rotated by heading (`core/maps/map_markers.dart`).
+- **Payments:** cash only at launch. Platform fees on cash jobs become driver debt (Admin driver detail, `DRIVER_DEBT_LIMIT_VND`); merchants pay commission per closed settlement period (Admin store detail). No card/wallet/payout rails.
 - **Uploads:** KYC/KYB documents are sent as base64 in the partner application and served to Ops via `GET /v1/ops/partner-applications/:id/documents/:index`.
 
 ---
@@ -45,10 +45,10 @@ related:
 
 | Design id | Title | Route path | Status | Notes |
 |---|---|---|---|---|
-| C001 | Trang chủ DealGo (Golden) | `/customer` | LIVE | Home search, services, stores from Nest |
-| C002 | Bản đồ đặt xe / chọn hành trình | `/customer/book` | LIVE | `RideMapPage`; place search; tile map when configured |
+| C001 | Trang chủ DealGo (Golden) | `/customer` | LIVE | Home search; **one “Đặt xe” entry** (class chosen inside the flow, `DG-DEC-VEH-001`) + Food; stores from Nest |
+| C002 | Bản đồ đặt xe / chọn hành trình | `/customer/book` | LIVE | `RideMapPage`; map-first + draggable bottom sheet; round back button top-left (pops, or returns to Home when the tab is the root) and Android/iOS system back do the same; recenter + map-style buttons top-right; place search; A→B Mapbox route line |
 | C003 | Tổng quan điểm đón/đến & tuyến | `/customer/ride/route` | LIVE | Server quote (distance/duration) |
-| C004 | Chọn loại phương tiện (Golden) | `/customer/ride/vehicle` | LIVE | Only motorbike is dispatched: single pre-selected option priced from the server quote |
+| C004 | Chọn loại phương tiện (Golden) | `/customer/ride/vehicle` | FOLDED | Hot path picks class (MOTORBIKE / CAR_4 / CAR_7) inside C006 fare sheet; standalone route kept (`app_router.dart:344`). MOTORBIKE + CAR catalog (`DG-DEC-VEH-001`); customer must pick `vehicleClassCode`; priced from server quote / class knobs (OPEN-003 Car tariffs still OPEN) |
 | C005 | Chi tiết giá cước / điều kiện | `/customer/ride/fare-detail` | LIVE | From the server quote; prices first if opened without one |
 | C006 | Tự đề xuất giá chuyến | `/customer/ride/fare` | LIVE | Fare bid within server bounds |
 | C007 | Danh sách tài xế chào giá | `/customer/ride/offers/:rideId` | LIVE | Sort, match/counter chips; empty/expired/taken states |
@@ -78,7 +78,7 @@ related:
 | C031 | Báo giá giao của tài xế | — | DEFERRED | With C030 |
 | C032 | Đặt hàng thành công | `/customer/food/order-success` | LIVE | |
 | C033 | Theo dõi đơn Food | `/customer/food/orders/:orderId` | LIVE | Reconnect state; driver location; delivery code while on the way (DEC-PROD-036) |
-| C034 | Xác nhận thay món / giá | — | DEFERRED | P1 partial adjustments (merchant M018 too) |
+| C034 | Xác nhận thay món / giá | `/customer/food/orders/:orderId` | FOLDED | Order-change card on tracking: accept or cancel within `FOOD_ORDER_CHANGE_RESPONSE_MINUTES` |
 | C035 | Hủy đơn & chọn lý do | `/customer/food/orders/:orderId/cancel` | LIVE | |
 | C036 | Chi tiết đơn / hóa đơn Food | `/customer/food/orders/:orderId/invoice` | LIVE | Option lines; rating card |
 | C037 | Đánh giá món / quán / giao | `/customer/food/orders/:orderId/invoice` | LIVE | Store stars + driver stars + comment (`RateServiceCard`); no per-dish score |
@@ -94,7 +94,7 @@ related:
 | C047 | Chi tiết hoàn tiền | — | DEFERRED | COD only — no customer-side refunds yet; Ops sees `/refunds` |
 | C048 | Danh sách đơn/chuyến đặt trước | — | DEFERRED | P2 |
 
-**Customer:** LIVE 31 · PARTIAL 3 · DEFERRED 14 · MISSING 0.
+**Customer:** LIVE 31 · PARTIAL 3 · FOLDED 1 · DEFERRED 13 · MISSING 0.
 
 ---
 
@@ -122,12 +122,12 @@ related:
 | D018 | Job feed yêu cầu mở | `/driver/jobs` | LIVE | Rides + ready food orders in radius; `D018__job_taken` |
 | D019 | Chi tiết yêu cầu & thu nhập | `/driver/rides/:rideId`, `/driver/food/:orderId` | LIVE | Server fields only |
 | D020 | Báo giá / trả giá với khách | `/driver/rides/:rideId/offer` | LIVE | |
-| D021 | Chuyến đã nhận / điều hướng đón | `/driver/rides/:rideId/active` | LIVE | MapPort map + Google Maps / Waze hand-off (DEC-PROD-035) |
+| D021 | Chuyến đã nhận / điều hướng đón | `/driver/rides/:rideId/active` | LIVE | MapPort map with Đón/Đến pins + "Điều hướng" sheet (DEC-PROD-035) |
 | D022 | Đã đến điểm đón / chờ | `/driver/rides/:rideId/active` | LIVE | |
 | D023 | Nhập OTP hành khách | `/driver/rides/:rideId/otp` | LIVE | Server-verified code |
 | D024 | Bản đồ chuyến đang chạy | `/driver/rides/:rideId/active` | LIVE | MapPort map (13a; was a static box) + nav hand-off to dropoff |
 | D025 | Kết thúc chuyến / thu tiền | `/driver/rides/:rideId/active` | LIVE | COD |
-| D026 | Điều hướng tới quán lấy đơn | `/driver/food/:orderId` | LIVE | Map from the order's pickup snapshot (DEC-PROD-034) + Google Maps / Waze |
+| D026 | Điều hướng tới quán lấy đơn | `/driver/food/:orderId` | LIVE | Map from the order's pickup snapshot (DEC-PROD-034) with Quán/Giao pins + "Điều hướng" sheet |
 | D027 | Đến quán chờ món | `/driver/food/:orderId` | LIVE | |
 | D028 | Xác nhận lấy món | `/driver/food/:orderId` | LIVE | Server pickup |
 | D029 | Bản đồ giao tới khách | `/driver/food/:orderId` | LIVE | Same map, dropoff focus |
@@ -173,7 +173,7 @@ related:
 | M015 | Hàng đợi đơn (Golden) | `/merchant/orders` | LIVE | Empty/error states |
 | M016 | Chi tiết đơn & xác nhận | `/merchant/orders/:orderId` | LIVE | Accept/reject, option lines; conflict state |
 | M017 | Bếp đang chế biến | `/merchant/orders` | FOLDED | "Preparing" section + kitchen lines; mark ready |
-| M018 | Điều chỉnh món / giá | — | DEFERRED | P1 with C034 |
+| M018 | Điều chỉnh món / giá | `/merchant/orders/:orderId` | FOLDED | Order-change sheet (out of stock / quantity), customer confirms (C034) |
 | M019 | Bàn giao & mã tài xế | `/merchant/orders/:orderId` | LIVE | Server **handover code** shown while ASSIGNED; driver enters it at pickup when `FOOD_HANDOVER_CODE_REQUIRED` (default off, DEC-PROD-036) |
 | M020 | Lịch sử đơn Shop | `/merchant/history` | LIVE | Finished orders + filters/search (DEC-PROD-039) |
 | M021 | Đơn hủy / bồi hoàn / tranh chấp | — | DEFERRED | Ops `/disputes`, `/refunds` |
@@ -201,7 +201,7 @@ related:
 | M043 | Mời / sửa quyền nhân viên | — | DEFERRED | Multi-staff |
 | M044 | Cập nhật giấy tờ hết hạn | — | DEFERRED | Same as D015 |
 
-**Merchant:** LIVE 18 · PARTIAL 3 · FOLDED 8 · DEFERRED 15 · MISSING 0.
+**Merchant:** LIVE 18 · PARTIAL 3 · FOLDED 9 · DEFERRED 14 · MISSING 0.
 
 ---
 
@@ -228,14 +228,14 @@ All pages read Nest through the `/api/ops/*` BFF; none renders fixtures.
 | A015 | Danh sách khách hàng | `/customers` | LIVE | |
 | A016 | Chi tiết khách hàng | `/customers/[code]` | LIVE | Activities; account-deletion restore needs `customers.write` (DEC-PROD-045) |
 | A017 | Danh sách tài xế | `/drivers` | LIVE | Real trips count (DEC-PROD-034) |
-| A018 | Chi tiết tài xế | `/drivers/[code]` | LIVE | Real trips + completion rate (driver cancels only, DEC-PROD-035); balance card hidden until a wallet exists |
+| A018 | Chi tiết tài xế | `/drivers/[code]` | LIVE | Real trips + completion rate (driver cancels only, DEC-PROD-035); platform-fee debt card (balance, payments, mark collected; audited) |
 | A019 | Duyệt KYC tài xế | `/drivers/kyc`, `/drivers/kyc/[code]` | LIVE | Documents viewer, approve/reject |
 | A020 | Danh sách cửa hàng | `/stores` | LIVE | |
 | A021 | Chi tiết cửa hàng | `/stores/[code]` | LIVE | |
 | A022 | Duyệt hồ sơ cửa hàng | `/stores/approvals` | LIVE | |
 | A023 | Kiểm duyệt sản phẩm / thực đơn | `/catalog/moderation` | LIVE | Approve/reject items |
 | A024 | Danh sách giao dịch | `/transactions` | LIVE | Read-only |
-| A025 | Đối soát & thanh toán đối tác | `/settlements` | PARTIAL | Day buckets read-only; **no payout execution** |
+| A025 | Đối soát & thanh toán đối tác | `/settlements`, `/stores/[code]` | PARTIAL | Day buckets (ICT) read-only; store commission statement per `MERCHANT_SETTLEMENT_CYCLE_DAYS` with "store paid" record; **no payout execution** |
 | A026 | Xử lý hoàn tiền | `/refunds` | PARTIAL | List only (COD — no refund rail) |
 | A027 | Khiếu nại / tranh chấp | `/disputes` | LIVE | |
 | A028 | Chi tiết xử lý khiếu nại | `/disputes/[code]` | LIVE | Resolve |
@@ -305,8 +305,8 @@ Extra Admin routes without a mockup id: `/support-tickets`, `/support-tickets/[i
 | S012 | Edit profile | `/{role}/edit-profile` | LIVE | Name/email/avatar (DEC-PROD-038) |
 | S013 | Saved addresses | `/{role}/account/addresses` | LIVE | |
 | S014 | Add/edit address | addresses sheet | LIVE | `address_form_sheet` |
-| S015 | Place search | place picker | LIVE | `S015__search_empty` |
-| S016 | Map pin | place picker | PARTIAL | Pin on tile map when configured; `S016__location_denied` |
+| S015 | Place search | place picker | LIVE | `S015__search_empty`; header back + iOS edge swipe-back (platform page); rows: current location, "Chọn trên bản đồ", recent/saved, results |
+| S016 | Map pin | `MapPinPickerPage` (from S015 "Chọn trên bản đồ" and the address form map button) | LIVE | Centre pin over a draggable map; address resolves once the map rests (500 ms) through an LRU cache (~11 m cells, 64 entries, in-flight dedup); search inside the picker (350 ms debounce, no reverse call for a picked result); my-location (denied → Settings action); style switcher; zoom by pinch/double-tap; attribution; confirm returns the pinned place; back closes search first, then the picker. Serves ride pickup/dropoff, food delivery, saved addresses and merchant store pin (`S016__location_denied`) |
 | S017 | Payment methods | — | DEFERRED | COD only (MVP) |
 | S018 | Link payment | — | DEFERRED | No payment rail |
 | S019 | Help center | `/{role}/account/help` | LIVE | FAQs from Ops |
@@ -324,7 +324,7 @@ Extra Admin routes without a mockup id: `/support-tickets`, `/support-tickets/[i
 
 ---
 
-## 6. Final gap list (round 12d)
+## 6. Gap list
 
 ### (a) Done — MVP journeys live end to end
 
@@ -343,9 +343,8 @@ Extra Admin routes without a mockup id: `/support-tickets`, `/support-tickets/[i
 | Scheduled / multi-stop / pre-orders | C019–C021, C041, C048 | P2 in PRD; no scheduling engine |
 | Change destination mid-trip | C015 | Re-pricing a negotiated fare needs policy |
 | Food delivery fee bidding, delivery tiers | C030, C031, C040 | Food fee is server-priced; tiers need policy |
-| Item/price adjustment after order | C034, M018 | P1 partial-adjustment flow |
 | Favourites, promo detail, store-level promos, review replies | C039, C045, M040, M041, M031 (reply) | P1 marketing/review depth |
-| Wallets, payouts, withdrawals, refunds to customer | D036–D039, M008, M034–M038, C047, S017, S018, A025 payout, A026 execution, A018 balance | COD-only MVP; no payment/payout rail |
+| Wallets, payouts, withdrawals, refunds to customer | D036–D039, M008, M034–M038, C047, S017, S018, A025 payout, A026 execution | Cash-only launch; no payment/payout rail |
 | Other verticals | C042, A013, A014 | Non-MVP (DEC-PROD-001) |
 | Multi-branch, merchant staff | M014, M042, M043 | P1 |
 | Document expiry / re-verification, vehicle change | D015, M044, D041 | Backend does not track document expiry yet |
@@ -356,21 +355,21 @@ Extra Admin routes without a mockup id: `/support-tickets`, `/support-tickets/[i
 | OCR / liveness | D005, D006 parts | Needs a vendor |
 | seed-scale raw-SQL orders without pickup snapshot | — | Read path falls back to the store point |
 
-### (c) Decided in round 13 (DEC-PROD-035 … DEC-PROD-039)
+### (c) Product decisions applied (DEC-PROD-035 … DEC-PROD-040)
 
-> Status per item: **13a** done = 3, 4, 8, 9, 10 · **13b** done = 5, 7, 11 · **13c** done = 1 (+ super-admin UI, merchant ASSIGNED refresh) · **13d** done = 2 (S012/S024/S025/S028) · **13e** done = 6 (M027/M025/A030/M020) · **13f** closes soft gaps of 6 (photo upload + category DnD).
+| Topic | Ids | Current behaviour |
+|---|---|---|
+| Account deletion | S027 | Re-auth, blockers, grace period + purge (DEC-PROD-037) |
+| Profile, notification prefs, security, sessions | S012, S024, S025, S028 | Live (DEC-PROD-038) |
+| Customer cancel after driver assigned | C011 | Allowed; `cancelledBy` recorded; late-cancel fee rules in [cancellation domain](../02-domain/cancellation-refund-disputes.md) (DEC-PROD-035) |
+| Driver navigation | Driver ride/food job pages | One "Điều hướng" button → bottom sheet (Google Maps, Apple Maps on iOS, Waze, Google Maps web), destination follows the phase |
+| Food delivery proof | D030 | Delivery code (`FOOD_DELIVERY_CODE_REQUIRED`, default on); no proof photo (DEC-PROD-036) |
+| Merchant handoff code | M019 | `FOOD_HANDOVER_CODE_REQUIRED`, default off (DEC-PROD-036) |
+| Merchant item editing, categories, order history | M027, M025, A030, M020 | Live incl. photo upload and category drag-reorder (DEC-PROD-039, DEC-PROD-040) |
+| Tip | C018 | Out of scope; no tip UI (DEC-PROD-035) |
+| Admin password reset | A002 | Super-admin reset; forgot page tells staff to contact an admin |
 
-1. **Account deletion (S027)** — **done in 13c** (DEC-PROD-037).
-2. **Edit profile / notification prefs / security / sessions (S012, S024, S025, S028)** — **done in 13d** (DEC-PROD-038).
-3. **Customer cancel after driver assigned** — **done in 13a** (DEC-PROD-035 `cancelledBy`).
-4. **Driver navigation** — **done in 13a** (Google Maps / Waze buttons).
-5. **Food delivery proof (D030)** — **OTP mã giao hàng done in 13b** (DEC-PROD-036); photo-at-handoff still open if needed.
-6. **Merchant item editing (M027) + category CRUD (M025/A030) + order history (M020)** — **done in 13e** (DEC-PROD-039); **photo upload + category drag-reorder done in 13f** (DEC-PROD-040).
-7. **Merchant handoff code (M019)** — **mechanism done in 13b** (setting `FOOD_HANDOVER_CODE_REQUIRED`, default off); product choice whether to turn on by default.
-8. **Tip (C018)** — **out of scope / done in 13a** (no tip UI).
-9. **Driver "Số dư khả dụng" (A018)** — **done in 13a** (card hidden until wallet).
-10. **Option images / per-option quantity limits (C026/M028)** — needed?
-11. **Admin password reset (A002)** — **done in 13b/13c** (super-admin reset + forgot page points to contact admin).
+**Open product question:** option images and per-option quantity limits (C026/M028).
 
 ---
 
@@ -380,14 +379,6 @@ Extra Admin routes without a mockup id: `/support-tickets`, `/support-tickets/[i
 - Catalog titles: `docs/DealGo_MD_File_List.md`
 - Mobile routes: `mobile/lib/app/router/app_router.dart`, `features/**/utils/*_routes.dart`, `features/shell/presentation/account_routes.dart`
 - Admin routes: `website/app/**/page.tsx`; BFF paths `website/lib/api/paths.ts`; Nest `backend/src/**/*controller.ts`
-- Decisions: `docs/00-governance/decisions-and-assumptions.md` (DEC-PROD-001…045)
+- Decisions: `docs/00-governance/decisions-and-assumptions.md`
 
-**NOT_VISUALLY_VERIFIED:** pixel parity for every frame on a physical device; screenshots cover the golden set and the screens changed in rounds 10–12.
-
-<!-- round13e applied 2026-10-19T14:17:28+00:00 -->
-
-<!-- round13f applied -->
-
-<!-- round14a applied -->
-<!-- round14b applied DEC-PROD-042 -->
-<!-- round14c applied DEC-PROD-043 -->
+**NOT_VISUALLY_VERIFIED:** pixel parity for every frame on a physical device; screenshots cover the golden set only.

@@ -27,5 +27,18 @@ services:
       timeout: 5s
       retries: 10
 
+  # In-app voice calls (dev only). `--dev` uses API key `devkey` / secret `secret`; never use in production.
+  # 7880 = signalling (LIVEKIT_URL), 7881 = WebRTC over TCP, 7882/udp = WebRTC media.
+  # --node-ip: the address put in ICE candidates. Without it LiveKit advertises the
+  # container IP (172.x), which apps cannot reach, and the call never connects audio.
+  # Set LIVEKIT_NODE_IP to the Mac's LAN IP (same host as LIVEKIT_URL) for phones / sims.
+  livekit:
+    image: livekit/livekit-server:v1.13.11 # same tag as deploy/livekit (production)
+    command: ["--dev", "--bind", "0.0.0.0", "--node-ip", "${LIVEKIT_NODE_IP:-127.0.0.1}"]
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+
 volumes:
   dealgo_postgres:

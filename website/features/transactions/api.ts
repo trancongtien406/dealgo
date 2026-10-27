@@ -5,8 +5,10 @@ import type {
 import { apiFetch } from "@/lib/api/client";
 import type { ListQuery, PaginatedList } from "@/lib/api/pagination";
 import { apiPaths } from "@/lib/api/paths";
+import { setOpsDateRange, type OpsDateRange } from "@/lib/api/ops-date-range";
 
-export type FetchTransactionsParams = ListQuery & {
+export type FetchTransactionsParams = ListQuery &
+  OpsDateRange & {
   status?: TxStatus | "ALL";
   service?: string | null;
   payment?: string | null;
@@ -25,6 +27,7 @@ export async function fetchTransactions(
     search.set("service", params.service);
   if (params.payment && params.payment !== "ALL")
     search.set("payment", params.payment);
+  setOpsDateRange(search, params);
 
   const envelope = await apiFetch<{
     success: boolean;

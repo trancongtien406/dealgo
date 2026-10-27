@@ -11,13 +11,17 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('driver kyc submit calls partner API when not mock', () async {
     final partners = FakePartnerApplicationsClient();
-    final cubit = DriverKycCubit(
-      submitPartnerApplication: SubmitPartnerApplication(
-        PartnerApplicationsRepositoryImpl(partners),
-      ),
-      accessToken: () => 'access-token',
-      useMock: false,
-    )..goToStep(DriverKycStep.review);
+    final cubit =
+        DriverKycCubit(
+            submitPartnerApplication: SubmitPartnerApplication(
+              PartnerApplicationsRepositoryImpl(partners),
+            ),
+            accessToken: () => 'access-token',
+            useMock: false,
+          )
+          // Fail closed: submit requires an explicit vehicle class (DG-DEC-VEH-001).
+          ..setVehicleClass(code: 'MOTORBIKE', name: 'Xe máy')
+          ..goToStep(DriverKycStep.review);
 
     await cubit.submit();
 

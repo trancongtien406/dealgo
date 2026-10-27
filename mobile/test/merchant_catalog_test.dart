@@ -185,7 +185,10 @@ void main() {
       );
       final state = cubit.state as MerchantCatalogReady;
       expect(state.store.items.single.available, isTrue);
-      expect((state.actionError!.error! as ApiException).message, 'Not store owner');
+      expect(
+        (state.actionError!.error! as ApiException).message,
+        'Not store owner',
+      );
       expect(
         state.actionError!.resolve(lookupAppLocalizations(const Locale('vi'))),
         'Tài khoản không quản lý cửa hàng này.',

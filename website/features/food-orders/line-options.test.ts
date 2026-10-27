@@ -42,7 +42,10 @@ describe("food order line options (DEC-PROD-033)", () => {
       ],
     };
     const row = mapNestFoodOrderToListItem(order);
-    expect(row.lines.map((line) => line.options)).toEqual(["Size: L (+10.000đ)", ""]);
+    expect(row.lines.map((line) => line.options)).toEqual([
+      "Size: L (+10.000đ)",
+      "",
+    ]);
     expect(row.lines[0].unitPriceVnd).toBe(63000);
   });
 });

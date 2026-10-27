@@ -1,9 +1,24 @@
 import { cancelActorLabel } from "@/lib/cancel-actor";
+import { rideCancelReasonLabel } from "@/lib/ride-cancel-reason";
 import type { StatusTone } from "@/lib/admin-format";
 import type { NestRideStatus, NestRideView } from "@/features/rides/nest-types";
 import type { GeoPoint, RideListItem, RideStatus } from "@/features/rides/types";
 import type { OpsPerson } from "@/lib/api/ops-people";
 import { formatOpsClock } from "@/lib/ops-time";
+
+
+const VEHICLE_CLASS_LABELS: Record<string, string> = {
+  MOTORBIKE: "Xe máy",
+  CAR: "Ô tô",
+  CAR_4: "Xe 4 chỗ",
+  CAR_7: "Xe 7 chỗ",
+};
+
+/** Admin label for a Nest `vehicleClassCode` (DG-P1-001). */
+export function rideVehicleClassLabel(code: string | null | undefined): string {
+  if (!code) return "—";
+  return VEHICLE_CLASS_LABELS[code] ?? code;
+}
 
 const nestRideStatusMap: Record<NestRideStatus, RideStatus> = {
   NEGOTIATING: "WAITING",
@@ -38,7 +53,8 @@ export function mapNestRideToListItem(ride: NestRideView): RideListItem {
     pickupArea: areaHint(pickupLabel),
     dropoff: dropoffLabel,
     dropoffArea: areaHint(dropoffLabel),
-    seats: ride.status === "NEGOTIATING" ? "Đang thương lượng" : "—",
+    seats: rideVehicleClassLabel(ride.vehicleClassCode),
+    vehicleClassCode: ride.vehicleClassCode ?? null,
     price: ride.agreedFareVnd ?? ride.offeredFareVnd,
     discountVnd: ride.discountVnd ?? 0,
     voucherCode: ride.voucherCode ?? null,
@@ -47,6 +63,7 @@ export function mapNestRideToListItem(ride: NestRideView): RideListItem {
       Math.max(0, (ride.agreedFareVnd ?? ride.offeredFareVnd) - (ride.discountVnd ?? 0)),
     status: nestRideStatusToFeature(ride.status),
     cancelledBy: cancelActorLabel(ride.cancelledBy),
+    cancelReason: rideCancelReasonLabel(ride.cancelReasonCode, ride.noShow),
     time: formatOpsClock(ride.expiresAt),
     pickupPoint: geoPoint(ride.pickup),
     dropoffPoint: geoPoint(ride.dropoff),

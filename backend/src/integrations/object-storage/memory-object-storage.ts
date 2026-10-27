@@ -28,7 +28,8 @@ export class MemoryObjectStorage implements ObjectStorage {
 
   async *list(prefix: string): AsyncIterable<ListedObject> {
     assertSafeObjectKey(prefix);
-    for (const [key, value] of [...this.objects.entries()]) {
+    // Snapshot first: callers may delete while iterating.
+    for (const [key, value] of Array.from(this.objects.entries())) {
       if (key.startsWith(`${prefix}/`)) {
         yield { key, lastModified: value.lastModified };
       }

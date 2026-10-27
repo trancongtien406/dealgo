@@ -34,7 +34,19 @@ import {
   STORE_SERVICE_MODES,
   type StoreServiceMode,
 } from './store-service-mode.js';
-import { FOOD_REJECT_NOTE_MAX, FOOD_REJECT_REASONS, type FoodRejectReason } from './food.constants.js';
+import {
+  FOOD_DRIVER_RELEASE_REASONS,
+  FOOD_REJECT_NOTE_MAX,
+  FOOD_REJECT_REASONS,
+  type FoodDriverReleaseReason,
+  type FoodRejectReason,
+  FOOD_FAIL_REASONS,
+  FOOD_FAIL_NOTE_MAX,
+  type FoodFailReason,
+  FOOD_ORDER_CHANGE_REASONS,
+  type FoodOrderChangeReason,
+} from './food.constants.js';
+import { OpsDateRangeQueryDto } from '../operations/ops-date-window.js';
 
 export const FOOD_STORE_SORT_BY = ['name', 'createdAt', 'distance'] as const;
 export type FoodStoreSortBy = (typeof FOOD_STORE_SORT_BY)[number];
@@ -323,6 +335,24 @@ export class MerchantHistoryQueryDto {
   to?: string;
 }
 
+/** Why the assigned driver hands an order back before pickup. */
+export class ReleaseFoodOrderDto {
+  @IsIn(FOOD_DRIVER_RELEASE_REASONS)
+  reasonCode!: FoodDriverReleaseReason;
+}
+
+/** Failure report after pickup. */
+export class FailFoodOrderDto {
+  @IsIn(FOOD_FAIL_REASONS)
+  reasonCode!: FoodFailReason;
+
+  /** Required when reasonCode is OTHER. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(FOOD_FAIL_NOTE_MAX)
+  note?: string;
+}
+
 export class RejectFoodOrderDto {
   @IsIn(FOOD_REJECT_REASONS)
   reasonCode!: FoodRejectReason;
@@ -332,6 +362,36 @@ export class RejectFoodOrderDto {
   @IsString()
   @MaxLength(FOOD_REJECT_NOTE_MAX)
   note?: string;
+}
+
+/** One edited order line. */
+export class FoodOrderChangeLineDto {
+  @IsUUID()
+  lineId!: string;
+
+  /** Lower than the ordered quantity; 0 removes the line (out of stock). */
+  @IsInt()
+  @Min(0)
+  @Max(99)
+  toQuantity!: number;
+}
+
+/** Merchant edits a PLACED/PREPARING order; the customer must confirm. */
+export class ProposeFoodOrderChangeDto {
+  @IsIn(FOOD_ORDER_CHANGE_REASONS)
+  reasonCode!: FoodOrderChangeReason;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(FOOD_REJECT_NOTE_MAX)
+  note?: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => FoodOrderChangeLineDto)
+  lines!: FoodOrderChangeLineDto[];
 }
 
 export class SetFoodItemAvailabilityDto {
@@ -497,7 +557,7 @@ export class ListFoodStoresQueryDto {
   sort_by?: FoodStoreSortBy;
 }
 
-export class OpsPageQueryDto {
+export class OpsPageQueryDto extends OpsDateRangeQueryDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -551,9 +611,14 @@ export class OpsPageQueryDto {
   @IsOptional()
   @IsString()
   kyb?: string;
+
+  /** MISSING lists stores that cannot take delivery orders (no coordinates). */
+  @IsOptional()
+  @IsIn(['ALL', 'MISSING'])
+  location?: string;
 }
 
-export class OpsCatalogModerationQueryDto {
+export class OpsCatalogModerationQueryDto extends OpsDateRangeQueryDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -616,6 +681,37 @@ export class MerchantStatsQueryDto {
   @Min(1)
   @Max(30)
   days?: number;
+}
+
+const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** ICT day range for merchant statements (inclusive). */
+export class MerchantStatementQueryDto {
+  @IsOptional()
+  @Matches(DAY_KEY)
+  from?: string;
+
+  @IsOptional()
+  @Matches(DAY_KEY)
+  to?: string;
+}
+
+export class RecordMerchantSettlementDto {
+  @Matches(DAY_KEY)
+  from!: string;
+
+  @Matches(DAY_KEY)
+  to!: string;
+
+  @IsString()
+  @MinLength(3)
+  @MaxLength(500)
+  reason!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
 }
 
 /** DEC-PROD-036: the merchant's handover code, required when FOOD_HANDOVER_CODE_REQUIRED. */

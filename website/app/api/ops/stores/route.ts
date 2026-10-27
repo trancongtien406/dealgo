@@ -15,6 +15,8 @@ export async function GET(request: Request) {
   const region = searchParams.get("region")?.trim() || undefined;
   const category = searchParams.get("category")?.trim() || undefined;
   const kyb = searchParams.get("kyb")?.trim() || undefined;
+  const location =
+    searchParams.get("location")?.trim() === "MISSING" ? "MISSING" : undefined;
 
   const result = await fetchOpsUpstream({
     path: "/v1/ops/stores",
@@ -27,6 +29,7 @@ export async function GET(request: Request) {
       ...(region ? { region } : {}),
       ...(category ? { category } : {}),
       ...(kyb ? { kyb } : {}),
+      ...(location ? { location } : {}),
     },
   });
   return jsonFromOpsUpstream(result);

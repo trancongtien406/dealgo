@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma, PrismaClient } from '../../generated/prisma/client.js';
+import { driverBalanceOf } from '../earnings/driver-balance.js';
 import {
   DELETED_USER_DISPLAY_NAME,
   type AccountDeletionBlocker,
@@ -253,23 +254,54 @@ export class PrismaAccountDeletionRepository implements AccountDeletionRepositor
       return { amountVnd: balance.amountVnd, settledThrough: input.at };
     });
   }
+
+  async recordDriverPayment(input: {
+    driverId: string;
+    actorUserId: string;
+    direction: 'DRIVER_PAID' | 'DEALGO_PAID';
+    amountVnd: number;
+    reason: string;
+    at: Date;
+  }): Promise<{ id: string; adjustmentVnd: number }> {
+    const id = randomUUID();
+    const adjustmentVnd = input.direction === 'DRIVER_PAID' ? -input.amountVnd : input.amountVnd;
+    await this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "users" WHERE "id" = ${input.driverId}::uuid FOR UPDATE`;
+      await tx.driverBalanceAdjustment.create({
+        data: {
+          id,
+          driverId: input.driverId,
+          amountVnd: adjustmentVnd,
+          kind: input.direction === 'DRIVER_PAID' ? 'OPS_DRIVER_PAYMENT' : 'OPS_DRIVER_PAYOUT',
+          refType: 'OPS',
+          refId: id,
+          occurredAt: input.at,
+        },
+      });
+      await tx.opsAuditLog.create({
+        data: {
+          id: randomUUID(),
+          actorUserId: input.actorUserId,
+          action: 'DRIVER_BALANCE_PAYMENT',
+          entityType: 'USER',
+          entityId: input.driverId,
+          reason: input.reason,
+          metadata: { direction: input.direction, amountVnd: input.amountVnd, adjustmentId: id },
+        },
+      });
+    });
+    return { id, adjustmentVnd };
+  }
 }
 
-/** Fees accrued after the latest settlement (optionally only up to `until`). */
+/**
+ * Fees accrued after the latest settlement (optionally only up to `until`), plus signed
+ * balance adjustments (customer cancel/no-show fee hand-overs) — one shared definition with
+ * the dispatch debt check.
+ */
 async function feeBalanceOf(db: Db, driverId: string, until?: Date): Promise<DriverFeeBalance> {
-  const last = await db.driverFeeSettlement.findFirst({
-    where: { driverId },
-    orderBy: { settledThrough: 'desc' },
-    select: { settledThrough: true },
-  });
-  const completedAt: Prisma.DateTimeFilter = {};
-  if (last) completedAt.gt = last.settledThrough;
-  if (until) completedAt.lte = until;
-  const sum = await db.jobEarning.aggregate({
-    where: { driverId, ...(last || until ? { completedAt } : {}) },
-    _sum: { feeVnd: true },
-  });
-  return { amountVnd: sum._sum.feeVnd ?? 0, settledThrough: last?.settledThrough ?? null };
+  const balance = await driverBalanceOf(db, driverId, until);
+  return { amountVnd: balance.amountVnd, settledThrough: balance.settledThrough };
 }
 
 async function blockersOf(db: Db, userId: string): Promise<AccountDeletionBlocker[]> {

@@ -3,6 +3,7 @@
  * Skips when DATABASE_URL is unset (default unit suite uses memory repos).
  */
 import { uniqueTestPhone } from './test-phone.js';
+import { pinStore } from './store-pin.js';
 import { INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
@@ -114,6 +115,7 @@ describePg('driver history (postgres)', () => {
       .send({ name: `History Bun ${Date.now()}`, priceVnd: 60_000 })
       .expect(200);
     const catalog = await get(merchant.token, '/v1/food/merchant/catalog').expect(200);
+    await pinStore(app, merchant.token);
     const customer = await login();
     const driver = await login();
     await ensureGrant(app.get(IDENTITY_REPOSITORY), driver.userId, 'DRIVER');
@@ -123,7 +125,7 @@ describePg('driver history (postgres)', () => {
     expect(empty.body.data).toEqual({ items: [], nextCursor: null });
 
     const settings = app.get(PlatformSettingsService);
-    await settings.patch('PLATFORM_FEE_FOOD_PERCENT', '12.5', 'pg test TEST_ONLY', driver.userId);
+    await settings.patch('FOOD_DRIVER_COMMISSION_PERCENT', '12.5', 'pg test TEST_ONLY', driver.userId);
 
     const placed = await post(customer.token, '/v1/food/orders')
       .set('Idempotency-Key', `hist-${Date.now()}`)
@@ -143,7 +145,7 @@ describePg('driver history (postgres)', () => {
       .deliveryCode as string;
     await post(driver.token, `/v1/food/orders/${orderId}/deliver`).send({ deliveryCode }).expect(200);
     // Later rate changes must not rewrite this delivery's earnings.
-    await settings.patch('PLATFORM_FEE_FOOD_PERCENT', '30', 'pg test TEST_ONLY', driver.userId);
+    await settings.patch('FOOD_DRIVER_COMMISSION_PERCENT', '30', 'pg test TEST_ONLY', driver.userId);
     const fare = placed.body.data.deliveryFareVnd as number;
     const fee = Math.round((fare * 1250) / 10_000);
     const db = prisma.db()!;
@@ -181,7 +183,7 @@ describePg('driver history (postgres)', () => {
       feeVnd: fee,
       earningsVnd: fare - fee,
     });
-    await settings.patch('PLATFORM_FEE_FOOD_PERCENT', '0', 'pg test reset', driver.userId);
+    await settings.patch('FOOD_DRIVER_COMMISSION_PERCENT', '0', 'pg test reset', driver.userId);
     expect(summary.body.data.days).toHaveLength(7);
     expect(summary.body.data.rating).toMatchObject({ average: 4, count: 1 });
   });
@@ -194,11 +196,12 @@ describePg('driver history (postgres)', () => {
       .send({ name: `Atomic Mi ${Date.now()}`, priceVnd: 40_000 })
       .expect(200);
     const catalog = await get(merchant.token, '/v1/food/merchant/catalog').expect(200);
+    await pinStore(app, merchant.token);
     const customer = await login();
     const driver = await login();
     await ensureGrant(app.get(IDENTITY_REPOSITORY), driver.userId, 'DRIVER');
     const settings = app.get(PlatformSettingsService);
-    await settings.patch('PLATFORM_FEE_FOOD_PERCENT', '10', 'pg test TEST_ONLY', driver.userId);
+    await settings.patch('FOOD_DRIVER_COMMISSION_PERCENT', '10', 'pg test TEST_ONLY', driver.userId);
 
     const placed = await post(customer.token, '/v1/food/orders')
       .set('Idempotency-Key', `atomic-${Date.now()}`)
@@ -250,8 +253,10 @@ describePg('driver history (postgres)', () => {
     expect(events.map((row) => row.event).sort()).toEqual([
       'COD_OBLIGATION_POSTED',
       'DRIVER_PLATFORM_FEE_ACCRUED',
+      // Store commission on the subtotal (FOOD_MERCHANT_COMMISSION_PERCENT, DRAFT).
+      'MERCHANT_COMMISSION_ACCRUED',
     ]);
-    await settings.patch('PLATFORM_FEE_FOOD_PERCENT', '0', 'pg test reset', driver.userId);
+    await settings.patch('FOOD_DRIVER_COMMISSION_PERCENT', '0', 'pg test reset', driver.userId);
   });
 });
 

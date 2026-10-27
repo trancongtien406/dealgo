@@ -27,6 +27,24 @@ class DioMerchantStatsRemoteDataSource implements MerchantStatsRepository {
       throw apiExceptionFromDio(error);
     }
   }
+
+  @override
+  Future<MerchantStatement> statement({
+    required String accessToken,
+    String? from,
+    String? to,
+  }) async {
+    try {
+      final response = await dio.get<Object?>(
+        ApiPaths.foodMerchantStatement,
+        queryParameters: {'from': ?from, 'to': ?to},
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      );
+      return decodeMerchantStatement(requireSuccessData(response.data));
+    } on DioException catch (error) {
+      throw apiExceptionFromDio(error);
+    }
+  }
 }
 
 int _int(Object? value) => value is num ? value.toInt() : 0;
@@ -66,6 +84,42 @@ MerchantStats decodeMerchantStats(Map<String, Object?> data) {
             MerchantTopItem(
               name: item['name'] as String,
               quantity: _int(item['quantity']),
+            ),
+    ],
+  );
+}
+
+MerchantStatement decodeMerchantStatement(Map<String, Object?> data) {
+  final totals = data['totals'];
+  if (totals is! Map) {
+    throw const ApiException(
+      statusCode: 502,
+      message: 'Malformed merchant statement',
+      errorCode: 'MALFORMED_RESPONSE',
+    );
+  }
+  final settlements = data['settlements'];
+  final percent = data['commissionPercentNow'];
+  String str(Object? v) => v is String ? v : '';
+  return MerchantStatement(
+    from: str(data['from']),
+    to: str(data['to']),
+    commissionPercentNow: percent is num ? percent : 0,
+    orderCount: _int(totals['orderCount']),
+    cashReceivedVnd: _int(totals['cashReceivedVnd']),
+    commissionVnd: _int(totals['commissionVnd']),
+    netVnd: _int(totals['netVnd']),
+    unsettledCommissionVnd: _int(data['unsettledCommissionVnd']),
+    settlementCycleDays: _int(data['settlementCycleDays']),
+    settlements: [
+      if (settlements is List)
+        for (final row in settlements)
+          if (row is Map)
+            MerchantSettlement(
+              periodStart: str(row['periodStart']),
+              periodEnd: str(row['periodEnd']),
+              commissionVnd: _int(row['commissionVnd']),
+              createdAt: DateTime.tryParse(str(row['createdAt'])),
             ),
     ],
   );

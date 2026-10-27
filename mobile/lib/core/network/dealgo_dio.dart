@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kReleaseMode;
 
 import '../auth/token_store.dart';
 import '../config/api_base_url.dart';
@@ -14,6 +15,19 @@ const skipAuthRefreshExtra = 'dealgo.skipAuthRefresh';
 
 typedef SessionRefreshed = Future<void> Function(StoredTokens tokens);
 typedef SessionUnauthorized = Future<void> Function();
+
+/// Lets non-HTTP transports (the realtime socket) force the same single-flight
+/// refresh the HTTP interceptor uses. Wired by [createDealGoDio].
+class SessionRefresher {
+  Future<StoredTokens?> Function()? _impl;
+
+  /// Refreshes the session; null when no refresh token is stored. Throws
+  /// [ApiException] when the API rejects the refresh token.
+  Future<StoredTokens?> refresh() async {
+    final impl = _impl;
+    return impl == null ? null : impl();
+  }
+}
 
 BaseOptions _dealGoBaseOptions(String baseUrl) {
   return BaseOptions(
@@ -36,8 +50,10 @@ Dio createDealGoDio({
   required SessionRefreshed onSessionRefreshed,
   required SessionUnauthorized onUnauthorized,
   bool? enableLogging,
+  SessionRefresher? sessionRefresher,
 }) {
   final resolvedBase = normalizeBaseUrl(baseUrl ?? apiBaseUrl);
+  assertSecureApiBaseUrl(resolvedBase, isRelease: kReleaseMode);
   final dio = Dio(_dealGoBaseOptions(resolvedBase));
   // Refresh/retry must not share the auth QueuedInterceptor: while onError is
   // awaiting, another request's onError is queued behind it and deadlocks.
@@ -51,15 +67,15 @@ Dio createDealGoDio({
       refreshDio.interceptors.add(refreshLog);
     }
   }
-  dio.interceptors.add(
-    _DealGoAuthInterceptor(
-      dio: dio,
-      refreshDio: refreshDio,
-      tokenStore: tokenStore,
-      onSessionRefreshed: onSessionRefreshed,
-      onUnauthorized: onUnauthorized,
-    ),
+  final auth = _DealGoAuthInterceptor(
+    dio: dio,
+    refreshDio: refreshDio,
+    tokenStore: tokenStore,
+    onSessionRefreshed: onSessionRefreshed,
+    onUnauthorized: onUnauthorized,
   );
+  dio.interceptors.add(auth);
+  sessionRefresher?._impl = auth._refreshSingleFlight;
   return dio;
 }
 
@@ -117,26 +133,62 @@ class _DealGoAuthInterceptor extends QueuedInterceptor {
       return;
     }
 
+    final request = err.requestOptions;
+    final StoredTokens? next;
     try {
-      final next = await _refreshSingleFlight();
-      if (next == null) {
+      next = await _freshTokensFor(request);
+    } on ApiException catch (refreshError) {
+      // Only a definitive rejection of the refresh token ends the session.
+      // Network / 5xx failures keep the user signed in so a cold start under
+      // a slow or restarting API does not bounce them to the login screen.
+      final code = refreshError.statusCode;
+      if (code >= 400 && code < 500) {
         await onUnauthorized();
-        handler.next(err);
-        return;
       }
-      final request = err.requestOptions;
-      request.headers['Authorization'] = 'Bearer ${next.accessToken}';
-      request.extra['dealgo.authRetried'] = true;
+      handler.next(err);
+      return;
+    } catch (_) {
+      handler.next(err);
+      return;
+    }
+    if (next == null) {
+      await onUnauthorized();
+      handler.next(err);
+      return;
+    }
+    request.headers['Authorization'] = 'Bearer ${next.accessToken}';
+    request.extra['dealgo.authRetried'] = true;
+    try {
       _syncRefreshClient();
       final response = await refreshDio.fetch<Object?>(request);
       handler.resolve(response);
-    } on DioException catch (refreshError) {
-      await onUnauthorized();
-      handler.next(refreshError);
+    } on DioException catch (retryError) {
+      // The retried request failing for its own reasons (409, 404, 5xx,
+      // timeout) says nothing about the session; only a second 401 with a
+      // freshly refreshed token does.
+      if (retryError.response?.statusCode == 401) {
+        await onUnauthorized();
+      }
+      handler.next(retryError);
     } catch (_) {
-      await onUnauthorized();
       handler.next(err);
     }
+  }
+
+  /// Tokens to retry [request] with. When another queued 401 already rotated
+  /// the session, reuse the stored access token instead of refreshing again
+  /// (each refresh rotates the refresh token).
+  Future<StoredTokens?> _freshTokensFor(RequestOptions request) async {
+    final sent = request.headers['Authorization'];
+    final stored = await tokenStore.read();
+    final storedAccess = stored?.accessToken.trim() ?? '';
+    if (stored != null &&
+        storedAccess.isNotEmpty &&
+        sent is String &&
+        sent != 'Bearer $storedAccess') {
+      return stored;
+    }
+    return _refreshSingleFlight();
   }
 
   Future<StoredTokens?> _refreshSingleFlight() {
@@ -187,5 +239,30 @@ class _DealGoAuthInterceptor extends QueuedInterceptor {
     } on DioException catch (error) {
       throw apiExceptionFromDio(error);
     }
+  }
+}
+
+/// Socket auth recovery: refresh the session, sign out only when the API
+/// definitively rejects it (4xx). Network failures return null so the socket
+/// retries later instead of logging the user out during an API restart.
+Future<String?> refreshRealtimeToken(
+  SessionRefresher refresher,
+  SessionUnauthorized onUnauthorized,
+) async {
+  try {
+    final next = await refresher.refresh();
+    if (next == null) {
+      await onUnauthorized();
+      return null;
+    }
+    return next.accessToken;
+  } on ApiException catch (error) {
+    final status = error.statusCode;
+    if (status >= 400 && status < 500) {
+      await onUnauthorized();
+    }
+    return null;
+  } catch (_) {
+    return null;
   }
 }

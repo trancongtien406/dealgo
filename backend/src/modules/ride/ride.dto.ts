@@ -1,5 +1,8 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
+  IsIn,
   IsDefined,
   IsInt,
   IsNumber,
@@ -46,6 +49,18 @@ export class CreateRideDto {
   @IsInt()
   @Min(1)
   offeredFareVnd!: number;
+
+  /** Required Ride class (MOTORBIKE | CAR_4 | CAR_7, …). No silent default (DG-DEC-VEH-001). */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(32)
+  @Matches(/^[A-Za-z0-9_]+$/)
+  vehicleClassCode!: string;
+
+  /** One-tap re-post of the customer's own EXPIRED request. */
+  @IsOptional()
+  @IsUUID()
+  repostOfRideId?: string;
 }
 
 export class QuoteRideDto {
@@ -124,4 +139,81 @@ export class OpsInterveneDto {
   @MinLength(3)
   @MaxLength(500)
   reason!: string;
+}
+
+/** Authenticated road geometry for the app (same provider as Admin DEC-PROD-045). */
+export class RideRouteQueryDto {
+  @Type(() => Number)
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(-90)
+  @Max(90)
+  fromLat!: number;
+
+  @Type(() => Number)
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(-180)
+  @Max(180)
+  fromLng!: number;
+
+  @Type(() => Number)
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(-90)
+  @Max(90)
+  toLat!: number;
+
+  @Type(() => Number)
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(-180)
+  @Max(180)
+  toLng!: number;
+}
+
+/** Customer raises the bid (must be above the current one; class max still applies). */
+export class RaiseFareDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  amountVnd!: number;
+}
+
+/** Customer rejects one driver's offer. */
+export class DeclineOfferDto {
+  @IsUUID()
+  offerId!: string;
+}
+
+/** Reasons a driver may give when cancelling an assigned ride. */
+export const DRIVER_CANCEL_REASONS = [
+  'CUSTOMER_UNREACHABLE',
+  'PICKUP_TOO_FAR',
+  'VEHICLE_PROBLEM',
+  'SAFETY_CONCERN',
+  'CUSTOMER_ASKED',
+  'OTHER',
+] as const;
+
+export class DriverCancelRideDto {
+  @IsString()
+  @IsIn(DRIVER_CANCEL_REASONS as unknown as string[])
+  reasonCode!: (typeof DRIVER_CANCEL_REASONS)[number];
+}
+
+/** Driver → customer rating. */
+export class RateCustomerDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  stars!: number;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(6)
+  @IsIn(['ON_TIME', 'POLITE', 'CLEAR_PICKUP', 'LATE', 'RUDE', 'WRONG_PICKUP'], { each: true })
+  tags?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  comment?: string;
 }

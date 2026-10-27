@@ -16,6 +16,7 @@ String partnerDocumentLabel(AppLocalizations l10n, String kind) {
     PartnerDocumentKind.selfie => l10n.partnerKindSelfie,
     PartnerDocumentKind.license => l10n.partnerKindLicense,
     PartnerDocumentKind.vehicleReg => l10n.partnerKindVehicleReg,
+    PartnerDocumentKind.vehicleInsurance => l10n.partnerKindVehicleInsurance,
     PartnerDocumentKind.businessLicense => l10n.partnerKindBusinessLicense,
     PartnerDocumentKind.repIdFront => l10n.partnerKindRepIdFront,
     PartnerDocumentKind.repIdBack => l10n.partnerKindRepIdBack,

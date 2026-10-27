@@ -1,9 +1,25 @@
-/// Local Nest listens on 3011 (website/BFF often takes 3001). Override with
-/// `--dart-define=API_BASE_URL=...` when the API port differs.
+/// Local Nest listens on 3001 (Admin Web takes 3000). Override with
+/// `--dart-define=API_BASE_URL=...` when the API runs elsewhere
+/// (Android emulator: `http://10.0.2.2:3001`).
 const apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'http://localhost:3011',
+  defaultValue: 'http://localhost:3001',
 );
+
+/// Chat and all API traffic must use TLS outside local debug.
+/// Release builds reject any http:// base URL; debug allows http only for
+/// localhost, 127.0.0.1 and 10.0.2.2 (Android emulator).
+void assertSecureApiBaseUrl(String url, {required bool isRelease}) {
+  final uri = Uri.tryParse(url.trim());
+  if (uri == null || uri.scheme == 'https' || uri.scheme == 'wss') return;
+  if (uri.scheme == 'http' || uri.scheme == 'ws') {
+    const local = {'localhost', '127.0.0.1', '10.0.2.2'};
+    if (!isRelease && local.contains(uri.host)) return;
+    throw StateError(
+      'Insecure API base URL scheme for this build: ${uri.scheme}',
+    );
+  }
+}
 
 String normalizeBaseUrl(String raw) {
   final trimmed = raw.trim();

@@ -519,7 +519,7 @@ void main() {
         foodClient: food,
         pricing: FakePricingRemoteDataSource(deliveryFareVnd: 15000),
       );
-      await tester.tap(navLabel('Mua hàng'));
+      await tester.tap(navLabel('Mua'));
       await tester.pumpAndSettle();
       final card = find.byKey(const Key('food-store-card-store-tea'));
       await tester.scrollUntilVisible(
@@ -557,8 +557,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('63.000đ'), findsWidgets);
       await chooseDeliveryAddress(tester);
-      await tester.tap(find.text('Tiếp tục thanh toán'));
-      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('food-place-order')));
       await tester.pumpAndSettle();
       final placed = food.placeCalls.single.items.single;
@@ -596,10 +594,12 @@ void main() {
     expect(sel.extrasVnd, 10000);
     expect(sel.optionIds, ['o-pearl', 'o-pearl']);
     expect(foodOptionDelta(groups, sel.optionIds), 10000);
-    final blocked =
-        sel.setQuantity(groups.first, groups.first.choices.first, 3);
+    final blocked = sel.setQuantity(
+      groups.first,
+      groups.first.choices.first,
+      3,
+    );
     expect(blocked.quantityOf('g-top', 'o-pearl'), 2);
     expect(foodOptionDelta(groups, ['o-pearl', 'o-pearl', 'o-pearl']), isNull);
   });
-
 }

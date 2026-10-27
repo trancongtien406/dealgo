@@ -13,7 +13,35 @@ import { ApiError } from "@/lib/api/errors";
 import type { ListQuery, PaginatedList } from "@/lib/api/pagination";
 import { apiPaths } from "@/lib/api/paths";
 
-export type FetchKycParams = ListQuery & { status?: KycStatus | "ALL" };
+export type FetchKycParams = ListQuery & {
+  status?: KycStatus | "ALL";
+  /** Partner type; the driver KYC queue must not list merchant (KYB) cases. */
+  role?: "DRIVER" | "MERCHANT";
+};
+
+/** Nest query for the ops partner-application list. */
+export function buildKycQueueSearch(params: FetchKycParams): URLSearchParams {
+  const nestStatus = kycFilterToNestPartnerStatus(params.status ?? "ALL");
+  const search = new URLSearchParams();
+  if (nestStatus) {
+    search.set("status", nestStatus);
+  } else if (!params.status || params.status === "ALL") {
+    search.set("status", "SUBMITTED");
+  }
+  if (params.role) {
+    search.set("role", params.role);
+  }
+  if (params.page) {
+    search.set("page", String(params.page));
+  }
+  if (params.limit) {
+    search.set("limit", String(params.limit));
+  }
+  if (params.q?.trim()) {
+    search.set("q", params.q.trim());
+  }
+  return search;
+}
 
 export async function fetchKycQueue(
   params: FetchKycParams,
@@ -36,11 +64,17 @@ export async function fetchKycByCode(code: string): Promise<KycCase | null> {
   }
 }
 
-export async function approveKycApplication(id: string): Promise<KycCase> {
+export async function approveKycApplication(
+  id: string,
+  vehicleClassCode?: string,
+): Promise<KycCase> {
   const envelope = await apiFetch<{
     success: boolean;
     data: NestPartnerApplicationView;
-  }>(apiPaths.opsPartnerApplicationApprove(id), { method: "POST", body: {} });
+  }>(apiPaths.opsPartnerApplicationApprove(id), {
+    method: "POST",
+    body: vehicleClassCode ? { vehicleClassCode } : {},
+  });
   return mapNestPartnerApplicationToKycCase(envelope.data);
 }
 
@@ -72,22 +106,7 @@ async function fetchKycFromBff(
     };
   }
 
-  const nestStatus = kycFilterToNestPartnerStatus(params.status ?? "ALL");
-  const search = new URLSearchParams();
-  if (nestStatus) {
-    search.set("status", nestStatus);
-  } else if (!params.status || params.status === "ALL") {
-    search.set("status", "SUBMITTED");
-  }
-  if (params.page) {
-    search.set("page", String(params.page));
-  }
-  if (params.limit) {
-    search.set("limit", String(params.limit));
-  }
-  if (params.q?.trim()) {
-    search.set("q", params.q.trim());
-  }
+  const search = buildKycQueueSearch(params);
 
   const envelope = await apiFetch<{
     success: boolean;

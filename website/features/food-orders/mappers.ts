@@ -2,10 +2,12 @@ import { cancelActorLabel } from "@/lib/cancel-actor";
 import { vnd, type StatusTone } from "@/lib/admin-format";
 import type {
   NestFoodLineOption,
+  NestFoodOrderChange,
   NestFoodOrderStatus,
   NestFoodOrderView,
 } from "@/features/food-orders/nest-types";
 import type {
+  FoodOrderChangeSummary,
   FoodOrderListItem,
   FoodOrderStatus,
 } from "@/features/food-orders/types";
@@ -39,9 +41,7 @@ export function formatLineOptions(
     .map((option) => {
       const group = option.groupName?.trim();
       const delta =
-        option.priceDeltaVnd > 0
-          ? ` (+${vnd(option.priceDeltaVnd)})`
-          : "";
+        option.priceDeltaVnd > 0 ? ` (+${vnd(option.priceDeltaVnd)})` : "";
       return `${group ? `${group}: ` : ""}${option.name}${delta}`;
     })
     .join(" · ");
@@ -83,6 +83,65 @@ export function mapNestFoodOrderToListItem(
     cancelledBy: cancelActorLabel(order.cancelledBy),
     pickupPoint: geoPoint(order.pickup),
     dropoffPoint: geoPoint(order.dropoff),
+    change: mapFoodOrderChange(order.latestChange),
+  };
+}
+
+const CHANGE_REASON_LABELS: Record<string, string> = {
+  OUT_OF_STOCK: "Hết món",
+  NOT_ENOUGH_PORTIONS: "Không đủ phần",
+  OTHER: "Lý do khác",
+};
+
+const CHANGE_STATUS: Record<
+  NestFoodOrderChange["status"],
+  { label: string; tone: FoodOrderChangeSummary["statusTone"] }
+> = {
+  PENDING: { label: "Chờ khách xác nhận", tone: "brand" },
+  ACCEPTED: { label: "Khách đồng ý", tone: "success" },
+  REJECTED: { label: "Khách từ chối · đơn huỷ", tone: "danger" },
+  EXPIRED: { label: "Khách không trả lời · đơn huỷ", tone: "danger" },
+};
+
+function hhmm(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Ho_Chi_Minh",
+  });
+}
+
+/** Ops view of the latest merchant edit (null when none). */
+export function mapFoodOrderChange(
+  change: NestFoodOrderChange | null | undefined,
+): FoodOrderChangeSummary | null {
+  if (!change) return null;
+  const status = CHANGE_STATUS[change.status] ?? {
+    label: change.status,
+    tone: "brand" as const,
+  };
+  const reason =
+    CHANGE_REASON_LABELS[change.reasonCode] ?? CHANGE_REASON_LABELS.OTHER;
+  const note = change.note?.trim();
+  return {
+    status: status.label,
+    statusTone: status.tone,
+    reason: note ? `${reason} — ${note}` : reason,
+    lines: change.lines.map(
+      (line) =>
+        `${line.name}: ${line.fromQuantity} → ${line.toQuantity}${
+          line.toQuantity === 0 ? " (bỏ món)" : ""
+        }`,
+    ),
+    oldSubtotalVnd: change.oldSubtotalVnd,
+    newSubtotalVnd: change.newSubtotalVnd,
+    newTotalVnd: change.newTotalVnd,
+    createdAt: hhmm(change.createdAt) ?? "—",
+    answerBy: hhmm(change.expiresAt) ?? "—",
+    respondedAt: hhmm(change.respondedAt),
   };
 }
 
@@ -91,6 +150,12 @@ const FOOD_REJECT_LABELS: Record<string, string> = {
   STORE_BUSY: "Quán đang quá tải",
   STORE_CLOSING: "Quán sắp đóng cửa",
   ITEM_PRICE_CHANGED: "Giá món đã thay đổi",
+  // Worker timeouts (cancelledBy SYSTEM).
+  MERCHANT_TIMEOUT: "Quán không xác nhận kịp",
+  NO_DRIVER: "Không có tài xế nhận đơn",
+  // The customer declined / ignored the store's edit.
+  CHANGE_REJECTED: "Khách không đồng ý quán sửa đơn",
+  CHANGE_EXPIRED: "Khách không xác nhận quán sửa đơn",
   OTHER: "Lý do khác",
 };
 

@@ -6,10 +6,7 @@ import 'package:flutter/foundation.dart';
 String redactForLog(String input) {
   var out = input;
   out = out.replaceAllMapped(
-    RegExp(
-      r'(Authorization\s*[:=]\s*)Bearer\s+\S+',
-      caseSensitive: false,
-    ),
+    RegExp(r'(Authorization\s*[:=]\s*)Bearer\s+\S+', caseSensitive: false),
     (match) => '${match[1]}Bearer ***',
   );
   out = out.replaceAllMapped(
@@ -29,6 +26,7 @@ String redactForLog(String input) {
     'token',
     'idToken',
     'authorizationCode',
+    'body', // chat message text
   ];
   for (final key in keys) {
     out = out.replaceAllMapped(

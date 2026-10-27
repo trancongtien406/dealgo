@@ -220,19 +220,17 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
   Future<FoodStoreDetail> updateStoreProfile({
     required String accessToken,
     required String name,
-  }) =>
-      _profileUpdate('name:$name', (s) => s.copyWith(name: name));
+  }) => _profileUpdate('name:$name', (s) => s.copyWith(name: name));
 
   @override
   Future<FoodStoreDetail> uploadStoreLogo({
     required String accessToken,
     required String contentBase64,
     String? contentType,
-  }) =>
-      _profileUpdate(
-        'logo',
-        (s) => s.copyWith(logoUrl: '/v1/public/store-logos/${s.id}/fake.png'),
-      );
+  }) => _profileUpdate(
+    'logo',
+    (s) => s.copyWith(logoUrl: '/v1/public/store-logos/${s.id}/fake.png'),
+  );
 
   @override
   Future<FoodStoreDetail> clearStoreLogo({required String accessToken}) =>
@@ -250,7 +248,11 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
   }) async {
     storeLocationCalls.add((lat, lng, addressLabel));
     final store = await getMerchantCatalog(accessToken);
-    final updated = store.copyWith(lat: lat, lng: lng, addressLabel: addressLabel);
+    final updated = store.copyWith(
+      lat: lat,
+      lng: lng,
+      addressLabel: addressLabel,
+    );
     onGetCatalog = () => updated;
     return updated;
   }
@@ -397,8 +399,18 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
   }
 
   final menuCategories = <MerchantMenuCategory>[
-    const MerchantMenuCategory(id: 'cat-1', name: 'Món chính', position: 0, itemCount: 2),
-    const MerchantMenuCategory(id: 'cat-2', name: 'Đồ uống', position: 1, itemCount: 1),
+    const MerchantMenuCategory(
+      id: 'cat-1',
+      name: 'Món chính',
+      position: 0,
+      itemCount: 2,
+    ),
+    const MerchantMenuCategory(
+      id: 'cat-2',
+      name: 'Đồ uống',
+      position: 1,
+      itemCount: 1,
+    ),
   ];
   final historyOrders = <MerchantHistoryOrder>[
     MerchantHistoryOrder(
@@ -414,7 +426,9 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
   ];
 
   @override
-  Future<List<MerchantMenuCategory>> listMenuCategories(String accessToken) async {
+  Future<List<MerchantMenuCategory>> listMenuCategories(
+    String accessToken,
+  ) async {
     return List.of(menuCategories);
   }
 
@@ -443,7 +457,11 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
   }) async {
     final i = menuCategories.indexWhere((c) => c.id == categoryId);
     if (i < 0) {
-      throw const ApiException(statusCode: 404, message: 'Missing', errorCode: 'NOT_FOUND');
+      throw const ApiException(
+        statusCode: 404,
+        message: 'Missing',
+        errorCode: 'NOT_FOUND',
+      );
     }
     final next = MerchantMenuCategory(
       id: categoryId,
@@ -476,7 +494,9 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
     if (tab == 'DELIVERED') {
       items = items.where((o) => o.status == 'DELIVERED').toList();
     } else if (tab == 'CANCELLED') {
-      items = items.where((o) => o.status == 'CANCELLED' || o.status == 'FAILED').toList();
+      items = items
+          .where((o) => o.status == 'CANCELLED' || o.status == 'FAILED')
+          .toList();
     }
     if (q != null && q.trim().isNotEmpty) {
       final needle = q.trim().toLowerCase();
@@ -493,7 +513,9 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
       page: page,
       limit: limit,
       total: items.length,
-      deliveredCount: historyOrders.where((o) => o.status == 'DELIVERED').length,
+      deliveredCount: historyOrders
+          .where((o) => o.status == 'DELIVERED')
+          .length,
       deliveredRevenueVnd: historyOrders
           .where((o) => o.status == 'DELIVERED')
           .fold<int>(0, (sum, o) => sum + o.totalVnd),
@@ -508,13 +530,15 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
     final next = <MerchantMenuCategory>[];
     for (var i = 0; i < orderedIds.length; i++) {
       final prev = menuCategories.firstWhere((c) => c.id == orderedIds[i]);
-      next.add(MerchantMenuCategory(
-        id: prev.id,
-        name: prev.name,
-        description: prev.description,
-        position: i,
-        itemCount: prev.itemCount,
-      ));
+      next.add(
+        MerchantMenuCategory(
+          id: prev.id,
+          name: prev.name,
+          description: prev.description,
+          position: i,
+          itemCount: prev.itemCount,
+        ),
+      );
     }
     menuCategories
       ..clear()
@@ -544,10 +568,7 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
     }
     final url = '/v1/public/menu-items/$itemId/fake.jpg';
     final prev = handler(itemId, null, null);
-    return prev.copyWith(
-      imageUrl: url,
-      imageUrls: [...prev.imageUrls, url],
-    );
+    return prev.copyWith(imageUrl: url, imageUrls: [...prev.imageUrls, url]);
   }
 
   final uploadImageCalls = <String>[];
@@ -559,8 +580,18 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
   }) async {
     final handler = onUpdateItem;
     if (handler == null) {
-      return FoodMenuItem(id: itemId, name: 'Item', priceVnd: 1000, available: true, imageUrls: const []);
+      return FoodMenuItem(
+        id: itemId,
+        name: 'Item',
+        priceVnd: 1000,
+        available: true,
+        imageUrls: const [],
+      );
     }
-    return handler(itemId, null, null).copyWith(clearImageUrl: true, imageUrls: const []);
+    return handler(
+      itemId,
+      null,
+      null,
+    ).copyWith(clearImageUrl: true, imageUrls: const []);
   }
 }

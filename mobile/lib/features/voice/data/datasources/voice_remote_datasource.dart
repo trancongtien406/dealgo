@@ -1,16 +1,7 @@
-import '../../domain/entities/voice_models.dart';
+import '../../domain/repositories/voice_repository.dart';
 
-abstract interface class VoiceRemoteDataSource {
-  Future<VoiceSession> createRideVoiceSession({
-    required String accessToken,
-    required String rideId,
-  });
+/// HTTP side of in-app calls; same contract as the repository.
+abstract interface class VoiceRemoteDataSource implements VoiceRepository {}
 
-  Future<VoiceSession> createFoodOrderVoiceSession({
-    required String accessToken,
-    required String orderId,
-  });
-}
-
-/// Backward-compatible alias used by mocks, tests, and DI overrides.
+/// Alias used by DI overrides and tests.
 typedef VoiceClient = VoiceRemoteDataSource;

@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 MOBILE="$ROOT/mobile"
 ENV_FILE="${BACKEND_ENV:-$ROOT/backend/.env}"
-API_BASE_URL="${API_BASE_URL:-http://localhost:3011}"
+API_BASE_URL="${API_BASE_URL:-http://localhost:3001}"
 DEVICE="${1:-}"
 
 MAPS_API_KEY=""

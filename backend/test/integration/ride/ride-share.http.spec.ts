@@ -1,3 +1,4 @@
+import { seedVehicleClassOnDriverGrant } from '../../support/driver-class-fixture.js';
 import type { INestApplication } from '@nestjs/common';
 import { RideShareModule } from '../../../src/modules/ride-share/ride-share.module.js';
 import { RIDE_SHARE_VIEW_LIMIT_PER_MIN } from '../../../src/modules/ride-share/share-view-throttler.guard.js';
@@ -13,6 +14,7 @@ describe('ride share link http (DEC-PROD-021)', () => {
 
   beforeAll(async () => {
     harness = await createTestApp([RideShareModule]);
+    seedVehicleClassOnDriverGrant(harness.app, harness.identity);
     app = harness.app;
   });
 
@@ -27,7 +29,7 @@ describe('ride share link http (DEC-PROD-021)', () => {
       .post('/v1/rides')
       .set('Authorization', `Bearer ${customer.token}`)
       .set('Idempotency-Key', `share-create-${serial}`)
-      .send({ pickup, dropoff, offeredFareVnd: 30_000 })
+      .send({ pickup, dropoff, offeredFareVnd: 30_000, vehicleClassCode: 'MOTORBIKE'})
       .expect(200);
     return created.body.data.id as string;
   }

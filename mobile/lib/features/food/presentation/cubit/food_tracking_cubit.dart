@@ -87,7 +87,9 @@ class FoodTrackingCubit extends Cubit<FoodTrackingState> {
       return;
     }
     if (token == null || token.isEmpty) {
-      emit(FoodTrackingOffline(order: state.order, cause: sessionExpiredFailure));
+      emit(
+        FoodTrackingOffline(order: state.order, cause: sessionExpiredFailure),
+      );
       return;
     }
     _inFlight = true;

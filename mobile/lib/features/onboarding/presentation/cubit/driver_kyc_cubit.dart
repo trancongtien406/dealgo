@@ -26,9 +26,9 @@ enum DriverKycStep {
   review,
 }
 
-/// Default vehicle type; DealGo is motorbike-only (stored as display text
-/// because the customer-facing driver card shows it verbatim).
+/// Legacy display fallbacks (UI labels only). KYC draft must not pre-select a class.
 const driverDefaultVehicleType = 'Xe máy';
+const driverDefaultVehicleClassCode = 'MOTORBIKE';
 
 class DriverKycState {
   const DriverKycState({
@@ -43,7 +43,8 @@ class DriverKycState {
     required this.licenseClass,
     required this.licenseNumber,
     required this.vehiclePlate,
-    required this.vehicleType,
+    this.vehicleClassCode,
+    this.vehicleType,
     required this.vehicleBrand,
     required this.vehicleModel,
     required this.bankName,
@@ -56,14 +57,17 @@ class DriverKycState {
     this.loading = false,
     this.submitting = false,
     this.submitError,
+    this.documentsRequired = true,
   });
 
   factory DriverKycState.initial() {
     return const DriverKycState(
       status: PartnerApplicationStatus.draft,
       step: DriverKycStep.services,
-      rideService: true,
-      foodService: true,
+      // Nothing preselected: with both cards pre-ticked, the natural "choose
+      // Chở khách" tap unticked it. The applicant opts in.
+      rideService: false,
+      foodService: false,
       fullName: '',
       birthDate: '',
       address: '',
@@ -71,7 +75,8 @@ class DriverKycState {
       licenseClass: 'A1',
       licenseNumber: '',
       vehiclePlate: '',
-      vehicleType: driverDefaultVehicleType,
+      vehicleClassCode: null,
+      vehicleType: null,
       vehicleBrand: '',
       vehicleModel: '',
       bankName: '',
@@ -94,7 +99,10 @@ class DriverKycState {
   final String licenseClass;
   final String licenseNumber;
   final String vehiclePlate;
-  final String vehicleType;
+
+  /// Null until the applicant picks MOTORBIKE | CAR_4 | CAR_7 (fail closed).
+  final String? vehicleClassCode;
+  final String? vehicleType;
   final String vehicleBrand;
   final String vehicleModel;
   final String bankName;
@@ -112,15 +120,33 @@ class DriverKycState {
   /// A [PartnerSubmitError] code or a server `errorCode`.
   final String? submitError;
 
-  int get stepNumber => DriverKycStep.values.indexOf(step) + 1;
-  int get totalSteps => DriverKycStep.values.length;
+  /// DEC-PROD-048 (DRAFT): false when admin turned KYC off — no documents,
+  /// only services, name and vehicle class; ops still approves.
+  final bool documentsRequired;
+
+  /// Steps for the current mode (full KYC or the quick registration).
+  List<DriverKycStep> get steps => documentsRequired
+      ? DriverKycStep.values
+      : const [
+          DriverKycStep.services,
+          DriverKycStep.personal,
+          DriverKycStep.vehicle,
+          DriverKycStep.review,
+        ];
+
+  int get stepNumber {
+    final index = steps.indexOf(step);
+    return (index < 0 ? 0 : index) + 1;
+  }
+
+  int get totalSteps => steps.length;
 
   bool get canContinueServices => rideService || foodService;
 
   bool get canContinuePersonal =>
       fullName.trim().length >= 2 &&
-      birthDate.trim().isNotEmpty &&
-      address.trim().isNotEmpty;
+      (!documentsRequired ||
+          (birthDate.trim().isNotEmpty && address.trim().isNotEmpty));
 
   bool get canContinueIdentity => documents.hasAll(const [
     PartnerDocumentKind.idFront,
@@ -137,15 +163,44 @@ class DriverKycState {
 
   bool get canContinueVehicle => vehiclePlate.trim().length >= 5;
 
-  bool get canContinueVehicleStep =>
-      canContinueVehicle && documents.has(PartnerDocumentKind.vehicleReg);
+  bool get hasSelectedVehicleClass {
+    final code = vehicleClassCode?.trim().toUpperCase() ?? '';
+    return code == 'MOTORBIKE' || code == 'CAR_4' || code == 'CAR_7';
+  }
+
+  bool get canContinueVehicleStep {
+    if (!documentsRequired) {
+      // Quick registration: plate + an explicit class (fail closed), no photos.
+      return canContinueVehicle && hasSelectedVehicleClass;
+    }
+    if (!canContinueVehicle || !documents.has(PartnerDocumentKind.vehicleReg)) {
+      return false;
+    }
+    // Fail closed: must explicitly choose a catalog class before continue/submit.
+    if (!hasSelectedVehicleClass) {
+      return false;
+    }
+    // OPEN-006 Car scaffold: require insurance photo for Car classes (fail closed in UI).
+    if (PartnerDocumentKind.isCarClass(vehicleClassCode!) &&
+        !documents.has(PartnerDocumentKind.vehicleInsurance)) {
+      return false;
+    }
+    return true;
+  }
+
+  List<String> get requiredDriverDocumentKinds =>
+      PartnerDocumentKind.driverRequiredFor(vehicleClassCode ?? '');
 
   bool get canContinueBank =>
       bankName.trim().length >= 2 &&
       RegExp(r'^\d{6,20}$').hasMatch(bankAccountNumber) &&
       bankAccountHolder.trim().length >= 2;
 
-  bool get canSubmit =>
+  bool get canSubmit => documentsRequired
+      ? canSubmitFull
+      : canContinueServices && canContinuePersonal && canContinueVehicleStep;
+
+  bool get canSubmitFull =>
       canContinueServices &&
       canContinuePersonal &&
       canContinueIdentity &&
@@ -166,7 +221,10 @@ class DriverKycState {
     String? licenseClass,
     String? licenseNumber,
     String? vehiclePlate,
+    String? vehicleClassCode,
+    bool clearVehicleClassCode = false,
     String? vehicleType,
+    bool clearVehicleType = false,
     String? vehicleBrand,
     String? vehicleModel,
     String? bankName,
@@ -181,8 +239,10 @@ class DriverKycState {
     bool? submitting,
     String? submitError,
     bool clearSubmitError = false,
+    bool? documentsRequired,
   }) {
     return DriverKycState(
+      documentsRequired: documentsRequired ?? this.documentsRequired,
       status: status ?? this.status,
       step: step ?? this.step,
       rideService: rideService ?? this.rideService,
@@ -194,7 +254,10 @@ class DriverKycState {
       licenseClass: licenseClass ?? this.licenseClass,
       licenseNumber: licenseNumber ?? this.licenseNumber,
       vehiclePlate: vehiclePlate ?? this.vehiclePlate,
-      vehicleType: vehicleType ?? this.vehicleType,
+      vehicleClassCode: clearVehicleClassCode
+          ? null
+          : (vehicleClassCode ?? this.vehicleClassCode),
+      vehicleType: clearVehicleType ? null : (vehicleType ?? this.vehicleType),
       vehicleBrand: vehicleBrand ?? this.vehicleBrand,
       vehicleModel: vehicleModel ?? this.vehicleModel,
       bankName: bankName ?? this.bankName,
@@ -216,6 +279,7 @@ class DriverKycCubit extends Cubit<DriverKycState> {
     this._submitPartnerApplication,
     this._getMyPartnerApplication,
     this._accessToken,
+    this._loadDocumentsRequired,
     bool? useMock,
   }) : _useMock = useMock ?? useMockData,
        super(DriverKycState.initial());
@@ -225,7 +289,31 @@ class DriverKycCubit extends Cubit<DriverKycState> {
   final SubmitPartnerApplication? _submitPartnerApplication;
   final GetMyPartnerApplication? _getMyPartnerApplication;
   final String? Function()? _accessToken;
+  final Future<bool> Function({
+    required String accessToken,
+    required String role,
+  })?
+  _loadDocumentsRequired;
   final bool _useMock;
+
+  /// DEC-PROD-048: reads the admin KYC switch; keeps documents required on error.
+  Future<void> loadRequirements() async {
+    final load = _loadDocumentsRequired;
+    final token = _accessToken?.call()?.trim() ?? '';
+    if (load == null || token.isEmpty) {
+      return;
+    }
+    final required = await load(accessToken: token, role: role);
+    if (isClosed || required == state.documentsRequired) {
+      return;
+    }
+    final next = state.copyWith(documentsRequired: required);
+    emit(
+      next.steps.contains(next.step)
+          ? next
+          : next.copyWith(step: DriverKycStep.services),
+    );
+  }
 
   void seedFromProfile(UserProfile profile) {
     if (state.seeded) {
@@ -298,6 +386,10 @@ class DriverKycCubit extends Cubit<DriverKycState> {
         licenseClass: metadataText(m, 'licenseClass'),
         licenseNumber: keep(state.licenseNumber, 'licenseNumber'),
         vehiclePlate: keep(state.vehiclePlate, 'vehiclePlate'),
+        vehicleClassCode: metadataText(m, 'vehicleClassCode'),
+        clearVehicleClassCode: metadataText(m, 'vehicleClassCode') == null,
+        vehicleType: metadataText(m, 'vehicleType'),
+        clearVehicleType: metadataText(m, 'vehicleType') == null,
         vehicleBrand: keep(state.vehicleBrand, 'vehicleBrand'),
         vehicleModel: keep(state.vehicleModel, 'vehicleModel'),
         bankName: keep(state.bankName, 'bankName'),
@@ -324,6 +416,9 @@ class DriverKycCubit extends Cubit<DriverKycState> {
 
   void setVehiclePlate(String value) =>
       emit(state.copyWith(vehiclePlate: value.toUpperCase()));
+
+  void setVehicleClass({required String code, required String name}) =>
+      emit(state.copyWith(vehicleClassCode: code, vehicleType: name));
 
   void setVehicleBrand(String value) =>
       emit(state.copyWith(vehicleBrand: value));
@@ -371,19 +466,21 @@ class DriverKycCubit extends Cubit<DriverKycState> {
   }
 
   void nextStep() {
-    final index = DriverKycStep.values.indexOf(state.step);
-    if (index >= DriverKycStep.values.length - 1) {
+    final steps = state.steps;
+    final index = steps.indexOf(state.step);
+    if (index < 0 || index >= steps.length - 1) {
       return;
     }
-    emit(state.copyWith(step: DriverKycStep.values[index + 1]));
+    emit(state.copyWith(step: steps[index + 1]));
   }
 
   void previousStep() {
-    final index = DriverKycStep.values.indexOf(state.step);
+    final steps = state.steps;
+    final index = steps.indexOf(state.step);
     if (index <= 0) {
       return;
     }
-    emit(state.copyWith(step: DriverKycStep.values[index - 1]));
+    emit(state.copyWith(step: steps[index - 1]));
   }
 
   /// Opens the flow at the step for [section] (or the first flagged one) and
@@ -427,7 +524,11 @@ class DriverKycCubit extends Cubit<DriverKycState> {
     'licenseClass': state.licenseClass,
     'licenseNumber': state.licenseNumber,
     'vehiclePlate': state.vehiclePlate.trim(),
-    'vehicleType': state.vehicleType,
+    if (state.vehicleClassCode != null &&
+        state.vehicleClassCode!.trim().isNotEmpty)
+      'vehicleClassCode': state.vehicleClassCode!.trim().toUpperCase(),
+    if (state.vehicleType != null && state.vehicleType!.trim().isNotEmpty)
+      'vehicleType': state.vehicleType!.trim(),
     'vehicleBrand': state.vehicleBrand.trim(),
     'vehicleModel': state.vehicleModel.trim(),
     'bankName': state.bankName.trim(),
@@ -437,6 +538,10 @@ class DriverKycCubit extends Cubit<DriverKycState> {
 
   Future<void> _submitApplication() async {
     if (state.submitting) {
+      return;
+    }
+    if (!state.hasSelectedVehicleClass) {
+      emit(state.copyWith(submitError: PartnerSubmitError.validation));
       return;
     }
     final submit = _submitPartnerApplication;
@@ -467,9 +572,9 @@ class DriverKycCubit extends Cubit<DriverKycState> {
           accessToken: token,
           role: role,
           metadata: _metadata(),
-          documents: state.documents.uploads(
-            PartnerDocumentKind.driverRequired,
-          ),
+          documents: state.documentsRequired
+              ? state.documents.uploads(state.requiredDriverDocumentKinds)
+              : const [],
         ),
       );
       if (isClosed) {

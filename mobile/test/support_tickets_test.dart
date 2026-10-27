@@ -166,11 +166,19 @@ void main() {
     await tester.tap(find.byKey(const Key('support-ticket-a')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Hỗ trợ DealGo'), findsWidgets);
-    expect(
-      find.text('DealGo đã ghi nhận và đang liên hệ tài xế.'),
-      findsOneWidget,
+    final staffBody = find.text('DealGo đã ghi nhận và đang liên hệ tài xế.');
+    await tester.scrollUntilVisible(
+      staffBody,
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byType(RefreshIndicator),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
+    expect(staffBody, findsOneWidget);
+    expect(find.text('Hỗ trợ DealGo'), findsWidgets);
 
     await tester.enterText(
       find.byKey(const Key('support-reply-field')),

@@ -59,11 +59,12 @@ class _MerchantCategoriesPageState extends State<MerchantCategoriesPage> {
       final items = await context
           .read<MerchantOrdersRepository>()
           .listMenuCategories(merchantAccessToken(context) ?? '');
-      if (mounted)
+      if (mounted) {
         setState(() {
           _items = items;
           _loading = false;
         });
+      }
     } on Object catch (error) {
       if (mounted) {
         setState(() {
@@ -75,9 +76,9 @@ class _MerchantCategoriesPageState extends State<MerchantCategoriesPage> {
   }
 
   Future<void> _reorder(int oldIndex, int newIndex) async {
+    // onReorderItem already adjusts newIndex for the removed item.
     if (_reordering || oldIndex == newIndex) return;
     var next = List<MerchantMenuCategory>.of(_items);
-    if (newIndex > oldIndex) newIndex -= 1;
     final item = next.removeAt(oldIndex);
     next.insert(newIndex, item);
     setState(() {
@@ -279,7 +280,7 @@ class _MerchantCategoriesPageState extends State<MerchantCategoriesPage> {
                           padding: merchantPagePadding,
                           itemCount: _visible.length,
                           buildDefaultDragHandles: false,
-                          onReorder: _search.text.trim().isEmpty
+                          onReorderItem: _search.text.trim().isEmpty
                               ? _reorder
                               : (oldIndex, newIndex) {},
                           itemBuilder: (context, index) {

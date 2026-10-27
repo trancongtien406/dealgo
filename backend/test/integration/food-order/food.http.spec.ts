@@ -299,6 +299,12 @@ describe('food order http', () => {
       .set('Authorization', `Bearer ${merchant.token}`)
       .expect(200);
 
+    // DISPATCH_REQUIRE_FRESH_PRESENCE — online with a fresh fix before the pool shows.
+    await request(app.getHttpServer())
+      .post('/v1/me/presence')
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ online: true, lat: dropoff.lat, lng: dropoff.lng })
+      .expect(200);
     const listed = await request(app.getHttpServer())
       .get('/v1/food/orders/ready')
       .set('Authorization', `Bearer ${driver.token}`)
@@ -310,16 +316,20 @@ describe('food order http', () => {
     expect(match).toEqual({
       id: orderId,
       storeId: readyCatalog.storeId,
+      // Drivers see the store's ready ETA (also used for early claim).
+      estimatedReadyAt: expect.any(String),
       storeName: ready.body.data.storeName,
-      storeAddress: null,
+      storeAddress: 'Hải Châu, Đà Nẵng',
       status: 'READY',
       deliveryFareVnd: ready.body.data.deliveryFareVnd,
       subtotalVnd: ready.body.data.subtotalVnd,
       totalVnd: ready.body.data.totalVnd,
       dropoff,
       lineCount: (ready.body.data.lines as unknown[]).length,
-      store: null,
-      pickup: null,
+      // Every store that takes orders has a pin, so drivers get a pickup point.
+      store: { lat: 16.0544, lng: 108.2022 },
+      pickup: { lat: 16.0544, lng: 108.2022, label: 'Hải Châu, Đà Nẵng' },
+      route: expect.objectContaining({ coords: expect.any(Array) }),
     });
     expect(JSON.stringify(listed.body.data)).not.toContain('"phone"');
   });
@@ -353,7 +363,7 @@ describe('food order http', () => {
     if (!(foods instanceof MemoryFoodRepository)) {
       throw new Error('Expected the in-memory food repository');
     }
-    const otherStore = await foods.createStore(otherMerchant.userId, 'Cơm Tấm', [
+    const otherStore = await createPinnedStore(foods, otherMerchant.userId, 'Cơm Tấm', [
       { name: 'Cơm sườn', priceVnd: 40_000 },
     ]);
     const foreignItem = otherStore.items[0];
@@ -406,7 +416,7 @@ describe('food order http', () => {
     if (!(foods instanceof MemoryFoodRepository)) {
       throw new Error('Expected the in-memory food repository');
     }
-    const store = await foods.createStore(owner.userId, 'Quán Thống Kê', [
+    const store = await createPinnedStore(foods, owner.userId, 'Quán Thống Kê', [
       { name: 'Mì Quảng', priceVnd: 45_000 },
     ]);
     const item = store.items[0]!;
@@ -1085,6 +1095,131 @@ describe('food order http', () => {
       .expect(403);
   });
 
+  it('A store without a map pin is hidden, cannot open and cannot take orders', async () => {
+    const owner = await login();
+    await repository.insertGrant(owner.userId, 'MERCHANT', 'ACTIVE');
+    const customer = await login();
+    const foods = app.get(FOOD_REPOSITORY);
+    if (!(foods instanceof MemoryFoodRepository)) {
+      throw new Error('Expected the in-memory food repository');
+    }
+    const store = await foods.createStore(owner.userId, 'Quán Chưa Ghim', [
+      { name: 'Bánh xèo', priceVnd: 30_000 },
+    ]);
+    const itemId = store.items[0]!.id;
+    const browse = () =>
+      request(app.getHttpServer())
+        .get('/v1/food/stores')
+        .query({ search: 'Quán Chưa Ghim', limit: 20 })
+        .set('Authorization', `Bearer ${customer.token}`)
+        .expect(200);
+    expect((await browse()).body.data.items).toHaveLength(0);
+
+    const blocked = await place(customer.token, 'idem-food-nopin-1', store.id, [{ itemId, quantity: 1 }]);
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.errorCode).toBe('FOOD_STORE_LOCATION_REQUIRED');
+    const quote = await request(app.getHttpServer())
+      .post('/v1/food/quote')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .send({ storeId: store.id, dropoff });
+    expect(quote.status).toBe(409);
+
+    const open = await request(app.getHttpServer())
+      .patch('/v1/food/merchant/store/status')
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({ mode: 'BUSY' });
+    expect(open.status).toBe(409);
+    expect(open.body.errorCode).toBe('FOOD_STORE_LOCATION_REQUIRED');
+
+    const missing = await foods.listStoresPage(1, 100, { location: 'MISSING' });
+    expect(missing.items.map((row) => row.id)).toContain(store.id);
+
+    await request(app.getHttpServer())
+      .patch('/v1/food/merchant/store/location')
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({ lat: 16.0544, lng: 108.2022, addressLabel: 'Hải Châu' })
+      .expect(200);
+    expect((await browse()).body.data.items).toHaveLength(1);
+    const placed = await place(customer.token, 'idem-food-nopin-2', store.id, [{ itemId, quantity: 1 }]);
+    expect(placed.status).toBe(200);
+    const after = await foods.listStoresPage(1, 100, { location: 'MISSING' });
+    expect(after.items.map((row) => row.id)).not.toContain(store.id);
+  });
+
+  it('Merchant marks an item out of stock, customer sees it and accepts the new total', async () => {
+    const owner = await login();
+    await repository.insertGrant(owner.userId, 'MERCHANT', 'ACTIVE');
+    const customer = await login();
+    const foods = app.get(FOOD_REPOSITORY);
+    if (!(foods instanceof MemoryFoodRepository)) {
+      throw new Error('Expected the in-memory food repository');
+    }
+    const store = await createPinnedStore(foods, owner.userId, 'Quán Sửa Đơn', [
+      { name: 'Cơm gà', priceVnd: 40_000 },
+      { name: 'Nước ngọt', priceVnd: 10_000 },
+    ]);
+    const res = await place(customer.token, 'idem-food-change-1', store.id, [
+      { itemId: store.items[0]!.id, quantity: 1 },
+      { itemId: store.items[1]!.id, quantity: 2 },
+    ]);
+    expect(res.status).toBe(200);
+    const order = res.body.data;
+    const drink = order.lines.find((line: { name: string }) => line.name === 'Nước ngọt');
+    expect(drink.id).toEqual(expect.any(String));
+
+    const asCustomer = await request(app.getHttpServer())
+      .post(`/v1/food/orders/${order.id}/changes`)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .send({ reasonCode: 'OUT_OF_STOCK', lines: [{ lineId: drink.id, toQuantity: 0 }] });
+    expect(asCustomer.status).toBe(403);
+
+    const proposed = await request(app.getHttpServer())
+      .post(`/v1/food/orders/${order.id}/changes`)
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({ reasonCode: 'OUT_OF_STOCK', lines: [{ lineId: drink.id, toQuantity: 0 }] })
+      .expect(201);
+    const change = proposed.body.data.change;
+    expect(change).toMatchObject({ status: 'PENDING', newSubtotalVnd: 40_000 });
+
+    const seen = await request(app.getHttpServer())
+      .get(`/v1/food/orders/${order.id}`)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    expect(seen.body.data.pendingChange).toMatchObject({ id: change.id, status: 'PENDING' });
+    const latest = await request(app.getHttpServer())
+      .get(`/v1/food/orders/${order.id}/change`)
+      .set('Authorization', `Bearer ${owner.token}`)
+      .expect(200);
+    expect(latest.body.data).toMatchObject({ id: change.id });
+
+    const accepted = await request(app.getHttpServer())
+      .post(`/v1/food/orders/${order.id}/changes/${change.id}/accept`)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    expect(accepted.body.data.order).toMatchObject({ status: 'PLACED', subtotalVnd: 40_000 });
+    expect(accepted.body.data.order.lines).toHaveLength(1);
+    const after = await request(app.getHttpServer())
+      .get(`/v1/food/orders/${order.id}`)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    expect(after.body.data.pendingChange).toBeUndefined();
+
+    const ops = await request(app.getHttpServer())
+      .post('/v1/ops/sessions')
+      .send({ email: OPS_EMAIL, password: OPS_PASSWORD })
+      .expect(200);
+    const opsDetail = await request(app.getHttpServer())
+      .get(`/v1/ops/food-orders/${order.id}`)
+      .set('Authorization', `Bearer ${ops.body.data.accessToken}`)
+      .expect(200);
+    expect(opsDetail.body.data.latestChange).toMatchObject({
+      id: change.id,
+      status: 'ACCEPTED',
+      reasonCode: 'OUT_OF_STOCK',
+    });
+    expect(opsDetail.body.data.pendingChange).toBeUndefined();
+  });
+
   it('stores M024 busy/pause mode and blocks new orders while paused (DEC-PROD-026)', async () => {
     const owner = await login();
     await repository.insertGrant(owner.userId, 'MERCHANT', 'ACTIVE');
@@ -1093,7 +1228,7 @@ describe('food order http', () => {
     if (!(foods instanceof MemoryFoodRepository)) {
       throw new Error('Expected the in-memory food repository');
     }
-    const store = await foods.createStore(owner.userId, 'Bánh Mì Pause', [
+    const store = await createPinnedStore(foods, owner.userId, 'Bánh Mì Pause', [
       { name: 'Bánh mì thịt', priceVnd: 25_000 },
     ]);
     const itemId = store.items[0]!.id;
@@ -1144,7 +1279,7 @@ describe('food order http', () => {
     if (!(foods instanceof MemoryFoodRepository)) {
       throw new Error('Expected the in-memory food repository');
     }
-    const store = await foods.createStore(owner.userId, 'Aaa Giờ Mở Cửa', [
+    const store = await createPinnedStore(foods, owner.userId, 'Aaa Giờ Mở Cửa', [
       { name: 'Cơm gà', priceVnd: 35_000 },
     ]);
     const itemId = store.items[0]!.id;
@@ -1229,7 +1364,7 @@ describe('food order http', () => {
     if (!(foods instanceof MemoryFoodRepository)) {
       throw new Error('Expected the in-memory food repository');
     }
-    const store = await foods.createStore(owner.userId, 'Quán Nhận Đơn', [
+    const store = await createPinnedStore(foods, owner.userId, 'Quán Nhận Đơn', [
       { name: 'Bún chả', priceVnd: 45_000 },
     ]);
     const itemId = store.items[0]!.id;
@@ -1597,3 +1732,19 @@ describe('food order http', () => {
       .send({ storeId, items, dropoff, deliveryFareVnd: 15_000 });
   }
 });
+
+/** Stores need a map pin before they can open or take orders. */
+async function createPinnedStore(
+  foods: MemoryFoodRepository,
+  ownerId: string,
+  name: string,
+  items: { name: string; priceVnd: number }[],
+): Promise<Awaited<ReturnType<MemoryFoodRepository['createStore']>>> {
+  await foods.createStore(ownerId, name, items);
+  return foods.updateStoreLocation({
+    ownerId,
+    lat: 16.0544,
+    lng: 108.2022,
+    addressLabel: 'Hải Châu, Đà Nẵng',
+  }) as never;
+}

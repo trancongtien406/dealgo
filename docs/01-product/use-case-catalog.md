@@ -7,7 +7,7 @@ updated_at: "2026-10-12"
 owner_role: "Product / Business Analysis"
 review_roles: ["Product Owner", "Tech Lead", "Mobile Lead", "Operations", "Finance", "Security/Legal", "QA"]
 product: "DealGo"
-scope: ["Ride hai bánh", "Food", "Customer", "Merchant", "Driver", "Admin Web"]
+scope: ["Ride (xe máy, ô tô)", "Food", "Customer", "Merchant", "Driver", "Admin Web"]
 predecessors:
   - "../00-governance/README.md"
   - "../00-governance/project-charter.md"
@@ -34,7 +34,7 @@ predecessors:
 
 ### 1.2. Phạm vi đã được xác nhận
 
-- `DEC-PROD-001`: MVP có hai dịch vụ **Ride hai bánh** và **Food**; không tự thêm ô tô hay giao kiện hàng riêng thành P0.
+- `DEC-PROD-001`: MVP có hai dịch vụ **Ride (xe máy, ô tô theo `DG-DEC-VEH-001`)** và **Food**; không tự thêm giao kiện hàng riêng thành P0.
 - `DEC-PROD-002`: **một ứng dụng Flutter** hỗ trợ Customer, Merchant, Driver thông qua role/eligibility phù hợp; **Admin Web** là bề mặt quản trị riêng.
 - `DEC-PROD-003`: học quy trình công khai từ Grab/GrabFood/ShopeeFood; không coi giả định về logic nội bộ đối thủ là yêu cầu DealGo.
 - `DEC-PROD-004`: yêu cầu bao gồm khả năng chạy thực, xử lý lỗi, kiểm thử, bảo mật và vận hành chứ không chỉ những màn hình đẹp.
@@ -172,7 +172,7 @@ Các bất biến trên là cách diễn giải và kiểm thử yêu cầu PRD;
 
 | Use Case | Mục tiêu người dùng / hệ thống | Actor chính | FR liên quan | Policy TBD |
 |---|---|---|---|---|
-| `UC-RIDE-001` | Thiết lập điểm đón và điểm đến của Ride hai bánh | Customer | `FR-RIDE-001` | `OPEN-001` |
+| `UC-RIDE-001` | Thiết lập điểm đón và điểm đến của Ride (xe máy, ô tô) | Customer | `FR-RIDE-001` | `OPEN-001` |
 | `UC-RIDE-002` | Xem route/ETA và giá tham khảo; nhập giá đề xuất | Customer | `FR-RIDE-002` | `OPEN-003/019` |
 | `UC-RIDE-003` | Gửi yêu cầu và hoàn tất thương lượng giá Ride trước assignment | Customer | `FR-RIDE-003` | `DEC-PROD-005`, `OPEN-003/019` |
 | `UC-RIDE-004` | Theo dõi tìm tài xế hoặc không có tài xế | Customer | `FR-RIDE-004` | `OPEN-004` |
@@ -347,7 +347,7 @@ Một UC đến bước triển khai P0 phải được nâng từ `CATALOGED` t
 
 ## 10. Fully dressed — Ride
 
-### 10.1. `UC-RIDE-003` — Khách xác nhận gọi xe hai bánh
+### 10.1. `UC-RIDE-003` — Khách xác nhận gọi xe
 
 - **Level/status:** user-goal; `SPECIFIED_DRAFT`, business pattern confirmed by `DEC-PROD-005`; production parameters/policy blocked by `OPEN-001/003/004/019`.
 - **Actor:** Customer. **Supporting:** Maps/Quote Service, Ride Service, Dispatch.
@@ -358,7 +358,7 @@ Một UC đến bước triển khai P0 phải được nâng từ `CATALOGED` t
 - **Bảo đảm thành công:** một RideRequest canonical có route, giá đề xuất và negotiation state; trước khi khách chọn thì chưa có driver assignment. Sau khi chọn, có một `AcceptedFareAgreement` và tối đa một assignment gắn đúng tài xế/giá cuối.
 
 **Luồng chính**
-1. `MSS-1`: Khách chọn Ride hai bánh, pickup/dropoff; backend xác thực vùng và route rồi trả ETA/quãng đường cùng **giá tham khảo** có version.
+1. `MSS-1`: Khách chọn Ride (xe máy, ô tô), pickup/dropoff; backend xác thực vùng và route rồi trả ETA/quãng đường cùng **giá tham khảo** có version.
 2. `MSS-2`: Khách nhập/chỉnh **giá đề xuất**; UI phân biệt rõ giá tham khảo, giá đề xuất, phụ phí/điều kiện đã biết.
 3. `MSS-3`: Khách gửi yêu cầu với idempotency key; server kiểm tra eligibility, policy version, giới hạn giá đã được phê duyệt và tạo `RideFareNegotiation`.
 4. `MSS-4`: Tài xế đủ điều kiện nhận lời mời thương lượng, xem projection dữ liệu tối thiểu, rồi chấp nhận giá khách hoặc gửi `FareCounterOffer` mới; mọi đề nghị có actor, amount, currency, expiry và state.

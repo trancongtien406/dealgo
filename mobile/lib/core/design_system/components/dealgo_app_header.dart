@@ -72,31 +72,36 @@ class DealGoAppHeader extends StatelessWidget implements PreferredSizeWidget {
                   ? const SizedBox.shrink()
                   : Semantics(
                       header: true,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: centerTitle
-                            ? CrossAxisAlignment.center
-                            : CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: centerTitle
-                                ? TextAlign.center
-                                : TextAlign.start,
-                            style: textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          if (subtitle != null)
+                      // Fixed-height header: cap scaling so title + subtitle
+                      // fit at accessibility text sizes.
+                      child: MediaQuery.withClampedTextScaling(
+                        maxScaleFactor: kHeaderMaxTextScale,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: centerTitle
+                              ? CrossAxisAlignment.center
+                              : CrossAxisAlignment.start,
+                          children: [
                             Text(
-                              subtitle!,
+                              title!,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: textTheme.bodySmall,
+                              textAlign: centerTitle
+                                  ? TextAlign.center
+                                  : TextAlign.start,
+                              style: textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                        ],
+                            if (subtitle != null)
+                              Text(
+                                subtitle!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: textTheme.bodySmall,
+                              ),
+                          ],
+                        ),
                       ),
                     ),
             ),
@@ -113,3 +118,6 @@ class DealGoAppHeader extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 }
+
+/// Max text scale inside [DealGoAppHeader]'s fixed-height title block.
+const double kHeaderMaxTextScale = 1.2;

@@ -24,8 +24,10 @@ export type NestOpsOverview = {
   driversOnline: number;
   storesTotal: number;
   exceptionsOpen: number;
-  revenueVnd: null;
-  commissionVnd: null;
+  /** Today's gross booking value: completed rides + delivered food (VN day). */
+  revenueVnd: number | null;
+  /** Today's platform commission: driver fees + merchant commission. */
+  commissionVnd: number | null;
   todayTimezone: string;
   generatedAt: string;
   hourlyTrend: {
@@ -133,6 +135,8 @@ function mapNestOverview(data: NestOpsOverview): OverviewSnapshot {
     areaTotal: sumCounts(areaRows),
     foodTotal: sumCounts(foodRows),
     pipelineTotal: sumCounts(pipelineRows),
+    revenueVnd: data.revenueVnd ?? null,
+    commissionVnd: data.commissionVnd ?? null,
     generatedAt: data.generatedAt,
     timezone: data.todayTimezone,
   };

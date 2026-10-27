@@ -1,4 +1,12 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   AccessAuthGuard,
@@ -17,8 +25,27 @@ export class PushTokensController {
 
   @Post()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Register an FCM device token for the current user' })
-  register(@CurrentActor() actor: RequestActor, @Body() dto: RegisterPushTokenDto) {
-    return this.tokens.register(actor.userId, dto.token, dto.platform ?? 'unknown');
+  @ApiOperation({
+    summary: 'Register an FCM device token for the current user',
+  })
+  register(
+    @CurrentActor() actor: RequestActor,
+    @Body() dto: RegisterPushTokenDto,
+  ) {
+    return this.tokens.register(
+      actor.userId,
+      dto.token,
+      dto.platform ?? 'unknown',
+    );
+  }
+
+  @Delete()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Unregister an FCM device token (logout)' })
+  unregister(
+    @CurrentActor() actor: RequestActor,
+    @Body() dto: RegisterPushTokenDto,
+  ) {
+    return this.tokens.unregister(actor.userId, dto.token);
   }
 }

@@ -1,5 +1,6 @@
 export const PLATFORM_SETTING_CATEGORIES = [
   { id: "ALL", label: "Tất cả" },
+  { id: "MONEY", label: "Dòng tiền & hoa hồng" },
   { id: "FARE", label: "Cước & Trả giá" },
   { id: "DISPATCH", label: "Điều phối & SLA" },
   { id: "ZONE_PAYMENT", label: "Vùng & Thanh toán" },

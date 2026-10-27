@@ -1,4 +1,5 @@
 import { fetchOpsUpstream } from "@/lib/api/ops-upstream";
+import { opsDateRangeFromSearch } from "@/lib/api/ops-date-range";
 import {
   jsonFromOpsUpstream,
   parsePositiveInt,
@@ -19,6 +20,7 @@ export async function GET(request: Request) {
   if (status) upstreamParams.status = status;
   if (service) upstreamParams.service = service;
   if (payment) upstreamParams.payment = payment;
+  Object.assign(upstreamParams, opsDateRangeFromSearch(searchParams));
 
   const result = await fetchOpsUpstream({
     path: "/v1/ops/transactions",

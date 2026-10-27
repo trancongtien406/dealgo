@@ -8,17 +8,20 @@ describe('OpsZonesService', () => {
   let listSettings: ReturnType<typeof vi.fn>;
   let rideGroupBy: ReturnType<typeof vi.fn>;
   let foodGroupBy: ReturnType<typeof vi.fn>;
+  let vehicleClasses: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     resetServiceRegionCatalog();
     listSettings = vi.fn();
     rideGroupBy = vi.fn().mockResolvedValue([]);
     foodGroupBy = vi.fn().mockResolvedValue([]);
+    vehicleClasses = vi.fn().mockResolvedValue([]);
 
     const prisma = {
       db: () => ({
         ride: { groupBy: rideGroupBy },
         foodOrder: { groupBy: foodGroupBy },
+        rideVehicleClass: { findMany: vehicleClasses },
       }),
     };
     // Memory-mode regions (no DB handle) so zones come from the bootstrap defaults.
@@ -209,5 +212,50 @@ describe('OpsZonesService', () => {
       }),
     );
     expect(page.items[0].zone).toContain('Đà Nẵng');
+  });
+
+  it('Shows live per-class Ride prices instead of the seed-only RIDE_* settings', async () => {
+    listSettings.mockResolvedValue([
+      {
+        key: 'RIDE_MIN_FARE_VND',
+        value: '15000',
+        valueType: 'number',
+        source: 'db',
+        openIds: [],
+        updatedAt: null,
+        updatedByUserId: null,
+      },
+      {
+        key: 'FOOD_MIN_DELIVERY_VND',
+        value: '12000',
+        valueType: 'number',
+        source: 'db',
+        openIds: [],
+        updatedAt: null,
+        updatedByUserId: null,
+      },
+    ]);
+    vehicleClasses.mockResolvedValue([
+      {
+        code: 'MOTORBIKE',
+        name: 'Xe máy',
+        baseFareVnd: 0,
+        perKmVnd: 8000,
+        minFareVnd: 12000,
+        maxFareVnd: 500000,
+        updatedAt: new Date('2026-10-26T00:00:00.000Z'),
+      },
+    ]);
+
+    const page = await service.listRules({ page: 1, limit: 50 });
+    const codes = page.items.map((r) => r.code);
+    expect(codes).not.toContain('RIDE_MIN_FARE_VND');
+    expect(codes).not.toContain('RIDE_MAX_FARE_VND');
+    expect(codes).not.toContain('RIDE_REFERENCE_VND_PER_KM');
+    expect(page.items.find((r) => r.code === 'RIDE_MOTORBIKE_MIN_FARE_VND')).toEqual(
+      expect.objectContaining({ name: 'Giá sàn chuyến xe · Xe máy', value: '12000', service: 'RIDE' }),
+    );
+    expect(page.items.find((r) => r.code === 'RIDE_MOTORBIKE_PER_KM_VND')?.value).toBe('8000');
+    expect(codes).toContain('FOOD_MIN_DELIVERY_VND');
   });
 });

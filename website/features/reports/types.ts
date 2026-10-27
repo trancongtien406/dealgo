@@ -1,5 +1,4 @@
 import type { OpsIconName } from "@/components/ui/ops-icons";
-import type { OverviewSnapshot } from "@/features/overview/types";
 
 export type Accent = "brand" | "food" | "delivery" | "success";
 
@@ -10,10 +9,46 @@ export interface ServiceActivity {
   icon: OpsIconName;
 }
 
-export type ReportsSnapshotView = OverviewSnapshot;
+/** Nest GET /v1/ops/reports — one Vietnam business day. */
+export interface NestOpsReportDay {
+  day: string;
+  ridesCompleted: number;
+  ridesCancelled: number;
+  foodDelivered: number;
+  foodCancelled: number;
+  revenueVnd: number;
+  commissionVnd: number;
+}
 
+export interface NestOpsReport {
+  from: string;
+  to: string;
+  timezone: string;
+  generatedAt: string;
+  totals: Omit<NestOpsReportDay, "day"> & {
+    rideRevenueVnd: number;
+    foodRevenueVnd: number;
+  };
+  daily: NestOpsReportDay[];
+}
+
+export interface ReportsSnapshotView {
+  from: string;
+  to: string;
+  timezone: string;
+  generatedAt: string;
+  revenueVnd: number;
+  rideRevenueVnd: number;
+  foodRevenueVnd: number;
+  commissionVnd: number;
+  services: ServiceActivity[];
+  /** Day labels (dd/MM) for the trend chart. */
+  trendDays: string[];
+  trendSeries: { label: string; tone: Accent; values: number[] }[];
+}
+
+/** Inclusive Vietnam business-day range (YYYY-MM-DD). */
 export interface ReportsFilterParams {
-  preset?: string;
   from?: string | null;
   to?: string | null;
 }

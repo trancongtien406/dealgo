@@ -7,6 +7,7 @@ abstract final class MerchantKybRoutes {
   static const steps = '/merchant/kyb/steps';
   static const status = '/merchant/kyb/status';
   static const rejected = '/merchant/kyb/rejected';
+  static const pin = '/merchant/kyb/pin';
 
   static String entryFor(PartnerApplicationStatus applicationStatus) {
     return switch (applicationStatus) {

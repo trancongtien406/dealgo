@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useOverviewQuery } from "@/features/overview/hooks";
 import { OpsActivityFeed } from "@/components/ui/ops-activity-feed";
@@ -11,9 +12,9 @@ import {
   AdminForbiddenState,
   AdminListErrorBanner,
 } from "@/components/ui/admin-state-ui";
-import { AdminHeaderDateFilter } from "@/components/ui/admin-header-date-filter";
 import { ApiError, isForbiddenError } from "@/lib/api/errors";
 import { formatOpsStamp } from "@/lib/ops-time";
+import { vnd } from "@/lib/admin-format";
 
 const OpsServiceTrendChart = dynamic(
   () =>
@@ -57,12 +58,17 @@ export function OverviewDashboard() {
             Theo dõi sản lượng chuyến đi, đơn đồ ăn và phiên trả giá toàn sàn.
           </p>
         </div>
-        <AdminHeaderDateFilter
-          defaultPreset="today"
-          onChange={() => {
-            void refetch();
-          }}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="inline-flex h-9 items-center rounded-lg border border-border bg-white px-3 text-sm text-ink">
+            Hôm nay · giờ Việt Nam
+          </p>
+          <Link
+            href="/reports"
+            className="inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium text-brand hover:underline"
+          >
+            Báo cáo theo kỳ
+          </Link>
+        </div>
       </div>
 
       {isError && !unavailable && !forbidden && data && data.kpis.length > 0 ? (
@@ -150,6 +156,16 @@ export function OverviewDashboard() {
               </li>
             ))}
           </ul>
+          <p className="text-sm text-muted">
+            Doanh thu hôm nay (GMV):{" "}
+            <span className="font-semibold text-ink tabular-nums">
+              {vnd(data.revenueVnd)}
+            </span>{" "}
+            · Hoa hồng nền tảng:{" "}
+            <span className="font-semibold text-ink tabular-nums">
+              {vnd(data.commissionVnd)}
+            </span>
+          </p>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(18rem,1fr)]">
             <section className="min-w-0 rounded-2xl border border-border bg-white p-4 shadow-sm sm:p-5">

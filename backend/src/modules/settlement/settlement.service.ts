@@ -1,3 +1,4 @@
+import { dayKeyInWindow } from '../operations/ops-date-window.js';
 import { Injectable } from '@nestjs/common';
 import {
   normalizeLimit,
@@ -7,7 +8,7 @@ import {
 import { PrismaService } from '../../platform/database/prisma.service.js';
 
 export type SettlementBatch = {
-  /** UTC calendar day (YYYY-MM-DD). */
+  /** Vietnam (Asia/Ho_Chi_Minh) calendar day (YYYY-MM-DD). */
   day: string;
   journalCount: number;
   totalAmountVnd: number;
@@ -17,13 +18,17 @@ export type SettlementBatch = {
 export type OpsSettlementBatch = SettlementBatch;
 
 /**
- * Settlement service: groups COD ledger journals by UTC day.
+ * Groups posted COD ledger journals by Vietnam business day (Asia/Ho_Chi_Minh, UTC+7).
  */
 @Injectable()
 export class SettlementService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(page?: number, limit?: number): Promise<PageResult<SettlementBatch>> {
+  async list(
+    page?: number,
+    limit?: number,
+    range: { from?: string | null; to?: string | null } = {},
+  ): Promise<PageResult<SettlementBatch>> {
     const safePage = normalizePage(page);
     const safeLimit = normalizeLimit(limit);
     const db = this.prisma.db();
@@ -31,34 +36,34 @@ export class SettlementService {
       return { items: [], page: safePage, limit: safeLimit, total: 0 };
     }
 
-    const journals = await db.ledgerJournal.findMany({
-      where: { event: 'COD_OBLIGATION_POSTED', status: 'POSTED' },
-      select: { entityType: true, amountVnd: true, postedAt: true },
-      orderBy: { postedAt: 'desc' },
-      take: 5_000,
-    });
+    // Batches are Vietnam business days (Asia/Ho_Chi_Minh), aggregated in SQL so older days are
+    // never silently dropped by a row cap. postedAt is stored as UTC without a zone.
+    const rows = await db.$queryRaw<
+      Array<{ day: string; journalCount: number; totalAmountVnd: bigint | number; entityTypes: string[] }>
+    >`
+      SELECT
+        to_char(("postedAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') AS day,
+        COUNT(*)::int AS "journalCount",
+        COALESCE(SUM("amountVnd"), 0)::bigint AS "totalAmountVnd",
+        array_agg(DISTINCT "entityType"::text) AS "entityTypes"
+      FROM ledger_journals
+      WHERE event = 'COD_OBLIGATION_POSTED' AND status = 'POSTED'
+      GROUP BY 1`;
+    const byDay = new Map<string, SettlementBatch>(
+      rows.map((row) => [
+        row.day,
+        {
+          day: row.day,
+          journalCount: Number(row.journalCount),
+          totalAmountVnd: Number(row.totalAmountVnd),
+          entityTypes: row.entityTypes as SettlementBatch['entityTypes'],
+        },
+      ]),
+    );
 
-    const byDay = new Map<string, SettlementBatch>();
-    for (const journal of journals) {
-      const day = journal.postedAt.toISOString().slice(0, 10);
-      const existing = byDay.get(day);
-      if (!existing) {
-        byDay.set(day, {
-          day,
-          journalCount: 1,
-          totalAmountVnd: journal.amountVnd,
-          entityTypes: [journal.entityType],
-        });
-        continue;
-      }
-      existing.journalCount += 1;
-      existing.totalAmountVnd += journal.amountVnd;
-      if (!existing.entityTypes.includes(journal.entityType)) {
-        existing.entityTypes.push(journal.entityType);
-      }
-    }
-
-    const batches = [...byDay.values()].sort((a, b) => b.day.localeCompare(a.day));
+    const batches = [...byDay.values()]
+      .filter((batch) => dayKeyInWindow(batch.day, range))
+      .sort((a, b) => b.day.localeCompare(a.day));
     const total = batches.length;
     const start = (safePage - 1) * safeLimit;
     return {

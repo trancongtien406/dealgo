@@ -9,7 +9,7 @@ last_reviewed_at: 2026-10-12
 classification: Internal
 owner: "Product Owner + Technical Lead"
 reviewers: ["Backend Lead", "Flutter Lead", "Admin Web Lead", "Security / Privacy", "Operations", "Finance", "Compliance"]
-release_scope: "MVP Ride hai bánh + Food; một Flutter app với Customer, Merchant, Driver; Admin Web"
+release_scope: "MVP Ride (xe máy, ô tô) + Food; một Flutter app với Customer, Merchant, Driver; Admin Web"
 source_of_truth:
   - ../00-governance/README.md
   - ../00-governance/decisions-and-assumptions.md
@@ -25,7 +25,7 @@ next_documents: [identity-kyc-kyb.md, merchant-and-catalog-rules.md, trust-safet
 
 # DealGo — Roles & Permissions / Vai trò, quyền hạn và kiểm soát truy cập
 
-> **DRAFT — hợp đồng authorization đề xuất, không phải policy đã được phê duyệt.** Định hướng được xác nhận: **một ứng dụng Flutter có ba vai trò Customer / Merchant / Driver**, hỗ trợ **Ride hai bánh + Food** và Admin Web. Phân quyền phải bảo đảm `least privilege`, `deny by default`, `server-side authorization`, kiểm soát sở hữu từng đối tượng, thu hồi quyền và truy vết. **Không được suy ra** rằng một tài khoản được kiêm nhiệm mọi vai trò, một tài xế được nhận đồng thời Ride+Food, cửa hàng đã có nhân viên/đa chi nhánh, hoặc admin có thể tự thay đổi mọi thông tin.
+> **DRAFT — hợp đồng authorization đề xuất, không phải policy đã được phê duyệt.** Định hướng được xác nhận: **một ứng dụng Flutter có ba vai trò Customer / Merchant / Driver**, hỗ trợ **Ride (xe máy, ô tô) + Food** và Admin Web. Phân quyền phải bảo đảm `least privilege`, `deny by default`, `server-side authorization`, kiểm soát sở hữu từng đối tượng, thu hồi quyền và truy vết. **Không được suy ra** rằng một tài khoản được kiêm nhiệm mọi vai trò, một tài xế được nhận đồng thời Ride+Food, cửa hàng đã có nhân viên/đa chi nhánh, hoặc admin có thể tự thay đổi mọi thông tin.
 >
 > **Nguồn thẩm quyền:** `DEC-PROD-001..007` được xác nhận; `FR-*`, ma trận quyền và chính sách chi tiết ở đây là **PROPOSED_P0** hoặc **DESIGN_PROPOSAL**. `OPEN-005`, `OPEN-006`, `OPEN-008`, `OPEN-013` và các vấn đề có liên quan phải được chốt trước khi kích hoạt tác vụ production phụ thuộc chúng. Các hành động có tác động tiền thật, KYC thật hoặc thông tin cực nhạy cảm phải **fail closed** khi thiếu policy.
 
@@ -45,7 +45,7 @@ next_documents: [identity-kyc-kyb.md, merchant-and-catalog-rules.md, trust-safet
 | Nội dung | Hiện trạng | Tác động đến thiết kế |
 |---|---|---|
 | Một Flutter app / Customer, Merchant, Driver | `DEC-PROD-002: CONFIRMED` | Một danh tính có thể nhận nhiều grant nhưng quyền không được tự hợp nhất. |
-| Ride hai bánh và Food cùng MVP | `DEC-PROD-001: CONFIRMED` | Rights theo service; driver được quyền service nào phải được xác minh riêng. |
+| Ride (xe máy, ô tô) và Food cùng MVP | `DEC-PROD-001: CONFIRMED` | Rights theo service; driver được quyền service nào phải được xác minh riêng. |
 | Kiêm nhiệm role, giới hạn job đồng thời | `OPEN-005` | Thiết kế policy hook/config; không bật concurrency chưa được phê duyệt. |
 | Mô hình pháp lý, điều kiện đối tác | `OPEN-006` | Không tự kích hoạt role Driver/Merchant cho hoạt động thương mại thật. |
 | OTP/KYC/KYB và nhà cung cấp | `OPEN-008` | Identity adapter, compliance status dùng mock/test đến khi được duyệt. |
@@ -153,7 +153,7 @@ flowchart LR
 
 Nếu cần thực hiện hành động hỗ trợ đang có active job sau suspend, phải có quy tắc safety-in-flight trong `OPEN-005/006/015`; **không tự biến suspend thành hủy chuyến/giao hàng tự động**.
 
-> **Đã triển khai trong code (2026-10-18):** grant `SUSPENDED` không thể tự mở lại qua `POST /v1/me/role-grants` (403 `ROLE_GRANT_SUSPENDED`); chỉ ops đổi trạng thái grant. Đăng ký/verify phone lần đầu cấp `CUSTOMER` `ACTIVE`; `requestRole` CUSTOMER ở production vẫn `PENDING`.
+> **Hành vi hiện tại của code:** grant `SUSPENDED` không thể tự mở lại qua `POST /v1/me/role-grants` (403 `ROLE_GRANT_SUSPENDED`); chỉ ops đổi trạng thái grant. Đăng ký/verify phone lần đầu cấp `CUSTOMER` `ACTIVE`; `requestRole` CUSTOMER ở production vẫn `PENDING`.
 
 ## 6. Actor và vai trò nghiệp vụ
 

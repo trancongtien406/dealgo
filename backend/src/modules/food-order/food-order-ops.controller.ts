@@ -15,6 +15,7 @@ import { CurrentActor, type RequestActor } from '../identity/access-auth.guard.j
 import { LedgerService } from '../ledger/ledger.service.js';
 import { OpsInterveneDto, OpsPageQueryDto } from './food.dto.js';
 import { FoodService } from './food.service.js';
+import { opsDateWindow } from '../operations/ops-date-window.js';
 import { OpsPermissionGuard } from '../identity/ops-rbac/ops-permission.guard.js';
 import { RequireOpsPermission } from '../identity/ops-rbac/ops-permission.decorator.js';
 
@@ -29,7 +30,10 @@ export class FoodOrderOpsController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: 'Ops paginated food order list' })
+  @ApiOperation({
+    summary:
+      'Ops paginated food order list; optional from/to (inclusive Vietnam business days on createdAt)',
+  })
   list(@Query() query: OpsPageQueryDto) {
     const statuses = parseStatusesCsv(query.statuses);
     return this.food.listForOps(query.page, query.limit, {
@@ -39,6 +43,7 @@ export class FoodOrderOpsController {
       store: query.store,
       payment: query.payment,
       zone: query.zone,
+      window: opsDateWindow(query),
     });
   }
 

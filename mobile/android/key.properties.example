@@ -1,0 +1,8 @@
+# Copy to android/key.properties (git-ignored) for release builds. DEC-PROD-053.
+# Create the upload key once (keep it and its passwords in a password manager):
+#   keytool -genkey -v -keystore ~/keys/dealgo-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+# storeFile is resolved relative to the android/ directory (absolute paths also work).
+storeFile=
+storePassword=
+keyAlias=upload
+keyPassword=

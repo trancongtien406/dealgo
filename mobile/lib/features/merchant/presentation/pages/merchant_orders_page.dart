@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design_system/components/handover_ref_badge.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../food/domain/entities/food_models.dart';
@@ -60,15 +61,19 @@ class _MerchantOrdersPageState extends State<MerchantOrdersPage> {
         ),
       MerchantQueueReady(:final orders) when orders.isEmpty =>
         MerchantQueueEmptyView(onCheck: _load),
-      MerchantQueueReady(:final orders) => _QueueList(orders: orders),
+      MerchantQueueReady(:final orders, :final busyIds) => _QueueList(
+        orders: orders,
+        busyIds: busyIds,
+      ),
     };
   }
 }
 
 class _QueueList extends StatelessWidget {
-  const _QueueList({required this.orders});
+  const _QueueList({required this.orders, required this.busyIds});
 
   final List<MerchantQueueOrder> orders;
+  final Set<String> busyIds;
 
   @override
   Widget build(BuildContext context) {
@@ -80,10 +85,9 @@ class _QueueList extends StatelessWidget {
         if (order.id != focus.id) order,
     ];
     final placed = merchantQueueTotals(orders).placed;
-    final storeId = focus.storeId;
     return MerchantPageFrame(
       title: l10n.merchantQueueTitle,
-      onBack: () => merchantBack(context),
+      showBack: false,
       footer: MerchantPrimaryBar(
         buttonKey: Key('merchant-open-${focus.id}'),
         label: l10n.merchantQueueViewOrder(shortRef(focus.id)),
@@ -116,12 +120,6 @@ class _QueueList extends StatelessWidget {
                         l10n.merchantQueueYourShop,
                         style: textTheme.titleMedium,
                       ),
-                      Text(shortRef(storeId), style: textTheme.bodySmall),
-                      const SizedBox(height: DealGoSpacing.s8),
-                      Text(
-                        l10n.merchantQueueNewToConfirm,
-                        style: textTheme.bodyMedium,
-                      ),
                     ],
                   ),
                 ),
@@ -137,24 +135,40 @@ class _QueueList extends StatelessWidget {
           const SizedBox(height: DealGoSpacing.s12),
           Text(l10n.merchantQueueToHandle, style: textTheme.titleMedium),
           const SizedBox(height: DealGoSpacing.s8),
-          _OrderCard(order: focus, onOpen: () => _open(context, focus)),
+          _card(context, focus),
           if (others.isNotEmpty) ...[
             const SizedBox(height: DealGoSpacing.s16),
             Text(l10n.merchantQueueOthers, style: textTheme.titleMedium),
             const SizedBox(height: DealGoSpacing.s8),
             for (final order in others) ...[
-              _OrderCard(order: order, onOpen: () => _open(context, order)),
+              _card(context, order),
               const SizedBox(height: DealGoSpacing.s8),
             ],
           ],
-          const SizedBox(height: DealGoSpacing.s12),
-          MerchantNote(
-            tone: MerchantNoteTone.green,
-            message: l10n.merchantNoNewOrdersNote,
-          ),
         ],
       ),
     );
+  }
+
+  Widget _card(BuildContext context, MerchantQueueOrder order) {
+    return _OrderCard(
+      order: order,
+      busy: busyIds.contains(order.id),
+      onOpen: () => _open(context, order),
+      onQuick: () => _quick(context, order),
+    );
+  }
+
+  Future<void> _quick(BuildContext context, MerchantQueueOrder order) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final l10n = AppLocalizations.of(context);
+    final ok = await context.read<MerchantQueueCubit>().runQuickAction(
+      merchantAccessToken(context),
+      order,
+    );
+    if (!ok) {
+      messenger?.showSnackBar(SnackBar(content: Text(l10n.errorGeneric)));
+    }
   }
 
   void _open(BuildContext context, MerchantQueueOrder order) {
@@ -177,14 +191,20 @@ MerchantQueueOrder _focusOrder(List<MerchantQueueOrder> orders) {
 }
 
 class _OrderCard extends StatelessWidget {
-  const _OrderCard({required this.order, required this.onOpen});
+  const _OrderCard({
+    required this.order,
+    required this.busy,
+    required this.onOpen,
+    required this.onQuick,
+  });
 
   final MerchantQueueOrder order;
+  final bool busy;
   final VoidCallback onOpen;
+  final VoidCallback onQuick;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     final l10n = AppLocalizations.of(context);
     return MerchantPanel(
       child: InkWell(
@@ -195,12 +215,9 @@ class _OrderCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Expanded(
-                  child: Text(
-                    AppLocalizations.of(context).orderRef(shortRef(order.id)),
-                    style: textTheme.titleMedium,
-                  ),
-                ),
+                // Handover ref doubles as the card title (DEC-PROD-047).
+                HandoverRefBadge(orderId: order.id, dense: true),
+                const Spacer(),
                 MerchantChip(
                   label: order.status == 'PLACED'
                       ? l10n.merchantQueueNewChip
@@ -246,6 +263,32 @@ class _OrderCard extends StatelessWidget {
               value: formatVnd(order.totalVnd),
               emphasize: true,
             ),
+            if (merchantQuickActionFor(order) case final action?) ...[
+              const SizedBox(height: DealGoSpacing.s12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  key: Key('merchant-quick-${action.name}-${order.id}'),
+                  onPressed: busy ? null : onQuick,
+                  icon: busy
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(
+                          action == MerchantQuickAction.accept
+                              ? Icons.check_rounded
+                              : Icons.room_service_outlined,
+                        ),
+                  label: Text(
+                    action == MerchantQuickAction.accept
+                        ? l10n.merchantAcceptOrder
+                        : l10n.merchantMarkReady,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

@@ -13,12 +13,6 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "DealGo Quản trị",
   description: "Kênh vận hành nội bộ DealGo cho Ride và Food.",
-  icons: {
-    icon: [
-      { url: "/icon.svg", type: "image/svg+xml" },
-      { url: "/dealgo-icon.svg", type: "image/svg+xml" },
-    ],
-  },
   robots: {
     index: false,
     follow: false,

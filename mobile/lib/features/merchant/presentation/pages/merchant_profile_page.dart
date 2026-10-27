@@ -75,7 +75,10 @@ class _MerchantProfilePageState extends State<MerchantProfilePage> {
   bool get _dirty => _store != null && _trimmed != _store!.name;
 
   Future<void> _run(
-    Future<FoodStoreDetail> Function(MerchantOrdersRepository repo, String token)
+    Future<FoodStoreDetail> Function(
+      MerchantOrdersRepository repo,
+      String token,
+    )
     action, {
     required String done,
     bool logo = false,
@@ -123,7 +126,9 @@ class _MerchantProfilePageState extends State<MerchantProfilePage> {
 
   Future<void> _pickLogo() async {
     if (_logoBusy) return;
-    final picked = await context.read<DocumentImageSource>().pick(camera: false);
+    final picked = await context.read<DocumentImageSource>().pick(
+      camera: false,
+    );
     if (picked == null || !mounted) return;
     await _run(
       (repo, token) => repo.uploadStoreLogo(
@@ -225,7 +230,10 @@ class _MerchantProfilePageState extends State<MerchantProfilePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(l10n.merchantProfileLogo, style: textTheme.titleSmall),
-                    Text(l10n.merchantProfileLogoHint, style: textTheme.bodySmall),
+                    Text(
+                      l10n.merchantProfileLogoHint,
+                      style: textTheme.bodySmall,
+                    ),
                     const SizedBox(height: DealGoSpacing.s8),
                     Wrap(
                       spacing: DealGoSpacing.s8,
@@ -237,7 +245,9 @@ class _MerchantProfilePageState extends State<MerchantProfilePage> {
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : Text(
                                   logo == null
@@ -273,7 +283,10 @@ class _MerchantProfilePageState extends State<MerchantProfilePage> {
         ),
         if (_notice != null) ...[
           const SizedBox(height: DealGoSpacing.s12),
-          DealGoBanner(key: const Key('merchant-profile-notice'), message: _notice!),
+          DealGoBanner(
+            key: const Key('merchant-profile-notice'),
+            message: _notice!,
+          ),
         ],
         if (_error != null) ...[
           const SizedBox(height: DealGoSpacing.s12),

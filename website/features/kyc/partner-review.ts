@@ -145,7 +145,7 @@ const REGISTRATION_SUBJECT_LABELS: Record<string, string> = {
   OTHER: "Khác",
 };
 
-/** KYB metadata stores codes since round 9; older rows hold Vietnamese text. */
+/** KYB metadata stores codes; older rows may still hold Vietnamese text. */
 export function businessTypeLabel(raw: string): string {
   return BUSINESS_TYPE_LABELS[raw] ?? raw;
 }

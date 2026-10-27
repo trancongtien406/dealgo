@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -9,7 +11,9 @@ import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../core/l10n/api_error_text.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/push/new_job_alert.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../identity/domain/entities/app_role.dart';
 import '../../identity/domain/entities/auth_state.dart';
 import '../../identity/presentation/cubit/auth_cubit.dart';
 import '../domain/account_settings.dart';
@@ -34,6 +38,14 @@ class _NotificationPrefsPageState extends State<NotificationPrefsPage> {
     return s is AuthSignedIn ? s.tokens.accessToken : null;
   }
 
+  /// "Âm báo có đơn mới" only matters to people who receive jobs / store orders.
+  bool get _receivesJobs {
+    final s = context.read<AuthCubit>().state;
+    if (s is! AuthSignedIn) return false;
+    final roles = s.profile.activeAppRoles;
+    return roles.contains(AppRole.driver) || roles.contains(AppRole.merchant);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -53,18 +65,21 @@ class _NotificationPrefsPageState extends State<NotificationPrefsPage> {
       final prefs = await context
           .read<AccountSettingsRepository>()
           .notificationPrefs(accessToken: token);
-      if (mounted)
+      if (mounted) {
         setState(() {
           _prefs = prefs;
           _loading = false;
           _loadFailure = null;
         });
+      }
+      unawaited(NewJobAlert.instance.setCustomSound(prefs.newJobSound));
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _loading = false;
           _loadFailure = error;
         });
+      }
     }
   }
 
@@ -81,14 +96,17 @@ class _NotificationPrefsPageState extends State<NotificationPrefsPage> {
       final saved = await context
           .read<AccountSettingsRepository>()
           .saveNotificationPrefs(accessToken: token, prefs: prefs);
-      if (mounted)
+      unawaited(NewJobAlert.instance.setCustomSound(saved.newJobSound));
+      if (mounted) {
         setState(() {
           _prefs = saved;
           _ok = AppLocalizations.of(context).notifPrefsSaved;
         });
+      }
     } on ApiException catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() => _error = apiErrorText(AppLocalizations.of(context), e));
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -101,7 +119,10 @@ class _NotificationPrefsPageState extends State<NotificationPrefsPage> {
     final textTheme = Theme.of(context).textTheme;
     return Scaffold(
       backgroundColor: DealGoColors.card,
-      appBar: DealGoAppHeader(title: l10n.notifPrefsHeader, applySafeArea: true),
+      appBar: DealGoAppHeader(
+        title: l10n.notifPrefsHeader,
+        applySafeArea: true,
+      ),
       body: SafeArea(
         top: false,
         child: _loading
@@ -173,6 +194,17 @@ class _NotificationPrefsPageState extends State<NotificationPrefsPage> {
                                 () => _prefs = prefs.copyWith(chat: v),
                               ),
                             ),
+                            if (_receivesJobs)
+                              _PrefTile(
+                                key: const ValueKey('notif-pref-new-job-sound'),
+                                icon: DealGoIcons.notificationsActive,
+                                title: l10n.notifPrefsNewJobSound,
+                                body: l10n.notifPrefsNewJobSoundBody,
+                                value: prefs.newJobSound,
+                                onChanged: (v) => setState(
+                                  () => _prefs = prefs.copyWith(newJobSound: v),
+                                ),
+                              ),
                           ],
                         ),
                         const SizedBox(height: 20),
@@ -300,6 +332,7 @@ class _PrefCard extends StatelessWidget {
 
 class _PrefTile extends StatelessWidget {
   const _PrefTile({
+    super.key,
     required this.icon,
     required this.title,
     required this.body,
@@ -320,7 +353,7 @@ class _PrefTile extends StatelessWidget {
       trailing: Switch.adaptive(
         value: value,
         onChanged: onChanged,
-        activeColor: DealGoColors.primary,
+        activeTrackColor: DealGoColors.primary,
       ),
     );
   }

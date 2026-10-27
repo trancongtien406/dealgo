@@ -213,9 +213,9 @@ export function KycQueueBoard() {
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 px-1">
             <h2 className="text-sm font-semibold text-ink">
-              Hàng đợi KYC ({items.length} hồ sơ mẫu)
+              Hàng đợi KYC ({items.length} hồ sơ trên trang này)
             </h2>
-            <p className="text-sm text-muted">Sắp xếp: Mới nhất</p>
+            <p className="text-sm text-muted">Sắp xếp: Nộp sớm nhất trước</p>
           </div>
           <AdminTableContainer minWidth="min-w-[720px]">
             <AdminTable caption="Hàng đợi KYC">

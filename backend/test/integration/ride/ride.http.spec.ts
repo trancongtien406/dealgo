@@ -1,3 +1,5 @@
+import { PROD_ENV_OK } from '../../fixtures/prod-env.js';
+import { seedVehicleClassOnDriverGrant } from '../../support/driver-class-fixture.js';
 import { MemoryRidePickupCodeStore, RIDE_PICKUP_CODE_STORE } from '../../../src/modules/ride/ride-pickup-code.js';
 import { INestApplication } from '@nestjs/common';
 import { EARNINGS_REPOSITORY, MemoryEarningsRepository } from '../../../src/modules/earnings/index.js';
@@ -28,7 +30,11 @@ import { OPS_NOTIFICATION_REPOSITORY } from '../../../src/modules/communication/
 import { PLATFORM_SETTINGS_REPOSITORY } from '../../../src/platform/settings/platform-settings.constants.js';
 import { MemoryOpsFaqRepository } from '../../../src/modules/support/ops-faq.repository.js';
 import { MemoryOpsNotificationRepository } from '../../../src/modules/communication/notifications/notification.repository.js';
-import { MemoryPlatformSettingsRepository } from '../../../src/platform/settings/platform-settings.repository.js';
+import { negotiationMechanicsSettings } from '../../support/settings-fixture.js';
+import {
+  MemoryRideCustomerRatingStore,
+  RIDE_CUSTOMER_RATING_STORE,
+} from '../../../src/modules/ride/ride-customer-rating.js';
 import { PARTNER_REPOSITORY } from '../../../src/modules/partner/partner.constants.js';
 import { MemoryPartnerRepository } from '../../../src/modules/partner/partner.repository.js';
 import { PAYMENT_REPOSITORY } from '../../../src/modules/payment/payment.constants.js';
@@ -39,6 +45,9 @@ import { RideModule } from '../../../src/modules/ride/ride.module.js';
 import { PROMOTION_REPOSITORY } from '../../../src/modules/promotion/promotion.constants.js';
 import { MemoryPromotionRepository } from '../../../src/modules/promotion/promotion.repository.js';
 import { MemoryRideRepository } from '../../../src/modules/ride/ride.repository.js';
+import { RIDE_VEHICLE_CLASS_REPOSITORY } from '../../../src/modules/ride-vehicle/ride-vehicle-class.constants.js';
+import { MemoryRideVehicleClassRepository } from '../../../src/modules/ride-vehicle/ride-vehicle-class.repository.js';
+import { RideVehicleClassService } from '../../../src/modules/ride-vehicle/ride-vehicle-class.service.js';
 
 const OPS_EMAIL = 'ops@dealgo.test';
 const OPS_PASSWORD = 'correct-horse-battery';
@@ -66,12 +75,14 @@ class ManualClock implements RideClock {
 describe('ride negotiation http', () => {
   let app: INestApplication;
   let repository: MemoryIdentityRepository;
+  let partners: MemoryPartnerRepository;
   let sms: MockSmsSender;
   let clock: ManualClock;
   let phoneSerial = 100;
 
   beforeAll(async () => {
     repository = new MemoryIdentityRepository();
+    partners = new MemoryPartnerRepository();
     sms = new MockSmsSender('test');
     clock = new ManualClock(CLOCK_START);
 
@@ -101,10 +112,14 @@ describe('ride negotiation http', () => {
     })
       .overrideProvider(SMS_SENDER)
       .useValue(sms)
+      .overrideProvider(PLATFORM_SETTINGS_REPOSITORY)
+      .useValue(await negotiationMechanicsSettings())
       .overrideProvider(IDENTITY_REPOSITORY)
       .useValue(repository)
       .overrideProvider(RIDE_CLOCK)
       .useValue(clock)
+      .overrideProvider(PARTNER_REPOSITORY)
+      .useValue(partners)
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -112,6 +127,7 @@ describe('ride negotiation http', () => {
     app.useGlobalFilters(new HttpExceptionFilter());
     app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
     await app.init();
+    seedVehicleClassOnDriverGrant(app, repository);
     await app.get(OpsAuthService).ensureOperator(OPS_EMAIL, OPS_PASSWORD, 'test');
   });
 
@@ -159,17 +175,51 @@ describe('ride negotiation http', () => {
       .send({ pickup, dropoff })
       .expect(200);
     const km = haversineKm(pickup, dropoff);
-    expect(quote.body.data).toEqual({
+    const referenceFareVnd = quoteReferenceFareVnd(km, 8000, 10_000);
+    expect(quote.body.data).toMatchObject({
       distanceKm: Math.round(km * 10) / 10,
-      referenceFareVnd: quoteReferenceFareVnd(km, 8000, 10_000),
+      referenceFareVnd,
       minFareVnd: 10_000,
-      maxFareVnd: expect.any(Number),
     });
+    expect(quote.body.data.maxFareVnd).toEqual(expect.any(Number));
+    expect(quote.body.data.route).toEqual({
+      available: false,
+      provider: 'none',
+      coords: [],
+      distanceM: null,
+      durationSec: null,
+    });
+    expect(quote.body.data.options).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'MOTORBIKE', referenceFareVnd }),
+      ]),
+    );
     await request(app.getHttpServer())
       .post('/v1/rides/quote')
       .set('Authorization', `Bearer ${customer.token}`)
       .send({ pickup })
       .expect(400);
+  });
+
+  it('returns unavailable road geometry on GET /v1/rides/route when ROUTING_PROVIDER=none', async () => {
+    const customer = await login();
+    const res = await request(app.getHttpServer())
+      .get('/v1/rides/route')
+      .query({
+        fromLat: pickup.lat,
+        fromLng: pickup.lng,
+        toLat: dropoff.lat,
+        toLng: dropoff.lng,
+      })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    expect(res.body.data).toEqual({
+      available: false,
+      provider: 'none',
+      coords: [],
+      distanceM: null,
+      durationSec: null,
+    });
   });
 
   it('assigns the countered driver and agreed fare, and replays the same selection key', async () => {
@@ -280,6 +330,15 @@ describe('ride negotiation http', () => {
     expect(expired.status).toBe(409);
     expect(expired.body.errorCode).toBe('RIDE_OFFER_EXPIRED');
 
+    // The request window (RIDE_REQUEST_WINDOW_SECONDS = 300) outlives one offer's
+    // TTL, so the ride keeps collecting bids until the window closes.
+    const stillOpen = await request(app.getHttpServer())
+      .get(`/v1/rides/${rideId}`)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    expect(stillOpen.body.data.status).toBe('NEGOTIATING');
+
+    clock.advanceSeconds(300);
     const stored = await request(app.getHttpServer())
       .get(`/v1/rides/${rideId}`)
       .set('Authorization', `Bearer ${customer.token}`)
@@ -341,6 +400,7 @@ describe('ride negotiation http', () => {
 
     const created = await postRide(customer.token, 'idem-open-list', 30_000);
     expect(created.status).toBe(200);
+    await goOnlineNearPickup(driver.token);
 
     const listed = await request(app.getHttpServer())
       .get('/v1/rides/open')
@@ -354,10 +414,15 @@ describe('ride negotiation http', () => {
       dropoff,
       offeredFareVnd: 30_000,
       referenceFareVnd: created.body.data.referenceFareVnd,
+      vehicleClassCode: 'MOTORBIKE',
+      imageUrl: null,
       expiresAt: created.body.data.expiresAt,
       offerCount: 0,
+      customerRating: { average: null, count: 0 },
+      pickupDistanceKm: expect.any(Number),
     });
     expect(JSON.stringify(listed.body.data)).not.toContain('"phone"');
+    expect(JSON.stringify(listed.body.data)).not.toContain(customer.userId);
   });
 
   it('rejects a customer without a driver grant from the open ride list', async () => {
@@ -803,7 +868,7 @@ describe('ride negotiation http', () => {
         .set('Authorization', `Bearer ${driver.token}`)
         .expect(200);
 
-    const off = await presence({ online: true, rideEnabled: false, foodEnabled: true });
+    const off = await presence({ online: true, rideEnabled: false, foodEnabled: true, lat: 10.77, lng: 106.7 });
     expect(off.body.data).toMatchObject({ online: true, rideEnabled: false, foodEnabled: true });
     expect((await open()).body.data).toEqual([]);
 
@@ -875,12 +940,210 @@ describe('ride negotiation http', () => {
     };
   }
 
-  function postRide(token: string, idempotencyKey: string, offeredFareVnd: number) {
+  // --- RIDE-CAR (DG-DEC-VEH-001 Wave 1) ---
+  it('RIDE-CAR: rejects create when vehicleClassCode is missing (no silent MOTORBIKE)', async () => {
+    const customer = await login();
+    const denied = await request(app.getHttpServer())
+      .post('/v1/rides')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .set('Idempotency-Key', 'idem-ride-car-missing-class')
+      .send({ pickup, dropoff, offeredFareVnd: 30_000 });
+    expect(denied.status).toBe(400);
+  });
+
+  it('RIDE-CAR: stores CAR_4 when requested and quotes include Car options', async () => {
+    const customer = await login();
+    const quote = await request(app.getHttpServer())
+      .post('/v1/rides/quote')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .send({ pickup, dropoff })
+      .expect(200);
+    const codes = (quote.body.data.options as { code: string }[]).map((o) => o.code);
+    expect(codes).toEqual(expect.arrayContaining(['MOTORBIKE', 'CAR_4', 'CAR_7']));
+
+    const created = await postRide(customer.token, 'idem-ride-car-create-car4', 30_000, 'CAR_4');
+    expect(created.status).toBe(200);
+    expect(created.body.data.vehicleClassCode).toBe('CAR_4');
+  });
+
+  it('RIDE-CAR: motorbike driver cannot offer on a CAR_4 ride (class mismatch)', async () => {
+    const customer = await login();
+    const bikeDriver = await login();
+    await repository.insertGrant(bikeDriver.userId, 'DRIVER', 'ACTIVE');
+    // No partner metadata → eligibility defaults legacy MOTORBIKE
+
+    const created = await postRide(customer.token, 'idem-ride-car-mismatch', 30_000, 'CAR_4');
+    expect(created.status).toBe(200);
+    const rideId = created.body.data.id as string;
+
+    const denied = await request(app.getHttpServer())
+      .post(`/v1/rides/${rideId}/offers`)
+      .set('Authorization', `Bearer ${bikeDriver.token}`)
+      .send({ amountVnd: 35_000 })
+      .expect(403);
+    expect(denied.body.errorCode).toBe('RIDE_VEHICLE_CLASS_MISMATCH');
+  });
+
+  it('RIDE-CAR: CAR_4 driver can offer on a matching CAR_4 ride', async () => {
+    const customer = await login();
+    const carDriver = await login();
+    await repository.insertGrant(carDriver.userId, 'DRIVER', 'ACTIVE');
+    await partners.upsertSubmit({
+      id: `app-car4-${carDriver.userId}`,
+      userId: carDriver.userId,
+      role: 'DRIVER',
+      metadata: { vehicleClassCode: 'CAR_4' },
+      documents: [],
+      now: clock.now(),
+    });
+
+    const created = await postRide(customer.token, 'idem-ride-car-match', 30_000, 'CAR_4');
+    expect(created.status).toBe(200);
+    const rideId = created.body.data.id as string;
+
+    const offer = await request(app.getHttpServer())
+      .post(`/v1/rides/${rideId}/offers`)
+      .set('Authorization', `Bearer ${carDriver.token}`)
+      .send({ amountVnd: 35_000 })
+      .expect(200);
+    expect(offer.body.data.offers).toEqual([
+      expect.objectContaining({
+        driverId: carDriver.userId,
+        amountVnd: 35_000,
+        status: 'PENDING',
+      }),
+    ]);
+  });
+
+  it('RIDE-CAR: open list for CAR_4 driver only shows CAR_4 rides', async () => {
+    const customerBike = await login();
+    const customerCar = await login();
+    const carDriver = await login();
+    await repository.insertGrant(carDriver.userId, 'DRIVER', 'ACTIVE');
+    await partners.upsertSubmit({
+      id: `app-car4-open-${carDriver.userId}`,
+      userId: carDriver.userId,
+      role: 'DRIVER',
+      metadata: { vehicleClassCode: 'CAR_4' },
+      documents: [],
+      now: clock.now(),
+    });
+
+    const bikeRide = await postRide(customerBike.token, 'idem-ride-car-open-bike', 30_000, 'MOTORBIKE');
+    const carRide = await postRide(customerCar.token, 'idem-ride-car-open-car', 30_000, 'CAR_4');
+    expect(bikeRide.status).toBe(200);
+    expect(carRide.status).toBe(200);
+    await goOnlineNearPickup(carDriver.token);
+
+    const listed = await request(app.getHttpServer())
+      .get('/v1/rides/open')
+      .set('Authorization', `Bearer ${carDriver.token}`)
+      .expect(200);
+    const ids = (listed.body.data as { id: string; vehicleClassCode: string }[]).map((r) => r.id);
+    expect(ids).toContain(carRide.body.data.id);
+    expect(ids).not.toContain(bikeRide.body.data.id);
+    for (const row of listed.body.data as { vehicleClassCode: string }[]) {
+      expect(row.vehicleClassCode).toBe('CAR_4');
+    }
+  });
+
+  it('RIDE-CAR-012: wrong-class driver gets 404 on GET negotiating ride (canRead class gate)', async () => {
+    const customer = await login();
+    const bikeDriver = await login();
+    await repository.insertGrant(bikeDriver.userId, 'DRIVER', 'ACTIVE');
+
+    const created = await postRide(customer.token, 'idem-ride-car-012', 30_000, 'CAR_4');
+    expect(created.status).toBe(200);
+    const rideId = created.body.data.id as string;
+
+    await request(app.getHttpServer())
+      .get(`/v1/rides/${rideId}`)
+      .set('Authorization', `Bearer ${bikeDriver.token}`)
+      .expect(404);
+
+    await request(app.getHttpServer())
+      .get(`/v1/rides/${rideId}`)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+  });
+
+  it('RIDE-CAR-006: rejects CAR_4 fare below class min (out of range)', async () => {
+    const customer = await login();
+    // DRAFT CAR_4 minFareVnd is max(platformMin, 25000) with test knobs → 25000.
+    const denied = await postRide(customer.token, 'idem-ride-car-006-low', 20_000, 'CAR_4');
+    expect(denied.status).toBe(400);
+    expect(denied.body.errorCode).toBe('RIDE_FARE_OUT_OF_RANGE');
+  });
+
+  it('RIDE-CAR-007: rejects CAR_4 fare above class max (out of range)', async () => {
+    const customer = await login();
+    // DRAFT CAR_4 maxFareVnd is max(platformMax, 800000) with test knobs → 800000.
+    const denied = await postRide(customer.token, 'idem-ride-car-007-high', 800_001, 'CAR_4');
+    expect(denied.status).toBe(400);
+    expect(denied.body.errorCode).toBe('RIDE_FARE_OUT_OF_RANGE');
+  });
+
+  it('RIDE-CAR: rejects create when vehicle class is disabled', async () => {
+    const customer = await login();
+    // Disable CAR_7 via ops path if available; otherwise patch repository seed.
+    const listed = await request(app.getHttpServer())
+      .post('/v1/rides/quote')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .send({ pickup, dropoff })
+      .expect(200);
+    const before = (listed.body.data.options as { code: string }[]).map((o) => o.code);
+    expect(before).toContain('CAR_7');
+
+    const vehicleClasses = app.get(RideVehicleClassService);
+    await vehicleClasses.update('CAR_7', { enabled: false }, 'test-ops');
+
+    const denied = await postRide(customer.token, 'idem-ride-car-disabled', 30_000, 'CAR_7');
+    expect(denied.status).toBe(400);
+    expect(denied.body.errorCode).toBe('RIDE_VEHICLE_CLASS_UNKNOWN');
+
+    // Restore for later tests in the same suite.
+    await vehicleClasses.update('CAR_7', { enabled: true }, 'test-ops');
+  });
+
+  it('RIDE-CAR: DRAFT Car reference fare differs from motorbike (ADMIN_EDITABLE seeds)', async () => {
+    const customer = await login();
+    const quote = await request(app.getHttpServer())
+      .post('/v1/rides/quote')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .send({ pickup, dropoff })
+      .expect(200);
+    const options = quote.body.data.options as {
+      code: string;
+      referenceFareVnd: number;
+    }[];
+    const bike = options.find((o) => o.code === 'MOTORBIKE');
+    const car4 = options.find((o) => o.code === 'CAR_4');
+    expect(bike).toBeDefined();
+    expect(car4).toBeDefined();
+    // DRAFT seeds: Car should not silently equal bike shared knobs anymore.
+    expect(car4!.referenceFareVnd).not.toBe(bike!.referenceFareVnd);
+  });
+
+  function postRide(
+    token: string,
+    idempotencyKey: string,
+    offeredFareVnd: number,
+    vehicleClassCode = 'MOTORBIKE',
+  ) {
     return request(app.getHttpServer())
       .post('/v1/rides')
       .set('Authorization', `Bearer ${token}`)
       .set('Idempotency-Key', idempotencyKey)
-      .send({ pickup, dropoff, offeredFareVnd });
+      .send({ pickup, dropoff, offeredFareVnd, vehicleClassCode });
+  }
+
+  /** The open list needs a fresh presence fix (DISPATCH_REQUIRE_FRESH_PRESENCE). */
+  function goOnlineNearPickup(token: string) {
+    return request(app.getHttpServer())
+      .post('/v1/me/presence')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ online: true, lat: pickup.lat + 0.001, lng: pickup.lng + 0.001 })
+      .expect(200);
   }
 
   function selectRide(token: string, rideId: string, offerId: string, idempotencyKey: string) {
@@ -907,10 +1170,12 @@ describe('ride negotiation in production', () => {
           ignoreEnvFile: true,
           validate: () =>
             loadEnv({
-              NODE_ENV: 'production',
+              ...PROD_ENV_OK,
               JWT_ACCESS_SECRET: 'production-test-secret',
-              SMS_PROVIDER: 'esms',
               PAYMENT_PROVIDER: 'vnpay',
+              VNPAY_TMN_CODE: 'T',
+              VNPAY_HASH_SECRET: 'H',
+              VNPAY_URL: 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',
               RIDE_MIN_FARE_VND: '10000',
               RIDE_MAX_FARE_VND: '500000',
               OTP_THROTTLE_LIMIT: '1000',
@@ -939,9 +1204,11 @@ describe('ride negotiation in production', () => {
       .overrideProvider(PARTNER_REPOSITORY)
       .useValue(new MemoryPartnerRepository())
       .overrideProvider(PLATFORM_SETTINGS_REPOSITORY)
-      .useValue(new MemoryPlatformSettingsRepository())
+      .useValue(await negotiationMechanicsSettings())
       .overrideProvider(RIDE_PICKUP_CODE_STORE)
       .useValue(new MemoryRidePickupCodeStore())
+      .overrideProvider(RIDE_CUSTOMER_RATING_STORE)
+      .useValue(new MemoryRideCustomerRatingStore())
       .overrideProvider(EARNINGS_REPOSITORY)
       .useValue(new MemoryEarningsRepository())
       .overrideProvider(OPS_FAQ_REPOSITORY)
@@ -950,6 +1217,8 @@ describe('ride negotiation in production', () => {
       .useValue(new MemoryOpsNotificationRepository())
       .overrideProvider(PROMOTION_REPOSITORY)
       .useValue(new MemoryPromotionRepository([]))
+      .overrideProvider(RIDE_VEHICLE_CLASS_REPOSITORY)
+      .useValue(new MemoryRideVehicleClassRepository())
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -982,7 +1251,7 @@ describe('ride negotiation in production', () => {
       .post('/v1/rides')
       .set('Authorization', `Bearer ${token}`)
       .set('Idempotency-Key', 'idem-production-ride')
-      .send({ pickup, dropoff, offeredFareVnd: 30_000 });
+      .send({ pickup, dropoff, offeredFareVnd: 30_000, vehicleClassCode: 'MOTORBIKE' });
     expect(created.status).toBeLessThan(300);
   });
 
@@ -999,7 +1268,7 @@ describe('ride negotiation in production', () => {
       .post('/v1/rides')
       .set('Authorization', `Bearer ${token}`)
       .set('Idempotency-Key', 'idem-production-ride-legacy')
-      .send({ pickup, dropoff, offeredFareVnd: 30_000 })
+      .send({ pickup, dropoff, offeredFareVnd: 30_000, vehicleClassCode: 'MOTORBIKE' })
       .expect(403);
     expect(denied.body.errorCode).toBe('ROLE_NOT_ACTIVE');
   });

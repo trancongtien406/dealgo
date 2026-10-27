@@ -1,0 +1,194 @@
+# DealGo production stack on a shared VPS (compose project "dealgo", lives in /opt/dealgo).
+# The VPS already runs other sites behind the vms Caddy (container vms-caddy-1, owns :80/:443).
+# DealGo joins that proxy through the external network vms_edge; it publishes no public ports.
+# Service names are prefixed (dealgo-*) so no alias such as "api"/"web" leaks into vms_edge.
+#
+#   ./gen-secrets.sh                                    # once: env/*.env (chmod 600)
+#   docker compose build
+#   docker compose --profile migrate run --rm dealgo-migrate
+#   docker compose up -d
+name: dealgo
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "20m", max-file: "5" }
+
+networks:
+  internal:
+    name: dealgo_internal
+  edge:
+    name: vms_edge
+    external: true
+
+volumes:
+  postgres: { name: dealgo_postgres }
+  redis: { name: dealgo_redis }
+  objects: { name: dealgo_objects }
+  photon: { name: dealgo_photon }
+
+services:
+  dealgo-postgres:
+    image: postgres:16-alpine
+    container_name: dealgo-postgres
+    env_file: ./env/postgres.env
+    volumes: [postgres:/var/lib/postgresql/data]
+    networks: [internal]
+    restart: unless-stopped
+    mem_limit: 1g
+    shm_size: 256m
+    logging: *logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  dealgo-redis:
+    image: redis:7-alpine
+    container_name: dealgo-redis
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
+    volumes: [redis:/data]
+    networks: [internal]
+    restart: unless-stopped
+    mem_limit: 384m
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  dealgo-migrate:
+    build: { context: ./src/backend, target: migrate }
+    image: dealgo-migrate:latest
+    env_file: ./env/backend.env
+    networks: [internal]
+    restart: "no"
+    profiles: ["migrate"]
+    depends_on:
+      dealgo-postgres: { condition: service_healthy }
+
+  dealgo-api:
+    build: { context: ./src/backend, target: api }
+    image: dealgo-api:latest
+    container_name: dealgo-api
+    env_file: ./env/backend.env
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      LOG_FORMAT: json
+    volumes:
+      - objects:/app/var/object-storage
+      - ./secrets:/run/dealgo:ro
+    networks: [internal, edge]
+    restart: unless-stopped
+    mem_limit: 1g
+    logging: *logging
+    depends_on:
+      dealgo-postgres: { condition: service_healthy }
+      dealgo-redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 40s
+
+  dealgo-worker:
+    build: { context: ./src/backend, target: worker }
+    image: dealgo-worker:latest
+    container_name: dealgo-worker
+    env_file: ./env/backend.env
+    environment:
+      NODE_ENV: production
+      LOG_FORMAT: json
+    volumes:
+      - objects:/app/var/object-storage
+      - ./secrets:/run/dealgo:ro
+    networks: [internal]
+    restart: unless-stopped
+    mem_limit: 768m
+    logging: *logging
+    depends_on:
+      dealgo-api: { condition: service_healthy }
+    # The worker writes a DB heartbeat; the API reports it (503 when stale or outbox lag is high).
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://dealgo-api:3001/health/worker').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  dealgo-web:
+    build:
+      context: ./src/website
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
+        NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN:-}
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+    image: dealgo-web:latest
+    container_name: dealgo-web
+    env_file: ./env/website.env
+    environment:
+      NODE_ENV: production
+      DEALGO_API_BASE_URL: http://dealgo-api:3001
+    networks: [internal, edge]
+    restart: unless-stopped
+    mem_limit: 768m
+    logging: *logging
+    depends_on:
+      dealgo-api: { condition: service_healthy }
+
+  # LiveKit SFU (voice calls). Host network: WebRTC needs the real UDP ports and public IP.
+  dealgo-livekit:
+    image: livekit/livekit-server:v1.13.11
+    container_name: dealgo-livekit
+    command: ["--config", "/etc/livekit.yaml"]
+    network_mode: host
+    restart: unless-stopped
+    mem_limit: 1g
+    logging: *logging
+    volumes:
+      - ./livekit/livekit.yaml:/etc/livekit.yaml:ro
+      - ./livekit/keys.yaml:/etc/livekit-keys.yaml:ro
+      - ./livekit/tls:/etc/livekit-tls:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:7880/ >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
+
+  # Photon (komoot) OSM street search, Vietnam-only index. Internal network only, no host port.
+  # Backend: PLACES_OSM_SEARCH_URL=http://dealgo-photon:2322 (env/backend.env).
+  # Build/refresh index (monthly):  docker compose --profile photon-import run --rm dealgo-photon-import
+  dealgo-photon:
+    build: { context: ./photon }
+    image: dealgo-photon:latest
+    container_name: dealgo-photon
+    environment:
+      JAVA_OPTS: "-Xms512m -Xmx1g"
+    volumes: [photon:/photon]
+    networks: [internal]
+    restart: unless-stopped
+    mem_limit: 1536m
+    cpus: 2
+    logging: *logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS 'http://127.0.0.1:2322/api?q=da%20nang&limit=1' >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+  dealgo-photon-import:
+    image: dealgo-photon:latest
+    command: ["photon-import"]
+    environment:
+      JAVA_OPTS: "-Xmx1g"
+    volumes: [photon:/photon]
+    networks: [internal]
+    restart: "no"
+    profiles: ["photon-import"]
+    mem_limit: 1536m
+    cpus: 2

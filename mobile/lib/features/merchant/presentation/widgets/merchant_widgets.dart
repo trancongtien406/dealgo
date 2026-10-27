@@ -41,6 +41,7 @@ String merchantStatusLabel(AppLocalizations l10n, String status) {
     'PREPARING' => l10n.merchantStatusPreparing,
     'READY' || 'READY_FOR_PICKUP' => l10n.merchantStatusReady,
     'ASSIGNED' => l10n.merchantStatusAssigned,
+    'CANCELLED' || 'CANCELED' || 'REJECTED' => l10n.statusCancelled,
     _ => status,
   };
 }
@@ -57,10 +58,8 @@ String merchantCountLabel(int value) {
   if (value < 0) {
     return '0';
   }
-  if (value < 100) {
-    return value.toString().padLeft(2, '0');
-  }
-  return value.toString();
+  // Plain integers like Grab/ShopeeFood merchant dashboards: "0", "7", "12".
+  return value > 999 ? '999+' : value.toString();
 }
 
 String formatSyncClock(AppLocalizations l10n, DateTime? time) {
@@ -128,6 +127,7 @@ class MerchantPageFrame extends StatelessWidget {
     this.footer,
     this.onBack,
     this.trailing,
+    this.showBack = true,
     this.insetBottom = false,
     super.key,
   });
@@ -138,6 +138,9 @@ class MerchantPageFrame extends StatelessWidget {
   final Widget? footer;
   final VoidCallback? onBack;
   final Widget? trailing;
+
+  /// False on bottom-nav tab roots (overview / orders / products / stats).
+  final bool showBack;
   final bool insetBottom;
 
   @override
@@ -154,6 +157,7 @@ class MerchantPageFrame extends StatelessWidget {
               subtitle: subtitle,
               onBack: onBack,
               trailing: trailing,
+              showBack: showBack,
             ),
             Expanded(
               child: Material(type: MaterialType.transparency, child: body),
@@ -172,6 +176,7 @@ class MerchantHeader extends StatelessWidget {
     this.subtitle,
     this.onBack,
     this.trailing,
+    this.showBack = true,
     super.key,
   });
 
@@ -179,15 +184,19 @@ class MerchantHeader extends StatelessWidget {
   final String? subtitle;
   final VoidCallback? onBack;
   final Widget? trailing;
+  final bool showBack;
 
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.maybeOf(context)?.canPop() ?? false;
+    // Never let a non-null onBack alone force the chevron — tab roots often
+    // pass onBack for multi-role fallback while the branch cannot pop.
+    final effectiveShow = showBack && canPop;
     return DealGoAppHeader(
       title: title,
       subtitle: subtitle,
-      onBack: onBack ?? (canPop ? () => merchantBack(context) : null),
-      showBack: canPop || onBack != null,
+      onBack: effectiveShow ? (onBack ?? () => merchantBack(context)) : null,
+      showBack: effectiveShow,
       trailing: trailing,
     );
   }

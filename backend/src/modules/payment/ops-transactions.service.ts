@@ -1,3 +1,4 @@
+import { prismaDateFilter, type OpsDateWindow } from '../operations/ops-date-window.js';
 import { Injectable } from '@nestjs/common';
 import { normalizeLimit, normalizePage, type PageResult } from '../../shared/pagination/pagination.js';
 import { PrismaService } from '../../platform/database/prisma.service.js';
@@ -30,6 +31,7 @@ export class OpsTransactionsService {
       status?: string;
       service?: string;
       payment?: string;
+      window?: OpsDateWindow;
     },
   ): Promise<PageResult<OpsTransactionItem>> {
     const safePage = normalizePage(page);
@@ -42,7 +44,9 @@ export class OpsTransactionsService {
 
     let allItems: OpsTransactionItem[] = [];
     try {
+      const createdAt = prismaDateFilter(filters?.window);
       const intents = await db.paymentIntent.findMany({
+        ...(createdAt ? { where: { createdAt } } : {}),
         orderBy: { createdAt: 'desc' },
         take: 200,
       });

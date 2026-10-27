@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchOpsUpstream } from "@/lib/api/ops-upstream";
+import { opsDateRangeFromSearch } from "@/lib/api/ops-date-range";
+import { formatOpsDateTime } from "@/lib/ops-time";
 import {
   jsonFromOpsUpstream,
   parsePositiveInt,
@@ -30,6 +32,8 @@ type NestFoodOrder = {
   pickup?: { lat?: number; lng?: number; label?: string | null } | null;
   assignedDriverId: string | null;
   lines?: Array<{ name: string; quantity: number }>;
+  /** ISO placement time (Nest FoodOrderView.createdAt). */
+  createdAt?: string | null;
 };
 
 type GeoPoint = { lat: number; lng: number };
@@ -122,7 +126,7 @@ function mapOrder(order: NestFoodOrder, people: OpsPeopleMap): DeliveryItem {
         `TX · ${shortId(order.assignedDriverId)}`
       : null,
     status: mapDeliveryStatus(order.status),
-    time: "—",
+    time: formatOpsDateTime(order.createdAt),
     regionLabel:
       serviceRegionLabel(order.serviceRegionCode) ??
       order.serviceRegionCode ??
@@ -154,6 +158,7 @@ export async function GET(request: Request) {
     page,
     limit,
     ...(q ? { q } : {}),
+    ...opsDateRangeFromSearch(searchParams),
   };
 
   if (Array.isArray(nestStatus)) {

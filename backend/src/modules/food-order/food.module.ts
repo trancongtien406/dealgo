@@ -15,6 +15,7 @@ import { FoodController } from './food.controller.js';
 import { MemoryFoodRepository, type FoodRepository } from './food.repository.js';
 import { FoodService } from './food.service.js';
 import { FoodOrderOpsController } from './food-order-ops.controller.js';
+import { MerchantSettlementOpsController } from './merchant-settlement-ops.controller.js';
 import { PrismaFoodRepository } from './food-prisma.repository.js';
 import {
   FOOD_ORDER_CODE_STORE,
@@ -22,6 +23,7 @@ import {
   PrismaFoodOrderCodeStore,
   type FoodOrderCodeStore,
 } from './food-order-code.js';
+import { RoutingModule } from '../routing/index.js';
 
 @Module({
   imports: [
@@ -34,10 +36,12 @@ import {
     PlatformSettingsModule,
     PromotionModule,
     EarningsModule,
+    RoutingModule,
   ],
   controllers: [
     FoodController,
     FoodOrderOpsController,
+    MerchantSettlementOpsController,
   ],
   providers: [
     FoodService,

@@ -30,6 +30,8 @@ export type NestRideView = {
   dropoff: { lat: number; lng: number; label: string };
   offeredFareVnd: number;
   referenceFareVnd: number;
+  /** DG-DEC-VEH-001 catalog code (MOTORBIKE | CAR_4 | CAR_7, …). */
+  vehicleClassCode?: string;
   agreedFareVnd: number | null;
   /** DEC-PROD-024: voucher reserved at selection; older payloads omit it. */
   discountVnd?: number;
@@ -38,6 +40,9 @@ export type NestRideView = {
   assignedDriverId: string | null;
   /** DEC-PROD-035: who cancelled (older payloads omit it). */
   cancelledBy?: NestCancelActor | null;
+  /** Driver cancel reason / system timeout code, and customer no-show. */
+  cancelReasonCode?: string | null;
+  noShow?: boolean;
   selectedOfferId: string | null;
   expiresAt: string;
   /** Present on Nest RideView; used when assignedDriverId is null. */

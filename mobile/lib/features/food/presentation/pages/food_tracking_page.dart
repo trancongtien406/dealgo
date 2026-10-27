@@ -9,28 +9,37 @@ import '../../../../core/design_system/components/dealgo_banner.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/design_system/components/dealgo_contact_button.dart';
 import '../../../../core/maps/map_lat_lng.dart';
+import '../../../live_location/presentation/pushed_route_eta.dart';
 import '../../../live_location/domain/driver_location.dart';
 import '../../../live_location/presentation/live_driver_map.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../chat/presentation/cubit/chat_cubit.dart';
+import '../../../chat/presentation/widgets/chat_unread_badge.dart';
 import '../../../chat/presentation/widgets/transaction_chat_sheet.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
 import '../../../voice/domain/entities/voice_models.dart';
-import '../../../voice/presentation/widgets/voice_call_sheet.dart';
+import '../../../voice/presentation/widgets/voice_call_actions.dart';
 import '../../domain/entities/food_models.dart';
 import '../../domain/entities/food_money.dart';
 import '../../domain/usecases/get_food_order.dart';
 import '../utils/food_routes.dart';
 import '../cubit/food_tracking_cubit.dart';
+import '../widgets/food_order_change_card.dart';
 import '../widgets/food_reject_reason.dart';
+import '../widgets/food_reorder_button.dart';
 import '../widgets/food_widgets.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/format/short_ref.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
+import '../../../../core/design_system/components/tracking_layout.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
+import '../../../../core/maps/route_geometry.dart';
+import '../../../../core/maps/live_route.dart';
+import '../../../chat/presentation/widgets/open_chat_on_arrival.dart';
 
 class FoodTrackingPage extends StatelessWidget {
   const FoodTrackingPage({required this.orderId, super.key});
@@ -71,15 +80,18 @@ class _FoodTrackingView extends StatelessWidget {
       resourceId: orderId,
       accessToken: currentAccessToken(context),
       currentUserId: userId,
+      viewer: ChatViewer.customer,
+      onCall: voiceCallsEnabled(context, listen: false)
+          ? () => _openVoice(context, orderId)
+          : null,
     );
   }
 
-  Future<void> _openVoice(BuildContext context, String orderId) {
-    return showVoiceCallSheet(
-      context: context,
+  void _openVoice(BuildContext context, String orderId) {
+    startVoiceCall(
+      context,
       kind: VoiceThreadKind.foodOrder,
       resourceId: orderId,
-      accessToken: currentAccessToken(context),
     );
   }
 
@@ -132,14 +144,19 @@ class _FoodTrackingView extends StatelessWidget {
                 onRetry: () => context.read<FoodTrackingCubit>().refresh(),
               );
             }
-            return _FoodLive(
-              order: order,
-              busy: busy,
-              onBack: () => _back(context),
-              onRefresh: () => context.read<FoodTrackingCubit>().refresh(),
-              onCancelStub: () => context.push(FoodRoutes.cancel(orderId)),
-              onOpenChat: () => _openChat(context, orderId),
-              onOpenVoice: () => _openVoice(context, orderId),
+            return OpenChatOnArrival(
+              onOpen: () => _openChat(context, orderId),
+              child: _FoodLive(
+                order: order,
+                busy: busy,
+                onBack: () => _back(context),
+                onRefresh: () => context.read<FoodTrackingCubit>().refresh(),
+                onCancelStub: () => context.push(FoodRoutes.cancel(orderId)),
+                onOpenChat: () => _openChat(context, orderId),
+                onOpenVoice: voiceCallsEnabled(context)
+                    ? () => _openVoice(context, orderId)
+                    : null,
+              ),
             );
           },
         ),
@@ -156,7 +173,7 @@ class _FoodLive extends StatelessWidget {
     required this.onRefresh,
     required this.onCancelStub,
     required this.onOpenChat,
-    required this.onOpenVoice,
+    this.onOpenVoice,
   });
 
   final FoodOrderDetail? order;
@@ -165,276 +182,329 @@ class _FoodLive extends StatelessWidget {
   final VoidCallback onRefresh;
   final VoidCallback onCancelStub;
   final VoidCallback onOpenChat;
-  final VoidCallback onOpenVoice;
+  final VoidCallback? onOpenVoice;
+
+  static int _stepIndex(String status) => switch (status) {
+    'PLACED' => 0,
+    'PREPARING' => 1,
+    'READY' || 'ASSIGNED' => 2,
+    'PICKED_UP' => 3,
+    'DELIVERED' => 4,
+    _ => 0,
+  };
 
   @override
   Widget build(BuildContext context) {
     final current = order;
+    final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
-    final title = current == null
-        ? AppLocalizations.of(context).foodTrackingTitle
-        : foodTrackingTitle(AppLocalizations.of(context), current.stage);
-    return Column(
-      children: [
-        DealGoAppHeader(
-          title: AppLocalizations.of(context).foodTrackingTitle,
-          onBack: onBack,
-          trailing: IconButton(
-            key: const Key('food-tracking-retry'),
-            tooltip: AppLocalizations.of(context).actionReload,
-            onPressed: busy ? null : onRefresh,
-            icon: const Icon(DealGoIcons.refresh),
+    if (current == null) {
+      return Column(
+        children: [
+          DealGoAppHeader(title: l10n.foodTrackingTitle, onBack: onBack),
+          const Expanded(child: Center(child: CircularProgressIndicator())),
+        ],
+      );
+    }
+    final title = foodTrackingTitle(
+      l10n,
+      current.stage,
+      status: current.status,
+    );
+    final failed =
+        current.stage == FoodTrackingStage.cancelled ||
+        current.stage == FoodTrackingStage.failed;
+    final readyAt = current.estimatedReadyAt;
+    final durationSec = current.route?.durationSec;
+    final eta = current.stage == FoodTrackingStage.preparing && readyAt != null
+        ? MaterialLocalizations.of(context).formatTimeOfDay(
+            TimeOfDay.fromDateTime(readyAt.toLocal()),
+            alwaysUse24HourFormat: true,
+          )
+        : current.status == 'PICKED_UP' &&
+              durationSec != null &&
+              durationSec > 0
+        ? l10n.trackEtaMinutes((durationSec / 60).ceil())
+        // DEC-PROD-031 rev 3 (DRAFT): driver→store ETA = server approach leg.
+        : current.status == 'ASSIGNED' &&
+              (current.approachRoute?.durationSec ?? 0) > 0
+        ? l10n.trackEtaMinutes(
+            (current.approachRoute!.durationSec! / 60).ceil(),
+          )
+        : null;
+    final hasDriver = current.assignedDriverId != null;
+    final contact = current.stage == FoodTrackingStage.cancelled
+        ? null
+        : DealGoContactActions(
+            children: [
+              DealGoContactButton(
+                key: const Key('food-open-chat'),
+                tooltip: l10n.chatContact,
+                onPressed: busy ? null : onOpenChat,
+                icon: ChatUnreadBadge(
+                  aggregateType: 'FoodOrder',
+                  aggregateId: current.id,
+                  child: const Icon(DealGoIcons.chat),
+                ),
+              ),
+              if (onOpenVoice != null)
+                DealGoContactButton(
+                  key: const Key('food-open-voice'),
+                  tooltip: l10n.voiceCall,
+                  onPressed: busy ? null : onOpenVoice,
+                  filled: true,
+                  color: DealGoColors.brandGreen,
+                  icon: const Icon(DealGoIcons.phone),
+                ),
+            ],
+          );
+    final lines = current.lines;
+    const shownLines = 3;
+    return TrackingScaffold(
+      onBack: onBack,
+      topTrailing: TrackingRoundButton(
+        key: const Key('food-tracking-retry'),
+        tooltip: l10n.actionReload,
+        icon: DealGoIcons.refresh,
+        onPressed: busy ? null : onRefresh,
+      ),
+      map: _FoodOnTheWayMap(order: current),
+      sheet: [
+        PushedRouteEta(
+          aggregateType: 'FoodOrder',
+          id: current.id,
+          phase: current.status == 'PICKED_UP'
+              ? 'TRIP'
+              : current.status == 'ASSIGNED'
+              ? 'APPROACH'
+              : null,
+          fallbackSec: null,
+          // Cached server leg; the ETA counts down along it on each GPS ping.
+          seedRoute: current.status == 'PICKED_UP'
+              ? current.route
+              : current.approachRoute,
+          builder: (context, pushedSec) => TrackingHeadline(
+            title: title,
+            // Live leg ETA wins; otherwise the REST snapshot ETA computed above.
+            eta: pushedSec != null && pushedSec > 0
+                ? l10n.trackEtaMinutes((pushedSec / 60).ceil())
+                : eta,
+            subtitle: '${l10n.foodInvoiceOrderId} ${shortRef(current.id)}',
           ),
         ),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              DealGoDimensions.pageGutter,
-              DealGoSpacing.s8,
-              DealGoDimensions.pageGutter,
-              DealGoSpacing.s16,
+        if (current.stage == FoodTrackingStage.preparing && readyAt != null)
+          Text(
+            l10n.foodTrackingReadyBy(eta ?? ''),
+            key: const Key('food-tracking-ready-by'),
+            style: textTheme.bodySmall?.copyWith(
+              color: DealGoColors.textSecondary,
             ),
+          ),
+        const SizedBox(height: DealGoSpacing.s16),
+        TrackingTimeline(
+          key: const Key('food-tracking-timeline'),
+          failed: failed,
+          current: _stepIndex(current.status),
+          steps: [
+            TrackingStep(DealGoIcons.receipt, l10n.trackStepPlaced),
+            TrackingStep(DealGoIcons.store, l10n.trackStepPreparing),
+            current.status == 'ASSIGNED'
+                ? TrackingStep(
+                    DealGoIcons.motorbike,
+                    l10n.trackStepDriverToStore,
+                  )
+                : TrackingStep(DealGoIcons.package, l10n.trackStepReady),
+            TrackingStep(DealGoIcons.motorbike, l10n.trackStepDelivering),
+            TrackingStep(DealGoIcons.success, l10n.trackStepDelivered),
+          ],
+        ),
+        if (current.cancelReason case final reason?)
+          TrackingSection(
+            child: DealGoBanner(
+              key: const Key('food-tracking-reject-reason'),
+              tone: DealGoBannerTone.warning,
+              title: l10n.foodRejectedTitle,
+              message: foodCancelReasonText(l10n, reason),
+            ),
+          ),
+        if (current.pendingChange case final change? when change.pending)
+          TrackingSection(
+            child: FoodOrderChangeCard(
+              orderId: current.id,
+              change: change,
+              onAnswered: onRefresh,
+              accessToken: currentAccessToken(context),
+            ),
+          ),
+        if (current.deliveryCode case final code?)
+          if (current.stage == FoodTrackingStage.onTheWay)
+            TrackingSection(
+              key: const Key('food-delivery-code-panel'),
+              child: TrackingCodeRow(
+                icon: DealGoIcons.shield,
+                label: l10n.foodDeliveryCodeTitle,
+                code: code,
+                codeKey: const Key('food-delivery-code'),
+              ),
+            ),
+        if (hasDriver)
+          TrackingSection(
+            child: DriverCardTile(
+              job: DriverCardJob.foodOrder,
+              jobId: current.id,
+              accessToken: currentAccessToken(context) ?? '',
+              assigned: true,
+              trailing: contact,
+            ),
+          ),
+        TrackingSection(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (current != null) ...[
-                FoodPanel(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              Row(
+                children: [
+                  const CircleAvatar(
+                    radius: 18,
+                    backgroundColor: DealGoColors.subtlePurple,
+                    child: Icon(
+                      DealGoIcons.store,
+                      size: 18,
+                      color: DealGoColors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: DealGoSpacing.s12),
+                  Expanded(
+                    child: Text(
+                      current.storeName ?? '—',
+                      key: const Key('food-tracking-store'),
+                      style: textTheme.titleMedium,
+                    ),
+                  ),
+                  if (!hasDriver) ?contact,
+                ],
+              ),
+              const SizedBox(height: DealGoSpacing.s8),
+              for (final line in lines.take(shownLines))
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              AppLocalizations.of(context)
-                                  .foodTrackingStatusTitle,
-                              style: textTheme.titleMedium,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: DealGoSpacing.s8),
                       Text(
-                        '${AppLocalizations.of(context).foodInvoiceOrderId} ${shortRef(current.id)}',
-                        key: ValueKey(current.stage),
-                        style: textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: DealGoSpacing.s8),
-                      DealGoChip(
-                        label: title,
-                        tone: switch (current.stage) {
-                          FoodTrackingStage.cancelled ||
-                          FoodTrackingStage.failed => DealGoChipTone.danger,
-                          FoodTrackingStage.unknown => DealGoChipTone.neutral,
-                          _ => DealGoChipTone.success,
-                        },
-                      ),
-                      if (current.stage == FoodTrackingStage.preparing &&
-                          current.estimatedReadyAt != null) ...[
-                        const SizedBox(height: DealGoSpacing.s8),
-                        Text(
-                          AppLocalizations.of(context).foodTrackingReadyBy(
-                            MaterialLocalizations.of(context).formatTimeOfDay(
-                              TimeOfDay.fromDateTime(
-                                current.estimatedReadyAt!.toLocal(),
-                              ),
-                              alwaysUse24HourFormat: true,
-                            ),
-                          ),
-                          key: const Key('food-tracking-ready-by'),
-                          style: textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                      if (current.cancelReason case final reason?) ...[
-                        const SizedBox(height: DealGoSpacing.s12),
-                        DealGoBanner(
-                          key: const Key('food-tracking-reject-reason'),
-                          tone: DealGoBannerTone.warning,
-                          title: AppLocalizations.of(context).foodRejectedTitle,
-                          message: foodCancelReasonText(
-                            AppLocalizations.of(context),
-                            reason,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: DealGoSpacing.s12),
-                      FoodMoneyRow(
-                        label: AppLocalizations.of(context).foodInvoiceStore,
-                        amount: current.storeName ?? '—',
-                      ),
-                      Text(
-                        AppLocalizations.of(context).foodTrackingDeliverTo,
-                        style: textTheme.bodySmall,
-                      ),
-                      Text(
-                        current.dropoff.label,
+                        '${line.quantity}×',
                         style: textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w700,
+                          color: DealGoColors.primary,
                         ),
+                      ),
+                      const SizedBox(width: DealGoSpacing.s8),
+                      Expanded(
+                        child: Text(
+                          line.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        formatVnd(line.unitPriceVnd * line.quantity),
+                        style: textTheme.bodySmall,
                       ),
                     ],
                   ),
                 ),
-                if (current.stage == FoodTrackingStage.onTheWay) ...[
-                  const SizedBox(height: DealGoSpacing.s12),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(DealGoRadius.card),
-                    child: SizedBox(
-                      height: 160,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          LiveDriverMap(
-                            job: TrackedJob.food,
-                            id: current.id,
-                            tracking:
-                                current.assignedDriverId != null &&
-                                (current.status == 'ASSIGNED' ||
-                                    current.status == 'PICKED_UP'),
-                            center: MapLatLng(
-                              lat: current.dropoff.lat,
-                              lng: current.dropoff.lng,
-                            ),
-                            markers: [
-                              MapLatLng(
-                                lat: current.dropoff.lat,
-                                lng: current.dropoff.lng,
-                              ),
-                            ],
-                          ),
-                          Positioned(
-                            top: DealGoSpacing.s12,
-                            left: DealGoSpacing.s12,
-                            child: DealGoChip(
-                              label: AppLocalizations.of(context)
-                                  .foodTrackingMapChip,
-                              tone: DealGoChipTone.neutral,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+              if (lines.length > shownLines)
+                Text(
+                  l10n.trackItemsMore(lines.length - shownLines),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: DealGoColors.textSecondary,
                   ),
-                  const SizedBox(height: DealGoSpacing.s12),
-                  FoodPanel(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          AppLocalizations.of(context).foodTrackingDriverTitle,
-                          style: textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: DealGoSpacing.s12),
-                        DriverCardTile(
-                          job: DriverCardJob.foodOrder,
-                          jobId: current.id,
-                          accessToken: currentAccessToken(context) ?? '',
-                          assigned: current.assignedDriverId != null,
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (current.deliveryCode case final code?) ...[
-                    const SizedBox(height: DealGoSpacing.s12),
-                    FoodDeliveryCodePanel(code: code),
-                  ],
-                ],
-                if (current.stage == FoodTrackingStage.preparing ||
-                    current.stage == FoodTrackingStage.onTheWay) ...[
-                  const SizedBox(height: DealGoSpacing.s12),
-                  FoodPanel(
-                    color: DealGoColors.subtlePurple,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          AppLocalizations.of(context)
-                              .foodTrackingPayOnDelivery,
-                          style: textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: DealGoSpacing.s8),
-                        FoodMoneyRow(
-                          label: AppLocalizations.of(context)
-                              .foodTrackingCodDue,
-                          amount: formatVnd(current.totalVnd),
-                          emphasize: true,
-                        ),
-                        Text(
-                          AppLocalizations.of(context).foodTrackingCodHint,
-                          style: textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
+                ),
             ],
           ),
         ),
-        if (current != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              DealGoDimensions.pageGutter,
-              DealGoSpacing.s8,
-              DealGoDimensions.pageGutter,
-              DealGoSpacing.s12,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (current.stage == FoodTrackingStage.cancelled)
-                  DealGoPrimaryButton(
-                    key: const Key('food-cancelled-browse'),
-                    label: AppLocalizations.of(context).foodCancelledBrowse,
-                    onPressed: () => context.go('/customer/shop'),
-                  )
-                else
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DealGoPrimaryButton(
-                          key: const Key('food-open-chat'),
-                          label: AppLocalizations.of(context).chatContact,
-                          enabled: !busy,
-                          onPressed: onOpenChat,
-                        ),
-                      ),
-                      const SizedBox(width: DealGoSpacing.s8),
-                      IconButton.filled(
-                        key: const Key('food-open-voice'),
-                        tooltip: AppLocalizations.of(context).voiceCall,
-                        onPressed: busy ? null : onOpenVoice,
-                        style: IconButton.styleFrom(
-                          backgroundColor: DealGoColors.brandGreen,
-                        ),
-                        icon: const Icon(
-                          DealGoIcons.phone,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                const SizedBox(height: DealGoSpacing.s8),
-                TextButton(
+        TrackingSection(
+          child: Row(
+            children: [
+              const Icon(DealGoIcons.pin, size: 18, color: DealGoColors.danger),
+              const SizedBox(width: DealGoSpacing.s8),
+              Expanded(
+                child: Text(
+                  current.dropoff.label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodyMedium,
+                ),
+              ),
+            ],
+          ),
+        ),
+        TrackingSection(
+          child: Column(
+            children: [
+              if (current.discountVnd > 0)
+                FoodMoneyRow(
+                  label: l10n.foodInvoiceDiscount,
+                  amount: formatVnd(-current.discountVnd),
+                ),
+              FoodMoneyRow(
+                label: failed ? l10n.foodCustomerPays : l10n.foodTrackingCodDue,
+                amount: formatVnd(current.totalVnd),
+                emphasize: true,
+              ),
+            ],
+          ),
+        ),
+        TrackingSection(
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
                   key: const Key('food-open-invoice'),
                   onPressed: busy
                       ? null
                       : () => context.push(FoodRoutes.invoice(current.id)),
-                  child: Text(AppLocalizations.of(context).foodInvoiceTitle),
+                  icon: const Icon(DealGoIcons.receipt, size: 16),
+                  label: Text(l10n.foodInvoiceTitle),
                 ),
-                if (current.stage == FoodTrackingStage.preparing) ...[
-                  TextButton(
+              ),
+              if (current.stage == FoodTrackingStage.preparing) ...[
+                const SizedBox(width: DealGoSpacing.s8),
+                Expanded(
+                  child: OutlinedButton.icon(
                     key: const Key('food-open-cancel-reasons'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: DealGoColors.danger,
+                    ),
                     onPressed: busy ? null : onCancelStub,
-                    child: Text(AppLocalizations.of(context).foodCancelTitle),
+                    icon: const Icon(DealGoIcons.close, size: 16),
+                    label: Text(l10n.foodCancelTitle),
                   ),
-                ],
+                ),
               ],
-            ),
+            ],
           ),
+        ),
       ],
+      footer:
+          current.stage == FoodTrackingStage.delivered ||
+              current.stage == FoodTrackingStage.cancelled
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (current.stage == FoodTrackingStage.cancelled) ...[
+                  DealGoPrimaryButton(
+                    key: const Key('food-cancelled-browse'),
+                    label: l10n.foodCancelledBrowse,
+                    onPressed: () => context.go('/customer/shop'),
+                  ),
+                  const SizedBox(height: DealGoSpacing.s8),
+                ],
+                // Reorder only once the order really reached the customer.
+                if (current.stage == FoodTrackingStage.delivered)
+                  FoodReorderButton(order: current),
+              ],
+            )
+          : null,
     );
   }
 }
@@ -458,7 +528,10 @@ class _FoodReconnect extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     return Column(
       children: [
-        DealGoAppHeader(title: AppLocalizations.of(context).foodTrackOrder, onBack: onBack),
+        DealGoAppHeader(
+          title: AppLocalizations.of(context).foodTrackOrder,
+          onBack: onBack,
+        ),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(
@@ -495,11 +568,19 @@ class _FoodReconnect extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(AppLocalizations.of(context).foodOrderInProgress, style: textTheme.titleMedium),
+                      Text(
+                        AppLocalizations.of(context).foodOrderInProgress,
+                        style: textTheme.titleMedium,
+                      ),
                       const SizedBox(height: DealGoSpacing.s8),
-                      FoodMoneyRow(label: AppLocalizations.of(context).merchantOrderRefLabel, amount: shortRef(current.id)),
                       FoodMoneyRow(
-                        label: AppLocalizations.of(context).merchantFoodValueLabel,
+                        label: AppLocalizations.of(context)
+                            .merchantOrderRefLabel,
+                        amount: shortRef(current.id),
+                      ),
+                      FoodMoneyRow(
+                        label: AppLocalizations.of(context)
+                            .merchantFoodValueLabel,
                         amount: formatVnd(current.subtotalVnd),
                       ),
                       FoodMoneyRow(
@@ -518,7 +599,10 @@ class _FoodReconnect extends StatelessWidget {
                 FoodPanel(
                   child: FoodMoneyRow(
                     label: AppLocalizations.of(context).foodLastKnownStatus,
-                    amount: foodTrackingTitle(AppLocalizations.of(context), current.stage),
+                    amount: foodTrackingTitle(
+                      AppLocalizations.of(context),
+                      current.stage,
+                    ),
                   ),
                 ),
               ],
@@ -544,7 +628,23 @@ class _FoodReconnect extends StatelessWidget {
   }
 }
 
-String foodTrackingTitle(AppLocalizations l10n, FoodTrackingStage stage) {
+/// Header copy follows the real delivery phase: READY waits for a driver,
+/// ASSIGNED is the driver→store approach, PICKED_UP is store→customer.
+String foodTrackingTitle(
+  AppLocalizations l10n,
+  FoodTrackingStage stage, {
+  String? status,
+}) {
+  if (stage == FoodTrackingStage.onTheWay) {
+    switch (status) {
+      case 'READY':
+        return l10n.foodStageFindingDriver;
+      case 'ASSIGNED':
+        return l10n.foodStageDriverToStore;
+      case 'PICKED_UP':
+        return l10n.foodStageDeliveringToYou;
+    }
+  }
   return switch (stage) {
     FoodTrackingStage.preparing => l10n.foodStagePreparing,
     FoodTrackingStage.onTheWay => l10n.foodStageOnTheWay,
@@ -597,6 +697,125 @@ class FoodDeliveryCodePanel extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Store pickup + dropoff (+ live driver via [LiveDriverMap]) for on-the-way orders.
+class _FoodOnTheWayMap extends StatelessWidget {
+  const _FoodOnTheWayMap({required this.order});
+
+  final FoodOrderDetail order;
+
+  @override
+  Widget build(BuildContext context) {
+    final pickup = order.pickup;
+    final dropoff = order.dropoff;
+    final markers = <MapLatLng>[
+      if (pickup != null) MapLatLng(lat: pickup.lat, lng: pickup.lng),
+      MapLatLng(lat: dropoff.lat, lng: dropoff.lng),
+    ];
+    final center = pickup != null
+        ? MapLatLng(
+            lat: (pickup.lat + dropoff.lat) / 2,
+            lng: (pickup.lng + dropoff.lng) / 2,
+          )
+        : MapLatLng(lat: dropoff.lat, lng: dropoff.lng);
+    final tracking =
+        order.assignedDriverId != null &&
+        (order.status == 'ASSIGNED' || order.status == 'PICKED_UP');
+    final l10n = AppLocalizations.of(context);
+    final chipLabel = tracking
+        ? l10n.foodTrackingMapChip
+        : l10n.foodTrackingMapWaitingDriver;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Builder(
+          builder: (context) {
+            final dropoff = MapLatLng(
+              lat: order.dropoff.lat,
+              lng: order.dropoff.lng,
+            );
+            final pickedUp = order.status == 'PICKED_UP';
+            final phase = pickedUp
+                ? LiveRoutePhase.toDropoff
+                : LiveRoutePhase.toPickup;
+            final liveTo = pickedUp
+                ? dropoff
+                : (pickup != null
+                      ? MapLatLng(lat: pickup.lat, lng: pickup.lng)
+                      : dropoff);
+            final shownMarkers = pickedUp ? <MapLatLng>[dropoff] : markers;
+            return LiveDriverMap(
+              job: TrackedJob.food,
+              sheetFraction: 0.48,
+              id: order.id,
+              tracking: tracking,
+              center: center,
+              markers: shownMarkers,
+              route: (order.route ?? RouteGeometry.unavailable).polylineOr(
+                markers.length >= 2 ? markers : const [],
+              ),
+              roadFollowed: order.route?.hasRoadPolyline ?? false,
+              phase: phase,
+              liveRouteTo: liveTo,
+              serverRoute: pickedUp ? null : order.approachRoute,
+              pulseRoute: true,
+              firstMarkerIsPickup: !pickedUp && pickup != null,
+            );
+          },
+        ),
+        // Sits right of the TrackingScaffold back button (s12 + 48 + s8) so the
+        // status chip never slides under it or the top bar (same row as ride).
+        // Live phases already name the leg in the sheet headline; the chip
+        // only flags the waiting-for-driver state to avoid duplicate text.
+        if (!tracking)
+          Positioned(
+            top: DealGoSpacing.s8 + 10,
+            left: DealGoSpacing.s12 + 48 + DealGoSpacing.s8,
+            right: DealGoSpacing.s12 + 48 + DealGoSpacing.s8,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: DealGoChip(
+                key: Key(
+                  tracking
+                      ? 'food-tracking-map-chip'
+                      : 'food-tracking-map-waiting',
+                ),
+                label: chipLabel,
+                tone: tracking
+                    ? DealGoChipTone.neutral
+                    : DealGoChipTone.warning,
+              ),
+            ),
+          ),
+        if (pickup == null && !tracking)
+          Positioned(
+            left: DealGoSpacing.s12,
+            right: DealGoSpacing.s12,
+            bottom: DealGoSpacing.s12,
+            child: DecoratedBox(
+              key: const Key('food-tracking-map-empty'),
+              decoration: BoxDecoration(
+                color: DealGoColors.card.withValues(alpha: 0.94),
+                borderRadius: BorderRadius.circular(DealGoRadius.input),
+                border: Border.all(color: DealGoColors.border),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: DealGoSpacing.s12,
+                  vertical: DealGoSpacing.s8,
+                ),
+                child: Text(
+                  l10n.foodTrackingMapEmptyHint,
+                  style: Theme.of(context).textTheme.labelMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

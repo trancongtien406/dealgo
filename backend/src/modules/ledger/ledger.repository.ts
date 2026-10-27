@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import {
   LEDGER_CASH_IN_TRANSIT_CODE,
+  LEDGER_COMMISSION_MERCHANT_RECEIVABLE_CODE,
+  LEDGER_COMMISSION_REVENUE_CODE,
   LEDGER_COD_OBLIGATION_CODE,
   LEDGER_FEE_DRIVER_RECEIVABLE_CODE,
   LEDGER_FEE_REVENUE_CODE,
@@ -17,7 +19,6 @@ import {
   buildCodObligationLines,
   buildDriverPlatformFeeLines,
   buildPromotionDiscountLines,
-  type CodJournalLine,
   LEDGER_LINE_BUILDERS,
   type PostableLedgerEvent,
   type LedgerLineBuilder,
@@ -272,6 +273,18 @@ export class MemoryLedgerRepository implements LedgerRepository {
         id: randomUUID(),
         code: LEDGER_FEE_REVENUE_CODE,
         name: 'Sandbox platform fee revenue',
+        kind: 'REVENUE',
+      },
+      {
+        id: randomUUID(),
+        code: LEDGER_COMMISSION_MERCHANT_RECEIVABLE_CODE,
+        name: 'Sandbox merchant commission receivable',
+        kind: 'ASSET',
+      },
+      {
+        id: randomUUID(),
+        code: LEDGER_COMMISSION_REVENUE_CODE,
+        name: 'Sandbox merchant commission revenue',
         kind: 'REVENUE',
       },
     ];

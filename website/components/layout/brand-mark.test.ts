@@ -10,9 +10,18 @@ describe("BrandMark", () => {
     const html = renderToString(React.createElement(BrandMark));
 
     expect(errorSpy).not.toHaveBeenCalled();
-    expect(html).toContain("Deal");
-    expect(html).toContain("Go");
+    expect(html).toContain('alt="DealGo"');
+    expect(html).toContain("/dealgo-logo.svg");
 
     errorSpy.mockRestore();
+  });
+
+  it("uses the v3 icon for compact navigation", () => {
+    const html = renderToString(
+      React.createElement(BrandMark, { compact: true }),
+    );
+
+    expect(html).toContain('alt="DealGo"');
+    expect(html).toContain("/dealgo-icon.svg");
   });
 });

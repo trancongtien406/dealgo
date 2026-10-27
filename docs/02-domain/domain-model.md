@@ -8,7 +8,7 @@ created_at: 2026-10-12
 last_reviewed_at: 2026-10-12
 owner: Product Owner + Technical Lead
 reviewers: [Backend Lead, Mobile Lead, Operations, Finance, Security]
-release_scope: "MVP Ride hai bánh + Food — một Flutter app / ba vai trò + Admin Web"
+release_scope: "MVP Ride (xe máy, ô tô) + Food — một Flutter app / ba vai trò + Admin Web"
 source_of_truth:
   - ../00-governance/README.md
   - ../00-governance/decisions-and-assumptions.md
@@ -31,7 +31,7 @@ next_documents:
 
 > **Trạng thái: `DRAFT / PROPOSED`.** Đây là **mô hình khái niệm và định hướng phân ranh giới**, không phải Prisma schema, tên bảng production, API contract hay kiến trúc triển khai đã phê duyệt. Các quyết định `DEC-PROD-001..007` đã được xác nhận theo Governance. Các chính sách liên quan `OPEN-001..021` vẫn là **chưa chốt**.
 >
-> **Phạm vi đã chốt:** DealGo là **một ứng dụng Flutter ba vai trò Customer / Merchant / Driver**, có **Ride hai bánh có thương lượng giá** và **Food**, cùng **Admin Web**. Không tự bổ sung ô tô, chuyển phát hàng độc lập, ví điện tử, đa nhà hàng/giỏ hay microservices bắt buộc.
+> **Phạm vi đã chốt:** DealGo là **một ứng dụng Flutter ba vai trò Customer / Merchant / Driver**, có **Ride (xe máy, ô tô) có thương lượng giá** và **Food**, cùng **Admin Web**. Không tự bổ sung chuyển phát hàng độc lập, ví điện tử, đa nhà hàng/giỏ hay microservices bắt buộc.
 
 ## 1. Mục đích và tiêu chí hoàn thành
 

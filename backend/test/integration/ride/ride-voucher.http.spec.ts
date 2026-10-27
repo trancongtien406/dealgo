@@ -1,3 +1,4 @@
+import { seedVehicleClassOnDriverGrant } from '../../support/driver-class-fixture.js';
 /**
  * DEC-PROD-024 ride vouchers over HTTP (memory repositories): reserve on offer selection,
  * release on cancel/reassign, cash = fare - discount, DealGo-funded share owed to the driver.
@@ -110,6 +111,7 @@ describe('ride vouchers http (DEC-PROD-024)', () => {
     app.useGlobalFilters(new HttpExceptionFilter());
     app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
     await app.init();
+    seedVehicleClassOnDriverGrant(app, identity);
     await app.get(OpsAuthService).ensureOperator(OPS_EMAIL, OPS_PASSWORD, 'test');
   });
 
@@ -223,7 +225,7 @@ describe('ride vouchers http (DEC-PROD-024)', () => {
       .post('/v1/rides')
       .set('Authorization', `Bearer ${customer.token}`)
       .set('Idempotency-Key', `create-${serial++}`)
-      .send({ pickup, dropoff, offeredFareVnd: 30_000 });
+      .send({ pickup, dropoff, offeredFareVnd: 30_000, vehicleClassCode: 'MOTORBIKE'});
     expect(created.status).toBe(200);
     const rideId = created.body.data.id as string;
     const offerId = await offer(driver.token, rideId, fare);

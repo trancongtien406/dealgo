@@ -68,7 +68,7 @@ class _DriverEarningsViewState extends State<_DriverEarningsView> {
     return DriverPageFrame(
       title: l10n.drvHistTitle,
       subtitle: l10n.drvHistSubtitle,
-      onBack: () => driverBack(context),
+      showBack: false,
       body: _body(context, state),
     );
   }
@@ -456,7 +456,7 @@ class _HistoryRow extends StatelessWidget {
         l10n.drvHistOutcomeCancelled,
       if (item.outcome == DriverJobOutcome.failed) l10n.drvHistOutcomeFailed,
       if (done && item.feeVnd > 0)
-        l10n.drvHistItemFee(
+        (isRide ? l10n.drvHistItemFee : l10n.drvHistItemFeeFood)(
           _percentLabel(item.feePercent ?? 0, locale),
           formatVnd(item.feeVnd),
         ),

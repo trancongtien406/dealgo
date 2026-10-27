@@ -5,6 +5,8 @@ import { useState } from "react";
 
 import { StatusChip, focusRing } from "@/components/ui/admin-list-ui";
 import { BackToList, DetailHeader, DetailSection, FieldList } from "@/components/ui/admin-detail-ui";
+import { ChatReviewButton } from "@/features/chat-review/components/chat-review-button";
+
 import {
   AdminForbiddenState,
   AdminListErrorBanner,
@@ -134,6 +136,14 @@ export function SupportTicketDetail({ id }: { id: string }) {
               {supportStatusLabel[ticket.status]}
             </StatusChip>
             <BackToList href="/support-tickets" />
+            {ticket.relatedId && ticket.relatedType ? (
+              <ChatReviewButton
+                kind={ticket.relatedType === "RIDE" ? "ride" : "food"}
+                id={ticket.relatedId}
+                ticketId={ticket.id}
+                partnerLabel={ticket.relatedType === "RIDE" ? "Tài xế" : "Tài xế/Cửa hàng"}
+              />
+            ) : null}
           </>
         }
       />

@@ -22,9 +22,6 @@ class AppLocalizationsVi extends AppLocalizations {
   String get actionSeeAll => 'Xem tất cả';
 
   @override
-  String get actionExplore => 'Khám phá ngay';
-
-  @override
   String get actionBookRideNow => 'Đặt xe ngay';
 
   @override
@@ -237,13 +234,78 @@ class AppLocalizationsVi extends AppLocalizations {
   String get voiceCall => 'Gọi thoại';
 
   @override
-  String get voiceTitle => 'Cuộc gọi trong chuyến';
+  String get voiceCalling => 'Đang gọi…';
 
   @override
-  String get voiceRoomLabel => 'Phòng';
+  String get voiceConnecting => 'Đang kết nối…';
 
   @override
-  String get voiceStubHint => 'Cuộc gọi trong ứng dụng sẽ sớm được hỗ trợ.';
+  String get voiceIncoming => 'Cuộc gọi đến';
+
+  @override
+  String get voiceReconnecting => 'Sóng yếu, đang kết nối lại…';
+
+  @override
+  String get voicePeerCustomer => 'Khách hàng';
+
+  @override
+  String get voicePeerDriver => 'Tài xế';
+
+  @override
+  String get voiceAccept => 'Nghe máy';
+
+  @override
+  String get voiceDecline => 'Từ chối';
+
+  @override
+  String get voiceHangUp => 'Kết thúc';
+
+  @override
+  String get voiceMute => 'Tắt mic';
+
+  @override
+  String get voiceUnmute => 'Bật mic';
+
+  @override
+  String get voiceSpeaker => 'Loa ngoài';
+
+  @override
+  String get voiceEndedHungUp => 'Cuộc gọi đã kết thúc';
+
+  @override
+  String get voiceEndedDeclined => 'Cuộc gọi bị từ chối';
+
+  @override
+  String get voiceEndedNoAnswer => 'Không có người nghe máy';
+
+  @override
+  String get voiceEndedMissed => 'Cuộc gọi nhỡ';
+
+  @override
+  String get voiceEndedTripClosed => 'Chuyến đã kết thúc nên cuộc gọi dừng lại';
+
+  @override
+  String get voiceEndedConnectionLost => 'Mất kết nối cuộc gọi';
+
+  @override
+  String get voiceMicDenied => 'Cần quyền micro để gọi. Hãy bật trong Cài đặt.';
+
+  @override
+  String get apiErrVoiceDisabled =>
+      'Tính năng gọi trong ứng dụng đang tạm tắt.';
+
+  @override
+  String get apiErrVoiceUnavailable =>
+      'Gọi thoại tạm thời chưa sẵn sàng. Vui lòng nhắn tin.';
+
+  @override
+  String get apiErrVoiceBusy => 'Chuyến này đang có một cuộc gọi khác.';
+
+  @override
+  String get apiErrVoiceNoCounterpart => 'Chưa có tài xế nhận chuyến này.';
+
+  @override
+  String get apiErrVoiceWindowClosed => 'Chỉ gọi được khi chuyến đang diễn ra.';
 
   @override
   String get bannerOfflineTitle => 'Bạn đang ngoại tuyến';
@@ -481,7 +543,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get driverServicesApprovedSection => 'Dịch vụ đã được duyệt';
 
   @override
-  String get driverServicesRideTitle => 'Chở khách bằng xe máy';
+  String get driverServicesRideTitle => 'Chở khách (xe máy & ô tô)';
 
   @override
   String get driverServicesRideBody => 'Chuyến gần bạn · Giá linh hoạt';
@@ -537,7 +599,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String driverOtpValidFor(String rideId) {
-    return 'Mã OTP chỉ có hiệu lực cho chuyến #$rideId';
+    return 'Mã OTP chỉ có hiệu lực cho chuyến $rideId';
   }
 
   @override
@@ -562,7 +624,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get driverOtpWaitingChip => 'CHỜ KHÁCH';
 
   @override
-  String get driverActiveNavTitle => 'Điều hướng đón khách';
+  String get driverActiveNavTitle => 'Đang đến đón khách';
 
   @override
   String get driverActiveArrivedTitle => 'Đã đến điểm đón';
@@ -597,7 +659,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get driverActiveReportIssue => 'Báo sự cố';
 
   @override
-  String get driverFoodPhaseNavTitle => 'Điều hướng tới quán';
+  String get driverFoodPhaseNavTitle => 'Đang tới quán';
 
   @override
   String get driverFoodPhaseWaitTitle => 'Chờ món tại quán';
@@ -647,7 +709,7 @@ class AppLocalizationsVi extends AppLocalizations {
       'Thu nhập thực nhận hiển thị sau khi đối soát.';
 
   @override
-  String get driverFoodCodCollect => 'COD cần thu khi giao';
+  String get driverFoodCodCollect => 'Thu hộ (COD)';
 
   @override
   String get merchantRejectOrder => 'Từ chối';
@@ -819,10 +881,14 @@ class AppLocalizationsVi extends AppLocalizations {
   String get rideRouteRefPrice => 'Giá tham khảo';
 
   @override
-  String get rideRoutePriceHint => 'Giá chính thức hiển thị khi chọn xe.';
+  String get rideRoutePriceHint =>
+      'Giá gợi ý theo loại xe; bạn đề xuất mức muốn trả ở bước tiếp theo.';
 
   @override
   String get rideRouteContinueVehicle => 'Tiếp tục chọn xe';
+
+  @override
+  String get rideRouteContinueBooking => 'Chọn xe & đề xuất giá';
 
   @override
   String get rideFareBreakdownTitle => 'Chi tiết giá cước';
@@ -921,7 +987,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get foodInvoiceSyncChip => 'v1 · Dữ liệu đồng bộ';
 
   @override
-  String get foodInvoiceDeliveredChip => 'DELIVERED';
+  String get foodInvoiceDeliveredChip => 'Đã giao';
 
   @override
   String get foodInvoiceStore => 'Quán';
@@ -965,10 +1031,32 @@ class AppLocalizationsVi extends AppLocalizations {
   String get foodInvoiceRateCta => 'Đánh giá đơn hàng';
 
   @override
+  String get foodInvoiceTrackCta => 'Theo dõi đơn';
+
+  @override
+  String get foodInvoiceItemsTitleOpen => 'Món đã chọn';
+
+  @override
+  String get foodInvoiceCodDue => 'Tổng cần thanh toán';
+
+  @override
+  String get checkoutEmptyBody => 'Hãy chọn món trước khi thanh toán.';
+
+  @override
+  String get checkoutBackToMenu => 'Quay lại thực đơn';
+
+  @override
   String get foodTrackingStatusTitle => 'Trạng thái thực tế';
 
   @override
   String get foodTrackingMapChip => 'Đơn đang được giao';
+
+  @override
+  String get foodTrackingMapWaitingDriver => 'Đang chờ vị trí tài xế';
+
+  @override
+  String get foodTrackingMapEmptyHint =>
+      'Điểm giao hàng đã sẵn sàng. Cửa hàng chưa có toạ độ trên bản đồ.';
 
   @override
   String get foodTrackingDriverTitle => 'Tài xế đang giao';
@@ -1167,7 +1255,19 @@ class AppLocalizationsVi extends AppLocalizations {
   String get serviceRideTitle => 'Đặt xe';
 
   @override
-  String get serviceRideBlurb => 'Đi muôn nơi\nan toàn, tiện lợi';
+  String get serviceRideBlurb => 'Xe máy · Ô tô · Trả giá';
+
+  @override
+  String get homeServiceBikeTitle => 'Xe máy';
+
+  @override
+  String get homeServiceBikeBlurb => 'Tiện lợi · 1 khách';
+
+  @override
+  String get homeServiceCarTitle => 'Ô tô';
+
+  @override
+  String get homeServiceCarBlurb => '4 & 7 chỗ';
 
   @override
   String get serviceFoodTitle => 'Đồ ăn';
@@ -1528,10 +1628,10 @@ class AppLocalizationsVi extends AppLocalizations {
   String get driverOtpMatched => 'Mã khớp — bắt đầu chuyến đi.';
 
   @override
-  String get driverHeadToPickup => 'Đến điểm đón khách';
+  String get driverHeadToPickup => 'Điểm đón';
 
   @override
-  String get driverFollowRoute => 'Theo lộ trình đến điểm đến';
+  String get driverFollowRoute => 'Điểm trả khách';
 
   @override
   String get driverPassenger => 'Khách hàng';
@@ -2376,7 +2476,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String drvHistGrossLine(String gross, String fee) {
-    return 'Tổng cước $gross · Phí nền tảng −$fee';
+    return 'Tổng cước $gross · Hoa hồng DealGo −$fee';
   }
 
   @override
@@ -2384,7 +2484,12 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String drvHistItemFee(String percent, String fee) {
-    return 'Phí $percent% −$fee';
+    return 'Hoa hồng $percent% −$fee';
+  }
+
+  @override
+  String drvHistItemFeeFood(String percent, String fee) {
+    return 'Hoa hồng $percent% phí giao −$fee';
   }
 
   @override
@@ -2456,6 +2561,33 @@ class AppLocalizationsVi extends AppLocalizations {
       'Tìm địa điểm hoặc dùng vị trí hiện tại để bắt đầu.';
 
   @override
+  String get placeHistoryTitle => 'Gần đây';
+
+  @override
+  String get placeHistoryClear => 'Xóa hết';
+
+  @override
+  String get placeHistoryDelete => 'Xóa khỏi lịch sử';
+
+  @override
+  String get placeHistoryClearTitle => 'Xóa lịch sử tìm kiếm?';
+
+  @override
+  String get placeHistoryClearBody =>
+      'Các địa điểm bạn đã chọn sẽ bị xóa trên mọi thiết bị.';
+
+  @override
+  String get placeHistoryClearConfirm => 'Xóa lịch sử';
+
+  @override
+  String get placeApproximate => 'Số nhà ước tính · kiểm tra ghim';
+
+  @override
+  String placeDistanceKm(String km) {
+    return '$km km';
+  }
+
+  @override
   String get rideBookTitle => 'Đặt xe';
 
   @override
@@ -2522,6 +2654,28 @@ class AppLocalizationsVi extends AppLocalizations {
   String get rideVehicleBikeTitle => 'Xe máy';
 
   @override
+  String get rideVehicleCar4Title => 'Xe 4 chỗ';
+
+  @override
+  String get rideVehicleCar7Title => 'Xe 7 chỗ';
+
+  @override
+  String rideVehicleSeats(int count) {
+    return '$count chỗ';
+  }
+
+  @override
+  String get rideFareOpening => 'Giá mở cửa';
+
+  @override
+  String get rideFarePerKm => 'Theo km';
+
+  @override
+  String rideFareTime(int minutes) {
+    return 'Theo thời gian ($minutes phút)';
+  }
+
+  @override
   String get rideVehicleBikeSubtitle => 'Tiện lợi · 1 khách';
 
   @override
@@ -2539,19 +2693,26 @@ class AppLocalizationsVi extends AppLocalizations {
   String get rideVehicleContinue => 'Xem chi tiết giá';
 
   @override
+  String get rideVehicleContinueToOffer => 'Đề xuất giá chuyến';
+
+  @override
+  String get rideVehicleClassesUnavailable =>
+      'Hiện chưa có loại xe khả dụng. Thử lại sau hoặc kéo để làm mới.';
+
+  @override
   String get homeQuickBookTitle => 'Đặt xe nhanh';
 
   @override
   String get homeQuickBookPickup => '123 Nguyễn Văn Linh, Hải Châu, Đà Nẵng';
 
   @override
-  String get homeQuickBookVehicle => 'Xe 4 chỗ';
+  String get homeQuickBookVehicle => 'Xe máy & ô tô';
 
   @override
   String get homeQuickBookEstimate => 'Ước tính';
 
   @override
-  String get homeQuickBookEtaPrice => '~ 42.000đ';
+  String get homeQuickBookEtaPrice => 'Khi chọn điểm';
 
   @override
   String get homeQuickBookEtaTime => 'Thời gian ~ 12 phút';
@@ -3278,7 +3439,7 @@ class AppLocalizationsVi extends AppLocalizations {
       'Lịch sử cập nhật sau khi chuyến kết thúc. Thử lại sau ít phút.';
 
   @override
-  String get driverCompletedFeeLabel => 'Phí nền tảng';
+  String get driverCompletedFeeLabel => 'Hoa hồng DealGo';
 
   @override
   String get driverCompletedNetLabel => 'Thực nhận';
@@ -3396,7 +3557,12 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String driverCompletedFeePercentLabel(String percent) {
-    return 'Phí nền tảng ($percent%)';
+    return 'Hoa hồng DealGo ($percent%)';
+  }
+
+  @override
+  String driverCompletedFoodFeePercentLabel(String percent) {
+    return 'Hoa hồng DealGo trên phí giao ($percent%)';
   }
 
   @override
@@ -3470,6 +3636,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get partnerKindVehicleReg => 'Giấy đăng ký xe';
 
   @override
+  String get partnerKindVehicleInsurance => 'Bảo hiểm xe (ảnh)';
+
+  @override
   String get partnerKindBusinessLicense => 'Giấy phép kinh doanh';
 
   @override
@@ -3539,6 +3708,12 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get partnerTimelineReview => 'Xét duyệt giấy tờ';
+
+  @override
+  String get partnerTimelineReviewQuick => 'Admin duyệt hồ sơ';
+
+  @override
+  String get kycStatusTitleQuick => 'Trạng thái đăng ký tài xế';
 
   @override
   String get partnerTimelineReviewing => 'Đang đối chiếu';
@@ -3793,7 +3968,12 @@ class AppLocalizationsVi extends AppLocalizations {
   String get kycVehicleModel => 'Dòng xe';
 
   @override
-  String get kycVehicleNote => 'DealGo hiện chỉ nhận xe máy.';
+  String get kycVehicleNote =>
+      'DealGo Ride nhận xe máy và ô tô. Đủ điều kiện giao đồ ăn là quy trình riêng.';
+
+  @override
+  String get kycVehicleInsuranceNote =>
+      'Hồ sơ ô tô cần ảnh bảo hiểm xe khi checklist bật. Đây chỉ là checklist trong app — không phải kết luận pháp lý.';
 
   @override
   String get kycReviewProfile => 'Hồ sơ cá nhân';
@@ -4009,6 +4189,16 @@ class AppLocalizationsVi extends AppLocalizations {
   String get kybShopAddress => 'Địa chỉ';
 
   @override
+  String get kybShopPin => 'Ghim vị trí quán trên bản đồ';
+
+  @override
+  String get kybShopPinRequired =>
+      'Bắt buộc: tài xế dùng điểm này để đến lấy món.';
+
+  @override
+  String get kybShopPinChange => 'Đã ghim. Chạm để đổi vị trí.';
+
+  @override
   String get kybShopType => 'Loại hình';
 
   @override
@@ -4138,6 +4328,42 @@ class AppLocalizationsVi extends AppLocalizations {
       'Doanh thu tính trên tiền món của đơn đã giao, theo giờ Việt Nam; không gồm phí giao.';
 
   @override
+  String get merchantStatementTitle => 'Hoa hồng DealGo';
+
+  @override
+  String merchantStatementCash(int count) {
+    return 'Tiền mặt nhận từ tài xế ($count đơn)';
+  }
+
+  @override
+  String merchantStatementCommission(String percent) {
+    return 'Hoa hồng ($percent%)';
+  }
+
+  @override
+  String get merchantStatementNet => 'Quán giữ lại';
+
+  @override
+  String merchantStatementCycle(int days) {
+    return 'Đối soát mỗi $days ngày';
+  }
+
+  @override
+  String get merchantStatementUnsettled => 'Hoa hồng chưa nộp';
+
+  @override
+  String get merchantStatementAllPaid => 'Đã nộp đủ hoa hồng trong khoảng này.';
+
+  @override
+  String merchantStatementLastPaid(String period, String amount) {
+    return 'Lần nộp gần nhất: $period · $amount';
+  }
+
+  @override
+  String get merchantStatementNote =>
+      'Tài xế trả tiền món cho quán khi lấy hàng; quán nộp phần hoa hồng cho DealGo. Liên hệ hỗ trợ nếu số liệu chưa khớp.';
+
+  @override
   String get merchantStatsFailed =>
       'Không tải được thống kê. Kéo xuống để thử lại.';
 
@@ -4175,7 +4401,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get merchantQueueOthers => 'Hàng đợi khác';
 
   @override
-  String get merchantQueueNewChip => 'NEW · Chờ Shop xác nhận';
+  String get merchantQueueNewChip => 'Đơn mới';
 
   @override
   String get merchantQueueDeliverTo => 'Giao đến';
@@ -4424,7 +4650,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get rideMatchingReceiving => 'Đang nhận báo giá';
 
   @override
-  String get rideMatchingSearching => 'Đang tìm tài xế';
+  String get rideMatchingSearching => 'Đang chờ báo giá';
 
   @override
   String get rideMatchingLoadFailed =>
@@ -4442,6 +4668,30 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get rideStatusLabel => 'Trạng thái';
+
+  @override
+  String get rideStatusNegotiating => 'Đang thương lượng';
+
+  @override
+  String get rideStatusAssigned => 'Đã có tài xế';
+
+  @override
+  String get rideStatusDriverEnRoute => 'Tài xế đang đến';
+
+  @override
+  String get rideStatusDriverArrived => 'Tài xế đã tới';
+
+  @override
+  String get rideStatusInTrip => 'Đang trong chuyến';
+
+  @override
+  String get rideStatusCompleted => 'Đã hoàn tất';
+
+  @override
+  String get rideStatusCancelled => 'Đã hủy';
+
+  @override
+  String get rideStatusExpired => 'Hết hạn';
 
   @override
   String get rideNoOffersTitle => 'Chưa có tài xế chào giá';
@@ -4571,7 +4821,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get rideFareSendFailed => 'Không gửi được đề xuất.';
 
   @override
-  String get rideFareTitle => 'Tự đề xuất giá chuyến';
+  String get rideFareTitle => 'Giá của bạn';
 
   @override
   String get rideBookingInfo => 'Thông tin đặt xe';
@@ -4581,6 +4831,22 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get rideYourOffer => 'Đề xuất của bạn';
+
+  @override
+  String rideSuggestedFare(String amount) {
+    return 'Giá gợi ý $amount';
+  }
+
+  @override
+  String get rideSuggestedFareShort => 'Giá gợi ý';
+
+  @override
+  String get rideSuggestedFareHint =>
+      'Chọn loại xe, rồi đề xuất mức giá bạn muốn trả.';
+
+  @override
+  String get ridePickVehicleClassFirst =>
+      'Chọn loại xe (xe máy hoặc ô tô) trước khi gửi đề xuất.';
 
   @override
   String get rideEnterAmount => 'Nhập số tiền';
@@ -4715,8 +4981,25 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String rideSendOffer(String amount) {
-    return 'Gửi đề xuất $amount';
+    return 'Tìm tài xế · $amount';
   }
+
+  @override
+  String rideFindDriverCta(String amount) {
+    return 'Tìm tài xế · $amount';
+  }
+
+  @override
+  String get rideFindDriverPlain => 'Tìm tài xế';
+
+  @override
+  String rideRecommendedFareLabel(String amount) {
+    return 'Giá gợi ý $amount';
+  }
+
+  @override
+  String get rideFareAdjustHint =>
+      'Chạm − / + hoặc nhập số tiền. Tài xế có thể chấp nhận hoặc trả giá khác.';
 
   @override
   String get rideVehicleMotorbike => 'Xe máy';
@@ -4759,6 +5042,9 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get driverVehicleUnknown => 'Chưa có biển số trong hồ sơ tài xế';
+
+  @override
+  String get driverVehicleNotOnFile => 'Chưa có phương tiện trong hồ sơ';
 
   @override
   String get driverServicesSaved =>
@@ -4843,10 +5129,18 @@ class AppLocalizationsVi extends AppLocalizations {
   String get driverRideDetailTitle => 'Chi tiết yêu cầu chở khách';
 
   @override
+  String get driverCounterOffer => 'Chào giá khác';
+
+  @override
+  String driverAcceptAtPrice(String price) {
+    return 'Nhận giá $price';
+  }
+
+  @override
   String get driverMakeOffer => 'Chào giá';
 
   @override
-  String get driverRideChip => 'Chở khách · Xe máy';
+  String get driverRideChip => 'Chở khách · Xe máy & ô tô';
 
   @override
   String get driverCustomerFare => 'Giá khách đề xuất';
@@ -5256,16 +5550,6 @@ class AppLocalizationsVi extends AppLocalizations {
   String get homeSearchHint => 'Tìm điểm đến, cửa hàng, món ăn...';
 
   @override
-  String get homeHeroTitle => 'Một ứng dụng\nvạn trải nghiệm';
-
-  @override
-  String get homeHeroSubtitle =>
-      'Đặt xe • Mua sắm • Giao hàng\nTiện lợi mỗi ngày tại Đà Nẵng';
-
-  @override
-  String get homeHeroCity => '~ Đà Nẵng đi đâu cũng gần';
-
-  @override
   String get homeServiceFoodSub => 'Hàng ngàn cửa hàng\ngiao tận nơi';
 
   @override
@@ -5273,6 +5557,12 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get mapIllustrative => 'Bản đồ minh họa';
+
+  @override
+  String get mapRouteRoadFollowed => 'Theo đường thật';
+
+  @override
+  String get mapRouteStraightFallback => 'Đường thẳng minh họa';
 
   @override
   String get rideVoucherTitle => 'Mã ưu đãi';
@@ -5703,8 +5993,116 @@ class AppLocalizationsVi extends AppLocalizations {
   String get driverNavWaze => 'Waze';
 
   @override
+  String get driverNavAppleMaps => 'Apple Maps';
+
+  @override
+  String get chatRoleDriver => 'Tài xế';
+
+  @override
+  String get chatRoleCustomer => 'Khách hàng';
+
+  @override
+  String get chatCallAction => 'Gọi';
+
+  @override
+  String get chatCloseAction => 'Đóng';
+
+  @override
+  String get chatSendAction => 'Gửi';
+
+  @override
+  String get chatStatusSending => 'Đang gửi';
+
+  @override
+  String get chatStatusSent => 'Đã gửi';
+
+  @override
+  String get chatStatusFailed => 'Chưa gửi được · Chạm để thử lại';
+
+  @override
+  String get chatToday => 'Hôm nay';
+
+  @override
+  String get chatYesterday => 'Hôm qua';
+
+  @override
+  String get chatEmptyBody => 'Gửi tin nhắn để trao đổi nhanh';
+
+  @override
+  String chatUnreadCount(int count) {
+    return '$count tin nhắn mới';
+  }
+
+  @override
+  String get chatQuickDriverComing => 'Tôi đang tới';
+
+  @override
+  String get chatQuickDriverDelivering => 'Tôi đang giao tới';
+
+  @override
+  String get chatQuickDriverArrived => 'Tôi đã đến';
+
+  @override
+  String get chatQuickDriverWait => 'Chờ tôi 2 phút';
+
+  @override
+  String get chatQuickCustomerGate => 'Tôi đứng ở cổng';
+
+  @override
+  String get chatQuickCustomerComing => 'Tôi ra ngay';
+
+  @override
+  String get chatQuickCustomerWhere => 'Bạn đang ở đâu?';
+
+  @override
+  String get chatQuickCustomerLeaveAtGate => 'Để ở cổng giúp tôi';
+
+  @override
   String get driverNavOpenFailed =>
-      'Không mở được ứng dụng chỉ đường. Hãy đi theo bản đồ trong app.';
+      'Không mở được ứng dụng chỉ đường. Kiểm tra Google Maps hoặc Waze trên máy.';
+
+  @override
+  String get driverNavOpen => 'Điều hướng';
+
+  @override
+  String get driverNavSheetTitle => 'Chỉ đường bằng';
+
+  @override
+  String get driverNavWeb => 'Google Maps (trình duyệt)';
+
+  @override
+  String get driverNavLastUsed => 'Lần trước';
+
+  @override
+  String get driverNavToPickup => 'Đến điểm đón khách';
+
+  @override
+  String get driverNavToDropoff => 'Đến điểm trả khách';
+
+  @override
+  String get driverNavToStore => 'Đến quán lấy món';
+
+  @override
+  String get driverNavToCustomer => 'Đến chỗ khách nhận món';
+
+  @override
+  String get driverRideUnassignedTitle => 'Chuyến đã chuyển cho tài xế khác';
+
+  @override
+  String get driverRideUnassignedStartTimeout =>
+      'Bạn chưa bắt đầu đi đón khách đúng hạn.';
+
+  @override
+  String get driverRideUnassignedArriveTimeout =>
+      'Bạn chưa đến điểm đón đúng hạn.';
+
+  @override
+  String get driverRideUnassignedOps =>
+      'Bộ phận hỗ trợ DealGo đã điều phối lại chuyến.';
+
+  @override
+  String get driverRideUnassignedGeneric =>
+      'Chuyến đã được mở lại để nhận báo giá mới.';
 
   @override
   String get driverFoodDeliveryCodeTitle => 'Mã giao hàng';
@@ -6011,6 +6409,13 @@ class AppLocalizationsVi extends AppLocalizations {
   String get notifPrefsChatBody => 'Tin nhắn từ người liên quan đến giao dịch';
 
   @override
+  String get notifPrefsNewJobSound => 'Âm báo có đơn mới';
+
+  @override
+  String get notifPrefsNewJobSoundBody =>
+      'Phát giọng nói \"DealGo, có cuốc mới\" khi có cuốc, đơn giao hoặc đơn của quán. Tắt để dùng âm báo mặc định của máy.';
+
+  @override
   String get notifPrefsOther => 'Thông báo khác';
 
   @override
@@ -6060,6 +6465,9 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get securityVerified => 'Đã xác minh';
+
+  @override
+  String get securityEmail => 'Email';
 
   @override
   String get securityPasskey => 'Passkey';
@@ -6334,6 +6742,10 @@ class AppLocalizationsVi extends AppLocalizations {
   String get merchantProductsEmptyFilter => 'Không có món khớp bộ lọc';
 
   @override
+  String get merchantProductsEmptyMenu =>
+      'Chưa có món nào. Bấm “Thêm món” để bắt đầu bán.';
+
+  @override
   String get merchantOptionsChoiceMaxQty => 'Số lượng tối đa mỗi dòng';
 
   @override
@@ -6362,7 +6774,10 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get merchantLocationUnset =>
-      'Quán chưa có vị trí. Tài xế sẽ không có điểm lấy hàng chính xác và phí giao dùng mức mặc định.';
+      'Quán chưa ghim vị trí nên đang bị ẩn và không nhận được đơn. Ghim vị trí để tài xế đến đúng chỗ lấy món.';
+
+  @override
+  String get merchantLocationPinNow => 'Ghim ngay';
 
   @override
   String get merchantLocationUnsetValue => 'Chưa đặt vị trí';
@@ -6461,7 +6876,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get securityPasskeyNeedsPhone =>
-      'Cần xác minh số điện thoại trước khi thêm passkey.';
+      'Cần xác minh số điện thoại hoặc email trước khi thêm passkey.';
 
   @override
   String get merchantProfileTitle => 'Hồ sơ quán';
@@ -6506,4 +6921,454 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get accountStoreProfileBody => 'Tên quán và logo';
+
+  @override
+  String get foodReorderConfirmTitle => 'Đặt lại đơn này?';
+
+  @override
+  String get foodReorderConfirmBody =>
+      'Món trong đơn cũ sẽ được thêm vào giỏ theo giá hiện tại. Bạn xem lại trước khi đặt.';
+
+  @override
+  String get actionReorder => 'Đặt lại';
+
+  @override
+  String get foodReorderNone => 'Các món trong đơn cũ hiện không còn bán';
+
+  @override
+  String foodReorderPartial(int count) {
+    return '$count món không còn bán đã được bỏ khỏi giỏ';
+  }
+
+  @override
+  String get kycQuickModeBanner =>
+      'Đăng ký nhanh: không cần giấy tờ. Admin sẽ duyệt và xác nhận hạng xe.';
+
+  @override
+  String get kybQuickModeBanner =>
+      'Đăng ký nhanh: không cần giấy tờ. Admin sẽ duyệt cửa hàng.';
+
+  @override
+  String get handoverRefLabel => 'Mã đối chiếu';
+
+  @override
+  String handoverRefSemantics(String ref) {
+    return 'Mã đối chiếu đơn $ref';
+  }
+
+  @override
+  String get rideRebookAction => 'Đặt lại chuyến';
+
+  @override
+  String trackEtaMinutes(int minutes) {
+    return '~$minutes phút';
+  }
+
+  @override
+  String get trackStepFinding => 'Tìm xe';
+
+  @override
+  String get trackStepComing => 'Đang tới';
+
+  @override
+  String get trackStepArrived => 'Đã đến';
+
+  @override
+  String get trackStepOnTrip => 'Trên xe';
+
+  @override
+  String get trackStepDone => 'Hoàn tất';
+
+  @override
+  String get trackStepPlaced => 'Đã đặt';
+
+  @override
+  String get trackStepPreparing => 'Đang làm';
+
+  @override
+  String get trackStepReady => 'Chờ lấy';
+
+  @override
+  String get trackStepDriverToStore => 'Tài xế đến quán';
+
+  @override
+  String get trackStepDelivering => 'Đang giao';
+
+  @override
+  String get trackStepDelivered => 'Đã giao';
+
+  @override
+  String get trackDeliveryCodeLabel => 'Mã nhận hàng';
+
+  @override
+  String trackItemsMore(int count) {
+    return '+$count món khác';
+  }
+
+  @override
+  String get foodStageFindingDriver => 'Đang tìm tài xế';
+
+  @override
+  String get foodStageDriverToStore => 'Tài xế đang đến quán';
+
+  @override
+  String get foodStageDeliveringToYou => 'Tài xế đang giao tới bạn';
+
+  @override
+  String get accountSignOutConfirmTitle => 'Đăng xuất khỏi DealGo?';
+
+  @override
+  String get accountSignOutConfirmBody =>
+      'Bạn sẽ cần nhập lại số điện thoại và mã OTP để đăng nhập.';
+
+  @override
+  String get accountSignOutCancel => 'Huỷ';
+
+  @override
+  String get rideOfferConfirmTitle => 'Chọn tài xế này?';
+
+  @override
+  String rideOfferConfirmBody(String amount) {
+    return 'Giá chuyến $amount. Tài xế sẽ được gán cho chuyến của bạn ngay.';
+  }
+
+  @override
+  String get rideOfferConfirmAction => 'Chọn tài xế';
+
+  @override
+  String get rideOfferConfirmCancel => 'Xem lại';
+
+  @override
+  String get rideRaiseFare => 'Tăng giá';
+
+  @override
+  String get rideRaiseFareTitle => 'Tăng giá đề nghị';
+
+  @override
+  String rideRaiseFareBody(String amount) {
+    return 'Tài xế thấy giá mới ngay. Giá hiện tại: $amount';
+  }
+
+  @override
+  String rideRaiseFareStep(String amount) {
+    return '+$amount';
+  }
+
+  @override
+  String rideRaiseFareDone(String amount) {
+    return 'Đã tăng giá lên $amount';
+  }
+
+  @override
+  String get rideDeclineOffer => 'Từ chối giá này';
+
+  @override
+  String get rideDeclineOfferDone => 'Đã từ chối. Tài xế có thể gửi giá mới.';
+
+  @override
+  String get driverWithdrawOffer => 'Rút đề nghị';
+
+  @override
+  String get driverWithdrawOfferDone => 'Đã rút đề nghị';
+
+  @override
+  String get driverCustomerRating => 'Đánh giá khách';
+
+  @override
+  String driverCustomerRatingValue(String average, int count) {
+    return '$average★ ($count lượt)';
+  }
+
+  @override
+  String get driverCustomerRatingNone => 'Khách mới – chưa có đánh giá';
+
+  @override
+  String get driverCancelRide => 'Huỷ chuyến';
+
+  @override
+  String get driverCancelReasonTitle => 'Lý do huỷ chuyến?';
+
+  @override
+  String get driverCancelHint =>
+      'Huỷ chuyến đã nhận sẽ tính vào tỉ lệ huỷ của bạn.';
+
+  @override
+  String get driverCancelReasonCustomerUnreachable =>
+      'Không liên lạc được khách';
+
+  @override
+  String get driverCancelReasonPickupTooFar => 'Điểm đón quá xa';
+
+  @override
+  String get driverCancelReasonVehicleProblem => 'Xe gặp sự cố';
+
+  @override
+  String get driverCancelReasonSafetyConcern => 'Lo ngại an toàn';
+
+  @override
+  String get driverCancelReasonCustomerAsked => 'Khách yêu cầu huỷ';
+
+  @override
+  String get driverCancelReasonOther => 'Lý do khác';
+
+  @override
+  String get driverCancelDone => 'Đã huỷ chuyến';
+
+  @override
+  String get driverNoShow => 'Khách không xuất hiện';
+
+  @override
+  String get driverNoShowBody =>
+      'Chỉ dùng khi đã chờ ở điểm đón. Hệ thống kiểm tra thời gian chờ và có thể tính phí khách không xuất hiện.';
+
+  @override
+  String get driverNoShowDone =>
+      'Đã ghi nhận khách không xuất hiện. Chuyến đã đóng.';
+
+  @override
+  String get driverRateCustomerTitle => 'Đánh giá khách hàng';
+
+  @override
+  String get driverRateCustomerSubmit => 'Gửi đánh giá';
+
+  @override
+  String get driverRateCustomerDone => 'Đã gửi đánh giá – cảm ơn bạn!';
+
+  @override
+  String driverRateCustomerYours(int stars) {
+    return 'Bạn đã đánh giá: $stars★';
+  }
+
+  @override
+  String get driverRateTagOnTime => 'Đúng giờ';
+
+  @override
+  String get driverRateTagPolite => 'Lịch sự';
+
+  @override
+  String get driverRateTagClearPickup => 'Điểm đón rõ ràng';
+
+  @override
+  String get driverRateTagLate => 'Để chờ lâu';
+
+  @override
+  String get driverRateTagRude => 'Thiếu lịch sự';
+
+  @override
+  String get driverRateTagWrongPickup => 'Sai điểm đón';
+
+  @override
+  String get driverFoodRelease => 'Trả đơn';
+
+  @override
+  String get driverFoodReleaseTitle => 'Lý do trả đơn?';
+
+  @override
+  String get driverFoodReleaseHint =>
+      'Đơn sẽ được chuyển cho tài xế khác. Trả đơn tính là một lần huỷ.';
+
+  @override
+  String get driverFoodReleaseStoreTooSlow => 'Quán chuẩn bị quá lâu';
+
+  @override
+  String get driverFoodReleaseStoreClosed => 'Quán đóng cửa';
+
+  @override
+  String get driverFoodReleaseVehicleProblem => 'Xe gặp sự cố';
+
+  @override
+  String get driverFoodReleaseSafetyConcern => 'Lo ngại an toàn';
+
+  @override
+  String get driverFoodReleaseOther => 'Lý do khác';
+
+  @override
+  String get driverFoodReleaseDone => 'Đã trả đơn';
+
+  @override
+  String get driverFailNoteLabel => 'Chuyện gì đã xảy ra? (bắt buộc)';
+
+  @override
+  String get driverFailNoteRequired => 'Vui lòng mô tả chuyện gì đã xảy ra.';
+
+  @override
+  String get driverFailAbsentHint =>
+      'Hãy gọi và nhắn tin cho khách trước. Bạn chỉ báo \"không liên lạc được khách\" sau khi đã chờ ở điểm giao vài phút.';
+
+  @override
+  String get driverFoodFailedDone => 'Đã báo giao không thành công';
+
+  @override
+  String get apiErrLiveOffersFull =>
+      'Chuyến này đã đủ số giá đề nghị. Thử lại sau ít phút.';
+
+  @override
+  String get apiErrFareRaiseLimit =>
+      'Bạn không thể tăng giá thêm cho chuyến này.';
+
+  @override
+  String get apiErrCancelCooldown =>
+      'Bạn vừa huỷ nhiều chuyến. Vui lòng chờ một lúc trước khi đặt lại.';
+
+  @override
+  String get apiErrRepostInvalid => 'Không thể đăng lại chuyến này.';
+
+  @override
+  String get apiErrFailTooEarly =>
+      'Hãy chờ ở điểm giao thêm vài phút rồi mới báo không liên lạc được khách.';
+
+  @override
+  String get apiErrFailNoteRequired => 'Vui lòng ghi chú mô tả vấn đề.';
+
+  @override
+  String get apiErrStoreLocationRequired => 'Quán chưa ghim vị trí.';
+
+  @override
+  String get apiErrDriverLocationStale =>
+      'Chưa lấy được vị trí hiện tại của bạn. Bật định vị rồi kéo xuống để tải lại.';
+
+  @override
+  String get apiErrOutsideServiceZone =>
+      'Địa chỉ này nằm ngoài khu vực phục vụ.';
+
+  @override
+  String get apiErrTooFar => 'Địa chỉ giao quá xa quán.';
+
+  @override
+  String get apiErrSettlementOverlap =>
+      'Kỳ này trùng với một bảng đối soát đã có.';
+
+  @override
+  String get apiErrSettlementPeriodOpen => 'Kỳ này chưa kết thúc.';
+
+  @override
+  String get apiErrShopLocationRequired =>
+      'Hãy ghim vị trí cửa hàng trên bản đồ để tiếp tục.';
+
+  @override
+  String get apiErrChangePending =>
+      'Đơn đang có một thay đổi chờ khách xác nhận.';
+
+  @override
+  String get apiErrChangeInvalid =>
+      'Thay đổi không hợp lệ. Chỉ được giảm số lượng hoặc bỏ món.';
+
+  @override
+  String get apiErrChangeNotFound => 'Thay đổi này không còn chờ xác nhận.';
+
+  @override
+  String get foodCancelChangeRejected => 'Bạn đã từ chối thay đổi của quán';
+
+  @override
+  String get foodCancelChangeExpired =>
+      'Thay đổi của quán không được xác nhận kịp';
+
+  @override
+  String get foodChangeTitle => 'Quán cần thay đổi đơn của bạn';
+
+  @override
+  String get foodChangeReasonOutOfStock => 'Một số món đã hết';
+
+  @override
+  String get foodChangeReasonNotEnough => 'Không đủ phần';
+
+  @override
+  String get foodChangeReasonOther => 'Lý do khác';
+
+  @override
+  String get foodChangeLineRemoved => 'Bỏ món';
+
+  @override
+  String get foodChangeNewTotal => 'Tổng mới';
+
+  @override
+  String foodChangeAnswerBy(String time) {
+    return 'Trả lời trước $time, nếu không đơn sẽ tự huỷ miễn phí.';
+  }
+
+  @override
+  String get foodChangeAccept => 'Đồng ý';
+
+  @override
+  String get foodChangeReject => 'Huỷ đơn';
+
+  @override
+  String get foodChangeRejectConfirmTitle => 'Huỷ đơn này?';
+
+  @override
+  String get foodChangeRejectConfirmBody =>
+      'Đơn sẽ được huỷ và bạn không mất phí.';
+
+  @override
+  String get merchantEditOrder => 'Báo hết món / sửa đơn';
+
+  @override
+  String get merchantEditOrderHint =>
+      'Giảm số lượng hoặc bỏ món. Khách cần đồng ý trước khi quán làm tiếp.';
+
+  @override
+  String get merchantEditOrderNote => 'Ghi chú cho khách';
+
+  @override
+  String get merchantEditOrderAllRemoved => 'Nếu bỏ hết món, hãy từ chối đơn.';
+
+  @override
+  String merchantEditOrderNewSubtotal(String amount) {
+    return 'Giá trị món mới: $amount';
+  }
+
+  @override
+  String get merchantEditOrderSend => 'Gửi khách xác nhận';
+
+  @override
+  String merchantChangePending(String total, String time) {
+    return 'Đang chờ khách đồng ý thay đổi (tổng mới $total) đến $time.';
+  }
+
+  @override
+  String get pushForegroundOpen => 'Xem';
+
+  @override
+  String get mapPinPickup => 'Đón';
+
+  @override
+  String get mapPinDropoff => 'Đến';
+
+  @override
+  String get mapPinStore => 'Quán';
+
+  @override
+  String get mapPinHome => 'Giao';
+
+  @override
+  String get mapPickerTitle => 'Chọn trên bản đồ';
+
+  @override
+  String get mapPickerConfirm => 'Chọn vị trí này';
+
+  @override
+  String get mapPickerPinned => 'Vị trí đã ghim';
+
+  @override
+  String get mapPickerSearch => 'Tìm địa điểm';
+
+  @override
+  String get mapStyleTitle => 'Kiểu bản đồ';
+
+  @override
+  String get mapStyleStandard => 'Chuẩn';
+
+  @override
+  String get mapStyleSatellite => 'Vệ tinh';
+
+  @override
+  String get mapStyleDark => 'Tối';
+
+  @override
+  String get mapOpenSettings => 'Cài đặt';
+
+  @override
+  String homeBannerSlideLabel(int index, int count, String title) {
+    return 'Banner $index/$count: $title';
+  }
 }

@@ -1,9 +1,11 @@
 import { apiFetch } from "@/lib/api/client";
 import { apiPaths } from "@/lib/api/paths";
+import { formatOpsDateTime } from "@/lib/ops-time";
+import { setOpsDateRange, type OpsDateRange } from "@/lib/api/ops-date-range";
 import type { ModeratedProduct } from "@/features/catalog-moderation/types";
 import type { PaginatedList } from "@/lib/api/pagination";
 
-export type FetchCatalogModerationParams = {
+export type FetchCatalogModerationParams = OpsDateRange & {
   page: number;
   limit: number;
   q?: string;
@@ -17,6 +19,13 @@ type NestModerationRow = Partial<ModeratedProduct> & {
   code?: string;
 };
 
+/** Nest sends the ISO submission time; show it in Vietnam time, keep any legacy label as-is. */
+export function formatSubmittedAt(value: string | null | undefined): string {
+  if (!value) return "—";
+  const formatted = formatOpsDateTime(value);
+  return formatted === "—" ? value : formatted;
+}
+
 function mapItem(row: NestModerationRow): ModeratedProduct {
   const code = row.code ?? row.id ?? "—";
   return {
@@ -26,7 +35,7 @@ function mapItem(row: NestModerationRow): ModeratedProduct {
     category: row.category ?? "—",
     store: row.store ?? "—",
     price: row.price ?? 0,
-    submittedAt: row.submittedAt ?? "—",
+    submittedAt: formatSubmittedAt(row.submittedAt),
     status: (row.status as ModeratedProduct["status"]) ?? "PENDING",
     nameReady: row.nameReady ?? false,
     imageReady: row.imageReady ?? false,
@@ -45,6 +54,7 @@ export async function fetchCatalogModeration(
     search.set("category", params.category);
   if (params.status && params.status !== "ALL")
     search.set("status", params.status);
+  setOpsDateRange(search, params);
 
   const envelope = await apiFetch<{
     success: boolean;

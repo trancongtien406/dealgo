@@ -15,7 +15,29 @@ class StubPush implements PushPort {
   bool _registered = false;
 
   @override
+  Future<void> listenForTaps(
+    void Function(Map<String, Object?> data) onTap,
+  ) async {}
+
+  @override
+  Future<void> listenForeground(
+    void Function(PushMessage message) onMessage,
+  ) async {}
+
+  @override
   Future<String?> currentToken() async => _token;
+
+  @override
+  Future<void> unregister({required String accessToken}) async {
+    _registered = false;
+    try {
+      await _dio?.delete<Object?>(
+        ApiPaths.mePushTokens,
+        data: {'token': _token},
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      );
+    } catch (_) {}
+  }
 
   @override
   Future<void> ensureRegistered({required String accessToken}) async {

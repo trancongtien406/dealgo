@@ -47,6 +47,9 @@ void main() {
     cubit
       ..setShopName('Quán Hà')
       ..setShopAddress('Hải Châu');
+    // The map pin is required too.
+    expect(cubit.state.canContinueShopInfo, isFalse);
+    cubit.setShopPin(lat: 16.06, lng: 108.22, label: 'Hải Châu');
     expect(cubit.state.canContinueShopInfo, isTrue);
   });
 }

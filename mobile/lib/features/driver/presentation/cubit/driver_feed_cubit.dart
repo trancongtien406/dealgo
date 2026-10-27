@@ -41,7 +41,17 @@ class DriverFeedCubit extends Cubit<DriverFeedState> {
   DriverFeedCubit({
     required this._listOpenDriverRides,
     required this._listReadyDriverOrders,
+    this.staleLocationRetries = const [
+      Duration(seconds: 2),
+      Duration(seconds: 4),
+    ],
   }) : super(const DriverFeedIdle());
+
+  /// Opening the app from a "new ride nearby" push (cold start / long background)
+  /// asks for the list before the location reporter's first fix lands, so the server
+  /// answers DRIVER_LOCATION_STALE. Wait for that fix and ask again instead of
+  /// showing an error over a ride the driver was just told about.
+  final List<Duration> staleLocationRetries;
 
   final ListOpenDriverRides _listOpenDriverRides;
   final ListReadyDriverOrders _listReadyDriverOrders;
@@ -62,12 +72,28 @@ class DriverFeedCubit extends Cubit<DriverFeedState> {
       return;
     }
     emit(const DriverFeedLoading());
-    final opened = _capture(_listOpenDriverRides(token));
-    final ready = _capture(_listReadyDriverOrders(token));
-    final openedResult = await opened;
-    final readyResult = await ready;
-    if (isClosed || generation != _generation) {
-      return;
+    var attempt = 0;
+    late _Capture<List<OpenRide>> openedResult;
+    late _Capture<List<ReadyFoodJob>> readyResult;
+    while (true) {
+      final opened = _capture(_listOpenDriverRides(token));
+      final ready = _capture(_listReadyDriverOrders(token));
+      openedResult = await opened;
+      readyResult = await ready;
+      if (isClosed || generation != _generation) {
+        return;
+      }
+      final stale =
+          _locationStale(openedResult.error) ||
+          _locationStale(readyResult.error);
+      if (!stale || attempt >= staleLocationRetries.length) {
+        break;
+      }
+      await Future<void>.delayed(staleLocationRetries[attempt]);
+      attempt += 1;
+      if (isClosed || generation != _generation) {
+        return;
+      }
     }
     if (_roleInactive(openedResult.error) || _roleInactive(readyResult.error)) {
       emit(const DriverFeedIneligible());
@@ -109,6 +135,12 @@ ReadyFoodJob? readyFoodFrom(DriverFeedState state, String id) {
     }
   }
   return null;
+}
+
+bool _locationStale(Object? error) {
+  return error is ApiException &&
+      error.statusCode == 409 &&
+      error.errorCode == 'DRIVER_LOCATION_STALE';
 }
 
 bool _roleInactive(Object? error) {

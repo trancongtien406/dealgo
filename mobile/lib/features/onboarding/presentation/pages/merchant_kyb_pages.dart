@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../utils/partner_status_listener.dart';
 import '../../../../core/design_system/components/dealgo_card.dart';
 import '../../../../core/design_system/components/dealgo_segmented_control.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../identity/domain/entities/auth_state.dart';
+import '../../../places/domain/place.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
 import '../../domain/entities/partner_documents.dart';
 import '../../domain/entities/partner_onboarding.dart';
@@ -23,7 +25,8 @@ Future<void> _loadMerchantKyb(BuildContext context) async {
   if (auth is AuthSignedIn) {
     cubit.seedFromProfile(auth.profile);
   }
-  await cubit.refresh().timeout(const Duration(seconds: 12));
+  await Future.wait([cubit.refresh(), cubit.loadRequirements()])
+      .timeout(const Duration(seconds: 12));
 }
 
 bool _isMerchantKybPath(String path) {
@@ -288,7 +291,15 @@ class _MerchantKybIntroPageState extends State<MerchantKybIntroPage> {
           const SizedBox(height: DealGoSpacing.s12),
           const _BenefitGrid(),
           const SizedBox(height: DealGoSpacing.s16),
-          OnboardingInfoBanner(message: l10n.kybIntroRequirements),
+          BlocBuilder<MerchantKybCubit, MerchantKybState>(
+            buildWhen: (a, b) => a.documentsRequired != b.documentsRequired,
+            builder: (context, state) => OnboardingInfoBanner(
+              key: const Key('kyb-intro-requirements'),
+              message: state.documentsRequired
+                  ? l10n.kybIntroRequirements
+                  : l10n.kybQuickModeBanner,
+            ),
+          ),
         ],
       ),
     );
@@ -406,7 +417,23 @@ class MerchantKybStatusPage extends StatefulWidget {
   State<MerchantKybStatusPage> createState() => _MerchantKybStatusPageState();
 }
 
-class _MerchantKybStatusPageState extends State<MerchantKybStatusPage> {
+class _MerchantKybStatusPageState extends State<MerchantKybStatusPage>
+    with WidgetsBindingObserver, PartnerStatusListener<MerchantKybStatusPage> {
+  @override
+  String get partnerStatusRole => 'MERCHANT';
+
+  @override
+  bool get pendingStatusActive {
+    final status = context.read<MerchantKybCubit>().state.status;
+    return status != PartnerApplicationStatus.active &&
+        status != PartnerApplicationStatus.rejected &&
+        status != PartnerApplicationStatus.draft;
+  }
+
+  @override
+  Future<void> refreshPendingStatus() =>
+      context.read<MerchantKybCubit>().refresh();
+
   @override
   void initState() {
     super.initState();
@@ -445,7 +472,11 @@ class _MerchantKybStatusPageState extends State<MerchantKybStatusPage> {
                 )
               : OnboardingContinueBar(
                   label: l10n.kybTrackCta,
-                  onPressed: () => context.go('/merchant'),
+                  onPressed: () async {
+                    final router = GoRouter.of(context);
+                    await context.read<AuthCubit>().refreshProfile();
+                    router.go('/merchant');
+                  },
                 ),
           body: RefreshIndicator(
             onRefresh: () => context.read<MerchantKybCubit>().refresh(),
@@ -510,7 +541,9 @@ class _MerchantKybStatusPageState extends State<MerchantKybStatusPage> {
                 ),
                 const SizedBox(height: DealGoSpacing.s12),
                 PartnerTimelineRow(
-                  title: l10n.partnerTimelineReview,
+                  title: state.documentsRequired
+                      ? l10n.partnerTimelineReview
+                      : l10n.partnerTimelineReviewQuick,
                   subtitle: isActive || isRejected
                       ? l10n.partnerTimelineReviewed
                       : l10n.partnerTimelineReviewing,
@@ -781,12 +814,65 @@ class _ShopInfoStep extends StatelessWidget {
           onChanged: cubit.setShopAddress,
         ),
         const SizedBox(height: DealGoSpacing.s12),
+        _ShopPinTile(state: state),
+        const SizedBox(height: DealGoSpacing.s12),
         OnboardingMockField(
           label: l10n.kybShopType,
           value: merchantBusinessTypeLabel(l10n, state.businessType),
           required: true,
         ),
       ],
+    );
+  }
+}
+
+/// The store must be pinned before KYB can be submitted.
+class _ShopPinTile extends StatelessWidget {
+  const _ShopPinTile({required this.state});
+
+  final MerchantKybState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    final pinned = state.hasShopPin;
+    return DealGoCard(
+      child: Material(
+        type: MaterialType.transparency,
+        child: ListTile(
+          key: const Key('kyb-shop-pin'),
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(
+            DealGoIcons.pin,
+            color: pinned ? DealGoColors.primary : DealGoColors.danger,
+          ),
+          title: Text(
+            pinned
+                ? '${state.shopLat!.toStringAsFixed(5)}, ${state.shopLng!.toStringAsFixed(5)}'
+                : l10n.kybShopPin,
+            style: textTheme.bodyMedium,
+          ),
+          subtitle: Text(
+            pinned ? l10n.kybShopPinChange : l10n.kybShopPinRequired,
+            style: textTheme.bodySmall,
+          ),
+          trailing: const Icon(DealGoIcons.chevronRight),
+          onTap: () async {
+            final cubit = context.read<MerchantKybCubit>();
+            final place = await context.push<PlaceOption>(
+              MerchantKybRoutes.pin,
+            );
+            if (place != null) {
+              cubit.setShopPin(
+                lat: place.lat,
+                lng: place.lng,
+                label: place.label,
+              );
+            }
+          },
+        ),
+      ),
     );
   }
 }
@@ -882,48 +968,55 @@ class _MerchantReviewStep extends StatelessWidget {
                     '${state.shopName} · ${merchantBusinessTypeLabel(l10n, state.businessType)}',
                 ok: state.canContinueShopInfo,
               ),
-              PartnerReviewRow(
-                title: l10n.kybReviewRep,
-                subtitle:
-                    '${state.representativeName} · ${merchantSubjectLabel(l10n, state.registrationSubject)}',
-                ok: state.representativeName.trim().length >= 2,
-              ),
-              PartnerReviewRow(
-                title: l10n.kybReviewBank,
-                subtitle: state.bankAccountNumber.isEmpty
-                    ? ''
-                    : '${state.bankName} · ${partnerMaskAccount(state.bankAccountNumber)}',
-                ok: state.canContinueRepresentative,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: DealGoSpacing.s12),
-        DealGoCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(l10n.partnerReviewTitleDocs, style: textTheme.titleMedium),
-              const SizedBox(height: DealGoSpacing.s12),
-              for (final kind in PartnerDocumentKind.merchantAll)
-                InkWell(
-                  onTap: () => cubit.goToStep(MerchantKybStep.documents),
-                  child: PartnerReviewRow(
-                    title: partnerDocumentLabel(l10n, kind),
-                    subtitle: kind == PartnerDocumentKind.storefront
-                        ? l10n.partnerDocOptional
-                        : '',
-                    ok:
-                        state.documents.has(kind) ||
-                        (kind == PartnerDocumentKind.storefront &&
-                            !state.documents.isFlagged(kind)),
-                  ),
+              if (state.documentsRequired) ...[
+                PartnerReviewRow(
+                  title: l10n.kybReviewRep,
+                  subtitle:
+                      '${state.representativeName} · ${merchantSubjectLabel(l10n, state.registrationSubject)}',
+                  ok: state.representativeName.trim().length >= 2,
                 ),
+                PartnerReviewRow(
+                  title: l10n.kybReviewBank,
+                  subtitle: state.bankAccountNumber.isEmpty
+                      ? ''
+                      : '${state.bankName} · ${partnerMaskAccount(state.bankAccountNumber)}',
+                  ok: state.canContinueRepresentative,
+                ),
+              ],
             ],
           ),
         ),
         const SizedBox(height: DealGoSpacing.s12),
-        OnboardingInfoBanner(message: l10n.kybReviewNote),
+        if (state.documentsRequired)
+          DealGoCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l10n.partnerReviewTitleDocs, style: textTheme.titleMedium),
+                const SizedBox(height: DealGoSpacing.s12),
+                for (final kind in PartnerDocumentKind.merchantAll)
+                  InkWell(
+                    onTap: () => cubit.goToStep(MerchantKybStep.documents),
+                    child: PartnerReviewRow(
+                      title: partnerDocumentLabel(l10n, kind),
+                      subtitle: kind == PartnerDocumentKind.storefront
+                          ? l10n.partnerDocOptional
+                          : '',
+                      ok:
+                          state.documents.has(kind) ||
+                          (kind == PartnerDocumentKind.storefront &&
+                              !state.documents.isFlagged(kind)),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        const SizedBox(height: DealGoSpacing.s12),
+        OnboardingInfoBanner(
+          message: state.documentsRequired
+              ? l10n.kybReviewNote
+              : l10n.kybQuickModeBanner,
+        ),
       ],
     );
   }

@@ -1,5 +1,6 @@
 import { jsonFromOpsUpstream } from "@/lib/api/ops-bff-response";
 import { fetchOpsUpstream } from "@/lib/api/ops-upstream";
+import { opsDateRangeFromSearch } from "@/lib/api/ops-date-range";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -19,6 +20,7 @@ export async function GET(request: Request) {
       ...(status ? { status } : {}),
       ...(page ? { page } : {}),
       ...(limit ? { limit } : {}),
+      ...opsDateRangeFromSearch(url.searchParams),
     },
   });
 

@@ -38,11 +38,14 @@ PartnerDocumentSummary _stored(int index, String kind) =>
 DriverKycCubit _driver(FakePartnerApplicationsClient partners) {
   final repo = PartnerApplicationsRepositoryImpl(partners);
   return DriverKycCubit(
-    submitPartnerApplication: SubmitPartnerApplication(repo),
-    getMyPartnerApplication: GetMyPartnerApplication(repo),
-    accessToken: () => 'token',
-    useMock: false,
-  );
+      submitPartnerApplication: SubmitPartnerApplication(repo),
+      getMyPartnerApplication: GetMyPartnerApplication(repo),
+      accessToken: () => 'token',
+      useMock: false,
+    )
+    // Services are no longer preselected; tick both explicitly.
+    ..toggleRide()
+    ..toggleFood();
 }
 
 void main() {
@@ -118,6 +121,8 @@ void main() {
         ..setIdNumber('0480 9500 1234')
         ..setLicenseNumber('480123456')
         ..setVehiclePlate('43b1-123.45')
+        // Fail closed: submit requires an explicit vehicle class (DG-DEC-VEH-001).
+        ..setVehicleClass(code: 'MOTORBIKE', name: 'Xe máy')
         ..setBankName('Vietcombank')
         ..setBankAccountNumber('0123 456 789')
         ..setBankAccountHolder('Tran Cong Tien');
@@ -157,6 +162,8 @@ void main() {
             'idNumber': '048095001234',
             'licenseNumber': '480123456',
             'vehiclePlate': '43B1-123.45',
+            // DG-DEC-VEH-001: a stored application carries its vehicle class.
+            'vehicleClassCode': 'MOTORBIKE',
             'bankName': 'Vietcombank',
             'bankAccountNumber': '0123456789',
             'bankAccountHolder': 'TRAN CONG TIEN',

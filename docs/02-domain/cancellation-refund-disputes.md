@@ -1,15 +1,15 @@
 ---
 document_id: DOC-DOM-007
 title: "DealGo — Cancellation, Refund, Compensation & Disputes / Hủy, hoàn tiền, bồi hoàn và tranh chấp"
-version: "0.2.0"
+version: "0.3.0"
 status: DRAFT
 language: vi-VN
 created_at: 2026-10-12
-last_reviewed_at: 2026-10-12
+last_reviewed_at: 2026-10-26
 classification: Internal
 owner: "Product Owner + Finance + Operations"
 reviewers: ["Ride Operations", "Food Operations", "Merchant Operations", "Driver Operations", "Backend Lead", "Flutter Lead", "QA Lead", "Security", "Legal / Compliance"]
-release_scope: "MVP Ride hai bánh + Food; một Flutter app ba vai trò + Admin Web"
+release_scope: "MVP Ride (xe máy, ô tô) + Food; một Flutter app ba vai trò + Admin Web"
 policy_status: PROPOSED_NOT_APPROVED
 upstream_documents:
   - ../00-governance/README.md
@@ -47,7 +47,17 @@ related_requirements: ["FR-CORE-007", "FR-CORE-008", "FR-CORE-010", "FR-CORE-012
 
 # DealGo — Cancellation, Refund, Compensation & Disputes
 
-> **DRAFT / DESIGN PROPOSAL — KHÔNG PHẢI CHÍNH SÁCH THƯƠNG MẠI ĐƯỢC DUYỆT.** `DEC-PROD-001..007` xác nhận Ride hai bánh + Food, ba role Flutter, auth methods và transaction-scoped chat/voice; **chưa chốt** mức phí hủy, mức bồi hoàn, thời gian chờ, chính sách không nhận hàng, lúc thu tiền Food, phương thức COD hay quyền tài xế được thu hộ. Mọi ngưỡng, phần trăm và ví dụ tiền đều `TEST_ONLY`/`TBD`, phải được duyệt theo `OPEN-002/003/006/010/016/017/018/019` trước khi dùng production. Thương lượng giá Ride là pattern đã xác nhận (`DEC-PROD-005`); phí hủy và liability vẫn chưa chốt.
+> **DRAFT / DESIGN PROPOSAL — KHÔNG PHẢI CHÍNH SÁCH THƯƠNG MẠI ĐƯỢC DUYỆT.** `DEC-PROD-001..007` xác nhận Ride (xe máy, ô tô) + Food, ba role Flutter, auth methods và transaction-scoped chat/voice; **chưa chốt** mức phí hủy, mức bồi hoàn, thời gian chờ, chính sách không nhận hàng, lúc thu tiền Food, phương thức COD hay quyền tài xế được thu hộ. Mọi ngưỡng, phần trăm và ví dụ tiền đều `TEST_ONLY`/`TBD`, phải được duyệt theo `OPEN-002/003/006/010/016/017/018/019` trước khi dùng production. Thương lượng giá Ride là pattern đã xác nhận (`DEC-PROD-005`); phí hủy và liability vẫn chưa chốt.
+>
+> **Hệ thống hiện có (code là nguồn chuẩn):**
+> - Khách huỷ chuyến miễn phí trong `RIDE_FREE_CANCEL_MINUTES` (mặc định 5 phút) sau khi có tài xế; huỷ muộn hơn hoặc bị tài xế báo không gặp sau `RIDE_NO_SHOW_WAIT_MINUTES` (mặc định 5 phút chờ) thì phát sinh phí theo hạng xe: `RIDE_CANCEL_FEE_BIKE_VND` (3.000) / `RIDE_CANCEL_FEE_CAR_VND` (10.000). Phí lưu ở `customer_fee_charges` (`LATE_CANCEL` / `NO_SHOW`), trả cho tài xế bị ảnh hưởng và được cộng vào chuyến tiền mặt kế tiếp của khách.
+> - Khách huỷ sau khi có tài xế quá `CUSTOMER_CANCEL_LIMIT_COUNT` lần trong `CUSTOMER_CANCEL_LIMIT_WINDOW_HOURS` giờ thì bị tạm chặn đặt chuyến `CUSTOMER_CANCEL_COOLDOWN_MINUTES` phút. Tỷ lệ huỷ của tài xế tính trên `DRIVER_CANCEL_RATE_WINDOW_DAYS` ngày, cảnh báo ở ngưỡng `DRIVER_CANCEL_RATE_WARN_PERCENT`.
+> - Tài xế huỷ chuyến phải chọn lý do; chuyến trở lại trạng thái trả giá cho tài xế khác. Với Food, tài xế `release` đơn trước khi lấy món; sau khi lấy món chỉ có thể báo giao thất bại (`PICKED_UP → FAILED`) kèm lý do, sau thời gian chờ tối thiểu `FOOD_FAIL_MIN_WAIT_MINUTES` nếu không liên lạc được khách.
+> - Quán sửa đơn / báo hết món thì khách phải xác nhận trong `FOOD_ORDER_CHANGE_RESPONSE_MINUTES` phút.
+> - Hệ thống tự huỷ (actor `SYSTEM`) khi hết thời gian chờ.
+> - Ops huỷ hoặc gán lại chuyến/đơn qua `/v1/ops/rides|food-orders/:id/cancel|reassign`, có lý do và audit.
+> - Tranh chấp: Admin xem và xử lý `DisputeCase` (`/v1/ops/disputes`, quyền `disputes.write` để resolve); phương án hoàn tiền chỉ được ghi nhận, chưa chuyển tiền thật qua cổng thanh toán. Khách chưa có luồng tự mở khiếu nại trong app; chưa có `FeeAssessment` như thiết kế bên dưới.
+> - Mọi tham số trên là cài đặt Admin (Cài đặt › Tham số › Dòng tiền & hoa hồng / Điều phối), xem [bản đồ cài đặt](../10-ai-execution/open-admin-settings-map.md). Giá trị mặc định là DRAFT (`DEC-PROD-059`, `DEC-PROD-060`).
 >
 > **An toàn tài chính:** `cancelled != refunded`; `refund_requested != refund_succeeded`; `order_canceled != delivery_task_canceled` cho mọi tình huống; `compensation_approved != payout_completed`. AI Agent **không** được gộp các trạng thái này.
 
@@ -67,7 +77,7 @@ Tài liệu mô tả **ai được yêu cầu hủy/hỗ trợ, lúc nào đư�
 
 ## 2. Phạm vi và ngoài phạm vi
 
-**Bao gồm:** Ride đặt xe máy, Food đặt đồ ăn/giao bởi tài xế, hủy do Customer/Driver/Merchant/System/Admin, timeout/no-show, partial/full refund, merchant/driver compensation, cost allocation, dispute, customer support, evidence, financial adjustments, audit, abuse monitoring, SLA cấu hình và reconciliation.
+**Bao gồm:** Ride đặt xe máy/ô tô (`DG-DEC-VEH-001`), Food đặt đồ ăn/giao bởi tài xế, hủy do Customer/Driver/Merchant/System/Admin, timeout/no-show, partial/full refund, merchant/driver compensation, cost allocation, dispute, customer support, evidence, financial adjustments, audit, abuse monitoring, SLA cấu hình và reconciliation.
 
 **Không tự mở rộng:** GrabCar, giao hàng độc lập, đa quán trong một đơn, bảo hiểm/đền bù tai nạn, ví tiền nạp/rút, chargeback API thật của PSP chưa ký hợp đồng, đấu giá tự động hoặc chương trình bồi hoàn có tỷ lệ cố định. Thương lượng giá giữa khách và tài xế của Ride đã nằm trong scope; các ngưỡng/điều khoản vẫn theo `OPEN-019`. Nội dung pháp lý là checklist để Legal xác nhận.
 

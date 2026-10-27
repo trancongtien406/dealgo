@@ -67,6 +67,11 @@ abstract final class ApiPaths {
 
   static const partnerApplications = '/v1/me/partner-applications';
 
+  /// DEC-PROD-048: whether KYC/KYB documents are required for [role].
+  static String partnerRequirements(String role) {
+    return '/v1/me/partner-applications/requirements/${Uri.encodeComponent(role)}';
+  }
+
   static String partnerApplication(String role) {
     return '/v1/me/partner-applications/${Uri.encodeComponent(role)}';
   }
@@ -74,6 +79,7 @@ abstract final class ApiPaths {
   /// Merchant-owned catalog (owner scoped; creates empty store if none).
   static const foodMerchantCatalog = '/v1/food/merchant/catalog';
   static const foodMerchantStats = '/v1/food/merchant/stats';
+  static const foodMerchantStatement = '/v1/food/merchant/statement';
 
   static const foodMerchantItems = '/v1/food/merchant/items';
 
@@ -144,6 +150,20 @@ abstract final class ApiPaths {
     return '/v1/food/orders/${Uri.encodeComponent(orderId)}/$action';
   }
 
+  /// Store proposes an edit (POST) — lower quantities / remove lines.
+  static String foodOrderChanges(String orderId) {
+    return '/v1/food/orders/${Uri.encodeComponent(orderId)}/changes';
+  }
+
+  /// Customer answer, `accept` or `reject`.
+  static String foodOrderChangeAnswer(
+    String orderId,
+    String changeId,
+    String answer,
+  ) {
+    return '/v1/food/orders/${Uri.encodeComponent(orderId)}/changes/${Uri.encodeComponent(changeId)}/$answer';
+  }
+
   /// Customer cancel (backend allows PLACED only).
   static String foodOrderCancel(String orderId) {
     return '/v1/food/orders/${Uri.encodeComponent(orderId)}/cancel';
@@ -155,6 +175,8 @@ abstract final class ApiPaths {
   static const rides = '/v1/rides';
 
   static const ridesOpen = '/v1/rides/open';
+
+  static const rideVehicleClasses = '/v1/rides/vehicle-classes';
 
   static String ride(String rideId) {
     return '/v1/rides/${Uri.encodeComponent(rideId)}';
@@ -177,6 +199,22 @@ abstract final class ApiPaths {
     return '/v1/rides/${Uri.encodeComponent(rideId)}/cancel';
   }
 
+  /// Negotiation/lifecycle commands.
+  static String rideFare(String rideId) =>
+      '/v1/rides/${Uri.encodeComponent(rideId)}/fare';
+  static String rideOfferDecline(String rideId) =>
+      '/v1/rides/${Uri.encodeComponent(rideId)}/offers/decline';
+  static String rideOfferWithdraw(String rideId) =>
+      '/v1/rides/${Uri.encodeComponent(rideId)}/offers/withdraw';
+  static String rideDriverCancel(String rideId) =>
+      '/v1/rides/${Uri.encodeComponent(rideId)}/driver-cancel';
+  static String rideNoShow(String rideId) =>
+      '/v1/rides/${Uri.encodeComponent(rideId)}/no-show';
+  static String rideCustomerRating(String rideId) =>
+      '/v1/rides/${Uri.encodeComponent(rideId)}/customer-rating';
+  static String foodOrderRelease(String orderId) =>
+      '/v1/food/orders/${Uri.encodeComponent(orderId)}/release';
+
   static String rideMessages(String rideId) {
     return '/v1/rides/${Uri.encodeComponent(rideId)}/messages';
   }
@@ -193,6 +231,8 @@ abstract final class ApiPaths {
   static String rating(String subjectType, String subjectId) =>
       '/v1/ratings/$subjectType/$subjectId';
   static const driverHistory = '/v1/driver/history';
+  static const driverActiveJob = '/v1/driver/active-job';
+  static const customerActiveTrip = '/v1/customer/active-trip';
   static const driverHistorySummary = '/v1/driver/history/summary';
   static const meAddresses = '/v1/me/addresses';
 
@@ -201,11 +241,25 @@ abstract final class ApiPaths {
   static String meAccountDeletionConfirm(String id) =>
       '/v1/me/account-deletion/${Uri.encodeComponent(id)}/confirm';
   static const placesSearch = '/v1/places/search';
+  static const publicHomeBanners = '/v1/public/home-banners';
+  static const publicHomeBannerEvents = '/v1/public/home-banners/events';
   static const placesReverse = '/v1/places/reverse';
+  static const mePlaceHistory = '/v1/me/place-history';
+  static String mePlaceHistoryItem(String id) => '/v1/me/place-history/$id';
   static const ridesQuote = '/v1/rides/quote';
+
+  /// Nest road geometry (ROUTING_PROVIDER) for live remaining path / previews.
+  static const ridesRoute = '/v1/rides/route';
 
   static String rideDriver(String rideId) =>
       '/v1/rides/${Uri.encodeComponent(rideId)}/driver';
+
+  /// Customer name for the assigned driver (`GET /v1/rides/:id/customer`).
+  static String rideCustomer(String rideId) =>
+      '/v1/rides/${Uri.encodeComponent(rideId)}/customer';
+
+  static String foodOrderCustomer(String orderId) =>
+      '/v1/food/orders/${Uri.encodeComponent(orderId)}/customer';
 
   static String rideOfferDriver(String rideId, String offerId) =>
       '/v1/rides/${Uri.encodeComponent(rideId)}/offers/${Uri.encodeComponent(offerId)}/driver';
@@ -259,11 +313,24 @@ abstract final class ApiPaths {
   /// Customer food-order history (Nest GET /v1/food/orders actor-scoped).
   static const meFoodOrders = '/v1/food/orders';
 
-  static String rideVoiceSession(String rideId) {
-    return '/v1/rides/${Uri.encodeComponent(rideId)}/voice-session';
+  /// Start an in-app call with the other party of a ride (customer ↔ driver).
+  static String rideCalls(String rideId) {
+    return '/v1/rides/${Uri.encodeComponent(rideId)}/calls';
   }
 
-  static String foodOrderVoiceSession(String orderId) {
-    return '/v1/food/orders/${Uri.encodeComponent(orderId)}/voice-session';
+  /// Start an in-app call with the other party of a food order.
+  static String foodOrderCalls(String orderId) {
+    return '/v1/food/orders/${Uri.encodeComponent(orderId)}/calls';
+  }
+
+  static const callsConfig = '/v1/calls/config';
+
+  static String call(String callId) {
+    return '/v1/calls/${Uri.encodeComponent(callId)}';
+  }
+
+  /// `accept`, `decline` or `end`.
+  static String callAction(String callId, String action) {
+    return '/v1/calls/${Uri.encodeComponent(callId)}/$action';
   }
 }

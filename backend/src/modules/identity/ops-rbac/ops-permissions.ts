@@ -34,6 +34,10 @@ export const OPS_PERMISSIONS = [
   'staff.write',
   'zones.write',
   'notifications.write',
+  /** DEC-PROD-056: read decrypted ride/order chat for a stated reason (audited). */
+  'chat.review',
+  /** DEC-PROD-055: edit and publish public pages (privacy, terms, support…). */
+  'content.write',
 ] as const;
 
 export type OpsPermission = (typeof OPS_PERMISSIONS)[number];
@@ -54,7 +58,9 @@ export const OPS_ROLE_PERMISSIONS: Record<OpsStaffRoleName, readonly OpsPermissi
     'customers.write',
     'drivers.read',
     'staff.read',
+    'chat.review',
   ],
+
   OPERATIONS: [
     'orders.read',
     'orders.intervene',

@@ -7,8 +7,10 @@ import type {
   PartnerApplicationRecord,
   PartnerRepository,
   PartnerRoleName,
+  PartnerStatusEventInput,
   PartnerStatusName,
 } from './partner.repository.js';
+import { writePartnerStatusOutbox } from '../communication/outbox/outbox.write.js';
 
 type Db = NonNullable<PrismaClient>;
 
@@ -131,6 +133,10 @@ export class PrismaPartnerRepository implements PartnerRepository {
     return mapRow(row);
   }
 
+  async recordStatusEvent(input: PartnerStatusEventInput): Promise<void> {
+    await writePartnerStatusOutbox(this.db, input);
+  }
+
   async review(input: {
     id: string;
     status: Extract<PartnerStatusName, 'APPROVED' | 'REJECTED'>;
@@ -138,6 +144,7 @@ export class PrismaPartnerRepository implements PartnerRepository {
     reviewIssues: PartnerReviewIssue[];
     reviewedBy: string;
     now: Date;
+    metadata?: Record<string, unknown>;
   }): Promise<PartnerApplicationRecord | null> {
     // Conditional on SUBMITTED so concurrent approve/reject cannot both win.
     const updated = await this.db.partnerApplication.updateMany({
@@ -148,6 +155,7 @@ export class PrismaPartnerRepository implements PartnerRepository {
         reviewIssues: asInputJson(input.reviewIssues),
         reviewedBy: input.reviewedBy,
         reviewedAt: input.now,
+        ...(input.metadata ? { metadata: asInputJson(input.metadata) } : {}),
       },
     });
     if (updated.count !== 1) {

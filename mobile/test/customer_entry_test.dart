@@ -39,7 +39,10 @@ void main() {
 
     expect(find.text('Đặt xe'), findsWidgets);
     expect(find.text('Đồ ăn'), findsWidgets);
-    expect(find.text('Xe 4 chỗ'), findsOneWidget);
+    expect(find.byKey(const Key('home-service-ride')), findsOneWidget);
+    expect(find.byKey(const Key('home-service-food')), findsOneWidget);
+    expect(find.byKey(const Key('home-service-bike')), findsNothing);
+    expect(find.byKey(const Key('home-service-car')), findsNothing);
     expect(find.text('Bún Bò Huế Ô Cồ'), findsOneWidget);
     expect(find.byKey(const Key('home-store-s1')), findsOneWidget);
     // The recent card shows the latest ride from the history endpoint.
@@ -52,6 +55,6 @@ void main() {
     );
     expect(find.text('Sân bay Đà Nẵng → 123 Nguyễn Văn Linh'), findsNothing);
     expect(find.textContaining('50%'), findsNothing);
-    expect(navLabel('Trang chủ'), findsOneWidget);
+    expect(navLabel('Trang'), findsOneWidget);
   });
 }

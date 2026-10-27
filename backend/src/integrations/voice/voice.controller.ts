@@ -1,5 +1,6 @@
 import {
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Param,
@@ -22,16 +23,17 @@ import { VoiceService } from './voice.service.js';
 export class RideVoiceController {
   constructor(private readonly voice: VoiceService) {}
 
-  @Post(':rideId/voice-session')
-  @HttpCode(HttpStatus.OK)
+  @Post(':rideId/calls')
+  @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
-    summary: 'Create an audio-only in-app voice session for a ride',
+    summary:
+      'Call the other party of an active ride (customer ↔ assigned driver): rings the callee, returns the caller’s audio-only LiveKit join token',
   })
-  create(
+  start(
     @CurrentActor() actor: RequestActor,
     @Param('rideId', ParseUUIDPipe) rideId: string,
   ) {
-    return this.voice.createForRide(actor, rideId);
+    return this.voice.startForRide(actor, rideId);
   }
 }
 
@@ -42,15 +44,71 @@ export class RideVoiceController {
 export class FoodVoiceController {
   constructor(private readonly voice: VoiceService) {}
 
-  @Post(':orderId/voice-session')
-  @HttpCode(HttpStatus.OK)
+  @Post(':orderId/calls')
+  @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
-    summary: 'Create an audio-only in-app voice session for a food order',
+    summary:
+      'Call the other party of an active food order (customer ↔ assigned driver): rings the callee, returns the caller’s audio-only LiveKit join token',
   })
-  create(
+  start(
     @CurrentActor() actor: RequestActor,
     @Param('orderId', ParseUUIDPipe) orderId: string,
   ) {
-    return this.voice.createForFood(actor, orderId);
+    return this.voice.startForFood(actor, orderId);
+  }
+}
+
+@ApiTags('voice')
+@ApiBearerAuth()
+@Controller('v1/calls')
+@UseGuards(CustomerSessionGuard)
+export class VoiceCallController {
+  constructor(private readonly voice: VoiceService) {}
+
+  @Get('config')
+  @ApiOperation({ summary: 'Whether in-app calls are available (admin toggle and provider configured)' })
+  config() {
+    return this.voice.callConfig();
+  }
+
+  @Get(':callId')
+  @ApiOperation({ summary: 'Current state of a call (caller or callee only)' })
+  get(
+    @CurrentActor() actor: RequestActor,
+    @Param('callId', ParseUUIDPipe) callId: string,
+  ) {
+    return this.voice.get(actor, callId);
+  }
+
+  @Post(':callId/accept')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Answer a ringing call (callee only); returns the callee’s join token' })
+  accept(
+    @CurrentActor() actor: RequestActor,
+    @Param('callId', ParseUUIDPipe) callId: string,
+  ) {
+    return this.voice.accept(actor, callId);
+  }
+
+  @Post(':callId/decline')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Decline a ringing call (callee only)' })
+  decline(
+    @CurrentActor() actor: RequestActor,
+    @Param('callId', ParseUUIDPipe) callId: string,
+  ) {
+    return this.voice.decline(actor, callId);
+  }
+
+  @Post(':callId/end')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Hang up: cancelling while it rings records a missed call; a connected call ends',
+  })
+  end(
+    @CurrentActor() actor: RequestActor,
+    @Param('callId', ParseUUIDPipe) callId: string,
+  ) {
+    return this.voice.end(actor, callId);
   }
 }

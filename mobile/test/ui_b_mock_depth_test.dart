@@ -1,4 +1,8 @@
 import 'package:dealgo/features/pricing/data/pricing_remote_datasource.dart';
+
+import 'support/fake_location.dart';
+
+import 'package:dealgo/features/places/domain/place.dart';
 import 'package:dealgo/features/places/data/places_remote_datasource.dart';
 import 'package:dealgo/features/food/domain/entities/food_models.dart';
 import 'package:dealgo/features/identity/domain/entities/user_profile.dart';
@@ -31,39 +35,45 @@ const _merchantProfile = UserProfile(
 
 void main() {
   test('ride short reference is the tail of the real id', () {
-    expect(rideShortRef('3f9a1c2e-0000-4000-8000-00000abc1234'), '#BC1234');
+    expect(rideShortRef('3f9a1c2e-0000-4000-8000-00000abc1234'), '#1234');
     expect(rideShortRef(''), '#—');
   });
 
-  testWidgets('vehicle picker appears before fare', (tester) async {
+  testWidgets('unified Đặt xe opens class+offer after A/B', (tester) async {
     await tester.binding.setSurfaceSize(const Size(400, 1800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final rides = FakeRideClient();
+    const airport = PlaceOption(
+      name: 'Sân bay Quốc tế Đà Nẵng',
+      address: 'Nguyễn Văn Linh, Hải Châu, Đà Nẵng',
+      lat: 16.0439,
+      lng: 108.1994,
+      source: PlaceSource.recent,
+    );
     await pumpSignedIn(
       tester,
       profile: customerProfile,
       rideClient: rides,
-      places: FakePlacesRemoteDataSource(
-        recent: FakePlacesRemoteDataSource.sampleRecent,
-      ),
+      locationOverride: FakeLocationService(),
+      places: FakePlacesRemoteDataSource(recent: [airport]),
+      pricing: FakePricingRemoteDataSource(fixedReferenceVnd: 42000),
     );
 
-    await tester.tap(find.text('Đặt xe').hitTestable().first);
+    // One Ride entry — class chosen on the merged fare screen.
+    await tester.tap(find.byKey(const Key('home-service-ride')));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const Key('ride-suggestion-0')));
-    await tester.tap(find.byKey(const Key('ride-suggestion-0')));
-    await tester.pump();
+    expect(find.text('Bạn muốn đi đâu?'), findsOneWidget);
+    await tester.tap(find.text(airport.name));
+    await tester.pumpAndSettle();
+    // Map confirm sheet then class+fare (skip overview only).
+    expect(find.byKey(const Key('ride-open-route-overview')), findsOneWidget);
     await tester.tap(find.byKey(const Key('ride-open-route-overview')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('ride-open-vehicle')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Chọn loại xe'), findsOneWidget);
-    // Only motorbike rides are dispatched; no unsupported car classes.
+    expect(find.text('Đề xuất của bạn'), findsOneWidget);
     expect(find.text('Xe máy'), findsWidgets);
-    expect(find.text('Xe 4 chỗ'), findsNothing);
-    expect(find.text('Xe 7 chỗ'), findsNothing);
-    expect(find.text('Tự đề xuất giá chuyến'), findsNothing);
+    expect(find.text('Xe 4 chỗ'), findsWidgets);
+    expect(find.text('Xe 7 chỗ'), findsWidgets);
+    expect(find.byKey(const Key('ride-submit-fare')), findsOneWidget);
   });
 
   testWidgets('driver notifications use driver copy', (tester) async {
@@ -158,7 +168,7 @@ void main() {
       foodClient: food,
       pricing: FakePricingRemoteDataSource(deliveryFareVnd: 25000),
     );
-    await tester.tap(navLabel('Mua hàng'));
+    await tester.tap(navLabel('Mua'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('food-store-card-store-bun-bo')));
     await tester.pumpAndSettle();
@@ -172,8 +182,6 @@ void main() {
     await tester.tap(find.text('Xem giỏ hàng'));
     await tester.pumpAndSettle();
     await chooseDeliveryAddress(tester);
-    await tester.tap(find.text('Tiếp tục thanh toán'));
-    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('food-place-order')));
     await tester.pumpAndSettle();
 

@@ -37,4 +37,12 @@ abstract interface class DriverCardRepository {
     required String jobId,
     String? offerId,
   });
+
+  /// Customer's profile name for the assigned driver ('' when unset).
+  /// Throws `ApiException` (404 for anyone but the assigned driver).
+  Future<String> fetchCustomerName({
+    required String accessToken,
+    required String jobId,
+    bool isFood = false,
+  });
 }

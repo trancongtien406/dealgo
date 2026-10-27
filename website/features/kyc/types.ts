@@ -19,6 +19,10 @@ export type KycCase = {
   vehicleKind: string;
   vehicle: string;
   plate: string;
+  /** DRIVER only: MOTORBIKE | CAR_4 | CAR_7 from the application (DEC-PROD-048). */
+  vehicleClassCode: string | null;
+  /** Submitted while the admin KYC/KYB switch was OFF (DEC-PROD-048). */
+  documentsWaived: boolean;
   status: KycStatus;
   activity: string;
   activated: boolean;

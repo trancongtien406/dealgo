@@ -208,18 +208,14 @@ List<FoodStoreSummary> _popularThisWeek(
   final rated = [
     for (final store in stores)
       if (ratings[store.id]?.average != null) store,
-  ]..sort(
-    (a, b) => ratings[b.id]!.average!.compareTo(ratings[a.id]!.average!),
-  );
+  ]..sort((a, b) => ratings[b.id]!.average!.compareTo(ratings[a.id]!.average!));
   final shown = stores.take(2).map((store) => store.id).toSet();
   final ranked = rated.isNotEmpty ? rated : stores.skip(2);
   final fresh = [
     for (final store in ranked)
       if (!shown.contains(store.id)) store,
   ];
-  final picks = fresh.isNotEmpty
-      ? fresh
-      : (rated.isNotEmpty ? rated : stores);
+  final picks = fresh.isNotEmpty ? fresh : (rated.isNotEmpty ? rated : stores);
   return picks.take(3).toList(growable: false);
 }
 
@@ -283,9 +279,7 @@ class _LocationChip extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return Material(
       color: DealGoColors.card,
-      shape: const StadiumBorder(
-        side: BorderSide(color: DealGoColors.border),
-      ),
+      shape: const StadiumBorder(side: BorderSide(color: DealGoColors.border)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _pick(context),

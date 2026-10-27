@@ -1,6 +1,10 @@
 import { Prisma } from '../../../generated/prisma/client.js';
 
-export type OutboxAggregateType = 'Ride' | 'FoodOrder' | 'NotificationCampaign';
+export type OutboxAggregateType =
+  | 'Ride'
+  | 'FoodOrder'
+  | 'NotificationCampaign'
+  | 'PartnerApplication';
 
 export type StatusOutboxAggregateType = 'Ride' | 'FoodOrder';
 
@@ -9,7 +13,16 @@ export type OutboxWriteInput = {
   aggregateId: string;
   status: string;
   payload?: Record<string, unknown>;
+  /**
+   * Appended to the event key. A ride can be ASSIGNED again after a timeout/drop, so the
+   * pre-trip statuses carry the driver + moment; otherwise the second "Khách đã chọn bạn"
+   * would collide with the first key and be skipped.
+   */
+  eventKeySuffix?: string;
 };
+
+/** eventType of the row telling a dropped driver (and the customer) a ride went back to offers. */
+export const RIDE_UNASSIGNED_EVENT = 'Ride.driver.unassigned';
 
 const RIDE_OUTBOX_STATUSES = new Set([
   'ASSIGNED',
@@ -88,7 +101,8 @@ export async function writeStatusOutbox(
     return 'skipped';
   }
 
-  const eventKey = outboxEventKey(input.aggregateType, input.aggregateId, input.status);
+  const baseKey = outboxEventKey(input.aggregateType, input.aggregateId, input.status);
+  const eventKey = input.eventKeySuffix ? `${baseKey}:${input.eventKeySuffix}` : baseKey;
   const eventType = outboxEventType(input.aggregateType, input.status);
   const result = await tx.outboxMessage.createMany({
     data: [
@@ -172,6 +186,119 @@ export async function writeCampaignSendOutbox(
           body: input.body,
           audience: input.audience,
           channels: input.channels,
+        } as Prisma.InputJsonValue,
+      },
+    ],
+    skipDuplicates: true,
+  });
+  return result.count === 1 ? 'written' : 'duplicate';
+}
+
+export type PartnerStatusOutboxInput = {
+  applicationId: string;
+  userId: string;
+  role: string;
+  status: 'APPROVED' | 'REJECTED';
+  reviewedAt: Date;
+};
+
+/**
+ * Partner decision event for the applicant's `user:` room. eventKey includes reviewedAt
+ * because a rejected application can be resubmitted and reviewed again.
+ */
+export async function writePartnerStatusOutbox(
+  tx: OutboxTx,
+  input: PartnerStatusOutboxInput,
+): Promise<'written' | 'duplicate'> {
+  const eventKey = `PartnerApplication:${input.applicationId}:status:${input.status}:${input.reviewedAt.getTime()}`;
+  const result = await tx.outboxMessage.createMany({
+    data: [
+      {
+        eventKey,
+        aggregateType: 'PartnerApplication',
+        aggregateId: input.applicationId,
+        eventType: `PartnerApplication.status.${input.status}`,
+        payload: {
+          status: input.status,
+          userId: input.userId,
+          role: input.role,
+        } as Prisma.InputJsonValue,
+      },
+    ],
+    skipDuplicates: true,
+  });
+  return result.count === 1 ? 'written' : 'duplicate';
+}
+
+/** Merchant edit of a food order (PENDING → customer, ACCEPTED → store). */
+export const FOOD_CHANGE_EVENT_PREFIX = 'FoodOrder.change.';
+
+export type FoodChangeOutboxInput = {
+  orderId: string;
+  changeId: string;
+  changeStatus: 'PENDING' | 'ACCEPTED';
+  /** Current order status (snapshot consumers need it). */
+  status: string;
+  storeId: string;
+  expiresAt?: string;
+};
+
+export async function writeFoodChangeOutbox(
+  tx: OutboxTx,
+  input: FoodChangeOutboxInput,
+): Promise<'written' | 'duplicate'> {
+  const result = await tx.outboxMessage.createMany({
+    data: [
+      {
+        eventKey: `FoodOrder:${input.orderId}:change:${input.changeId}:${input.changeStatus}`,
+        aggregateType: 'FoodOrder',
+        aggregateId: input.orderId,
+        eventType: `${FOOD_CHANGE_EVENT_PREFIX}${input.changeStatus}`,
+        payload: {
+          status: input.status,
+          storeId: input.storeId,
+          changeId: input.changeId,
+          changeStatus: input.changeStatus,
+          ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
+        } as Prisma.InputJsonValue,
+      },
+    ],
+    skipDuplicates: true,
+  });
+  return result.count === 1 ? 'written' : 'duplicate';
+}
+
+export type RideUnassignedOutboxInput = {
+  rideId: string;
+  driverId: string;
+  actor: string;
+  reasonCode: string;
+  fromStatus: string;
+  at: Date;
+};
+
+/**
+ * The assigned driver lost the ride (start/approach timeout, own drop, ops reassign). One row per
+ * drop: the relay pushes + socket-hints the dropped driver (their app clears the job) and tells
+ * the customer the ride is open for offers again.
+ */
+export async function writeRideUnassignedOutbox(
+  tx: OutboxTx,
+  input: RideUnassignedOutboxInput,
+): Promise<'written' | 'duplicate'> {
+  const result = await tx.outboxMessage.createMany({
+    data: [
+      {
+        eventKey: `Ride:${input.rideId}:unassigned:${input.driverId}:${input.at.getTime()}`,
+        aggregateType: 'Ride',
+        aggregateId: input.rideId,
+        eventType: RIDE_UNASSIGNED_EVENT,
+        payload: {
+          status: 'NEGOTIATING',
+          droppedDriverId: input.driverId,
+          actor: input.actor,
+          reasonCode: input.reasonCode,
+          fromStatus: input.fromStatus,
         } as Prisma.InputJsonValue,
       },
     ],

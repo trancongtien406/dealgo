@@ -42,7 +42,8 @@ export class CatalogOpsController {
 
   @Get('moderation')
   @ApiOperation({
-    summary: 'Ops catalog moderation queue with server filters & pagination',
+    summary:
+      'Ops catalog moderation queue with server filters & pagination; optional from/to (inclusive Vietnam business days on item submission time)',
   })
   list(@Query() query: CatalogModerationQueryDto) {
     return this.catalog.listModeration(query);

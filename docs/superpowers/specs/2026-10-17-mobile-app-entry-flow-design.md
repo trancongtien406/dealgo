@@ -1,5 +1,7 @@
 # DealGo Mobile App Entry & Onboarding Flow Specification (S001–S007)
 
+> **Trạng thái trong code:** đã có Splash `/splash` là màn khởi đầu và màn hồ sơ `profile_setup_page.dart`; màn cho phép truy cập S006 (`/onboarding/permissions`) mới có hằng route, chưa có trang. Mục "Hiện trạng" bên dưới mô tả bối cảnh lúc viết (2026-10-17).
+
 > **Mục tiêu:** Căn chỉnh và hoàn thiện toàn bộ luồng khởi động, xác thực và nhập môn của ứng dụng Flutter DealGo theo bộ thiết kế mockup mới nhất (`design/mockups/new/S001.png` đến `S007.png`).
 
 ---

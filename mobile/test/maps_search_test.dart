@@ -99,6 +99,11 @@ void main() {
     );
     await tester.pumpWidget(
       MaterialApp(
+        // Reduced-motion → static glow so pumpAndSettle stays deterministic.
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(disableAnimations: true),
+          child: child!,
+        ),
         home: SizedBox(
           width: 360,
           height: 400,
@@ -108,6 +113,11 @@ void main() {
               MapLatLng(lat: 16.0544, lng: 108.2022),
               MapLatLng(lat: 16.0678, lng: 108.2208),
             ],
+            route: const [
+              MapLatLng(lat: 16.0544, lng: 108.2022),
+              MapLatLng(lat: 16.0678, lng: 108.2208),
+            ],
+            pulseRoute: true,
           ),
         ),
       ),
@@ -116,9 +126,40 @@ void main() {
     expect(find.byKey(const Key('map-live')), findsOneWidget);
     expect(find.byKey(const Key('map-live-marker-0')), findsOneWidget);
     expect(find.byKey(const Key('map-live-marker-1')), findsOneWidget);
+    expect(find.byKey(const Key('map-live-route')), findsOneWidget);
     expect(find.text('© Tile provider'), findsOneWidget);
     expect(tiles.requests, greaterThan(0));
   });
+
+  testWidgets(
+    'TileMapPort pulseRoute paints glow (animated on device; static under FLUTTER_TEST)',
+    (tester) async {
+      final port = TileMapPort(
+        urlTemplate: 'https://t.example.com/{z}/{x}/{y}.png',
+        tileProvider: _MemoryTiles(),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SizedBox(
+            width: 360,
+            height: 400,
+            child: port.buildMap(
+              center: danangViewportCenter,
+              route: const [
+                MapLatLng(lat: 16.0544, lng: 108.2022),
+                MapLatLng(lat: 16.0678, lng: 108.2208),
+              ],
+              pulseRoute: true,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.byKey(const Key('map-live-route')), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.byKey(const Key('map-live-route')), findsOneWidget);
+    },
+  );
 
   testWidgets('TileMapPort draws the live driver marker (DEC-PROD-031)', (
     tester,
@@ -158,7 +199,7 @@ void main() {
     await tester.tap(find.byKey(const Key('home-search-food')));
     await tester.pumpAndSettle();
 
-    final field = tester.widget<TextField>(
+    final field = tester.widget<TextFormField>(
       find.byKey(const Key('food-search-field')),
     );
     expect(field.controller?.text, 'bún bò');

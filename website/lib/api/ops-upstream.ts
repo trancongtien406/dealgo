@@ -11,7 +11,7 @@ export type OpsUpstreamResult =
   | { ok: false; status: number; message: string; errorCode?: string };
 
 type OpsUpstreamInit = {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   path: string;
   body?: unknown;
   searchParams?: Record<string, string | number | undefined>;

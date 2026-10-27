@@ -21,6 +21,7 @@ export class MerchantOpsController {
       region: query.region,
       category: query.category,
       kyb: query.kyb,
+      location: query.location,
     });
   }
 

@@ -1,0 +1,20 @@
+# systemd unit: starts the stack at boot. Install:
+#   sudo cp livekit-docker.service /etc/systemd/system/ && sudo systemctl daemon-reload
+#   sudo systemctl enable --now livekit-docker
+# Assumes the kit lives in /opt/livekit. Use systemctl (not docker compose down) to stop it.
+[Unit]
+Description=LiveKit (docker compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/livekit
+ExecStart=/usr/bin/docker compose up -d --remove-orphans
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

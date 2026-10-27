@@ -21,7 +21,8 @@ import {
   sumStatuses,
   type StatusCountRow,
 } from './ops-overview.aggregates.js';
-import { startOfTodayHoChiMinh, todayTimezoneLabel } from './ops-overview.day.js';
+import { hoChiMinhDayKey, startOfTodayHoChiMinh, todayTimezoneLabel } from './ops-overview.day.js';
+import { loadPeriodDays } from './ops-reports.service.js';
 import {
   EMPTY_MONITOR_PANELS,
   EMPTY_OVERVIEW_PANELS,
@@ -62,9 +63,13 @@ export type OpsOverviewSummary = {
   driversOnline: number;
   storesTotal: number;
   exceptionsOpen: number;
-  /** Explicitly unavailable — no ledger aggregate for ops KPIs yet. */
-  revenueVnd: null;
-  commissionVnd: null;
+  /**
+   * Today's gross booking value (Asia/Ho_Chi_Minh day): agreed fares of completed rides plus
+   * subtotal + delivery fare of delivered food orders. Null only when the money query failed.
+   */
+  revenueVnd: number | null;
+  /** Today's platform commission: driver fees (job_earnings) + merchant commission. */
+  commissionVnd: number | null;
   todayTimezone: ReturnType<typeof todayTimezoneLabel>;
   generatedAt: string;
 } & OpsOverviewPanels;
@@ -98,8 +103,8 @@ const EMPTY_OVERVIEW: Omit<
   driversOnline: 0,
   storesTotal: 0,
   exceptionsOpen: 0,
-  revenueVnd: null,
-  commissionVnd: null,
+  revenueVnd: 0,
+  commissionVnd: 0,
 };
 
 type QueryClient = PrismaClient | Prisma.TransactionClient;
@@ -217,6 +222,25 @@ export class OpsOverviewService implements OnModuleInit {
     return this.overviewInFlight;
   }
 
+  /** Today's revenue / commission; a failure leaves both null instead of failing the overview. */
+  private async safeTodayMoney(
+    db: QueryClient,
+    dayStart: Date,
+    now: Date,
+  ): Promise<{ revenueVnd: number; commissionVnd: number } | null> {
+    try {
+      const { totals } = await loadPeriodDays(db, {
+        start: dayStart,
+        end: new Date(dayStart.getTime() + 86_400_000),
+        days: [hoChiMinhDayKey(now)],
+      });
+      return { revenueVnd: totals.revenueVnd, commissionVnd: totals.commissionVnd };
+    } catch (error) {
+      this.logger.warn(`overview.money unavailable: ${String(error)}`);
+      return null;
+    }
+  }
+
   private async loadOverview(now: Date): Promise<OpsOverviewSummary> {
     const generatedAt = now.toISOString();
     const todayTimezone = todayTimezoneLabel();
@@ -311,6 +335,7 @@ export class OpsOverviewService implements OnModuleInit {
         this.exceptions.countOpen(now),
       ]);
 
+      const money = await this.safeTodayMoney(db, dayStart, now);
       const panels = await this.safeOverviewPanels(db, now);
       // Refresh dense hourly scan after the response path — never contend for pool.
       this.scheduleHourlyTrendRefresh(db, hoursAgoUtc(now, 24), now);
@@ -335,8 +360,8 @@ export class OpsOverviewService implements OnModuleInit {
         driversOnline: Number(dir?.online ?? 0n),
         storesTotal: Number(dir?.stores ?? 0n),
         exceptionsOpen,
-        revenueVnd: null,
-        commissionVnd: null,
+        revenueVnd: money?.revenueVnd ?? null,
+        commissionVnd: money?.commissionVnd ?? null,
         todayTimezone,
         generatedAt,
         ...panels,
@@ -833,7 +858,7 @@ export class OpsOverviewService implements OnModuleInit {
       `
       SELECT
         to_char(
-          date_trunc('hour', "createdAt" AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+          date_trunc('hour', ("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Ho_Chi_Minh'),
           'YYYY-MM-DD"T"HH24:00'
         ) || '+07:00' AS "hourKey",
         COUNT(*)::bigint AS cnt
@@ -856,7 +881,7 @@ export class OpsOverviewService implements OnModuleInit {
       `
       SELECT
         to_char(
-          date_trunc('hour', "createdAt" AT TIME ZONE 'Asia/Ho_Chi_Minh'),
+          date_trunc('hour', ("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Ho_Chi_Minh'),
           'YYYY-MM-DD"T"HH24:00'
         ) || '+07:00' AS "hourKey",
         COUNT(*)::bigint AS cnt

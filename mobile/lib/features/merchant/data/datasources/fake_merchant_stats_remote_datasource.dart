@@ -2,9 +2,17 @@ import '../../domain/merchant_stats.dart';
 
 /// Empty stats for tests and offline mock mode (no invented sales figures).
 class FakeMerchantStatsRemoteDataSource implements MerchantStatsRepository {
-  FakeMerchantStatsRemoteDataSource({this.result, this.error});
+  FakeMerchantStatsRemoteDataSource({
+    this.result,
+    this.error,
+    this.statementResult,
+    this.statementError,
+  });
 
   MerchantStats? result;
+  MerchantStatement? statementResult;
+  Object? statementError;
+  final statementCalls = <(String?, String?)>[];
   Object? error;
   final calls = <int>[];
 
@@ -19,6 +27,32 @@ class FakeMerchantStatsRemoteDataSource implements MerchantStatsRepository {
       throw failure;
     }
     return result ?? empty(days, DateTime.now());
+  }
+
+  @override
+  Future<MerchantStatement> statement({
+    required String accessToken,
+    String? from,
+    String? to,
+  }) async {
+    statementCalls.add((from, to));
+    final failure = statementError;
+    if (failure != null) {
+      throw failure;
+    }
+    return statementResult ??
+        MerchantStatement(
+          from: from ?? '',
+          to: to ?? '',
+          commissionPercentNow: 0,
+          orderCount: 0,
+          cashReceivedVnd: 0,
+          commissionVnd: 0,
+          netVnd: 0,
+          unsettledCommissionVnd: 0,
+          settlements: const [],
+          settlementCycleDays: 7,
+        );
   }
 
   static MerchantStats empty(int days, DateTime now) {

@@ -122,12 +122,6 @@ abstract class AppLocalizations {
   /// **'See all'**
   String get actionSeeAll;
 
-  /// No description provided for @actionExplore.
-  ///
-  /// In en, this message translates to:
-  /// **'Explore now'**
-  String get actionExplore;
-
   /// No description provided for @actionBookRideNow.
   ///
   /// In en, this message translates to:
@@ -530,23 +524,149 @@ abstract class AppLocalizations {
   /// **'Voice call'**
   String get voiceCall;
 
-  /// No description provided for @voiceTitle.
+  /// No description provided for @voiceCalling.
   ///
   /// In en, this message translates to:
-  /// **'In-trip voice call'**
-  String get voiceTitle;
+  /// **'Calling…'**
+  String get voiceCalling;
 
-  /// No description provided for @voiceRoomLabel.
+  /// No description provided for @voiceConnecting.
   ///
   /// In en, this message translates to:
-  /// **'Room'**
-  String get voiceRoomLabel;
+  /// **'Connecting…'**
+  String get voiceConnecting;
 
-  /// No description provided for @voiceStubHint.
+  /// No description provided for @voiceIncoming.
   ///
   /// In en, this message translates to:
-  /// **'In-app calling is coming soon.'**
-  String get voiceStubHint;
+  /// **'Incoming call'**
+  String get voiceIncoming;
+
+  /// No description provided for @voiceReconnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Weak signal, reconnecting…'**
+  String get voiceReconnecting;
+
+  /// No description provided for @voicePeerCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get voicePeerCustomer;
+
+  /// No description provided for @voicePeerDriver.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver'**
+  String get voicePeerDriver;
+
+  /// No description provided for @voiceAccept.
+  ///
+  /// In en, this message translates to:
+  /// **'Answer'**
+  String get voiceAccept;
+
+  /// No description provided for @voiceDecline.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline'**
+  String get voiceDecline;
+
+  /// No description provided for @voiceHangUp.
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get voiceHangUp;
+
+  /// No description provided for @voiceMute.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute'**
+  String get voiceMute;
+
+  /// No description provided for @voiceUnmute.
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute'**
+  String get voiceUnmute;
+
+  /// No description provided for @voiceSpeaker.
+  ///
+  /// In en, this message translates to:
+  /// **'Speaker'**
+  String get voiceSpeaker;
+
+  /// No description provided for @voiceEndedHungUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Call ended'**
+  String get voiceEndedHungUp;
+
+  /// No description provided for @voiceEndedDeclined.
+  ///
+  /// In en, this message translates to:
+  /// **'Call declined'**
+  String get voiceEndedDeclined;
+
+  /// No description provided for @voiceEndedNoAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'No answer'**
+  String get voiceEndedNoAnswer;
+
+  /// No description provided for @voiceEndedMissed.
+  ///
+  /// In en, this message translates to:
+  /// **'Missed call'**
+  String get voiceEndedMissed;
+
+  /// No description provided for @voiceEndedTripClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'The trip has ended, so the call stopped'**
+  String get voiceEndedTripClosed;
+
+  /// No description provided for @voiceEndedConnectionLost.
+  ///
+  /// In en, this message translates to:
+  /// **'Call connection lost'**
+  String get voiceEndedConnectionLost;
+
+  /// No description provided for @voiceMicDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone access is needed for calls. Turn it on in Settings.'**
+  String get voiceMicDenied;
+
+  /// No description provided for @apiErrVoiceDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'In-app calling is turned off right now.'**
+  String get apiErrVoiceDisabled;
+
+  /// No description provided for @apiErrVoiceUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Calling isn\'t available right now. Please use chat.'**
+  String get apiErrVoiceUnavailable;
+
+  /// No description provided for @apiErrVoiceBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'There is already a call for this trip.'**
+  String get apiErrVoiceBusy;
+
+  /// No description provided for @apiErrVoiceNoCounterpart.
+  ///
+  /// In en, this message translates to:
+  /// **'No driver has taken this trip yet.'**
+  String get apiErrVoiceNoCounterpart;
+
+  /// No description provided for @apiErrVoiceWindowClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Calls are only available while the trip is in progress.'**
+  String get apiErrVoiceWindowClosed;
 
   /// No description provided for @bannerOfflineTitle.
   ///
@@ -995,7 +1115,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverServicesRideTitle.
   ///
   /// In en, this message translates to:
-  /// **'Passenger rides (motorbike)'**
+  /// **'Passenger rides (bike & car)'**
   String get driverServicesRideTitle;
 
   /// No description provided for @driverServicesRideBody.
@@ -1097,7 +1217,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverOtpValidFor.
   ///
   /// In en, this message translates to:
-  /// **'OTP is valid only for trip #{rideId}'**
+  /// **'OTP is valid only for trip {rideId}'**
   String driverOtpValidFor(String rideId);
 
   /// No description provided for @driverOtpWaitingHint.
@@ -1139,7 +1259,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverActiveNavTitle.
   ///
   /// In en, this message translates to:
-  /// **'Navigate to pickup'**
+  /// **'Heading to pickup'**
   String get driverActiveNavTitle;
 
   /// No description provided for @driverActiveArrivedTitle.
@@ -1205,7 +1325,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverFoodPhaseNavTitle.
   ///
   /// In en, this message translates to:
-  /// **'Navigate to store'**
+  /// **'Heading to store'**
   String get driverFoodPhaseNavTitle;
 
   /// No description provided for @driverFoodPhaseWaitTitle.
@@ -1295,7 +1415,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverFoodCodCollect.
   ///
   /// In en, this message translates to:
-  /// **'COD to collect on delivery'**
+  /// **'Collect (COD)'**
   String get driverFoodCodCollect;
 
   /// No description provided for @merchantRejectOrder.
@@ -1625,7 +1745,7 @@ abstract class AppLocalizations {
   /// No description provided for @rideRoutePriceHint.
   ///
   /// In en, this message translates to:
-  /// **'Official price appears when you choose a vehicle.'**
+  /// **'Suggested fares depend on vehicle class; you propose your offer next.'**
   String get rideRoutePriceHint;
 
   /// No description provided for @rideRouteContinueVehicle.
@@ -1633,6 +1753,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Continue to vehicles'**
   String get rideRouteContinueVehicle;
+
+  /// No description provided for @rideRouteContinueBooking.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose vehicle & offer'**
+  String get rideRouteContinueBooking;
 
   /// No description provided for @rideFareBreakdownTitle.
   ///
@@ -1823,7 +1949,7 @@ abstract class AppLocalizations {
   /// No description provided for @foodInvoiceDeliveredChip.
   ///
   /// In en, this message translates to:
-  /// **'DELIVERED'**
+  /// **'Delivered'**
   String get foodInvoiceDeliveredChip;
 
   /// No description provided for @foodInvoiceStore.
@@ -1904,6 +2030,36 @@ abstract class AppLocalizations {
   /// **'Rate order'**
   String get foodInvoiceRateCta;
 
+  /// No description provided for @foodInvoiceTrackCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Track order'**
+  String get foodInvoiceTrackCta;
+
+  /// No description provided for @foodInvoiceItemsTitleOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Items'**
+  String get foodInvoiceItemsTitleOpen;
+
+  /// No description provided for @foodInvoiceCodDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Total due'**
+  String get foodInvoiceCodDue;
+
+  /// No description provided for @checkoutEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Add items before checking out.'**
+  String get checkoutEmptyBody;
+
+  /// No description provided for @checkoutBackToMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to menu'**
+  String get checkoutBackToMenu;
+
   /// No description provided for @foodTrackingStatusTitle.
   ///
   /// In en, this message translates to:
@@ -1915,6 +2071,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Order is being delivered'**
   String get foodTrackingMapChip;
+
+  /// No description provided for @foodTrackingMapWaitingDriver.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for driver location'**
+  String get foodTrackingMapWaitingDriver;
+
+  /// No description provided for @foodTrackingMapEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Dropoff is ready. Store coordinates are not on the map yet.'**
+  String get foodTrackingMapEmptyHint;
 
   /// No description provided for @foodTrackingDriverTitle.
   ///
@@ -2291,8 +2459,32 @@ abstract class AppLocalizations {
   /// No description provided for @serviceRideBlurb.
   ///
   /// In en, this message translates to:
-  /// **'Go anywhere\nsafe and easy'**
+  /// **'Bike · Car · Bid your fare'**
   String get serviceRideBlurb;
+
+  /// No description provided for @homeServiceBikeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Motorbike'**
+  String get homeServiceBikeTitle;
+
+  /// No description provided for @homeServiceBikeBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick · 1 passenger'**
+  String get homeServiceBikeBlurb;
+
+  /// No description provided for @homeServiceCarTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Car'**
+  String get homeServiceCarTitle;
+
+  /// No description provided for @homeServiceCarBlurb.
+  ///
+  /// In en, this message translates to:
+  /// **'4 & 7 seats'**
+  String get homeServiceCarBlurb;
 
   /// No description provided for @serviceFoodTitle.
   ///
@@ -2969,13 +3161,13 @@ abstract class AppLocalizations {
   /// No description provided for @driverHeadToPickup.
   ///
   /// In en, this message translates to:
-  /// **'Head to pickup'**
+  /// **'Pickup point'**
   String get driverHeadToPickup;
 
   /// No description provided for @driverFollowRoute.
   ///
   /// In en, this message translates to:
-  /// **'Follow the route to the destination'**
+  /// **'Drop-off point'**
   String get driverFollowRoute;
 
   /// No description provided for @driverPassenger.
@@ -4547,7 +4739,7 @@ abstract class AppLocalizations {
   /// No description provided for @drvHistGrossLine.
   ///
   /// In en, this message translates to:
-  /// **'Gross fares {gross} · Platform fee −{fee}'**
+  /// **'Gross fares {gross} · DealGo commission −{fee}'**
   String drvHistGrossLine(String gross, String fee);
 
   /// No description provided for @drvHistNetNote.
@@ -4559,8 +4751,14 @@ abstract class AppLocalizations {
   /// No description provided for @drvHistItemFee.
   ///
   /// In en, this message translates to:
-  /// **'Fee {percent}% −{fee}'**
+  /// **'Commission {percent}% −{fee}'**
   String drvHistItemFee(String percent, String fee);
+
+  /// No description provided for @drvHistItemFeeFood.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission {percent}% of delivery fee −{fee}'**
+  String drvHistItemFeeFood(String percent, String fee);
 
   /// No description provided for @rateDeadline.
   ///
@@ -4688,6 +4886,54 @@ abstract class AppLocalizations {
   /// **'Search for a place or use your current location to start.'**
   String get placeNothingYet;
 
+  /// No description provided for @placeHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent'**
+  String get placeHistoryTitle;
+
+  /// No description provided for @placeHistoryClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get placeHistoryClear;
+
+  /// No description provided for @placeHistoryDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from history'**
+  String get placeHistoryDelete;
+
+  /// No description provided for @placeHistoryClearTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search history?'**
+  String get placeHistoryClearTitle;
+
+  /// No description provided for @placeHistoryClearBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Places you picked will be removed on all your devices.'**
+  String get placeHistoryClearBody;
+
+  /// No description provided for @placeHistoryClearConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear history'**
+  String get placeHistoryClearConfirm;
+
+  /// No description provided for @placeApproximate.
+  ///
+  /// In en, this message translates to:
+  /// **'Approximate house number · check the pin'**
+  String get placeApproximate;
+
+  /// No description provided for @placeDistanceKm.
+  ///
+  /// In en, this message translates to:
+  /// **'{km} km'**
+  String placeDistanceKm(String km);
+
   /// No description provided for @rideBookTitle.
   ///
   /// In en, this message translates to:
@@ -4808,6 +5054,42 @@ abstract class AppLocalizations {
   /// **'Motorbike'**
   String get rideVehicleBikeTitle;
 
+  /// No description provided for @rideVehicleCar4Title.
+  ///
+  /// In en, this message translates to:
+  /// **'4-seat car'**
+  String get rideVehicleCar4Title;
+
+  /// No description provided for @rideVehicleCar7Title.
+  ///
+  /// In en, this message translates to:
+  /// **'7-seat car'**
+  String get rideVehicleCar7Title;
+
+  /// No description provided for @rideVehicleSeats.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} seats'**
+  String rideVehicleSeats(int count);
+
+  /// No description provided for @rideFareOpening.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening fare'**
+  String get rideFareOpening;
+
+  /// No description provided for @rideFarePerKm.
+  ///
+  /// In en, this message translates to:
+  /// **'Per kilometre'**
+  String get rideFarePerKm;
+
+  /// No description provided for @rideFareTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Time ({minutes} min)'**
+  String rideFareTime(int minutes);
+
   /// No description provided for @rideVehicleBikeSubtitle.
   ///
   /// In en, this message translates to:
@@ -4838,6 +5120,18 @@ abstract class AppLocalizations {
   /// **'View fare details'**
   String get rideVehicleContinue;
 
+  /// No description provided for @rideVehicleContinueToOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Propose your fare'**
+  String get rideVehicleContinueToOffer;
+
+  /// No description provided for @rideVehicleClassesUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No vehicle classes are available right now. Pull to refresh or try again shortly.'**
+  String get rideVehicleClassesUnavailable;
+
   /// No description provided for @homeQuickBookTitle.
   ///
   /// In en, this message translates to:
@@ -4853,7 +5147,7 @@ abstract class AppLocalizations {
   /// No description provided for @homeQuickBookVehicle.
   ///
   /// In en, this message translates to:
-  /// **'4-seater'**
+  /// **'Bike & Car'**
   String get homeQuickBookVehicle;
 
   /// No description provided for @homeQuickBookEstimate.
@@ -4865,7 +5159,7 @@ abstract class AppLocalizations {
   /// No description provided for @homeQuickBookEtaPrice.
   ///
   /// In en, this message translates to:
-  /// **'~ 42,000đ'**
+  /// **'After places'**
   String get homeQuickBookEtaPrice;
 
   /// No description provided for @homeQuickBookEtaTime.
@@ -6197,7 +6491,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverCompletedFeeLabel.
   ///
   /// In en, this message translates to:
-  /// **'Platform fee'**
+  /// **'DealGo commission'**
   String get driverCompletedFeeLabel;
 
   /// No description provided for @driverCompletedNetLabel.
@@ -6413,8 +6707,14 @@ abstract class AppLocalizations {
   /// No description provided for @driverCompletedFeePercentLabel.
   ///
   /// In en, this message translates to:
-  /// **'Platform fee ({percent}%)'**
+  /// **'DealGo commission ({percent}%)'**
   String driverCompletedFeePercentLabel(String percent);
+
+  /// No description provided for @driverCompletedFoodFeePercentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'DealGo commission on delivery fee ({percent}%)'**
+  String driverCompletedFoodFeePercentLabel(String percent);
 
   /// No description provided for @merchantOrderPlacedAt.
   ///
@@ -6541,6 +6841,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Vehicle registration'**
   String get partnerKindVehicleReg;
+
+  /// No description provided for @partnerKindVehicleInsurance.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle insurance (photo)'**
+  String get partnerKindVehicleInsurance;
 
   /// No description provided for @partnerKindBusinessLicense.
   ///
@@ -6679,6 +6985,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Document review'**
   String get partnerTimelineReview;
+
+  /// No description provided for @partnerTimelineReviewQuick.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin approval'**
+  String get partnerTimelineReviewQuick;
+
+  /// No description provided for @kycStatusTitleQuick.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver registration status'**
+  String get kycStatusTitleQuick;
 
   /// No description provided for @partnerTimelineReviewing.
   ///
@@ -7151,8 +7469,14 @@ abstract class AppLocalizations {
   /// No description provided for @kycVehicleNote.
   ///
   /// In en, this message translates to:
-  /// **'DealGo currently accepts motorbikes only.'**
+  /// **'DealGo Ride accepts motorbikes and cars. Food delivery eligibility is separate.'**
   String get kycVehicleNote;
+
+  /// No description provided for @kycVehicleInsuranceNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Car applications need a vehicle insurance photo when this checklist is on. This is an app checklist only — not a legal or regulatory determination.'**
+  String get kycVehicleInsuranceNote;
 
   /// No description provided for @kycReviewProfile.
   ///
@@ -7550,6 +7874,24 @@ abstract class AppLocalizations {
   /// **'Address'**
   String get kybShopAddress;
 
+  /// No description provided for @kybShopPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin your store on the map'**
+  String get kybShopPin;
+
+  /// No description provided for @kybShopPinRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required: drivers use this point to pick up orders.'**
+  String get kybShopPinRequired;
+
+  /// No description provided for @kybShopPinChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned. Tap to change.'**
+  String get kybShopPinChange;
+
   /// No description provided for @kybShopType.
   ///
   /// In en, this message translates to:
@@ -7778,6 +8120,60 @@ abstract class AppLocalizations {
   /// **'Sales are the food subtotal of delivered orders, in Vietnam time; delivery fees excluded.'**
   String get merchantStatsNote;
 
+  /// No description provided for @merchantStatementTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'DealGo commission'**
+  String get merchantStatementTitle;
+
+  /// No description provided for @merchantStatementCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash from drivers ({count} orders)'**
+  String merchantStatementCash(int count);
+
+  /// No description provided for @merchantStatementCommission.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission ({percent}%)'**
+  String merchantStatementCommission(String percent);
+
+  /// No description provided for @merchantStatementNet.
+  ///
+  /// In en, this message translates to:
+  /// **'Store keeps'**
+  String get merchantStatementNet;
+
+  /// No description provided for @merchantStatementCycle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settled every {days} days'**
+  String merchantStatementCycle(int days);
+
+  /// No description provided for @merchantStatementUnsettled.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission not yet paid'**
+  String get merchantStatementUnsettled;
+
+  /// No description provided for @merchantStatementAllPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission for this period is fully paid.'**
+  String get merchantStatementAllPaid;
+
+  /// No description provided for @merchantStatementLastPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Last payment: {period} · {amount}'**
+  String merchantStatementLastPaid(String period, String amount);
+
+  /// No description provided for @merchantStatementNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Drivers pay the food amount to the store at pickup; the store pays the commission to DealGo. Contact support if the figures look wrong.'**
+  String get merchantStatementNote;
+
   /// No description provided for @merchantStatsFailed.
   ///
   /// In en, this message translates to:
@@ -7841,7 +8237,7 @@ abstract class AppLocalizations {
   /// No description provided for @merchantQueueNewChip.
   ///
   /// In en, this message translates to:
-  /// **'NEW · Awaiting shop'**
+  /// **'New order'**
   String get merchantQueueNewChip;
 
   /// No description provided for @merchantQueueDeliverTo.
@@ -8261,7 +8657,7 @@ abstract class AppLocalizations {
   /// No description provided for @rideMatchingSearching.
   ///
   /// In en, this message translates to:
-  /// **'Finding drivers'**
+  /// **'Waiting for offers'**
   String get rideMatchingSearching;
 
   /// No description provided for @rideMatchingLoadFailed.
@@ -8293,6 +8689,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Status'**
   String get rideStatusLabel;
+
+  /// No description provided for @rideStatusNegotiating.
+  ///
+  /// In en, this message translates to:
+  /// **'Negotiating'**
+  String get rideStatusNegotiating;
+
+  /// No description provided for @rideStatusAssigned.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver assigned'**
+  String get rideStatusAssigned;
+
+  /// No description provided for @rideStatusDriverEnRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver on the way'**
+  String get rideStatusDriverEnRoute;
+
+  /// No description provided for @rideStatusDriverArrived.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver arrived'**
+  String get rideStatusDriverArrived;
+
+  /// No description provided for @rideStatusInTrip.
+  ///
+  /// In en, this message translates to:
+  /// **'Trip in progress'**
+  String get rideStatusInTrip;
+
+  /// No description provided for @rideStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get rideStatusCompleted;
+
+  /// No description provided for @rideStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get rideStatusCancelled;
+
+  /// No description provided for @rideStatusExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get rideStatusExpired;
 
   /// No description provided for @rideNoOffersTitle.
   ///
@@ -8531,7 +8975,7 @@ abstract class AppLocalizations {
   /// No description provided for @rideFareTitle.
   ///
   /// In en, this message translates to:
-  /// **'Propose your fare'**
+  /// **'Your fare'**
   String get rideFareTitle;
 
   /// No description provided for @rideBookingInfo.
@@ -8551,6 +8995,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your offer'**
   String get rideYourOffer;
+
+  /// No description provided for @rideSuggestedFare.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested fare {amount}'**
+  String rideSuggestedFare(String amount);
+
+  /// No description provided for @rideSuggestedFareShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested'**
+  String get rideSuggestedFareShort;
+
+  /// No description provided for @rideSuggestedFareHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a vehicle, then set the fare you want to offer.'**
+  String get rideSuggestedFareHint;
+
+  /// No description provided for @ridePickVehicleClassFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a vehicle class (bike or car) before sending your offer.'**
+  String get ridePickVehicleClassFirst;
 
   /// No description provided for @rideEnterAmount.
   ///
@@ -8783,8 +9251,32 @@ abstract class AppLocalizations {
   /// No description provided for @rideSendOffer.
   ///
   /// In en, this message translates to:
-  /// **'Send offer {amount}'**
+  /// **'Find a driver · {amount}'**
   String rideSendOffer(String amount);
+
+  /// No description provided for @rideFindDriverCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Find a driver · {amount}'**
+  String rideFindDriverCta(String amount);
+
+  /// No description provided for @rideFindDriverPlain.
+  ///
+  /// In en, this message translates to:
+  /// **'Find a driver'**
+  String get rideFindDriverPlain;
+
+  /// No description provided for @rideRecommendedFareLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended fare {amount}'**
+  String rideRecommendedFareLabel(String amount);
+
+  /// No description provided for @rideFareAdjustHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap − / + or enter an amount. Drivers may accept or counter.'**
+  String get rideFareAdjustHint;
 
   /// No description provided for @rideVehicleMotorbike.
   ///
@@ -8863,6 +9355,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No plate number in your driver application'**
   String get driverVehicleUnknown;
+
+  /// No description provided for @driverVehicleNotOnFile.
+  ///
+  /// In en, this message translates to:
+  /// **'No vehicle on file yet'**
+  String get driverVehicleNotOnFile;
 
   /// No description provided for @driverServicesSaved.
   ///
@@ -9014,6 +9512,18 @@ abstract class AppLocalizations {
   /// **'Ride request details'**
   String get driverRideDetailTitle;
 
+  /// No description provided for @driverCounterOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Counter offer'**
+  String get driverCounterOffer;
+
+  /// No description provided for @driverAcceptAtPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept {price}'**
+  String driverAcceptAtPrice(String price);
+
   /// No description provided for @driverMakeOffer.
   ///
   /// In en, this message translates to:
@@ -9023,7 +9533,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverRideChip.
   ///
   /// In en, this message translates to:
-  /// **'Ride · Motorbike'**
+  /// **'Ride · Bike & Car'**
   String get driverRideChip;
 
   /// No description provided for @driverCustomerFare.
@@ -9770,24 +10280,6 @@ abstract class AppLocalizations {
   /// **'Search places, stores, dishes...'**
   String get homeSearchHint;
 
-  /// No description provided for @homeHeroTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'One app,\nendless options'**
-  String get homeHeroTitle;
-
-  /// No description provided for @homeHeroSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Ride • Shop • Delivery\nEveryday convenience in Da Nang'**
-  String get homeHeroSubtitle;
-
-  /// No description provided for @homeHeroCity.
-  ///
-  /// In en, this message translates to:
-  /// **'~ Da Nang, always close by'**
-  String get homeHeroCity;
-
   /// No description provided for @homeServiceFoodSub.
   ///
   /// In en, this message translates to:
@@ -9805,6 +10297,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Illustrative map'**
   String get mapIllustrative;
+
+  /// No description provided for @mapRouteRoadFollowed.
+  ///
+  /// In en, this message translates to:
+  /// **'Road route'**
+  String get mapRouteRoadFollowed;
+
+  /// No description provided for @mapRouteStraightFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Straight-line preview'**
+  String get mapRouteStraightFallback;
 
   /// No description provided for @rideVoucherTitle.
   ///
@@ -10532,11 +11036,215 @@ abstract class AppLocalizations {
   /// **'Waze'**
   String get driverNavWaze;
 
+  /// No description provided for @driverNavAppleMaps.
+  ///
+  /// In en, this message translates to:
+  /// **'Apple Maps'**
+  String get driverNavAppleMaps;
+
+  /// No description provided for @chatRoleDriver.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver'**
+  String get chatRoleDriver;
+
+  /// No description provided for @chatRoleCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer'**
+  String get chatRoleCustomer;
+
+  /// No description provided for @chatCallAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Call'**
+  String get chatCallAction;
+
+  /// No description provided for @chatCloseAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get chatCloseAction;
+
+  /// No description provided for @chatSendAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get chatSendAction;
+
+  /// No description provided for @chatStatusSending.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending'**
+  String get chatStatusSending;
+
+  /// No description provided for @chatStatusSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent'**
+  String get chatStatusSent;
+
+  /// No description provided for @chatStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Not sent · Tap to retry'**
+  String get chatStatusFailed;
+
+  /// No description provided for @chatToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get chatToday;
+
+  /// No description provided for @chatYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get chatYesterday;
+
+  /// No description provided for @chatEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a message to coordinate quickly'**
+  String get chatEmptyBody;
+
+  /// No description provided for @chatUnreadCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} new messages'**
+  String chatUnreadCount(int count);
+
+  /// No description provided for @chatQuickDriverComing.
+  ///
+  /// In en, this message translates to:
+  /// **'I\'m on my way'**
+  String get chatQuickDriverComing;
+
+  /// No description provided for @chatQuickDriverDelivering.
+  ///
+  /// In en, this message translates to:
+  /// **'I\'m on my way with your order'**
+  String get chatQuickDriverDelivering;
+
+  /// No description provided for @chatQuickDriverArrived.
+  ///
+  /// In en, this message translates to:
+  /// **'I\'ve arrived'**
+  String get chatQuickDriverArrived;
+
+  /// No description provided for @chatQuickDriverWait.
+  ///
+  /// In en, this message translates to:
+  /// **'Give me 2 minutes'**
+  String get chatQuickDriverWait;
+
+  /// No description provided for @chatQuickCustomerGate.
+  ///
+  /// In en, this message translates to:
+  /// **'I\'m at the gate'**
+  String get chatQuickCustomerGate;
+
+  /// No description provided for @chatQuickCustomerComing.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming out now'**
+  String get chatQuickCustomerComing;
+
+  /// No description provided for @chatQuickCustomerWhere.
+  ///
+  /// In en, this message translates to:
+  /// **'Where are you?'**
+  String get chatQuickCustomerWhere;
+
+  /// No description provided for @chatQuickCustomerLeaveAtGate.
+  ///
+  /// In en, this message translates to:
+  /// **'Please leave it at the gate'**
+  String get chatQuickCustomerLeaveAtGate;
+
   /// No description provided for @driverNavOpenFailed.
   ///
   /// In en, this message translates to:
-  /// **'Couldn\'t open a navigation app. Follow the in-app map.'**
+  /// **'Couldn\'t open a navigation app. Check Google Maps or Waze on this phone.'**
   String get driverNavOpenFailed;
+
+  /// No description provided for @driverNavOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Navigate'**
+  String get driverNavOpen;
+
+  /// No description provided for @driverNavSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Navigate with'**
+  String get driverNavSheetTitle;
+
+  /// No description provided for @driverNavWeb.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Maps (browser)'**
+  String get driverNavWeb;
+
+  /// No description provided for @driverNavLastUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Last used'**
+  String get driverNavLastUsed;
+
+  /// No description provided for @driverNavToPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'To the pickup point'**
+  String get driverNavToPickup;
+
+  /// No description provided for @driverNavToDropoff.
+  ///
+  /// In en, this message translates to:
+  /// **'To the drop-off point'**
+  String get driverNavToDropoff;
+
+  /// No description provided for @driverNavToStore.
+  ///
+  /// In en, this message translates to:
+  /// **'To the store'**
+  String get driverNavToStore;
+
+  /// No description provided for @driverNavToCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'To the customer'**
+  String get driverNavToCustomer;
+
+  /// No description provided for @driverRideUnassignedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This ride was handed to another driver'**
+  String get driverRideUnassignedTitle;
+
+  /// No description provided for @driverRideUnassignedStartTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'You didn\'t start heading to the pickup in time.'**
+  String get driverRideUnassignedStartTimeout;
+
+  /// No description provided for @driverRideUnassignedArriveTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'You didn\'t reach the pickup in time.'**
+  String get driverRideUnassignedArriveTimeout;
+
+  /// No description provided for @driverRideUnassignedOps.
+  ///
+  /// In en, this message translates to:
+  /// **'DealGo support reassigned the ride.'**
+  String get driverRideUnassignedOps;
+
+  /// No description provided for @driverRideUnassignedGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'The ride was reopened for new offers.'**
+  String get driverRideUnassignedGeneric;
 
   /// No description provided for @driverFoodDeliveryCodeTitle.
   ///
@@ -11072,6 +11780,18 @@ abstract class AppLocalizations {
   /// **'Messages from people on your trips/orders'**
   String get notifPrefsChatBody;
 
+  /// No description provided for @notifPrefsNewJobSound.
+  ///
+  /// In en, this message translates to:
+  /// **'New job sound'**
+  String get notifPrefsNewJobSound;
+
+  /// No description provided for @notifPrefsNewJobSoundBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Play the spoken \"DealGo, có cuốc mới\" alert for new rides, deliveries and store orders. Turn off to use the phone\'s default sound.'**
+  String get notifPrefsNewJobSoundBody;
+
   /// No description provided for @notifPrefsOther.
   ///
   /// In en, this message translates to:
@@ -11167,6 +11887,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Verified'**
   String get securityVerified;
+
+  /// No description provided for @securityEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get securityEmail;
 
   /// No description provided for @securityPasskey.
   ///
@@ -11678,6 +12404,12 @@ abstract class AppLocalizations {
   /// **'No items match this filter'**
   String get merchantProductsEmptyFilter;
 
+  /// No description provided for @merchantProductsEmptyMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'No items yet. Tap “Add item” to start selling.'**
+  String get merchantProductsEmptyMenu;
+
   /// No description provided for @merchantOptionsChoiceMaxQty.
   ///
   /// In en, this message translates to:
@@ -11729,8 +12461,14 @@ abstract class AppLocalizations {
   /// No description provided for @merchantLocationUnset.
   ///
   /// In en, this message translates to:
-  /// **'Your store has no location yet. Drivers get no exact pickup point and the delivery fee uses the default.'**
+  /// **'Your store is not pinned, so it is hidden and cannot take orders. Pin it so drivers find the pickup point.'**
   String get merchantLocationUnset;
+
+  /// No description provided for @merchantLocationPinNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin now'**
+  String get merchantLocationPinNow;
 
   /// No description provided for @merchantLocationUnsetValue.
   ///
@@ -11903,7 +12641,7 @@ abstract class AppLocalizations {
   /// No description provided for @securityPasskeyNeedsPhone.
   ///
   /// In en, this message translates to:
-  /// **'Verify your phone number before adding a passkey.'**
+  /// **'Verify your phone number or email before adding a passkey.'**
   String get securityPasskeyNeedsPhone;
 
   /// No description provided for @merchantProfileTitle.
@@ -11989,6 +12727,804 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Store name and logo'**
   String get accountStoreProfileBody;
+
+  /// No description provided for @foodReorderConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reorder this order?'**
+  String get foodReorderConfirmTitle;
+
+  /// No description provided for @foodReorderConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Items from this order go into your cart at current prices. You can review before placing.'**
+  String get foodReorderConfirmBody;
+
+  /// No description provided for @actionReorder.
+  ///
+  /// In en, this message translates to:
+  /// **'Reorder'**
+  String get actionReorder;
+
+  /// No description provided for @foodReorderNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None of the old order\'s dishes are available now'**
+  String get foodReorderNone;
+
+  /// No description provided for @foodReorderPartial.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} unavailable item(s) were left out'**
+  String foodReorderPartial(int count);
+
+  /// No description provided for @kycQuickModeBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick sign-up: no documents needed. Admin will review and confirm your vehicle class.'**
+  String get kycQuickModeBanner;
+
+  /// No description provided for @kybQuickModeBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick sign-up: no documents needed. Admin will review your store.'**
+  String get kybQuickModeBanner;
+
+  /// No description provided for @handoverRefLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Handover code'**
+  String get handoverRefLabel;
+
+  /// No description provided for @handoverRefSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Handover code {ref}'**
+  String handoverRefSemantics(String ref);
+
+  /// No description provided for @rideRebookAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Rebook ride'**
+  String get rideRebookAction;
+
+  /// No description provided for @trackEtaMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'~{minutes} min'**
+  String trackEtaMinutes(int minutes);
+
+  /// No description provided for @trackStepFinding.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding'**
+  String get trackStepFinding;
+
+  /// No description provided for @trackStepComing.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming'**
+  String get trackStepComing;
+
+  /// No description provided for @trackStepArrived.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrived'**
+  String get trackStepArrived;
+
+  /// No description provided for @trackStepOnTrip.
+  ///
+  /// In en, this message translates to:
+  /// **'On trip'**
+  String get trackStepOnTrip;
+
+  /// No description provided for @trackStepDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get trackStepDone;
+
+  /// No description provided for @trackStepPlaced.
+  ///
+  /// In en, this message translates to:
+  /// **'Placed'**
+  String get trackStepPlaced;
+
+  /// No description provided for @trackStepPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Cooking'**
+  String get trackStepPreparing;
+
+  /// No description provided for @trackStepReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready'**
+  String get trackStepReady;
+
+  /// No description provided for @trackStepDriverToStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver to store'**
+  String get trackStepDriverToStore;
+
+  /// No description provided for @trackStepDelivering.
+  ///
+  /// In en, this message translates to:
+  /// **'On the way'**
+  String get trackStepDelivering;
+
+  /// No description provided for @trackStepDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get trackStepDelivered;
+
+  /// No description provided for @trackDeliveryCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery code'**
+  String get trackDeliveryCodeLabel;
+
+  /// No description provided for @trackItemsMore.
+  ///
+  /// In en, this message translates to:
+  /// **'+{count} more'**
+  String trackItemsMore(int count);
+
+  /// No description provided for @foodStageFindingDriver.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding a driver'**
+  String get foodStageFindingDriver;
+
+  /// No description provided for @foodStageDriverToStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver heading to the store'**
+  String get foodStageDriverToStore;
+
+  /// No description provided for @foodStageDeliveringToYou.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver is on the way to you'**
+  String get foodStageDeliveringToYou;
+
+  /// No description provided for @accountSignOutConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out of DealGo?'**
+  String get accountSignOutConfirmTitle;
+
+  /// No description provided for @accountSignOutConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You will need your phone number and an OTP code to sign in again.'**
+  String get accountSignOutConfirmBody;
+
+  /// No description provided for @accountSignOutCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get accountSignOutCancel;
+
+  /// No description provided for @rideOfferConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose this driver?'**
+  String get rideOfferConfirmTitle;
+
+  /// No description provided for @rideOfferConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Fare {amount}. The driver will be assigned to your ride right away.'**
+  String rideOfferConfirmBody(String amount);
+
+  /// No description provided for @rideOfferConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose driver'**
+  String get rideOfferConfirmAction;
+
+  /// No description provided for @rideOfferConfirmCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Review'**
+  String get rideOfferConfirmCancel;
+
+  /// No description provided for @rideRaiseFare.
+  ///
+  /// In en, this message translates to:
+  /// **'Raise fare'**
+  String get rideRaiseFare;
+
+  /// No description provided for @rideRaiseFareTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Raise your offer'**
+  String get rideRaiseFareTitle;
+
+  /// No description provided for @rideRaiseFareBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Drivers see the new price right away. Current price: {amount}'**
+  String rideRaiseFareBody(String amount);
+
+  /// No description provided for @rideRaiseFareStep.
+  ///
+  /// In en, this message translates to:
+  /// **'+{amount}'**
+  String rideRaiseFareStep(String amount);
+
+  /// No description provided for @rideRaiseFareDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Fare raised to {amount}'**
+  String rideRaiseFareDone(String amount);
+
+  /// No description provided for @rideDeclineOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline this price'**
+  String get rideDeclineOffer;
+
+  /// No description provided for @rideDeclineOfferDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer declined. The driver can send a new price.'**
+  String get rideDeclineOfferDone;
+
+  /// No description provided for @driverWithdrawOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Withdraw offer'**
+  String get driverWithdrawOffer;
+
+  /// No description provided for @driverWithdrawOfferDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer withdrawn'**
+  String get driverWithdrawOfferDone;
+
+  /// No description provided for @driverCustomerRating.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer rating'**
+  String get driverCustomerRating;
+
+  /// No description provided for @driverCustomerRatingValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{average}★ ({count} ratings)'**
+  String driverCustomerRatingValue(String average, int count);
+
+  /// No description provided for @driverCustomerRatingNone.
+  ///
+  /// In en, this message translates to:
+  /// **'New customer – no ratings yet'**
+  String get driverCustomerRatingNone;
+
+  /// No description provided for @driverCancelRide.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel ride'**
+  String get driverCancelRide;
+
+  /// No description provided for @driverCancelReasonTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Why are you cancelling?'**
+  String get driverCancelReasonTitle;
+
+  /// No description provided for @driverCancelHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelling an accepted ride counts toward your cancellation rate.'**
+  String get driverCancelHint;
+
+  /// No description provided for @driverCancelReasonCustomerUnreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t reach the customer'**
+  String get driverCancelReasonCustomerUnreachable;
+
+  /// No description provided for @driverCancelReasonPickupTooFar.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup is too far'**
+  String get driverCancelReasonPickupTooFar;
+
+  /// No description provided for @driverCancelReasonVehicleProblem.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle problem'**
+  String get driverCancelReasonVehicleProblem;
+
+  /// No description provided for @driverCancelReasonSafetyConcern.
+  ///
+  /// In en, this message translates to:
+  /// **'Safety concern'**
+  String get driverCancelReasonSafetyConcern;
+
+  /// No description provided for @driverCancelReasonCustomerAsked.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer asked to cancel'**
+  String get driverCancelReasonCustomerAsked;
+
+  /// No description provided for @driverCancelReasonOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other reason'**
+  String get driverCancelReasonOther;
+
+  /// No description provided for @driverCancelDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Ride cancelled'**
+  String get driverCancelDone;
+
+  /// No description provided for @driverNoShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer didn\'t show'**
+  String get driverNoShow;
+
+  /// No description provided for @driverNoShowBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this only after waiting at the pickup point. The server checks the wait time and may charge the customer a no-show fee.'**
+  String get driverNoShowBody;
+
+  /// No description provided for @driverNoShowDone.
+  ///
+  /// In en, this message translates to:
+  /// **'No-show recorded. The ride is closed.'**
+  String get driverNoShowDone;
+
+  /// No description provided for @driverRateCustomerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate the customer'**
+  String get driverRateCustomerTitle;
+
+  /// No description provided for @driverRateCustomerSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Send rating'**
+  String get driverRateCustomerSubmit;
+
+  /// No description provided for @driverRateCustomerDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Rating sent – thank you!'**
+  String get driverRateCustomerDone;
+
+  /// No description provided for @driverRateCustomerYours.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rating: {stars}★'**
+  String driverRateCustomerYours(int stars);
+
+  /// No description provided for @driverRateTagOnTime.
+  ///
+  /// In en, this message translates to:
+  /// **'On time'**
+  String get driverRateTagOnTime;
+
+  /// No description provided for @driverRateTagPolite.
+  ///
+  /// In en, this message translates to:
+  /// **'Polite'**
+  String get driverRateTagPolite;
+
+  /// No description provided for @driverRateTagClearPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear pickup'**
+  String get driverRateTagClearPickup;
+
+  /// No description provided for @driverRateTagLate.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept me waiting'**
+  String get driverRateTagLate;
+
+  /// No description provided for @driverRateTagRude.
+  ///
+  /// In en, this message translates to:
+  /// **'Rude'**
+  String get driverRateTagRude;
+
+  /// No description provided for @driverRateTagWrongPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong pickup point'**
+  String get driverRateTagWrongPickup;
+
+  /// No description provided for @driverFoodRelease.
+  ///
+  /// In en, this message translates to:
+  /// **'Return order'**
+  String get driverFoodRelease;
+
+  /// No description provided for @driverFoodReleaseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Why return this order?'**
+  String get driverFoodReleaseTitle;
+
+  /// No description provided for @driverFoodReleaseHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The order goes back to other drivers. Returning counts as a cancellation.'**
+  String get driverFoodReleaseHint;
+
+  /// No description provided for @driverFoodReleaseStoreTooSlow.
+  ///
+  /// In en, this message translates to:
+  /// **'Store is too slow'**
+  String get driverFoodReleaseStoreTooSlow;
+
+  /// No description provided for @driverFoodReleaseStoreClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Store is closed'**
+  String get driverFoodReleaseStoreClosed;
+
+  /// No description provided for @driverFoodReleaseVehicleProblem.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle problem'**
+  String get driverFoodReleaseVehicleProblem;
+
+  /// No description provided for @driverFoodReleaseSafetyConcern.
+  ///
+  /// In en, this message translates to:
+  /// **'Safety concern'**
+  String get driverFoodReleaseSafetyConcern;
+
+  /// No description provided for @driverFoodReleaseOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other reason'**
+  String get driverFoodReleaseOther;
+
+  /// No description provided for @driverFoodReleaseDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Order returned'**
+  String get driverFoodReleaseDone;
+
+  /// No description provided for @driverFailNoteLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'What happened? (required)'**
+  String get driverFailNoteLabel;
+
+  /// No description provided for @driverFailNoteRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please describe what happened.'**
+  String get driverFailNoteRequired;
+
+  /// No description provided for @driverFailAbsentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Call and message the customer first. You can report \"customer unreachable\" only after waiting at the drop-off for a few minutes.'**
+  String get driverFailAbsentHint;
+
+  /// No description provided for @driverFoodFailedDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery reported as failed'**
+  String get driverFoodFailedDone;
+
+  /// No description provided for @apiErrLiveOffersFull.
+  ///
+  /// In en, this message translates to:
+  /// **'This ride already has the maximum number of offers. Try again shortly.'**
+  String get apiErrLiveOffersFull;
+
+  /// No description provided for @apiErrFareRaiseLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'You can\'t raise the fare any more for this ride.'**
+  String get apiErrFareRaiseLimit;
+
+  /// No description provided for @apiErrCancelCooldown.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve cancelled several rides recently. Please wait a little before booking again.'**
+  String get apiErrCancelCooldown;
+
+  /// No description provided for @apiErrRepostInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'This ride can\'t be reposted.'**
+  String get apiErrRepostInvalid;
+
+  /// No description provided for @apiErrFailTooEarly.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait at the drop-off a few more minutes before reporting the customer unreachable.'**
+  String get apiErrFailTooEarly;
+
+  /// No description provided for @apiErrFailNoteRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please add a note describing the problem.'**
+  String get apiErrFailNoteRequired;
+
+  /// No description provided for @apiErrStoreLocationRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'This store hasn\'t set its location yet.'**
+  String get apiErrStoreLocationRequired;
+
+  /// No description provided for @apiErrDriverLocationStale.
+  ///
+  /// In en, this message translates to:
+  /// **'We don\'t have your current location yet. Turn on location and pull to refresh.'**
+  String get apiErrDriverLocationStale;
+
+  /// No description provided for @apiErrOutsideServiceZone.
+  ///
+  /// In en, this message translates to:
+  /// **'This address is outside our service area.'**
+  String get apiErrOutsideServiceZone;
+
+  /// No description provided for @apiErrTooFar.
+  ///
+  /// In en, this message translates to:
+  /// **'The delivery address is too far from this store.'**
+  String get apiErrTooFar;
+
+  /// No description provided for @apiErrSettlementOverlap.
+  ///
+  /// In en, this message translates to:
+  /// **'This period overlaps an existing statement.'**
+  String get apiErrSettlementOverlap;
+
+  /// No description provided for @apiErrSettlementPeriodOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'This period hasn\'t ended yet.'**
+  String get apiErrSettlementPeriodOpen;
+
+  /// No description provided for @apiErrShopLocationRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin your shop location on the map to continue.'**
+  String get apiErrShopLocationRequired;
+
+  /// No description provided for @apiErrChangePending.
+  ///
+  /// In en, this message translates to:
+  /// **'There\'s already an order change waiting for the customer.'**
+  String get apiErrChangePending;
+
+  /// No description provided for @apiErrChangeInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'This change isn\'t allowed. You can only lower quantities or remove items.'**
+  String get apiErrChangeInvalid;
+
+  /// No description provided for @apiErrChangeNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'This change is no longer waiting for an answer.'**
+  String get apiErrChangeNotFound;
+
+  /// No description provided for @foodCancelChangeRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'You declined the store\'s change'**
+  String get foodCancelChangeRejected;
+
+  /// No description provided for @foodCancelChangeExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'The store\'s change wasn\'t answered in time'**
+  String get foodCancelChangeExpired;
+
+  /// No description provided for @foodChangeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The store changed your order'**
+  String get foodChangeTitle;
+
+  /// No description provided for @foodChangeReasonOutOfStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Some items are sold out'**
+  String get foodChangeReasonOutOfStock;
+
+  /// No description provided for @foodChangeReasonNotEnough.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough portions left'**
+  String get foodChangeReasonNotEnough;
+
+  /// No description provided for @foodChangeReasonOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other reason'**
+  String get foodChangeReasonOther;
+
+  /// No description provided for @foodChangeLineRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed'**
+  String get foodChangeLineRemoved;
+
+  /// No description provided for @foodChangeNewTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'New total'**
+  String get foodChangeNewTotal;
+
+  /// No description provided for @foodChangeAnswerBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Answer by {time}, otherwise the order is cancelled for free.'**
+  String foodChangeAnswerBy(String time);
+
+  /// No description provided for @foodChangeAccept.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept'**
+  String get foodChangeAccept;
+
+  /// No description provided for @foodChangeReject.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel order'**
+  String get foodChangeReject;
+
+  /// No description provided for @foodChangeRejectConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel this order?'**
+  String get foodChangeRejectConfirmTitle;
+
+  /// No description provided for @foodChangeRejectConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The order will be cancelled at no cost to you.'**
+  String get foodChangeRejectConfirmBody;
+
+  /// No description provided for @merchantEditOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Report sold-out items'**
+  String get merchantEditOrder;
+
+  /// No description provided for @merchantEditOrderHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Lower quantities or remove items. The customer must accept before you continue.'**
+  String get merchantEditOrderHint;
+
+  /// No description provided for @merchantEditOrderNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Note for the customer'**
+  String get merchantEditOrderNote;
+
+  /// No description provided for @merchantEditOrderAllRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'To remove every item, reject the order instead.'**
+  String get merchantEditOrderAllRemoved;
+
+  /// No description provided for @merchantEditOrderNewSubtotal.
+  ///
+  /// In en, this message translates to:
+  /// **'New food value: {amount}'**
+  String merchantEditOrderNewSubtotal(String amount);
+
+  /// No description provided for @merchantEditOrderSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send to customer'**
+  String get merchantEditOrderSend;
+
+  /// No description provided for @merchantChangePending.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the customer to accept the change (new total {total}) until {time}.'**
+  String merchantChangePending(String total, String time);
+
+  /// No description provided for @pushForegroundOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'View'**
+  String get pushForegroundOpen;
+
+  /// Short chip above the pickup pin on maps.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup'**
+  String get mapPinPickup;
+
+  /// No description provided for @mapPinDropoff.
+  ///
+  /// In en, this message translates to:
+  /// **'Drop-off'**
+  String get mapPinDropoff;
+
+  /// No description provided for @mapPinStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Store'**
+  String get mapPinStore;
+
+  /// No description provided for @mapPinHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliver'**
+  String get mapPinHome;
+
+  /// No description provided for @mapPickerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick on map'**
+  String get mapPickerTitle;
+
+  /// No description provided for @mapPickerConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this location'**
+  String get mapPickerConfirm;
+
+  /// No description provided for @mapPickerPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned location'**
+  String get mapPickerPinned;
+
+  /// No description provided for @mapPickerSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search places'**
+  String get mapPickerSearch;
+
+  /// No description provided for @mapStyleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Map style'**
+  String get mapStyleTitle;
+
+  /// No description provided for @mapStyleStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard'**
+  String get mapStyleStandard;
+
+  /// No description provided for @mapStyleSatellite.
+  ///
+  /// In en, this message translates to:
+  /// **'Satellite'**
+  String get mapStyleSatellite;
+
+  /// No description provided for @mapStyleDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get mapStyleDark;
+
+  /// No description provided for @mapOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get mapOpenSettings;
+
+  /// Screen-reader label of one home banner slide.
+  ///
+  /// In en, this message translates to:
+  /// **'Banner {index} of {count}: {title}'**
+  String homeBannerSlideLabel(int index, int count, String title);
 }
 
 class _AppLocalizationsDelegate

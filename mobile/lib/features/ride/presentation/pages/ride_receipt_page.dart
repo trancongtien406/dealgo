@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/config/api_base_url.dart';
 import '../../../rating/domain/service_rating.dart';
 import '../../../rating/presentation/rate_service_card.dart';
+import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
+import '../utils/ride_routes.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/network/request_failure.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
@@ -16,6 +19,7 @@ import '../../domain/entities/ride_models.dart';
 import '../../domain/entities/ride_vehicle.dart';
 import '../../domain/usecases/get_ride.dart';
 import '../cubit/ride_receipt_cubit.dart';
+import '../utils/ride_vehicle_label.dart';
 import '../widgets/ride_widgets.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
@@ -117,7 +121,7 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
               ),
             ),
             Expanded(child: _body(ride, textTheme)),
-            if (ride != null && ride.agreedFareVnd != null)
+            if (ride != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(
                   DealGoDimensions.pageGutter,
@@ -125,11 +129,36 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
                   DealGoDimensions.pageGutter,
                   DealGoSpacing.s12,
                 ),
-                child: DealGoSecondaryButton(
-                  key: const Key('ride-receipt-help'),
-                  label: l10n.rideReceiptHelp,
-                  onPressed: () =>
-                      context.push(AccountRoutes.help('/customer/account')),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // "Đặt lại": same A→B and class; the fare page asks the
+                    // server for a fresh quote (no old price is reused).
+                    DealGoPrimaryButton(
+                      key: const Key('ride-receipt-reorder'),
+                      label: l10n.rideRebookAction,
+                      onPressed: () => context.push(
+                        RideRoutes.fare,
+                        extra: RidePlaces(
+                          pickup: ride.pickup,
+                          dropoff: ride.dropoff,
+                          vehicleClassCode: ride.vehicleClassCode.isEmpty
+                              ? null
+                              : ride.vehicleClassCode,
+                        ),
+                      ),
+                    ),
+                    if (ride.agreedFareVnd != null) ...[
+                      const SizedBox(height: DealGoSpacing.s8),
+                      DealGoSecondaryButton(
+                        key: const Key('ride-receipt-help'),
+                        label: l10n.rideReceiptHelp,
+                        onPressed: () => context.push(
+                          AccountRoutes.help('/customer/account'),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
           ],
@@ -252,9 +281,17 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
                   label: l10n.rideReceiptFinishedAt,
                   amount: finishedAt,
                 ),
+              if (resolveMediaUrl(ride.imageUrl) != null) ...[
+                RideVehicleClassPhoto(
+                  imageUrl: ride.imageUrl,
+                  code: ride.vehicleClassCode,
+                  size: 48,
+                ),
+                const SizedBox(height: DealGoSpacing.s8),
+              ],
               RideMoneyLine(
                 label: l10n.rideVehicleLabel,
-                amount: l10n.rideVehicleBikeTitle,
+                amount: rideVehicleClassLabel(l10n, ride.vehicleClassCode),
               ),
             ],
           ),
@@ -279,7 +316,9 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
                 RideMoneyLine(
                   key: const Key('ride-receipt-total'),
                   label: l10n.checkoutTotalSection,
-                  amount: formatRideVnd(rideCashAfterVoucher(agreed, ride.discountVnd)),
+                  amount: formatRideVnd(
+                    rideCashAfterVoucher(agreed, ride.discountVnd),
+                  ),
                   emphasize: true,
                 ),
               ] else

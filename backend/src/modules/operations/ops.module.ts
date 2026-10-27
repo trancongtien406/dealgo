@@ -7,6 +7,8 @@ import { OpsExceptionsController } from './ops-exceptions.controller.js';
 import { OpsExceptionsService } from './ops-exceptions.service.js';
 import { OpsOverviewController } from './ops-overview.controller.js';
 import { OpsOverviewService } from './ops-overview.service.js';
+import { OpsReportsController } from './ops-reports.controller.js';
+import { OpsReportsService } from './ops-reports.service.js';
 import { AuditModule } from '../../platform/audit/index.js';
 
 @Module({
@@ -16,10 +18,12 @@ import { AuditModule } from '../../platform/audit/index.js';
     OpsExceptionsController,
     OpsOverviewController,
     OpsAuditLogsController,
+    OpsReportsController,
   ],
   providers: [
     OpsExceptionsService,
     OpsOverviewService,
+    OpsReportsService,
   ],
   exports: [
     OpsExceptionsService,

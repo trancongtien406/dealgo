@@ -88,4 +88,3 @@ class AccountToneIcon extends StatelessWidget {
     );
   }
 }
-

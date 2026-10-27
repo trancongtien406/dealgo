@@ -8,7 +8,7 @@ import 'support/fake_identity_client.dart';
 Future<FakeInboxRemoteDataSource> _openInbox(WidgetTester tester) async {
   final inbox = FakeInboxRemoteDataSource(now: DateTime.now());
   await pumpSignedIn(tester, profile: customerProfile, inboxRemote: inbox);
-  await tester.tap(navLabel('Tài khoản'));
+  await tester.tap(navLabel('Tôi'));
   await tester.pumpAndSettle();
   await tester.tap(find.byTooltip('Thông báo'));
   await tester.pumpAndSettle();

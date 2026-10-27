@@ -31,6 +31,27 @@ class LocationService {
     );
   }
 
+  /// Proximity hint for search without ever prompting: only when permission
+  /// is already granted; cached fix first, else a quick low-accuracy fix.
+  Future<Position?> quietPosition() async {
+    try {
+      final perm = await Geolocator.checkPermission();
+      if (perm != LocationPermission.always &&
+          perm != LocationPermission.whileInUse) {
+        return null;
+      }
+      return await Geolocator.getLastKnownPosition() ??
+          await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.low,
+              timeLimit: Duration(seconds: 4),
+            ),
+          );
+    } catch (_) {
+      return null;
+    }
+  }
+
   Stream<Position> watchPosition({
     LocationAccuracy accuracy = LocationAccuracy.high,
     int distanceFilterMeters = 10,

@@ -5,8 +5,9 @@ import { IsInt, IsOptional, Max, Min } from 'class-validator';
 import { OpsPermissionGuard } from '../identity/ops-rbac/ops-permission.guard.js';
 import { RequireOpsPermission } from '../identity/ops-rbac/ops-permission.decorator.js';
 import { SettlementService } from './settlement.service.js';
+import { OpsDateRangeQueryDto, opsDateWindow } from '../operations/ops-date-window.js';
 
-export class SettlementPageQueryDto {
+export class SettlementPageQueryDto extends OpsDateRangeQueryDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -35,10 +36,11 @@ export class SettlementController {
   @RequireOpsPermission('settlements.read')
   @ApiOperation({
     summary:
-      'Sandbox settlement stub: COD ledger journals grouped by UTC day (read-only; no payout)',
+      'COD ledger journals grouped by Vietnam business day (Asia/Ho_Chi_Minh, YYYY-MM-DD), newest first; optional from/to (inclusive business days). Read-only; no payout.',
   })
   list(@Query() query: SettlementPageQueryDto) {
-    return this.settlements.list(query.page, query.limit);
+    opsDateWindow(query);
+    return this.settlements.list(query.page, query.limit, { from: query.from, to: query.to });
   }
 }
 

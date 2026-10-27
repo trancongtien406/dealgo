@@ -1,4 +1,5 @@
 import 'food_options.dart';
+import '../../../../core/maps/route_geometry.dart';
 
 export 'food_options.dart';
 
@@ -152,8 +153,9 @@ class FoodMenuItem {
       imageUrl: clearImageUrl ? null : (imageUrl ?? this.imageUrl),
       imageUrls: imageUrls ?? this.imageUrls,
       soldCount: soldCount ?? this.soldCount,
-      menuCategoryId:
-          clearMenuCategoryId ? null : (menuCategoryId ?? this.menuCategoryId),
+      menuCategoryId: clearMenuCategoryId
+          ? null
+          : (menuCategoryId ?? this.menuCategoryId),
       optionGroups: optionGroups ?? this.optionGroups,
     );
   }
@@ -329,6 +331,7 @@ class FoodDropoff {
 
 class FoodOrderLine {
   const FoodOrderLine({
+    this.id,
     required this.itemId,
     required this.name,
     required this.unitPriceVnd,
@@ -337,6 +340,8 @@ class FoodOrderLine {
     this.options = const [],
   });
 
+  /// Server line id (the store edits a line by id); null on old fakes.
+  final String? id;
   final String itemId;
   final String name;
 
@@ -351,8 +356,9 @@ class FoodOrderLine {
   final List<FoodLineOption> options;
 
   /// "Size: L · Topping: Trân châu" for receipts and kitchen tickets.
-  String get optionsSummary =>
-      options.map((option) => '${option.groupName}: ${option.name}').join(' · ');
+  String get optionsSummary => options
+      .map((option) => '${option.groupName}: ${option.name}')
+      .join(' · ');
 
   int get lineTotalVnd => unitPriceVnd * quantity;
 }
@@ -369,11 +375,20 @@ class ReadyFoodJob {
     this.storeName,
     this.storeAddress,
     this.pickup,
+    this.route,
+    this.approachRoute,
   });
 
   final String id;
   final String storeId;
+
+  /// DEC-PROD-031 rev 3 (DRAFT): driver→store leg snapshot (assigned only).
+  final RouteGeometry? approachRoute;
   final String? storeName;
+
+  /// Road geometry pickup→dropoff from Nest (DEC-PROD-045). Null/unavailable →
+  /// the map draws no line (never a straight store→customer segment).
+  final RouteGeometry? route;
   final String? storeAddress;
 
   /// Store point snapshotted on the order (DEC-PROD-034); null when the store
@@ -491,9 +506,22 @@ enum FoodRejectReason {
   storeBusy('STORE_BUSY'),
   storeClosing('STORE_CLOSING'),
   itemPriceChanged('ITEM_PRICE_CHANGED'),
-  other('OTHER');
+  other('OTHER'),
+
+  /// The customer declined the store's edit / did not answer in time.
+  changeRejected('CHANGE_REJECTED'),
+  changeExpired('CHANGE_EXPIRED');
 
   const FoodRejectReason(this.wire);
+
+  /// Reasons a store may pick when declining (the change ones are set by the server).
+  static const storeChoices = [
+    outOfStock,
+    storeBusy,
+    storeClosing,
+    itemPriceChanged,
+    other,
+  ];
 
   final String wire;
 
@@ -521,6 +549,7 @@ class FoodOrderDetail {
     required this.dropoff,
     required this.lines,
     this.storeName,
+    this.storeId,
     this.assignedDriverId,
     this.discountVnd = 0,
     this.cancelReason,
@@ -528,7 +557,14 @@ class FoodOrderDetail {
     this.estimatedReadyAt,
     this.deliveryCode,
     this.handoverCode,
+    this.pickup,
+    this.route,
+    this.approachRoute,
+    this.pendingChange,
   });
+
+  /// Store edit waiting for the customer's answer (customer/store only).
+  final FoodOrderChange? pendingChange;
 
   /// DEC-PROD-036: customer-only delivery code while the courier is assigned / on the way.
   final String? deliveryCode;
@@ -550,8 +586,20 @@ class FoodOrderDetail {
   final FoodDropoff dropoff;
   final List<FoodOrderLine> lines;
   final String? storeName;
+
+  /// Needed to reorder ("Đặt lại"); null on old fakes.
+  final String? storeId;
   final String? assignedDriverId;
   final int discountVnd;
+
+  /// Store pickup snapshotted on the order; null when the store had no coords.
+  final FoodDropoff? pickup;
+
+  /// Nest road geometry when pickup coords exist.
+  final RouteGeometry? route;
+
+  /// DEC-PROD-031 rev 3 (DRAFT): driver→store leg while ASSIGNED.
+  final RouteGeometry? approachRoute;
 
   FoodTrackingStage get stage => foodTrackingStage(status);
 }
@@ -578,4 +626,72 @@ class PlacedFoodOrder {
   final String? voucherCode;
   final int totalVnd;
   final List<FoodOrderLine> lines;
+}
+
+/// Why a store edited an order (backend FOOD_ORDER_CHANGE_REASONS).
+enum FoodOrderChangeReason {
+  outOfStock('OUT_OF_STOCK'),
+  notEnoughPortions('NOT_ENOUGH_PORTIONS'),
+  other('OTHER');
+
+  const FoodOrderChangeReason(this.wire);
+
+  final String wire;
+
+  static FoodOrderChangeReason fromWire(Object? value) =>
+      FoodOrderChangeReason.values.firstWhere(
+        (r) => r.wire == value,
+        orElse: () => FoodOrderChangeReason.other,
+      );
+}
+
+/// One edited line: the store can only lower a quantity or remove the line (0).
+class FoodOrderChangeLine {
+  const FoodOrderChangeLine({
+    required this.lineId,
+    required this.name,
+    required this.unitPriceVnd,
+    required this.fromQuantity,
+    required this.toQuantity,
+  });
+
+  final String lineId;
+  final String name;
+  final int unitPriceVnd;
+  final int fromQuantity;
+  final int toQuantity;
+
+  bool get removed => toQuantity == 0;
+}
+
+/// Store edit the customer accepts or rejects.
+/// Rejecting (or not answering before [expiresAt]) cancels the order without a fee.
+class FoodOrderChange {
+  const FoodOrderChange({
+    required this.id,
+    required this.status,
+    required this.reason,
+    required this.lines,
+    required this.oldSubtotalVnd,
+    required this.newSubtotalVnd,
+    required this.newDiscountVnd,
+    required this.newTotalVnd,
+    required this.expiresAt,
+    this.note,
+  });
+
+  final String id;
+
+  /// PENDING | ACCEPTED | REJECTED | EXPIRED
+  final String status;
+  final FoodOrderChangeReason reason;
+  final String? note;
+  final List<FoodOrderChangeLine> lines;
+  final int oldSubtotalVnd;
+  final int newSubtotalVnd;
+  final int newDiscountVnd;
+  final int newTotalVnd;
+  final DateTime expiresAt;
+
+  bool get pending => status == 'PENDING';
 }

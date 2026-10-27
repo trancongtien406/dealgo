@@ -1,3 +1,4 @@
+import '../../../../core/maps/route_geometry.dart';
 import '../../../pricing/domain/pricing.dart';
 import 'ride_money.dart';
 
@@ -56,7 +57,13 @@ enum RideOfferKind {
 enum RideOfferStatus {
   pending('PENDING'),
   selected('SELECTED'),
-  lost('LOST');
+  lost('LOST'),
+
+  /// The customer turned this price down; the driver may re-offer.
+  declined('DECLINED'),
+
+  /// The driver took the offer back before the customer chose.
+  withdrawn('WITHDRAWN');
 
   const RideOfferStatus(this.wire);
 
@@ -72,6 +79,14 @@ enum RideOfferStatus {
   }
 }
 
+/// The customer's average rating from drivers (null until rated).
+class CustomerRatingSummary {
+  const CustomerRatingSummary({required this.average, required this.count});
+
+  final double? average;
+  final int count;
+}
+
 class RidePoint {
   const RidePoint({required this.lat, required this.lng, required this.label});
 
@@ -82,7 +97,12 @@ class RidePoint {
 
 /// Pickup and drop-off chosen by the customer, with real coordinates.
 class RidePlaces {
-  const RidePlaces({required this.pickup, required this.dropoff, this.quote});
+  const RidePlaces({
+    required this.pickup,
+    required this.dropoff,
+    this.quote,
+    this.vehicleClassCode,
+  });
 
   final RidePoint pickup;
   final RidePoint dropoff;
@@ -90,8 +110,23 @@ class RidePlaces {
   /// Server quote (`POST /v1/rides/quote`), once the route overview loaded it.
   final RideQuote? quote;
 
-  RidePlaces withQuote(RideQuote quote) =>
-      RidePlaces(pickup: pickup, dropoff: dropoff, quote: quote);
+  /// Class chosen on the vehicle step. Omitted until then.
+  final String? vehicleClassCode;
+
+  RidePlaces withQuote(RideQuote quote) => RidePlaces(
+    pickup: pickup,
+    dropoff: dropoff,
+    quote: quote,
+    vehicleClassCode: vehicleClassCode,
+  );
+
+  RidePlaces selectClass(RideQuote quote) => RidePlaces(
+    pickup: pickup,
+    dropoff: dropoff,
+    quote: quote,
+    // DG-DEC-VEH-001: never invent MOTORBIKE when the customer has not chosen a class.
+    vehicleClassCode: quote.vehicleClassCode ?? vehicleClassCode,
+  );
 
   String get pickupLabel => pickup.label;
   String get dropoffLabel => dropoff.label;
@@ -141,6 +176,11 @@ class RideView {
     this.updatedAt,
     this.discountVnd = 0,
     this.voucherCode,
+    this.vehicleClassCode = '',
+    this.imageUrl,
+    this.route = RouteGeometry.unavailable,
+    this.approachRoute,
+    this.customerRating,
   });
 
   final String id;
@@ -165,6 +205,24 @@ class RideView {
   /// DEC-PROD-024: voucher discount reserved at offer selection (0 when none).
   final int discountVnd;
   final String? voucherCode;
+  final String vehicleClassCode;
+  final String? imageUrl;
+
+  /// Nest road geometry (ROUTING_PROVIDER). Unavailable ⇒ no line is drawn.
+  final RouteGeometry route;
+
+  /// DEC-PROD-031 rev 3 (DRAFT): driver→pickup leg while ASSIGNED /
+  /// DRIVER_EN_ROUTE (server-computed snapshot; `routeUpdated` replaces it).
+  final RouteGeometry? approachRoute;
+
+  /// Shown to drivers only (null on customer reads).
+  final CustomerRatingSummary? customerRating;
+
+  /// Offers still in play (Declined/withdrawn ones stay in the snapshot).
+  List<RideOffer> get liveOffers => [
+    for (final offer in offers)
+      if (offer.status == RideOfferStatus.pending) offer,
+  ];
 
   /// Cash the customer hands the driver: the agreed fare minus the voucher.
   int? get cashDueVnd {
@@ -187,6 +245,11 @@ class OpenRide {
     required this.referenceFareVnd,
     required this.expiresAt,
     required this.offerCount,
+    this.vehicleClassCode = '',
+    this.imageUrl,
+    this.route = RouteGeometry.unavailable,
+    this.approachRoute,
+    this.customerRating,
   });
 
   final String id;
@@ -197,6 +260,15 @@ class OpenRide {
   final int referenceFareVnd;
   final String expiresAt;
   final int offerCount;
+  final String vehicleClassCode;
+  final String? imageUrl;
+  final RouteGeometry route;
+
+  /// DEC-PROD-031 rev 3 (DRAFT): driver→pickup leg snapshot (assigned only).
+  final RouteGeometry? approachRoute;
+
+  /// The customer's rating from drivers, so a driver can decide.
+  final CustomerRatingSummary? customerRating;
 }
 
 class RideConfirmArgs {

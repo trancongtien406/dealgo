@@ -32,6 +32,12 @@ import {
 } from "@/features/kyc/components/partner-review-panels";
 import { validateIssues, type PartnerIssue } from "@/features/kyc/partner-review";
 
+const VEHICLE_CLASS_OPTIONS = [
+  { value: "MOTORBIKE", label: "Xe máy (MOTORBIKE)" },
+  { value: "CAR_4", label: "Ô tô 4 chỗ (CAR_4)" },
+  { value: "CAR_7", label: "Ô tô 7 chỗ (CAR_7)" },
+];
+
 type Decision = "" | "approve" | "reject" | "request";
 type PendingConfirm = null | "approve" | "reject";
 
@@ -64,6 +70,10 @@ export function KycCaseDetail({ code }: { code: string }) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<PendingConfirm>(null);
   const [issues, setIssues] = useState<PartnerIssue[]>([]);
+  // DEC-PROD-048: ops assigns or confirms the driver's class; empty = keep the applicant's.
+  const [vehicleClass, setVehicleClass] = useState<string>("");
+  const effectiveVehicleClass = vehicleClass || selected?.vehicleClassCode || "";
+  const needsVehicleClass = selected?.role === "DRIVER";
 
   const crumbs = useMemo(
     () => [
@@ -83,7 +93,10 @@ export function KycCaseDetail({ code }: { code: string }) {
       ? selected.status === "APPROVED" || selected.status === "REJECTED"
       : false);
 
-  const canApprove = decision === "approve" && note.trim().length > 0;
+  const canApprove =
+    decision === "approve" &&
+    note.trim().length > 0 &&
+    (!needsVehicleClass || effectiveVehicleClass.length > 0);
 
   const runApprove = async () => {
     if (locked || !canApprove) {
@@ -91,7 +104,9 @@ export function KycCaseDetail({ code }: { code: string }) {
     }
     setActionError(null);
     try {
-      await approveMutation.mutateAsync();
+      await approveMutation.mutateAsync(
+        needsVehicleClass ? effectiveVehicleClass || undefined : undefined,
+      );
       setOutcome({ kind: "approved", note: note.trim() });
       toast.success("Đã duyệt hồ sơ KYC.");
       setConfirm(null);
@@ -270,6 +285,11 @@ export function KycCaseDetail({ code }: { code: string }) {
                               : kycStatusLabel(selected.status)}
                       </StatusChip>
                       <StatusChip tone="brand">{selected.activity}</StatusChip>
+                      {selected.documentsWaived ? (
+                        <StatusChip tone="food">
+                          {selected.role === "DRIVER" ? "Miễn KYC" : "Miễn KYB"}
+                        </StatusChip>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -412,6 +432,18 @@ export function KycCaseDetail({ code }: { code: string }) {
                     onChange={(val) => setDecision((val ?? "") as Decision)}
                   />
                 </div>
+                {decision === "approve" && needsVehicleClass ? (
+                  <div className="mt-3" data-testid="kyc-vehicle-class">
+                    <SearchSelect
+                      label="Hạng xe được duyệt"
+                      value={effectiveVehicleClass || null}
+                      placeholder="Chọn hạng xe"
+                      disabled={locked}
+                      options={VEHICLE_CLASS_OPTIONS}
+                      onChange={(val) => setVehicleClass(val ?? "")}
+                    />
+                  </div>
+                ) : null}
                 {decision === "request" ? (
                   <PartnerIssuePicker
                     role={selected.role}
@@ -469,9 +501,11 @@ export function KycCaseDetail({ code }: { code: string }) {
                 >
                   {approveMutation.isPending
                     ? "Đang duyệt…"
-                    : canApprove && !locked
-                      ? "Duyệt hồ sơ"
-                      : "Chưa đủ điều kiện duyệt"}
+                    : kycApproveButtonLabel({
+                        status: selected?.status,
+                        approvedNow: outcome.kind === "approved",
+                        ready: canApprove && !locked,
+                      })}
                 </button>
               </section>
               <section className="rounded-2xl border border-border bg-white p-4 shadow-sm">
@@ -509,4 +543,15 @@ function errorMessage(error: unknown): string {
     return error.message;
   }
   return "Thao tác thất bại. Thử lại.";
+}
+
+/** Label for the approve button; a decided case must not read "not eligible". */
+export function kycApproveButtonLabel(input: {
+  status?: string;
+  approvedNow: boolean;
+  ready: boolean;
+}): string {
+  if (input.approvedNow || input.status === "APPROVED") return "Đã duyệt";
+  if (input.status === "REJECTED") return "Đã từ chối";
+  return input.ready ? "Duyệt hồ sơ" : "Chưa đủ điều kiện duyệt";
 }

@@ -61,20 +61,18 @@ class DefaultMerchantOrdersClient implements MerchantOrdersClient {
   Future<FoodStoreDetail> updateStoreProfile({
     required String accessToken,
     required String name,
-  }) =>
-      food.updateStoreProfile(accessToken: accessToken, name: name);
+  }) => food.updateStoreProfile(accessToken: accessToken, name: name);
 
   @override
   Future<FoodStoreDetail> uploadStoreLogo({
     required String accessToken,
     required String contentBase64,
     String? contentType,
-  }) =>
-      food.uploadStoreLogo(
-        accessToken: accessToken,
-        contentBase64: contentBase64,
-        contentType: contentType,
-      );
+  }) => food.uploadStoreLogo(
+    accessToken: accessToken,
+    contentBase64: contentBase64,
+    contentType: contentType,
+  );
 
   @override
   Future<FoodStoreDetail> clearStoreLogo({required String accessToken}) =>
@@ -206,12 +204,11 @@ class DefaultMerchantOrdersClient implements MerchantOrdersClient {
     required String accessToken,
     required String name,
     String? description,
-  }) =>
-      food.createMerchantMenuCategory(
-        accessToken: accessToken,
-        name: name,
-        description: description,
-      );
+  }) => food.createMerchantMenuCategory(
+    accessToken: accessToken,
+    name: name,
+    description: description,
+  );
 
   @override
   Future<MerchantMenuCategory> updateMenuCategory({
@@ -219,23 +216,21 @@ class DefaultMerchantOrdersClient implements MerchantOrdersClient {
     required String categoryId,
     required String name,
     String? description,
-  }) =>
-      food.updateMerchantMenuCategory(
-        accessToken: accessToken,
-        categoryId: categoryId,
-        name: name,
-        description: description,
-      );
+  }) => food.updateMerchantMenuCategory(
+    accessToken: accessToken,
+    categoryId: categoryId,
+    name: name,
+    description: description,
+  );
 
   @override
   Future<void> deleteMenuCategory({
     required String accessToken,
     required String categoryId,
-  }) =>
-      food.deleteMerchantMenuCategory(
-        accessToken: accessToken,
-        categoryId: categoryId,
-      );
+  }) => food.deleteMerchantMenuCategory(
+    accessToken: accessToken,
+    categoryId: categoryId,
+  );
 
   @override
   Future<MerchantHistoryPage> listOrderHistory({
@@ -244,24 +239,22 @@ class DefaultMerchantOrdersClient implements MerchantOrdersClient {
     int limit = 20,
     String? tab,
     String? q,
-  }) =>
-      food.listMerchantOrderHistory(
-        accessToken: accessToken,
-        page: page,
-        limit: limit,
-        tab: tab,
-        q: q,
-      );
+  }) => food.listMerchantOrderHistory(
+    accessToken: accessToken,
+    page: page,
+    limit: limit,
+    tab: tab,
+    q: q,
+  );
 
   @override
   Future<List<MerchantMenuCategory>> reorderMenuCategories({
     required String accessToken,
     required List<String> orderedIds,
-  }) =>
-      food.reorderMerchantMenuCategories(
-        accessToken: accessToken,
-        orderedIds: orderedIds,
-      );
+  }) => food.reorderMerchantMenuCategories(
+    accessToken: accessToken,
+    orderedIds: orderedIds,
+  );
 
   @override
   Future<FoodMenuItem> uploadItemImage({
@@ -269,18 +262,16 @@ class DefaultMerchantOrdersClient implements MerchantOrdersClient {
     required String itemId,
     required String contentBase64,
     String? contentType,
-  }) =>
-      food.uploadMerchantItemImage(
-        accessToken: accessToken,
-        itemId: itemId,
-        contentBase64: contentBase64,
-        contentType: contentType,
-      );
+  }) => food.uploadMerchantItemImage(
+    accessToken: accessToken,
+    itemId: itemId,
+    contentBase64: contentBase64,
+    contentType: contentType,
+  );
 
   @override
   Future<FoodMenuItem> clearItemImage({
     required String accessToken,
     required String itemId,
-  }) =>
-      food.clearMerchantItemImage(accessToken: accessToken, itemId: itemId);
+  }) => food.clearMerchantItemImage(accessToken: accessToken, itemId: itemId);
 }

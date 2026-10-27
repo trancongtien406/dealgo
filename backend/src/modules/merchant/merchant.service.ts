@@ -19,6 +19,8 @@ export class MerchantService {
       region?: string;
       category?: string;
       kyb?: string;
+      /** MISSING = stores without map coordinates. */
+      location?: string;
     },
   ): Promise<PageResult<OpsStoreListItem>> {
     return this.food.listStoresForOps(page, limit, filter);

@@ -3,10 +3,11 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { OpsTransactionsService } from './ops-transactions.service.js';
+import { OpsDateRangeQueryDto, opsDateWindow } from '../operations/ops-date-window.js';
 import { OpsPermissionGuard } from '../identity/ops-rbac/ops-permission.guard.js';
 import { RequireOpsPermission } from '../identity/ops-rbac/ops-permission.decorator.js';
 
-export class OpsTransactionPageQueryDto {
+export class OpsTransactionPageQueryDto extends OpsDateRangeQueryDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -47,7 +48,7 @@ export class OpsTransactionsController {
   @RequireOpsPermission('transactions.read')
   @Get()
   @ApiOperation({
-    summary: 'Ops paginated transactions with server-side filters (q, status, service, payment)',
+    summary: 'Ops paginated transactions with server-side filters (q, status, service, payment, from/to Vietnam business days on payment intent createdAt)',
   })
   list(@Query() query: OpsTransactionPageQueryDto) {
     return this.transactions.list(query.page, query.limit, {
@@ -55,6 +56,7 @@ export class OpsTransactionsController {
       status: query.status,
       service: query.service,
       payment: query.payment,
+      window: opsDateWindow(query),
     });
   }
 }

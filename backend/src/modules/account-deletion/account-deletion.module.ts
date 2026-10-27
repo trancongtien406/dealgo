@@ -1,3 +1,4 @@
+import { EarningsModule } from '../earnings/earnings.module.js';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { AppEnv } from '../../platform/config/index.js';
@@ -19,7 +20,7 @@ import {
 import { AccountDeletionService } from './account-deletion.service.js';
 
 @Module({
-  imports: [PrismaModule, IdentityModule, PlatformSettingsModule],
+  imports: [PrismaModule, IdentityModule, PlatformSettingsModule, EarningsModule],
   controllers: [AccountDeletionController, OpsAccountDeletionController],
   providers: [
     AccountDeletionService,

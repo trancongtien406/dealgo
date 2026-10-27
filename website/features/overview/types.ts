@@ -26,6 +26,10 @@ export type OverviewSnapshot = {
   areaTotal: number;
   foodTotal: number;
   pipelineTotal: number;
+  /** Today's gross booking value (VND); null when the backend could not compute it. */
+  revenueVnd: number | null;
+  /** Today's platform commission (VND); null when unavailable. */
+  commissionVnd: number | null;
   generatedAt: string | null;
   timezone: string;
 };

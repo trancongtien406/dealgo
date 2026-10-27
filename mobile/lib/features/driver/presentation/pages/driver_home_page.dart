@@ -11,6 +11,8 @@ import '../../../driver_card/presentation/driver_card_tile.dart';
 import '../../../driver_history/domain/driver_history.dart';
 import '../../../ride/domain/entities/ride_money.dart';
 import '../../../onboarding/presentation/utils/driver_kyc_routes.dart';
+import '../../../onboarding/presentation/cubit/driver_kyc_cubit.dart';
+import '../../../ride/presentation/utils/ride_vehicle_label.dart';
 import '../../../presence/domain/entities/driver_service_prefs.dart';
 import '../../../shell/presentation/account_routes.dart';
 import '../cubit/driver_duty_cubit.dart';
@@ -18,6 +20,7 @@ import '../cubit/driver_services_cubit.dart';
 import '../cubit/driver_feed_cubit.dart';
 import '../utils/driver_routes.dart';
 import '../widgets/driver_widgets.dart';
+import '../widgets/driver_duty_map.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 
 class DriverHomePage extends StatelessWidget {
@@ -47,7 +50,7 @@ class DriverOfflineView extends StatelessWidget {
     final prefs = context.watch<DriverServicesCubit>().state.saved;
     return DriverPageFrame(
       title: l10n.driverHomeTitle,
-      onBack: () => driverBack(context),
+      showBack: false,
       footer: DriverFooter(
         secondaryLabel: l10n.driverSeeHistory,
         primaryLabel: l10n.driverGoOnline,
@@ -89,8 +92,6 @@ class DriverOfflineView extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: DealGoSpacing.s12),
-          DriverNote(message: l10n.driverOfflineNote),
         ],
       ),
     );
@@ -108,7 +109,7 @@ class DriverIneligibleView extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return DriverPageFrame(
       title: l10n.driverHomeTitle,
-      onBack: () => driverBack(context),
+      showBack: false,
       footer: DriverFooter(
         secondaryLabel: l10n.driverContactSupport,
         primaryLabel: l10n.driverOpenApplication,
@@ -202,6 +203,7 @@ class _DriverOnlineViewState extends State<DriverOnlineView> {
       _loadSummary();
       if (mounted) {
         context.read<DriverServicesCubit>().load();
+        context.read<DriverKycCubit>().refresh();
       }
     });
   }
@@ -260,10 +262,11 @@ class _DriverOnlineViewState extends State<DriverOnlineView> {
     final summary = _summary;
     final rating = summary?.ratingAverage;
     final services = context.watch<DriverServicesCubit>().state;
+    final vehicleClass = context.watch<DriverKycCubit>().state.vehicleClassCode;
 
     return DriverPageFrame(
       title: l10n.driverHomeTitle,
-      onBack: () => driverBack(context),
+      showBack: false,
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
           DealGoDimensions.pageGutter,
@@ -304,7 +307,11 @@ class _DriverOnlineViewState extends State<DriverOnlineView> {
             ),
           ),
           const SizedBox(height: DealGoSpacing.s12),
-          const _DutyMap(),
+          DriverDutyMap(
+            online: context.watch<DriverDutyCubit>().state,
+            vehicleClassCode: vehicleClass,
+            demand: feedDemandPoints(context.watch<DriverFeedCubit>().state),
+          ),
           const SizedBox(height: DealGoSpacing.s12),
           Row(
             children: [
@@ -374,9 +381,11 @@ class _DriverOnlineViewState extends State<DriverOnlineView> {
                 const SizedBox(height: DealGoSpacing.s8),
                 _ServiceSwitch(
                   key: const Key('driver-home-ride-switch'),
-                  icon: DealGoIcons.motorbike,
+                  icon: _isCar(vehicleClass)
+                      ? DealGoIcons.car
+                      : DealGoIcons.motorbike,
                   title: l10n.driverServicePassenger,
-                  subtitle: l10n.rideVehicleMotorbike,
+                  subtitle: rideVehicleClassLabel(l10n, vehicleClass),
                   value: services.prefs.rideEnabled,
                   onChanged: services.busy
                       ? null
@@ -450,131 +459,6 @@ class _OnlineBadge extends StatelessWidget {
       ),
     );
   }
-}
-
-class _DutyMap extends StatelessWidget {
-  const _DutyMap();
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(DealGoRadius.card),
-      child: SizedBox(
-        height: 180,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            const CustomPaint(painter: _DutyMapPainter()),
-            const Align(
-              alignment: Alignment(0.15, 0.05),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: DealGoColors.card,
-                  shape: BoxShape.circle,
-                ),
-                child: SizedBox(
-                  width: 36,
-                  height: 36,
-                  child: Icon(
-                    DealGoIcons.motorbike,
-                    color: DealGoColors.primary,
-                    size: 20,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              right: 12,
-              bottom: 12,
-              child: DecoratedBox(
-                decoration: const BoxDecoration(
-                  color: DealGoColors.primary,
-                  borderRadius: BorderRadius.all(Radius.circular(999)),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: DealGoSpacing.s12,
-                    vertical: DealGoSpacing.s8,
-                  ),
-                  child: Text(
-                    AppLocalizations.of(context).driverOnDutyMapLabel,
-                    style: const TextStyle(
-                      color: DealGoColors.card,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DutyMapPainter extends CustomPainter {
-  const _DutyMapPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()..color = DealGoColors.infoSurface,
-    );
-    final street = Paint()
-      ..color = DealGoColors.canvas
-      ..strokeWidth = 14
-      ..style = PaintingStyle.stroke;
-    for (var y = 18.0; y < size.height; y += 36) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y + 10), street);
-    }
-    for (var x = 12.0; x < size.width; x += 46) {
-      canvas.drawLine(Offset(x, 0), Offset(x + 16, size.height), street);
-    }
-    final river = Path()
-      ..moveTo(size.width * 0.62, 0)
-      ..quadraticBezierTo(
-        size.width * 0.84,
-        size.height * 0.45,
-        size.width * 0.5,
-        size.height,
-      )
-      ..lineTo(size.width * 0.68, size.height)
-      ..quadraticBezierTo(
-        size.width * 0.98,
-        size.height * 0.4,
-        size.width * 0.78,
-        0,
-      )
-      ..close();
-    canvas.drawPath(river, Paint()..color = DealGoColors.lavender);
-
-    final route = Path()
-      ..moveTo(size.width * 0.18, size.height * 0.78)
-      ..lineTo(size.width * 0.18, size.height * 0.42)
-      ..lineTo(size.width * 0.46, size.height * 0.42)
-      ..lineTo(size.width * 0.46, size.height * 0.22)
-      ..lineTo(size.width * 0.72, size.height * 0.22);
-    canvas.drawPath(
-      route,
-      Paint()
-        ..color = DealGoColors.primary
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 4
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round,
-    );
-    canvas.drawCircle(
-      Offset(size.width * 0.72, size.height * 0.22),
-      5,
-      Paint()..color = DealGoColors.danger,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _StatTile extends StatelessWidget {
@@ -672,3 +556,5 @@ String driverServicesSummary(AppLocalizations l10n, DriverServicePrefs prefs) {
   ];
   return parts.isEmpty ? l10n.driverNoServiceOn : parts.join(', ');
 }
+
+bool _isCar(String? code) => (code ?? '').toUpperCase().startsWith('CAR');

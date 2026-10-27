@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/config/api_base_url.dart';
+import '../../../core/design_system/components/dealgo_dialog.dart';
 import '../../../core/design_system/components/dealgo_card.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../identity/domain/entities/app_role.dart';
@@ -18,6 +19,7 @@ import '../../onboarding/presentation/utils/merchant_kyb_routes.dart';
 import '../../merchant/presentation/utils/merchant_routes.dart';
 import '../../../l10n/app_localizations.dart';
 import 'account_routes.dart';
+import 'driver_account_vehicle.dart';
 import 'customer_tab_bar.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/components/dealgo_app_header.dart';
@@ -41,7 +43,10 @@ class AccountPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthCubit>().state;
     final signedIn = auth is AuthSignedIn ? auth : null;
-    final phone = signedIn?.profile.phone;
+    final headerTitle = accountProfileTitle(
+      signedIn?.profile.displayName,
+      signedIn?.profile.phone,
+    );
     final canSwitchRole =
         signedIn != null && signedIn.profile.activeAppRoles.length > 1;
     final roleLabel = accountShellRoleLabel(
@@ -91,7 +96,7 @@ class AccountPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _ProfileCard(
-                      phone: phone,
+                      phone: headerTitle,
                       roleLabel: roleLabel,
                       avatarUrl: resolveMediaUrl(signedIn?.profile.avatarUrl),
                       onTap: signedIn == null
@@ -101,6 +106,10 @@ class AccountPage extends StatelessWidget {
                             ),
                     ),
                     const SizedBox(height: DealGoSpacing.s12),
+                    if (shellPath.startsWith('/driver')) ...[
+                      const DriverAccountVehicle(),
+                      const SizedBox(height: DealGoSpacing.s12),
+                    ],
                     _MenuGroup(
                       children: [
                         _MenuRow(
@@ -376,6 +385,16 @@ String _partnerActionLabel(
   };
 }
 
+/// Profile header line: the user's name; the phone only when no name is set.
+String? accountProfileTitle(String? displayName, String? phone) {
+  final name = displayName?.trim() ?? '';
+  if (name.isNotEmpty) {
+    return name;
+  }
+  final shown = phone?.trim() ?? '';
+  return shown.isEmpty ? null : shown;
+}
+
 class _ProfileCard extends StatelessWidget {
   const _ProfileCard({
     required this.phone,
@@ -609,6 +628,19 @@ class _LogoutRowState extends State<_LogoutRow> {
     if (_signingOut) {
       return;
     }
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDealGoConfirmDialog(
+      context: context,
+      title: l10n.accountSignOutConfirmTitle,
+      body: l10n.accountSignOutConfirmBody,
+      confirmLabel: l10n.accountSignOut,
+      cancelLabel: l10n.accountSignOutCancel,
+      confirmTone: DealGoDialogPrimaryTone.danger,
+      confirmKey: const Key('account-signout-confirm'),
+    );
+    if (!confirmed || !mounted) {
+      return;
+    }
     setState(() => _signingOut = true);
     final auth = context.read<AuthCubit>();
     await auth.signOut();
@@ -624,6 +656,7 @@ class _LogoutRowState extends State<_LogoutRow> {
     return Material(
       color: DealGoColors.card,
       child: InkWell(
+        key: const Key('account-signout'),
         onTap: _signingOut ? null : _logout,
         child: Padding(
           padding: const EdgeInsets.all(DealGoSpacing.s16),

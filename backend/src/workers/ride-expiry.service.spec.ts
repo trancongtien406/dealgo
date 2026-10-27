@@ -1,6 +1,7 @@
 import { RideLedger } from '../modules/ride/ride-ledger.js';
 import { MemoryRideRepository } from '../modules/ride/ride.repository.js';
 import type { RideService } from '../modules/ride/ride.service.js';
+import type { FoodService } from '../modules/food-order/food.service.js';
 import { RideExpiryService } from './ride-expiry.service.js';
 
 const pickup = { lat: 10.776889, lng: 106.700806, label: 'District 1' };
@@ -16,6 +17,7 @@ describe('RideExpiryService', () => {
       pickup,
       dropoff,
       offeredFareVnd: 40_000,
+      vehicleClassCode: 'MOTORBIKE',
       referenceFareVnd: 40_000,
       expiresAt: new Date(start.getTime() + 60_000),
       now: start,
@@ -36,6 +38,26 @@ describe('RideExpiryService', () => {
     expect(stored?.status).toBe('EXPIRED');
   });
 
+  it('Also runs ride assignment timeouts and food timeouts', async () => {
+    const calls: string[] = [];
+    const rideService = {
+      expireDue: async () => ({ expiredIds: [] }),
+      timeoutDue: async () => {
+        calls.push('ride.timeoutDue');
+        return { returnedIds: ['r1'] };
+      },
+    } as unknown as RideService;
+    const foodService = {
+      timeoutDue: async (now: Date) => {
+        calls.push(`food.timeoutDue:${now.toISOString()}`);
+        return { orderIds: ['f1', 'f2'] };
+      },
+    } as unknown as FoodService;
+    const at = new Date('2026-10-14T12:00:00.000Z');
+    await expect(new RideExpiryService(rideService, foodService).runOnce(at)).resolves.toBe(0);
+    expect(calls).toEqual(['ride.timeoutDue', `food.timeoutDue:${at.toISOString()}`]);
+  });
+
   it('marks due negotiating rides expired in the ledger', () => {
     const ledger = new RideLedger();
     const now = new Date('2026-10-14T12:00:00.000Z');
@@ -45,6 +67,7 @@ describe('RideExpiryService', () => {
       pickup,
       dropoff,
       offeredFareVnd: 40_000,
+      vehicleClassCode: 'MOTORBIKE',
       referenceFareVnd: 40_000,
       expiresAt: new Date(now.getTime() + 30_000),
       now,

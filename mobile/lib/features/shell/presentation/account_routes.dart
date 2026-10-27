@@ -11,13 +11,15 @@ abstract final class AccountRoutes {
 
   static String editProfile(String shellPath) => '$shellPath/edit-profile';
 
-  static String notificationPrefs(String shellPath) => '$shellPath/notification-prefs';
+  static String notificationPrefs(String shellPath) =>
+      '$shellPath/notification-prefs';
 
   static String security(String shellPath) => '$shellPath/security';
 
   static String sessions(String shellPath) => '$shellPath/sessions';
 
-  static String changePassword(String shellPath) => '$shellPath/change-password';
+  static String changePassword(String shellPath) =>
+      '$shellPath/change-password';
 
   static String vouchers(String shellPath) => '$shellPath/vouchers';
 

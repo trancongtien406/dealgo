@@ -1,21 +1,27 @@
-import { HttpException, Inject, Injectable } from '@nestjs/common';
+import { HttpException, Inject, Injectable, Optional } from '@nestjs/common';
+import { RideVehicleClassService } from '../ride-vehicle/ride-vehicle-class.service.js';
 import { IDENTITY_REPOSITORY } from '../identity/identity.constants.js';
 import {
   UniqueConflictError,
   type IdentityRepository,
 } from '../identity/identity.repository.js';
+import { ConfigService } from '@nestjs/config';
+import type { AppEnv } from '../../platform/config/env.js';
 import {
   PARTNER_DOCUMENT_KINDS,
   PARTNER_ISSUE_SECTIONS,
   PARTNER_REPOSITORY,
-  PARTNER_REQUIRED_DOCUMENTS,
+  requiredPartnerDocuments,
 } from './partner.constants.js';
+import { vehicleClassCodeFromMetadata } from '../ride-vehicle/ride-vehicle-class.js';
 import type {
   OpsPartnerApplicationQueryDto,
   PartnerReviewIssueDto,
   SubmitPartnerApplicationDto,
 } from './partner.dto.js';
 import { partnerError } from './partner.error.js';
+import { shopPinFromMetadata } from './partner-shop-pin.js';
+import { PlatformSettingsService } from '../../platform/settings/platform-settings.service.js';
 import { DocumentStoreService } from '../../platform/storage/document-store.service.js';
 import { maskPhone } from '../../shared/privacy/pii-mask.js';
 import type {
@@ -32,6 +38,8 @@ export type PartnerApplicationView = {
   role: PartnerRoleName;
   status: PartnerStatusName;
   metadata: Record<string, unknown>;
+  /** Ops case detail only: applicant's account phone. */
+  applicantPhone?: string;
   documents: PartnerDocumentView[];
   reason: string | null;
   /** Sections ops asked the applicant to fix (empty for approvals and plain rejections). */
@@ -61,7 +69,51 @@ export class PartnerService {
     @Inject(PARTNER_REPOSITORY) private readonly partners: PartnerRepository,
     @Inject(IDENTITY_REPOSITORY) private readonly identity: IdentityRepository,
     private readonly documents: DocumentStoreService,
+    @Optional() private readonly config?: ConfigService<AppEnv, true>,
+    @Optional() private readonly vehicleClasses?: RideVehicleClassService,
+    @Optional() private readonly settings?: PlatformSettingsService,
   ) {}
+
+  /**
+   * DEC-PROD-048 (DRAFT): admin switch ONBOARDING_DRIVER_KYC_REQUIRED /
+   * ONBOARDING_MERCHANT_KYB_REQUIRED. Fails closed (documents required) when settings are absent.
+   */
+  async documentsRequired(role: PartnerRoleName): Promise<boolean> {
+    if (!this.settings) {
+      return true;
+    }
+    const key =
+      role === 'DRIVER' ? 'ONBOARDING_DRIVER_KYC_REQUIRED' : 'ONBOARDING_MERCHANT_KYB_REQUIRED';
+    try {
+      const raw = await this.settings.getJson<unknown>(key);
+      return raw !== false;
+    } catch {
+      return true;
+    }
+  }
+
+  async requirements(
+    role: PartnerRoleName,
+    vehicleClassCode?: string,
+  ): Promise<{
+    role: PartnerRoleName;
+    documentsRequired: boolean;
+    requiredDocuments: readonly string[];
+    vehicleClassRequired: boolean;
+  }> {
+    const documentsRequired = await this.documentsRequired(role);
+    return {
+      role,
+      documentsRequired,
+      requiredDocuments: documentsRequired
+        ? requiredPartnerDocuments(role, {
+            vehicleClassCode: vehicleClassCode?.trim().toUpperCase() || undefined,
+            carExtraDocsGate: this.carExtraDocsGateEnabled(),
+          })
+        : [],
+      vehicleClassRequired: role === 'DRIVER',
+    };
+  }
 
   async listMine(userId: string): Promise<{ applications: PartnerApplicationView[] }> {
     const rows = await this.partners.listByUser(userId);
@@ -110,9 +162,33 @@ export class PartnerService {
       (doc) => doc.kind && allowedKinds.includes(doc.kind) && !seen.has(doc.kind) && hasStoredFile(doc),
     );
     const onFile = new Set([...seen, ...kept.map((doc) => doc.kind!)]);
-    const missing = (PARTNER_REQUIRED_DOCUMENTS[dto.role] as readonly string[]).filter(
-      (kind) => !onFile.has(kind),
-    );
+    const previewClass =
+      dto.role === 'DRIVER'
+        ? vehicleClassCodeFromMetadata(sanitizeMetadata(dto.metadata))
+        : undefined;
+    if (dto.role === 'DRIVER' && !previewClass) {
+      throw partnerError(
+        400,
+        'VALIDATION_ERROR',
+        'Driver KYC requires a valid vehicleClassCode (MOTORBIKE | CAR_4 | CAR_7)',
+      );
+    }
+    if (dto.role === 'MERCHANT' && !shopPinFromMetadata(sanitizeMetadata(dto.metadata))) {
+      // Like GrabFood/ShopeeFood merchant sign-up, the shop must be pinned on the map —
+      // delivery fares, distance caps and driver pickup all need real coordinates.
+      throw partnerError(
+        400,
+        'PARTNER_SHOP_LOCATION_REQUIRED',
+        'Merchant KYB requires the shop pinned on the map (shopLat/shopLng inside Vietnam)',
+      );
+    }
+    const documentsRequired = await this.documentsRequired(dto.role);
+    const missing = documentsRequired
+      ? requiredPartnerDocuments(dto.role, {
+          vehicleClassCode: previewClass ?? undefined,
+          carExtraDocsGate: this.carExtraDocsGateEnabled(),
+        }).filter((kind) => !onFile.has(kind))
+      : [];
     if (missing.length > 0) {
       throw new HttpException(
         {
@@ -142,13 +218,16 @@ export class PartnerService {
       (a, b) => order.indexOf(a.kind ?? '') - order.indexOf(b.kind ?? ''),
     );
     const now = new Date();
+    const metadata = await this.bindVehicleClass(dto.role, sanitizeMetadata(dto.metadata));
+    // Audit trail for ops: this application was submitted while documents were waived.
+    metadata.documentsWaived = !documentsRequired;
     let saved;
     try {
       saved = await this.partners.upsertSubmit({
         id: applicationId,
         userId,
         role: dto.role,
-        metadata: sanitizeMetadata(dto.metadata),
+        metadata,
         documents,
         now,
       });
@@ -199,7 +278,7 @@ export class PartnerService {
       role: opts.role,
     });
     return {
-      applications: result.items.map(toView),
+      applications: await Promise.all(result.items.map((row) => this.toOpsView(row, false))),
       total: result.total,
       page,
       limit,
@@ -211,13 +290,66 @@ export class PartnerService {
     if (!existing) {
       throw partnerError(404, 'PARTNER_APPLICATION_NOT_FOUND', 'Partner application not found');
     }
-    return toView(existing);
+    return this.toOpsView(existing, true);
   }
 
-  async approve(applicationId: string, reviewerId: string): Promise<PartnerApplicationView> {
+  /**
+   * Ops views carry the applicant's account phone: the mobile forms never ask
+   * for it again, so metadata alone left the KYC queue/detail without one.
+   * Lists get the masked phone; the case detail also gets the full number so
+   * the reviewer can call the applicant.
+   */
+  private async toOpsView(
+    row: PartnerApplicationRecord,
+    withFullPhone: boolean,
+  ): Promise<PartnerApplicationView> {
+    const view = toView(row);
+    let phone: string | null = null;
+    try {
+      phone = (await this.identity.findUserById(row.userId))?.phone ?? null;
+    } catch {
+      phone = null;
+    }
+    if (phone) {
+      if (!view.metadata.phoneMasked) {
+        view.metadata.phoneMasked = maskPhone(phone);
+      }
+      if (withFullPhone) {
+        view.applicantPhone = phone;
+      }
+    }
+    return view;
+  }
+
+  async approve(
+    applicationId: string,
+    reviewerId: string,
+    vehicleClassCode?: string,
+  ): Promise<PartnerApplicationView> {
     const existing = await this.requireSubmitted(applicationId);
     const now = new Date();
+    let metadata: Record<string, unknown> | undefined;
+    if (existing.role === 'DRIVER') {
+      // DEC-PROD-048: a driver is never approved without a valid vehicle class (fail closed).
+      const requested = vehicleClassCode?.trim().toUpperCase();
+      const base = requested
+        ? { ...existing.metadata, vehicleClassCode: requested }
+        : { ...existing.metadata };
+      if (!vehicleClassCodeFromMetadata(base)) {
+        throw partnerError(
+          400,
+          'PARTNER_VEHICLE_CLASS_REQUIRED',
+          'Approve a driver only with a valid vehicleClassCode (MOTORBIKE | CAR_4 | CAR_7)',
+        );
+      }
+      const bound = await this.bindVehicleClass('DRIVER', base);
+      if (requested) {
+        bound.vehicleClassConfirmedBy = reviewerId;
+      }
+      metadata = bound;
+    }
     const updated = await this.partners.review({
+      metadata,
       id: existing.id,
       status: 'APPROVED',
       reason: null,
@@ -229,6 +361,14 @@ export class PartnerService {
       throw notSubmittedError();
     }
     await this.ensureGrant(existing.userId, existing.role, 'ACTIVE');
+    // After the grant so the app's REST refetch already sees the active role.
+    await this.partners.recordStatusEvent({
+      applicationId: existing.id,
+      userId: existing.userId,
+      role: existing.role,
+      status: 'APPROVED',
+      reviewedAt: now,
+    });
     return toView(updated);
   }
 
@@ -272,6 +412,13 @@ export class PartnerService {
       throw notSubmittedError();
     }
     await this.ensureGrant(existing.userId, existing.role, 'SUSPENDED');
+    await this.partners.recordStatusEvent({
+      applicationId: existing.id,
+      userId: existing.userId,
+      role: existing.role,
+      status: 'REJECTED',
+      reviewedAt: now,
+    });
     return toView(updated);
   }
 
@@ -310,6 +457,43 @@ export class PartnerService {
     if (existing.status !== status) {
       await this.identity.updateGrantStatus(existing.id, status);
     }
+  }
+
+  /**
+   * OPEN-006 Car KYC extra-docs gate (fail closed in production when unset).
+   * Mirrors PARTNER_ELIGIBILITY_BYPASS defaults — no secrets invented.
+   */
+  private carExtraDocsGateEnabled(): boolean {
+    if (!this.config) {
+      return false;
+    }
+    const explicit = this.config.get('PARTNER_CAR_KYC_EXTRA_DOCS', { infer: true });
+    if (explicit !== undefined) {
+      return explicit;
+    }
+    return this.config.get('NODE_ENV', { infer: true }) === 'production';
+  }
+
+  private async bindVehicleClass(
+    role: PartnerRoleName,
+    metadata: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    if (role !== 'DRIVER' || !this.vehicleClasses) {
+      return metadata;
+    }
+    const raw = metadata.vehicleClassCode;
+    if (typeof raw !== 'string' || !raw.trim()) {
+      return metadata;
+    }
+    const vehicle = await this.vehicleClasses.findEnabled(raw);
+    if (!vehicle) {
+      throw partnerError(400, 'PARTNER_VEHICLE_CLASS_UNKNOWN', 'Vehicle class is not available');
+    }
+    return {
+      ...metadata,
+      vehicleClassCode: vehicle.code,
+      vehicleType: vehicle.name,
+    };
   }
 }
 

@@ -74,11 +74,14 @@ export function mapNestStoreToListItem(store: NestOpsStore): StoreListItem {
     serviceModeUntil: store.serviceModeUntil ?? null,
     acceptSummary: storeAcceptSummary(store),
     prepMinutes: store.estimatedPrepMinutes ?? null,
+    locationMissing: store.lat == null || store.lng == null,
   };
 }
 
 /** "Thủ công" / "Tự động", plus the kitchen cap when one is set. */
-export function storeAcceptSummary(store: Pick<NestOpsStore, "acceptSettings">): string | null {
+export function storeAcceptSummary(
+  store: Pick<NestOpsStore, "acceptSettings">,
+): string | null {
   const settings = store.acceptSettings;
   if (!settings) return null;
   const mode = settings.acceptMode === "AUTO" ? "Tự động" : "Thủ công";
@@ -93,7 +96,8 @@ function shortId(id: string): string {
 
 /** Live intake state from the backend (DEC-PROD-026/027); falls back to the legacy `sale` field. */
 export function storeSaleFromNest(store: NestOpsStore): StoreSaleStatus | null {
-  if (store.closedReason === "PAUSED" || store.serviceMode === "PAUSED") return "PAUSED";
+  if (store.closedReason === "PAUSED" || store.serviceMode === "PAUSED")
+    return "PAUSED";
   if (store.openNow === false) return "CLOSED";
   if (store.serviceMode === "BUSY") return "BUSY";
   if (store.openNow === true) return "OPEN";

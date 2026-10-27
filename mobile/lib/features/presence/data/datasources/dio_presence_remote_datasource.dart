@@ -41,7 +41,9 @@ class DioPresenceRemoteDataSource implements PresenceRemoteDataSource {
   }
 
   @override
-  Future<DriverServicePrefs> getServicePrefs({required String accessToken}) async {
+  Future<DriverServicePrefs> getServicePrefs({
+    required String accessToken,
+  }) async {
     try {
       final response = await _dio.get<Object?>(
         ApiPaths.mePresence,

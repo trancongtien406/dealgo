@@ -3,6 +3,8 @@ import {
   LEDGER_COD_OBLIGATION_CODE,
   LEDGER_FEE_DRIVER_RECEIVABLE_CODE,
   LEDGER_FEE_REVENUE_CODE,
+  LEDGER_COMMISSION_MERCHANT_RECEIVABLE_CODE,
+  LEDGER_COMMISSION_REVENUE_CODE,
   LEDGER_PROMO_DRIVER_PAYABLE_CODE,
   LEDGER_PROMO_EXPENSE_CODE,
   LEDGER_PROMO_MERCHANT_PAYABLE_CODE,
@@ -73,11 +75,23 @@ export function buildDriverPlatformFeeLines(amountVnd: number): CodJournalLine[]
   ];
 }
 
+/** Merchant commission on a delivered food order (receivable vs revenue). */
+export function buildMerchantCommissionLines(amountVnd: number): CodJournalLine[] {
+  if (!Number.isSafeInteger(amountVnd) || amountVnd <= 0) {
+    throw new LedgerRuleError('LEDGER_AMOUNT_INVALID');
+  }
+  return [
+    { accountCode: LEDGER_COMMISSION_MERCHANT_RECEIVABLE_CODE, direction: 'DEBIT', amountVnd },
+    { accountCode: LEDGER_COMMISSION_REVENUE_CODE, direction: 'CREDIT', amountVnd },
+  ];
+}
+
 /** Ledger events that can be posted for a completed job, with their line builders. */
 export type PostableLedgerEvent =
   | 'COD_OBLIGATION_POSTED'
   | 'PROMOTION_DISCOUNT_FUNDED'
-  | 'DRIVER_PLATFORM_FEE_ACCRUED';
+  | 'DRIVER_PLATFORM_FEE_ACCRUED'
+  | 'MERCHANT_COMMISSION_ACCRUED';
 
 export type LedgerLineBuilder = (
   amountVnd: number,
@@ -88,6 +102,7 @@ export const LEDGER_LINE_BUILDERS: Readonly<Record<PostableLedgerEvent, LedgerLi
   COD_OBLIGATION_POSTED: buildCodObligationLines,
   PROMOTION_DISCOUNT_FUNDED: buildPromotionDiscountLines,
   DRIVER_PLATFORM_FEE_ACCRUED: buildDriverPlatformFeeLines,
+  MERCHANT_COMMISSION_ACCRUED: buildMerchantCommissionLines,
 };
 
 export function assertBalancedLines(lines: CodJournalLine[]): void {

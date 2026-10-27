@@ -1,3 +1,4 @@
+import { inBox, type GeoBox } from '../dispatch/dispatch-filter.js';
 import { cancellationCountsAgainstDriver } from '../../shared/cancel-actor.js';
 import type { CancelActorName } from '../../shared/cancel-actor.js';
 import type { DriverJobCounts } from '../../shared/driver-job-counts.js';
@@ -19,7 +20,7 @@ export type RideStatusName =
   | 'EXPIRED';
 export type { CancelActorName };
 export type RideOfferKindName = 'ACCEPT' | 'COUNTER';
-export type RideOfferStatusName = 'PENDING' | 'SELECTED' | 'LOST';
+export type RideOfferStatusName = 'PENDING' | 'SELECTED' | 'LOST' | 'DECLINED' | 'WITHDRAWN';
 
 export const RIDE_PRE_TRIP_STATUSES = [
   'ASSIGNED',
@@ -42,6 +43,43 @@ export type RideOfferSnapshot = {
   kind: RideOfferKindName;
   status: RideOfferStatusName;
   expiresAt: Date;
+  /** Changes after the first offer (RIDE_MAX_OFFER_EDITS_PER_DRIVER). */
+  editCount: number;
+};
+
+/** A driver gave up an assigned ride (self-cancel or SYSTEM timeout). */
+export type DriverCancellationRecord = {
+  rideId: string;
+  driverId: string;
+  actor: 'DRIVER' | 'SYSTEM' | 'OPS';
+  reasonCode: string;
+  fromStatus: RideStatusName;
+  at: Date;
+};
+
+/** A driver lost an assigned ride (timeout, own drop or ops reassign); they and the customer are told. */
+export type RideUnassignment = {
+  rideId: string;
+  driverId: string;
+  actor: DriverCancellationRecord['actor'];
+  reasonCode: string;
+  fromStatus: RideStatusName;
+  at: Date;
+};
+
+export type CustomerFeeKindName = 'LATE_CANCEL' | 'NO_SHOW';
+
+/** Fee owed by a customer, collected in the next completed ride's cash. */
+export type CustomerFeeRecord = {
+  id: string;
+  customerId: string;
+  rideId: string;
+  kind: CustomerFeeKindName;
+  amountVnd: number;
+  beneficiaryDriverId: string | null;
+  status: 'PENDING' | 'COLLECTED' | 'WAIVED';
+  collectedRideId: string | null;
+  createdAt: Date;
 };
 
 export type RideSnapshot = {
@@ -52,6 +90,7 @@ export type RideSnapshot = {
   dropoff: GeoPoint;
   offeredFareVnd: number;
   referenceFareVnd: number;
+  vehicleClassCode: string;
   agreedFareVnd: number | null;
   /** DEC-PROD-024: voucher discount reserved at offer selection (0 when none). */
   discountVnd: number;
@@ -63,7 +102,21 @@ export type RideSnapshot = {
   selectedOfferId: string | null;
   expiresAt: Date;
   updatedAt: Date;
+  /** Lifecycle fields. */
+  createdAt: Date;
+  assignedAt: Date | null;
+  statusChangedAt: Date;
+  noShow: boolean;
+  cancelReasonCode: string | null;
+  /** Earlier unpaid customer fees collected in this ride's cash (set at completion). */
+  priorFeesVnd: number;
+  /** Customer fare raises so far (each one opens a new negotiation round). */
+  fareRaiseCount: number;
+  /** EXPIRED ride this request re-posts. */
+  repostOfRideId: string | null;
   offers: RideOfferSnapshot[];
+  /** Transient: fee charges collected by this completion (cash hand-over adjustments). */
+  collectedFees?: Array<{ id: string; amountVnd: number; beneficiaryDriverId: string | null }>;
 };
 
 export type RideVoucherSponsor = 'PLATFORM' | 'MERCHANT' | 'SHARED';
@@ -96,18 +149,87 @@ export type CreateRideInput = {
   dropoff: GeoPoint;
   offeredFareVnd: number;
   referenceFareVnd: number;
+  /** Required at create — no silent MOTORBIKE default (DG-DEC-VEH-001). */
+  vehicleClassCode: string;
   expiresAt: Date;
   now: Date;
+  /** EXPIRED ride of the same customer being re-posted. */
+  repostOfRideId?: string | null;
 };
 
 export type OfferInput = {
   rideId: string;
   driverId: string;
   amountVnd: number;
+  /** Per-offer TTL end; capped at the ride's own expiresAt. */
   expiresAt: Date;
   now: Date;
-  /** When set, blocks new driver offers once this many offers exist on the ride. */
-  maxRounds?: number;
+  /**
+   * Cap on live (PENDING, unexpired) offers from different drivers on one ride
+   * (setting RIDE_MAX_LIVE_OFFERS_PER_RIDE; 0/undefined = unlimited, as on inDrive).
+   */
+  maxLiveOffers?: number;
+  /** Max price changes per driver within the current round (undefined = unlimited). */
+  maxEdits?: number;
+};
+
+/** Late-cancel / no-show fee policy resolved from settings by the service. */
+export type RideFeePolicy = {
+  freeCancelMinutes: number;
+  amountVnd: number;
+};
+
+export type RaiseFareInput = {
+  rideId: string;
+  customerId: string;
+  amountVnd: number;
+  now: Date;
+  /** New end of the request window (never shortens the current one). */
+  windowExpiresAt: Date;
+  /** Max raises per ride (RIDE_MAX_FARE_RAISES_PER_RIDE; 0/undefined = unlimited). */
+  maxRaises?: number;
+};
+
+export type DeclineOfferInput = {
+  rideId: string;
+  customerId: string;
+  offerId: string;
+  now: Date;
+};
+
+export type WithdrawOfferInput = {
+  rideId: string;
+  driverId: string;
+  now: Date;
+};
+
+export type DriverCancelInput = {
+  rideId: string;
+  driverId: string;
+  reasonCode: string;
+  now: Date;
+  /** The ride goes back to bidding until this time. */
+  windowExpiresAt: Date;
+};
+
+export type NoShowInput = {
+  rideId: string;
+  driverId: string;
+  now: Date;
+  waitMinutes: number;
+  feeVnd: number;
+};
+
+export type RideTimeoutPolicy = {
+  assignedTimeoutMinutes: number;
+  enRouteTimeoutMinutes: number;
+};
+
+export type SystemTimeoutInput = {
+  rideId: string;
+  now: Date;
+  policy: RideTimeoutPolicy;
+  windowExpiresAt: Date;
 };
 
 export type SelectInput = {
@@ -126,6 +248,8 @@ export type CancelInput = {
   rideId: string;
   customerId: string;
   now: Date;
+  /** Late-cancel fee policy; omitted = free cancel. */
+  fee?: RideFeePolicy;
 };
 
 export type OpsCancelInput = {
@@ -136,6 +260,8 @@ export type OpsCancelInput = {
 export type OpsReassignInput = {
   rideId: string;
   now: Date;
+  /** Fresh request window for the returned ride (defaults to keeping expiresAt). */
+  windowExpiresAt?: Date;
 };
 
 const OPS_CANCELLABLE = new Set<string>([
@@ -156,11 +282,14 @@ export type DriverLifecycleInput = {
 
 export type OpenRideListing = {
   id: string;
+  /** Internal (customer-rating lookup); never copied into the driver-facing view. */
+  customerId: string;
   status: 'NEGOTIATING';
   pickup: GeoPoint;
   dropoff: GeoPoint;
   offeredFareVnd: number;
   referenceFareVnd: number;
+  vehicleClassCode: string;
   expiresAt: Date;
   offerCount: number;
 };
@@ -176,6 +305,7 @@ type RideRow = {
   dropoffLabel: string;
   offeredFareVnd: number;
   referenceFareVnd: number;
+  vehicleClassCode: string;
   agreedFareVnd: number | null;
   discountVnd: number;
   voucherCode: string | null;
@@ -189,6 +319,13 @@ type RideRow = {
   idempotencyKey: string;
   createdAt: Date;
   updatedAt: Date;
+  assignedAt: Date | null;
+  statusChangedAt: Date;
+  noShow: boolean;
+  cancelReasonCode: string | null;
+  priorFeesVnd: number;
+  fareRaiseCount: number;
+  repostOfRideId: string | null;
 };
 
 type OfferRow = {
@@ -200,6 +337,7 @@ type OfferRow = {
   status: RideOfferStatusName;
   expiresAt: Date;
   createdAt: Date;
+  editCount: number;
 };
 
 type SelectionRow = {
@@ -234,6 +372,13 @@ export class RideLedger {
   private readonly newRideIds = new Set<string>();
   private readonly newOfferIds = new Set<string>();
   private readonly newSelectionKeys = new Set<string>();
+  /** Driver cancellations / fees recorded by this ledger (memory repo keeps them all). */
+  private readonly cancellations: DriverCancellationRecord[] = [];
+  private readonly fees: CustomerFeeRecord[] = [];
+  private newCancellations: DriverCancellationRecord[] = [];
+  private newUnassignments: RideUnassignment[] = [];
+  private newFees: CustomerFeeRecord[] = [];
+  private readonly dirtyFeeIds = new Set<string>();
 
   static hydrate(input: {
     rides: RideRow[];
@@ -285,6 +430,7 @@ export class RideLedger {
       dropoffLabel: input.dropoff.label,
       offeredFareVnd: input.offeredFareVnd,
       referenceFareVnd: input.referenceFareVnd,
+      vehicleClassCode: input.vehicleClassCode,
       agreedFareVnd: null,
       discountVnd: 0,
       voucherCode: null,
@@ -298,6 +444,13 @@ export class RideLedger {
       idempotencyKey: input.idempotencyKey,
       createdAt: input.now,
       updatedAt: input.now,
+      assignedAt: null,
+      statusChangedAt: input.now,
+      noShow: false,
+      cancelReasonCode: null,
+      priorFeesVnd: 0,
+      fareRaiseCount: 0,
+      repostOfRideId: input.repostOfRideId ?? null,
     };
     this.rides.set(ride.id, ride);
     this.newRideIds.add(ride.id);
@@ -314,21 +467,34 @@ export class RideLedger {
     return this.snapshot(ride);
   }
 
-  listOpen(now: Date, limit?: number): OpenRideListing[] {
+  listOpen(
+    now: Date,
+    limit?: number,
+    vehicleClassCode?: string,
+    area?: GeoBox,
+  ): OpenRideListing[] {
     const nowMs = now.getTime();
     const rows = [...this.rides.values()]
-      .filter((ride) => ride.status === 'NEGOTIATING' && ride.expiresAt.getTime() > nowMs)
+      .filter(
+        (ride) =>
+          ride.status === 'NEGOTIATING' &&
+          ride.expiresAt.getTime() > nowMs &&
+          (vehicleClassCode === undefined || ride.vehicleClassCode === vehicleClassCode) &&
+          (area === undefined || inBox({ lat: ride.pickupLat, lng: ride.pickupLng }, area)),
+      )
       .sort(
         (left, right) =>
           left.expiresAt.getTime() - right.expiresAt.getTime() || left.id.localeCompare(right.id),
       )
       .map((ride) => ({
         id: ride.id,
+        customerId: ride.customerId,
         status: 'NEGOTIATING' as const,
         pickup: { lat: ride.pickupLat, lng: ride.pickupLng, label: ride.pickupLabel },
         dropoff: { lat: ride.dropoffLat, lng: ride.dropoffLng, label: ride.dropoffLabel },
         offeredFareVnd: ride.offeredFareVnd,
         referenceFareVnd: ride.referenceFareVnd,
+        vehicleClassCode: ride.vehicleClassCode,
         expiresAt: new Date(ride.expiresAt),
         offerCount: this.countOffers(ride.id),
       }));
@@ -351,30 +517,50 @@ export class RideLedger {
       return { error: 'RIDE_OFFER_UNAVAILABLE' };
     }
 
+    // A driver accepts the bid or asks for more, never less.
+    if (input.amountVnd < ride.offeredFareVnd) {
+      return { error: 'RIDE_COUNTER_OUT_OF_RANGE' };
+    }
     const kind: RideOfferKindName =
       input.amountVnd === ride.offeredFareVnd ? 'ACCEPT' : 'COUNTER';
+    const expiresAt =
+      input.expiresAt.getTime() < ride.expiresAt.getTime() ? input.expiresAt : new Date(ride.expiresAt);
     const existing = [...this.offers.values()].find(
       (offer) => offer.rideId === ride.id && offer.driverId === input.driverId,
     );
+    const maxLive = input.maxLiveOffers;
+    const liveFull =
+      maxLive !== undefined &&
+      Number.isSafeInteger(maxLive) &&
+      maxLive > 0 &&
+      this.countLiveOffers(ride.id, input.now, existing?.id) >= maxLive;
     if (existing) {
-      if (existing.status !== 'PENDING') {
-        return { error: 'RIDE_OFFER_UNAVAILABLE' };
+      // DECLINED (customer said no) and SELECTED stay final for this driver on this ride.
+      if (existing.status === 'DECLINED' || existing.status === 'SELECTED') {
+        return { error: existing.status === 'DECLINED' ? 'RIDE_OFFER_DECLINED' : 'RIDE_OFFER_UNAVAILABLE' };
+      }
+      // Only a price change counts as an edit; re-sending the same price after a withdraw /
+      // expiry (inDrive "offer again") does not use up the round.
+      const priceChanged = existing.amountVnd !== input.amountVnd;
+      if (priceChanged && input.maxEdits !== undefined && existing.editCount >= input.maxEdits) {
+        return { error: 'RIDE_OFFER_EDIT_LIMIT' };
+      }
+      if (liveFull) {
+        return { error: 'RIDE_LIVE_OFFERS_FULL' };
       }
       existing.amountVnd = input.amountVnd;
       existing.kind = kind;
-      existing.expiresAt = input.expiresAt;
+      existing.expiresAt = expiresAt;
+      existing.status = 'PENDING';
+      if (priceChanged) {
+        existing.editCount += 1;
+      }
       this.dirtyOfferIds.add(existing.id);
       return { ride: this.snapshot(ride) };
     }
 
-    const maxRounds = input.maxRounds;
-    if (
-      maxRounds !== undefined &&
-      Number.isSafeInteger(maxRounds) &&
-      maxRounds > 0 &&
-      this.countOffers(ride.id) >= maxRounds
-    ) {
-      return { error: 'RIDE_NEGOTIATION_ROUNDS_EXCEEDED' };
+    if (liveFull) {
+      return { error: 'RIDE_LIVE_OFFERS_FULL' };
     }
 
     const created: OfferRow = {
@@ -384,8 +570,9 @@ export class RideLedger {
       amountVnd: input.amountVnd,
       kind,
       status: 'PENDING',
-      expiresAt: input.expiresAt,
+      expiresAt,
       createdAt: input.now,
+      editCount: 0,
     };
     this.offers.set(created.id, created);
     this.newOfferIds.add(created.id);
@@ -441,6 +628,8 @@ export class RideLedger {
     ride.assignedDriverId = offer.driverId;
     ride.selectedOfferId = offer.id;
     ride.updatedAt = input.now;
+    ride.assignedAt = input.now;
+    ride.statusChangedAt = input.now;
     this.dirtyRideIds.add(ride.id);
     offer.status = 'SELECTED';
     this.dirtyOfferIds.add(offer.id);
@@ -494,13 +683,314 @@ export class RideLedger {
     }
     this.expireIfDue(ride, input.now);
     if (ride.status === 'NEGOTIATING' || PRE_TRIP.has(ride.status)) {
+      const lateFee = this.lateCancelFee(ride, input);
       ride.status = 'CANCELLED';
       ride.cancelledBy = 'CUSTOMER';
       ride.updatedAt = input.now;
+      ride.statusChangedAt = input.now;
       this.dirtyRideIds.add(ride.id);
+      this.loseOpenOffers(ride.id);
+      if (lateFee > 0) {
+        this.recordFee(ride, 'LATE_CANCEL', lateFee, input.now);
+      }
       return { ride: this.snapshot(ride) };
     }
     return { error: 'RIDE_NOT_CANCELLABLE' };
+  }
+
+  /** Fee when the customer cancels after the free window or on arrival. */
+  private lateCancelFee(ride: RideRow, input: CancelInput): number {
+    const fee = input.fee;
+    if (!fee || fee.amountVnd <= 0 || !ride.assignedDriverId || !PRE_TRIP.has(ride.status)) {
+      return 0;
+    }
+    if (ride.status === 'DRIVER_ARRIVED') {
+      return fee.amountVnd;
+    }
+    const since = (ride.assignedAt ?? ride.statusChangedAt).getTime();
+    return input.now.getTime() - since >= fee.freeCancelMinutes * 60_000 ? fee.amountVnd : 0;
+  }
+
+  private recordFee(ride: RideRow, kind: CustomerFeeKindName, amountVnd: number, now: Date): void {
+    if (this.fees.some((fee) => fee.rideId === ride.id && fee.kind === kind)) {
+      return;
+    }
+    const fee: CustomerFeeRecord = {
+      id: randomUUID(),
+      customerId: ride.customerId,
+      rideId: ride.id,
+      kind,
+      amountVnd,
+      beneficiaryDriverId: ride.assignedDriverId,
+      status: 'PENDING',
+      collectedRideId: null,
+      createdAt: now,
+    };
+    this.fees.push(fee);
+    this.newFees.push(fee);
+  }
+
+  /** Pending customer fees known to this ledger (memory repo). */
+  pendingFees(customerId: string): CustomerFeeRecord[] {
+    return this.fees.filter((fee) => fee.customerId === customerId && fee.status === 'PENDING');
+  }
+
+  /** Mark fees collected in `rideId`'s cash; returns the ride with priorFeesVnd set. */
+  collectFees(rideId: string, charges: CustomerFeeRecord[], now: Date): void {
+    const ride = this.rides.get(rideId);
+    if (!ride) {
+      return;
+    }
+    for (const charge of charges) {
+      charge.status = 'COLLECTED';
+      charge.collectedRideId = rideId;
+      this.dirtyFeeIds.add(charge.id);
+    }
+    ride.priorFeesVnd = charges.reduce((sum, charge) => sum + charge.amountVnd, 0);
+    ride.updatedAt = now;
+    this.dirtyRideIds.add(ride.id);
+  }
+
+  /** Customer raises the bid (inDrive). Increase only; extends the request window. */
+  raiseFare(input: RaiseFareInput): LedgerOutcome {
+    const ride = this.rides.get(input.rideId);
+    if (!ride || ride.customerId !== input.customerId) {
+      return { error: 'RIDE_NOT_FOUND' };
+    }
+    this.expireIfDue(ride, input.now);
+    if (ride.status !== 'NEGOTIATING') {
+      return { error: 'RIDE_STATUS_CONFLICT' };
+    }
+    if (input.amountVnd <= ride.offeredFareVnd) {
+      return { error: 'RIDE_FARE_RAISE_INVALID' };
+    }
+    if (
+      input.maxRaises !== undefined &&
+      Number.isSafeInteger(input.maxRaises) &&
+      input.maxRaises > 0 &&
+      ride.fareRaiseCount >= input.maxRaises
+    ) {
+      return { error: 'RIDE_FARE_RAISE_LIMIT' };
+    }
+    ride.offeredFareVnd = input.amountVnd;
+    ride.fareRaiseCount += 1;
+    if (input.windowExpiresAt.getTime() > ride.expiresAt.getTime()) {
+      ride.expiresAt = input.windowExpiresAt;
+    }
+    ride.updatedAt = input.now;
+    this.dirtyRideIds.add(ride.id);
+    // Live offers below the new bid are lifted to it: a driver never ends up with less.
+    // A raise opens a new round — every driver not declined gets their edits back.
+    for (const offer of this.offers.values()) {
+      if (offer.rideId !== ride.id || offer.status === 'DECLINED') continue;
+      if (offer.editCount !== 0) {
+        offer.editCount = 0;
+        this.dirtyOfferIds.add(offer.id);
+      }
+      if (offer.status !== 'PENDING') continue;
+      if (offer.amountVnd <= input.amountVnd) {
+        offer.amountVnd = input.amountVnd;
+        offer.kind = 'ACCEPT';
+        this.dirtyOfferIds.add(offer.id);
+      }
+    }
+    return { ride: this.snapshot(ride) };
+  }
+
+  /** Customer declines one offer; that driver cannot bid on this ride again. */
+  declineOffer(input: DeclineOfferInput): LedgerOutcome {
+    const ride = this.rides.get(input.rideId);
+    if (!ride || ride.customerId !== input.customerId) {
+      return { error: 'RIDE_NOT_FOUND' };
+    }
+    this.expireIfDue(ride, input.now);
+    const offer = this.offers.get(input.offerId);
+    if (!offer || offer.rideId !== ride.id) {
+      return { error: 'RIDE_OFFER_UNAVAILABLE' };
+    }
+    if (ride.status !== 'NEGOTIATING' || offer.status !== 'PENDING') {
+      return { error: 'RIDE_OFFER_UNAVAILABLE' };
+    }
+    offer.status = 'DECLINED';
+    this.dirtyOfferIds.add(offer.id);
+    return { ride: this.snapshot(ride) };
+  }
+
+  /** Driver withdraws a pending offer (may bid again while the ride negotiates). */
+  withdrawOffer(input: WithdrawOfferInput): LedgerOutcome {
+    const ride = this.rides.get(input.rideId);
+    if (!ride) {
+      return { error: 'RIDE_NOT_FOUND' };
+    }
+    this.expireIfDue(ride, input.now);
+    const offer = [...this.offers.values()].find(
+      (row) => row.rideId === ride.id && row.driverId === input.driverId,
+    );
+    if (!offer || ride.status !== 'NEGOTIATING' || offer.status !== 'PENDING') {
+      return { error: 'RIDE_OFFER_UNAVAILABLE' };
+    }
+    offer.status = 'WITHDRAWN';
+    this.dirtyOfferIds.add(offer.id);
+    return { ride: this.snapshot(ride) };
+  }
+
+  /**
+   * The assigned driver gives up before the trip. The ride returns to bidding (no auto
+   * match) with a fresh window; the cancellation counts in the driver's completion rate.
+   */
+  driverCancel(input: DriverCancelInput): LedgerOutcome {
+    const ride = this.rides.get(input.rideId);
+    if (!ride) {
+      return { error: 'RIDE_NOT_FOUND' };
+    }
+    if (ride.assignedDriverId !== input.driverId) {
+      return { error: 'RIDE_NOT_ASSIGNED_DRIVER' };
+    }
+    if (!PRE_TRIP.has(ride.status)) {
+      return { error: 'RIDE_NOT_CANCELLABLE' };
+    }
+    this.returnToBidding(ride, {
+      actor: 'DRIVER',
+      reasonCode: input.reasonCode,
+      now: input.now,
+      windowExpiresAt: input.windowExpiresAt,
+    });
+    return { ride: this.snapshot(ride) };
+  }
+
+  /** Customer no-show after the driver waited at pickup. */
+  markNoShow(input: NoShowInput): LedgerOutcome {
+    const ride = this.rides.get(input.rideId);
+    if (!ride) {
+      return { error: 'RIDE_NOT_FOUND' };
+    }
+    if (ride.assignedDriverId !== input.driverId) {
+      return { error: 'RIDE_NOT_ASSIGNED_DRIVER' };
+    }
+    if (ride.status !== 'DRIVER_ARRIVED') {
+      return { error: 'RIDE_STATUS_CONFLICT' };
+    }
+    if (input.now.getTime() - ride.statusChangedAt.getTime() < input.waitMinutes * 60_000) {
+      return { error: 'RIDE_NO_SHOW_TOO_EARLY' };
+    }
+    ride.status = 'CANCELLED';
+    ride.cancelledBy = 'CUSTOMER';
+    ride.noShow = true;
+    ride.cancelReasonCode = 'NO_SHOW';
+    ride.updatedAt = input.now;
+    ride.statusChangedAt = input.now;
+    this.dirtyRideIds.add(ride.id);
+    if (input.feeVnd > 0) {
+      this.recordFee(ride, 'NO_SHOW', input.feeVnd, input.now);
+    }
+    return { ride: this.snapshot(ride) };
+  }
+
+  /** Rides stuck in ASSIGNED / DRIVER_EN_ROUTE past the timeout (worker). */
+  listTimeoutCandidates(now: Date, policy: RideTimeoutPolicy): string[] {
+    return [...this.rides.values()]
+      .filter((ride) => this.timeoutReason(ride, now, policy) !== null)
+      .map((ride) => ride.id)
+      .sort();
+  }
+
+  systemTimeout(input: SystemTimeoutInput): LedgerOutcome {
+    const ride = this.rides.get(input.rideId);
+    if (!ride) {
+      return { error: 'RIDE_NOT_FOUND' };
+    }
+    const reason = this.timeoutReason(ride, input.now, input.policy);
+    if (!reason) {
+      return { error: 'RIDE_STATUS_CONFLICT' };
+    }
+    this.returnToBidding(ride, {
+      actor: 'SYSTEM',
+      reasonCode: reason,
+      now: input.now,
+      windowExpiresAt: input.windowExpiresAt,
+    });
+    return { ride: this.snapshot(ride) };
+  }
+
+  private timeoutReason(ride: RideRow, now: Date, policy: RideTimeoutPolicy): string | null {
+    const age = now.getTime() - ride.statusChangedAt.getTime();
+    if (
+      ride.status === 'ASSIGNED' &&
+      policy.assignedTimeoutMinutes > 0 &&
+      age >= policy.assignedTimeoutMinutes * 60_000
+    ) {
+      return 'ASSIGNED_TIMEOUT';
+    }
+    if (
+      ride.status === 'DRIVER_EN_ROUTE' &&
+      policy.enRouteTimeoutMinutes > 0 &&
+      age >= policy.enRouteTimeoutMinutes * 60_000
+    ) {
+      return 'EN_ROUTE_TIMEOUT';
+    }
+    return null;
+  }
+
+  private returnToBidding(
+    ride: RideRow,
+    input: { actor: DriverCancellationRecord['actor']; reasonCode: string; now: Date; windowExpiresAt: Date | undefined },
+  ): void {
+    if (ride.assignedDriverId) {
+      this.newUnassignments.push({
+        rideId: ride.id,
+        driverId: ride.assignedDriverId,
+        actor: input.actor,
+        reasonCode: input.reasonCode,
+        fromStatus: ride.status,
+        at: input.now,
+      });
+    }
+    if (ride.assignedDriverId && input.actor !== 'OPS') {
+      const record: DriverCancellationRecord = {
+        rideId: ride.id,
+        driverId: ride.assignedDriverId,
+        actor: input.actor,
+        reasonCode: input.reasonCode,
+        fromStatus: ride.status,
+        at: input.now,
+      };
+      this.cancellations.push(record);
+      this.newCancellations.push(record);
+    }
+    if (ride.selectedOfferId) {
+      const offer = this.offers.get(ride.selectedOfferId);
+      if (offer) {
+        // The driver who dropped the job cannot win it again; ops reassign keeps LOST.
+        offer.status = input.actor === 'OPS' ? 'LOST' : 'DECLINED';
+        this.dirtyOfferIds.add(offer.id);
+      }
+      ride.selectedOfferId = null;
+    }
+    ride.assignedDriverId = null;
+    ride.assignedAt = null;
+    ride.agreedFareVnd = null;
+    // The reserved voucher is released by the repository; the next selection may apply one again.
+    ride.discountVnd = 0;
+    ride.voucherCode = null;
+    ride.voucherSponsor = null;
+    ride.status = 'NEGOTIATING';
+    ride.cancelReasonCode = input.actor === 'OPS' ? ride.cancelReasonCode : input.reasonCode;
+    if (input.windowExpiresAt && input.windowExpiresAt.getTime() > ride.expiresAt.getTime()) {
+      ride.expiresAt = input.windowExpiresAt;
+    }
+    ride.updatedAt = input.now;
+    ride.statusChangedAt = input.now;
+    this.dirtyRideIds.add(ride.id);
+  }
+
+  /** PENDING offers die with the ride (expired / cancelled). */
+  private loseOpenOffers(rideId: string): void {
+    for (const offer of this.offers.values()) {
+      if (offer.rideId === rideId && offer.status === 'PENDING') {
+        offer.status = 'LOST';
+        this.dirtyOfferIds.add(offer.id);
+      }
+    }
   }
 
   opsCancel(input: OpsCancelInput): LedgerOutcome {
@@ -515,7 +1005,9 @@ export class RideLedger {
     ride.status = 'CANCELLED';
     ride.cancelledBy = 'OPS';
     ride.updatedAt = input.now;
+    ride.statusChangedAt = input.now;
     this.dirtyRideIds.add(ride.id);
+    this.loseOpenOffers(ride.id);
     return { ride: this.snapshot(ride) };
   }
 
@@ -529,23 +1021,13 @@ export class RideLedger {
     if (!OPS_REASSIGNABLE.has(ride.status)) {
       return { error: 'RIDE_STATUS_CONFLICT' };
     }
-    if (ride.selectedOfferId) {
-      const offer = this.offers.get(ride.selectedOfferId);
-      if (offer) {
-        offer.status = 'LOST';
-        this.dirtyOfferIds.add(offer.id);
-      }
-      ride.selectedOfferId = null;
-    }
-    ride.assignedDriverId = null;
-    ride.agreedFareVnd = null;
-    // The reserved voucher is released by the repository; the next selection may apply one again.
-    ride.discountVnd = 0;
-    ride.voucherCode = null;
-    ride.voucherSponsor = null;
-    ride.status = 'NEGOTIATING';
-    ride.updatedAt = input.now;
-    this.dirtyRideIds.add(ride.id);
+    // A fresh window so the returned ride does not expire immediately.
+    this.returnToBidding(ride, {
+      actor: 'OPS',
+      reasonCode: 'OPS_REASSIGN',
+      now: input.now,
+      windowExpiresAt: input.windowExpiresAt,
+    });
     return { ride: this.snapshot(ride) };
   }
 
@@ -594,7 +1076,41 @@ export class RideLedger {
       }
       counts.set(driverId, current);
     }
+    // Assigned jobs the driver gave up (self-cancel / timeout) count as finished, not completed.
+    for (const record of this.cancellations) {
+      if (!wanted.has(record.driverId)) continue;
+      const current = counts.get(record.driverId) ?? { completed: 0, finished: 0 };
+      current.finished += 1;
+      counts.set(record.driverId, current);
+    }
     return counts;
+  }
+
+  listIdsForDriverInStatuses(driverId: string, statuses: readonly string[]): string[] {
+    return [...this.rides.values()]
+      .filter((ride) => ride.assignedDriverId === driverId && statuses.includes(ride.status))
+      .map((ride) => ride.id);
+  }
+
+  /** When this customer cancelled rides that already had a driver, since `since`. */
+  customerCancelTimes(customerId: string, since: Date): Date[] {
+    return [...this.rides.values()]
+      .filter(
+        (ride) =>
+          ride.customerId === customerId &&
+          ride.status === 'CANCELLED' &&
+          ride.cancelledBy === 'CUSTOMER' &&
+          ride.assignedDriverId !== null &&
+          ride.statusChangedAt.getTime() >= since.getTime(),
+      )
+      .map((ride) => new Date(ride.statusChangedAt));
+  }
+
+  listIdsForCustomerInStatuses(customerId: string, statuses: readonly string[]): string[] {
+    return [...this.rides.values()]
+      .filter((ride) => ride.customerId === customerId && statuses.includes(ride.status))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .map((ride) => ride.id);
   }
 
   listFinishedForDriver(driverId: string, window: DriverHistoryWindow): RideSnapshot[] {
@@ -643,6 +1159,7 @@ export class RideLedger {
     }
     ride.status = 'COMPLETED';
     ride.updatedAt = input.now;
+    ride.statusChangedAt = input.now;
     this.dirtyRideIds.add(ride.id);
     return { ride: this.snapshot(ride) };
   }
@@ -664,6 +1181,7 @@ export class RideLedger {
     }
     ride.status = to;
     ride.updatedAt = input.now;
+    ride.statusChangedAt = input.now;
     this.dirtyRideIds.add(ride.id);
     return { ride: this.snapshot(ride) };
   }
@@ -717,7 +1235,14 @@ export class RideLedger {
     };
   }
 
-  changes(): { rides: RideChange[]; offers: OfferChange[]; selections: SelectionRow[] } {
+  changes(): {
+    rides: RideChange[];
+    offers: OfferChange[];
+    selections: SelectionRow[];
+    cancellations: DriverCancellationRecord[];
+    unassignments: RideUnassignment[];
+    fees: CustomerFeeRecord[];
+  } {
     const rides: RideChange[] = [];
     for (const id of this.dirtyRideIds) {
       const row = this.rides.get(id);
@@ -741,7 +1266,36 @@ export class RideLedger {
     const selections = [...this.newSelectionKeys]
       .map((key) => this.selections.get(key))
       .filter((selection): selection is SelectionRow => selection !== undefined);
-    return { rides, offers, selections };
+    return {
+      rides,
+      offers,
+      selections,
+      cancellations: [...this.newCancellations],
+      unassignments: [...this.newUnassignments],
+      fees: [...this.newFees],
+    };
+  }
+
+  /** Memory repo: forget what was already "persisted" (the ledger is the store). */
+  clearRecorded(): void {
+    this.newCancellations = [];
+    this.newUnassignments = [];
+    this.newFees = [];
+  }
+
+  private countLiveOffers(rideId: string, now: Date, excludeId?: string): number {
+    let count = 0;
+    for (const offer of this.offers.values()) {
+      if (
+        offer.rideId === rideId &&
+        offer.id !== excludeId &&
+        offer.status === 'PENDING' &&
+        offer.expiresAt.getTime() > now.getTime()
+      ) {
+        count += 1;
+      }
+    }
+    return count;
   }
 
   private countOffers(rideId: string): number {
@@ -760,7 +1314,9 @@ export class RideLedger {
       if (ride.status === 'NEGOTIATING' && ride.expiresAt.getTime() <= now.getTime()) {
         ride.status = 'EXPIRED';
         ride.updatedAt = now;
+        ride.statusChangedAt = now;
         this.dirtyRideIds.add(ride.id);
+        this.loseOpenOffers(ride.id);
         expired.push(ride.id);
       }
     }
@@ -771,7 +1327,9 @@ export class RideLedger {
     if (ride.status === 'NEGOTIATING' && ride.expiresAt.getTime() <= now.getTime()) {
       ride.status = 'EXPIRED';
       ride.updatedAt = now;
+      ride.statusChangedAt = now;
       this.dirtyRideIds.add(ride.id);
+      this.loseOpenOffers(ride.id);
     }
   }
 
@@ -790,6 +1348,7 @@ export class RideLedger {
       dropoff: { lat: ride.dropoffLat, lng: ride.dropoffLng, label: ride.dropoffLabel },
       offeredFareVnd: ride.offeredFareVnd,
       referenceFareVnd: ride.referenceFareVnd,
+      vehicleClassCode: ride.vehicleClassCode,
       agreedFareVnd: ride.agreedFareVnd,
       discountVnd: ride.discountVnd,
       voucherCode: ride.voucherCode,
@@ -799,6 +1358,14 @@ export class RideLedger {
       selectedOfferId: ride.selectedOfferId,
       expiresAt: new Date(ride.expiresAt),
       updatedAt: new Date(ride.updatedAt),
+      createdAt: new Date(ride.createdAt),
+      assignedAt: ride.assignedAt ? new Date(ride.assignedAt) : null,
+      statusChangedAt: new Date(ride.statusChangedAt),
+      noShow: ride.noShow,
+      cancelReasonCode: ride.cancelReasonCode,
+      priorFeesVnd: ride.priorFeesVnd,
+      fareRaiseCount: ride.fareRaiseCount,
+      repostOfRideId: ride.repostOfRideId,
       offers: offers.map((offer) => ({
         id: offer.id,
         driverId: offer.driverId,
@@ -806,6 +1373,7 @@ export class RideLedger {
         kind: offer.kind,
         status: offer.status,
         expiresAt: new Date(offer.expiresAt),
+        editCount: offer.editCount,
       })),
     };
   }
@@ -822,6 +1390,7 @@ export function rideRowFromRecord(input: {
   dropoffLabel: string;
   offeredFareVnd: number;
   referenceFareVnd: number;
+  vehicleClassCode?: string;
   agreedFareVnd: number | null;
   discountVnd?: number;
   voucherCode?: string | null;
@@ -834,9 +1403,25 @@ export function rideRowFromRecord(input: {
   idempotencyKey: string;
   createdAt: Date;
   updatedAt: Date;
+  assignedAt?: Date | null;
+  statusChangedAt?: Date | null;
+  noShow?: boolean;
+  cancelReasonCode?: string | null;
+  priorFeesVnd?: number;
+  fareRaiseCount?: number;
+  repostOfRideId?: string | null;
 }): RideRow {
   return {
     ...input,
+    fareRaiseCount: input.fareRaiseCount ?? 0,
+    repostOfRideId: input.repostOfRideId ?? null,
+    assignedAt: input.assignedAt ?? null,
+    statusChangedAt: input.statusChangedAt ?? input.updatedAt,
+    noShow: input.noShow ?? false,
+    cancelReasonCode: input.cancelReasonCode ?? null,
+    priorFeesVnd: input.priorFeesVnd ?? 0,
+    // Legacy hydrate only: Prisma @default and pre-Wave-1 rows may omit class.
+    vehicleClassCode: input.vehicleClassCode ?? 'MOTORBIKE',
     discountVnd: input.discountVnd ?? 0,
     voucherCode: input.voucherCode ?? null,
     voucherSponsor: input.voucherSponsor ?? null,

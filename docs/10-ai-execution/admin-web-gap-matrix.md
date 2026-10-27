@@ -1,86 +1,53 @@
 ---
 doc_id: DG-AI-004
-title: "DealGo — Admin Web gap matrix vs dealgo-website.mdc"
-version: "0.5.6"
+title: "DealGo — Admin Web gap matrix"
+version: "1.0.0"
 status: "ACTIVE"
 owner: "Tech Lead"
-last_updated: "2026-10-18"
+last_updated: "2026-10-26"
 ---
 
 # Admin Web gap matrix
 
-> Lint/`tsc` xanh **không** bằng Done với Nest. Done Phase 1 = feature-first + data boundary + Query/URL.
+> Lint / `tsc` xanh không phải là Done. Done = màn hình đọc và ghi dữ liệu thật qua BFF → Nest, có trạng thái loading / lỗi / rỗng, và quyền đúng theo RBAC ops.
 
-## Verdict (2026-10-14)
+Tài liệu mô tả hiện trạng của `website/` (Next.js). Code là nguồn chuẩn.
 
-**Phase 1 + 1b DONE (architecture mock).** **Phase 2b–2c Nest-backed:** rides / food-orders / partner-applications (KYC + approve/reject) + ledger inspect + **exceptions board** (`/exceptions`, list-only) + **settlements** day buckets (`GET /api/ops/settlements` → Nest) + **auth-methods** (`/settings/auth-methods` → Nest GET/PATCH); session probe TTL (15s). **Login/logout** use `features/session` TanStack mutations (BFF `/api/ops/session`) — no direct `apiFetch`/`fetch` in form/button. **Platform settings** `/settings/platform` + **FAQ OPEN** `/settings/faqs` (Nest DB overrides for TEST_ONLY tunables; FAQ drafts PROPOSED OPEN-001..021). Role-grants Nest only has approve/reject by id (no ops list) — staff UI stays fixture. **Customers board remains fixture** until Nest exposes an ops users/customers list. Drivers / stores / transactions still fixture. Browser sanity NOT_RUN. **CAP-OPS-05 intervene** on ride/food detail DONE; exceptions list-only.
+## Kiến trúc
 
-## Phase plan
+- Trình duyệt chỉ gọi Route Handlers cùng origin `website/app/api/ops/*`; BFF gọi Nest phía server (`DEALGO_API_BASE_URL`). Mutation kiểm same-origin.
+- Phiên ops: cookie; `requireOpsSession` kiểm token với Nest, cache kết quả thành công trong process theo `OPS_SESSION_PROBE_TTL_MS` (mặc định 15 000 ms, giới hạn 5 000–30 000).
+- Mã nguồn theo feature (`website/features/*`), dữ liệu qua TanStack Query, tham số lọc trên URL (nuqs).
+- Không còn chế độ dữ liệu giả: mọi bảng đọc API thật.
+- Lọc theo ngày ở Giao dịch (`/transactions`), Giao hàng (`/deliveries`), Đối soát (`/settlements`) và Kiểm duyệt món (`/catalog/moderation`) chạy ở server. Nút thời gian ở đầu trang (Hôm nay, 7 ngày, tháng này, khoảng tuỳ chọn, Tất cả) và ô "Thời gian" của Giao dịch dùng chung một giá trị. Giá trị nằm trên URL (`from`/`to`, `YYYY-MM-DD`) ở Giao dịch, Giao hàng và Kiểm duyệt món; Đối soát giữ trong state của trang. BFF chỉ chuyển tiếp ngày hợp lệ và tự đảo khi `from` > `to` (`lib/api/ops-date-range.ts`). Nest coi `from`/`to` là ngày làm việc giờ Việt Nam, tính cả hai đầu: Giao dịch lọc theo `PaymentIntent.createdAt`, Giao hàng theo thời điểm đặt đơn, Kiểm duyệt món theo `FoodItem.createdAt` (thời điểm gửi duyệt), Đối soát theo ngày làm việc của lô. `from` > `to` hoặc ngày sai định dạng → 400 `DATE_RANGE_INVALID`. Mặc định là Tất cả thời gian. Cột Thời gian của Giao hàng và cột Gửi duyệt hiển thị giờ Việt Nam.
+- CSP `connect-src` dựng trong `next.config.ts` từ `'self'` + origin `NEXT_PUBLIC_API_BASE_URL`; `localhost` / `ws:` chỉ có ở dev.
 
-### Phase 1 / 1b — Ownership + data boundary — DONE
+## Màn hình và nguồn dữ liệu
 
-- [x] Feature folders; boards out of god `components/`
-- [x] EN codes + mappers; fixtures out of UI
-- [x] TanStack Query + nuqs + `lib/api`
-- [x] AdminPrivatePage all private routes
-- [x] Detail by `code` + SampleNotFound
-- [x] typecheck + vitest
+| Nhóm | Route | Nguồn Nest |
+|---|---|---|
+| Tổng quan, giám sát, báo cáo | `/overview`, `/monitor`, `/reports` | `/v1/ops/overview` (Báo cáo dùng lại cùng dữ liệu), `/v1/ops/monitor/snapshot` |
+| Chuyến xe, trả giá | `/rides`, `/rides/[code]`, `/negotiations` | `/v1/ops/rides` (+ ledger, huỷ, gán lại) |
+| Đơn đồ ăn, giao hàng | `/food-orders`, `/deliveries` | `/v1/ops/food-orders` (+ ledger, huỷ, gán lại) |
+| Ngoại lệ | `/exceptions` | `/v1/ops/exceptions` (danh sách; can thiệp ở trang chi tiết chuyến/đơn) |
+| Khách hàng | `/customers`, `/customers/[code]` | `/v1/ops/customers` |
+| Tài xế, KYC | `/drivers`, `/drivers/[code]`, `/drivers/kyc` | `/v1/ops/drivers`, đơn đối tác; thẻ công nợ phí nền tảng |
+| Quán, KYB, thực đơn | `/stores`, `/stores/[code]`, `/stores/approvals`, `/catalog`, `/catalog/moderation` | `/v1/ops/food-stores`, kiểm duyệt món; sao kê và ghi nhận "đã trả quán" |
+| Tiền | `/transactions`, `/settlements`, `/refunds` | `PaymentIntent`, đối soát, yêu cầu hoàn tiền |
+| Khiếu nại, hỗ trợ | `/disputes`, `/support-tickets` | `/v1/ops/disputes`, phiếu hỗ trợ; xem chat có lý do (`chat.review`) |
+| Khuyến mãi, thông báo | `/promotions`, `/notifications` | `/v1/ops/promotions`, chiến dịch thông báo |
+| Khu vực & giá | `/zones` | `/v1/ops/zones` |
+| Nhân sự, audit | `/staff`, `/audit-logs` | nhân sự + ma trận RBAC, nhật ký audit |
+| Cài đặt | `/settings/platform` (Tham số), `/settings/auth-methods`, `/settings/vehicle-classes`, `/settings/faqs`, `/settings/content` | cài đặt nền tảng, phương thức đăng nhập, hạng xe, FAQ, trang công khai |
+| Công khai | `/support`, `/privacy`, `/terms`, `/chia-se-chuyen/[token]` | form hỗ trợ → `POST /v1/public/support/tickets`; trang nội dung; theo dõi chuyến được chia sẻ |
 
-### Phase 2 — Auth + Nest contract
+## Khoảng trống
 
-1. [x] Verify ops session với Nest (GET `/api/ops/session` + `requireOpsSession` probe `GET /v1/ops/rides?limit=1`; no Nest ops `/me`)
-2. [x] BFF Route Handlers: rides, food-orders, partner-applications (+ approve/reject)
-3. [x] Swap mock adapters → BFF khi `ADMIN_UI_MOCK` tắt (3 domains)
-4. [x] Map Nest status → feature EN → VN labels
-5. [x] **Phase 2b:** BFF `…/rides/:id/ledger`, `…/food-orders/:id/ledger` + detail journal panel (live only)
-6. [x] **Phase 2b:** KYC detail approve/reject → Nest when `!ADMIN_UI_MOCK` + query invalidation
-7. [x] **Phase 2b:** Enrich customer/driver/store labels from Nest ids/metadata (RideView still omits `customerId`)
-8. [x] **Phase 2b:** Session probe TTL cache (`OPS_SESSION_PROBE_TTL_MS`, default 15s, clamp 5–30s; success-only)
-9. [x] **Phase 2b:** Ops exceptions BFF + live adapter when `!ADMIN_UI_MOCK` (`GET /v1/ops/exceptions`)
-10. [x] **Phase 2b:** Exceptions board UI `/exceptions` (nav + filters + entity links; **list-only**, no intervene)
-11. [x] **Phase 2c:** Settlements BFF + live lines table when `!ADMIN_UI_MOCK` (`GET /v1/ops/settlements`)
-12. [ ] Role-grants staff UI: Nest chỉ `POST …/approve|reject` (không list ops) — giữ fixture
-13. [ ] **Customers:** vẫn fixture — Nest **không** có `GET /v1/ops/users|customers` (cũng không có ops GET user-by-id); không invent BFF live swap. Drivers / stores / transactions vẫn fixture.
-14. [x] **CAP-OPS-05 intervene (DONE cancel/reassign on detail):** Nest `POST …/rides|food-orders/:id/cancel|reassign` + Admin BFF CSRF + detail reason dialog when `!ADMIN_UI_MOCK`; exceptions board remains list-only
-15. [x] **Auth methods (FR-OPS-010):** `/settings` link → `/settings/auth-methods`; BFF GET/PATCH → Nest when `!ADMIN_UI_MOCK`
-
-### Phase 3 — UX reliability
-
-- error/loading/not-found
-- Mutation thật thay PreviewButton (KYC approve/reject + ride/food cancel/reassign + **login/logout session mutations** done; other boards pending)
-- Hex → CSS variables
-- Browser E2E smoke
-
-## Session probe cache (ops)
-
-| Item | Value |
+| Khoảng trống | Ghi chú |
 |---|---|
-| Where | `website/lib/api/ops-upstream.ts` → `verifyOpsAccessToken` |
-| Used by | `requireOpsSession` on every `AdminPrivatePage` |
-| TTL | `OPS_SESSION_PROBE_TTL_MS` env, default **15000**, clamped **5000–30000** |
-| Scope | In-process Map keyed by truncated token fingerprint; **successful** probes only |
-| Why | Nest has no ops `/me`; list probe each navigation is expensive |
-
-## Nest coverage vs Admin boards
-
-| Board / surface | Nest ops API | Admin BFF | Live adapter |
-|---|---|---|---|
-| Rides list/detail | Yes | Yes | Yes (`!ADMIN_UI_MOCK`) |
-| Ride ledger | Yes `GET …/rides/:id/ledger` | Yes | Yes (detail panel) |
-| Food orders list/detail | Yes | Yes | Yes |
-| Food order ledger | Yes `GET …/food-orders/:id/ledger` | Yes | Yes (detail panel) |
-| KYC / partner applications | Yes | Yes + approve/reject | Yes |
-| Ops exceptions board | Yes `GET /v1/ops/exceptions` | Yes | Yes (`!ADMIN_UI_MOCK`); UI `/exceptions` DONE; **list-only** (intervene on ride/food detail) |
-| Ride / food cancel (CAP-OPS-05) | Yes `POST …/cancel` | Yes | Yes (detail reason dialog; `!ADMIN_UI_MOCK`) |
-| Ride / food reassign | Yes `POST …/reassign` (TEST_ONLY) | Yes | Yes (detail reason dialog; eligibility heuristic on feature status) |
-| Settlements | Yes `GET /v1/ops/settlements` (day buckets) | Yes | Yes (lines table; KPI/partner still fixture) |
-| Role grants approve/reject | Yes approve/reject only (no ops list) | Paths reserved | Staff page still mock matrix |
-| Auth methods (Passkey/SMS/Email) | Yes `GET/PATCH /v1/ops/auth-methods` | Yes | Yes (`/settings/auth-methods`; `!ADMIN_UI_MOCK`) |
-| **Customers** list/detail | **No** ops users/customers list; **no** ops GET user-by-id | Paths reserved (`opsCustomers`) | **Fixtures** until Nest list exists — do not invent API |
-| Drivers / stores / transactions / … | No | Paths reserved | Fixtures |
-| Customer labels on food detail | Nest returns `customerId` on food order | N/A (via food BFF) | Live label `Khách · {id}` (not full profile) |
-| Customer labels on ride detail | RideView omits `customerId` | N/A | Placeholder `Khách (Nest ẩn id)` |
-| Promotions | Yes `/v1/ops/promotions` (Postgres) | Yes; POST/PATCH status kiểm same-origin | Yes |
-| Public support form (`/support`) | **No** Nest endpoint | `POST /api/public/support` chỉ log (mask PII) và trả mã `INQ-*`; nội dung **không** được lưu | Cần endpoint Support trước khi coi là live |
-
-CSP `connect-src` dựng trong `next.config.ts`: `'self'` + origin `NEXT_PUBLIC_API_BASE_URL` (nếu có, đọc lúc build); `localhost`/`ws:` chỉ ở dev.
+| Doanh thu / hoa hồng ở Tổng quan | Nest trả `revenueVnd` / `commissionVnd` = `null`; số hoa hồng xem ở Đối soát |
+| Báo cáo | `/reports` hiển thị số liệu Tổng quan, bộ lọc thời gian chưa được gửi lên API |
+| Hoàn tiền | Chỉ ghi nhận bản ghi + bút toán sandbox; chưa chuyển tiền thật |
+| Audit hạng xe | Sửa hạng xe không ghi nhật ký audit |
+| Bộ lọc thời gian các danh sách khác | Nút thời gian ở Chuyến xe, Trả giá, Khuyến mãi, Thông báo, Hoàn tiền, Khiếu nại, Khách hàng chưa gửi `from`/`to` lên API |
+| Kiểm thử trình duyệt | Chỉ có vitest + typecheck + lint; chưa có E2E trình duyệt |

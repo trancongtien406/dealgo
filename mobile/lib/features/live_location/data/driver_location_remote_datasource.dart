@@ -14,16 +14,19 @@ class DioDriverLocationRemoteDataSource implements DriverLocationRepository {
       Options(headers: {'Authorization': 'Bearer $token'});
 
   @override
-  Future<void> report({
+  Future<DriverLocationReportResult> report({
     required String accessToken,
-    required double lat,
-    required double lng,
+    required DriverLocationFix fix,
   }) async {
     try {
-      await dio.post<Object?>(
+      final response = await dio.post<Object?>(
         ApiPaths.mePresenceLocation,
-        data: {'lat': lat, 'lng': lng},
+        data: fix.toJson(),
         options: _auth(accessToken),
+      );
+      final body = response.data;
+      return decodeDriverLocationReport(
+        body is Map && body['data'] is Map ? body['data'] : body,
       );
     } on DioException catch (error) {
       throw apiExceptionFromDio(error);
@@ -55,15 +58,22 @@ class FakeDriverLocationRemoteDataSource implements DriverLocationRepository {
   /// What [latest] returns for every job.
   DriverLiveLocation? location;
   final List<({double lat, double lng})> reports = [];
+  final List<DriverLocationFix> fixes = [];
+
+  /// What [report] answers; default accepted without a policy.
+  DriverLocationReportResult reply = const DriverLocationReportResult(
+    accepted: true,
+  );
   final List<({TrackedJob job, String id})> reads = [];
 
   @override
-  Future<void> report({
+  Future<DriverLocationReportResult> report({
     required String accessToken,
-    required double lat,
-    required double lng,
+    required DriverLocationFix fix,
   }) async {
-    reports.add((lat: lat, lng: lng));
+    reports.add((lat: fix.lat, lng: fix.lng));
+    fixes.add(fix);
+    return reply;
   }
 
   @override

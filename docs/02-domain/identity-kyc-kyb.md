@@ -59,7 +59,7 @@ related_decisions:
 
 > **Trạng thái `DRAFT`, chưa được phê duyệt cho vận hành thương mại.** Tài liệu này xác định mô hình nghiệp vụ và yêu cầu kiểm soát đối với Identity, Customer, Driver và Merchant trong DealGo; không xác nhận DealGo có quyền truy cập CSDL dân cư, VNeID, API định danh nhà nước hoặc được phép tự động kết luận tính hợp lệ của giấy phép/giấy tờ. **Giấy tờ thật, dữ liệu khuôn mặt, số định danh, bí mật xác thực và dữ liệu người dùng không được đưa vào tài liệu, test fixture công khai hoặc nhật ký hệ thống.**
 >
-> **Phạm vi chắc chắn:** MVP bao gồm Ride hai bánh + Food; một Flutter app ba role và Admin Web; đăng ký/xác thực có passkey, xác minh phone qua SMS, email verified; Admin được phân quyền bật/tắt method; chat và voice call trong app gắn Ride/Food. `OPEN-006/008/020/021` vẫn chặn giấy tờ, provider, recovery/retention và chi tiết production.
+> **Phạm vi chắc chắn:** MVP bao gồm Ride (xe máy, ô tô) + Food; một Flutter app ba role và Admin Web; đăng ký/xác thực có passkey, xác minh phone qua SMS, email verified; Admin được phân quyền bật/tắt method; chat và voice call trong app gắn Ride/Food. `OPEN-006/008/020/021` vẫn chặn giấy tờ, provider, recovery/retention và chi tiết production.
 
 ## 1. Mục tiêu, phạm vi và outcome
 
@@ -219,7 +219,7 @@ flowchart TD
 
 **Email/SMS note:** Passkey vẫn là phương thức ưu tiên khi thiết bị hỗ trợ; SMS và email+password là phương thức đăng nhập đầy đủ theo yêu cầu sản phẩm 2026-10-18. Cần rà soát assurance khi chốt `OPEN-020`.
 
-> **Đã triển khai trong code (2026-10-18), chưa phải policy chốt `OPEN-020`:** OTP phone không tạo Account trước khi verify; verify lần đầu tạo/khớp Account và cấp `CUSTOMER` `ACTIVE` ở mọi môi trường. Đăng ký email+password hai bước giống phone: `POST /v1/auth/email/register` lưu challenge pending (mật khẩu đã hash, OTP 6 số hash, TTL 10 phút, tối đa 5 lần sai tính trên cả challenge — gửi lại không reset, đạt ngưỡng thì khóa và không gửi lại được, phải bắt đầu challenge mới; gửi lại sau 60 giây, tối đa 5 lần gửi, 5 challenge/email/giờ — theo `DEC-PROD-008`) và gửi OTP qua `MailSender`; Account + credential + `CUSTOMER` `ACTIVE` + session chỉ được tạo ở `…/register/:id/verify` (email verified). Email đã có Account nhận cùng phản hồi, chủ email nhận thư báo thay vì mã. Quên mật khẩu: `POST /v1/auth/email/password-resets` luôn trả 202 (không lộ email tồn tại), token one-time TTL 30 phút, confirm đổi mật khẩu và thu hồi session Customer. Đăng nhập email chỉ cho email đã verify. Account cũ chưa verify: đăng nhập đúng mật khẩu → 403 `AUTH_EMAIL_NOT_VERIFIED` kèm `details` `{challengeId, expiresAt, resendAvailableAt}` và OTP kích hoạt qua email (challenge `ACTIVATE_EXISTING`, cùng giới hạn); verify qua cùng `…/register/:id/verify` → đánh dấu email verified, đảm bảo `CUSTOMER` (giữ nguyên nếu đang `SUSPENDED`), trả session. Sai mật khẩu → 401, không gửi mã. Quên mật khẩu vẫn kích hoạt được.
+> **Hành vi hiện tại của code (policy `OPEN-020` chưa chốt):** OTP phone không tạo Account trước khi verify; verify lần đầu tạo/khớp Account và cấp `CUSTOMER` `ACTIVE` ở mọi môi trường. Đăng ký email+password hai bước giống phone: `POST /v1/auth/email/register` lưu challenge pending (mật khẩu đã hash, OTP 6 số hash, TTL 10 phút, tối đa 5 lần sai tính trên cả challenge — gửi lại không reset, đạt ngưỡng thì khóa và không gửi lại được, phải bắt đầu challenge mới; gửi lại sau 60 giây, tối đa 5 lần gửi, 5 challenge/email/giờ — theo `DEC-PROD-008`) và gửi OTP qua `MailSender`; Account + credential + `CUSTOMER` `ACTIVE` + session chỉ được tạo ở `…/register/:id/verify` (email verified). Email đã có Account nhận cùng phản hồi, chủ email nhận thư báo thay vì mã. Quên mật khẩu: `POST /v1/auth/email/password-resets` luôn trả 202 (không lộ email tồn tại), token one-time TTL 30 phút, confirm đổi mật khẩu và thu hồi session Customer. Đăng nhập email chỉ cho email đã verify. Account cũ chưa verify: đăng nhập đúng mật khẩu → 403 `AUTH_EMAIL_NOT_VERIFIED` kèm `details` `{challengeId, expiresAt, resendAvailableAt}` và OTP kích hoạt qua email (challenge `ACTIVATE_EXISTING`, cùng giới hạn); verify qua cùng `…/register/:id/verify` → đánh dấu email verified, đảm bảo `CUSTOMER` (giữ nguyên nếu đang `SUSPENDED`), trả session. Sai mật khẩu → 401, không gửi mã. Quên mật khẩu vẫn kích hoạt được.
 
 **Không tự yêu cầu CCCD/selfie cho mọi Customer**: thu thập có điều kiện, mục đích phù hợp, tối thiểu hóa dữ liệu và xem xét rủi ro. KYC customer nâng cao chỉ khi có nhu cầu pháp lý/nghiệp vụ được phê duyệt.
 
@@ -795,7 +795,7 @@ Không triển khai `check → external API → grant role` ở ngoài transacti
 | ID | Chủ đề phải quyết định | Options cần phân tích | Owner đề xuất | Go-live blocker |
 |---|---|---|---|---|
 | `OPEN-006` | DealGo là đơn vị cung cấp/kết nối dịch vụ kiểu nào? | agency/marketplace/other theo tư vấn pháp lý | PO + Legal | YES |
-| `OPEN-006` | Driver Ride hai bánh phải thỏa hồ sơ/giấy phép gì? | service × vehicle × region × legal entity | Legal + Ops | YES |
+| `OPEN-006` | Driver Ride (xe máy, ô tô) phải thỏa hồ sơ/giấy phép gì? | service × vehicle × region × legal entity | Legal + Ops | YES |
 | `OPEN-006` | Food Merchant yêu cầu chứng từ gì theo business type? | cá nhân/hộ kinh doanh/tổ chức và loại thực phẩm | Legal + Ops | YES |
 | `OPEN-008` | OTP login provider? | SMS / Zalo OTP / provider khác theo điều kiện chính thức | Tech + PO + Security | YES for live |
 | `OPEN-008` | KYC: manual review hay đối tác eKYC được phép? | capability, data sources, cost, DPA, fallback | Legal + Tech + Security | YES |
@@ -834,7 +834,7 @@ Không triển khai `check → external API → grant role` ở ngoài transacti
 4. **Luật Thương mại điện tử 122/2025/QH15** (hiệu lực 01/07/2026): https://vanban.chinhphu.vn/?classid=1&docid=216503&pageid=27160
 5. **Nghị định 13/2023/NĐ-CP** (văn bản lịch sử/đối chiếu; cần xác định điều khoản còn áp dụng và quan hệ với luật/nghị định mới, không tự suy luận hiệu lực từng điều): https://vanban.chinhphu.vn/default.aspx?docid=207759&pageid=27160
 
-**Hạng mục rà soát pháp lý chưa giải quyết:** quy định hiện hành về hoạt động kinh doanh vận tải bằng xe hai bánh tại địa phương, bằng lái/loại xe, giấy tờ cần có, điều kiện đối tác Food và an toàn thực phẩm, xử lý/giữ dữ liệu điện tử, chuyển dữ liệu xuyên biên giới và thời hạn thông báo sự cố. Không dùng văn bản quản lý vận tải **ô tô** để tự áp vào xe máy.
+**Hạng mục rà soát pháp lý chưa giải quyết:** quy định hiện hành về hoạt động kinh doanh vận tải bằng xe máy, ô tô tại địa phương, bằng lái/loại xe, giấy tờ cần có, điều kiện đối tác Food và an toàn thực phẩm, xử lý/giữ dữ liệu điện tử, chuyển dữ liệu xuyên biên giới và thời hạn thông báo sự cố. Không dùng văn bản quản lý vận tải **ô tô** để tự áp vào xe máy.
 
 ### 31.2. Security & identity methods
 

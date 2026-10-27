@@ -127,16 +127,12 @@ final class PhoneAuthError extends PhoneAuthState {
 
 class PhoneAuthCubit extends Cubit<PhoneAuthState> {
   PhoneAuthCubit({
-    required CreatePhoneChallenge createPhoneChallenge,
-    required VerifyPhoneChallenge verifyPhoneChallenge,
+    required this._createPhoneChallenge,
+    required this._verifyPhoneChallenge,
     required this.auth,
-    required IdentityRepository identityRepository,
-    required PasskeyPlatform passkeyPlatform,
-  }) : _createPhoneChallenge = createPhoneChallenge,
-       _verifyPhoneChallenge = verifyPhoneChallenge,
-       _identityRepository = identityRepository,
-       _passkeyPlatform = passkeyPlatform,
-       super(const PhoneAuthIdle());
+    required this._identityRepository,
+    required this._passkeyPlatform,
+  }) : super(const PhoneAuthIdle());
 
   final CreatePhoneChallenge _createPhoneChallenge;
   final VerifyPhoneChallenge _verifyPhoneChallenge;

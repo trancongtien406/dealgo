@@ -3,7 +3,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
 import { fetchTransactions } from "@/features/transactions/api";
-import { listSearchParams } from "@/lib/list-search-params";
+import {
+  dateRangeSearchParams,
+  listSearchParams,
+} from "@/lib/list-search-params";
 
 const txStatusFilterValues = [
   "ALL",
@@ -25,12 +28,15 @@ export const transactionQueryKeys = {
     q: string;
     page: number;
     limit: number;
+    from: string;
+    to: string;
   }) => [...transactionQueryKeys.all, "list", filters] as const,
 };
 
 export function useTransactionListFilters() {
   return useQueryStates({
     ...listSearchParams,
+    ...dateRangeSearchParams,
     status: parseAsStringLiteral(txStatusFilterValues).withDefault("ALL"),
     service: parseAsString.withDefault("ALL"),
     payment: parseAsString.withDefault("ALL"),
@@ -49,6 +55,8 @@ export function useTransactionsQuery() {
         q: filters.q,
         page: filters.page,
         limit: filters.limit,
+        from: filters.from || null,
+        to: filters.to || null,
       }),
   });
 }

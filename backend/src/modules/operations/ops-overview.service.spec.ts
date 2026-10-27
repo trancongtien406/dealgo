@@ -16,7 +16,8 @@ describe('OpsOverviewService', () => {
     const overview = await service.overview(new Date('2026-10-15T12:00:00.000Z'));
     expect(overview.ridesTotal).toBe(0);
     expect(overview.foodInFlight).toBe(0);
-    expect(overview.revenueVnd).toBeNull();
+    expect(overview.revenueVnd).toBe(0);
+    expect(overview.commissionVnd).toBe(0);
     expect(overview.todayTimezone).toBe('Asia/Ho_Chi_Minh');
     expect(overview.hourlyTrend.buckets).toEqual([]);
     expect(overview.recentActivity).toEqual([]);
@@ -47,6 +48,12 @@ describe('OpsOverviewService', () => {
         db: () => ({
           $queryRaw: async (strings: TemplateStringsArray) => {
             const sql = strings.join(' ');
+            if (sql.includes('job_earnings') && sql.includes('FROM rides')) {
+              return [{ day: '2026-10-15', completed: 9n, cancelled: 8n, grossVnd: 450_000n, commissionVnd: 45_000n }];
+            }
+            if (sql.includes('job_earnings') && sql.includes('FROM food_orders')) {
+              return [{ day: '2026-10-15', completed: 6n, cancelled: 1n, grossVnd: 300_000n, commissionVnd: 60_000n }];
+            }
             if (
               sql.includes('FROM rides') &&
               sql.includes('FROM food_orders') &&
@@ -107,8 +114,8 @@ describe('OpsOverviewService', () => {
         driversOnline: 5,
         storesTotal: 11,
         exceptionsOpen: 42,
-        revenueVnd: null,
-        commissionVnd: null,
+        revenueVnd: 750_000,
+        commissionVnd: 105_000,
         hourlyTrend: { buckets: [] },
         recentActivity: [],
         ridesByArea: [],

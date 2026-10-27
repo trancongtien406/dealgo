@@ -96,7 +96,11 @@ class FoodCoverImage extends StatelessWidget {
         children: [
           SizedBox(height: height, width: double.infinity, child: image),
           if (badge != null)
-            Positioned(right: DealGoSpacing.s12, bottom: DealGoSpacing.s12, child: badge!),
+            Positioned(
+              right: DealGoSpacing.s12,
+              bottom: DealGoSpacing.s12,
+              child: badge!,
+            ),
         ],
       ),
     );
@@ -120,7 +124,9 @@ class FoodInfoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final foreground = filled ? DealGoColors.primary : DealGoColors.textSecondary;
+    final foreground = filled
+        ? DealGoColors.primary
+        : DealGoColors.textSecondary;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: filled ? DealGoColors.subtlePurple : DealGoColors.card,
@@ -141,10 +147,8 @@ class FoodInfoChip extends StatelessWidget {
             ],
             Text(
               label,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: foreground,
-                fontWeight: FontWeight.w700,
-              ),
+              style: Theme.of(context).textTheme.labelSmall
+                  ?.copyWith(color: foreground, fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -177,6 +181,7 @@ class FoodMoneyRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: DealGoSpacing.s4),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: Text(
@@ -184,7 +189,10 @@ class FoodMoneyRow extends StatelessWidget {
               style: emphasize ? textTheme.titleMedium : textTheme.bodyMedium,
             ),
           ),
-          Text(amount, style: valueStyle),
+          const SizedBox(width: DealGoSpacing.s8),
+          Flexible(
+            child: Text(amount, style: valueStyle, textAlign: TextAlign.end),
+          ),
         ],
       ),
     );
@@ -356,7 +364,8 @@ class FoodLineSummary extends StatelessWidget {
                     ),
                   ),
                 Text(
-                  AppLocalizations.of(context).foodLineQtyPrice(quantity, formatVnd(unitPriceVnd)),
+                  AppLocalizations.of(context)
+                      .foodLineQtyPrice(quantity, formatVnd(unitPriceVnd)),
                   style: textTheme.bodySmall,
                 ),
               ],

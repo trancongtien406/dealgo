@@ -8,6 +8,8 @@ export type NestPartnerApplicationView = {
   role: NestPartnerRole;
   status: NestPartnerStatus;
   metadata: Record<string, unknown>;
+  /** Case detail only: applicant's account phone (ops can call). */
+  applicantPhone?: string;
   documents: Array<{
     index?: number;
     kind?: string | null;

@@ -107,6 +107,7 @@ describePg('driver stats + pickup snapshot (postgres)', () => {
     ) =>
       db.ride.create({
         data: {
+          vehicleClassCode: 'MOTORBIKE',
           id: randomUUID(),
           customerId: customer.id,
           pickupLat: 16.05,
@@ -141,6 +142,7 @@ describePg('driver stats + pickup snapshot (postgres)', () => {
     // The Prisma repository persists the actor on a real customer cancel.
     const open = await db.ride.create({
       data: {
+        vehicleClassCode: 'MOTORBIKE',
         id: randomUUID(),
         customerId: customer.id,
         pickupLat: 16.05,

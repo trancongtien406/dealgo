@@ -121,7 +121,18 @@ export function DeliveriesList() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <AdminHeaderDateFilter defaultPreset="today" />
+          <AdminHeaderDateFilter
+            value={{ from: filters.from || null, to: filters.to || null }}
+            onChange={(range) => {
+              void setFilters({
+                from: range.from ?? "",
+                to: range.to ?? "",
+                page: 1,
+              });
+            }}
+            defaultPreset="all"
+            labelPrefix="Ngày đặt"
+          />
           <ExportCsvButton
             filename="deliveries.csv"
             headers={["Mã", "Trạng thái"]}
@@ -226,7 +237,7 @@ export function DeliveriesList() {
             </PreviewButton>
             <AdminResetFilterButton
               onClick={() => {
-                void setFilters({ status: "", q: "", page: 1 });
+                void setFilters({ status: "", q: "", from: "", to: "", page: 1 });
               }}
             />
           </div>
@@ -251,7 +262,7 @@ export function DeliveriesList() {
           action={
             <AdminResetFilterButton
               onClick={() => {
-                void setFilters({ status: "", q: "", page: 1 });
+                void setFilters({ status: "", q: "", from: "", to: "", page: 1 });
               }}
             />
           }

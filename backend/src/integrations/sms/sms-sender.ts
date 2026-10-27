@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { redactPhone } from '../../modules/identity/phone-number.js';
+import { SmsDeliveryError } from './sms-errors.js';
+
 
 export interface SmsSender {
   sendOtp(phone: string, code: string): Promise<void>;
@@ -33,6 +35,6 @@ export class MockSmsSender implements SmsSender {
 @Injectable()
 export class UnavailableSmsSender implements SmsSender {
   async sendOtp(): Promise<void> {
-    throw new Error('SMS provider is not configured');
+    throw new SmsDeliveryError('not_configured', 'none');
   }
 }

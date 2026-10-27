@@ -3,6 +3,7 @@
  * Skips when DATABASE_URL is unset (default unit suite uses memory repos).
  */
 import { uniqueTestPhone } from './test-phone.js';
+import { pinStore } from './store-pin.js';
 import { releaseVoucherInTx } from '../../src/modules/promotion/promotion-redemption.js';
 import { INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -114,6 +115,7 @@ describePg('food voucher race (postgres)', () => {
       .get('/v1/food/merchant/catalog')
       .set('Authorization', `Bearer ${merchant.token}`)
       .expect(200);
+    await pinStore(app, merchant.token);
     return {
       storeId: catalog.body.data.id as string,
       itemId: item.body.data.id as string,
@@ -240,7 +242,10 @@ describePg('food voucher race (postgres)', () => {
     await call(store.merchantToken, 'ready').expect(200);
     await call(driver.token, 'claim').expect(200);
     await call(driver.token, 'pickup').expect(200);
-    const results = await Promise.all([call(driver.token, 'fail'), call(driver.token, 'fail')]);
+    const results = await Promise.all([
+      call(driver.token, 'fail').send({ reasonCode: 'CUSTOMER_REFUSED' }),
+      call(driver.token, 'fail').send({ reasonCode: 'CUSTOMER_REFUSED' }),
+    ]);
     expect(results.map((r) => r.status).sort((a, b) => a - b)).toEqual([200, 409]);
     const db = prisma.db()!;
     const after = await db.promotion.findUniqueOrThrow({ where: { id: promo.id } });

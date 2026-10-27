@@ -41,7 +41,7 @@ upstream_docs:
 
 > **Tình trạng:** `DRAFT`, nghiên cứu công khai chốt tại **12/10/2026**. Tài liệu mô tả những gì có **bằng chứng từ website/trung tâm hướng dẫn chính thức**, khác với kiểm thử phiên bản app đang cài đặt. Không xem chi tiết nội bộ, thuật toán, UI chưa được truy cập, phí, SLA hoặc chính sách có thể thay đổi là dữ kiện chắc chắn.
 >
-> **Bất biến sản phẩm DealGo:** MVP gồm **Ride xe máy hai bánh + Food giao tận nơi**; **một app Flutter** hỗ trợ **Customer / Merchant / Driver**, cùng Admin Web. Ride có thương lượng giá theo `DEC-PROD-005`; Food không mặc định dùng thương lượng giá. Benchmark bổ sung evidence cho định hướng đã chốt, không sao chép policy/thuật toán đối thủ.
+> **Bất biến sản phẩm DealGo:** MVP gồm **Ride (`MOTORBIKE` + `CAR` per `DG-DEC-VEH-001`) + Food giao tận nơi**; **một app Flutter** hỗ trợ **Customer / Merchant / Driver**, cùng Admin Web. Ride thương lượng giá / bid-offer kiểu inDrive theo `DEC-PROD-005` (không auto-match Grab); Food không mặc định dùng thương lượng giá. Benchmark bổ sung evidence cho định hướng đã chốt, không sao chép policy/thuật toán đối thủ. Car fare tiers / regs vẫn **OPEN/DRAFT** đến khi owner duyệt (`OPEN-003`).
 >
 > **Phạm vi và nguồn chuẩn:** benchmark ghi bằng chứng & cơ hội; PRD ghi yêu cầu; Scope & Release Plan chốt priority/release; Domain/Workflow chốt policies và states. Mọi phần `RECOMMEND` là **đề xuất**, không phải `APPROVED`.
 
@@ -107,7 +107,7 @@ upstream_docs:
 
 | Thuộc tính | GrabBike | GrabFood | ShopeeFood | Bài học DealGo |
 |---|---|---|---|---|
-| Domain | Ride xe máy | Giao đồ ăn | Giao đồ ăn | Cả Ride và Food đều P0. |
+| Domain | Ride (GrabBike = 2 bánh; DealGo = MOTORBIKE+CAR per DG-DEC-VEH-001) | Giao đồ ăn | Giao đồ ăn | Cả Ride và Food đều P0. |
 | Khách hàng | Dịch vụ trong app Grab [S01] | Dịch vụ trong app Grab [S02] | Trang/app đặt món công khai; trang hướng dẫn có dấu legacy [S15] | Một điểm vào Customer rõ ràng. |
 | Merchant | N/A cho Ride | GrabMerchant quản lý vận hành [S03][S04] | Shopee Partner/Merchant quản lý quán [S06][S07] | Cần merchant workspace thật. |
 | Driver | Tài xế thực hiện Ride [S01] | Đối tác giao hàng [S11] | Đối tác giao nhận [S14] | Driver có eligibility/job/task riêng. |
@@ -350,7 +350,8 @@ Ký hiệu: `V` = nguồn chính thức xác minh được; `?` = chưa xác min
 
 | Capability | GrabBike | GrabFood | ShopeeFood | DealGo quyết định |
 |---|---|---|---|---|
-| Ride 2 bánh | V [S01] | N/A | N/A | **CONFIRMED P0** |
+| Ride 2 bánh | V [S01] | N/A | N/A | **CONFIRMED P0** (`MOTORBIKE`) |
+| Ride ô tô (4/7 chỗ) | ? (GrabCar ngoài phạm vi nguồn GrabBike [S01]) | N/A | N/A | **CONFIRMED P0 scope** per `DG-DEC-VEH-001`; fare/tier **DRAFT/OPEN-003** |
 | Food delivery | N/A | V [S02] | V [S15] | **CONFIRMED P0** |
 | Giá trước xác nhận Ride | V [S01] | N/A | N/A | `PROPOSED_P0` |
 | Chọn địa chỉ Food | N/A | V [S02] | V [S15] | `PROPOSED_P0` |
@@ -588,7 +589,7 @@ review_status: DRAFT
 - Không tuyên bố có công nghệ định giá/điều phối tự động như Grab mà chưa triển khai/kiểm chứng.
 - Không làm theo một thời gian chờ, tỷ lệ phạt, điều kiện bồi hoàn của đối thủ mà không có phê duyệt phù hợp.
 - Không nhầm `thiếu nguồn công khai` với `đối thủ không có tính năng`.
-- Không thêm multi-merchant cart, scheduled food, ride car, batch delivery, loyalty, wallet chỉ vì đối thủ có.
+- Không thêm multi-merchant cart, scheduled food, batch delivery, loyalty, wallet chỉ vì đối thủ có. (Ride Car **đã** trong scope DealGo theo `DG-DEC-VEH-001` — không phải copy GrabCar; fare/regs vẫn OPEN.)
 
 ## 22. Acceptance criteria cho CHÍNH tài liệu benchmark
 
@@ -656,7 +657,7 @@ review_status: DRAFT
 
 ## 25. Khuyến nghị hành động sau khi duyệt benchmark
 
-1. **Không thay đổi scope xác nhận.** Ride hai bánh và Food cùng vào MVP; giữ một Flutter app cho ba role.
+1. **Không thay đổi scope xác nhận.** Ride (`MOTORBIKE` + `CAR` / `DG-DEC-VEH-001`) và Food cùng vào MVP; giữ một Flutter app cho ba role. Bid/offer inDrive-like (`DEC-PROD-005`) giữ nguyên các quan sát OBS — không đổi sang auto-match.
 2. **Thiết kế state machine domain riêng:** `RideRequest/RideTrip`, `FoodOrder/DeliveryTask`, `Payment/Settlement/Claim` trước khi khóa schema/API.
 3. **Ưu tiên exception flow cùng happy path:** đặc biệt no driver, merchant ready, unreachable customer, late payment callback và role switch.
 4. **Chốt 18 OPEN theo milestone:** không tự tạo con số giả cho giá cước/timeout/hạn mức COD.

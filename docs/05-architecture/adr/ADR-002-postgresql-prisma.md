@@ -15,7 +15,7 @@ related_decisions:
 
 `PROPOSED`. Working baseline cho schema và migration.
 
-> Đã triển khai trong code (rà soát 2026-10-18): Prisma 7 + PostgreSQL (`backend/prisma/schema.prisma`, `backend/prisma/migrations/`). Trạng thái vẫn `PROPOSED` — chủ repo cần quyết định `ACCEPTED`/supersede.
+**Hiện trạng trong code:** Prisma 7 + PostgreSQL (`backend/prisma/schema.prisma`, `backend/prisma/migrations/`). Quyết định chờ chủ dự án chuyển sang `ACCEPTED` hoặc thay thế.
 
 ## Context
 

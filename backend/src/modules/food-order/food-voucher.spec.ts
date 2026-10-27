@@ -51,6 +51,8 @@ async function setup(seed: PromotionCampaign[]) {
   return { promotions, food, place };
 }
 
+
+const FAIL = { reasonCode: 'CUSTOMER_REFUSED', note: null, minWaitMinutes: 0, now: new Date() };
 describe('food checkout vouchers', () => {
   it('snapshots the discount on the order and nets it out of the total', async () => {
     const { promotions, place } = await setup([campaign()]);
@@ -97,10 +99,10 @@ describe('food checkout vouchers', () => {
     await food.markReady(order.id, 'owner-1');
     await food.claim(order.id, 'driver-1', 1);
     await food.pickup(order.id, 'driver-1');
-    await food.fail(order.id, 'driver-1');
+    await food.fail(order.id, 'driver-1', FAIL);
     expect((await promotions.findByCode('FOOD20'))?.usedCount).toBe(0);
     expect(await promotions.release({ entityType: 'FOOD_ORDER', entityId: order.id })).toBe(false);
-    await expect(food.fail(order.id, 'driver-1')).rejects.toMatchObject({
+    await expect(food.fail(order.id, 'driver-1', FAIL)).rejects.toMatchObject({
       code: 'FOOD_STATUS_CONFLICT',
     });
     expect((await promotions.findByCode('FOOD20'))?.usedCount).toBe(0);

@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import Link from "next/link";
 import { usePlatformSettingsQuery } from "@/features/platform-settings/hooks";
+import { featureFlagRows as pickFeatureFlags } from "@/features/platform-settings/mappers";
 import { OpsIcon } from "@/components/ui/ops-icons";
 import {
   AdminBreadcrumb,
@@ -42,6 +43,7 @@ export function SettingsBoard() {
     refetch: refetchPlatform,
   } = usePlatformSettingsQuery();
   const forbidden = platformError && isForbiddenError(platformErr);
+  const featureFlagRows = pickFeatureFlags(platformRows);
 
   return (
     <div className="min-w-0 space-y-5">
@@ -227,6 +229,24 @@ export function SettingsBoard() {
                   Quản lý
                 </Link>
               </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-canvas/60 p-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-ink">
+                    Loại xe và giá tham chiếu
+                  </p>
+                  <p className="mt-0.5 text-sm text-muted">
+                    Xe máy, xe 4 chỗ, xe 7 chỗ: giá mở cửa, theo km, theo phút
+                    và khoảng báo giá.
+                  </p>
+                </div>
+                <Link
+                  href="/settings/vehicle-classes"
+                  className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-brand/30 bg-white px-3 text-sm font-medium text-brand hover:bg-brand/5 cursor-pointer ${focusRing}`}
+                >
+                  <OpsIcon name="car" className="size-4" />
+                  Quản lý
+                </Link>
+              </div>
             </div>
           )}
 
@@ -235,42 +255,67 @@ export function SettingsBoard() {
               <h2 className="text-xs font-semibold tracking-wide text-muted">
                 DỊCH VỤ & CỔNG KẾT NỐI
               </h2>
-              <p className="text-sm text-muted">
-                Chưa có danh sách cổng tích hợp riêng. Theo dõi cấu hình liên
-                quan ở cấu hình nền tảng và phương thức xác thực.
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-canvas/60 p-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-ink">
+                    Bản đồ (Mapbox / Google Maps)
+                  </p>
+                  <p className="mt-0.5 text-sm text-muted">
+                    Chọn nhà cung cấp cho tìm địa chỉ, địa chỉ từ vị trí và lộ
+                    trình.
+                  </p>
+                </div>
+                <Link
+                  href="/settings/maps"
+                  className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-brand/30 bg-white px-3 text-sm font-medium text-brand hover:bg-brand/5 cursor-pointer ${focusRing}`}
+                >
+                  <OpsIcon name="pin" className="size-4" />
+                  Quản lý
+                </Link>
+              </div>
             </div>
           )}
 
           {activeTab === "Feature flags" && (
             <div role="tabpanel" className="mt-4 space-y-3">
               <h2 className="text-xs font-semibold tracking-wide text-muted">
-                CÔNG TẮC TÍNH NĂNG THỬ NGHIỆM
+                CÔNG TẮC VẬN HÀNH (TỪ MÁY CHỦ)
               </h2>
-              <div className="divide-y divide-border">
-                <div className="flex items-center justify-between py-3">
-                  <div>
-                    <p className="text-sm font-medium text-ink">
-                      Giao diện điều phối bản đồ V2
-                    </p>
-                    <p className="text-xs text-muted">
-                      Hiển thị cụm mật độ tài xế thời gian thực bằng WebGL
-                    </p>
-                  </div>
-                  <StatusChip tone="success">100% người dùng</StatusChip>
+              {featureFlagRows.length === 0 ? (
+                <p className="text-sm text-muted" data-testid="feature-flags-empty">
+                  {platformPending
+                    ? "Đang tải công tắc vận hành…"
+                    : "Máy chủ chưa trả về công tắc vận hành nào."}
+                </p>
+              ) : (
+                <div className="divide-y divide-border" data-testid="feature-flags-list">
+                  {featureFlagRows.map((row) => (
+                    <div
+                      key={row.key}
+                      className="flex items-center justify-between gap-3 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-ink">
+                          {row.label || row.key}
+                        </p>
+                        {row.hint ? (
+                          <p className="text-xs text-muted">{row.hint}</p>
+                        ) : null}
+                      </div>
+                      <StatusChip tone={row.value === "true" ? "success" : "food"}>
+                        {row.value === "true" ? "Bật" : "Tắt"}
+                      </StatusChip>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center justify-between py-3">
-                  <div>
-                    <p className="text-sm font-medium text-ink">
-                      Thuật toán ghép cuốc thông minh
-                    </p>
-                    <p className="text-xs text-muted">
-                      Tối ưu hóa thời gian chờ theo mật độ giao thông
-                    </p>
-                  </div>
-                  <StatusChip tone="brand">Thử nghiệm 50%</StatusChip>
-                </div>
-              </div>
+              )}
+              <p className="text-xs text-muted">
+                Bật/tắt tại{" "}
+                <Link href="/settings/platform" className="text-brand underline">
+                  Cấu hình nền tảng
+                </Link>{" "}
+                (có nhật ký kiểm toán).
+              </p>
             </div>
           )}
 

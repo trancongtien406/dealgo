@@ -13,14 +13,12 @@ import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../core/network/request_failure.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../food/presentation/utils/food_routes.dart';
+import '../../../core/notifications/push_route_resolver.dart';
 import '../../identity/domain/entities/auth_state.dart';
 import '../../identity/presentation/cubit/auth_cubit.dart';
 import '../../inbox/domain/entities/inbox_notification.dart';
 import '../../inbox/domain/usecases/inbox_usecases.dart';
 import 'account_widgets.dart';
-import '../../driver/presentation/utils/driver_routes.dart';
-import 'account_routes.dart';
 import 'inbox_copy.dart';
 import '../../../core/design_system/components/dealgo_app_header.dart';
 
@@ -63,8 +61,6 @@ class NotificationsInboxPage extends StatefulWidget {
 
   /// Shown as a bottom-nav tab (driver), so there is no back button.
   final bool asTab;
-
-  bool get _isDriver => shellPath.startsWith('/driver');
 
   @override
   State<NotificationsInboxPage> createState() => _NotificationsInboxPageState();
@@ -122,13 +118,16 @@ class _NotificationsInboxPageState extends State<NotificationsInboxPage> {
           .read<MarkInboxNotificationRead>()(accessToken: token, id: item.id)
           .ignore();
     }
-    final id = item.aggregateId;
-    if (item.aggregateType == 'FoodOrder' && id != null) {
-      await context.push(
-        widget._isDriver ? DriverRoutes.food(id) : FoodRoutes.order(id),
-      );
-    } else if (item.aggregateType == 'SupportTicket' && id != null) {
-      await context.push(AccountRoutes.supportTicket(widget.shellPath, id));
+    // Same targets as a push tap, for this shell's role.
+    final target = inboxTargetFor(
+      shellPath: widget.shellPath,
+      aggregateType: item.aggregateType,
+      aggregateId: item.aggregateId,
+      status: item.status,
+      path: item.path,
+    );
+    if (target != null) {
+      await context.push(target);
     }
   }
 

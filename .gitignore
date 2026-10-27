@@ -117,3 +117,9 @@ tmp/
 temp/
 .temp/
 .tmp/
+
+# Local agent smoke artifacts (do not commit)
+.agent-artifacts/
+
+# Apple APNs auth keys (AuthKey_<id>.p8): secret, never commit
+*.p8

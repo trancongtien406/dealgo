@@ -12,6 +12,7 @@ describe('MemoryRideRepository', () => {
     pickup: { lat: 10.7769, lng: 106.7009, label: 'Ben Thanh, D1' },
     dropoff: { lat: 10.8231, lng: 106.6297, label: 'Airport, Tan Binh' },
     offeredFareVnd: 75_000,
+    vehicleClassCode: 'MOTORBIKE',
     referenceFareVnd: 70_000,
     expiresAt: future,
     now,

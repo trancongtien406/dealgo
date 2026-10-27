@@ -90,6 +90,19 @@ export interface AccountDeletionRepository {
     reason: string;
     at: Date;
   }): Promise<{ amountVnd: number; settledThrough: Date } | null>;
+  /**
+   * Ops records a partial cash movement with the driver (audited).
+   * DRIVER_PAID lowers what the driver owes (may go below 0 = prepaid credit / top-up);
+   * DEALGO_PAID records DealGo paying out a credit to the driver.
+   */
+  recordDriverPayment(input: {
+    driverId: string;
+    actorUserId: string;
+    direction: 'DRIVER_PAID' | 'DEALGO_PAID';
+    amountVnd: number;
+    reason: string;
+    at: Date;
+  }): Promise<{ id: string; adjustmentVnd: number }>;
 }
 
 type MemoryAudit = { actorUserId: string; action: string; entityId: string; reason: string };
@@ -276,5 +289,24 @@ export class MemoryAccountDeletionRepository implements AccountDeletionRepositor
       reason: input.reason,
     });
     return { amountVnd, settledThrough: input.at };
+  }
+
+  async recordDriverPayment(input: {
+    driverId: string;
+    actorUserId: string;
+    direction: 'DRIVER_PAID' | 'DEALGO_PAID';
+    amountVnd: number;
+    reason: string;
+    at: Date;
+  }): Promise<{ id: string; adjustmentVnd: number }> {
+    const adjustmentVnd = input.direction === 'DRIVER_PAID' ? -input.amountVnd : input.amountVnd;
+    this.fees.set(input.driverId, (this.fees.get(input.driverId) ?? 0) + adjustmentVnd);
+    this.audits.push({
+      actorUserId: input.actorUserId,
+      action: 'DRIVER_BALANCE_PAYMENT',
+      entityId: input.driverId,
+      reason: input.reason,
+    });
+    return { id: `pay-${this.audits.length}`, adjustmentVnd };
   }
 }

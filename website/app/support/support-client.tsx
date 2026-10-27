@@ -2,46 +2,107 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { BrandMark } from "@/components/layout/brand-mark";
-import { OpsIcon } from "@/components/ui/ops-icons";
-import { useSupportConfigQuery } from "@/features/content-cms/hooks";
+import { OpsIcon, type OpsIconName } from "@/components/ui/ops-icons";
+import { shownContact } from "@/features/content-cms/public-documents";
+import { PublicPageHeader } from "@/features/content-cms/components/public-page-header";
+import type { PublicPageView, SupportCategory, SupportContent } from "@/features/content-cms/types";
 
-export function SupportClient() {
-  const { data: config, isPending } = useSupportConfigQuery();
+const COPY = {
+  vi: {
+    heading: "Chúng tôi có thể giúp gì cho bạn?",
+    search: "Tìm vấn đề",
+    topics: "Chủ đề hỗ trợ",
+    sendForTopic: "Gửi yêu cầu →",
+    formTitle: "Gửi yêu cầu hỗ trợ",
+    role: "Bạn là",
+    roles: { CUSTOMER: "Khách hàng", DRIVER: "Tài xế", MERCHANT: "Cửa hàng", OTHER: "Khác" },
+    topic: "Nhóm vấn đề",
+    topicsList: { PAYMENT: "Thanh toán", RIDE: "Chuyến đi", FOOD: "Đơn đồ ăn", ACCOUNT: "Tài khoản", SAFETY: "An toàn", OTHER: "Khác" },
+    contact: "Số điện thoại hoặc email",
+    name: "Tên",
+    ref: "Mã chuyến / đơn",
+    content: "Nội dung",
+    submit: "Gửi yêu cầu",
+    sending: "Đang gửi…",
+    failed: "Không thể gửi yêu cầu. Thử lại.",
+    offline: "Mất kết nối máy chủ. Thử lại.",
+    done: "Đã tạo yêu cầu hỗ trợ",
+    code: "Mã yêu cầu",
+    another: "Gửi yêu cầu khác",
+    hotline: "Hotline",
+    email: "Email",
+    hours: "Giờ hỗ trợ",
+    address: "Địa chỉ",
+    terms: "Điều khoản",
+    privacy: "Quyền riêng tư",
+  },
+  en: {
+    heading: "How can we help?",
+    search: "Search issues",
+    topics: "Help topics",
+    sendForTopic: "Send a request →",
+    formTitle: "Send a support request",
+    role: "You are",
+    roles: { CUSTOMER: "Customer", DRIVER: "Driver", MERCHANT: "Merchant", OTHER: "Other" },
+    topic: "Topic",
+    topicsList: { PAYMENT: "Payment", RIDE: "Ride", FOOD: "Food order", ACCOUNT: "Account", SAFETY: "Safety", OTHER: "Other" },
+    contact: "Phone or email",
+    name: "Name",
+    ref: "Ride / order code",
+    content: "Message",
+    submit: "Send request",
+    sending: "Sending…",
+    failed: "Could not send the request. Try again.",
+    offline: "Connection lost. Try again.",
+    done: "Support request created",
+    code: "Request code",
+    another: "Send another request",
+    hotline: "Hotline",
+    email: "Email",
+    hours: "Hours",
+    address: "Address",
+    terms: "Terms",
+    privacy: "Privacy",
+  },
+} as const;
+
+const ICONS = new Set<OpsIconName>(["motorcycle", "utensils", "user", "driver", "store", "car", "wallet", "shield", "headset", "package", "receipt", "users"]);
+const TONE_CLASS: Record<string, string> = {
+  ride: "border-brand/20 bg-brand/10 text-brand",
+  food: "border-food/20 bg-food/10 text-food",
+  delivery: "border-delivery/20 bg-delivery/10 text-delivery",
+  neutral: "border-border bg-canvas text-ink",
+};
+
+const fieldClass =
+  "mt-1.5 h-10 w-full rounded-xl border border-border bg-white px-3 text-sm text-ink focus:border-brand focus:outline-none";
+const labelClass = "block text-xs font-medium text-muted";
+
+export function SupportClient({ page }: { page: PublicPageView<SupportContent> }) {
+  const t = COPY[page.locale];
+  const config = page.content;
+  const hotline = shownContact(config.hotline);
+  const email = shownContact(config.email);
+  const hours = shownContact(config.hours);
+  const address = shownContact(config.address);
+  const q = page.locale === "en" ? "?lang=en" : "";
 
   const [query, setQuery] = useState("");
-  const [role, setRole] = useState("CUSTOMER");
-  const [topic, setTopic] = useState("PAYMENT");
+  const [role, setRole] = useState<string>("CUSTOMER");
+  const [topic, setTopic] = useState<string>("PAYMENT");
   const [contactName, setContactName] = useState("");
   const [refCode, setRefCode] = useState("");
   const [contact, setContact] = useState("");
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitted, setSubmitted] = useState(false);
   const [ticketCode, setTicketCode] = useState<string | null>(null);
-
-  if (isPending || !config) {
-    return (
-      <div className="min-h-screen bg-canvas text-ink flex flex-col items-center justify-center p-4">
-        <OpsIcon
-          name="refresh"
-          className="size-8 animate-spin text-brand mb-3"
-        />
-        <p className="text-sm font-medium text-muted">
-          Đang tải thông tin hỗ trợ từ máy chủ DealGo...
-        </p>
-      </div>
-    );
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim() || !contact.trim()) return;
-
     setSubmitting(true);
     setSubmitError(null);
-
     try {
       const res = await fetch("/api/public/support", {
         method: "POST",
@@ -55,453 +116,202 @@ export function SupportClient() {
           content: content.trim(),
         }),
       });
-
       const json = (await res.json().catch(() => null)) as {
         success?: boolean;
         message?: string;
         data?: { ticketCode?: string };
       } | null;
-
-      if (!res.ok || !json?.success) {
-        setSubmitError(
-          json?.message || "Không thể gửi yêu cầu hỗ trợ. Vui lòng thử lại.",
-        );
-        return;
-      }
-
-      if (!json.data?.ticketCode) {
-        setSubmitError("Không thể gửi yêu cầu hỗ trợ. Vui lòng thử lại.");
+      if (!res.ok || !json?.success || !json.data?.ticketCode) {
+        setSubmitError(json?.message || t.failed);
         return;
       }
       setTicketCode(json.data.ticketCode);
-      setSubmitted(true);
     } catch {
-      setSubmitError(
-        "Mất kết nối máy chủ. Vui lòng kiểm tra kết nối mạng hoặc gọi tổng đài.",
-      );
+      setSubmitError(t.offline);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const filteredCategories = config.categories.map((cat) => {
-    if (!query.trim()) return cat;
-    const q = query.trim().toLowerCase();
-    return {
-      ...cat,
-      items: cat.items.filter((item) => item.toLowerCase().includes(q)),
-    };
-  });
+  const needle = query.trim().toLowerCase();
+  const categories: SupportCategory[] = config.categories
+    .map((cat) => (needle ? { ...cat, items: cat.items.filter((i) => i.toLowerCase().includes(needle)) } : cat))
+    .filter((cat) => !needle || cat.items.length > 0);
 
   return (
-    <div className="min-h-screen bg-canvas text-ink">
-      {/* Top Header */}
-      <header className="sticky top-0 z-30 border-b border-border bg-white/90 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <Link href="/overview" className="flex items-center gap-2">
-            <BrandMark />
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/settings/content"
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-brand/30 bg-brand/5 px-3 text-xs font-medium text-brand hover:bg-brand/10 transition-colors"
-            >
-              <OpsIcon name="settings" className="size-3.5" />
-              Chỉnh sửa (Admin)
-            </Link>
-            <Link
-              href="/login"
-              className="inline-flex h-9 items-center rounded-lg bg-brand px-3 text-xs font-medium text-white hover:bg-brand/90 transition-colors"
-            >
-              Đăng nhập quản trị
-            </Link>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-canvas text-ink" lang={page.locale}>
+      <PublicPageHeader path="/support" locale={page.locale} showSupportLink={false} />
 
-      {/* Hero Header */}
       <section className="border-b border-border bg-gradient-to-b from-brand/5 via-white to-canvas px-4 py-12 text-center sm:px-6 sm:py-16">
         <div className="mx-auto max-w-3xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-medium text-success">
-            <span className="size-2 rounded-full bg-success animate-pulse" />
-            {config.systemStatusNotice ||
-              "Hệ thống hỗ trợ DealGo trực tuyến 24/7"}
-          </div>
-          <h1 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl text-ink">
-            Chúng tôi có thể giúp gì cho bạn?
-          </h1>
-          <p className="mt-2 text-sm text-muted">
-            Tra cứu thông tin giải đáp nhanh hoặc gửi yêu cầu trực tiếp đến đội
-            ngũ Chăm sóc khách hàng DealGo.
-          </p>
-
-          {/* Search bar */}
+          {config.systemStatusNotice ? (
+            <div className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-medium text-success">
+              <span className="size-2 rounded-full bg-success" />
+              {config.systemStatusNotice}
+            </div>
+          ) : null}
+          <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">{page.title || t.heading}</h1>
+          {page.summary ? <p className="mt-2 text-sm text-muted">{page.summary}</p> : null}
           <div className="relative mx-auto mt-6 max-w-xl">
-            <OpsIcon
-              name="search"
-              className="pointer-events-none absolute top-1/2 left-3.5 size-4.5 -translate-y-1/2 text-muted"
-            />
+            <OpsIcon name="search" className="pointer-events-none absolute top-1/2 left-3.5 size-4.5 -translate-y-1/2 text-muted" />
             <input
               type="search"
+              aria-label={t.search}
+              placeholder={t.search}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Nhập vấn đề bạn cần trợ giúp (VD: quên đồ, hoàn tiền, nạp ví...)"
-              className="h-12 w-full rounded-2xl border border-border bg-white pr-4 pl-11 text-sm text-ink placeholder:text-muted shadow-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className="h-12 w-full rounded-2xl border border-border bg-white pr-4 pl-11 text-sm text-ink shadow-sm placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none"
             />
           </div>
         </div>
       </section>
 
-      {/* Support Categories */}
-      <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-12">
-        <h2 className="text-xl font-bold text-ink">
-          Chủ đề hỗ trợ theo vai trò
-        </h2>
-        <p className="mt-1 text-sm text-muted">
-          Chọn nhóm chủ đề liên quan để nhận hướng dẫn chi tiết
-        </p>
-
-        <div className="mt-6 grid gap-6 md:grid-cols-3">
-          {filteredCategories.map((cat) => (
-            <div
-              key={cat.title}
-              className="rounded-2xl border border-border bg-white p-5 shadow-xs flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`grid size-10 place-items-center rounded-xl border ${cat.tone}`}
-                  >
-                    <OpsIcon name={cat.icon} className="size-5" />
-                  </span>
-                  <h3 className="font-bold text-ink">{cat.title}</h3>
+      {categories.length > 0 ? (
+        <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-12">
+          <h2 className="text-xl font-bold text-ink">{t.topics}</h2>
+          <div className="mt-6 grid gap-6 md:grid-cols-3">
+            {categories.map((cat) => (
+              <div key={cat.id} className="flex flex-col justify-between rounded-2xl border border-border bg-white p-5">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <span className={`grid size-10 place-items-center rounded-xl border ${TONE_CLASS[cat.tone] ?? TONE_CLASS.neutral}`}>
+                      <OpsIcon name={ICONS.has(cat.icon as OpsIconName) ? (cat.icon as OpsIconName) : "headset"} className="size-5" />
+                    </span>
+                    <h3 className="font-bold text-ink">{cat.title}</h3>
+                  </div>
+                  <ul className="mt-4 space-y-2.5">
+                    {cat.items.map((item) => (
+                      <li key={item} className="flex items-start gap-2 text-xs text-muted">
+                        <OpsIcon name="chevron" className="mt-0.5 size-3.5 shrink-0 rotate-270 text-muted" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <ul className="mt-4 space-y-2.5">
-                  {cat.items.map((item, idx) => (
-                    <li
-                      key={idx}
-                      className="flex items-start gap-2 text-xs text-muted"
-                    >
-                      <OpsIcon
-                        name="chevron"
-                        className="size-3.5 shrink-0 rotate-270 text-muted mt-0.5"
-                      />
-                      <span className="hover:text-brand cursor-pointer transition-colors">
-                        {item}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="mt-6 border-t border-border pt-4">
+                  <a href="#ticket-form" onClick={() => setRole(cat.role)} className="text-xs font-semibold text-brand hover:underline">
+                    {t.sendForTopic}
+                  </a>
+                </div>
               </div>
-              <div className="mt-6 pt-4 border-t border-border">
-                <a
-                  href="#ticket-form"
-                  onClick={() => {
-                    if (cat.title.includes("Khách")) setRole("CUSTOMER");
-                    if (cat.title.includes("Tài xế")) setRole("DRIVER");
-                    if (cat.title.includes("Quán")) setRole("MERCHANT");
-                  }}
-                  className="text-xs font-semibold text-brand hover:underline inline-flex items-center gap-1"
-                >
-                  Gửi yêu cầu hỗ trợ nhóm này →
-                </a>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Ticket / Support Request Form */}
-      <section
-        id="ticket-form"
-        className="border-t border-border bg-white px-4 py-12 sm:px-6 sm:py-16"
-      >
-        <div className="mx-auto max-w-2xl">
-          <div className="text-center">
-            <span className="grid size-12 mx-auto place-items-center rounded-2xl bg-brand/10 text-brand">
-              <OpsIcon name="headset" className="size-6" />
-            </span>
-            <h2 className="mt-3 text-2xl font-bold text-ink">
-              Gửi thông tin phản ánh & Đóng góp ý kiến
-            </h2>
-            <p className="mt-1 text-sm text-muted">
-              Đối với sự cố chuyến đi hoặc giao hàng khẩn cấp, vui lòng gọi Tổng
-              đài <strong>{config.hotline}</strong> hoặc mở mục Trợ giúp trên
-              ứng dụng DealGo để được xác thực tài khoản tức thì.
-            </p>
+            ))}
           </div>
+        </section>
+      ) : null}
 
-          {submitted ? (
-            <div className="mt-8 rounded-2xl border border-success/30 bg-success/5 p-6 text-center space-y-4">
-              <span className="grid size-12 mx-auto place-items-center rounded-full bg-success/20 text-success">
+      <section id="ticket-form" className="border-t border-border bg-white px-4 py-12 sm:px-6 sm:py-16">
+        <div className="mx-auto max-w-2xl">
+          <h2 className="text-center text-2xl font-bold text-ink">{t.formTitle}</h2>
+          {ticketCode ? (
+            <div className="mt-8 space-y-4 rounded-2xl border border-success/30 bg-success/5 p-6 text-center">
+              <span className="mx-auto grid size-12 place-items-center rounded-full bg-success/20 text-success">
                 <OpsIcon name="check" className="size-6" />
               </span>
-              <div>
-                <h3 className="text-lg font-bold text-ink">
-                  Đã tạo yêu cầu hỗ trợ
-                </h3>
-                <p className="mt-2 text-sm text-muted">
-                  Bộ phận hỗ trợ DealGo đã nhận yêu cầu và sẽ liên hệ lại qua
-                  thông tin bạn cung cấp. Mã yêu cầu của bạn:
-                </p>
-                <div className="mt-2 inline-flex items-center gap-2 rounded-xl bg-white border border-border px-4 py-2 shadow-xs">
-                  <span className="text-xs text-muted">Mã yêu cầu:</span>
-                  <span className="font-mono text-base font-bold text-brand tracking-wider">
-                    {ticketCode}
-                  </span>
-                </div>
+              <h3 className="text-lg font-bold text-ink">{t.done}</h3>
+              <div className="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-4 py-2">
+                <span className="text-xs text-muted">{t.code}:</span>
+                <span className="font-mono text-base font-bold tracking-wider text-brand">{ticketCode}</span>
               </div>
-              <p className="text-xs text-muted max-w-lg mx-auto">
-                Nếu cần bổ sung hình ảnh/chứng từ, hãy gửi kèm mã này qua hòm
-                thư hỗ trợ hoặc đọc mã khi gọi tổng đài 24/7.
-              </p>
-              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                <a
-                  href={`mailto:${config.email}?subject=${encodeURIComponent(`[DealGo Hỗ trợ] [${ticketCode}] [${role}] [${topic}]${refCode ? ` - Mã đơn: ${refCode}` : ""}`)}&body=${encodeURIComponent(`Kính gửi Bộ phận CSKH DealGo,\n\nMã yêu cầu hỗ trợ của tôi: ${ticketCode}\nNhóm vấn đề: ${topic}\nVai trò: ${role}\nMã đơn/chuyến liên quan: ${refCode || "Không có"}\nThông tin liên hệ của tôi: ${contact}\n\nNội dung cần hỗ trợ:\n${content}\n\nRất mong được hỗ trợ xử lý sớm.\nTrân trọng!`)}`}
-                  className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-brand px-4 text-xs font-semibold text-white hover:bg-brand/90 transition-colors shadow-xs"
-                >
-                  <OpsIcon name="mail" className="size-4" />
-                  Gửi bổ sung qua email kèm mã yêu cầu
-                </a>
-                <a
-                  href={`tel:${config.hotline.replace(/\s+/g, "")}`}
-                  className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-border bg-white px-4 text-xs font-medium text-ink hover:bg-canvas transition-colors"
-                >
-                  <OpsIcon name="phone" className="size-3.5 text-danger" />
-                  Gọi tổng đài {config.hotline}
-                </a>
+              <div>
                 <button
                   type="button"
                   onClick={() => {
-                    setSubmitted(false);
+                    setTicketCode(null);
                     setContent("");
                     setContact("");
                     setRefCode("");
                     setContactName("");
-                    setTicketCode(null);
                   }}
-                  className="inline-flex h-10 items-center rounded-xl border border-transparent px-3 text-xs font-medium text-muted hover:text-ink transition-colors cursor-pointer"
+                  className="inline-flex h-10 items-center rounded-xl px-3 text-xs font-medium text-muted hover:text-ink"
                 >
-                  Gửi yêu cầu khác
+                  {t.another}
                 </button>
               </div>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="mt-8 space-y-4">
               {submitError ? (
-                <div className="rounded-xl border border-danger/30 bg-danger/5 p-3 text-xs text-danger flex items-center gap-2">
+                <div role="alert" className="flex items-center gap-2 rounded-xl border border-danger/30 bg-danger/5 p-3 text-xs text-danger">
                   <OpsIcon name="alert" className="size-4 shrink-0" />
                   <span>{submitError}</span>
                 </div>
               ) : null}
-
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label
-                    htmlFor="sup-role"
-                    className="block text-xs font-medium text-muted"
-                  >
-                    Bạn là:
-                  </label>
-                  <select
-                    id="sup-role"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
-                    className="mt-1.5 h-10 w-full rounded-xl border border-border bg-white px-3 text-sm text-ink focus:border-brand focus:outline-none"
-                  >
-                    <option value="CUSTOMER">Khách hàng đặt xe / đồ ăn</option>
-                    <option value="DRIVER">Tài xế đối tác DealGo</option>
-                    <option value="MERCHANT">Chủ quán ăn / Cửa hàng</option>
-                    <option value="OTHER">Khác</option>
+                  <label htmlFor="sup-role" className={labelClass}>{t.role}</label>
+                  <select id="sup-role" value={role} onChange={(e) => setRole(e.target.value)} className={fieldClass}>
+                    {Object.entries(t.roles).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label
-                    htmlFor="sup-topic"
-                    className="block text-xs font-medium text-muted"
-                  >
-                    Nhóm vấn đề:
-                  </label>
-                  <select
-                    id="sup-topic"
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
-                    className="mt-1.5 h-10 w-full rounded-xl border border-border bg-white px-3 text-sm text-ink focus:border-brand focus:outline-none"
-                  >
-                    <option value="PAYMENT">Thanh toán & Hoàn tiền</option>
-                    <option value="RIDE">Chuyến đi & Quên đồ</option>
-                    <option value="FOOD">Đơn đồ ăn & Giao nhận</option>
-                    <option value="ACCOUNT">Tài khoản & Xác minh KYC/KYB</option>
-                    <option value="SAFETY">An toàn & Sự cố</option>
-                    <option value="OTHER">Vấn đề khác</option>
+                  <label htmlFor="sup-topic" className={labelClass}>{t.topic}</label>
+                  <select id="sup-topic" value={topic} onChange={(e) => setTopic(e.target.value)} className={fieldClass}>
+                    {Object.entries(t.topicsList).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                 </div>
               </div>
-
               <div>
-                <label
-                  htmlFor="sup-contact"
-                  className="block text-xs font-medium text-muted"
-                >
-                  Số điện thoại hoặc Email để DealGo liên hệ phản hồi{" "}
-                  <span className="text-danger">*</span>:
-                </label>
-                <input
-                  id="sup-contact"
-                  type="text"
-                  required
-                  value={contact}
-                  onChange={(e) => setContact(e.target.value)}
-                  placeholder="Ví dụ: 0901234567 hoặc hotro@domain.vn"
-                  className="mt-1.5 h-10 w-full rounded-xl border border-border bg-white px-3 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none"
-                />
+                <label htmlFor="sup-contact" className={labelClass}>{t.contact} <span className="text-danger">*</span></label>
+                <input id="sup-contact" required maxLength={120} value={contact} onChange={(e) => setContact(e.target.value)} className={fieldClass} />
               </div>
-
-              <div>
-                <label
-                  htmlFor="sup-name"
-                  className="block text-xs font-medium text-muted"
-                >
-                  Tên của bạn (không bắt buộc):
-                </label>
-                <input
-                  id="sup-name"
-                  type="text"
-                  maxLength={80}
-                  value={contactName}
-                  onChange={(e) => setContactName(e.target.value)}
-                  className="mt-1.5 h-10 w-full rounded-xl border border-border bg-white px-3 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="sup-ref"
-                  className="block text-xs font-medium text-muted"
-                >
-                  Mã chuyến đi hoặc mã đơn hàng liên quan (nếu có):
-                </label>
-                <input
-                  id="sup-ref"
-                  type="text"
-                  value={refCode}
-                  onChange={(e) => setRefCode(e.target.value)}
-                  placeholder="Ví dụ: RIDE-88421 hoặc FO-240610-0892"
-                  className="mt-1.5 h-10 w-full rounded-xl border border-border bg-white px-3 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="sup-desc"
-                  className="block text-xs font-medium text-muted"
-                >
-                  Mô tả chi tiết vấn đề cần hỗ trợ (tối thiểu 10 ký tự){" "}
-                  <span className="text-danger">*</span>:
-                </label>
-                <textarea
-                  id="sup-desc"
-                  rows={4}
-                  required
-                  minLength={10}
-                  maxLength={2000}
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="Vui lòng mô tả cụ thể tình huống, thời gian xảy ra và yêu cầu cần trợ giúp..."
-                  className="mt-1.5 w-full rounded-xl border border-border bg-white p-3 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none"
-                />
-              </div>
-
-              <div className="space-y-3 pt-1">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand text-sm font-semibold text-white hover:bg-brand/90 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
-                >
-                  {submitting ? (
-                    <>
-                      <OpsIcon name="refresh" className="size-4 animate-spin" />
-                      Đang gửi yêu cầu...
-                    </>
-                  ) : (
-                    "Gửi yêu cầu hỗ trợ"
-                  )}
-                </button>
-
-                <div className="text-center">
-                  <a
-                    href={`mailto:${config.email}?subject=${encodeURIComponent(`[DealGo Hỗ trợ] [${role}] [${topic}]${refCode ? ` - Mã: ${refCode}` : ""}`)}&body=${encodeURIComponent(`Xin chào Bộ phận CSKH DealGo,\n\nTôi cần hỗ trợ về vấn đề sau:\n${content}\n\nThông tin liên hệ của tôi: ${contact}\nMã đơn/chuyến: ${refCode}`)}`}
-                    className="text-xs text-muted hover:text-brand underline inline-flex items-center gap-1"
-                  >
-                    <OpsIcon name="mail" className="size-3" />
-                    Hoặc mở ứng dụng thư gửi trực tiếp tới {config.email}
-                  </a>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="sup-name" className={labelClass}>{t.name}</label>
+                  <input id="sup-name" maxLength={80} value={contactName} onChange={(e) => setContactName(e.target.value)} className={fieldClass} />
+                </div>
+                <div>
+                  <label htmlFor="sup-ref" className={labelClass}>{t.ref}</label>
+                  <input id="sup-ref" maxLength={64} value={refCode} onChange={(e) => setRefCode(e.target.value)} className={fieldClass} />
                 </div>
               </div>
+              <div>
+                <label htmlFor="sup-desc" className={labelClass}>{t.content} <span className="text-danger">*</span></label>
+                <textarea id="sup-desc" rows={4} required minLength={10} maxLength={2000} value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-border bg-white p-3 text-sm text-ink focus:border-brand focus:outline-none" />
+              </div>
+              <button type="submit" disabled={submitting}
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand text-sm font-semibold text-white hover:bg-brand/90 disabled:opacity-50">
+                {submitting ? t.sending : t.submit}
+              </button>
             </form>
           )}
         </div>
       </section>
 
-      {/* Emergency Contact & Channels */}
       <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-border bg-white p-5 text-center">
-            <span className="grid size-10 mx-auto place-items-center rounded-xl bg-danger/10 text-danger">
-              <OpsIcon name="phone" className="size-5" />
-            </span>
-            <h4 className="mt-2 font-bold text-ink">Tổng đài khẩn cấp 24/7</h4>
-            <p className="mt-1 text-xs text-muted">
-              Hỗ trợ các vấn đề sự cố trên đường
-            </p>
-            <p className="mt-2 text-base font-extrabold text-danger">
-              {config.hotline}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-border bg-white p-5 text-center">
-            <span className="grid size-10 mx-auto place-items-center rounded-xl bg-brand/10 text-brand">
-              <OpsIcon name="mail" className="size-5" />
-            </span>
-            <h4 className="mt-2 font-bold text-ink">Hòm thư tiếp nhận</h4>
-            <p className="mt-1 text-xs text-muted">
-              Gửi hóa đơn, chứng từ bồi thường
-            </p>
-            <p className="mt-2 text-sm font-bold text-brand">{config.email}</p>
-          </div>
-          <div className="rounded-2xl border border-border bg-white p-5 text-center">
-            <span className="grid size-10 mx-auto place-items-center rounded-xl bg-success/10 text-success">
-              <OpsIcon name="shield" className="size-5" />
-            </span>
-            <h4 className="mt-2 font-bold text-ink">Chính sách & Quy định</h4>
-            <p className="mt-1 text-xs text-muted">
-              Tra cứu quyền lợi & trách nhiệm
-            </p>
-            <div className="mt-2 flex items-center justify-center gap-3 text-xs">
-              <Link
-                href="/terms"
-                className="text-brand font-medium hover:underline"
-              >
-                Điều khoản
-              </Link>
-              <span>·</span>
-              <Link
-                href="/privacy"
-                className="text-brand font-medium hover:underline"
-              >
-                Quyền riêng tư
-              </Link>
-            </div>
-          </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {hotline ? (
+            <ContactCard icon="phone" label={t.hotline}>
+              <a href={`tel:${hotline.replace(/\s+/g, "")}`} className="font-bold text-danger hover:underline">{hotline}</a>
+            </ContactCard>
+          ) : null}
+          {email ? (
+            <ContactCard icon="mail" label={t.email}>
+              <a href={`mailto:${email}`} className="font-bold text-brand hover:underline">{email}</a>
+            </ContactCard>
+          ) : null}
+          {hours ? <ContactCard icon="clock" label={t.hours}>{hours}</ContactCard> : null}
+          {address ? <ContactCard icon="pin" label={t.address}>{address}</ContactCard> : null}
+        </div>
+        <div className="mt-6 flex items-center justify-center gap-3 text-xs">
+          <Link href={`/terms${q}`} className="font-medium text-brand hover:underline">{t.terms}</Link>
+          <span>·</span>
+          <Link href={`/privacy${q}`} className="font-medium text-brand hover:underline">{t.privacy}</Link>
         </div>
       </section>
+    </div>
+  );
+}
 
-      {/* Footer */}
-      <footer className="border-t border-border bg-white px-4 py-8 text-center text-xs text-muted sm:px-6">
-        <p>
-          © {new Date().getFullYear()} DealGo Platform. Nền tảng điều phối vận
-          tải & giao đồ ăn thông minh.
-        </p>
-      </footer>
+function ContactCard({ icon, label, children }: { icon: OpsIconName; label: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-border bg-white p-5 text-center">
+      <span className="mx-auto grid size-10 place-items-center rounded-xl bg-canvas text-ink">
+        <OpsIcon name={icon} className="size-5" />
+      </span>
+      <h4 className="mt-2 text-xs font-medium text-muted">{label}</h4>
+      <div className="mt-1 text-sm text-ink">{children}</div>
     </div>
   );
 }

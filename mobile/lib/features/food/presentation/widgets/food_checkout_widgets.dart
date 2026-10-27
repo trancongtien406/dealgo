@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/motion/dealgo_sheet.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/design_system/components/dealgo_bottom_bar.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
@@ -15,9 +16,14 @@ import '../../domain/entities/food_models.dart';
 import '../../domain/entities/food_money.dart';
 import '../../domain/params/place_food_order_params.dart';
 import '../../../promotion/domain/entities/voucher_quote.dart';
+import '../../../promotion/domain/usecases/list_available_vouchers.dart';
+import '../../../promotion/presentation/widgets/food_voucher_picker_sheet.dart';
 import '../../../promotion/presentation/widgets/voucher_field.dart';
 import '../cubit/food_cart_cubit.dart';
+import 'food_dropoff_tile.dart';
 import 'food_widgets.dart';
+import '../utils/food_routes.dart';
+import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 
 class CheckoutBody extends StatelessWidget {
@@ -32,8 +38,8 @@ class CheckoutBody extends StatelessWidget {
       CheckoutOffline(:final attempt) => _OfflineBody(attempt: attempt),
       final CheckoutRepriced repriced => _RepricedBody(phase: repriced),
       CheckoutPlaced(:final order) => _Receipt(order: order, placed: true),
-      CheckoutRejected(:final message) => _Receipt(notice: message),
-      CheckoutEditing() => const _Receipt(),
+      CheckoutRejected(:final message) => _EditingOrEmpty(notice: message),
+      CheckoutEditing() => const _EditingOrEmpty(),
     };
   }
 }
@@ -56,9 +62,11 @@ class CheckoutActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cart = context.watch<FoodCartCubit>().state;
+    // Empty cart: CTA lives on DealGoStateView only (avoid duplicate bottom bar).
     final child = switch (phase) {
-      CheckoutEditing() ||
-      CheckoutRejected() => _PlaceButton(onSubmit: onSubmit),
+      CheckoutEditing() || CheckoutRejected() =>
+        cart.lines.isEmpty ? null : _PlaceButton(onSubmit: onSubmit),
       CheckoutOffline() => _OfflineButtons(onRetry: onRetry),
       CheckoutRepriced(:final nextTotalVnd) => _RepriceButtons(
         label: AppLocalizations.of(context)
@@ -71,6 +79,40 @@ class CheckoutActions extends StatelessWidget {
       return const SizedBox.shrink();
     }
     return DealGoBottomBar(child: child);
+  }
+}
+
+class _EditingOrEmpty extends StatelessWidget {
+  const _EditingOrEmpty({this.notice});
+
+  final String? notice;
+
+  @override
+  Widget build(BuildContext context) {
+    final cart = context.watch<FoodCartCubit>().state;
+    if (cart.lines.isEmpty) {
+      return _EmptyCheckoutBody(notice: notice);
+    }
+    return _Receipt(notice: notice);
+  }
+}
+
+class _EmptyCheckoutBody extends StatelessWidget {
+  const _EmptyCheckoutBody({this.notice});
+
+  final String? notice;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return DealGoStateView(
+      key: const Key('food-checkout-empty'),
+      art: DealGoStateArt.noOrders,
+      title: l10n.foodCartEmpty,
+      message: notice ?? l10n.checkoutEmptyBody,
+      actionLabel: l10n.checkoutBackToMenu,
+      onAction: () => _backToMenu(context),
+    );
   }
 }
 
@@ -152,6 +194,19 @@ void _leave(BuildContext context) {
   }
 }
 
+void _backToMenu(BuildContext context) {
+  final storeId = context.read<FoodCartCubit>().state.storeId;
+  if (storeId != null && storeId.isNotEmpty) {
+    context.go(FoodRoutes.store(storeId));
+    return;
+  }
+  if (context.canPop()) {
+    context.pop();
+    return;
+  }
+  context.go('/customer/shop');
+}
+
 class _Receipt extends StatelessWidget {
   const _Receipt({this.order, this.notice, this.placed = false});
 
@@ -189,12 +244,12 @@ class _Receipt extends StatelessWidget {
           ];
     final shownLines = lines.isEmpty && order == null ? lines : lines;
     final textTheme = Theme.of(context).textTheme;
-    final l10n = AppLocalizations.of(context);
     final profile = context.watch<AuthCubit>().state;
-    final phone = profile is AuthSignedIn ? profile.profile.phone : null;
-    final recipient = phone == null
-        ? AppLocalizations.of(context).checkoutRecipient
-        : formatDisplayPhone(phone);
+    final recipient = checkoutRecipientLine(
+      displayName: profile is AuthSignedIn ? profile.profile.displayName : null,
+      phone: profile is AuthSignedIn ? profile.profile.phone : null,
+      fallback: AppLocalizations.of(context).checkoutRecipient,
+    );
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         DealGoDimensions.pageGutter,
@@ -235,7 +290,12 @@ class _Receipt extends StatelessWidget {
                             color: DealGoColors.text,
                           ),
                         ),
-                        Text(cart.dropoffLabel, style: textTheme.bodySmall),
+                        // Merged cart + checkout: the address (and its
+                        // server-quoted fee) is edited right here.
+                        if (order == null && !placed)
+                          const FoodDropoffTile()
+                        else
+                          Text(cart.dropoffLabel, style: textTheme.bodySmall),
                       ],
                     ),
                   ),
@@ -276,28 +336,11 @@ class _Receipt extends StatelessWidget {
         ),
         if (order == null && !placed) ...[
           const SizedBox(height: DealGoSpacing.s16),
-          FoodPanel(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(l10n.voucherLabel, style: textTheme.titleMedium),
-                const SizedBox(height: DealGoSpacing.s12),
-                VoucherField(
-                  service: VoucherService.food,
-                  orderAmountVnd: subtotal,
-                  deliveryFeeVnd: delivery,
-                  storeId: cart.storeId,
-                  accessToken: () => currentAccessToken(context),
-                  formatAmount: formatVnd,
-                  initialCode: cart.voucherCode,
-                  onQuote: (quote) =>
-                      context.read<FoodCartCubit>().applyVoucher(
-                        code: quote != null && quote.valid ? quote.code : null,
-                        discountVnd: quote?.discountVnd ?? 0,
-                      ),
-                ),
-              ],
-            ),
+          _CheckoutVoucherPanel(
+            subtotal: subtotal,
+            delivery: delivery,
+            storeId: cart.storeId,
+            initialCode: cart.voucherCode,
           ),
         ],
         const SizedBox(height: DealGoSpacing.s16),
@@ -720,6 +763,93 @@ String _draftCode(CheckoutHeldAttempt attempt) {
   return 'CART-$tail';
 }
 
+class _CheckoutVoucherPanel extends StatefulWidget {
+  const _CheckoutVoucherPanel({
+    required this.subtotal,
+    required this.delivery,
+    required this.storeId,
+    required this.initialCode,
+  });
+
+  final int subtotal;
+  final int delivery;
+  final String? storeId;
+  final String? initialCode;
+
+  @override
+  State<_CheckoutVoucherPanel> createState() => _CheckoutVoucherPanelState();
+}
+
+class _CheckoutVoucherPanelState extends State<_CheckoutVoucherPanel> {
+  String? _pickedCode;
+  var _pickedVersion = 0;
+
+  Future<void> _openList() async {
+    final vouchers = context.read<ListAvailableVouchers>();
+    final token = currentAccessToken(context);
+    final code = await showDealGoSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => FoodVoucherPickerSheet(
+        load: () {
+          if (token == null || token.isEmpty) {
+            throw const ApiException(
+              statusCode: 401,
+              message: '',
+              errorCode: 'UNAUTHORIZED',
+            );
+          }
+          return vouchers(accessToken: token, service: VoucherService.food);
+        },
+      ),
+    );
+    if (!mounted || code == null || code.isEmpty) {
+      return;
+    }
+    setState(() {
+      _pickedCode = code;
+      _pickedVersion++;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    return FoodPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l10n.voucherLabel, style: textTheme.titleMedium),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              key: const Key('checkout-voucher-picker'),
+              onPressed: _openList,
+              child: Text(l10n.accountVouchers),
+            ),
+          ),
+          VoucherField(
+            service: VoucherService.food,
+            orderAmountVnd: widget.subtotal,
+            deliveryFeeVnd: widget.delivery,
+            storeId: widget.storeId,
+            accessToken: () => currentAccessToken(context),
+            formatAmount: formatVnd,
+            initialCode: widget.initialCode,
+            seededCode: _pickedCode,
+            seededCodeVersion: _pickedVersion,
+            onQuote: (quote) => context.read<FoodCartCubit>().applyVoucher(
+              code: quote != null && quote.valid ? quote.code : null,
+              discountVnd: quote?.discountVnd ?? 0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 sealed class CheckoutPhase {
   const CheckoutPhase();
 }
@@ -766,4 +896,24 @@ class CheckoutRejected extends CheckoutPhase {
   const CheckoutRejected(this.message);
 
   final String message;
+}
+
+/// Recipient line on checkout: "Name · 0909 990 101" (name first, like the
+/// delivery apps' address card); falls back to the phone, then the label.
+String checkoutRecipientLine({
+  required String? displayName,
+  required String? phone,
+  required String fallback,
+}) {
+  final name = displayName?.trim() ?? '';
+  final shownPhone = (phone == null || phone.trim().isEmpty)
+      ? null
+      : formatDisplayPhone(phone);
+  if (name.isNotEmpty && shownPhone != null) {
+    return '$name · $shownPhone';
+  }
+  if (name.isNotEmpty) {
+    return name;
+  }
+  return shownPhone ?? fallback;
 }

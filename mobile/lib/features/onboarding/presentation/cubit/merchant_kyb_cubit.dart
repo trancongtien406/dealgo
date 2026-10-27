@@ -38,9 +38,12 @@ class MerchantKybState {
     required this.issues,
     required this.seeded,
     this.reason,
+    this.shopLat,
+    this.shopLng,
     this.loading = false,
     this.submitting = false,
     this.submitError,
+    this.documentsRequired = true,
   });
 
   factory MerchantKybState.initial() {
@@ -71,6 +74,13 @@ class MerchantKybState {
   final String registrationSubject;
   final String shopName;
   final String shopAddress;
+
+  /// The pickup pin, required by the backend for merchant KYB
+  /// (GrabFood / ShopeeFood merchant sign-up also pins the store on a map).
+  final double? shopLat;
+  final double? shopLng;
+
+  bool get hasShopPin => shopLat != null && shopLng != null;
   final String representativeName;
   final String bankName;
   final String bankAccountNumber;
@@ -83,11 +93,29 @@ class MerchantKybState {
   final bool submitting;
   final String? submitError;
 
-  int get stepNumber => MerchantKybStep.values.indexOf(step) + 1;
-  int get totalSteps => MerchantKybStep.values.length;
+  /// DEC-PROD-048 (DRAFT): false when admin turned KYB off — shop info only,
+  /// no documents or bank; ops still approves.
+  final bool documentsRequired;
+
+  List<MerchantKybStep> get steps => documentsRequired
+      ? MerchantKybStep.values
+      : const [
+          MerchantKybStep.businessType,
+          MerchantKybStep.shopInfo,
+          MerchantKybStep.review,
+        ];
+
+  int get stepNumber {
+    final index = steps.indexOf(step);
+    return (index < 0 ? 0 : index) + 1;
+  }
+
+  int get totalSteps => steps.length;
 
   bool get canContinueShopInfo =>
-      shopName.trim().length >= 2 && shopAddress.trim().isNotEmpty;
+      shopName.trim().length >= 2 &&
+      shopAddress.trim().isNotEmpty &&
+      hasShopPin;
 
   bool get canContinueRepresentative =>
       representativeName.trim().length >= 2 &&
@@ -99,8 +127,9 @@ class MerchantKybState {
       documents.hasAll(PartnerDocumentKind.merchantRequired) &&
       !documents.isFlagged(PartnerDocumentKind.storefront);
 
-  bool get canSubmit =>
-      canContinueShopInfo && canContinueRepresentative && canContinueDocuments;
+  bool get canSubmit => documentsRequired
+      ? canContinueShopInfo && canContinueRepresentative && canContinueDocuments
+      : canContinueShopInfo;
 
   MerchantKybState copyWith({
     PartnerApplicationStatus? status,
@@ -109,6 +138,8 @@ class MerchantKybState {
     String? registrationSubject,
     String? shopName,
     String? shopAddress,
+    double? shopLat,
+    double? shopLng,
     String? representativeName,
     String? bankName,
     String? bankAccountNumber,
@@ -122,14 +153,18 @@ class MerchantKybState {
     bool? submitting,
     String? submitError,
     bool clearSubmitError = false,
+    bool? documentsRequired,
   }) {
     return MerchantKybState(
+      documentsRequired: documentsRequired ?? this.documentsRequired,
       status: status ?? this.status,
       step: step ?? this.step,
       businessType: businessType ?? this.businessType,
       registrationSubject: registrationSubject ?? this.registrationSubject,
       shopName: shopName ?? this.shopName,
       shopAddress: shopAddress ?? this.shopAddress,
+      shopLat: shopLat ?? this.shopLat,
+      shopLng: shopLng ?? this.shopLng,
       representativeName: representativeName ?? this.representativeName,
       bankName: bankName ?? this.bankName,
       bankAccountNumber: bankAccountNumber ?? this.bankAccountNumber,
@@ -150,6 +185,7 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
     this._submitPartnerApplication,
     this._getMyPartnerApplication,
     this._accessToken,
+    this._loadDocumentsRequired,
     bool? useMock,
   }) : _useMock = useMock ?? useMockData,
        super(MerchantKybState.initial());
@@ -159,7 +195,31 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
   final SubmitPartnerApplication? _submitPartnerApplication;
   final GetMyPartnerApplication? _getMyPartnerApplication;
   final String? Function()? _accessToken;
+  final Future<bool> Function({
+    required String accessToken,
+    required String role,
+  })?
+  _loadDocumentsRequired;
   final bool _useMock;
+
+  /// DEC-PROD-048: reads the admin KYB switch; keeps documents required on error.
+  Future<void> loadRequirements() async {
+    final load = _loadDocumentsRequired;
+    final token = _accessToken?.call()?.trim() ?? '';
+    if (load == null || token.isEmpty) {
+      return;
+    }
+    final required = await load(accessToken: token, role: role);
+    if (isClosed || required == state.documentsRequired) {
+      return;
+    }
+    final next = state.copyWith(documentsRequired: required);
+    emit(
+      next.steps.contains(next.step)
+          ? next
+          : next.copyWith(step: MerchantKybStep.businessType),
+    );
+  }
 
   void seedFromProfile(UserProfile profile) {
     if (state.seeded) {
@@ -226,6 +286,8 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
               : null,
           shopName: keep(state.shopName, 'shopName'),
           shopAddress: keep(state.shopAddress, 'shopAddress'),
+          shopLat: state.shopLat ?? _coordinate(m['shopLat']),
+          shopLng: state.shopLng ?? _coordinate(m['shopLng']),
           representativeName: metadataText(m, 'representativeName'),
           bankName: keep(state.bankName, 'bankName'),
           bankAccountNumber: keep(state.bankAccountNumber, 'bankAccountNumber'),
@@ -242,6 +304,21 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
   void setShopName(String value) => emit(state.copyWith(shopName: value));
 
   void setShopAddress(String value) => emit(state.copyWith(shopAddress: value));
+
+  /// Pins the store; fills an empty address with the picked place label.
+  void setShopPin({
+    required double lat,
+    required double lng,
+    required String label,
+  }) {
+    emit(
+      state.copyWith(
+        shopLat: lat,
+        shopLng: lng,
+        shopAddress: state.shopAddress.trim().isEmpty ? label : null,
+      ),
+    );
+  }
 
   void setRepresentativeName(String value) =>
       emit(state.copyWith(representativeName: value));
@@ -286,19 +363,21 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
   }
 
   void nextStep() {
-    final index = MerchantKybStep.values.indexOf(state.step);
-    if (index >= MerchantKybStep.values.length - 1) {
+    final steps = state.steps;
+    final index = steps.indexOf(state.step);
+    if (index < 0 || index >= steps.length - 1) {
       return;
     }
-    emit(state.copyWith(step: MerchantKybStep.values[index + 1]));
+    emit(state.copyWith(step: steps[index + 1]));
   }
 
   void previousStep() {
-    final index = MerchantKybStep.values.indexOf(state.step);
+    final steps = state.steps;
+    final index = steps.indexOf(state.step);
     if (index <= 0) {
       return;
     }
-    emit(state.copyWith(step: MerchantKybStep.values[index - 1]));
+    emit(state.copyWith(step: steps[index - 1]));
   }
 
   void beginResubmit([String? section]) {
@@ -363,12 +442,16 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
             'registrationSubject': state.registrationSubject,
             'shopName': state.shopName.trim(),
             'shopAddress': state.shopAddress.trim(),
+            'shopLat': ?state.shopLat,
+            'shopLng': ?state.shopLng,
             'representativeName': state.representativeName.trim(),
             'bankName': state.bankName.trim(),
             'bankAccountNumber': state.bankAccountNumber,
             'bankAccountHolder': state.bankAccountHolder.trim(),
           },
-          documents: state.documents.uploads(PartnerDocumentKind.merchantAll),
+          documents: state.documentsRequired
+              ? state.documents.uploads(PartnerDocumentKind.merchantAll)
+              : const [],
         ),
       );
       if (isClosed) {
@@ -402,3 +485,5 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
     }
   }
 }
+
+double? _coordinate(Object? value) => value is num ? value.toDouble() : null;

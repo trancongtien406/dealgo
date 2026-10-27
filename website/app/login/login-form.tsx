@@ -112,18 +112,21 @@ export function LoginForm() {
       >
         {pending ? "Đang đăng nhập…" : "Đăng nhập"}
       </button>
-      <button
-        type="button"
-        disabled={pending}
-        onClick={() => {
-          setEmail("ops@localhost");
-          setPassword("change-me-dev-only");
-        }}
-        className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-brand/40 bg-brand/5 px-4 text-sm font-medium text-brand hover:bg-brand/10 disabled:opacity-60 ${focusRing}`}
-      >
-        <OpsIcon name="shield" className="size-4" />
-        Sử dụng tài khoản Ops mặc định (ops@localhost)
-      </button>
+      {process.env.NODE_ENV !== "production" ? (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => {
+            // Dev only: the password is OPS_BOOTSTRAP_PASSWORD in backend/.env (never hardcoded).
+            setEmail("ops@localhost");
+          }}
+          className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-brand/40 bg-brand/5 px-4 text-sm font-medium text-brand hover:bg-brand/10 disabled:opacity-60 ${focusRing}`}
+        >
+          <OpsIcon name="shield" className="size-4" />
+          Sử dụng tài khoản Ops mặc định (ops@localhost)
+        </button>
+      ) : null}
+
       {notice ? (
         <p
           id="login-notice"

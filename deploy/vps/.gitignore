@@ -1,0 +1,10 @@
+# Generated on the VPS by gen-secrets.sh / livekit/gen-keys.sh. These hold secrets.
+env/
+secrets/
+.env
+*.env
+livekit/keys.yaml
+livekit/keys.yaml.*
+livekit/backend.env.snippet
+livekit/backend.env.snippet.*
+livekit/tls/

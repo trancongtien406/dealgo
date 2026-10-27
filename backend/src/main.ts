@@ -1,20 +1,33 @@
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
 import {
   buildOpenApiDocument,
   localDevCors,
+  applyTrustProxy,
   registerRouteBodyParsers,
   requestIdMiddleware,
   shouldServeSwagger,
 } from './platform/http/index.js';
-import { createMorganMiddleware } from './platform/observability/index.js';
+import {
+  createAppLogger,
+  createMorganMiddleware,
+  initSentry,
+  sentryOptionsFromEnv,
+} from './platform/observability/index.js';
 import type { AppEnv } from './platform/config/index.js';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  initSentry(sentryOptionsFromEnv(process.env, 'api'));
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: createAppLogger(),
+  });
+  // Before any middleware reads req.ip (throttling, audit): DEC-PROD-053.
+  applyTrustProxy(app, process.env.TRUST_PROXY);
   app.use(requestIdMiddleware);
+
   app.use(createMorganMiddleware());
   registerRouteBodyParsers(app);
   app.enableShutdownHooks();

@@ -66,6 +66,12 @@ export const storeKybOptions: SearchSelectOption[] = [
   { value: "REJECTED", label: "Từ chối" },
 ];
 
+/** Stores without map coordinates cannot take delivery orders. */
+export const storeLocationOptions: SearchSelectOption[] = [
+  { value: "ALL", label: "Tất cả" },
+  { value: "MISSING", label: "Chưa ghim vị trí" },
+];
+
 export const deliveryCargoOptions: SearchSelectOption[] = [
   { value: "ALL", label: "Tất cả loại hàng" },
   { value: "DOC", label: "Tài liệu" },

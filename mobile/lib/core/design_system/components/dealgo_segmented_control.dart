@@ -130,13 +130,16 @@ class _SegmentPill extends StatelessWidget {
                     softWrap: false,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
-                    style: (Theme.of(context).textTheme.labelSmall ??
-                            const TextStyle())
-                        .copyWith(
-                          color: selected ? Colors.white : DealGoColors.text,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
+                    style:
+                        (Theme.of(context).textTheme.labelSmall ??
+                                const TextStyle())
+                            .copyWith(
+                              color: selected
+                                  ? Colors.white
+                                  : DealGoColors.text,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
                   ),
                 ),
               ),

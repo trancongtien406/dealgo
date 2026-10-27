@@ -73,7 +73,11 @@ class FoodDiscoveryCubit extends Cubit<FoodDiscoveryState> {
       if (isClosed || generation != _generation) {
         return;
       }
-      emit(FoodDiscoveryFailed(UiMessage.error(error, fallback: (l10n) => l10n.errorNetwork)));
+      emit(
+        FoodDiscoveryFailed(
+          UiMessage.error(error, fallback: (l10n) => l10n.errorNetwork),
+        ),
+      );
     }
   }
 

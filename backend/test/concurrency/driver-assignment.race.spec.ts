@@ -21,6 +21,8 @@ import { PrismaModule } from '../../src/platform/database/prisma.module.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 import { RIDE_CLOCK, type RideClock } from '../../src/modules/ride/ride.constants.js';
 import { RideModule } from '../../src/modules/ride/ride.module.js';
+import { PARTNER_REPOSITORY } from '../../src/modules/partner/partner.constants.js';
+import type { PartnerRepository } from '../../src/modules/partner/partner.repository.js';
 
 const hasDatabase = Boolean(process.env.DATABASE_URL?.trim());
 const describePg = hasDatabase ? describe : describe.skip;
@@ -107,6 +109,20 @@ describePg('ride select race (postgres)', () => {
     };
   }
 
+  async function minBid(token: string, code: string): Promise<number> {
+    // The server rejects bids under max(class min, reference × floor %).
+    const quote = await request(app.getHttpServer())
+      .post('/v1/rides/quote')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ pickup, dropoff })
+      .expect(200);
+    const option = (quote.body.data.options as { code: string; minBidVnd: number }[]).find(
+      (item) => item.code === code,
+    );
+    if (!option) throw new Error(`no quote option for ${code}`);
+    return option.minBidVnd;
+  }
+
   it('lets only one of two racing selections win against Postgres', async () => {
     const customer = await login();
     const driverA = await login();
@@ -114,25 +130,38 @@ describePg('ride select race (postgres)', () => {
     const identity = app.get(IDENTITY_REPOSITORY);
     await ensureGrant(identity, driverA.userId, 'DRIVER');
     await ensureGrant(identity, driverB.userId, 'DRIVER');
+    // DG-DEC-VEH-001: offers fail closed without a DRIVER application carrying the class.
+    const partners = app.get<PartnerRepository>(PARTNER_REPOSITORY);
+    for (const d of [driverA, driverB]) {
+      await partners.upsertSubmit({
+        id: randomUUID(),
+        userId: d.userId,
+        role: 'DRIVER',
+        metadata: { vehicleClassCode: 'MOTORBIKE' },
+        documents: [],
+        now: CLOCK_START,
+      });
+    }
 
     const suffix = `${Date.now()}-${randomUUID().slice(0, 8)}`;
+    const floor = await minBid(customer.token, 'MOTORBIKE');
     const created = await request(app.getHttpServer())
       .post('/v1/rides')
       .set('Authorization', `Bearer ${customer.token}`)
       .set('Idempotency-Key', `pg-race-create-${suffix}`)
-      .send({ pickup, dropoff, offeredFareVnd: 30_000 })
+      .send({ pickup, dropoff, offeredFareVnd: floor, vehicleClassCode: 'MOTORBIKE' })
       .expect(200);
     const rideId = created.body.data.id as string;
 
     const offerA = await request(app.getHttpServer())
       .post(`/v1/rides/${rideId}/offers`)
       .set('Authorization', `Bearer ${driverA.token}`)
-      .send({ amountVnd: 40_000 })
+      .send({ amountVnd: floor + 1_000 })
       .expect(200);
     const offerB = await request(app.getHttpServer())
       .post(`/v1/rides/${rideId}/offers`)
       .set('Authorization', `Bearer ${driverB.token}`)
-      .send({ amountVnd: 42_000 })
+      .send({ amountVnd: floor + 2_000 })
       .expect(200);
     const offerAId = offerA.body.data.offers.find(
       (item: { driverId: string }) => item.driverId === driverA.userId,
@@ -158,6 +187,80 @@ describePg('ride select race (postgres)', () => {
     expect(statuses).toEqual([200, 409]);
     const success = first.status === 200 ? first : second;
     expect(success.body.data.status).toBe('ASSIGNED');
+  });
+
+  it('RIDE-CAR-011: lets only one of two racing CAR_4 selections win against Postgres', async () => {
+    const customer = await login();
+    const driverA = await login();
+    const driverB = await login();
+    const identity = app.get(IDENTITY_REPOSITORY);
+    const partners = app.get<PartnerRepository>(PARTNER_REPOSITORY);
+    await ensureGrant(identity, driverA.userId, 'DRIVER');
+    await ensureGrant(identity, driverB.userId, 'DRIVER');
+    const now = CLOCK_START;
+    await partners.upsertSubmit({
+      id: randomUUID(),
+      userId: driverA.userId,
+      role: 'DRIVER',
+      metadata: { vehicleClassCode: 'CAR_4' },
+      documents: [],
+      now,
+    });
+    await partners.upsertSubmit({
+      id: randomUUID(),
+      userId: driverB.userId,
+      role: 'DRIVER',
+      metadata: { vehicleClassCode: 'CAR_4' },
+      documents: [],
+      now,
+    });
+
+    const suffix = `${Date.now()}-${randomUUID().slice(0, 8)}`;
+    const carFloor = await minBid(customer.token, 'CAR_4');
+    const created = await request(app.getHttpServer())
+      .post('/v1/rides')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .set('Idempotency-Key', `pg-race-car4-create-${suffix}`)
+      .send({ pickup, dropoff, offeredFareVnd: carFloor, vehicleClassCode: 'CAR_4' })
+      .expect(200);
+    expect(created.body.data.vehicleClassCode).toBe('CAR_4');
+    const rideId = created.body.data.id as string;
+
+    const offerA = await request(app.getHttpServer())
+      .post(`/v1/rides/${rideId}/offers`)
+      .set('Authorization', `Bearer ${driverA.token}`)
+      .send({ amountVnd: carFloor + 1_000 })
+      .expect(200);
+    const offerB = await request(app.getHttpServer())
+      .post(`/v1/rides/${rideId}/offers`)
+      .set('Authorization', `Bearer ${driverB.token}`)
+      .send({ amountVnd: carFloor + 2_000 })
+      .expect(200);
+    const offerAId = offerA.body.data.offers.find(
+      (item: { driverId: string }) => item.driverId === driverA.userId,
+    ).id as string;
+    const offerBId = offerB.body.data.offers.find(
+      (item: { driverId: string }) => item.driverId === driverB.userId,
+    ).id as string;
+
+    const [first, second] = await Promise.all([
+      request(app.getHttpServer())
+        .post(`/v1/rides/${rideId}/selection`)
+        .set('Authorization', `Bearer ${customer.token}`)
+        .set('Idempotency-Key', `pg-race-car4-a-${suffix}`)
+        .send({ offerId: offerAId }),
+      request(app.getHttpServer())
+        .post(`/v1/rides/${rideId}/selection`)
+        .set('Authorization', `Bearer ${customer.token}`)
+        .set('Idempotency-Key', `pg-race-car4-b-${suffix}`)
+        .send({ offerId: offerBId }),
+    ]);
+
+    const statuses = [first.status, second.status].sort((a, b) => a - b);
+    expect(statuses).toEqual([200, 409]);
+    const success = first.status === 200 ? first : second;
+    expect(success.body.data.status).toBe('ASSIGNED');
+    expect(success.body.data.vehicleClassCode).toBe('CAR_4');
   });
 });
 

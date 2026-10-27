@@ -1,0 +1,9 @@
+# Generated on the VPS. keys.yaml and backend.env.snippet hold the LiveKit secret.
+.env
+keys.yaml
+keys.yaml.*
+backend.env.snippet
+backend.env.snippet.*
+livekit.yaml
+caddy.yaml
+caddy_data/

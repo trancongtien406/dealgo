@@ -5,24 +5,30 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/config/api_base_url.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../ride/domain/entities/ride_models.dart';
+import '../../../ride/presentation/utils/ride_vehicle_label.dart';
+import '../../../ride/presentation/widgets/ride_negotiation_ui.dart';
 import '../../../ride/domain/entities/ride_money.dart';
-import '../../../ride/domain/params/get_ride_params.dart';
 import '../../../ride/domain/params/submit_ride_offer_params.dart';
 import '../../../ride/domain/usecases/get_ride.dart';
 import '../../domain/usecases/submit_driver_ride_offer.dart';
 import '../cubit/driver_offer_cubit.dart';
+
+export '../cubit/driver_offer_cubit.dart'
+    show DriverOfferSelection, driverOfferSelectionFor;
 import '../utils/driver_routes.dart';
 import '../widgets/driver_widgets.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../features/food/domain/entities/food_money.dart';
 import '../../../../core/format/short_ref.dart';
 import '../../../../core/l10n/api_error_text.dart';
-import '../../../../core/realtime/snapshot_binding.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
 
 class DriverRideDetailPage extends StatelessWidget {
@@ -33,18 +39,35 @@ class DriverRideDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final classPhoto = resolveMediaUrl(ride.imageUrl);
     return Scaffold(
       body: DriverPageFrame(
         title: l10n.driverRideDetailTitle,
+        subtitle: rideVehicleClassLabel(l10n, ride.vehicleClassCode),
+        trailing: classPhoto == null
+            ? null
+            : RideVehicleClassPhoto(
+                imageUrl: ride.imageUrl,
+                code: ride.vehicleClassCode,
+                size: 36,
+              ),
         insetBottom: true,
         onBack: () => driverBack(context),
         footer: DriverFooter(
-          secondaryLabel: l10n.actionSkip,
-          primaryLabel: l10n.driverMakeOffer,
-          primaryKey: const Key('driver-open-offer'),
-          onSecondary: () => driverBack(context),
-          onPrimary: () =>
+          // inDrive-style: one tap takes the customer's price; a counter
+          // offer stays one step away.
+          secondaryLabel: l10n.driverCounterOffer,
+          secondaryKey: const Key('driver-open-offer'),
+          primaryLabel: l10n.driverAcceptAtPrice(
+            formatVnd(ride.offeredFareVnd),
+          ),
+          primaryKey: const Key('driver-quick-accept'),
+          onSecondary: () =>
               context.push(DriverRoutes.offer(ride.id), extra: ride),
+          onPrimary: () => context.push(
+            '${DriverRoutes.offer(ride.id)}?accept=1',
+            extra: ride,
+          ),
         ),
         body: ListView(
           padding: const EdgeInsets.fromLTRB(
@@ -96,6 +119,12 @@ class DriverRideDetailPage extends StatelessWidget {
                     label: l10n.driverOfferCount,
                     value: '${ride.offerCount}',
                   ),
+                  // Drivers see the customer's rating first.
+                  DriverMoneyRow(
+                    key: const Key('driver-customer-rating'),
+                    label: l10n.driverCustomerRating,
+                    value: customerRatingText(l10n, ride.customerRating),
+                  ),
                 ],
               ),
             ),
@@ -112,25 +141,43 @@ class DriverRideDetailPage extends StatelessWidget {
 }
 
 class DriverOfferPage extends StatelessWidget {
-  const DriverOfferPage({required this.ride, super.key});
+  const DriverOfferPage({
+    required this.ride,
+    this.quickAccept = false,
+    super.key,
+  });
 
   final OpenRide ride;
+
+  /// Sends the customer's own price immediately (one-tap accept).
+  final bool quickAccept;
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (context) => DriverOfferCubit(
         submitDriverRideOffer: context.read<SubmitDriverRideOffer>(),
+        getRide: context.read<GetRide>(),
+        realtime: _maybeRealtime(context),
       ),
-      child: _DriverOfferView(ride: ride),
+      child: _DriverOfferView(ride: ride, quickAccept: quickAccept),
     );
   }
 }
 
+SnapshotRealtime? _maybeRealtime(BuildContext context) {
+  try {
+    return context.read<SnapshotRealtime>();
+  } catch (_) {
+    return null;
+  }
+}
+
 class _DriverOfferView extends StatefulWidget {
-  const _DriverOfferView({required this.ride});
+  const _DriverOfferView({required this.ride, this.quickAccept = false});
 
   final OpenRide ride;
+  final bool quickAccept;
 
   @override
   State<_DriverOfferView> createState() => _DriverOfferPageState();
@@ -141,78 +188,71 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
     text: '${widget.ride.offeredFareVnd}',
   );
   var _submitting = false;
+  var _withdrawing = false;
   String? _error;
   int? _sentAmount;
-  var _selection = DriverOfferSelection.waiting;
-  Timer? _poll;
-  SnapshotBinding? _binding;
+
+  /// Take a pending offer back before the customer chooses.
+  Future<void> _withdraw() async {
+    final client = maybeRideNegotiation(context);
+    final token = driverAccessToken(context);
+    if (_withdrawing || client == null || token == null || token.isEmpty) {
+      return;
+    }
+    setState(() {
+      _withdrawing = true;
+      _error = null;
+    });
+    try {
+      await client.withdrawOffer(accessToken: token, rideId: widget.ride.id);
+      if (!mounted) {
+        return;
+      }
+      showNegotiationSnack(
+        context,
+        AppLocalizations.of(context).driverWithdrawOfferDone,
+      );
+      context.go('/driver/jobs');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _withdrawing = false;
+        _error = negotiationErrorText(context, error);
+      });
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.quickAccept) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          unawaited(_submit());
+        }
+      });
+    }
+  }
 
   @override
   void dispose() {
-    _stopWatching();
     _amount.dispose();
     super.dispose();
   }
 
-  /// After the offer is sent, follow the ride until the customer picks a driver:
-  /// the server keeps a non-negotiating ride readable only for its assigned driver.
-  /// DEC-PROD-025: the `ride:<id>` socket hint (ASSIGNED/CANCELLED/EXPIRED) triggers an
-  /// immediate REST check; a slow poll stays as the safety net when the socket is down.
+  /// After the offer is sent, follow the ride until the customer picks a driver.
+  /// DEC-PROD-031 rev 2026-10-24: socket only (no poll) — see [DriverOfferCubit].
   void _startWatching() {
-    _stopWatching();
-    _poll = Timer.periodic(driverOfferPollInterval, (_) => _checkSelection());
-    SnapshotRealtime? realtime;
-    try {
-      realtime = context.read<SnapshotRealtime>();
-    } catch (_) {
-      realtime = null;
-    }
-    if (realtime == null) {
-      return;
-    }
-    final binding = SnapshotBinding(
-      realtime: realtime,
-      room: RideSnapshotRoom(widget.ride.id),
-      onInvalidate: _checkSelection,
-    );
-    _binding = binding;
-    binding.start(accessToken: driverAccessToken(context)).catchError((Object _) {});
-  }
-
-  void _stopWatching() {
-    _poll?.cancel();
-    _poll = null;
-    final binding = _binding;
-    _binding = null;
-    binding?.stop().catchError((Object _) {});
-  }
-
-  Future<void> _checkSelection() async {
     final token = driverAccessToken(context);
     if (token == null || token.isEmpty) {
       return;
     }
-    DriverOfferSelection next;
-    try {
-      final view = await context.read<GetRide>()(
-        GetRideParams(accessToken: token, rideId: widget.ride.id),
-      );
-      next = driverOfferSelectionFor(view.status);
-    } on ApiException catch (error) {
-      if (error.statusCode != 404) {
-        return;
-      }
-      next = DriverOfferSelection.lost;
-    } catch (_) {
-      return;
-    }
-    if (!mounted) {
-      return;
-    }
-    if (next != DriverOfferSelection.waiting) {
-      _stopWatching();
-    }
-    setState(() => _selection = next);
+    context
+        .read<DriverOfferCubit>()
+        .watchSelection(accessToken: token, rideId: widget.ride.id)
+        .catchError((Object _) {});
   }
 
   Future<void> _submit() async {
@@ -272,15 +312,24 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
 
   @override
   Widget build(BuildContext context) {
+    final selection = context.watch<DriverOfferCubit>().state;
     final textTheme = Theme.of(context).textTheme;
     final l10n = AppLocalizations.of(context);
     final ride = widget.ride;
     final amount = parseRideFareInput(_amount.text);
     final sent = _sentAmount;
+    final classPhoto = resolveMediaUrl(ride.imageUrl);
     return Scaffold(
       body: DriverPageFrame(
         title: l10n.driverOfferTitle,
-        subtitle: l10n.rideVehicleMotorbike,
+        subtitle: rideVehicleClassLabel(l10n, ride.vehicleClassCode),
+        trailing: classPhoto == null
+            ? null
+            : RideVehicleClassPhoto(
+                imageUrl: ride.imageUrl,
+                code: ride.vehicleClassCode,
+                size: 36,
+              ),
         insetBottom: true,
         onBack: () => driverBack(context),
         footer: sent == null
@@ -313,7 +362,10 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(l10n.driverCustomerRequest, style: textTheme.titleMedium),
+                  Text(
+                    l10n.driverCustomerRequest,
+                    style: textTheme.titleMedium,
+                  ),
                   const SizedBox(height: DealGoSpacing.s12),
                   Text(
                     AppLocalizations.of(context).rideRef(shortRef(ride.id)),
@@ -325,7 +377,7 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
                   ),
                   DriverMoneyRow(
                     label: l10n.driverVehicle,
-                    value: l10n.rideVehicleMotorbike,
+                    value: rideVehicleClassLabel(l10n, ride.vehicleClassCode),
                   ),
                 ],
               ),
@@ -347,14 +399,15 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
                     ),
                     const SizedBox(height: DealGoSpacing.s8),
                     DriverChip(
-                      label: switch (_selection) {
-                        DriverOfferSelection.waiting => sent == ride.offeredFareVnd
-                            ? l10n.driverOfferWaitingAccept
-                            : l10n.driverOfferWaitingCounter,
+                      label: switch (selection) {
+                        DriverOfferSelection.waiting =>
+                          sent == ride.offeredFareVnd
+                              ? l10n.driverOfferWaitingAccept
+                              : l10n.driverOfferWaitingCounter,
                         DriverOfferSelection.selected => l10n.driverOfferChosen,
                         DriverOfferSelection.lost => l10n.driverOfferLost,
                       },
-                      tone: _selection == DriverOfferSelection.lost
+                      tone: selection == DriverOfferSelection.lost
                           ? DriverChipTone.danger
                           : DriverChipTone.green,
                     ),
@@ -373,7 +426,7 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _selection == DriverOfferSelection.selected
+                            selection == DriverOfferSelection.selected
                                 ? l10n.driverReadyToNavigate
                                 : l10n.driverWaitingForCustomer,
                             style: textTheme.titleMedium?.copyWith(
@@ -381,10 +434,13 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
                             ),
                           ),
                           Text(
-                            switch (_selection) {
-                              DriverOfferSelection.waiting => l10n.driverWaitingForCustomerBody,
-                              DriverOfferSelection.selected => l10n.driverReadyToNavigateBody,
-                              DriverOfferSelection.lost => l10n.driverOfferLostBody,
+                            switch (selection) {
+                              DriverOfferSelection.waiting =>
+                                l10n.driverWaitingForCustomerBody,
+                              DriverOfferSelection.selected =>
+                                l10n.driverReadyToNavigateBody,
+                              DriverOfferSelection.lost =>
+                                l10n.driverOfferLostBody,
                             },
                             style: textTheme.bodySmall?.copyWith(
                               color: Colors.white70,
@@ -397,7 +453,7 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
                 ),
               ),
               const SizedBox(height: DealGoSpacing.s12),
-              if (_selection == DriverOfferSelection.selected)
+              if (selection == DriverOfferSelection.selected)
                 DealGoPrimaryButton(
                   key: const Key('driver-open-active-ride'),
                   label: l10n.driverOpenPickupNavigation,
@@ -407,11 +463,18 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
                     extra: ride,
                   ),
                 )
-              else if (_selection == DriverOfferSelection.lost)
+              else if (selection == DriverOfferSelection.lost)
                 DealGoPrimaryButton(
                   key: const Key('driver-offer-back-to-jobs'),
                   label: l10n.driverBackToJobs,
                   onPressed: () => context.go('/driver/jobs'),
+                )
+              else if (maybeRideNegotiation(context) != null)
+                DealGoSecondaryButton(
+                  key: const Key('driver-withdraw-offer'),
+                  label: l10n.driverWithdrawOffer,
+                  enabled: !_withdrawing,
+                  onPressed: _withdraw,
                 ),
             ] else ...[
               DriverPanel(
@@ -483,15 +546,3 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
     return AppLocalizations.of(context).driverOfferHintCounter;
   }
 }
-
-/// Safety-net poll while waiting for the customer's choice; the socket hint is the fast path.
-const driverOfferPollInterval = Duration(seconds: 15);
-
-enum DriverOfferSelection { waiting, selected, lost }
-
-/// Still negotiating → wait; the ride moved on and is still readable → it is ours.
-DriverOfferSelection driverOfferSelectionFor(RideStatus status) => switch (status) {
-  RideStatus.negotiating => DriverOfferSelection.waiting,
-  RideStatus.cancelled || RideStatus.expired => DriverOfferSelection.lost,
-  _ => DriverOfferSelection.selected,
-};

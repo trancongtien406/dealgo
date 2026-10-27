@@ -15,10 +15,14 @@ export class PlacesController {
   @Get('search')
   @ApiOperation({
     summary:
-      'Search places by text on the maps provider; { items[{lat,lng,name,address,provider}], available }',
+      'Search places in Vietnam (Mapbox + optional OSM/Photon), ranked city-first by distance and text; { items[{lat,lng,name,address,provider,distanceKm?,approximate?}], available }',
   })
   search(@Query() query: SearchPlacesQueryDto) {
-    return this.places.search(query.q, query.limit);
+    return this.places.search(
+      query.q,
+      query.limit,
+      query.lat != null && query.lng != null ? { lat: query.lat, lng: query.lng } : undefined,
+    );
   }
 
   @Get('reverse')

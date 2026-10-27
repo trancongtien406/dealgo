@@ -8,6 +8,8 @@ String foodRejectReasonLabel(AppLocalizations l10n, FoodRejectReason reason) =>
       FoodRejectReason.storeClosing => l10n.foodRejectStoreClosing,
       FoodRejectReason.itemPriceChanged => l10n.foodRejectPriceChanged,
       FoodRejectReason.other => l10n.foodRejectOther,
+      FoodRejectReason.changeRejected => l10n.foodCancelChangeRejected,
+      FoodRejectReason.changeExpired => l10n.foodCancelChangeExpired,
     };
 
 /// "Lý do: Hết món — ghi chú" for the customer.

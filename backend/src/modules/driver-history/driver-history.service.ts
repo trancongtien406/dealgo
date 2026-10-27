@@ -51,6 +51,9 @@ export type DriverHistoryItem = {
   driverStars: number | null;
 };
 
+/** The driver's in-progress job, used by the app to resume after a relaunch. */
+export type DriverActiveJob = { kind: 'RIDE' | 'FOOD_ORDER'; id: string } | null;
+
 export type DriverHistoryPage = {
   items: DriverHistoryItem[];
   nextCursor: string | null;
@@ -183,6 +186,25 @@ export class DriverHistoryService {
     private readonly food: FoodService,
     private readonly earnings: EarningsService,
   ) {}
+
+  /**
+   * Current assigned ride (ASSIGNED..IN_TRIP) or food order (ASSIGNED/PICKED_UP).
+   * Rides win when both exist; there should never be more than one per kind.
+   */
+  async activeJob(driverId: string): Promise<{ job: DriverActiveJob }> {
+    await this.requireDriver(driverId);
+    const [rideIds, orderIds] = await Promise.all([
+      this.rides.trackingRideIdsForDriver(driverId),
+      this.food.trackingOrderIdsForDriver(driverId),
+    ]);
+    if (rideIds[0]) {
+      return { job: { kind: 'RIDE', id: rideIds[0] } };
+    }
+    if (orderIds[0]) {
+      return { job: { kind: 'FOOD_ORDER', id: orderIds[0] } };
+    }
+    return { job: null };
+  }
 
   async list(driverId: string, query: DriverHistoryQueryDto = {}): Promise<DriverHistoryPage> {
     await this.requireDriver(driverId);

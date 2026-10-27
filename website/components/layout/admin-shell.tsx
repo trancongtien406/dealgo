@@ -134,8 +134,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
             title="DealGo"
           >
             {desktopCollapsed ? (
-              <span className="hidden text-sm font-bold text-brand lg:inline">
-                DG
+              <span className="hidden lg:inline-flex">
+                <BrandMark compact />
               </span>
             ) : null}
             <span className={desktopCollapsed ? "lg:hidden" : ""}>

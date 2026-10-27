@@ -34,7 +34,7 @@ upstream_docs:
 
 > **Trạng thái:** `DRAFT / v0.1.0`. Đây là PRD cấp sản phẩm, **chưa phải hợp đồng API, schema database, chính sách pháp lý hoặc điều kiện go-live được phê duyệt**. Hạng mục chỉ có trạng thái `PROPOSED_P0` khi phạm vi MVP tổng thể đã chốt nhưng chi tiết nghiệp vụ còn chờ duyệt. Không tự điền giá, phụ phí, tỷ lệ hoa hồng, timeout, bán kính, SLO hoặc provider.
 >
-> **Bảy định hướng đã xác nhận:** MVP Ride hai bánh + Food; một app Flutter cho Customer/Merchant/Driver; Ride thương lượng giá; tham khảo luồng công khai mà không sao chép; docs đủ cho triển khai/QA/ops; đăng ký passkey + phone SMS + email verified và Admin method controls; chat + voice call trong app theo transaction. Nguồn: `DEC-PROD-001..007`.
+> **Bảy định hướng đã xác nhận:** MVP Ride (xe máy **và** ô tô per `DG-DEC-VEH-001`) + Food; một app Flutter cho Customer/Merchant/Driver; Ride thương lượng giá; tham khảo luồng công khai mà không sao chép; docs đủ cho triển khai/QA/ops; đăng ký passkey + phone SMS + email verified và Admin method controls; chat + voice call trong app theo transaction. Nguồn: `DEC-PROD-001..007`, `DG-DEC-VEH-001`.
 
 ## 1. Tóm tắt điều hành
 
@@ -95,7 +95,7 @@ DealGo là nền tảng dịch vụ địa phương có hai hành trình:
 
 ## 3. Tầm nhìn, nguyên tắc và giá trị
 
-**Định hướng sản phẩm (PROPOSED):** DealGo giúp người dùng truy cập hai nhu cầu thiết yếu — di chuyển bằng xe hai bánh và đặt đồ ăn — trong một trải nghiệm nhất quán, có thể theo dõi và có phương án xử lý khi giao dịch không như mong đợi.
+**Định hướng sản phẩm (PROPOSED):** DealGo giúp người dùng truy cập hai nhu cầu thiết yếu — di chuyển bằng xe máy **và** ô tô (`DG-DEC-VEH-001`) và đặt đồ ăn — trong một trải nghiệm nhất quán, có thể theo dõi và có phương án xử lý khi giao dịch không như mong đợi.
 
 **Nguyên tắc thiết kế sản phẩm:**
 
@@ -141,7 +141,7 @@ DealGo là nền tảng dịch vụ địa phương có hai hành trình:
 
 | ID | Cam kết |
 |---|---|
-| `DEC-PROD-001` | MVP có **Ride hai bánh** và **Food giao tận nơi**. |
+| `DEC-PROD-001` | MVP có **Ride** (xe máy **và** ô tô per `DG-DEC-VEH-001`) và **Food giao tận nơi**. |
 | `DEC-PROD-002` | **Một app Flutter** có Customer, Merchant và Driver. |
 | `DEC-PROD-003` | Dùng tài liệu công khai của Grab/GrabFood/ShopeeFood để nghiên cứu *patterns*, không sao chép hoặc mặc định policy. |
 | `DEC-PROD-004` | Docs phải hỗ trợ coding/testing/operations; không chỉ có screen list. |
@@ -157,13 +157,13 @@ DealGo là nền tảng dịch vụ địa phương có hai hành trình:
 - `PROPOSED_P2`: chưa cần cho MVP, cần business case/decision mới.
 - `OUT_OF_SCOPE`: không triển khai trong baseline MVP; muốn thêm phải change request.
 
-**Không đánh đồng:** 49 `CAP-*` P0 đã hoạch định trong `scope-release-plan.md` là *capability inventory*; yêu cầu `FR-*` bên dưới chi tiết hóa hành vi, **không** làm tăng 49 capabilities hoặc tự cấp quyền approve cho feature. Screen inventory 165 mobile / 37 admin từng được nêu trước đây là tham chiếu chưa phân pha, không phải KPI giao hàng P0.
+**Không đánh đồng:** 49 `CAP-*` P0 đã hoạch định trong `scope-release-plan.md` là *capability inventory*; yêu cầu `FR-*` bên dưới chi tiết hóa hành vi, **không** làm tăng 49 capabilities hoặc tự cấp quyền approve cho feature. Screen inventory 165 mobile / 37 admin là tham chiếu chưa phân pha, không phải KPI giao hàng P0.
 
 ### 5.3. In scope / out of scope
 
 | In scope ở mức mục tiêu MVP | Chưa tự đưa vào MVP |
 |---|---|
-| Customer đặt Ride hai bánh và Food; theo dõi, lịch sử, hỗ trợ; auth passkey/SMS/verified email; transaction-scoped chat/voice call | Ride ô tô, nhiều điểm, liên tỉnh, đặt hộ nhiều khách; chat tự do/video/ghi âm |
+| Customer đặt Ride (xe máy **và** ô tô) và Food; theo dõi, lịch sử, hỗ trợ; auth passkey/SMS/verified email; transaction-scoped chat/voice call | Nhiều điểm, liên tỉnh, đặt hộ nhiều khách; chat tự do/video/ghi âm; Car fares/KYC/regs remain OPEN-003/006 |
 | Driver đủ điều kiện nhận và thực hiện Ride/Food | Gom nhiều đơn, pooling, thuật toán điều phối phức tạp độc quyền |
 | Merchant được xét duyệt, mở/đóng, menu, nhận/chuẩn bị/bàn giao đơn | Marketplace bán hàng phi thực phẩm, livestream, loyalty phức tạp |
 | Multi-role trong cùng app, xét quyền server-side | Tự động cho phép hoạt động đồng thời nhiều job khi chưa có policy |
@@ -183,10 +183,10 @@ Bảng này giữ đồng bộ với `scope-release-plan.md` và **không thay �
 | `PROPOSED_P1` | `CAP-P1-01..04` | Địa chỉ yêu thích/đặt lại, marketing ưu đãi nâng cao, rating/review; không gồm chat/call cốt lõi đã chuyển P0 theo `DEC-PROD-007`. |
 | `PROPOSED_P1` | `CAP-P1-05..07` | Multi-staff/multi-branch Merchant, phân tích hiệu suất Driver, chỉnh/sửa món hoặc partial adjustments theo policy. |
 | `PROPOSED_P1` | `CAP-P1-08..10` | Analytics/export nâng cao, lifecycle messaging, A/B experiments/personalization. |
-| `OUT_OF_SCOPE` (`P2`) | `CAP-P2-01..04` | Xe ô tô, giao kiện độc lập, đi chợ/vertical khác, pooling/batch/multi-stop. |
+| `OUT_OF_SCOPE` (`P2`) | `CAP-P2-01..04` | `CAP-P2-01` remaining = taxi/subtypes beyond Ride catalog; **Car itself is in-scope** per `DG-DEC-VEH-001` (2026-10-23). Also: giao kiện độc lập, đi chợ/vertical khác, pooling/batch/multi-stop. |
 | `OUT_OF_SCOPE` (`P2`) | `CAP-P2-05..09` | Đặt lịch phức tạp, ví/tín dụng, loyalty nhiều tầng, nhượng quyền, AI tự định giá. |
 
-**Ưu tiên đã cập nhật:** chat văn bản và gọi thoại trong app theo giao dịch là P0 theo `DEC-PROD-007`; chat tự do, video call, ghi âm, tệp đính kèm và liên lạc ngoài ngữ cảnh chưa thuộc baseline.
+**Ưu tiên:** chat văn bản và gọi thoại trong app theo giao dịch là P0 theo `DEC-PROD-007`; chat tự do, video call, ghi âm, tệp đính kèm và liên lạc ngoài ngữ cảnh chưa thuộc baseline.
 
 ## 6. Người dùng, kênh và quyền nghiệp vụ
 
@@ -213,7 +213,7 @@ Bảng này giữ đồng bộ với `scope-release-plan.md` và **không thay �
 
 ### 7.1. Điều kiện tiên quyết
 
-- Customer có phiên đăng nhập hợp lệ (phương thức đăng nhập `OPEN-008`), chọn Ride hai bánh.
+- Customer có phiên đăng nhập hợp lệ (phương thức đăng nhập `OPEN-008`), chọn Ride và `vehicleClassCode` (MOTORBIKE hoặc CAR catalog).
 - Điểm đón và điểm đến được hệ thống nhận dạng/định vị ở địa bàn có thể phục vụ (`OPEN-001`); phải báo lỗi địa chỉ không xác định hoặc không thuộc vùng.
 - Giá và điều kiện chuyến được trình bày trước xác nhận, với chính sách quote/version `OPEN-003`.
 - Driver cần profile và quyền nhận Ride hợp lệ; hiện trạng online/khả dụng phải được backend kiểm tra.
@@ -310,7 +310,7 @@ Merchant closed, món hết khi checkout, giá đổi, merchant không phản h�
 
 | ID | Yêu cầu | Minimum acceptance | `CAP-*` / blocker |
 |---|---|---|---|
-| `FR-RIDE-001` | Customer chọn loại Ride hai bánh, pickup và destination. | Điểm ngoài vùng/không hợp lệ có lỗi rõ; không gửi yêu cầu. | `CAP-RIDE-01`, `OPEN-001` |
+| `FR-RIDE-001` | Customer chọn loại Ride (MOTORBIKE hoặc CAR catalog), pickup và destination. | Điểm ngoài vùng/không hợp lệ có lỗi rõ; thiếu `vehicleClassCode` → 400; không gửi yêu cầu. | `CAP-RIDE-01`, `OPEN-001`, `DG-DEC-VEH-001` |
 | `FR-RIDE-002` | Xem route/ETA và giá tham khảo; nhập giá đề xuất Ride. | Tách giá tham khảo, giá khách đề xuất và giá cuối; nêu rõ điều kiện/phí. | `CAP-RIDE-01`, `DEC-PROD-005`, `OPEN-003/019` |
 | `FR-RIDE-003` | Xác nhận gửi RideRequest. | Double tap/retry cùng intent không tạo hai RideRequest hợp lệ. | `CAP-RIDE-02`, `CAP-CORE-06` |
 | `FR-RIDE-004` | Theo dõi quá trình tìm tài xế; có trạng thái hết tài xế/hủy. | Searching không tồn tại vô hạn nếu policy yêu cầu timeout; UX giải thích kết quả. | `CAP-RIDE-03`, `OPEN-004` |
@@ -719,7 +719,7 @@ Chi tiết nguồn chuẩn và bộ bằng chứng ở `../00-governance/scope-r
 | Ref | Nguồn | Kiến thức quan sát được | Giới hạn |
 |---|---|---|---|
 | `[SRC-01]` | [GrabFood Việt Nam](https://www.grab.com/vn/food/) | Flow chọn địa chỉ/quán/món, xác nhận, tracking, ảnh hưởng của giờ mở. | Không là quy tắc DealGo, không khẳng định trạng thái tối ưu hay policy hiện thời mọi khu vực. |
-| `[SRC-02]` | [GrabBike Việt Nam](https://www.grab.com/vn/transport/bike/) | Ride hai bánh và hiển thị giá chuyến trước thực hiện. | Không công bố thuật toán dispatch, giá chuẩn DealGo. |
+| `[SRC-02]` | [GrabBike Việt Nam](https://www.grab.com/vn/transport/bike/) | Ride xe hai bánh và hiển thị giá chuyến trước thực hiện. | Không công bố thuật toán dispatch, giá chuẩn DealGo. |
 | `[SRC-03]` | [GrabMerchant Việt Nam](https://merchant.grab.com/vn-vn) | Khả năng quản lý merchant profile/menu/order. | Không là bản mô tả kỹ thuật nội bộ. |
 | `[SRC-04]` | [GrabMerchant — tính năng xác nhận đơn](https://merchant.grab.com/vn-vn/blog/xacnhandonhang) | Quan hệ giữa chuẩn bị, trạng thái ready và điều phối giao. | Bài có bối cảnh và thời điểm triển khai riêng; không áp dụng nguyên xi. |
 | `[SRC-05]` | [ShopeeFood — hướng dẫn đặt đồ ăn](https://shopeefood.vn/how-to-order-delivery) | Chọn thông tin giao, kiểm tra phí, mã ưu đãi và xác nhận. | Có tính năng đặt nhóm/đặt giờ nhưng **không** mặc định thuộc MVP DealGo. |

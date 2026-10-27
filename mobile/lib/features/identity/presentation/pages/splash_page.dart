@@ -56,8 +56,17 @@ class _DealGoSplashScreenState extends State<DealGoSplashScreen>
     });
   }
 
+  /// False once something else (a cold-start push tap, a deep link, the auth
+  /// redirect) already navigated away: the splash may still be mounted
+  /// during the outgoing transition and must not drag the user back to home.
+  bool get _stillOnSplash {
+    if (!mounted) return false;
+    final route = ModalRoute.of(context);
+    return route == null || route.isCurrent;
+  }
+
   Future<void> _proceed() async {
-    if (!mounted) return;
+    if (!_stillOnSplash) return;
 
     try {
       final authCubit = context.read<AuthCubit>();
@@ -69,7 +78,7 @@ class _DealGoSplashScreenState extends State<DealGoSplashScreen>
     } catch (_) {}
 
     final hasSeenOnboarding = await _storage.hasSeenOnboarding();
-    if (!mounted) return;
+    if (!mounted || !_stillOnSplash) return;
 
     if (hasSeenOnboarding) {
       context.go(AuthRoutes.login);
@@ -134,27 +143,29 @@ class _DealGoSplashScreenState extends State<DealGoSplashScreen>
                           horizontal: DealGoSpacing.s16,
                         ),
                         child: ClipRRect(
-                          borderRadius:
-                              BorderRadius.circular(DealGoRadius.card),
+                          borderRadius: BorderRadius.circular(
+                            DealGoRadius.card,
+                          ),
                           child: Image.asset(
                             'assets/images/hero_dealgo_danang.png',
                             fit: BoxFit.contain,
                             errorBuilder: (context, error, stackTrace) =>
                                 Container(
-                              height: 240,
-                              decoration: BoxDecoration(
-                                color: DealGoColors.subtlePurple,
-                                borderRadius:
-                                    BorderRadius.circular(DealGoRadius.card),
-                              ),
-                              child: const Center(
-                                child: Icon(
-                                  DealGoIcons.city,
-                                  size: 72,
-                                  color: DealGoColors.primary,
+                                  height: 240,
+                                  decoration: BoxDecoration(
+                                    color: DealGoColors.subtlePurple,
+                                    borderRadius: BorderRadius.circular(
+                                      DealGoRadius.card,
+                                    ),
+                                  ),
+                                  child: const Center(
+                                    child: Icon(
+                                      DealGoIcons.city,
+                                      size: 72,
+                                      color: DealGoColors.primary,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
                           ),
                         ),
                       ),
@@ -193,19 +204,20 @@ class _DealGoSplashScreenState extends State<DealGoSplashScreen>
                         animation: _controller,
                         builder: (context, child) {
                           return ClipRRect(
-                            borderRadius:
-                                BorderRadius.circular(DealGoRadius.small),
+                            borderRadius: BorderRadius.circular(
+                              DealGoRadius.small,
+                            ),
                             child: ColoredBox(
-                              color:
-                                  DealGoColors.border.withValues(alpha: 0.55),
+                              color: DealGoColors.border.withValues(
+                                alpha: 0.55,
+                              ),
                               child: SizedBox(
                                 height: 5,
                                 width: double.infinity,
                                 child: FractionallySizedBox(
                                   alignment: Alignment.centerLeft,
-                                  widthFactor:
-                                      ((_controller.value * 0.7) + 0.3)
-                                          .clamp(0.0, 1.0),
+                                  widthFactor: ((_controller.value * 0.7) + 0.3)
+                                      .clamp(0.0, 1.0),
                                   child: const ColoredBox(
                                     color: DealGoColors.primary,
                                   ),

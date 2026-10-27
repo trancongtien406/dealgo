@@ -24,7 +24,7 @@ export function settlementLineStatusTone(status: SettlementLineStatus) {
 }
 
 /**
- * Nest settlements are UTC-day COD journal buckets (sandbox stub, no payout).
+ * Nest settlements are COD journal buckets per Vietnam business day (Asia/Ho_Chi_Minh); no payout.
  * Map into SettlementLine rows for the existing board table.
  */
 export function mapNestSettlementBatchToLine(

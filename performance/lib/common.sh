@@ -8,7 +8,7 @@ BACKEND_ROOT="${REPO_ROOT}/backend"
 REPORT_DIR="${PERF_ROOT}/reports"
 mkdir -p "${REPORT_DIR}"
 
-BASE_URL="${BASE_URL:-http://127.0.0.1:3011}"
+BASE_URL="${BASE_URL:-http://127.0.0.1:3001}"
 RUN_ID="${RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
 REPORT_FILE="${REPORT_FILE:-${REPORT_DIR}/${RUN_ID}.tsv}"
 SUMMARY_FILE="${SUMMARY_FILE:-${REPORT_DIR}/${RUN_ID}.summary.md}"

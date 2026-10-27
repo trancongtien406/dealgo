@@ -31,7 +31,7 @@ related_decisions:
 
 ## 1. Executive summary
 
-**DealGo** là một nền tảng số phục vụ **di chuyển bằng xe hai bánh (Ride)** và **đặt đồ ăn giao tận nơi (Food)**. Phạm vi MVP đã thống nhất bao gồm **cả hai dịch vụ**, trên **một ứng dụng Flutter hỗ trợ ba vai trò Customer / Merchant / Driver**, cùng **Admin Web** phục vụ quản trị và điều hành.
+**DealGo** là một nền tảng số phục vụ **di chuyển bằng xe máy và ô tô (Ride)** và **đặt đồ ăn giao tận nơi (Food)**. Phạm vi MVP đã thống nhất bao gồm **cả hai dịch vụ**, trên **một ứng dụng Flutter hỗ trợ ba vai trò Customer / Merchant / Driver**, cùng **Admin Web** phục vụ quản trị và điều hành.
 
 DealGo muốn giải quyết nhu cầu kết nối đúng người — đúng dịch vụ — đúng thời điểm, đồng thời quản lý minh bạch hành trình, trạng thái và trách nhiệm của các bên.
 
@@ -39,9 +39,9 @@ DealGo muốn giải quyết nhu cầu kết nối đúng người — đúng d�
 |---|---|---|
 | Tên dự án | DealGo | `CONFIRMED` |
 | Thị trường mục tiêu | Việt Nam; khu vực triển khai đầu tiên chưa chọn | `PROPOSED` / `TBD` |
-| Dịch vụ Ride | Đặt xe hai bánh có thương lượng giá: khách đề xuất; tài xế chấp nhận/đưa giá khác; khách chọn trước assignment | `CONFIRMED` (`DEC-PROD-005`) |
+| Dịch vụ Ride | Đặt xe máy hoặc ô tô có thương lượng giá: khách đề xuất; tài xế chấp nhận/đưa giá khác; khách chọn trước assignment | `CONFIRMED` (`DEC-PROD-005`) |
 | Dịch vụ Food | Đặt món từ cửa hàng/nhà hàng, giao đến khách | `CONFIRMED` |
-| Đăng ký/xác thực | Phone SMS, email+password đăng ký/đăng nhập, passkey; Admin bật/tắt phương thức | `CONFIRMED` (cập nhật 2026-10-18; `DEC-PROD-006` đã `SUPERSEDED`) |
+| Đăng ký/xác thực | Phone SMS, email+password đăng ký/đăng nhập, passkey; Admin bật/tắt phương thức | `CONFIRMED` (`DEC-PROD-008`) |
 | Liên lạc dịch vụ | Chat và gọi thoại trong app theo giao dịch Ride/Food; không lộ số cá nhân | `CONFIRMED` (`DEC-PROD-007`) |
 | Mobile app | Một ứng dụng Flutter hỗ trợ Customer, Merchant, Driver | `CONFIRMED` |
 | Kênh vận hành | Admin Web có phân quyền | `BASELINE` từ hồ sơ dự án |
@@ -77,7 +77,7 @@ Nguồn công khai và ngày tham khảo được ghi tại §19; nghiên cứu 
 
 ### 3.1. Product vision
 
-> **DealGo hướng đến trở thành một điểm truy cập tiện lợi cho nhu cầu di chuyển bằng xe hai bánh và đặt đồ ăn, kết nối khách hàng, cửa hàng và tài xế bằng các luồng minh bạch, dễ sử dụng và có khả năng vận hành đáng tin cậy.**
+> **DealGo hướng đến trở thành một điểm truy cập tiện lợi cho nhu cầu di chuyển bằng xe máy, ô tô và đặt đồ ăn, kết nối khách hàng, cửa hàng và tài xế bằng các luồng minh bạch, dễ sử dụng và có khả năng vận hành đáng tin cậy.**
 
 Đây là **tuyên bố định hướng được đề xuất**, không phải tuyên bố về vị thế thị trường hoặc lợi thế cạnh tranh đã được kiểm nghiệm.
 
@@ -105,7 +105,7 @@ Nguồn công khai và ngày tham khảo được ghi tại §19; nghiên cứu 
 
 | ID | Mục tiêu | Bằng chứng hoàn thành cấp sản phẩm | Trạng thái |
 |---|---|---|---|
-| `OBJ-001` | Khách hàng hoàn thành luồng Ride hai bánh | Có E2E: báo giá → gửi yêu cầu → gán tài xế → đón → di chuyển → kết thúc → ghi nhận thanh toán / công nợ | `CONFIRMED SCOPE` |
+| `OBJ-001` | Khách hàng hoàn thành luồng Ride (xe máy, ô tô) | Có E2E: báo giá → gửi yêu cầu → gán tài xế → đón → di chuyển → kết thúc → ghi nhận thanh toán / công nợ | `CONFIRMED SCOPE` |
 | `OBJ-002` | Khách hàng hoàn thành luồng Food | Có E2E: chọn quán/món → checkout → quán xác nhận/chế biến → gán tài xế → giao → hoàn tất → ghi nhận tài chính | `CONFIRMED SCOPE` |
 | `OBJ-003` | Cùng app phục vụ đủ ba vai trò | Customer, Merchant và Driver có luồng truy cập/phân quyền, onboarding, điều hướng và trạng thái đúng | `CONFIRMED SCOPE` |
 | `OBJ-004` | Vận hành được luồng ngoại lệ quan trọng | Admin hỗ trợ xử lý hủy, không gán được tài xế, giao không thành công và tranh chấp có audit trail | `PROPOSED ACCEPTANCE` |
@@ -133,7 +133,7 @@ Các ngưỡng định lượng chỉ được điền sau khi có baseline, quy
 
 | Mã | Phạm vi | Ghi chú |
 |---|---|---|
-| `SCOPE-001` | Ride — xe hai bánh, khách đề xuất giá, tài xế accept/counter, khách chọn trước assignment | Có luồng requester ↔ driver ↔ customer selection |
+| `SCOPE-001` | Ride — xe máy và ô tô, khách đề xuất giá, tài xế accept/counter, khách chọn trước assignment | Có luồng requester ↔ driver ↔ customer selection |
 | `SCOPE-002` | Food — đặt món từ merchant và giao bởi driver | Có luồng customer ↔ merchant ↔ driver |
 | `SCOPE-003` | **Một** mobile Flutter có ba role | Customer / Merchant / Driver, không mặc định ba app |
 | `SCOPE-004` | Tham chiếu Grab/GrabFood/ShopeeFood cho Ride/Food và inDrive cho thương lượng Ride | Không sao chép tính năng/policy/thuật toán |
@@ -497,7 +497,7 @@ Khi tạo `decisions-and-assumptions.md`, các câu hỏi này phải được �
 ### 18.1. Checklist trước khi chuyển `APPROVED`
 
 - [ ] Product Owner xác nhận product vision và giá trị cốt lõi.
-- [ ] Product Owner xác nhận rõ Ride **hai bánh** + Food cùng thuộc MVP.
+- [ ] Product Owner xác nhận rõ Ride (xe máy, ô tô) + Food cùng thuộc MVP.
 - [ ] Xác nhận một ứng dụng Flutter ba role và Admin Web (nếu có thay đổi so với baseline, phải ghi decision).
 - [ ] Xác nhận không có scope ngoài dự kiến bị ghi nhầm là `CONFIRMED`.
 - [ ] Có owner cho các critical decisions `OPEN-001..008`, `OPEN-020/021`.

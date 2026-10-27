@@ -13,7 +13,7 @@ export class OpsOverviewController {
   @Get('overview')
   @ApiOperation({
     summary:
-      'Ops dashboard KPIs + optional panels (hourlyTrend, recentActivity, ridesByArea, foodByCategory). Today = Asia/Ho_Chi_Minh. revenueVnd/commissionVnd null. Enrichment fail-soft → empty arrays.',
+      'Ops dashboard KPIs + optional panels (hourlyTrend, recentActivity, ridesByArea, foodByCategory). Today = Asia/Ho_Chi_Minh. revenueVnd = gross booking value of completed rides + delivered food today; commissionVnd = driver fees + merchant commission today (null only if that query failed). Enrichment fail-soft → empty arrays.',
   })
   getOverview() {
     return this.overview.overview();

@@ -47,6 +47,23 @@ describe('SnapshotGateway subscribe authz', () => {
     expect(sock.join).not.toHaveBeenCalled();
   });
 
+  it('subscribe sent before connection auth finishes waits for it (no false UNAUTHORIZED)', async () => {
+    let finishAuth!: (actor: unknown) => void;
+    const access = {
+      authenticateSocket: vi.fn(() => new Promise((resolve) => (finishAuth = resolve))),
+      canJoinRoom: vi.fn().mockResolvedValue(true),
+    };
+    const gw = gateway(access as never);
+    const sock = { ...client(), data: {} as Record<string, unknown> };
+
+    const connecting = gw.handleConnection(sock as never);
+    const subscribing = gw.subscribe(sock as never, { room: `ride:${rideId}` });
+    finishAuth({ userId: 'customer-1', sessionId: 's1', channel: 'customer' });
+    await connecting;
+
+    await expect(subscribing).resolves.toEqual({ ok: true, room: `ride:${rideId}` });
+  });
+
   it('allows join and joins socket room when participant', async () => {
     const access = { canJoinRoom: vi.fn().mockResolvedValue(true) };
     const gw = gateway(access);

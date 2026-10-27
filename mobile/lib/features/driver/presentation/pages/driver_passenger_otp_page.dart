@@ -10,6 +10,7 @@ import '../../../ride/domain/entities/ride_models.dart';
 import '../../../ride/domain/entities/ride_money.dart';
 import '../../../ride/domain/params/ride_driver_action.dart';
 import '../../domain/usecases/advance_driver_ride.dart';
+import '../cubit/driver_duty_cubit.dart';
 import '../utils/driver_action_runner.dart';
 import '../utils/driver_routes.dart';
 import '../widgets/driver_contact_actions.dart';
@@ -35,6 +36,16 @@ class _DriverPassengerOtpPageState extends State<DriverPassengerOtpPage>
   var _confirmed = false;
 
   static const _otpLength = 4;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ensureDriverOnDuty(context);
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -78,7 +89,7 @@ class _DriverPassengerOtpPageState extends State<DriverPassengerOtpPage>
       return;
     }
     setState(() => _confirmed = true);
-    context.push(
+    context.pushReplacement(
       DriverRoutes.active(widget.rideId),
       extra: {'ride': widget.ride, 'phase': 'onTrip'},
     );
@@ -160,7 +171,7 @@ class _DriverPassengerOtpPageState extends State<DriverPassengerOtpPage>
                 ),
                 const SizedBox(height: DealGoSpacing.s8),
                 Text(
-                  l10n.driverOtpValidFor(widget.rideId),
+                  l10n.driverOtpValidFor(shortRef(widget.rideId)),
                   style: textTheme.bodySmall,
                 ),
                 const SizedBox(height: DealGoSpacing.s16),

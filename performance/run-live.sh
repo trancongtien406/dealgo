@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=lib/common.sh
 source "${ROOT}/lib/common.sh"
 
-BASE_URL="${BASE_URL:-http://127.0.0.1:3011}"
+BASE_URL="${BASE_URL:-http://127.0.0.1:3001}"
 export BASE_URL RUN_ID
 
 echo "=============================================="

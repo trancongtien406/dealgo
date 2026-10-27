@@ -7,7 +7,7 @@
 
 ## 1. Tổng quan hệ thống & Bối cảnh dự án
 
-DealGo là nền tảng kết hợp **Ride** (xe hai bánh) và **Food** (giao đồ ăn), mở rộng thêm **Delivery** (giao hàng) và **Negotiation** (trả giá cuốc xe).
+DealGo là nền tảng kết hợp **Ride** (xe máy, ô tô) và **Food** (giao đồ ăn), mở rộng thêm **Delivery** (giao hàng) và **Negotiation** (trả giá cuốc xe).
 Hệ thống gồm 3 phân hệ chính:
 1. **Mobile Client (`mobile/`)**: 1 ứng dụng Flutter đa vai trò (Customer, Merchant, Driver).
 2. **Backend Services (`backend/`)**: NestJS 11 đóng vai trò là **Nguồn Sự Thật Duy Nhất (Single Source of Truth)** cho dữ liệu, quyền hạn, giá đã chốt, phân công, trạng thái và sổ cái giao dịch.

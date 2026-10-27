@@ -347,3 +347,16 @@ function normalizeVi(value: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+/** The ACTIVE region containing the point, or null (PLANNED regions do not count). */
+export function activeRegionCodeAt(lat: number, lng: number): string | null {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null;
+  }
+  for (const region of catalog) {
+    if (region.status === 'ACTIVE' && pointInBBox(lat, lng, region.bbox)) {
+      return region.code;
+    }
+  }
+  return null;
+}

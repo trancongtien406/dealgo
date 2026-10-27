@@ -131,9 +131,114 @@ void main() {
     expect(find.text('3'), findsOneWidget);
     expect(find.text('4.6'), findsOneWidget);
     expect(find.text('Bún bò'), findsOneWidget);
+    expect(find.text('Ngon'), findsOneWidget);
     expect(find.text('4 phần'), findsOneWidget);
     expect(find.textContaining('Tổng 5 đơn'), findsOneWidget);
     expect(find.text('2,45 triệu'), findsNothing);
+    expect(stats.statementCalls, hasLength(1));
+    expect(find.byKey(const Key('merchant-statement')), findsOneWidget);
+  });
+
+  test('statement window is Vietnam days including today', () {
+    // 2026-10-26 18:30 UTC = 2026-10-27 01:30 ICT
+    final now = DateTime.utc(2026, 10, 26, 18, 30);
+    expect(statementRange(7, now), ('2026-10-21', '2026-10-27'));
+    expect(statementRange(90, now).$1, '2026-09-27');
+  });
+
+  test('decodes the merchant statement', () {
+    final statement = decodeMerchantStatement({
+      'from': '2026-10-20',
+      'to': '2026-10-26',
+      'commissionPercentNow': 15,
+      'totals': {
+        'orderCount': 3,
+        'cashReceivedVnd': 300000,
+        'commissionVnd': 45000,
+        'netVnd': 255000,
+      },
+      'unsettledCommissionVnd': 15000,
+      'settlementCycleDays': 7,
+      'settlements': [
+        {
+          'periodStart': '2026-10-20',
+          'periodEnd': '2026-10-22',
+          'commissionVnd': 30000,
+          'createdAt': '2026-10-23T03:00:00.000Z',
+        },
+      ],
+    });
+    expect(statement.orderCount, 3);
+    expect(statement.unsettledCommissionVnd, 15000);
+    expect(statement.settlementCycleDays, 7);
+    expect(statement.settlements.single.periodEnd, '2026-10-22');
+    expect(
+      () => decodeMerchantStatement(const {'from': 'x'}),
+      throwsA(isA<ApiException>()),
+    );
+  });
+
+  testWidgets('statement card shows unpaid commission', (tester) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final stats = FakeMerchantStatsRemoteDataSource(
+      result: decodeMerchantStats(Map<String, Object?>.from(_payload)),
+      statementResult: const MerchantStatement(
+        from: '2026-10-20',
+        to: '2026-10-26',
+        commissionPercentNow: 15,
+        orderCount: 3,
+        cashReceivedVnd: 300000,
+        commissionVnd: 45000,
+        netVnd: 255000,
+        unsettledCommissionVnd: 15000,
+        settlementCycleDays: 7,
+        settlements: [
+          MerchantSettlement(
+            periodStart: '2026-10-20',
+            periodEnd: '2026-10-22',
+            commissionVnd: 30000,
+            createdAt: null,
+          ),
+        ],
+      ),
+    );
+    final orders = FakeMerchantOrdersClient(
+      onGetCatalog: () =>
+          const FoodStoreDetail(id: 'store-1', name: 'Quán Hà', items: []),
+    );
+    await tester.pumpWidget(
+      MultiRepositoryProvider(
+        providers: [
+          RepositoryProvider<MerchantStatsRepository>.value(value: stats),
+          RepositoryProvider<GetMerchantCatalog>.value(
+            value: GetMerchantCatalog(MerchantOrdersRepositoryImpl(orders)),
+          ),
+          RepositoryProvider<RatingRepository>.value(value: _Ratings()),
+        ],
+        child: BlocProvider<AuthCubit>.value(
+          value: _SignedIn(),
+          child: const MaterialApp(
+            localizationsDelegates: testLocalizationsDelegates,
+            supportedLocales: [testLocale],
+            locale: testLocale,
+            home: MerchantStatsPage(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('merchant-statement-unsettled')),
+      200,
+    );
+    expect(find.text('Hoa hồng (15%)'), findsOneWidget);
+    expect(find.text('Đối soát mỗi 7 ngày'), findsOneWidget);
+    expect(
+      find.textContaining('Lần nộp gần nhất: 20/10–22/10'),
+      findsOneWidget,
+    );
   });
 }
 
@@ -146,6 +251,24 @@ class _Ratings implements RatingRepository {
     for (final id in storeIds)
       id: StoreRating(storeId: id, count: 12, average: 4.6),
   };
+
+  @override
+  Future<StoreReviews> storeReviews({
+    required String accessToken,
+    required String storeId,
+  }) async {
+    return StoreReviews(
+      summary: StoreRating(storeId: storeId, count: 12, average: 4.6),
+      items: [
+        StoreReview(
+          stars: 5,
+          tags: const [],
+          createdAt: DateTime.utc(2026, 10, 1),
+          comment: 'Ngon',
+        ),
+      ],
+    );
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

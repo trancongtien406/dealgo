@@ -1,4 +1,5 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { AppReviewLoginService } from './app-review-login.service.js';
 import { ConfigService } from '@nestjs/config';
 import type { AppEnv } from '../../platform/config/env.js';
 import type { MailSender } from '../../integrations/email/mail-sender.js';
@@ -69,7 +70,9 @@ export class EmailPasswordAuthService {
     private readonly authMethods: AuthMethodPolicyService,
     @Inject(MAIL_SENDER) private readonly mail: MailSender,
     private readonly config: ConfigService<AppEnv, true>,
-  ) {}
+    @Optional() private readonly review?: AppReviewLoginService,
+  ) {
+}
 
   /**
    * Responds identically whether or not the address already has an account; the
@@ -85,7 +88,8 @@ export class EmailPasswordAuthService {
     await this.assertHourlyCap(email, now);
 
     const existing = await this.repository.findUserByEmail(email);
-    const code = randomOtpCode();
+    const reviewCode = existing ? null : await this.reviewCode(email);
+    const code = reviewCode ?? randomOtpCode();
     const expiresAt = new Date(now.getTime() + EMAIL_SIGNUP_TTL_MS);
     const challenge = await this.repository.createEmailSignupChallenge({
       email,
@@ -96,11 +100,13 @@ export class EmailPasswordAuthService {
       sentAt: now,
     });
 
-    await this.deliver(() =>
-      existing
-        ? this.mail.sendSignupAccountExists({ email })
-        : this.mail.sendSignupCode({ email, code, expiresAt }),
-    );
+    if (!reviewCode) {
+      await this.deliver(() =>
+        existing
+          ? this.mail.sendSignupAccountExists({ email })
+          : this.mail.sendSignupCode({ email, code, expiresAt }),
+      );
+    }
     return toView(challenge);
   }
 
@@ -128,9 +134,20 @@ export class EmailPasswordAuthService {
     if (!consumed) {
       throw authError(401, 'AUTH_CODE_INVALID', 'Verification code is invalid');
     }
+    if (await this.review?.matches('email', challenge.email)) {
+      const session = await (challenge.purpose === 'ACTIVATE_EXISTING'
+        ? this.activateExistingUser(challenge)
+        : this.createRegisteredUser(challenge));
+      await this.review?.recordSignIn(session.user.id, 'email');
+      return session;
+    }
     if (challenge.purpose === 'ACTIVATE_EXISTING') {
       return this.activateExistingUser(challenge);
     }
+    return this.createRegisteredUser(challenge);
+  }
+
+  private async createRegisteredUser(challenge: EmailSignupChallengeRecord): Promise<SessionResult> {
     if (!challenge.passwordHash) {
       throw authError(401, 'AUTH_CODE_INVALID', 'Verification code is invalid');
     }
@@ -173,7 +190,8 @@ export class EmailPasswordAuthService {
 
     const activation = challenge.purpose === 'ACTIVATE_EXISTING';
     const pending = activation || challenge.passwordHash !== null;
-    const code = randomOtpCode();
+    const reviewCode = pending ? await this.reviewCode(challenge.email) : null;
+    const code = reviewCode ?? randomOtpCode();
     const expiresAt = new Date(now.getTime() + EMAIL_SIGNUP_TTL_MS);
     const reissued = await this.repository.reissueEmailSignupCode(challenge.id, {
       codeHash: pending ? this.hashCode(code) : this.unusableCodeHash(),
@@ -192,7 +210,7 @@ export class EmailPasswordAuthService {
       throw resendCooldown();
     }
     // The account-exists notice is sent once; repeating it would only help someone spam the owner.
-    if (pending) {
+    if (pending && !reviewCode) {
       await this.deliver(() =>
         this.mail.sendSignupCode({
           email: challenge.email,
@@ -254,7 +272,8 @@ export class EmailPasswordAuthService {
     }
     await this.assertHourlyCap(email, now);
 
-    const code = randomOtpCode();
+    const reviewCode = await this.reviewCode(email);
+    const code = reviewCode ?? randomOtpCode();
     const expiresAt = new Date(now.getTime() + EMAIL_SIGNUP_TTL_MS);
     const challenge = await this.repository.createEmailSignupChallenge({
       purpose: 'ACTIVATE_EXISTING',
@@ -266,9 +285,11 @@ export class EmailPasswordAuthService {
       expiresAt,
       sentAt: now,
     });
-    await this.deliver(() =>
-      this.mail.sendSignupCode({ email, code, expiresAt, purpose: 'activation' }),
-    );
+    if (!reviewCode) {
+      await this.deliver(() =>
+        this.mail.sendSignupCode({ email, code, expiresAt, purpose: 'activation' }),
+      );
+    }
     return challenge;
   }
 
@@ -303,7 +324,12 @@ export class EmailPasswordAuthService {
     }
   }
 
+  private async reviewCode(email: string): Promise<string | null> {
+    return (await this.review?.fixedCodeFor('email', email)) ?? null;
+  }
+
   private async deliver(send: () => Promise<void>): Promise<void> {
+
     try {
       await send();
     } catch (error) {

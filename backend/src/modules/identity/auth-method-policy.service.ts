@@ -1,4 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { AuthMethodProviderStatus } from './auth-method-providers.js';
 import { authError } from './auth-error.js';
 import {
   AUTH_METHOD_POLICY_REPOSITORY,
@@ -15,6 +16,8 @@ export type AuthMethodPolicyView = {
   enabled: boolean;
   updatedAt: string;
   updatedByUserId: string | null;
+  /** False when env has no provider for the method; enabling it is refused. */
+  providerReady: boolean;
 };
 
 @Injectable()
@@ -22,11 +25,16 @@ export class AuthMethodPolicyService {
   constructor(
     @Inject(AUTH_METHOD_POLICY_REPOSITORY)
     private readonly policies: AuthMethodPolicyRepository,
+    @Optional() private readonly providers?: AuthMethodProviderStatus,
   ) {}
 
   async list(): Promise<AuthMethodPolicyView[]> {
     const rows = await this.policies.list();
-    return rows.map(toView);
+    return rows.map((row) => toView(row, this.providerReady(row.method)));
+  }
+
+  private providerReady(method: AuthMethodName): boolean {
+    return this.providers ? this.providers.isAvailable(method) : true;
   }
 
   async setEnabled(
@@ -37,6 +45,13 @@ export class AuthMethodPolicyService {
   ): Promise<AuthMethodPolicyView> {
     if (!isAuthMethodName(rawMethod)) {
       throw authError(400, 'VALIDATION_ERROR', 'Unknown auth method');
+    }
+    if (enabled && !this.providerReady(rawMethod)) {
+      throw authError(
+        409,
+        'AUTH_METHOD_PROVIDER_UNAVAILABLE',
+        `Auth method ${rawMethod} has no configured provider`,
+      );
     }
 
     const updated = await this.policies.setEnabled({
@@ -52,7 +67,7 @@ export class AuthMethodPolicyService {
         'At least one auth method must remain enabled',
       );
     }
-    return toView(updated);
+    return toView(updated, this.providerReady(updated.method));
   }
 
   async assertEnabled(method: AuthMethodName): Promise<void> {
@@ -63,11 +78,13 @@ export class AuthMethodPolicyService {
   }
 }
 
-function toView(row: AuthMethodPolicyRecord): AuthMethodPolicyView {
+function toView(row: AuthMethodPolicyRecord, providerReady: boolean): AuthMethodPolicyView {
   return {
     method: row.method,
     enabled: row.enabled,
     updatedAt: row.updatedAt.toISOString(),
     updatedByUserId: row.updatedByUserId,
+    providerReady,
   };
 }
+

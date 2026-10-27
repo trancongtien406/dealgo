@@ -81,6 +81,12 @@ export class SocketAccessService {
   }
 
   async canJoinRoom(userId: string, room: ParsedSnapshotRoom): Promise<boolean> {
+    if (room.kind === 'ride-location' || room.kind === 'ride-offers') {
+      return this.rides.canSubscribeLocation(userId, room.id);
+    }
+    if (room.kind === 'food-location') {
+      return this.food.canSubscribeLocation(userId, room.id);
+    }
     if (room.kind === 'ride') {
       return this.rides.canSubscribe(userId, room.id);
     }

@@ -1,15 +1,15 @@
 ---
 document_id: DOC-DOM-005
 title: "DealGo — Pricing, Fees & Promotions / Quy tắc giá, phí và khuyến mại"
-version: 0.1.0
+version: 0.2.0
 status: DRAFT
 language: vi-VN
 created_at: 2026-10-12
-last_reviewed_at: 2026-10-12
+last_reviewed_at: 2026-10-26
 classification: Internal
 owner: "Product Owner + Finance"
 reviewers: ["Ride Operations", "Food Operations", "Merchant Operations", "Backend Lead", "Flutter Lead", "QA Lead", "Security", "Legal / Compliance"]
-release_scope: "MVP Ride hai bánh + Food, một ứng dụng Flutter ba vai trò"
+release_scope: "MVP Ride (xe máy, ô tô) + Food, một ứng dụng Flutter ba vai trò"
 policy_status: PROPOSED_NOT_APPROVED
 upstream_documents:
   - ../00-governance/README.md
@@ -44,6 +44,13 @@ related_business_rules: [BR-CORE-001, BR-CORE-003, BR-FIN-001, BR-FIN-002, BR-OP
 > **Trạng thái: DRAFT / đề xuất thiết kế.** Tài liệu này xác định *hợp đồng nghiệp vụ và tính đúng đắn* cho báo giá Ride/Food; **không** phê duyệt mức giá, % chiết khấu, thuế, kênh thu hộ, khuyến mại cụ thể, thời gian hiệu lực quote hay ngân sách chiến dịch. Các điểm ấy thuộc `OPEN-002/003/006/010/018` và chỉ được chuyển sang production sau review/approval tương ứng.
 >
 > Ví dụ tiền trong tài liệu là **`TEST_ONLY`**, không phải bảng giá, voucher hoặc chính sách thương mại DealGo.
+>
+> **Hệ thống hiện có (code là nguồn chuẩn):**
+> - Ride: giá do khách đề xuất và tài xế trả giá (kiểu inDrive, không tự ghép). Server tính giá tham khảo và khoảng sàn/trần theo hạng xe (`ride_vehicle_classes`: MOTORBIKE, CAR_4, CAR_7) qua `POST /v1/rides/quote`; app không có hằng số giá.
+> - Food: phí giao do server tính theo cự ly (`FOOD_DELIVERY_VND_PER_KM`, kẹp `FOOD_MIN/MAX_DELIVERY_VND`) qua `POST /v1/food/quote`; khách không sửa được.
+> - Voucher (`PromotionModule`, bảng `promotions`): kiểm tra phía server khi đặt, nhà tài trợ `PLATFORM` / `MERCHANT` / `SHARED` (`VOUCHER_SHARED_PLATFORM_PERCENT`).
+> - Hoa hồng và phí huỷ là cài đặt Admin; cách hạch toán ở [payments-ledger-settlement.md](payments-ledger-settlement.md), phí huỷ ở [cancellation-refund-disputes.md](cancellation-refund-disputes.md).
+> - Tiền là số nguyên VND. Giá trị mặc định là DRAFT (`DEC-PROD-016`, `DEC-PROD-059`).
 
 ## 1. Mục tiêu, câu hỏi tài liệu phải trả lời
 
@@ -74,7 +81,7 @@ related_business_rules: [BR-CORE-001, BR-CORE-003, BR-FIN-001, BR-FIN-002, BR-OP
 ## 3. Phạm vi và ngoài phạm vi
 
 **Trong phạm vi:**
-- Ride hai bánh: giá tham khảo theo hành trình + negotiation giữa khách và tài xế; lưu giá khách đề xuất/counter-offer riêng; khóa giá cuối do khách chọn trước assignment. Phí/thuế ngoài mức thỏa thuận phải tách bạch và được duyệt.
+- Ride (xe máy, ô tô): giá tham khảo theo hành trình + negotiation giữa khách và tài xế; lưu giá khách đề xuất/counter-offer riêng; khóa giá cuối do khách chọn trước assignment. Phí/thuế ngoài mức thỏa thuận phải tách bạch và được duyệt.
 - Food: giá từng dòng món/variant/modifier, phí giao hàng, phí bao bì/khác khi hợp lệ, ưu đãi món/đơn/phí giao, thời điểm xác thực lại cart, price snapshot khi order commit.
 - Hai dịch vụ: pricing rule registry, cấu hình theo service/zone/store, ưu đãi theo người dùng/thời gian/budget, phân bổ funder, attribution, audit và rollback.
 - Liên kết Finance: frozen economics snapshot, external reference, chênh lệch/điều chỉnh, đối soát nguyên tắc.
@@ -187,7 +194,7 @@ Ví dụ hàm phân bổ giảm giá 10.001 VND lên 3 dòng 40.000/35.000/25.00
 | Trường | Authoritative owner | Validation / rejection |
 |---|---|---|
 | `requesterAccountId`, `activeRole` | Identity (từ auth context) | Không tin client gửi userId |
-| `serviceType` | Product/service catalog | Chỉ `RIDE_BIKE` hoặc `FOOD` ở MVP |
+| `serviceType` | Product/service catalog | `RIDE` (kèm `vehicleClassCode` MOTORBIKE / CAR_4 / CAR_7 theo `DG-DEC-VEH-001`; thiếu class → fail-closed 400) hoặc `FOOD` ở MVP |
 | `serviceZoneId` | Geo/Operations | Zone hoạt động, không cross-zone khi chưa hỗ trợ |
 | `routeId`, `distanceMeters`, `durationSeconds`, `routeSource` | Routing adapter | Route stale/unavailable bị fail-safe theo policy |
 | `routeDataTimestamp`, `trafficDataQuality` | Routing adapter | Input hết hạn phải được refresh/có cảnh báo |
@@ -231,7 +238,7 @@ flowchart TD
 | Field | Ý nghĩa |
 |---|---|
 | `rateCardId/version` | Mã/phiên bản duy nhất; version bất biến sau publish |
-| `serviceType` | RIDE_BIKE / FOOD_DELIVERY / FOOD_ITEMS / PLATFORM_FEE… |
+| `serviceType` | RIDE (theo `vehicleClassCode`) / FOOD_DELIVERY / FOOD_ITEMS / PLATFORM_FEE… |
 | `zoneSelector` | Thành phố, geofence, pickup/store location; `OPEN-001` |
 | `merchantSelector` | Store-level overrides nếu hợp đồng cho phép |
 | `validFrom/validTo` | Thời hiệu theo timestamp UTC + business timezone rõ ràng |
@@ -544,7 +551,8 @@ Policy RBAC/ABAC cuối thuộc `roles-and-permissions.md`. Các quyền ở tr�
 ```json
 {
   "requestType": "QUOTE_RIDE",
-  "service": "RIDE_BIKE",
+  "service": "RIDE",
+  "vehicleClassCode": "MOTORBIKE",
   "routeReference": "route_test_001",
   "voucherCode": "TEST-ONLY",
   "clientContextVersion": 3

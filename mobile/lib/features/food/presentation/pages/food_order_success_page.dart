@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../../core/design_system/components/dealgo_success_mark.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../domain/entities/food_models.dart';
 import '../../domain/entities/food_money.dart';
@@ -63,23 +64,7 @@ class FoodOrderSuccessPage extends StatelessWidget {
                   DealGoSpacing.s16,
                 ),
                 children: [
-                  const Center(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: DealGoColors.greenSurface,
-                        shape: BoxShape.circle,
-                      ),
-                      child: SizedBox(
-                        width: 72,
-                        height: 72,
-                        child: Icon(
-                          DealGoIcons.check,
-                          color: DealGoColors.brandGreen,
-                          size: 36,
-                        ),
-                      ),
-                    ),
-                  ),
+                  const Center(child: DealGoSuccessMark()),
                   const SizedBox(height: DealGoSpacing.s16),
                   Text(
                     AppLocalizations.of(context).foodOrderPlaced,
@@ -98,7 +83,10 @@ class FoodOrderSuccessPage extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(AppLocalizations.of(context).merchantConflictOrder, style: textTheme.titleMedium),
+                        Text(
+                          AppLocalizations.of(context).merchantConflictOrder,
+                          style: textTheme.titleMedium,
+                        ),
                         const SizedBox(height: DealGoSpacing.s8),
                         Row(
                           children: [
@@ -119,12 +107,17 @@ class FoodOrderSuccessPage extends StatelessWidget {
                             const DecoratedBox(
                               decoration: BoxDecoration(
                                 color: DealGoColors.subtlePurple,
-                                borderRadius: BorderRadius.all(Radius.circular(8)),
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(8),
+                                ),
                               ),
                               child: SizedBox(
                                 width: 48,
                                 height: 48,
-                                child: Icon(DealGoIcons.store, color: DealGoColors.primary),
+                                child: Icon(
+                                  DealGoIcons.store,
+                                  color: DealGoColors.primary,
+                                ),
                               ),
                             ),
                             const SizedBox(width: DealGoSpacing.s12),
@@ -176,7 +169,10 @@ class FoodOrderSuccessPage extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(AppLocalizations.of(context).rideProgress, style: textTheme.titleMedium),
+                        Text(
+                          AppLocalizations.of(context).rideProgress,
+                          style: textTheme.titleMedium,
+                        ),
                         const SizedBox(height: DealGoSpacing.s12),
                         _ProgressRow(
                           label: AppLocalizations.of(context).foodStepSent,
@@ -185,12 +181,14 @@ class FoodOrderSuccessPage extends StatelessWidget {
                         ),
                         const SizedBox(height: DealGoSpacing.s8),
                         _ProgressRow(
-                          label: AppLocalizations.of(context).foodStepAwaitStore,
+                          label: AppLocalizations.of(context)
+                              .foodStepAwaitStore,
                           tone: FoodChipTone.warning,
                         ),
                         const SizedBox(height: DealGoSpacing.s8),
                         _ProgressRow(
-                          label: AppLocalizations.of(context).foodStepNotPreparing,
+                          label: AppLocalizations.of(context)
+                              .foodStepNotPreparing,
                           tone: FoodChipTone.neutral,
                         ),
                       ],

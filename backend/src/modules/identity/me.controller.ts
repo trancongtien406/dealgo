@@ -69,7 +69,14 @@ export class MeController {
       'Driver location heartbeat (DEC-PROD-031). Updates lat/lng only; customers see it on an active ride/food order while it is under 2 minutes old.',
   })
   reportLocation(@CurrentActor() actor: RequestActor, @Body() dto: ReportLocationDto) {
-    return this.presence.reportLocation(actor.userId, { lat: dto.lat, lng: dto.lng });
+    return this.presence.reportLocation(actor.userId, {
+      lat: dto.lat,
+      lng: dto.lng,
+      ...(dto.heading !== undefined ? { heading: dto.heading } : {}),
+      ...(dto.speedMps !== undefined ? { speedMps: dto.speedMps } : {}),
+      ...(dto.accuracyM !== undefined ? { accuracyM: dto.accuracyM } : {}),
+      ...(dto.recordedAt ? { recordedAt: new Date(dto.recordedAt) } : {}),
+    });
   }
 
   @Get('presence')

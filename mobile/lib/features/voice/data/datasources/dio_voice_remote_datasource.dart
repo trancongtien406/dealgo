@@ -13,59 +13,111 @@ class DioVoiceRemoteDataSource implements VoiceRemoteDataSource {
   final Dio _dio;
 
   @override
-  Future<VoiceSession> createRideVoiceSession({
-    required String accessToken,
-    required String rideId,
-  }) {
-    return _create(
-      path: ApiPaths.rideVoiceSession(rideId),
-      accessToken: accessToken,
+  Future<VoiceCallConfig> config({required String accessToken}) async {
+    final data = requireSuccessData(
+      await _send('GET', ApiPaths.callsConfig, accessToken),
+    );
+    return VoiceCallConfig(
+      enabled: data['enabled'] == true,
+      ringSeconds: (data['ringSeconds'] as num?)?.toInt() ?? 40,
     );
   }
 
   @override
-  Future<VoiceSession> createFoodOrderVoiceSession({
+  Future<VoiceCallJoin> start({
     required String accessToken,
-    required String orderId,
-  }) {
-    return _create(
-      path: ApiPaths.foodOrderVoiceSession(orderId),
-      accessToken: accessToken,
-    );
+    required VoiceThreadKind kind,
+    required String resourceId,
+  }) async {
+    final path = switch (kind) {
+      VoiceThreadKind.ride => ApiPaths.rideCalls(resourceId),
+      VoiceThreadKind.foodOrder => ApiPaths.foodOrderCalls(resourceId),
+    };
+    return decodeVoiceCallJoin(await _send('POST', path, accessToken));
   }
 
-  Future<VoiceSession> _create({
-    required String path,
+  @override
+  Future<VoiceCall> get({
     required String accessToken,
-  }) async {
+    required String callId,
+  }) async =>
+      decodeVoiceCall(await _send('GET', ApiPaths.call(callId), accessToken));
+
+  @override
+  Future<VoiceCallJoin> accept({
+    required String accessToken,
+    required String callId,
+  }) async => decodeVoiceCallJoin(
+    await _send('POST', ApiPaths.callAction(callId, 'accept'), accessToken),
+  );
+
+  @override
+  Future<VoiceCall> decline({
+    required String accessToken,
+    required String callId,
+  }) async => decodeVoiceCall(
+    await _send('POST', ApiPaths.callAction(callId, 'decline'), accessToken),
+  );
+
+  @override
+  Future<VoiceCall> end({
+    required String accessToken,
+    required String callId,
+  }) async => decodeVoiceCall(
+    await _send('POST', ApiPaths.callAction(callId, 'end'), accessToken),
+  );
+
+  Future<Object?> _send(String method, String path, String accessToken) async {
     try {
-      final response = await _dio.post<Object?>(
+      final response = await _dio.request<Object?>(
         path,
-        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+        options: Options(
+          method: method,
+          headers: {'Authorization': 'Bearer $accessToken'},
+        ),
       );
-      return decodeVoiceSession(response.data);
+      return response.data;
     } on DioException catch (error) {
       throw apiExceptionFromDio(error);
     }
   }
 }
 
-VoiceSession decodeVoiceSession(Object? body) {
+const _invalidCall = ApiException(
+  statusCode: 200,
+  message: 'Invalid call payload',
+  errorCode: 'INVALID_RESPONSE',
+);
+
+VoiceCall decodeVoiceCall(Object? body) {
+  return VoiceCall.tryParse(requireSuccessData(body)) ?? (throw _invalidCall);
+}
+
+VoiceCallJoin decodeVoiceCallJoin(Object? body) {
   final data = requireSuccessData(body);
-  final room =
-      data['roomName'] as String? ??
-      data['room'] as String? ??
-      data['roomId'] as String?;
-  final token = data['token'] as String? ?? data['accessToken'] as String?;
-  if (room == null || room.isEmpty || token == null || token.isEmpty) {
-    throw const ApiException(
-      statusCode: 200,
-      message: 'Invalid voice session',
-      errorCode: 'INVALID_VOICE_SESSION',
-    );
+  final call = VoiceCall.tryParse(data['call']);
+  final session = decodeVoiceSession(data['session']);
+  if (call == null || session == null) {
+    throw _invalidCall;
   }
-  final url = data['url'] as String? ?? data['livekitUrl'] as String?;
-  return VoiceSession(roomName: room, token: token, url: url);
+  return VoiceCallJoin(call: call, session: session);
+}
+
+VoiceSession? decodeVoiceSession(Object? raw) {
+  if (raw is! Map) {
+    return null;
+  }
+  final room = raw['roomName'];
+  final token = raw['token'];
+  if (room is! String || room.isEmpty || token is! String || token.isEmpty) {
+    return null;
+  }
+  final url = raw['url'];
+  return VoiceSession(
+    roomName: room,
+    token: token,
+    url: url is String && url.isNotEmpty ? url : null,
+  );
 }
 
 typedef DioVoiceClient = DioVoiceRemoteDataSource;

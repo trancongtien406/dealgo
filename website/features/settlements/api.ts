@@ -4,8 +4,9 @@ import type { SettlementLine } from "@/features/settlements/types";
 import { apiFetch } from "@/lib/api/client";
 import type { PaginatedList } from "@/lib/api/pagination";
 import { apiPaths } from "@/lib/api/paths";
+import { setOpsDateRange, type OpsDateRange } from "@/lib/api/ops-date-range";
 
-export type FetchSettlementsParams = {
+export type FetchSettlementsParams = OpsDateRange & {
   page?: number;
   limit?: number;
 };
@@ -25,6 +26,7 @@ async function fetchSettlementsFromBff(
     page: String(page),
     limit: String(limit),
   });
+  setOpsDateRange(search, params);
   const envelope = await apiFetch<{
     success: boolean;
     data: NestSettlementPage;

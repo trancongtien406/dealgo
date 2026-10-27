@@ -34,6 +34,10 @@ export function registerRouteBodyParsers(app: INestApplication): void {
     '/v1/food/merchant/items/:itemId/image',
     wrap(json({ limit: MENU_ITEM_IMAGE_JSON_LIMIT })),
   );
+  app.use(
+    '/v1/ops/ride-vehicle-classes/:code/image',
+    wrap(json({ limit: MENU_ITEM_IMAGE_JSON_LIMIT })),
+  );
   app.use(PARTNER_APPLICATION_PATH, wrap(json({ limit: PARTNER_APPLICATION_JSON_LIMIT })));
   const ticketParser = wrap(json({ limit: SUPPORT_TICKET_JSON_LIMIT }));
   for (const path of SUPPORT_TICKET_UPLOAD_PATHS) {

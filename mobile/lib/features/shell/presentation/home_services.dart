@@ -8,11 +8,12 @@ import '../../../l10n/app_localizations.dart';
 import '../../places/presentation/place_picker_page.dart';
 import '../../ride/presentation/cubit/ride_destination.dart';
 
-/// C001 service tiles: full background art + icon chip + copy overlay.
+/// C001 service tiles: one Ride entry (class chosen in booking flow) + Food.
+/// DG-DEC-VEH-001: MOTORBIKE + CAR live under the same Ride booking path.
 class ServiceRow extends StatelessWidget {
-  const ServiceRow({required this.onBook, required this.onFood, super.key});
+  const ServiceRow({required this.onRide, required this.onFood, super.key});
 
-  final VoidCallback onBook;
+  final VoidCallback onRide;
   final VoidCallback onFood;
 
   @override
@@ -24,18 +25,20 @@ class ServiceRow extends StatelessWidget {
         children: [
           Expanded(
             child: _ServiceCard(
-              title: l10n.rideBookTitle,
+              key: const Key('home-service-ride'),
+              title: l10n.serviceRideTitle,
               subtitle: l10n.serviceRideBlurb,
               fallbackColor: DealGoColors.subtlePurple,
               iconBackground: DealGoColors.primary,
-              icon: DealGoIcons.car,
+              icon: DealGoIcons.motorbike,
               backgroundArt: 'assets/images/service_ride_bg.png',
-              onTap: onBook,
+              onTap: onRide,
             ),
           ),
           const SizedBox(width: DealGoSpacing.s12),
           Expanded(
             child: _ServiceCard(
+              key: const Key('home-service-food'),
               title: l10n.homeCatFood,
               subtitle: l10n.homeServiceFoodSub,
               fallbackColor: DealGoColors.greenSurface,
@@ -60,6 +63,7 @@ class _ServiceCard extends StatelessWidget {
     required this.icon,
     required this.backgroundArt,
     required this.onTap,
+    super.key,
   });
 
   final String title;
@@ -73,90 +77,83 @@ class _ServiceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final body = Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          backgroundArt,
+          fit: BoxFit.cover,
+          alignment: Alignment.center,
+          filterQuality: FilterQuality.high,
+          errorBuilder: (context, error, stack) {
+            return ColoredBox(color: fallbackColor);
+          },
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 10, 8),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: FractionallySizedBox(
+              widthFactor: 0.55,
+              heightFactor: 1,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _IconChip(
+                    background: iconBackground,
+                    icon: icon,
+                    foreground: Colors.white,
+                  ),
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.bottomLeft,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.titleMedium?.copyWith(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: DealGoColors.text,
+                              height: 1.1,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.bodySmall?.copyWith(
+                              height: 1.15,
+                              fontSize: 11,
+                              color: DealGoColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const _ArrowChip(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
     return Material(
       color: fallbackColor,
       borderRadius: BorderRadius.circular(DealGoRadius.card),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: SizedBox(
-          height: 176,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                height: 104,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Image.asset(
-                      backgroundArt,
-                      fit: BoxFit.cover,
-                      alignment: Alignment.center,
-                      filterQuality: FilterQuality.high,
-                      errorBuilder: (context, error, stack) {
-                        return ColoredBox(color: fallbackColor);
-                      },
-                    ),
-                    Positioned(
-                      left: 10,
-                      top: 10,
-                      child: _IconChip(
-                        background: iconBackground,
-                        icon: icon,
-                        foreground: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: ColoredBox(
-                  color: fallbackColor,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: textTheme.titleMedium?.copyWith(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w800,
-                                  color: DealGoColors.text,
-                                  height: 1.1,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                subtitle,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: textTheme.bodySmall?.copyWith(
-                                  height: 1.2,
-                                  fontSize: 11,
-                                  color: DealGoColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const _ArrowChip(),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        child: AspectRatio(aspectRatio: 4 / 3, child: body),
       ),
     );
   }
@@ -204,13 +201,9 @@ class _ArrowChip extends StatelessWidget {
         ],
       ),
       child: const SizedBox(
-        width: 28,
-        height: 28,
-        child: Icon(
-          DealGoIcons.arrowRight,
-          color: DealGoColors.text,
-          size: 16,
-        ),
+        width: 26,
+        height: 26,
+        child: Icon(DealGoIcons.arrowRight, color: DealGoColors.text, size: 16),
       ),
     );
   }
@@ -293,8 +286,9 @@ class QuickBookCard extends StatelessWidget {
                         color: Colors.transparent,
                         child: InkWell(
                           key: const Key('home-where-to'),
-                          borderRadius:
-                              BorderRadius.circular(DealGoRadius.input),
+                          borderRadius: BorderRadius.circular(
+                            DealGoRadius.input,
+                          ),
                           onTap: () => _pickDestination(context),
                           child: _StopLine(
                             color: DealGoColors.danger,
@@ -489,9 +483,7 @@ class _StopLine extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: style.bodySmall?.copyWith(
-                  color: muted
-                      ? DealGoColors.textSecondary
-                      : DealGoColors.text,
+                  color: muted ? DealGoColors.textSecondary : DealGoColors.text,
                   fontWeight: muted ? FontWeight.w500 : FontWeight.w600,
                 ),
               ),

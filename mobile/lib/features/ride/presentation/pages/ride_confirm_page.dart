@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/config/api_base_url.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../../core/design_system/components/dealgo_success_mark.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../domain/entities/ride_money.dart';
 import '../../domain/entities/ride_models.dart';
+import '../utils/ride_vehicle_label.dart';
 import '../widgets/ride_widgets.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../l10n/app_localizations.dart';
@@ -50,13 +53,14 @@ class _RideConfirmPageState extends State<RideConfirmPage> {
         body: SafeArea(
           child: Column(
             children: [
-              DealGoAppHeader(title: AppLocalizations.of(context).rideConfirmTitle, onBack: _back),
+              DealGoAppHeader(
+                title: AppLocalizations.of(context).rideConfirmTitle,
+                onBack: _back,
+              ),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
-                  child: Text(
-                    AppLocalizations.of(context).rideConfirmNoAgreed,
-                  ),
+                  child: Text(AppLocalizations.of(context).rideConfirmNoAgreed),
                 ),
               ),
             ],
@@ -100,7 +104,10 @@ class _FareChanged extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            DealGoAppHeader(title: AppLocalizations.of(context).rideConfirmNewPrice, onBack: onBack),
+            DealGoAppHeader(
+              title: AppLocalizations.of(context).rideConfirmNewPrice,
+              onBack: onBack,
+            ),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(
@@ -115,14 +122,17 @@ class _FareChanged extends StatelessWidget {
                     iconColor: DealGoColors.warning,
                     background: DealGoColors.amberSurface,
                     title: AppLocalizations.of(context).rideFareChangedTitle,
-                    message: AppLocalizations.of(context).rideFareChangedMessage,
+                    message: AppLocalizations.of(context)
+                        .rideFareChangedMessage,
                   ),
                   const SizedBox(height: DealGoSpacing.s16),
                   RidePanel(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        RideSectionTitle(AppLocalizations.of(context).rideCurrentRoute),
+                        RideSectionTitle(
+                          AppLocalizations.of(context).rideCurrentRoute,
+                        ),
                         const SizedBox(height: DealGoSpacing.s12),
                         RideStopList(
                           pickup: ride.pickup.label,
@@ -136,7 +146,9 @@ class _FareChanged extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        RideSectionTitle(AppLocalizations.of(context).rideCompareFares),
+                        RideSectionTitle(
+                          AppLocalizations.of(context).rideCompareFares,
+                        ),
                         const SizedBox(height: DealGoSpacing.s8),
                         RideMoneyLine(
                           label: AppLocalizations.of(context).rideFareYouPicked,
@@ -147,7 +159,8 @@ class _FareChanged extends StatelessWidget {
                           amount: formatRideVnd(agreedFareVnd),
                         ),
                         RideMoneyLine(
-                          label: AppLocalizations.of(context).rideFareDifference,
+                          label: AppLocalizations.of(context)
+                              .rideFareDifference,
                           amount: formatRideVndDelta(delta),
                           emphasize: true,
                         ),
@@ -180,7 +193,8 @@ class _FareChanged extends StatelessWidget {
                   Expanded(
                     child: DealGoPrimaryButton(
                       key: const Key('ride-ack-fare'),
-                      label: AppLocalizations.of(context).rideAcceptAmount(formatRideVnd(agreedFareVnd)),
+                      label: AppLocalizations.of(context)
+                          .rideAcceptAmount(formatRideVnd(agreedFareVnd)),
                       onPressed: onAccept,
                     ),
                   ),
@@ -190,6 +204,38 @@ class _FareChanged extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ConfirmedVehicle extends StatelessWidget {
+  const _ConfirmedVehicle({required this.code, this.imageUrl});
+
+  final String? code;
+  final String? imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final photo = resolveMediaUrl(imageUrl);
+    return Row(
+      children: [
+        if (photo == null)
+          Icon(
+            rideVehicleClassIcon(code),
+            size: 16,
+            color: DealGoColors.textSecondary,
+          )
+        else
+          RideVehicleClassPhoto(imageUrl: imageUrl, code: code, size: 20),
+        const SizedBox(width: DealGoSpacing.s8),
+        Expanded(
+          child: Text(
+            rideVehicleClassLabel(AppLocalizations.of(context), code),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -207,14 +253,19 @@ class _Confirmed extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final driver = ride.assignedDriverId ?? AppLocalizations.of(context).kycRoleBadge;
+    // RideView carries no driver display name; never surface the raw driver
+    // UUID to the customer — show the localized role label instead.
+    final driver = AppLocalizations.of(context).kycRoleBadge;
     final initial = driver.isEmpty ? '?' : driver.substring(0, 1).toUpperCase();
     return Scaffold(
       backgroundColor: DealGoColors.canvas,
       body: SafeArea(
         child: Column(
           children: [
-            DealGoAppHeader(title: AppLocalizations.of(context).rideConfirmTitle, onBack: onBack),
+            DealGoAppHeader(
+              title: AppLocalizations.of(context).rideConfirmTitle,
+              onBack: onBack,
+            ),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(
@@ -224,11 +275,17 @@ class _Confirmed extends StatelessWidget {
                   DealGoSpacing.s16,
                 ),
                 children: [
+                  const Center(
+                    child: DealGoSuccessMark(size: 64, iconSize: 32),
+                  ),
+                  const SizedBox(height: DealGoSpacing.s16),
                   RidePanel(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        RideSectionTitle(AppLocalizations.of(context).rideChosenRoute),
+                        RideSectionTitle(
+                          AppLocalizations.of(context).rideChosenRoute,
+                        ),
                         const SizedBox(height: DealGoSpacing.s12),
                         RideStopList(
                           pickup: ride.pickup.label,
@@ -262,7 +319,10 @@ class _Confirmed extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: Theme.of(context).textTheme.titleMedium,
                               ),
-                              Text(AppLocalizations.of(context).rideVehicleMotorbike),
+                              _ConfirmedVehicle(
+                                code: ride.vehicleClassCode,
+                                imageUrl: ride.imageUrl,
+                              ),
                             ],
                           ),
                         ),
@@ -274,7 +334,9 @@ class _Confirmed extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        RideSectionTitle(AppLocalizations.of(context).rideOfferAgreed),
+                        RideSectionTitle(
+                          AppLocalizations.of(context).rideOfferAgreed,
+                        ),
                         const SizedBox(height: DealGoSpacing.s8),
                         RideStatusChip(
                           label: AppLocalizations.of(context).rideStillValid,
@@ -295,7 +357,10 @@ class _Confirmed extends StatelessWidget {
                           key: const Key('ride-agreed-fare'),
                           label: AppLocalizations.of(context).rideCustomerPays,
                           amount: formatRideVnd(
-                            rideCashAfterVoucher(agreedFareVnd, ride.discountVnd),
+                            rideCashAfterVoucher(
+                              agreedFareVnd,
+                              ride.discountVnd,
+                            ),
                           ),
                           emphasize: true,
                         ),
@@ -307,7 +372,9 @@ class _Confirmed extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        RideSectionTitle(AppLocalizations.of(context).ridePaymentMethod),
+                        RideSectionTitle(
+                          AppLocalizations.of(context).ridePaymentMethod,
+                        ),
                         const SizedBox(height: DealGoSpacing.s8),
                         Row(
                           children: [
@@ -321,17 +388,21 @@ class _Confirmed extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    AppLocalizations.of(context).paymentHistoryCash,
+                                    AppLocalizations.of(context)
+                                        .paymentHistoryCash,
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
-                                  Text(AppLocalizations.of(context).rideCashNote),
+                                  Text(
+                                    AppLocalizations.of(context).rideCashNote,
+                                  ),
                                 ],
                               ),
                             ),
                             RideStatusChip(
-                              label: AppLocalizations.of(context).commonSelected,
+                              label: AppLocalizations.of(context)
+                                  .commonSelected,
                               tone: RideChipTone.green,
                             ),
                           ],
@@ -355,7 +426,9 @@ class _Confirmed extends StatelessWidget {
               ),
               child: DealGoPrimaryButton(
                 label: AppLocalizations.of(context).rideRecordedAmount(
-                  formatRideVnd(rideCashAfterVoucher(agreedFareVnd, ride.discountVnd)),
+                  formatRideVnd(
+                    rideCashAfterVoucher(agreedFareVnd, ride.discountVnd),
+                  ),
                 ),
                 onPressed: onBack,
               ),

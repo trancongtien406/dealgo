@@ -1,7 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { AppEnv } from '../config/env.js';
+import { isCashOnlyPaymentProvider, type AppEnv } from '../config/env.js';
 import {
+  MAPS_PROVIDER_CHOICES,
+  MAPS_PROVIDER_SETTING_KEYS,
   PLATFORM_SETTING_SPECS,
   UPLOAD_SNIFFABLE_TYPES,
   isPlatformSettingKey,
@@ -30,12 +32,56 @@ export type PlatformSettingView = {
   updatedByUserId: string | null;
 };
 
+const SETTING_CATEGORY_OVERRIDES: Readonly<Record<string, 'FARE' | 'DISPATCH' | 'ZONE_PAYMENT'>> = {
+  RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE: 'FARE',
+  RIDE_COUNTER_MAX_PERCENT_OF_OFFER: 'FARE',
+  RIDE_CANCEL_FEE_BIKE_VND: 'FARE',
+  RIDE_CANCEL_FEE_CAR_VND: 'FARE',
+  RIDE_FREE_CANCEL_MINUTES: 'FARE',
+  RIDE_MAX_OFFER_EDITS_PER_DRIVER: 'DISPATCH',
+  RIDE_REQUEST_WINDOW_SECONDS: 'DISPATCH',
+  FOOD_MAX_DELIVERY_KM: 'ZONE_PAYMENT',
+  SERVICE_ZONE_ENFORCED: 'ZONE_PAYMENT',
+  DRIVER_DEBT_LIMIT_VND: 'ZONE_PAYMENT',
+  RIDE_MAX_LIVE_OFFERS_PER_RIDE: 'DISPATCH',
+  RIDE_MAX_FARE_RAISES_PER_RIDE: 'DISPATCH',
+  ROUTE_OFF_ROUTE_THRESHOLD_M: 'DISPATCH',
+  ROUTE_REROUTE_MIN_INTERVAL_SECONDS: 'DISPATCH',
+  CUSTOMER_CANCEL_LIMIT_COUNT: 'DISPATCH',
+  CUSTOMER_CANCEL_LIMIT_WINDOW_HOURS: 'DISPATCH',
+  CUSTOMER_CANCEL_COOLDOWN_MINUTES: 'DISPATCH',
+  DRIVER_CANCEL_RATE_WINDOW_DAYS: 'DISPATCH',
+  DRIVER_CANCEL_RATE_WARN_PERCENT: 'DISPATCH',
+  RIDE_REQUEST_PUSH_ENABLED: 'DISPATCH',
+  NEW_JOB_CUSTOM_SOUND_ENABLED: 'DISPATCH',
+  RIDE_REQUEST_PUSH_MAX_DRIVERS: 'DISPATCH',
+  FOOD_FAIL_MIN_WAIT_MINUTES: 'DISPATCH',
+  FOOD_MERCHANT_COMMISSION_PERCENT: 'FARE',
+  FOOD_ORDER_CHANGE_RESPONSE_MINUTES: 'DISPATCH',
+  RIDE_REPOST_RAISE_HINT_PERCENT: 'FARE',
+  RIDE_COMMISSION_BIKE_PERCENT: 'FARE',
+  RIDE_COMMISSION_CAR_PERCENT: 'FARE',
+  FOOD_DRIVER_COMMISSION_PERCENT: 'FARE',
+  MERCHANT_SETTLEMENT_CYCLE_DAYS: 'FARE',
+  VOUCHER_SHARED_PLATFORM_PERCENT: 'FARE',
+};
+
 function categorizeSettingKey(key: string): 'FARE' | 'DISPATCH' | 'ZONE_PAYMENT' | 'SUPPORT' {
+  const override = SETTING_CATEGORY_OVERRIDES[key];
+  if (override) {
+    return override;
+  }
+  if (key.includes('TIMEOUT') || key.includes('NO_SHOW') || key.includes('EARLY_ASSIGN') || key.includes('PRESENCE')) {
+    return 'DISPATCH';
+  }
   if (
     key.startsWith('SUPPORT_') ||
     key.startsWith('UPLOAD_') ||
     key.startsWith('ACCOUNT_') ||
-    key.startsWith('AUTH_')
+    key.startsWith('AUTH_') ||
+    key.startsWith('ONBOARDING_') ||
+    key.startsWith('VOICE_') ||
+    key.startsWith('MAPS_')
   ) {
     return 'SUPPORT';
   }
@@ -261,10 +307,6 @@ export class PlatformSettingsService {
         return String(this.config.get('DRIVER_SEARCH_RADIUS_KM', { infer: true }));
       case 'RIDE_OFFER_TTL_SECONDS':
         return String(this.config.get('RIDE_OFFER_TTL_SECONDS', { infer: true }));
-      case 'RIDE_NEGOTIATION_MAX_ROUNDS': {
-        const v = this.config.get('RIDE_NEGOTIATION_MAX_ROUNDS', { infer: true });
-        return v === undefined ? '' : String(v);
-      }
       case 'RIDE_MIN_FARE_VND':
         return String(this.config.get('RIDE_MIN_FARE_VND', { infer: true }));
       case 'RIDE_MAX_FARE_VND':
@@ -282,15 +324,24 @@ export class PlatformSettingsService {
       case 'MAX_CONCURRENT_JOBS_PER_DRIVER':
         return String(this.config.get('MAX_CONCURRENT_JOBS_PER_DRIVER', { infer: true }));
       case 'PAYMENT_METHODS_ENABLED':
+        // DEC-PROD-050: a cash-only launch never advertises online methods by default.
+        if (isCashOnlyPaymentProvider(this.config.get('PAYMENT_PROVIDER', { infer: true }))) {
+          return '["COD"]';
+        }
         return this.config.get('PAYMENT_METHODS_ENABLED', { infer: true });
+
       case 'RATING_WINDOW_DAYS':
-      case 'PLATFORM_FEE_RIDE_PERCENT':
-      case 'PLATFORM_FEE_FOOD_PERCENT':
+      case 'RIDE_COMMISSION_BIKE_PERCENT':
+      case 'RIDE_COMMISSION_CAR_PERCENT':
+      case 'FOOD_DRIVER_COMMISSION_PERCENT':
+      case 'MERCHANT_SETTLEMENT_CYCLE_DAYS':
       case 'VOUCHER_SHARED_PLATFORM_PERCENT':
       case 'RIDE_PICKUP_CODE_MAX_ATTEMPTS':
       case 'FOOD_DELIVERY_CODE_REQUIRED':
       case 'FOOD_DELIVERY_CODE_MAX_ATTEMPTS':
       case 'FOOD_HANDOVER_CODE_REQUIRED':
+      case 'ONBOARDING_DRIVER_KYC_REQUIRED':
+      case 'ONBOARDING_MERCHANT_KYB_REQUIRED':
       case 'SUPPORT_TICKET_MAX_OPEN_PER_USER':
       case 'SUPPORT_PUBLIC_TICKETS_PER_CONTACT_PER_DAY':
       case 'SUPPORT_TICKET_TEXT_MAX_CHARS':
@@ -303,6 +354,47 @@ export class PlatformSettingsService {
       case 'AUTH_PASSWORD_RESET_CODE_TTL_MINUTES':
       case 'AUTH_PASSWORD_RESET_MAX_ATTEMPTS':
       case 'AUTH_PASSWORD_RESET_MAX_PER_HOUR':
+      case 'CHAT_RETENTION_DAYS':
+      case 'APP_REVIEW_LOGIN_ENABLED':
+      case 'APP_REVIEW_PHONE':
+      case 'APP_REVIEW_EMAIL':
+      case 'RIDE_REQUEST_WINDOW_SECONDS':
+      case 'RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE':
+      case 'RIDE_COUNTER_MAX_PERCENT_OF_OFFER':
+      case 'RIDE_MAX_OFFER_EDITS_PER_DRIVER':
+      case 'RIDE_ASSIGNED_START_TIMEOUT_MINUTES':
+      case 'RIDE_EN_ROUTE_TIMEOUT_MINUTES':
+      case 'RIDE_NO_SHOW_WAIT_MINUTES':
+      case 'RIDE_FREE_CANCEL_MINUTES':
+      case 'RIDE_CANCEL_FEE_BIKE_VND':
+      case 'RIDE_CANCEL_FEE_CAR_VND':
+      case 'FOOD_MERCHANT_ACCEPT_TIMEOUT_MINUTES':
+      case 'FOOD_UNCLAIMED_READY_TIMEOUT_MINUTES':
+      case 'FOOD_EARLY_ASSIGN_LEAD_MINUTES':
+      case 'FOOD_MAX_DELIVERY_KM':
+      case 'SERVICE_ZONE_ENFORCED':
+      case 'DRIVER_DEBT_LIMIT_VND':
+      case 'DISPATCH_REQUIRE_FRESH_PRESENCE':
+      case 'RIDE_MAX_LIVE_OFFERS_PER_RIDE':
+      case 'RIDE_MAX_FARE_RAISES_PER_RIDE':
+      case 'ROUTE_OFF_ROUTE_THRESHOLD_M':
+      case 'ROUTE_REROUTE_MIN_INTERVAL_SECONDS':
+      case 'CUSTOMER_CANCEL_LIMIT_COUNT':
+      case 'CUSTOMER_CANCEL_LIMIT_WINDOW_HOURS':
+      case 'CUSTOMER_CANCEL_COOLDOWN_MINUTES':
+      case 'DRIVER_CANCEL_RATE_WINDOW_DAYS':
+      case 'DRIVER_CANCEL_RATE_WARN_PERCENT':
+      case 'RIDE_REQUEST_PUSH_ENABLED':
+      case 'NEW_JOB_CUSTOM_SOUND_ENABLED':
+      case 'VOICE_CALLS_ENABLED':
+      case 'RIDE_REQUEST_PUSH_MAX_DRIVERS':
+      case 'FOOD_FAIL_MIN_WAIT_MINUTES':
+      case 'FOOD_MERCHANT_COMMISSION_PERCENT':
+      case 'FOOD_ORDER_CHANGE_RESPONSE_MINUTES':
+      case 'RIDE_REPOST_RAISE_HINT_PERCENT':
+      case 'MAPS_SEARCH_PROVIDER':
+      case 'MAPS_REVERSE_PROVIDER':
+      case 'MAPS_ROUTE_PROVIDER':
         // Seeded by migration/seed (PLATFORM_SETTING_SEED_DEFAULTS); no env bootstrap.
         return PLATFORM_SETTING_SEED_DEFAULTS[key] ?? '';
       default: {
@@ -310,6 +402,21 @@ export class PlatformSettingsService {
         return _exhaustive;
       }
     }
+  }
+
+  private normalizeMapsProvider(key: PlatformSettingKey, value: string): string {
+    const choice = value.toLowerCase();
+    if (!(MAPS_PROVIDER_CHOICES as readonly string[]).includes(choice)) {
+      throw settingsError(400, 'PLATFORM_SETTING_INVALID', `${key} must be mapbox or google`);
+    }
+    if (choice === 'google' && !this.config.get('GOOGLE_MAPS_API_KEY', { infer: true })?.trim()) {
+      throw settingsError(
+        400,
+        'MAPS_PROVIDER_NOT_CONFIGURED',
+        'Google Maps chưa có GOOGLE_MAPS_API_KEY trên server',
+      );
+    }
+    return choice;
   }
 
   private validateAndNormalize(key: PlatformSettingKey, raw: string): string {
@@ -322,6 +429,9 @@ export class PlatformSettingsService {
       }
       if (trimmed.length > 200) {
         throw settingsError(400, 'PLATFORM_SETTING_INVALID', `${key} exceeds max length`);
+      }
+      if ((MAPS_PROVIDER_SETTING_KEYS as readonly string[]).includes(key)) {
+        return this.normalizeMapsProvider(key, trimmed);
       }
       return trimmed;
     }

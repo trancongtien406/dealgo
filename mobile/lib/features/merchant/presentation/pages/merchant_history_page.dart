@@ -19,7 +19,8 @@ class MerchantHistoryPageView extends StatefulWidget {
   const MerchantHistoryPageView({super.key});
 
   @override
-  State<MerchantHistoryPageView> createState() => _MerchantHistoryPageViewState();
+  State<MerchantHistoryPageView> createState() =>
+      _MerchantHistoryPageViewState();
 }
 
 class _MerchantHistoryPageViewState extends State<MerchantHistoryPageView> {
@@ -47,12 +48,19 @@ class _MerchantHistoryPageViewState extends State<MerchantHistoryPageView> {
       _failure = null;
     });
     try {
-      final page = await context.read<MerchantOrdersRepository>().listOrderHistory(
+      final page = await context
+          .read<MerchantOrdersRepository>()
+          .listOrderHistory(
             accessToken: (merchantAccessToken(context) ?? ''),
             tab: _tab,
             q: _search.text.trim().isEmpty ? null : _search.text.trim(),
           );
-      if (mounted) setState(() { _page = page; _loading = false; });
+      if (mounted) {
+        setState(() {
+          _page = page;
+          _loading = false;
+        });
+      }
     } on Object catch (error) {
       if (mounted) {
         setState(() {
@@ -73,7 +81,10 @@ class _MerchantHistoryPageViewState extends State<MerchantHistoryPageView> {
       body: ListView(
         padding: merchantPagePadding,
         children: [
-          Text(l10n.merchantHistoryHeadline, style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            l10n.merchantHistoryHeadline,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
           Text(l10n.merchantHistorySubtitle),
           const SizedBox(height: DealGoSpacing.s12),
           DealGoTextField(
@@ -149,7 +160,10 @@ class _MerchantHistoryPageViewState extends State<MerchantHistoryPageView> {
               compact: true,
             )
           else ...[
-            Text(l10n.merchantHistoryList, style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              l10n.merchantHistoryList,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: DealGoSpacing.s8),
             for (final row in page.items) ...[
               MerchantPanel(
@@ -157,7 +171,11 @@ class _MerchantHistoryPageViewState extends State<MerchantHistoryPageView> {
                   type: MaterialType.transparency,
                   child: ListTile(
                     key: Key('merchant-history-${row.id}'),
-                    title: Text(row.customerName?.isNotEmpty == true ? row.customerName! : row.id),
+                    title: Text(
+                      row.customerName?.isNotEmpty == true
+                          ? row.customerName!
+                          : row.id,
+                    ),
                     subtitle: Text('${row.lineSummary} · ${row.status}'),
                     trailing: Text(formatVnd(row.totalVnd)),
                   ),

@@ -41,6 +41,8 @@ export function rideShareStatusLabel(status: string): string {
 const VEHICLE_LABELS: Record<string, string> = {
   MOTORBIKE: "Xe máy",
   CAR: "Ô tô",
+  CAR_4: "Xe 4 chỗ",
+  CAR_7: "Xe 7 chỗ",
 };
 
 export function rideShareVehicleLabel(type: string | null): string | null {

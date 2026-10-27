@@ -9,12 +9,21 @@ void main() {
   final vi = lookupAppLocalizations(const Locale('vi'));
   final en = lookupAppLocalizations(const Locale('en'));
 
-  ApiException err(int status, String code) =>
-      ApiException(statusCode: status, message: 'English server text', errorCode: code);
+  ApiException err(int status, String code) => ApiException(
+    statusCode: status,
+    message: 'English server text',
+    errorCode: code,
+  );
 
   test('known codes get their own sentence in both languages', () {
-    expect(apiErrorText(vi, err(409, 'FOOD_ALREADY_ASSIGNED')), vi.apiErrJobTaken);
-    expect(apiErrorText(en, err(422, 'VOUCHER_MIN_ORDER')), en.apiErrVoucherMinOrder);
+    expect(
+      apiErrorText(vi, err(409, 'FOOD_ALREADY_ASSIGNED')),
+      vi.apiErrJobTaken,
+    );
+    expect(
+      apiErrorText(en, err(422, 'VOUCHER_MIN_ORDER')),
+      en.apiErrVoucherMinOrder,
+    );
     expect(apiErrorText(vi, err(0, 'NETWORK_ERROR')), vi.apiErrNetwork);
   });
 

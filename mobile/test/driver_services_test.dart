@@ -14,6 +14,7 @@ import 'package:go_router/go_router.dart';
 import 'support/auth_test_harness.dart';
 import 'support/fake_food_client.dart';
 import 'support/fake_ride_client.dart';
+
 import 'package:dealgo/core/realtime/fake_snapshot_realtime.dart';
 import 'package:dealgo/core/realtime/snapshot_realtime.dart';
 
@@ -28,12 +29,14 @@ const _driverProfile = UserProfile(
 
 void main() {
   group('DriverServicesCubit', () {
-    DriverServicesCubit build(FakePresenceClient presence, {bool online = true}) =>
-        DriverServicesCubit(
-          repository: PresenceRepositoryImpl(presence),
-          accessToken: () => 'access-token',
-          online: () => online,
-        );
+    DriverServicesCubit build(
+      FakePresenceClient presence, {
+      bool online = true,
+    }) => DriverServicesCubit(
+      repository: PresenceRepositoryImpl(presence),
+      accessToken: () => 'access-token',
+      online: () => online,
+    );
 
     test('load reads the server toggles', () async {
       final presence = FakePresenceClient(
@@ -65,7 +68,11 @@ void main() {
 
     test('a failed save keeps the last saved toggles', () async {
       final presence = FakePresenceClient()
-        ..saveError = const ApiException(statusCode: 500, message: 'x', errorCode: 'X');
+        ..saveError = const ApiException(
+          statusCode: 500,
+          message: 'x',
+          errorCode: 'X',
+        );
       final cubit = build(presence);
       await cubit.load();
       cubit.setRide(false);
@@ -77,15 +84,29 @@ void main() {
   });
 
   test('offer selection follows the ride status', () {
-    expect(driverOfferSelectionFor(RideStatus.negotiating), DriverOfferSelection.waiting);
-    expect(driverOfferSelectionFor(RideStatus.assigned), DriverOfferSelection.selected);
-    expect(driverOfferSelectionFor(RideStatus.cancelled), DriverOfferSelection.lost);
-    expect(driverPhaseForStatus(RideStatus.driverArrived), DriverRidePhase.arrived);
+    expect(
+      driverOfferSelectionFor(RideStatus.negotiating),
+      DriverOfferSelection.waiting,
+    );
+    expect(
+      driverOfferSelectionFor(RideStatus.assigned),
+      DriverOfferSelection.selected,
+    );
+    expect(
+      driverOfferSelectionFor(RideStatus.cancelled),
+      DriverOfferSelection.lost,
+    );
+    expect(
+      driverPhaseForStatus(RideStatus.driverArrived),
+      DriverRidePhase.arrived,
+    );
     expect(driverPhaseForStatus(RideStatus.inTrip), DriverRidePhase.onTrip);
     expect(driverPhaseForStatus(RideStatus.negotiating), isNull);
   });
 
-  testWidgets('home switch saves the service toggle to the server', (tester) async {
+  testWidgets('home switch saves the service toggle to the server', (
+    tester,
+  ) async {
     final presence = FakePresenceClient();
     await pumpSignedIn(
       tester,
@@ -107,10 +128,7 @@ void main() {
     await tester.ensureVisible(foodSwitch);
     await tester.pumpAndSettle();
     await tester.tap(
-      find.descendant(
-        of: foodSwitch,
-        matching: find.byType(Switch),
-      ),
+      find.descendant(of: foodSwitch, matching: find.byType(Switch)),
     );
     await tester.pumpAndSettle();
 
@@ -121,89 +139,125 @@ void main() {
     expect(presence.prefs.foodEnabled, isFalse);
   });
 
-  testWidgets('navigation opens only after the customer picks this driver', (tester) async {
-    final ride = _openRide();
-    var status = RideStatus.negotiating;
-    final rides = FakeRideClient()
-      ..openRides = [ride]
-      ..onOffer = ((request) => _view(RideStatus.negotiating))
-      ..onGet = ((_) => _view(status));
-    await pumpSignedIn(tester, profile: _driverProfile, rideClient: rides, foodClient: FakeFoodClient());
-    await tester.tap(find.byKey(const Key('driver-go-online')));
-    await tester.pumpAndSettle();
-    await tester.tap(navLabel('Việc nhận'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('driver-ride-ride-open-1')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('driver-open-offer')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('driver-submit-offer')));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'navigation opens only after the customer picks this driver (no poll)',
+    (tester) async {
+      final ride = _openRide();
+      var status = RideStatus.negotiating;
+      final realtime = FakeSnapshotRealtime();
+      final rides = FakeRideClient()
+        ..openRides = [ride]
+        ..onOffer = ((request) => _view(RideStatus.negotiating))
+        ..onGet = ((_) => _view(status));
+      await pumpSignedIn(
+        tester,
+        profile: _driverProfile,
+        rideClient: rides,
+        foodClient: FakeFoodClient(),
+        realtime: realtime,
+      );
+      await tester.tap(find.byKey(const Key('driver-go-online')));
+      await tester.pumpAndSettle();
+      await tester.tap(navLabel('Việc nhận'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('driver-ride-ride-open-1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('driver-open-offer')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('driver-submit-offer')));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Đúng giá khách · Chờ khách chọn'), findsOneWidget);
-    await tester.pump(driverOfferPollInterval);
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('driver-open-active-ride')), findsNothing);
+      expect(find.text('Đúng giá khách · Chờ khách chọn'), findsOneWidget);
+      final afterSubscribe = rides.getCalls.length;
+      // DEC-PROD-031 rev: 60 s of silence → zero extra requests.
+      await tester.pump(const Duration(seconds: 60));
+      await tester.pumpAndSettle();
+      expect(rides.getCalls.length, afterSubscribe);
+      expect(find.byKey(const Key('driver-open-active-ride')), findsNothing);
 
-    status = RideStatus.assigned;
-    await tester.pump(driverOfferPollInterval);
-    await tester.pumpAndSettle();
-    expect(find.text('Khách đã chọn bạn'), findsOneWidget);
-    expect(find.byKey(const Key('driver-open-active-ride')), findsOneWidget);
-  });
+      // Reconnect → exactly one authoritative refetch.
+      realtime.emitReconnect();
+      await tester.pumpAndSettle();
+      expect(rides.getCalls.length, afterSubscribe + 1);
 
-  testWidgets('DEC-PROD-025: the socket hint shows the choice without waiting for the poll', (
-    tester,
-  ) async {
-    final ride = _openRide();
-    var status = RideStatus.negotiating;
-    final realtime = FakeSnapshotRealtime();
-    final rides = FakeRideClient()
-      ..openRides = [ride]
-      ..onOffer = ((request) => _view(RideStatus.negotiating))
-      ..onGet = ((_) => _view(status));
-    await pumpSignedIn(
-      tester,
-      profile: _driverProfile,
-      rideClient: rides,
-      foodClient: FakeFoodClient(),
-      realtime: realtime,
-    );
-    await tester.tap(find.byKey(const Key('driver-go-online')));
-    await tester.pumpAndSettle();
-    await tester.tap(navLabel('Việc nhận'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('driver-ride-ride-open-1')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('driver-open-offer')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('driver-submit-offer')));
-    await tester.pumpAndSettle();
-    expect(realtime.subscribed, contains('ride:ride-open-1'));
+      status = RideStatus.assigned;
+      realtime.emitHint(
+        const SnapshotHint(
+          aggregateType: 'Ride',
+          aggregateId: 'ride-open-1',
+          status: 'ASSIGNED',
+          revision: '2',
+          occurredAt: '2030-01-01T00:00:00.000Z',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Khách đã chọn bạn'), findsOneWidget);
+      expect(find.byKey(const Key('driver-open-active-ride')), findsOneWidget);
+      expect(
+        realtime.subscribed.where((r) => r.startsWith('ride-offers:')),
+        isEmpty,
+      );
+    },
+  );
 
-    status = RideStatus.assigned;
-    realtime.emitHint(
-      const SnapshotHint(
-        aggregateType: 'Ride',
-        aggregateId: 'ride-open-1',
-        status: 'ASSIGNED',
-        revision: '1',
-        occurredAt: '2030-01-01T00:00:00.000Z',
-      ),
-    );
-    await tester.pump(const Duration(milliseconds: 50));
-    await tester.pumpAndSettle();
-    expect(find.text('Khách đã chọn bạn'), findsOneWidget);
-    // One REST check per hint; the safety-net poll had no time to run.
-    expect(rides.getCalls.where((id) => id == 'ride-open-1').length, 1);
-  });
+  testWidgets(
+    'DEC-PROD-025: the socket hint shows the choice without waiting for the poll',
+    (tester) async {
+      final ride = _openRide();
+      var status = RideStatus.negotiating;
+      final realtime = FakeSnapshotRealtime();
+      final rides = FakeRideClient()
+        ..openRides = [ride]
+        ..onOffer = ((request) => _view(RideStatus.negotiating))
+        ..onGet = ((_) => _view(status));
+      await pumpSignedIn(
+        tester,
+        profile: _driverProfile,
+        rideClient: rides,
+        foodClient: FakeFoodClient(),
+        realtime: realtime,
+      );
+      await tester.tap(find.byKey(const Key('driver-go-online')));
+      await tester.pumpAndSettle();
+      await tester.tap(navLabel('Việc nhận'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('driver-ride-ride-open-1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('driver-open-offer')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('driver-submit-offer')));
+      await tester.pumpAndSettle();
+      expect(realtime.subscribed, contains('ride:ride-open-1'));
+
+      status = RideStatus.assigned;
+      realtime.emitHint(
+        const SnapshotHint(
+          aggregateType: 'Ride',
+          aggregateId: 'ride-open-1',
+          status: 'ASSIGNED',
+          revision: '1',
+          occurredAt: '2030-01-01T00:00:00.000Z',
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pumpAndSettle();
+      expect(find.text('Khách đã chọn bạn'), findsOneWidget);
+      // One REST check after subscribe + one per hint; no poll.
+      expect(rides.getCalls.where((id) => id == 'ride-open-1').length, 2);
+    },
+  );
 
   testWidgets('another driver chosen (404) shows not chosen', (tester) async {
     final ride = _openRide();
     final rides = FakeRideClient()
       ..openRides = [ride]
       ..onOffer = (request) => _view(RideStatus.negotiating);
-    await pumpSignedIn(tester, profile: _driverProfile, rideClient: rides, foodClient: FakeFoodClient());
+    await pumpSignedIn(
+      tester,
+      profile: _driverProfile,
+      rideClient: rides,
+      foodClient: FakeFoodClient(),
+    );
     await tester.tap(find.byKey(const Key('driver-go-online')));
     await tester.pumpAndSettle();
     await tester.tap(navLabel('Việc nhận'));
@@ -214,21 +268,23 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('driver-submit-offer')));
     await tester.pumpAndSettle();
-    await tester.pump(driverOfferPollInterval);
-    await tester.pumpAndSettle();
     expect(find.text('Không được chọn'), findsOneWidget);
     expect(find.byKey(const Key('driver-offer-back-to-jobs')), findsOneWidget);
   });
 
-  testWidgets('active ride without data loads the real ride, never a sample', (tester) async {
-    final rides = FakeRideClient()..onGet = (_) => _view(RideStatus.driverArrived, agreed: 47000);
+  testWidgets('active ride without data loads the real ride, never a sample', (
+    tester,
+  ) async {
+    final rides = FakeRideClient()
+      ..onGet = (_) => _view(RideStatus.driverArrived, agreed: 47000);
     await pumpSignedIn(
       tester,
       profile: _driverProfile,
       rideClient: rides,
       foodClient: FakeFoodClient(),
     );
-    GoRouter.of(tester.element(find.text('Tổng quan tài xế'))).push('/driver/rides/ride-open-1/active');
+    GoRouter.of(tester.element(find.text('Tổng quan tài xế')))
+        .push('/driver/rides/ride-open-1/active');
     await tester.pumpAndSettle();
     expect(rides.getCalls, contains('ride-open-1'));
     expect(find.textContaining('123 Lê Lợi'), findsWidgets);
@@ -236,16 +292,20 @@ void main() {
     expect(find.byKey(const Key('driver-active-open-otp')), findsOneWidget);
   });
 
-  testWidgets('DEC-PROD-024: the driver collects the fare minus the voucher', (tester) async {
+  testWidgets('DEC-PROD-024: the driver collects the fare minus the voucher', (
+    tester,
+  ) async {
     final rides = FakeRideClient()
-      ..onGet = (_) => _view(RideStatus.completed, agreed: 47000, discount: 10000);
+      ..onGet = (_) =>
+          _view(RideStatus.completed, agreed: 47000, discount: 10000);
     await pumpSignedIn(
       tester,
       profile: _driverProfile,
       rideClient: rides,
       foodClient: FakeFoodClient(),
     );
-    GoRouter.of(tester.element(find.text('Tổng quan tài xế'))).push('/driver/rides/ride-open-1/active');
+    GoRouter.of(tester.element(find.text('Tổng quan tài xế')))
+        .push('/driver/rides/ride-open-1/active');
     await tester.pumpAndSettle();
     expect(find.text('Thu tiền mặt 37.000đ'), findsOneWidget);
     expect(find.textContaining('DealGo trả phần này cho bạn'), findsOneWidget);
@@ -260,7 +320,8 @@ void main() {
       rideClient: rides,
       foodClient: FakeFoodClient(),
     );
-    GoRouter.of(tester.element(find.text('Tổng quan tài xế'))).push('/driver/rides/ride-open-1/active');
+    GoRouter.of(tester.element(find.text('Tổng quan tài xế')))
+        .push('/driver/rides/ride-open-1/active');
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('driver-active-retry')), findsOneWidget);
   });

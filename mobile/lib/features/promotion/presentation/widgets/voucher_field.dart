@@ -23,6 +23,8 @@ class VoucherField extends StatefulWidget {
     this.storeId,
     this.onQuote,
     this.initialCode,
+    this.seededCode,
+    this.seededCodeVersion = 0,
     super.key,
   });
 
@@ -36,6 +38,11 @@ class VoucherField extends StatefulWidget {
 
   /// Code already held by the caller (e.g. the cart); re-quoted on mount.
   final String? initialCode;
+
+  /// Code chosen outside the field (voucher list). [seededCodeVersion] changes
+  /// on every pick so the same code is quoted again after the customer clears it.
+  final String? seededCode;
+  final int seededCodeVersion;
 
   @override
   State<VoucherField> createState() => _VoucherFieldState();
@@ -72,6 +79,16 @@ class _VoucherFieldState extends State<VoucherField> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _apply(silent: true);
+        }
+      });
+    }
+    final seeded = widget.seededCode?.trim() ?? '';
+    if (widget.seededCodeVersion != oldWidget.seededCodeVersion &&
+        seeded.isNotEmpty) {
+      _controller.text = seeded;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _apply();
         }
       });
     }

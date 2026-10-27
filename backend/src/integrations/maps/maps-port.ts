@@ -8,8 +8,11 @@ export type GeocodeResult = {
   lat: number;
   lng: number;
   label: string;
-  provider: 'mock' | 'goong' | 'google';
+  provider: 'mock' | 'mapbox' | 'goong' | 'google' | 'osm';
 };
+
+/** What a suggestion points at; decides house-number handling and ranking. */
+export type PlaceKind = 'address' | 'street' | 'poi' | 'area';
 
 export type PlaceSuggestion = {
   lat: number;
@@ -19,12 +22,18 @@ export type PlaceSuggestion = {
   /** Full address line. */
   address: string;
   provider: GeocodeResult['provider'];
+  kind?: PlaceKind;
+  /**
+   * True when the point is the street, not the house: the user typed a house
+   * number the provider does not know, so the app asks them to confirm the pin.
+   */
+  approximate?: boolean;
 };
 
 export interface MapsPort {
   geocode(query: string): Promise<GeocodeResult>;
   /** Up to `limit` matches for a free-text query; [] when nothing matches. */
-  searchPlaces(query: string, limit: number): Promise<PlaceSuggestion[]>;
+  searchPlaces(query: string, limit: number, near?: GeoPoint): Promise<PlaceSuggestion[]>;
   /** Nearest address for a GPS fix; null when the provider has nothing there. */
   reverseGeocode(point: GeoPoint): Promise<PlaceSuggestion | null>;
   routeDistanceKm(origin: GeoPoint, destination: GeoPoint): Promise<number>;
@@ -225,92 +234,148 @@ export class GoongMapsPort implements MapsPort {
 }
 
 /**
- * Google Geocoding + Distance Matrix stub. Requires GOOGLE_MAPS_API_KEY.
+ * Mapbox Geocoding + Directions distance. Uses MAPBOX_ACCESS_TOKEN (pk.*).
+ * Prefer this when the product already standardizes on Mapbox tiles/routing.
+ * Network/API failures surface as UnavailableMapsError so callers may fall back.
  */
 @Injectable()
-export class GoogleMapsPort implements MapsPort {
-  private readonly logger = new Logger(GoogleMapsPort.name);
+export class MapboxMapsPort implements MapsPort {
+  private readonly logger = new Logger(MapboxMapsPort.name);
 
-  constructor(private readonly apiKey: string) {}
+  constructor(private readonly accessToken: string) {}
 
   async geocode(query: string): Promise<GeocodeResult> {
-    const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
-    url.searchParams.set('address', query);
-    url.searchParams.set('key', this.apiKey);
-    const body = await this.fetchJson(url);
-    const first = body?.results?.[0];
-    const location = first?.geometry?.location;
-    if (
-      typeof location?.lat !== 'number' ||
-      typeof location?.lng !== 'number' ||
-      typeof first?.formatted_address !== 'string'
-    ) {
-      throw new UnavailableMapsError('Google geocode returned no result');
+    const features = await this.forward(query, 1);
+    const first = features[0];
+    if (!first) {
+      throw new UnavailableMapsError('Mapbox geocode returned no result');
     }
     return {
-      lat: location.lat,
-      lng: location.lng,
-      label: first.formatted_address,
-      provider: 'google',
+      lat: first.lat,
+      lng: first.lng,
+      label: first.address || first.name,
+      provider: 'mapbox',
     };
   }
 
-  async searchPlaces(query: string, limit: number): Promise<PlaceSuggestion[]> {
-    const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
-    url.searchParams.set('address', query);
-    url.searchParams.set('region', 'vn');
-    url.searchParams.set('key', this.apiKey);
-    return toSuggestions(await this.fetchJson(url), limit, 'google');
+  async searchPlaces(query: string, limit: number, near?: GeoPoint): Promise<PlaceSuggestion[]> {
+    return this.forward(query, limit, near);
   }
 
   async reverseGeocode(point: GeoPoint): Promise<PlaceSuggestion | null> {
-    const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
-    url.searchParams.set('latlng', `${point.lat},${point.lng}`);
-    url.searchParams.set('key', this.apiKey);
-    return toSuggestions(await this.fetchJson(url), 1, 'google')[0] ?? null;
+    const url = new URL(
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${point.lng},${point.lat}.json`,
+    );
+    url.searchParams.set('access_token', this.accessToken);
+    url.searchParams.set('language', 'vi');
+    url.searchParams.set('country', 'vn');
+    url.searchParams.set('limit', '1');
+    url.searchParams.set('types', 'address,poi,place,locality,neighborhood');
+    const body = await this.fetchJson(url);
+    return mapboxFeaturesToSuggestions(body, 1)[0] ?? null;
   }
 
   async routeDistanceKm(origin: GeoPoint, destination: GeoPoint): Promise<number> {
-    const url = new URL('https://maps.googleapis.com/maps/api/distancematrix/json');
-    url.searchParams.set('origins', `${origin.lat},${origin.lng}`);
-    url.searchParams.set('destinations', `${destination.lat},${destination.lng}`);
-    url.searchParams.set('mode', 'driving');
-    url.searchParams.set('key', this.apiKey);
+    const pair = `${origin.lng},${origin.lat};${destination.lng},${destination.lat}`;
+    const url = new URL(`https://api.mapbox.com/directions/v5/mapbox/driving/${pair}`);
+    url.searchParams.set('access_token', this.accessToken);
+    url.searchParams.set('overview', 'false');
     const body = await this.fetchJson(url);
-    const meters = body?.rows?.[0]?.elements?.[0]?.distance?.value;
+    const meters = body?.routes?.[0]?.distance;
     if (typeof meters !== 'number' || !Number.isFinite(meters) || meters < 0) {
-      throw new UnavailableMapsError('Google distance matrix returned no distance');
+      throw new UnavailableMapsError('Mapbox directions returned no distance');
     }
     return meters / 1000;
   }
 
-  private async fetchJson(url: URL): Promise<MapsProviderJson> {
+  private async forward(query: string, limit: number, near?: GeoPoint): Promise<PlaceSuggestion[]> {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      return [];
+    }
+    const url = new URL(
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(trimmed)}.json`,
+    );
+    url.searchParams.set('access_token', this.accessToken);
+    url.searchParams.set('language', 'vi');
+    url.searchParams.set('country', 'vn');
+    url.searchParams.set('limit', String(Math.min(Math.max(limit, 1), 10)));
+    url.searchParams.set('types', 'address,poi,place,locality,neighborhood');
+    // Bias toward the rider's own location (Grab/Uber-style "near me" ranking);
+    // fall back to Mapbox IP-based proximity when the app has no fix.
+    url.searchParams.set('proximity', near ? `${near.lng},${near.lat}` : 'ip');
+    return mapboxFeaturesToSuggestions(await this.fetchJson(url), limit);
+  }
+
+  private async fetchJson(url: URL): Promise<MapboxJson> {
     try {
       const response = await fetch(url, {
         method: 'GET',
         signal: AbortSignal.timeout(5_000),
       });
       if (!response.ok) {
-        this.logger.warn(`Google Maps HTTP ${response.status}`);
-        throw new UnavailableMapsError(`Google Maps HTTP ${response.status}`);
+        this.logger.warn(`Mapbox HTTP ${response.status}`);
+        throw new UnavailableMapsError(`Mapbox HTTP ${response.status}`);
       }
-      return (await response.json()) as MapsProviderJson;
+      return (await response.json()) as MapboxJson;
     } catch (error) {
       if (error instanceof UnavailableMapsError) {
         throw error;
       }
       this.logger.warn(
-        `Google Maps request failed: ${error instanceof Error ? error.message : 'unknown'}`,
+        `Mapbox request failed: ${error instanceof Error ? error.message : 'unknown'}`,
       );
-      throw new UnavailableMapsError('Google Maps request failed');
+      throw new UnavailableMapsError('Mapbox request failed');
     }
   }
+}
+
+/**
+ * Mapbox's VN dataset carries some street names with a Malay "Jalan " prefix
+ * (e.g. "Jalan Nguyen Hue" for Nguyễn Huệ, Q.1). Strip it so labels read as Vietnamese.
+ */
+export function cleanMapboxVnLabel(label: string): string {
+  return label.replace(/(^|,\s*)Jalan\s+/g, '$1');
+}
+
+function mapboxFeaturesToSuggestions(body: MapboxJson, limit: number): PlaceSuggestion[] {
+  const out: PlaceSuggestion[] = [];
+  for (const feature of body?.features ?? []) {
+    const center = feature.center;
+    if (!Array.isArray(center) || center.length < 2) {
+      continue;
+    }
+    const lng = center[0];
+    const lat = center[1];
+    if (typeof lat !== 'number' || typeof lng !== 'number') {
+      continue;
+    }
+    const placeName = cleanMapboxVnLabel(feature.place_name?.trim() || '');
+    const text = cleanMapboxVnLabel(feature.text?.trim() || '');
+    const name = text || placeName.split(',')[0]?.trim() || placeName;
+    if (!name) {
+      continue;
+    }
+    const number = feature.place_type?.[0] === 'address' ? feature.address?.trim() : undefined;
+    out.push({
+      lat,
+      lng,
+      name: number && !name.startsWith(number) ? `${number} ${name}` : name,
+      address: placeName || name,
+      provider: 'mapbox',
+      kind: mapboxKind(feature),
+    });
+    if (out.length >= limit) {
+      break;
+    }
+  }
+  return out;
 }
 
 function toSuggestions(
   body: MapsProviderJson,
   limit: number,
-  provider: 'goong' | 'google',
+  provider: 'goong',
 ): PlaceSuggestion[] {
   const out: PlaceSuggestion[] = [];
   for (const result of body?.results ?? []) {
@@ -327,6 +392,25 @@ function toSuggestions(
   }
   return out;
 }
+
+function mapboxKind(feature: { place_type?: string[]; address?: string }): PlaceKind {
+  const type = feature.place_type?.[0];
+  if (type === 'address') {
+    return feature.address ? 'address' : 'street';
+  }
+  return type === 'poi' ? 'poi' : 'area';
+}
+
+type MapboxJson = {
+  features?: Array<{
+    place_type?: string[];
+    address?: string;
+    text?: string;
+    place_name?: string;
+    center?: number[];
+  }>;
+  routes?: Array<{ distance?: number }>;
+};
 
 type MapsProviderJson = {
   results?: Array<{

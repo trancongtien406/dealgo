@@ -1,17 +1,21 @@
-/// Parses DealGo app / universal links into go_router locations.
-/// Registration with the OS and go_router hook is deferred (shell only).
+import '../config/app_env.dart';
+
+/// Parses DealGo app / universal links into go_router locations:
+/// `dealgo://customer/home` and `https://<appLinkHost>/app/customer/home`.
 class DeepLinkParser {
-  const DeepLinkParser();
+  const DeepLinkParser({this.host = appLinkHost});
 
   static const appScheme = 'dealgo';
-  static const httpsHosts = {'app.dealgo.vn', 'dealgo.app'};
+
+  final String host;
+
+  bool _isAppHost(String value) => value == host || value == 'www.$host';
 
   /// Returns a go_router location (path + query) or null when unrecognized.
   String? parse(Uri uri) {
     if (uri.scheme == appScheme) {
-      final path = uri.path.isEmpty
-          ? '/${uri.host}'
-          : '/${uri.host}${uri.path}';
+      final host = uri.host == 'app' ? '' : uri.host;
+      final path = uri.path.isEmpty ? '/$host' : '/$host${uri.path}';
       final normalized = path.replaceAll(RegExp(r'/+'), '/');
       if (normalized == '/') {
         return null;
@@ -19,13 +23,16 @@ class DeepLinkParser {
       return uri.hasQuery ? '$normalized?${uri.query}' : normalized;
     }
 
-    if ((uri.scheme == 'https' || uri.scheme == 'http') &&
-        httpsHosts.contains(uri.host)) {
-      final path = uri.path.isEmpty ? '/' : uri.path;
-      if (path == '/') {
+    if (uri.scheme == 'https' && _isAppHost(uri.host)) {
+      final path = uri.path;
+      if (!path.startsWith('$appLinkPathPrefix/')) {
         return null;
       }
-      return uri.hasQuery ? '$path?${uri.query}' : path;
+      final location = path.substring(appLinkPathPrefix.length);
+      if (location == '/') {
+        return null;
+      }
+      return uri.hasQuery ? '$location?${uri.query}' : location;
     }
 
     return null;

@@ -21,8 +21,10 @@ abstract final class DriverRoutes {
     return '/driver/food/${Uri.encodeComponent(orderId)}';
   }
 
-  static String failed(String jobId) {
-    return '/driver/jobs/failed/${Uri.encodeComponent(jobId)}';
+  /// [food]: a picked-up food order (the reason is sent to the server).
+  static String failed(String jobId, {bool food = false}) {
+    final path = '/driver/jobs/failed/${Uri.encodeComponent(jobId)}';
+    return food ? '$path?kind=food' : path;
   }
 
   static String completed(String jobId) {

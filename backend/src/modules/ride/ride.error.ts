@@ -13,6 +13,18 @@ export const RIDE_RULES = {
     status: 409,
     message: 'Negotiation round limit reached for this ride',
   },
+  // Correct name — the cap is on live offers from different drivers, not rounds.
+  RIDE_LIVE_OFFERS_FULL: {
+    status: 409,
+    message: 'This ride already has the maximum number of live offers',
+  },
+  RIDE_FARE_RAISE_LIMIT: { status: 409, message: 'You cannot raise the fare on this ride again' },
+  // Too many cancellations after a driver was assigned.
+  RIDE_CANCEL_COOLDOWN: {
+    status: 429,
+    message: 'Too many cancelled rides recently; please try again later',
+  },
+  RIDE_REPOST_INVALID: { status: 409, message: 'Only your own expired request can be re-posted' },
   RIDE_OFFER_EXPIRED: { status: 409, message: 'That offer has expired' },
   RIDE_ALREADY_ASSIGNED: { status: 409, message: 'The ride is already assigned' },
   RIDE_NOT_NEGOTIATING: { status: 409, message: 'The ride is not open for negotiation' },
@@ -22,6 +34,24 @@ export const RIDE_RULES = {
   DRIVER_AT_CAPACITY: {
     status: 409,
     message: 'Driver is at max concurrent jobs',
+  },
+  // Negotiation / lifecycle rules.
+  RIDE_OFFER_EDIT_LIMIT: { status: 409, message: 'You cannot change this offer again' },
+  RIDE_OFFER_DECLINED: { status: 409, message: 'The customer declined your offer on this ride' },
+  RIDE_COUNTER_OUT_OF_RANGE: { status: 400, message: 'The offer is outside the allowed range' },
+  RIDE_FARE_OUT_OF_RANGE: { status: 400, message: 'The fare is outside the allowed range' },
+  RIDE_FARE_RAISE_INVALID: { status: 400, message: 'The new fare must be higher than the current one' },
+  RIDE_NO_SHOW_TOO_EARLY: { status: 409, message: 'Wait a little longer before reporting a no-show' },
+  RIDE_CANCEL_REASON_REQUIRED: { status: 400, message: 'A cancellation reason is required' },
+  RIDE_ALREADY_RATED: { status: 409, message: 'This ride has already been rated' },
+  RIDE_OUTSIDE_SERVICE_ZONE: { status: 422, message: 'The pickup is outside our service area' },
+  DRIVER_LOCATION_STALE: {
+    status: 409,
+    message: 'Go online and share your current location to see nearby requests',
+  },
+  DRIVER_DEBT_LIMIT_REACHED: {
+    status: 403,
+    message: 'Settle your outstanding platform fees to keep receiving jobs',
   },
 } as const;
 

@@ -14,75 +14,35 @@ import {
   AdminListErrorBanner,
 } from "@/components/ui/admin-state-ui";
 import { isForbiddenError } from "@/lib/api/errors";
-import type { Accent, ServiceActivity } from "@/features/reports/types";
-import type { OverviewKpi } from "@/features/overview/types";
+import type { ServiceActivity } from "@/features/reports/types";
+import { addDaysIso, todayIso } from "@/components/ui/date-picker";
 import { formatShareRatio } from "@/features/reports/types";
 import { REPORTS_EXPORT_HEADERS } from "@/features/reports/constants";
 import { ReportsKpiGrid } from "./reports-kpi-grid";
 import { ReportsActivityChart } from "./reports-activity-chart";
 import { ReportsServiceBreakdown } from "./reports-service-breakdown";
 
+const MAX_REPORT_DAYS = 92;
+
 export function ReportsBoard() {
-  const [selectedPreset, setSelectedPreset] = useState("today");
+  const [range, setRange] = useState<{ from: string; to: string }>(() => {
+    const today = todayIso();
+    return { from: today, to: today };
+  });
   const {
-    data: overview,
+    data: report,
     isPending,
     isError,
     error,
     refetch,
     isFetching,
-  } = useReportsQuery({
-    preset: selectedPreset,
-  });
+  } = useReportsQuery(range);
   const forbidden = isError && isForbiddenError(error);
 
-  const services: readonly ServiceActivity[] = useMemo(() => {
-    const kpis = overview?.kpis;
-    const rideKpi = kpis?.find(
-      (kpi: OverviewKpi) => kpi.label === "Chuyến xe",
-    )?.value;
-    const foodKpi = kpis?.find(
-      (kpi: OverviewKpi) => kpi.label === "Đơn đồ ăn",
-    )?.value;
-    const deliveryKpi = kpis?.find(
-      (kpi: OverviewKpi) => kpi.label === "Đang xử lý giao",
-    )?.value;
-    const negoKpi = kpis?.find(
-      (kpi: OverviewKpi) => kpi.label === "Phiên trả giá",
-    )?.value;
-
-    const baseRide = rideKpi ?? overview?.areaTotal ?? 0;
-    const baseFood = foodKpi ?? overview?.foodTotal ?? 0;
-    const baseDelivery = deliveryKpi ?? overview?.pipelineTotal ?? 0;
-    const baseNeg = negoKpi ?? 0;
-
-    return [
-      {
-        label: "Chuyến xe",
-        value: baseRide,
-        accent: "brand" as Accent,
-        icon: "car",
-      },
-      {
-        label: "Đơn đồ ăn",
-        value: baseFood,
-        accent: "food" as Accent,
-        icon: "utensils",
-      },
-      {
-        label: "Đang xử lý giao",
-        value: baseDelivery,
-        accent: "delivery" as Accent,
-        icon: "package",
-      },
-      {
-        label: "Phiên trả giá",
-        value: baseNeg,
-        accent: "success" as Accent,
-        icon: "gavel",
-      },
-    ];
-  }, [overview]);
+  const services: readonly ServiceActivity[] = useMemo(
+    () => report?.services ?? [],
+    [report],
+  );
 
   const activityTotal = useMemo(() => {
     return services.reduce((sum, service) => sum + service.value, 0);
@@ -93,10 +53,10 @@ export function ReportsBoard() {
     ...services.map((service) => service.value),
   );
 
-  const trendHours = overview?.trendHours ?? [];
-  const trendSeries = overview?.trendSeries ?? [];
+  const trendDays = report?.trendDays ?? [];
+  const trendSeries = report?.trendSeries ?? [];
 
-  const hasData = overview && activityTotal > 0;
+  const hasData = Boolean(report);
 
   return (
     <div className="min-w-0 space-y-5">
@@ -125,17 +85,25 @@ export function ReportsBoard() {
             Tổng hợp dữ liệu vận hành
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Trích xuất dữ liệu tổng hợp trực tiếp từ Ops Overview Snapshot.
-            Không đại diện cho hệ thống kế toán / báo cáo tài chính định kỳ.
+            Số liệu theo ngày làm việc Việt Nam (Asia/Ho_Chi_Minh) cho kỳ đã chọn,
+            tối đa {MAX_REPORT_DAYS} ngày. Không thay thế báo cáo tài chính kế toán.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <AdminHeaderDateFilter
             defaultPreset="today"
             labelPrefix="Kỳ báo cáo"
-            onChange={(range) => {
-              if (range.from && range.to) {
-                setSelectedPreset(`${range.from}_${range.to}`);
+            onChange={(next) => {
+              const today = todayIso();
+              if (next.from || next.to) {
+                const from = next.from ?? next.to ?? today;
+                const to = next.to ?? from;
+                // The report covers at most MAX_REPORT_DAYS; clamp longer picks to the latest days.
+                const earliest = addDaysIso(to, -(MAX_REPORT_DAYS - 1));
+                setRange({ from: from < earliest ? earliest : from, to });
+              } else {
+                // "Tất cả thời gian": the latest MAX_REPORT_DAYS days.
+                setRange({ from: addDaysIso(today, -(MAX_REPORT_DAYS - 1)), to: today });
               }
             }}
           />
@@ -148,13 +116,17 @@ export function ReportsBoard() {
           </PreviewButton>
           <ExportCsvButton
             tone="brand"
-            filename="reports-overview-snapshot.csv"
+            filename={`reports-${range.from}_${range.to}.csv`}
             headers={[...REPORTS_EXPORT_HEADERS]}
-            rows={services.map((service) => [
-              service.label,
-              String(service.value),
-              formatShareRatio(service.value, activityTotal),
-            ])}
+            rows={[
+              ...services.map((service) => [
+                service.label,
+                String(service.value),
+                formatShareRatio(service.value, activityTotal),
+              ]),
+              ["Doanh thu (GMV, VND)", String(report?.revenueVnd ?? 0), ""],
+              ["Hoa hồng nền tảng (VND)", String(report?.commissionVnd ?? 0), ""],
+            ]}
           >
             <OpsIcon name="download" className="size-4" />
             Xuất báo cáo
@@ -194,6 +166,10 @@ export function ReportsBoard() {
       ) : (
         <>
           <ReportsKpiGrid
+            revenueVnd={report?.revenueVnd ?? 0}
+            rideRevenueVnd={report?.rideRevenueVnd ?? 0}
+            foodRevenueVnd={report?.foodRevenueVnd ?? 0}
+            commissionVnd={report?.commissionVnd ?? 0}
             activityTotal={activityTotal}
             services={services}
             isPending={isPending}
@@ -203,7 +179,7 @@ export function ReportsBoard() {
           <ReportsActivityChart
             services={services}
             activityTotal={activityTotal}
-            trendHours={trendHours}
+            trendDays={trendDays}
             trendSeries={trendSeries}
             isError={isError}
             isPending={isPending}
@@ -213,6 +189,7 @@ export function ReportsBoard() {
             services={services}
             activityTotal={activityTotal}
             largestService={largestService}
+            range={range}
             isPending={isPending}
             isError={isError}
           />

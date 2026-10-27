@@ -16,11 +16,11 @@ related_decisions:
 
 `PROPOSED`. Chủ dự án yêu cầu ngày 2026-10-13 chọn stack production để code tiếp, chỉ điền secret sau. Chưa có biên bản `ACCEPTED`. Code Phase 1 trở đi bám đề xuất này cho đến khi bị supersede.
 
-> Đã triển khai trong code (rà soát 2026-10-18): NestJS 12 modular monolith trong `backend/src/modules/*`. Trạng thái vẫn `PROPOSED` — chủ repo cần quyết định `ACCEPTED`/supersede.
+**Hiện trạng trong code:** NestJS 12 modular monolith: module nghiệp vụ trong `backend/src/modules/*`, hạ tầng dùng chung trong `backend/src/platform/*`, worker chạy process riêng. Quyết định chờ chủ dự án chuyển sang `ACCEPTED` hoặc thay thế.
 
 ## Context
 
-MVP là Ride hai bánh và Food trên một Flutter app, cộng Admin Web. Backend hiện là scaffold NestJS, chưa có ORM. Tách microservice ngay từ đầu làm tăng chi phí giao dịch, quan sát và triển khai khi chưa có SLO (`OPEN-007`).
+MVP là Ride (xe máy, ô tô) và Food trên một Flutter app, cộng Admin Web. Lúc đề xuất (2026-10-13), backend mới là scaffold NestJS chưa có ORM. Tách microservice ngay từ đầu làm tăng chi phí giao dịch, quan sát và triển khai khi chưa có SLO (`OPEN-007`).
 
 ## Decision
 

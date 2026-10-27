@@ -47,6 +47,8 @@ void main() {
   testWidgets('verify success navigates into the customer shell', (
     tester,
   ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     final client = FakeIdentityClient(profile: customerProfile);
     final store = MemoryTokenStore();
     await pumpDealGo(
@@ -60,13 +62,14 @@ void main() {
     await submitOtp(tester, '123456');
 
     expect(client.verifyCalls, [(challengeId: 'challenge-1', code: '123456')]);
-    expect(navLabel('Trang chủ'), findsOneWidget);
-    expect(find.text('Đặt xe'), findsWidgets);
+    expect(navLabel('Trang'), findsOneWidget);
+    // Single unified ride entry on home (ServiceRow).
+    expect(find.text("Đặt xe"), findsOneWidget);
     expect(await store.read(), isNotNull);
 
-    await tester.tap(navLabel('Tài khoản'));
+    await tester.tap(navLabel('Tôi'));
     await tester.pumpAndSettle();
-    expect(find.text('+84911111111'), findsOneWidget);
+    expect(find.text('Nguyễn Văn A'), findsWidgets);
   });
 
   testWidgets('verify success lands on profile setup when server needs it', (
@@ -112,10 +115,12 @@ void main() {
 
     await submitPhone(tester, '987654321');
     await submitOtp(tester, '123456');
-    await tester.tap(navLabel('Tài khoản'));
+    await tester.tap(navLabel('Tôi'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Đăng xuất'));
     await tester.tap(find.text('Đăng xuất'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('account-signout-confirm')));
     await tester.pumpAndSettle();
 
     expect(client.revokeCalls, ['access-token']);
@@ -135,10 +140,10 @@ void main() {
     await submitPhone(tester, '912345678');
     await submitOtp(tester, '123456');
 
-    expect(navLabel('Trang chủ'), findsOneWidget);
-    await tester.tap(navLabel('Tài khoản'));
+    expect(navLabel('Trang'), findsOneWidget);
+    await tester.tap(navLabel('Tôi'));
     await tester.pumpAndSettle();
-    expect(find.text('+84922222222'), findsOneWidget);
+    expect(find.text('Sandbox'), findsWidgets);
     expect(find.text('Đổi vai trò'), findsNothing);
   });
 

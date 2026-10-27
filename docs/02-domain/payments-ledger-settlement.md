@@ -1,15 +1,15 @@
 ---
 document_id: DOC-DOM-006
 title: "DealGo — Payments, Double-Entry Ledger, Settlement & Payout / Thanh toán, sổ cái kép, đối soát và chi trả"
-version: "0.2.0"
+version: "0.3.0"
 status: DRAFT
 language: vi-VN
 created_at: 2026-10-12
-last_reviewed_at: 2026-10-12
+last_reviewed_at: 2026-10-26
 classification: Internal
 owner: "Product Owner + Finance Lead"
 reviewers: ["Backend Lead", "Ride Operations", "Food Operations", "Merchant Operations", "Driver Operations", "Security", "Legal / Compliance", "QA Lead"]
-release_scope: "MVP Ride hai bánh + Food; một Flutter app ba vai trò + Admin Web"
+release_scope: "MVP Ride (xe máy, ô tô) + Food; một Flutter app ba vai trò + Admin Web"
 policy_status: PROPOSED_NOT_APPROVED
 upstream_documents:
   - ../00-governance/README.md
@@ -45,7 +45,16 @@ related_requirements: ["FR-CORE-007", "FR-CORE-008", "FR-CORE-010", "FR-CORE-012
 
 > **DRAFT — bản thiết kế nghiệp vụ và hợp đồng tính đúng đắn, không phải quyết định thanh toán production.** Các định hướng `DEC-PROD-001..007` đã xác nhận. `OPEN-002` (kênh thu/đơn vị nhận tiền/COD), `OPEN-003` (phí và phân chia), `OPEN-010` (lúc authorize/capture), `OPEN-016` (tổn thất Food) và `OPEN-018` (thu hộ COD của tài xế) **chưa được phê duyệt**. Không tự mở luồng thu tiền thật, ví tích tiền, giữ hộ tiền hay payout thật khi chưa được Legal, Finance, PO và provider duyệt.
 >
-> **Phạm vi đã chốt:** DealGo MVP hỗ trợ Ride hai bánh + Food, một Flutter app cho Customer/Merchant/Driver và Admin Web. Ví dụ số tiền/bút toán đều gắn nhãn `TEST_ONLY`; không thể dùng làm chính sách thuế, kế toán, hóa đơn, chiết khấu hay hợp đồng đối tác.
+> **Phạm vi đã chốt:** DealGo MVP hỗ trợ Ride (xe máy, ô tô) + Food, một Flutter app cho Customer/Merchant/Driver và Admin Web. Ví dụ số tiền/bút toán đều gắn nhãn `TEST_ONLY`; không thể dùng làm chính sách thuế, kế toán, hóa đơn, chiết khấu hay hợp đồng đối tác.
+>
+> **Hệ thống hiện có (code là nguồn chuẩn):**
+> - Ra mắt chỉ thu tiền mặt (`PAYMENT_PROVIDER=cash-only`). VNPAY/MoMo mới tạo `PaymentIntent` chuyển hướng (`CREATED`/`PENDING_REDIRECT`), chưa thu tiền thật.
+> - Ledger kép (`LedgerAccount`/`LedgerEntry`, journal `POSTED`, tổng Nợ = Có), ghi cùng transaction với thay đổi trạng thái. Sự kiện journal: `COD_OBLIGATION_POSTED`, `PROMOTION_DISCOUNT_FUNDED`, `DRIVER_PLATFORM_FEE_ACCRUED`, `MERCHANT_COMMISSION_ACCRUED`, `SANDBOX_REFUND_RECORDED` (ghi nhận hoàn tiền, không chuyển tiền).
+> - Hoa hồng là cài đặt Admin (Cài đặt › Tham số › Dòng tiền & hoa hồng): `RIDE_COMMISSION_BIKE_PERCENT` / `RIDE_COMMISSION_CAR_PERCENT` trên giá chuyến, `FOOD_DRIVER_COMMISSION_PERCENT` trên phí giao, `FOOD_MERCHANT_COMMISSION_PERCENT` trên tiền món (subtotal). Phần trăm được chốt vào đơn lúc hoàn tất.
+> - Tài xế giữ tiền mặt nên nợ DealGo phí nền tảng + phí huỷ/không xuất hiện + điều chỉnh; vượt `DRIVER_DEBT_LIMIT_VND` thì không nhận việc mới. Ops ghi nhận thu/trả ở trang chi tiết tài xế (có audit).
+> - Quán trả hoa hồng theo kỳ `MERCHANT_SETTLEMENT_CYCLE_DAYS`; Ops ghi nhận "quán đã trả" cho kỳ đã đóng (không chồng kỳ, có audit). Đối soát theo ngày Asia/Ho_Chi_Minh.
+> - Voucher: nhà tài trợ `PLATFORM` / `MERCHANT` / `SHARED`; với `SHARED`, DealGo chịu `VOUCHER_SHARED_PLATFORM_PERCENT` phần giảm giá.
+> - Chưa có ví, rút tiền, payout tự động hay hoàn tiền qua cổng thanh toán. Giá trị mặc định là DRAFT (`DEC-PROD-059`…`DEC-PROD-062`); xem [bản đồ cài đặt](../10-ai-execution/open-admin-settings-map.md).
 
 ## 1. Mục tiêu và điều kiện đạt
 

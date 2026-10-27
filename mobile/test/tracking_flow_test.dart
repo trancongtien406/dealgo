@@ -27,9 +27,27 @@ void main() {
     expect(foodTrackingStage('PICKED_UP'), FoodTrackingStage.onTheWay);
     expect(foodTrackingStage('DELIVERED'), FoodTrackingStage.delivered);
     expect(foodTrackingStage('FAILED'), FoodTrackingStage.failed);
-    expect(foodTrackingTitle(lookupAppLocalizations(const Locale('vi')), FoodTrackingStage.delivered), 'Đã giao thành công');
-    expect(foodTrackingTitle(lookupAppLocalizations(const Locale('vi')), FoodTrackingStage.preparing), 'Đang chuẩn bị món');
-    expect(foodTrackingTitle(lookupAppLocalizations(const Locale('vi')), FoodTrackingStage.onTheWay), 'Đơn đang được giao');
+    expect(
+      foodTrackingTitle(
+        lookupAppLocalizations(const Locale('vi')),
+        FoodTrackingStage.delivered,
+      ),
+      'Đã giao thành công',
+    );
+    expect(
+      foodTrackingTitle(
+        lookupAppLocalizations(const Locale('vi')),
+        FoodTrackingStage.preparing,
+      ),
+      'Đang chuẩn bị món',
+    );
+    expect(
+      foodTrackingTitle(
+        lookupAppLocalizations(const Locale('vi')),
+        FoodTrackingStage.onTheWay,
+      ),
+      'Đơn đang được giao',
+    );
 
     final order = decodeFoodOrderDetail({
       'success': true,
@@ -63,9 +81,31 @@ void main() {
 
     expect(find.text('Đang nhận báo giá'), findsOneWidget);
     expect(find.text('Đang chờ tài xế chào giá...'), findsOneWidget);
-    expect(find.text('Xe máy'), findsWidgets);
+    // Redesigned matching screen shows the sent offer instead of the vehicle label.
+    expect(find.text('Đã gửi đề xuất'), findsOneWidget);
+    expect(find.text('42.000đ'), findsWidgets);
     expect(find.textContaining('Xe 4 chỗ'), findsNothing);
     expect(find.text('Chưa tìm được tài xế'), findsNothing);
+  });
+
+  testWidgets('NEGOTIATING tracking waits for offers, not "driver accepted"', (
+    tester,
+  ) async {
+    final rides = FakeRideClient()..onGet = (_) => _ride();
+    await _pumpCustomer(tester, rides: rides);
+
+    await _push(tester, RideRoutes.tracking('ride-1'));
+    expect(find.text('Tài xế đã nhận chuyến'), findsNothing);
+    expect(find.text('Tài xế DealGo'), findsNothing);
+    expect(
+      find.byKey(const Key('ride-tracking-awaiting-offers')),
+      findsOneWidget,
+    );
+    expect(find.text('Đang chờ tài xế chào giá...'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('ride-tracking-open-matching')));
+    await tester.pumpAndSettle();
+    expect(find.text('Đã gửi đề xuất'), findsOneWidget);
   });
 
   testWidgets('no pickup code is shown until the server issues one', (
@@ -150,8 +190,9 @@ void main() {
     // Server-issued pickup code, shown as-is.
     expect(find.text('4 8 2 1'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('ride-open-receipt')));
-    await tester.pumpAndSettle();
+    // Receipt CTA only appears once the ride is COMPLETED.
+    expect(find.byKey(const Key('ride-open-receipt')), findsNothing);
+    await _push(tester, RideRoutes.receipt('ride-1'));
 
     // Not completed yet: no "completed" headline, no invented voucher/time.
     expect(find.text('Biên nhận chuyến đi'), findsWidgets);
@@ -162,12 +203,55 @@ void main() {
       tester.widget<Text>(find.byKey(const Key('ride-receipt-fare'))).data,
       '45.000đ',
     );
-    expect(find.text('Phí nền tảng'), findsNothing);
+    expect(find.text('Hoa hồng DealGo'), findsNothing);
     expect(find.text('Tiền tip'), findsNothing);
     expect(find.textContaining('Xe 4 chỗ'), findsNothing);
     expect(find.textContaining('Toyota'), findsNothing);
     expect(find.text('Xe máy'), findsOneWidget);
   });
+
+  testWidgets('COMPLETED ride shows the receipt CTA', (tester) async {
+    final rides = FakeRideClient()
+      ..onGet = (_) => _ride(
+        status: RideStatus.completed,
+        agreedFareVnd: 45000,
+        assignedDriverId: 'driver-tai',
+      );
+    await _pumpCustomer(tester, rides: rides);
+    await _push(tester, RideRoutes.tracking('ride-1'));
+    expect(find.byKey(const Key('ride-open-receipt')), findsOneWidget);
+  });
+
+  testWidgets(
+    'tracking ride A then ride B rebuilds state for B (ValueKey(rideId))',
+    (tester) async {
+      final rides = FakeRideClient()
+        ..onGet = (id) => id == 'ride-2'
+            ? _ride(
+                id: 'ride-2',
+                status: RideStatus.assigned,
+                agreedFareVnd: 61000,
+                assignedDriverId: 'driver-b',
+              )
+            : _ride(
+                status: RideStatus.assigned,
+                agreedFareVnd: 45000,
+                assignedDriverId: 'driver-a',
+              );
+      await _pumpCustomer(tester, rides: rides);
+      await _push(tester, RideRoutes.tracking('ride-1'));
+      expect(find.text('45.000đ'), findsWidgets);
+
+      final context = tester.element(find.byType(Scaffold).first);
+      // replace() keeps the page key, so only ValueKey(rideId) forces a fresh State.
+      GoRouter.of(context).replace(RideRoutes.tracking('ride-2'));
+      await tester.pumpAndSettle();
+
+      expect(rides.getCalls, contains('ride-2'));
+      expect(find.text('61.000đ'), findsWidgets);
+      expect(find.text('45.000đ'), findsNothing);
+    },
+  );
 
   testWidgets(
     'a failed ride refresh shows the offline copy and not a success arrival',
@@ -266,6 +350,28 @@ void main() {
     expect(find.text('~45 phút'), findsWidgets);
   });
 
+  testWidgets('food on the way map shows store pickup and dropoff', (
+    tester,
+  ) async {
+    final food = FakeFoodClient()
+      ..orderDetail = const FoodOrderDetail(
+        id: 'order-1',
+        status: 'PICKED_UP',
+        subtotalVnd: 45000,
+        deliveryFareVnd: 15000,
+        totalVnd: 60000,
+        dropoff: FoodDropoff(lat: 16.1, lng: 108.2, label: 'Sơn Trà'),
+        pickup: FoodDropoff(lat: 16.05, lng: 108.21, label: 'Cửa hàng'),
+        lines: [],
+        assignedDriverId: 'driver-1',
+      );
+    await _pumpCustomer(tester, food: food);
+    await _push(tester, FoodRoutes.order('order-1'));
+    expect(find.byKey(const Key('food-tracking-map-chip')), findsNothing);
+    expect(find.byKey(const Key('food-tracking-map-empty')), findsNothing);
+    expect(find.byKey(const Key('food-tracking-map-waiting')), findsNothing);
+  });
+
   testWidgets('food on the way shows the delivery code (DEC-PROD-036)', (
     tester,
   ) async {
@@ -325,6 +431,71 @@ void main() {
     await _push(tester, FoodRoutes.order('order-1'));
     expect(find.text('Dự kiến món sẵn sàng lúc 12:25'), findsOneWidget);
   });
+
+  testWidgets('food invoice matches PREPARING status (not delivered copy)', (
+    tester,
+  ) async {
+    final food = FakeFoodClient()
+      ..orderDetail = const FoodOrderDetail(
+        id: 'order-1',
+        status: 'PREPARING',
+        storeName: 'Bún Bò Huế',
+        subtotalVnd: 45000,
+        deliveryFareVnd: 15000,
+        totalVnd: 60000,
+        dropoff: FoodDropoff(lat: 16.1, lng: 108.2, label: 'Sơn Trà'),
+        lines: [
+          FoodOrderLine(
+            itemId: 'item-bun',
+            name: 'Bún bò',
+            unitPriceVnd: 45000,
+            quantity: 1,
+          ),
+        ],
+      );
+    await _pumpCustomer(tester, food: food);
+    await _push(tester, FoodRoutes.invoice('order-1'));
+
+    expect(find.byKey(const Key('food-invoice-status-title')), findsOneWidget);
+    expect(find.text('Đang chuẩn bị món'), findsWidgets);
+    expect(find.text('Đã giao thành công'), findsNothing);
+    expect(find.text('DELIVERED'), findsNothing);
+    expect(find.text('Đã giao'), findsNothing);
+    expect(find.text('Món đã chọn'), findsOneWidget);
+    expect(find.text('Tiền mặt · Chưa thanh toán'), findsOneWidget);
+    expect(find.byKey(const Key('food-invoice-track')), findsOneWidget);
+    expect(find.byKey(const Key('food-invoice-rate')), findsNothing);
+  });
+
+  testWidgets('food invoice DELIVERED keeps delivered copy', (tester) async {
+    final food = FakeFoodClient()
+      ..orderDetail = const FoodOrderDetail(
+        id: 'order-2',
+        status: 'DELIVERED',
+        storeName: 'Bún Bò Huế',
+        subtotalVnd: 45000,
+        deliveryFareVnd: 15000,
+        totalVnd: 60000,
+        dropoff: FoodDropoff(lat: 16.1, lng: 108.2, label: 'Sơn Trà'),
+        lines: [
+          FoodOrderLine(
+            itemId: 'item-bun',
+            name: 'Bún bò',
+            unitPriceVnd: 45000,
+            quantity: 1,
+          ),
+        ],
+      );
+    await _pumpCustomer(tester, food: food);
+    await _push(tester, FoodRoutes.invoice('order-2'));
+
+    expect(find.text('Đã giao thành công'), findsOneWidget);
+    expect(find.text('Đã giao'), findsOneWidget);
+    expect(find.text('Món đã nhận'), findsOneWidget);
+    expect(find.text('Tiền mặt · Đã thanh toán'), findsOneWidget);
+    expect(find.byKey(const Key('food-invoice-rate')), findsOneWidget);
+    expect(find.byKey(const Key('food-invoice-track')), findsNothing);
+  });
 }
 
 Future<void> _pumpCustomer(
@@ -351,14 +522,16 @@ Future<void> _push(WidgetTester tester, String location) async {
 }
 
 RideView _ride({
+  String id = 'ride-1',
   RideStatus status = RideStatus.negotiating,
   int? agreedFareVnd,
   String? assignedDriverId,
   String? pickupCode,
   String expiresAt = '2030-01-01T00:00:00.000Z',
+  String vehicleClassCode = 'MOTORBIKE',
 }) {
   return RideView(
-    id: 'ride-1',
+    id: id,
     status: status,
     pickup: const RidePoint(lat: 16.0544, lng: 108.2022, label: 'Hải Châu'),
     dropoff: const RidePoint(lat: 16.0439, lng: 108.1994, label: 'Sân bay'),
@@ -370,5 +543,6 @@ RideView _ride({
     expiresAt: expiresAt,
     offers: const [],
     pickupCode: pickupCode,
+    vehicleClassCode: vehicleClassCode,
   );
 }

@@ -2,15 +2,20 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/design_system/components/dealgo_card.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/components/dealgo_segmented_control.dart';
+import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../driver_card/presentation/driver_card_tile.dart'
+    show formatRatingAverage;
 import '../../../food/domain/entities/food_money.dart';
 import '../../../rating/domain/service_rating.dart';
+import '../../../rating/presentation/rate_service_card.dart';
 import '../../domain/merchant_stats.dart';
 import '../../domain/usecases/get_merchant_catalog.dart';
 import '../cubit/merchant_stats_cubit.dart';
@@ -58,7 +63,7 @@ class _MerchantStatsPageState extends State<MerchantStatsPage> {
       builder: (context, state) {
         return MerchantPageFrame(
           title: l10n.merchantStatsTitle,
-          onBack: () => merchantBack(context),
+          showBack: false,
           body: switch (state) {
             MerchantStatsLoading() => const DealGoSkeletonList(itemCount: 3),
             MerchantStatsIneligible() => ListView(
@@ -224,6 +229,10 @@ class _StatsBody extends StatelessWidget {
             ],
           ),
         ),
+        if (state.statement != null) ...[
+          const SizedBox(height: DealGoSpacing.s16),
+          _StatementCard(statement: state.statement!),
+        ],
         const SizedBox(height: DealGoSpacing.s16),
         DealGoCard(
           child: Column(
@@ -246,6 +255,8 @@ class _StatsBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: DealGoSpacing.s12),
+        _StoreReviews(state: state),
+        const SizedBox(height: DealGoSpacing.s12),
         MerchantNote(
           tone: MerchantNoteTone.green,
           message: l10n.merchantStatsNote,
@@ -266,6 +277,218 @@ class _StatsBody extends StatelessWidget {
     }
     final day = int.tryParse(parts[2]) ?? 0;
     return day % 5 == 0 ? parts[2] : '';
+  }
+}
+
+/// Cash received at pickup vs. DealGo commission owed.
+class _StatementCard extends StatelessWidget {
+  const _StatementCard({required this.statement});
+
+  final MerchantStatement statement;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    final percent = statement.commissionPercentNow;
+    final percentLabel = percent == percent.roundToDouble()
+        ? '${percent.toInt()}'
+        : percent.toStringAsFixed(1);
+    final last = statement.settlements.isEmpty
+        ? null
+        : statement.settlements.first;
+    Widget row(String label, String value, {Color? tone, Key? key}) => Padding(
+      padding: const EdgeInsets.only(bottom: DealGoSpacing.s8),
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: textTheme.bodyMedium)),
+          Text(
+            value,
+            key: key,
+            style: textTheme.titleSmall?.copyWith(color: tone),
+          ),
+        ],
+      ),
+    );
+    return DealGoCard(
+      key: const Key('merchant-statement'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l10n.merchantStatementTitle, style: textTheme.titleMedium),
+          const SizedBox(height: DealGoSpacing.s12),
+          row(
+            l10n.merchantStatementCash(statement.orderCount),
+            formatVnd(statement.cashReceivedVnd),
+          ),
+          row(
+            l10n.merchantStatementCommission(percentLabel),
+            formatVnd(statement.commissionVnd),
+          ),
+          row(l10n.merchantStatementNet, formatVnd(statement.netVnd)),
+          if (statement.settlementCycleDays > 0)
+            Padding(
+              padding: const EdgeInsets.only(bottom: DealGoSpacing.s8),
+              child: Text(
+                l10n.merchantStatementCycle(statement.settlementCycleDays),
+                key: const Key('merchant-statement-cycle'),
+                style: textTheme.bodySmall,
+              ),
+            ),
+          if (statement.unsettledCommissionVnd > 0)
+            row(
+              l10n.merchantStatementUnsettled,
+              formatVnd(statement.unsettledCommissionVnd),
+              tone: DealGoColors.danger,
+              key: const Key('merchant-statement-unsettled'),
+            )
+          else if (statement.commissionVnd > 0)
+            Text(l10n.merchantStatementAllPaid, style: textTheme.bodySmall),
+          if (last != null) ...[
+            const SizedBox(height: DealGoSpacing.s4),
+            Text(
+              l10n.merchantStatementLastPaid(
+                '${_shortDate(last.periodStart)}–${_shortDate(last.periodEnd)}',
+                formatVnd(last.commissionVnd),
+              ),
+              style: textTheme.bodySmall,
+            ),
+          ],
+          const SizedBox(height: DealGoSpacing.s8),
+          Text(l10n.merchantStatementNote, style: textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+
+  static String _shortDate(String date) {
+    final parts = date.split('-');
+    return parts.length == 3 ? '${parts[2]}/${parts[1]}' : date;
+  }
+}
+
+class _StoreReviews extends StatelessWidget {
+  const _StoreReviews({required this.state});
+
+  final MerchantStatsReady state;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    final failure = state.reviewsFailure;
+    final reviews = state.reviews;
+    final storeMissing = state.store == null;
+    return DealGoCard(
+      key: const Key('merchant-store-reviews'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l10n.foodStoreTabReviews, style: textTheme.titleMedium),
+          const SizedBox(height: DealGoSpacing.s12),
+          if (storeMissing)
+            Text(l10n.foodStoreReviewsNone, style: textTheme.bodySmall)
+          else if (failure != null)
+            Text(
+              l10n.foodStoreReviewsUnavailable,
+              key: const Key('merchant-store-reviews-error'),
+              style: textTheme.bodySmall,
+            )
+          else if (reviews == null)
+            Text(l10n.foodStoreReviewsNone, style: textTheme.bodySmall)
+          else ...[
+            _ReviewSummary(summary: reviews.summary),
+            for (final review in reviews.items) ...[
+              const SizedBox(height: DealGoSpacing.s12),
+              const Divider(height: 1),
+              const SizedBox(height: DealGoSpacing.s12),
+              _ReviewRow(review: review),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewSummary extends StatelessWidget {
+  const _ReviewSummary({required this.summary});
+
+  final StoreRating summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final average = summary.average;
+    final text = average == null
+        ? (summary.count == 0
+              ? l10n.foodStoreReviewsNone
+              : l10n.foodStoreReviewsHidden(summary.count))
+        : l10n.foodStoreReviewsSummary(
+            formatRatingAverage(context, average),
+            summary.count,
+          );
+    return Row(
+      children: [
+        const Icon(DealGoIcons.star, color: DealGoColors.amber, size: 18),
+        const SizedBox(width: DealGoSpacing.s8),
+        Expanded(
+          child: Text(
+            text,
+            key: const Key('merchant-store-review-summary'),
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ReviewRow extends StatelessWidget {
+  const _ReviewRow({required this.review});
+
+  final StoreReview review;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            for (var i = 0; i < 5; i++)
+              Icon(
+                DealGoIcons.star,
+                size: 14,
+                color: i < review.stars
+                    ? DealGoColors.amber
+                    : DealGoColors.border,
+              ),
+            const Spacer(),
+            Text(
+              DateFormat('dd/MM/yyyy').format(review.createdAt.toLocal()),
+              style: textTheme.labelSmall?.copyWith(
+                color: DealGoColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+        if (review.tags.isNotEmpty) ...[
+          const SizedBox(height: DealGoSpacing.s8),
+          Text(
+            [for (final tag in review.tags) ratingTagLabel(l10n, tag)]
+                .join(' · '),
+            style: textTheme.bodySmall?.copyWith(color: DealGoColors.primary),
+          ),
+        ],
+        if (review.comment != null) ...[
+          const SizedBox(height: DealGoSpacing.s8),
+          Text(review.comment!, style: textTheme.bodyMedium),
+        ],
+      ],
+    );
   }
 }
 

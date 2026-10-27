@@ -54,6 +54,7 @@ describePg('ride pickup code (postgres)', () => {
     const user = await db.user.create({ data: { displayName: 'pickup-code-pg' } });
     const ride = await db.ride.create({
       data: {
+        vehicleClassCode: 'MOTORBIKE',
         customerId: user.id,
         pickupLat: 16.05,
         pickupLng: 108.2,

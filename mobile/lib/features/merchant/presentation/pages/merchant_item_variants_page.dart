@@ -98,15 +98,16 @@ class _VariantsView extends StatelessWidget {
             MerchantItemOptionsLoading() => const DealGoSkeletonList(
               itemCount: 3,
             ),
-            MerchantItemOptionsFailed(:final message) => DealGoStateView.failure(
-              context,
-              key: const Key('merchant-variants-retry'),
-              onRetry: () => context.read<MerchantItemOptionsCubit>().load(
-                merchantAccessToken(context),
+            MerchantItemOptionsFailed(:final message) =>
+              DealGoStateView.failure(
+                context,
+                key: const Key('merchant-variants-retry'),
+                onRetry: () => context.read<MerchantItemOptionsCubit>().load(
+                  merchantAccessToken(context),
+                ),
+                cause: message.error,
+                message: message.resolve(l10n),
               ),
-              cause: message.error,
-              message: message.resolve(l10n),
-            ),
             // InkWell rows need a Material ancestor; the frame is a plain box.
             MerchantItemOptionsReady() => _VariantsBody(state: state),
           },
@@ -680,15 +681,14 @@ class _ChoiceDialogState extends State<_ChoiceDialog> {
         FilledButton(
           key: const Key('merchant-option-apply'),
           onPressed: ok
-              ? () =>
-                    Navigator.of(context).pop(
-                      _ChoiceEdit(
-                        _name.text.trim(),
-                        extra,
-                        _available,
-                        maxQuantity: maxQ,
-                      ),
-                    )
+              ? () => Navigator.of(context).pop(
+                  _ChoiceEdit(
+                    _name.text.trim(),
+                    extra,
+                    _available,
+                    maxQuantity: maxQ,
+                  ),
+                )
               : null,
           child: Text(l10n.merchantOptionsApply),
         ),

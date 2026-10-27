@@ -1,0 +1,53 @@
+# LiveKit SFU for production on one Linux VPS (Docker Engine + compose plugin).
+# network_mode: host is required: WebRTC needs the real UDP ports 50000-60000 and the public IP.
+# It does not work on Docker Desktop (Mac/Windows); local dev uses the root docker-compose.yml.
+#
+#   ./gen-keys.sh        # once: keys.yaml (chmod 600) + backend.env.snippet
+#   ./render.sh          # after every .env change: livekit.yaml + caddy.yaml
+#   docker compose up -d # COMPOSE_PROFILES=redis in .env also starts redis
+#   ./verify.sh
+name: livekit
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
+services:
+  livekit:
+    image: ${LIVEKIT_IMAGE:-livekit/livekit-server:v1.13.11}
+    command: ["--config", "/etc/livekit.yaml"]
+    network_mode: host
+    restart: unless-stopped
+    logging: *logging
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+      - ./keys.yaml:/etc/livekit-keys.yaml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:7880/ >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
+
+  caddy:
+    image: ${CADDY_IMAGE:-livekit/caddyl4:v2.11.3}
+    command: ["run", "--config", "/etc/caddy.yaml", "--adapter", "yaml"]
+    network_mode: host
+    restart: unless-stopped
+    logging: *logging
+    volumes:
+      - ./caddy.yaml:/etc/caddy.yaml:ro
+      - ./caddy_data:/data
+    depends_on:
+      - livekit
+
+  # Optional (profile "redis"): only for Egress/Ingress or more than one LiveKit node.
+  redis:
+    image: ${REDIS_IMAGE:-redis:7.4-alpine}
+    profiles: ["redis"]
+    command: ["redis-server", "--bind", "127.0.0.1", "--port", "6379", "--protected-mode", "yes", "--save", "", "--appendonly", "no"]
+    network_mode: host
+    restart: unless-stopped
+    logging: *logging

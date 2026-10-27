@@ -22,9 +22,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get actionSeeAll => 'See all';
 
   @override
-  String get actionExplore => 'Explore now';
-
-  @override
   String get actionBookRideNow => 'Book a ride';
 
   @override
@@ -235,13 +232,79 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voiceCall => 'Voice call';
 
   @override
-  String get voiceTitle => 'In-trip voice call';
+  String get voiceCalling => 'Calling…';
 
   @override
-  String get voiceRoomLabel => 'Room';
+  String get voiceConnecting => 'Connecting…';
 
   @override
-  String get voiceStubHint => 'In-app calling is coming soon.';
+  String get voiceIncoming => 'Incoming call';
+
+  @override
+  String get voiceReconnecting => 'Weak signal, reconnecting…';
+
+  @override
+  String get voicePeerCustomer => 'Customer';
+
+  @override
+  String get voicePeerDriver => 'Driver';
+
+  @override
+  String get voiceAccept => 'Answer';
+
+  @override
+  String get voiceDecline => 'Decline';
+
+  @override
+  String get voiceHangUp => 'End';
+
+  @override
+  String get voiceMute => 'Mute';
+
+  @override
+  String get voiceUnmute => 'Unmute';
+
+  @override
+  String get voiceSpeaker => 'Speaker';
+
+  @override
+  String get voiceEndedHungUp => 'Call ended';
+
+  @override
+  String get voiceEndedDeclined => 'Call declined';
+
+  @override
+  String get voiceEndedNoAnswer => 'No answer';
+
+  @override
+  String get voiceEndedMissed => 'Missed call';
+
+  @override
+  String get voiceEndedTripClosed => 'The trip has ended, so the call stopped';
+
+  @override
+  String get voiceEndedConnectionLost => 'Call connection lost';
+
+  @override
+  String get voiceMicDenied =>
+      'Microphone access is needed for calls. Turn it on in Settings.';
+
+  @override
+  String get apiErrVoiceDisabled => 'In-app calling is turned off right now.';
+
+  @override
+  String get apiErrVoiceUnavailable =>
+      'Calling isn\'t available right now. Please use chat.';
+
+  @override
+  String get apiErrVoiceBusy => 'There is already a call for this trip.';
+
+  @override
+  String get apiErrVoiceNoCounterpart => 'No driver has taken this trip yet.';
+
+  @override
+  String get apiErrVoiceWindowClosed =>
+      'Calls are only available while the trip is in progress.';
 
   @override
   String get bannerOfflineTitle => 'You’re offline';
@@ -480,7 +543,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get driverServicesApprovedSection => 'Approved services';
 
   @override
-  String get driverServicesRideTitle => 'Passenger rides (motorbike)';
+  String get driverServicesRideTitle => 'Passenger rides (bike & car)';
 
   @override
   String get driverServicesRideBody => 'Nearby trips · Flexible pricing';
@@ -537,7 +600,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String driverOtpValidFor(String rideId) {
-    return 'OTP is valid only for trip #$rideId';
+    return 'OTP is valid only for trip $rideId';
   }
 
   @override
@@ -562,7 +625,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get driverOtpWaitingChip => 'WAITING';
 
   @override
-  String get driverActiveNavTitle => 'Navigate to pickup';
+  String get driverActiveNavTitle => 'Heading to pickup';
 
   @override
   String get driverActiveArrivedTitle => 'Arrived at pickup';
@@ -598,7 +661,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get driverActiveReportIssue => 'Report issue';
 
   @override
-  String get driverFoodPhaseNavTitle => 'Navigate to store';
+  String get driverFoodPhaseNavTitle => 'Heading to store';
 
   @override
   String get driverFoodPhaseWaitTitle => 'Waiting at store';
@@ -647,7 +710,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get driverFoodNoClientFee => 'Your net income shows after settlement.';
 
   @override
-  String get driverFoodCodCollect => 'COD to collect on delivery';
+  String get driverFoodCodCollect => 'Collect (COD)';
 
   @override
   String get merchantRejectOrder => 'Reject';
@@ -822,10 +885,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get rideRoutePriceHint =>
-      'Official price appears when you choose a vehicle.';
+      'Suggested fares depend on vehicle class; you propose your offer next.';
 
   @override
   String get rideRouteContinueVehicle => 'Continue to vehicles';
+
+  @override
+  String get rideRouteContinueBooking => 'Choose vehicle & offer';
 
   @override
   String get rideFareBreakdownTitle => 'Fare details';
@@ -924,7 +990,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get foodInvoiceSyncChip => 'v1 · Synced';
 
   @override
-  String get foodInvoiceDeliveredChip => 'DELIVERED';
+  String get foodInvoiceDeliveredChip => 'Delivered';
 
   @override
   String get foodInvoiceStore => 'Store';
@@ -968,10 +1034,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String get foodInvoiceRateCta => 'Rate order';
 
   @override
+  String get foodInvoiceTrackCta => 'Track order';
+
+  @override
+  String get foodInvoiceItemsTitleOpen => 'Items';
+
+  @override
+  String get foodInvoiceCodDue => 'Total due';
+
+  @override
+  String get checkoutEmptyBody => 'Add items before checking out.';
+
+  @override
+  String get checkoutBackToMenu => 'Back to menu';
+
+  @override
   String get foodTrackingStatusTitle => 'Live status';
 
   @override
   String get foodTrackingMapChip => 'Order is being delivered';
+
+  @override
+  String get foodTrackingMapWaitingDriver => 'Waiting for driver location';
+
+  @override
+  String get foodTrackingMapEmptyHint =>
+      'Dropoff is ready. Store coordinates are not on the map yet.';
 
   @override
   String get foodTrackingDriverTitle => 'Driver delivering';
@@ -1168,7 +1256,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get serviceRideTitle => 'Ride';
 
   @override
-  String get serviceRideBlurb => 'Go anywhere\nsafe and easy';
+  String get serviceRideBlurb => 'Bike · Car · Bid your fare';
+
+  @override
+  String get homeServiceBikeTitle => 'Motorbike';
+
+  @override
+  String get homeServiceBikeBlurb => 'Quick · 1 passenger';
+
+  @override
+  String get homeServiceCarTitle => 'Car';
+
+  @override
+  String get homeServiceCarBlurb => '4 & 7 seats';
 
   @override
   String get serviceFoodTitle => 'Food';
@@ -1527,10 +1627,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get driverOtpMatched => 'Code matches — starting the trip.';
 
   @override
-  String get driverHeadToPickup => 'Head to pickup';
+  String get driverHeadToPickup => 'Pickup point';
 
   @override
-  String get driverFollowRoute => 'Follow the route to the destination';
+  String get driverFollowRoute => 'Drop-off point';
 
   @override
   String get driverPassenger => 'Customer';
@@ -2391,7 +2491,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String drvHistGrossLine(String gross, String fee) {
-    return 'Gross fares $gross · Platform fee −$fee';
+    return 'Gross fares $gross · DealGo commission −$fee';
   }
 
   @override
@@ -2399,7 +2499,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String drvHistItemFee(String percent, String fee) {
-    return 'Fee $percent% −$fee';
+    return 'Commission $percent% −$fee';
+  }
+
+  @override
+  String drvHistItemFeeFood(String percent, String fee) {
+    return 'Commission $percent% of delivery fee −$fee';
   }
 
   @override
@@ -2474,6 +2579,33 @@ class AppLocalizationsEn extends AppLocalizations {
       'Search for a place or use your current location to start.';
 
   @override
+  String get placeHistoryTitle => 'Recent';
+
+  @override
+  String get placeHistoryClear => 'Clear';
+
+  @override
+  String get placeHistoryDelete => 'Remove from history';
+
+  @override
+  String get placeHistoryClearTitle => 'Clear search history?';
+
+  @override
+  String get placeHistoryClearBody =>
+      'Places you picked will be removed on all your devices.';
+
+  @override
+  String get placeHistoryClearConfirm => 'Clear history';
+
+  @override
+  String get placeApproximate => 'Approximate house number · check the pin';
+
+  @override
+  String placeDistanceKm(String km) {
+    return '$km km';
+  }
+
+  @override
   String get rideBookTitle => 'Book a ride';
 
   @override
@@ -2540,6 +2672,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rideVehicleBikeTitle => 'Motorbike';
 
   @override
+  String get rideVehicleCar4Title => '4-seat car';
+
+  @override
+  String get rideVehicleCar7Title => '7-seat car';
+
+  @override
+  String rideVehicleSeats(int count) {
+    return '$count seats';
+  }
+
+  @override
+  String get rideFareOpening => 'Opening fare';
+
+  @override
+  String get rideFarePerKm => 'Per kilometre';
+
+  @override
+  String rideFareTime(int minutes) {
+    return 'Time ($minutes min)';
+  }
+
+  @override
   String get rideVehicleBikeSubtitle => 'Quick · 1 passenger';
 
   @override
@@ -2557,19 +2711,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rideVehicleContinue => 'View fare details';
 
   @override
+  String get rideVehicleContinueToOffer => 'Propose your fare';
+
+  @override
+  String get rideVehicleClassesUnavailable =>
+      'No vehicle classes are available right now. Pull to refresh or try again shortly.';
+
+  @override
   String get homeQuickBookTitle => 'Quick ride';
 
   @override
   String get homeQuickBookPickup => '123 Nguyen Van Linh, Hai Chau, Da Nang';
 
   @override
-  String get homeQuickBookVehicle => '4-seater';
+  String get homeQuickBookVehicle => 'Bike & Car';
 
   @override
   String get homeQuickBookEstimate => 'Estimate';
 
   @override
-  String get homeQuickBookEtaPrice => '~ 42,000đ';
+  String get homeQuickBookEtaPrice => 'After places';
 
   @override
   String get homeQuickBookEtaTime => 'Time ~ 12 min';
@@ -3297,7 +3458,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'History updates after a job ends. Try again in a few minutes.';
 
   @override
-  String get driverCompletedFeeLabel => 'Platform fee';
+  String get driverCompletedFeeLabel => 'DealGo commission';
 
   @override
   String get driverCompletedNetLabel => 'You earn';
@@ -3416,7 +3577,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String driverCompletedFeePercentLabel(String percent) {
-    return 'Platform fee ($percent%)';
+    return 'DealGo commission ($percent%)';
+  }
+
+  @override
+  String driverCompletedFoodFeePercentLabel(String percent) {
+    return 'DealGo commission on delivery fee ($percent%)';
   }
 
   @override
@@ -3491,6 +3657,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get partnerKindVehicleReg => 'Vehicle registration';
 
   @override
+  String get partnerKindVehicleInsurance => 'Vehicle insurance (photo)';
+
+  @override
   String get partnerKindBusinessLicense => 'Business licence';
 
   @override
@@ -3560,6 +3729,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get partnerTimelineReview => 'Document review';
+
+  @override
+  String get partnerTimelineReviewQuick => 'Admin approval';
+
+  @override
+  String get kycStatusTitleQuick => 'Driver registration status';
 
   @override
   String get partnerTimelineReviewing => 'Under review';
@@ -3813,7 +3988,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get kycVehicleModel => 'Model';
 
   @override
-  String get kycVehicleNote => 'DealGo currently accepts motorbikes only.';
+  String get kycVehicleNote =>
+      'DealGo Ride accepts motorbikes and cars. Food delivery eligibility is separate.';
+
+  @override
+  String get kycVehicleInsuranceNote =>
+      'Car applications need a vehicle insurance photo when this checklist is on. This is an app checklist only — not a legal or regulatory determination.';
 
   @override
   String get kycReviewProfile => 'Profile';
@@ -4025,6 +4205,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get kybShopAddress => 'Address';
 
   @override
+  String get kybShopPin => 'Pin your store on the map';
+
+  @override
+  String get kybShopPinRequired =>
+      'Required: drivers use this point to pick up orders.';
+
+  @override
+  String get kybShopPinChange => 'Pinned. Tap to change.';
+
+  @override
   String get kybShopType => 'Type';
 
   @override
@@ -4153,6 +4343,43 @@ class AppLocalizationsEn extends AppLocalizations {
       'Sales are the food subtotal of delivered orders, in Vietnam time; delivery fees excluded.';
 
   @override
+  String get merchantStatementTitle => 'DealGo commission';
+
+  @override
+  String merchantStatementCash(int count) {
+    return 'Cash from drivers ($count orders)';
+  }
+
+  @override
+  String merchantStatementCommission(String percent) {
+    return 'Commission ($percent%)';
+  }
+
+  @override
+  String get merchantStatementNet => 'Store keeps';
+
+  @override
+  String merchantStatementCycle(int days) {
+    return 'Settled every $days days';
+  }
+
+  @override
+  String get merchantStatementUnsettled => 'Commission not yet paid';
+
+  @override
+  String get merchantStatementAllPaid =>
+      'Commission for this period is fully paid.';
+
+  @override
+  String merchantStatementLastPaid(String period, String amount) {
+    return 'Last payment: $period · $amount';
+  }
+
+  @override
+  String get merchantStatementNote =>
+      'Drivers pay the food amount to the store at pickup; the store pays the commission to DealGo. Contact support if the figures look wrong.';
+
+  @override
   String get merchantStatsFailed => 'Could not load statistics. Pull to retry.';
 
   @override
@@ -4189,7 +4416,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get merchantQueueOthers => 'Other orders';
 
   @override
-  String get merchantQueueNewChip => 'NEW · Awaiting shop';
+  String get merchantQueueNewChip => 'New order';
 
   @override
   String get merchantQueueDeliverTo => 'Deliver to';
@@ -4440,7 +4667,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rideMatchingReceiving => 'Receiving offers';
 
   @override
-  String get rideMatchingSearching => 'Finding drivers';
+  String get rideMatchingSearching => 'Waiting for offers';
 
   @override
   String get rideMatchingLoadFailed =>
@@ -4458,6 +4685,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get rideStatusLabel => 'Status';
+
+  @override
+  String get rideStatusNegotiating => 'Negotiating';
+
+  @override
+  String get rideStatusAssigned => 'Driver assigned';
+
+  @override
+  String get rideStatusDriverEnRoute => 'Driver on the way';
+
+  @override
+  String get rideStatusDriverArrived => 'Driver arrived';
+
+  @override
+  String get rideStatusInTrip => 'Trip in progress';
+
+  @override
+  String get rideStatusCompleted => 'Completed';
+
+  @override
+  String get rideStatusCancelled => 'Cancelled';
+
+  @override
+  String get rideStatusExpired => 'Expired';
 
   @override
   String get rideNoOffersTitle => 'No driver offers yet';
@@ -4588,7 +4839,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rideFareSendFailed => 'Could not send your offer.';
 
   @override
-  String get rideFareTitle => 'Propose your fare';
+  String get rideFareTitle => 'Your fare';
 
   @override
   String get rideBookingInfo => 'Booking details';
@@ -4598,6 +4849,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get rideYourOffer => 'Your offer';
+
+  @override
+  String rideSuggestedFare(String amount) {
+    return 'Suggested fare $amount';
+  }
+
+  @override
+  String get rideSuggestedFareShort => 'Suggested';
+
+  @override
+  String get rideSuggestedFareHint =>
+      'Choose a vehicle, then set the fare you want to offer.';
+
+  @override
+  String get ridePickVehicleClassFirst =>
+      'Choose a vehicle class (bike or car) before sending your offer.';
 
   @override
   String get rideEnterAmount => 'Enter amount';
@@ -4738,8 +5005,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String rideSendOffer(String amount) {
-    return 'Send offer $amount';
+    return 'Find a driver · $amount';
   }
+
+  @override
+  String rideFindDriverCta(String amount) {
+    return 'Find a driver · $amount';
+  }
+
+  @override
+  String get rideFindDriverPlain => 'Find a driver';
+
+  @override
+  String rideRecommendedFareLabel(String amount) {
+    return 'Recommended fare $amount';
+  }
+
+  @override
+  String get rideFareAdjustHint =>
+      'Tap − / + or enter an amount. Drivers may accept or counter.';
 
   @override
   String get rideVehicleMotorbike => 'Motorbike';
@@ -4783,6 +5067,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get driverVehicleUnknown =>
       'No plate number in your driver application';
+
+  @override
+  String get driverVehicleNotOnFile => 'No vehicle on file yet';
 
   @override
   String get driverServicesSaved =>
@@ -4867,10 +5154,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get driverRideDetailTitle => 'Ride request details';
 
   @override
+  String get driverCounterOffer => 'Counter offer';
+
+  @override
+  String driverAcceptAtPrice(String price) {
+    return 'Accept $price';
+  }
+
+  @override
   String get driverMakeOffer => 'Make an offer';
 
   @override
-  String get driverRideChip => 'Ride · Motorbike';
+  String get driverRideChip => 'Ride · Bike & Car';
 
   @override
   String get driverCustomerFare => 'Customer\'s fare';
@@ -5283,16 +5578,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeSearchHint => 'Search places, stores, dishes...';
 
   @override
-  String get homeHeroTitle => 'One app,\nendless options';
-
-  @override
-  String get homeHeroSubtitle =>
-      'Ride • Shop • Delivery\nEveryday convenience in Da Nang';
-
-  @override
-  String get homeHeroCity => '~ Da Nang, always close by';
-
-  @override
   String get homeServiceFoodSub => 'Thousands of stores,\ndelivered';
 
   @override
@@ -5300,6 +5585,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mapIllustrative => 'Illustrative map';
+
+  @override
+  String get mapRouteRoadFollowed => 'Road route';
+
+  @override
+  String get mapRouteStraightFallback => 'Straight-line preview';
 
   @override
   String get rideVoucherTitle => 'Voucher';
@@ -5733,8 +6024,116 @@ class AppLocalizationsEn extends AppLocalizations {
   String get driverNavWaze => 'Waze';
 
   @override
+  String get driverNavAppleMaps => 'Apple Maps';
+
+  @override
+  String get chatRoleDriver => 'Driver';
+
+  @override
+  String get chatRoleCustomer => 'Customer';
+
+  @override
+  String get chatCallAction => 'Call';
+
+  @override
+  String get chatCloseAction => 'Close';
+
+  @override
+  String get chatSendAction => 'Send';
+
+  @override
+  String get chatStatusSending => 'Sending';
+
+  @override
+  String get chatStatusSent => 'Sent';
+
+  @override
+  String get chatStatusFailed => 'Not sent · Tap to retry';
+
+  @override
+  String get chatToday => 'Today';
+
+  @override
+  String get chatYesterday => 'Yesterday';
+
+  @override
+  String get chatEmptyBody => 'Send a message to coordinate quickly';
+
+  @override
+  String chatUnreadCount(int count) {
+    return '$count new messages';
+  }
+
+  @override
+  String get chatQuickDriverComing => 'I\'m on my way';
+
+  @override
+  String get chatQuickDriverDelivering => 'I\'m on my way with your order';
+
+  @override
+  String get chatQuickDriverArrived => 'I\'ve arrived';
+
+  @override
+  String get chatQuickDriverWait => 'Give me 2 minutes';
+
+  @override
+  String get chatQuickCustomerGate => 'I\'m at the gate';
+
+  @override
+  String get chatQuickCustomerComing => 'Coming out now';
+
+  @override
+  String get chatQuickCustomerWhere => 'Where are you?';
+
+  @override
+  String get chatQuickCustomerLeaveAtGate => 'Please leave it at the gate';
+
+  @override
   String get driverNavOpenFailed =>
-      'Couldn\'t open a navigation app. Follow the in-app map.';
+      'Couldn\'t open a navigation app. Check Google Maps or Waze on this phone.';
+
+  @override
+  String get driverNavOpen => 'Navigate';
+
+  @override
+  String get driverNavSheetTitle => 'Navigate with';
+
+  @override
+  String get driverNavWeb => 'Google Maps (browser)';
+
+  @override
+  String get driverNavLastUsed => 'Last used';
+
+  @override
+  String get driverNavToPickup => 'To the pickup point';
+
+  @override
+  String get driverNavToDropoff => 'To the drop-off point';
+
+  @override
+  String get driverNavToStore => 'To the store';
+
+  @override
+  String get driverNavToCustomer => 'To the customer';
+
+  @override
+  String get driverRideUnassignedTitle =>
+      'This ride was handed to another driver';
+
+  @override
+  String get driverRideUnassignedStartTimeout =>
+      'You didn\'t start heading to the pickup in time.';
+
+  @override
+  String get driverRideUnassignedArriveTimeout =>
+      'You didn\'t reach the pickup in time.';
+
+  @override
+  String get driverRideUnassignedOps => 'DealGo support reassigned the ride.';
+
+  @override
+  String get driverRideUnassignedGeneric =>
+      'The ride was reopened for new offers.';
 
   @override
   String get driverFoodDeliveryCodeTitle => 'Delivery code';
@@ -6040,6 +6439,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notifPrefsChatBody => 'Messages from people on your trips/orders';
 
   @override
+  String get notifPrefsNewJobSound => 'New job sound';
+
+  @override
+  String get notifPrefsNewJobSoundBody =>
+      'Play the spoken \"DealGo, có cuốc mới\" alert for new rides, deliveries and store orders. Turn off to use the phone\'s default sound.';
+
+  @override
   String get notifPrefsOther => 'Other';
 
   @override
@@ -6088,6 +6494,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get securityVerified => 'Verified';
+
+  @override
+  String get securityEmail => 'Email';
 
   @override
   String get securityPasskey => 'Passkey';
@@ -6361,6 +6770,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get merchantProductsEmptyFilter => 'No items match this filter';
 
   @override
+  String get merchantProductsEmptyMenu =>
+      'No items yet. Tap “Add item” to start selling.';
+
+  @override
   String get merchantOptionsChoiceMaxQty => 'Max quantity per line';
 
   @override
@@ -6390,7 +6803,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get merchantLocationUnset =>
-      'Your store has no location yet. Drivers get no exact pickup point and the delivery fee uses the default.';
+      'Your store is not pinned, so it is hidden and cannot take orders. Pin it so drivers find the pickup point.';
+
+  @override
+  String get merchantLocationPinNow => 'Pin now';
 
   @override
   String get merchantLocationUnsetValue => 'Not set';
@@ -6490,7 +6906,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get securityPasskeyNeedsPhone =>
-      'Verify your phone number before adding a passkey.';
+      'Verify your phone number or email before adding a passkey.';
 
   @override
   String get merchantProfileTitle => 'Store profile';
@@ -6536,4 +6952,459 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get accountStoreProfileBody => 'Store name and logo';
+
+  @override
+  String get foodReorderConfirmTitle => 'Reorder this order?';
+
+  @override
+  String get foodReorderConfirmBody =>
+      'Items from this order go into your cart at current prices. You can review before placing.';
+
+  @override
+  String get actionReorder => 'Reorder';
+
+  @override
+  String get foodReorderNone =>
+      'None of the old order\'s dishes are available now';
+
+  @override
+  String foodReorderPartial(int count) {
+    return '$count unavailable item(s) were left out';
+  }
+
+  @override
+  String get kycQuickModeBanner =>
+      'Quick sign-up: no documents needed. Admin will review and confirm your vehicle class.';
+
+  @override
+  String get kybQuickModeBanner =>
+      'Quick sign-up: no documents needed. Admin will review your store.';
+
+  @override
+  String get handoverRefLabel => 'Handover code';
+
+  @override
+  String handoverRefSemantics(String ref) {
+    return 'Handover code $ref';
+  }
+
+  @override
+  String get rideRebookAction => 'Rebook ride';
+
+  @override
+  String trackEtaMinutes(int minutes) {
+    return '~$minutes min';
+  }
+
+  @override
+  String get trackStepFinding => 'Finding';
+
+  @override
+  String get trackStepComing => 'Coming';
+
+  @override
+  String get trackStepArrived => 'Arrived';
+
+  @override
+  String get trackStepOnTrip => 'On trip';
+
+  @override
+  String get trackStepDone => 'Done';
+
+  @override
+  String get trackStepPlaced => 'Placed';
+
+  @override
+  String get trackStepPreparing => 'Cooking';
+
+  @override
+  String get trackStepReady => 'Ready';
+
+  @override
+  String get trackStepDriverToStore => 'Driver to store';
+
+  @override
+  String get trackStepDelivering => 'On the way';
+
+  @override
+  String get trackStepDelivered => 'Delivered';
+
+  @override
+  String get trackDeliveryCodeLabel => 'Delivery code';
+
+  @override
+  String trackItemsMore(int count) {
+    return '+$count more';
+  }
+
+  @override
+  String get foodStageFindingDriver => 'Finding a driver';
+
+  @override
+  String get foodStageDriverToStore => 'Driver heading to the store';
+
+  @override
+  String get foodStageDeliveringToYou => 'Driver is on the way to you';
+
+  @override
+  String get accountSignOutConfirmTitle => 'Sign out of DealGo?';
+
+  @override
+  String get accountSignOutConfirmBody =>
+      'You will need your phone number and an OTP code to sign in again.';
+
+  @override
+  String get accountSignOutCancel => 'Cancel';
+
+  @override
+  String get rideOfferConfirmTitle => 'Choose this driver?';
+
+  @override
+  String rideOfferConfirmBody(String amount) {
+    return 'Fare $amount. The driver will be assigned to your ride right away.';
+  }
+
+  @override
+  String get rideOfferConfirmAction => 'Choose driver';
+
+  @override
+  String get rideOfferConfirmCancel => 'Review';
+
+  @override
+  String get rideRaiseFare => 'Raise fare';
+
+  @override
+  String get rideRaiseFareTitle => 'Raise your offer';
+
+  @override
+  String rideRaiseFareBody(String amount) {
+    return 'Drivers see the new price right away. Current price: $amount';
+  }
+
+  @override
+  String rideRaiseFareStep(String amount) {
+    return '+$amount';
+  }
+
+  @override
+  String rideRaiseFareDone(String amount) {
+    return 'Fare raised to $amount';
+  }
+
+  @override
+  String get rideDeclineOffer => 'Decline this price';
+
+  @override
+  String get rideDeclineOfferDone =>
+      'Offer declined. The driver can send a new price.';
+
+  @override
+  String get driverWithdrawOffer => 'Withdraw offer';
+
+  @override
+  String get driverWithdrawOfferDone => 'Offer withdrawn';
+
+  @override
+  String get driverCustomerRating => 'Customer rating';
+
+  @override
+  String driverCustomerRatingValue(String average, int count) {
+    return '$average★ ($count ratings)';
+  }
+
+  @override
+  String get driverCustomerRatingNone => 'New customer – no ratings yet';
+
+  @override
+  String get driverCancelRide => 'Cancel ride';
+
+  @override
+  String get driverCancelReasonTitle => 'Why are you cancelling?';
+
+  @override
+  String get driverCancelHint =>
+      'Cancelling an accepted ride counts toward your cancellation rate.';
+
+  @override
+  String get driverCancelReasonCustomerUnreachable =>
+      'Can\'t reach the customer';
+
+  @override
+  String get driverCancelReasonPickupTooFar => 'Pickup is too far';
+
+  @override
+  String get driverCancelReasonVehicleProblem => 'Vehicle problem';
+
+  @override
+  String get driverCancelReasonSafetyConcern => 'Safety concern';
+
+  @override
+  String get driverCancelReasonCustomerAsked => 'Customer asked to cancel';
+
+  @override
+  String get driverCancelReasonOther => 'Other reason';
+
+  @override
+  String get driverCancelDone => 'Ride cancelled';
+
+  @override
+  String get driverNoShow => 'Customer didn\'t show';
+
+  @override
+  String get driverNoShowBody =>
+      'Use this only after waiting at the pickup point. The server checks the wait time and may charge the customer a no-show fee.';
+
+  @override
+  String get driverNoShowDone => 'No-show recorded. The ride is closed.';
+
+  @override
+  String get driverRateCustomerTitle => 'Rate the customer';
+
+  @override
+  String get driverRateCustomerSubmit => 'Send rating';
+
+  @override
+  String get driverRateCustomerDone => 'Rating sent – thank you!';
+
+  @override
+  String driverRateCustomerYours(int stars) {
+    return 'Your rating: $stars★';
+  }
+
+  @override
+  String get driverRateTagOnTime => 'On time';
+
+  @override
+  String get driverRateTagPolite => 'Polite';
+
+  @override
+  String get driverRateTagClearPickup => 'Clear pickup';
+
+  @override
+  String get driverRateTagLate => 'Kept me waiting';
+
+  @override
+  String get driverRateTagRude => 'Rude';
+
+  @override
+  String get driverRateTagWrongPickup => 'Wrong pickup point';
+
+  @override
+  String get driverFoodRelease => 'Return order';
+
+  @override
+  String get driverFoodReleaseTitle => 'Why return this order?';
+
+  @override
+  String get driverFoodReleaseHint =>
+      'The order goes back to other drivers. Returning counts as a cancellation.';
+
+  @override
+  String get driverFoodReleaseStoreTooSlow => 'Store is too slow';
+
+  @override
+  String get driverFoodReleaseStoreClosed => 'Store is closed';
+
+  @override
+  String get driverFoodReleaseVehicleProblem => 'Vehicle problem';
+
+  @override
+  String get driverFoodReleaseSafetyConcern => 'Safety concern';
+
+  @override
+  String get driverFoodReleaseOther => 'Other reason';
+
+  @override
+  String get driverFoodReleaseDone => 'Order returned';
+
+  @override
+  String get driverFailNoteLabel => 'What happened? (required)';
+
+  @override
+  String get driverFailNoteRequired => 'Please describe what happened.';
+
+  @override
+  String get driverFailAbsentHint =>
+      'Call and message the customer first. You can report \"customer unreachable\" only after waiting at the drop-off for a few minutes.';
+
+  @override
+  String get driverFoodFailedDone => 'Delivery reported as failed';
+
+  @override
+  String get apiErrLiveOffersFull =>
+      'This ride already has the maximum number of offers. Try again shortly.';
+
+  @override
+  String get apiErrFareRaiseLimit =>
+      'You can\'t raise the fare any more for this ride.';
+
+  @override
+  String get apiErrCancelCooldown =>
+      'You\'ve cancelled several rides recently. Please wait a little before booking again.';
+
+  @override
+  String get apiErrRepostInvalid => 'This ride can\'t be reposted.';
+
+  @override
+  String get apiErrFailTooEarly =>
+      'Wait at the drop-off a few more minutes before reporting the customer unreachable.';
+
+  @override
+  String get apiErrFailNoteRequired =>
+      'Please add a note describing the problem.';
+
+  @override
+  String get apiErrStoreLocationRequired =>
+      'This store hasn\'t set its location yet.';
+
+  @override
+  String get apiErrDriverLocationStale =>
+      'We don\'t have your current location yet. Turn on location and pull to refresh.';
+
+  @override
+  String get apiErrOutsideServiceZone =>
+      'This address is outside our service area.';
+
+  @override
+  String get apiErrTooFar => 'The delivery address is too far from this store.';
+
+  @override
+  String get apiErrSettlementOverlap =>
+      'This period overlaps an existing statement.';
+
+  @override
+  String get apiErrSettlementPeriodOpen => 'This period hasn\'t ended yet.';
+
+  @override
+  String get apiErrShopLocationRequired =>
+      'Pin your shop location on the map to continue.';
+
+  @override
+  String get apiErrChangePending =>
+      'There\'s already an order change waiting for the customer.';
+
+  @override
+  String get apiErrChangeInvalid =>
+      'This change isn\'t allowed. You can only lower quantities or remove items.';
+
+  @override
+  String get apiErrChangeNotFound =>
+      'This change is no longer waiting for an answer.';
+
+  @override
+  String get foodCancelChangeRejected => 'You declined the store\'s change';
+
+  @override
+  String get foodCancelChangeExpired =>
+      'The store\'s change wasn\'t answered in time';
+
+  @override
+  String get foodChangeTitle => 'The store changed your order';
+
+  @override
+  String get foodChangeReasonOutOfStock => 'Some items are sold out';
+
+  @override
+  String get foodChangeReasonNotEnough => 'Not enough portions left';
+
+  @override
+  String get foodChangeReasonOther => 'Other reason';
+
+  @override
+  String get foodChangeLineRemoved => 'Removed';
+
+  @override
+  String get foodChangeNewTotal => 'New total';
+
+  @override
+  String foodChangeAnswerBy(String time) {
+    return 'Answer by $time, otherwise the order is cancelled for free.';
+  }
+
+  @override
+  String get foodChangeAccept => 'Accept';
+
+  @override
+  String get foodChangeReject => 'Cancel order';
+
+  @override
+  String get foodChangeRejectConfirmTitle => 'Cancel this order?';
+
+  @override
+  String get foodChangeRejectConfirmBody =>
+      'The order will be cancelled at no cost to you.';
+
+  @override
+  String get merchantEditOrder => 'Report sold-out items';
+
+  @override
+  String get merchantEditOrderHint =>
+      'Lower quantities or remove items. The customer must accept before you continue.';
+
+  @override
+  String get merchantEditOrderNote => 'Note for the customer';
+
+  @override
+  String get merchantEditOrderAllRemoved =>
+      'To remove every item, reject the order instead.';
+
+  @override
+  String merchantEditOrderNewSubtotal(String amount) {
+    return 'New food value: $amount';
+  }
+
+  @override
+  String get merchantEditOrderSend => 'Send to customer';
+
+  @override
+  String merchantChangePending(String total, String time) {
+    return 'Waiting for the customer to accept the change (new total $total) until $time.';
+  }
+
+  @override
+  String get pushForegroundOpen => 'View';
+
+  @override
+  String get mapPinPickup => 'Pickup';
+
+  @override
+  String get mapPinDropoff => 'Drop-off';
+
+  @override
+  String get mapPinStore => 'Store';
+
+  @override
+  String get mapPinHome => 'Deliver';
+
+  @override
+  String get mapPickerTitle => 'Pick on map';
+
+  @override
+  String get mapPickerConfirm => 'Use this location';
+
+  @override
+  String get mapPickerPinned => 'Pinned location';
+
+  @override
+  String get mapPickerSearch => 'Search places';
+
+  @override
+  String get mapStyleTitle => 'Map style';
+
+  @override
+  String get mapStyleStandard => 'Standard';
+
+  @override
+  String get mapStyleSatellite => 'Satellite';
+
+  @override
+  String get mapStyleDark => 'Dark';
+
+  @override
+  String get mapOpenSettings => 'Settings';
+
+  @override
+  String homeBannerSlideLabel(int index, int count, String title) {
+    return 'Banner $index of $count: $title';
+  }
 }

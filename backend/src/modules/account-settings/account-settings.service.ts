@@ -49,6 +49,7 @@ export class AccountSettingsService {
       chat: patch.chat ?? current.chat,
       promotion: patch.promotion ?? current.promotion,
       news: patch.news ?? current.news,
+      newJobSound: patch.newJobSound ?? current.newJobSound,
     };
     await this.writePrefs(userId, next);
     return next;
@@ -150,7 +151,7 @@ export class AccountSettingsService {
     const db = this.prisma?.db();
     if (!db) {
       const row = this.memoryPrefs.get(userId);
-      return row ? { ...row } : null;
+      return row ? { ...DEFAULT_NOTIFICATION_PREFS, ...row } : null;
     }
     const row = await db.userNotificationPreference.findUnique({ where: { userId } });
     if (!row) return null;
@@ -160,6 +161,7 @@ export class AccountSettingsService {
       chat: row.chat,
       promotion: row.promotion,
       news: row.news,
+      newJobSound: row.newJobSound,
     };
   }
 

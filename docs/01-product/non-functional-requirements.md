@@ -42,7 +42,7 @@ related_decisions:
 
 > **Trạng thái `DRAFT` — KHÔNG PHẢI SLO/SLA ĐÃ CAM KẾT.** Các ngưỡng latency, throughput, concurrent users, tuổi dữ liệu GPS, crash-free, uptime, RTO, RPO, data retention, chi phí và cấu hình cảnh báo thuộc `OPEN-007` cùng các quyết định liên quan. Số liệu được ghi nhãn **CANDIDATE** chỉ là **điểm xuất phát cho lab benchmark**, không được coding agent tự đưa thành cấu hình production, cam kết đối tác hay điều kiện Go-live khi chưa được duyệt.
 >
-> **Phạm vi cố định:** DealGo MVP có **Ride hai bánh + Food**; **một ứng dụng Flutter** cho Customer, Merchant, Driver; **Admin Web** dành cho nội bộ. NFR này là lớp yêu cầu chất lượng *bao trùm* 71 `FR-*`; không bổ sung nghiệp vụ hoặc nhà cung cấp ngoài PRD.
+> **Phạm vi cố định:** DealGo MVP có **Ride (xe máy, ô tô) + Food**; **một ứng dụng Flutter** cho Customer, Merchant, Driver; **Admin Web** dành cho nội bộ. NFR này là lớp yêu cầu chất lượng *bao trùm* 71 `FR-*`; không bổ sung nghiệp vụ hoặc nhà cung cấp ngoài PRD.
 
 ## 1. Mục đích, giới hạn và nguồn sự thật
 

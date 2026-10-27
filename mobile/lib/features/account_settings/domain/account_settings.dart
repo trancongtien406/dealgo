@@ -5,6 +5,7 @@ class NotificationPrefs {
     required this.chat,
     required this.promotion,
     required this.news,
+    this.newJobSound = true,
   });
 
   final bool ride;
@@ -13,12 +14,16 @@ class NotificationPrefs {
   final bool promotion;
   final bool news;
 
+  /// Driver / merchant: spoken "DealGo, có cuốc mới" on new jobs (off = default sound).
+  final bool newJobSound;
+
   NotificationPrefs copyWith({
     bool? ride,
     bool? food,
     bool? chat,
     bool? promotion,
     bool? news,
+    bool? newJobSound,
   }) {
     return NotificationPrefs(
       ride: ride ?? this.ride,
@@ -26,24 +31,26 @@ class NotificationPrefs {
       chat: chat ?? this.chat,
       promotion: promotion ?? this.promotion,
       news: news ?? this.news,
+      newJobSound: newJobSound ?? this.newJobSound,
     );
   }
 
   Map<String, bool> toJson() => {
-        'ride': ride,
-        'food': food,
-        'chat': chat,
-        'promotion': promotion,
-        'news': news,
-      };
+    'ride': ride,
+    'food': food,
+    'chat': chat,
+    'promotion': promotion,
+    'news': news,
+    'newJobSound': newJobSound,
+  };
 }
 
 NotificationPrefs decodeNotificationPrefs(Object? raw) {
   final map = raw is Map<String, dynamic>
       ? raw
       : raw is Map
-          ? {for (final e in raw.entries) e.key.toString(): e.value}
-          : const <String, dynamic>{};
+      ? {for (final e in raw.entries) e.key.toString(): e.value}
+      : const <String, dynamic>{};
   bool flag(String key, {required bool fallback}) {
     final value = map[key];
     return value is bool ? value : fallback;
@@ -55,6 +62,7 @@ NotificationPrefs decodeNotificationPrefs(Object? raw) {
     chat: flag('chat', fallback: true),
     promotion: flag('promotion', fallback: false),
     news: flag('news', fallback: false),
+    newJobSound: flag('newJobSound', fallback: true),
   );
 }
 
@@ -89,8 +97,12 @@ List<AccountSession> decodeAccountSessions(Object? raw) {
           id: '${entry['id']}',
           channel: '${entry['channel'] ?? ''}',
           current: entry['current'] == true,
-          createdAt: DateTime.tryParse('${entry['createdAt'] ?? ''}') ?? DateTime.now(),
-          lastSeenAt: DateTime.tryParse('${entry['lastSeenAt'] ?? ''}') ?? DateTime.now(),
+          createdAt:
+              DateTime.tryParse('${entry['createdAt'] ?? ''}') ??
+              DateTime.now(),
+          lastSeenAt:
+              DateTime.tryParse('${entry['lastSeenAt'] ?? ''}') ??
+              DateTime.now(),
           deviceLabel: entry['deviceLabel'] as String?,
           userAgent: entry['userAgent'] as String?,
           ipAddress: entry['ipAddress'] as String?,
@@ -105,7 +117,10 @@ abstract class AccountSettingsRepository {
     required NotificationPrefs prefs,
   });
   Future<List<AccountSession>> sessions({required String accessToken});
-  Future<void> revokeSession({required String accessToken, required String sessionId});
+  Future<void> revokeSession({
+    required String accessToken,
+    required String sessionId,
+  });
   Future<int> revokeOtherSessions({required String accessToken});
   Future<void> changePassword({
     required String accessToken,
@@ -119,10 +134,15 @@ abstract class AccountSettingsRepository {
     String? dateOfBirth,
     String? gender,
   });
-  Future<void> touchCurrentDevice({required String accessToken, String? deviceLabel});
+  Future<void> touchCurrentDevice({
+    required String accessToken,
+    String? deviceLabel,
+  });
 
   /// S025 passkey enrolment (existing `/v1/auth/passkeys/registration/*` endpoints).
-  Future<Map<String, Object?>> passkeyRegistrationOptions({required String accessToken});
+  Future<Map<String, Object?>> passkeyRegistrationOptions({
+    required String accessToken,
+  });
   Future<void> verifyPasskeyRegistration({
     required String accessToken,
     required Map<String, Object?> response,

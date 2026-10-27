@@ -4,6 +4,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { uniqueTestPhone } from './test-phone.js';
+import { pinStore } from './store-pin.js';
 import { INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
@@ -116,6 +117,7 @@ describePg('food merchant reject race (postgres)', () => {
       .get('/v1/food/merchant/catalog')
       .set('Authorization', `Bearer ${merchant.token}`)
       .expect(200);
+    await pinStore(app, merchant.token);
     const storeId = catalog.body.data.id as string;
     const itemId = createdItem.body.data.id as string;
 

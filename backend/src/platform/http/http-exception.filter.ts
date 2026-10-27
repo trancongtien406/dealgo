@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { type RequestWithId, readOrCreateRequestId, REQUEST_ID_HEADER } from './request-id.js';
+import { captureServerError } from '../observability/sentry.js';
 
 type ErrorBody = {
   success: false;
@@ -65,6 +66,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
     }
 
+    if (body.statusCode >= 500) {
+      captureServerError(exception, { requestId, path: request.originalUrl || request.url });
+    }
     response.status(body.statusCode).json(body);
   }
 

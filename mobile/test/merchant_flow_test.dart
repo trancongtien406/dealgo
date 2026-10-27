@@ -4,20 +4,21 @@ import 'package:dealgo/core/network/api_exception.dart';
 import 'package:dealgo/features/identity/domain/entities/user_profile.dart';
 import 'package:dealgo/core/l10n/api_error_text.dart';
 import 'package:dealgo/l10n/app_localizations.dart';
+
 import 'dart:typed_data';
 
 import 'package:dealgo/features/onboarding/presentation/document_image_source.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:dealgo/features/identity/presentation/widgets/auth_widgets.dart';
-
 import 'package:dealgo/features/food/presentation/widgets/store_meta.dart';
 
 import 'package:dealgo/core/realtime/fake_snapshot_realtime.dart';
 import 'package:dealgo/core/realtime/snapshot_realtime.dart';
+
 import 'support/auth_test_harness.dart';
 import 'support/fake_food_client.dart';
+
 import 'package:dealgo/features/places/data/places_remote_datasource.dart';
 import 'package:dealgo/features/places/domain/place.dart';
 
@@ -85,117 +86,134 @@ void main() {
 
     expect(food.queueCalls, isNotEmpty);
     expect(food.queueCalls, everyElement('access-token'));
-    expect(find.textContaining('Chờ Shop xác nhận'), findsWidgets);
+    expect(find.text('Đơn mới'), findsWidgets);
     expect(find.text('456 Trần Hưng Đạo'), findsOneWidget);
     expect(find.textContaining('125.000đ'), findsWidgets);
     expect(find.text('150.000đ'), findsWidgets);
     expect(find.text('Chưa có đơn mới'), findsNothing);
   });
 
-  testWidgets('assigned order shows the handover code from the server (DEC-PROD-036)', (
-    tester,
-  ) async {
-    final food = FakeFoodClient()
-      ..queueOrders = [
-        MerchantQueueOrder(
+  testWidgets(
+    'assigned order shows the handover code from the server (DEC-PROD-036)',
+    (tester) async {
+      final food = FakeFoodClient()
+        ..queueOrders = [
+          MerchantQueueOrder(
+            id: 'order-placed-1',
+            storeId: 'store-1',
+            status: 'ASSIGNED',
+            deliveryFareVnd: 25000,
+            subtotalVnd: 125000,
+            totalVnd: 150000,
+            dropoff: const FoodDropoff(
+              lat: 16.1,
+              lng: 108.22,
+              label: '456 Trần Hưng Đạo',
+            ),
+            lineCount: 3,
+            createdAt: '2026-10-14T02:20:00.000Z',
+            driverName: 'Minh A.',
+          ),
+        ]
+        ..orderDetail = const FoodOrderDetail(
           id: 'order-placed-1',
-          storeId: 'store-1',
           status: 'ASSIGNED',
-          deliveryFareVnd: 25000,
           subtotalVnd: 125000,
+          deliveryFareVnd: 25000,
           totalVnd: 150000,
-          dropoff: const FoodDropoff(lat: 16.1, lng: 108.22, label: '456 Trần Hưng Đạo'),
-          lineCount: 3,
-          createdAt: '2026-10-14T02:20:00.000Z',
-          driverName: 'Minh A.',
-        ),
-      ]
-      ..orderDetail = const FoodOrderDetail(
+          dropoff: FoodDropoff(
+            lat: 16.1,
+            lng: 108.22,
+            label: '456 Trần Hưng Đạo',
+          ),
+          lines: [],
+          handoverCode: '2891',
+        );
+      await _openOrders(tester, food);
+      final card = find.byKey(const Key('merchant-order-order-placed-1'));
+      await tester.ensureVisible(card);
+      await tester.tap(card);
+      await tester.pumpAndSettle();
+      final code = find.byKey(const Key('merchant-handover-code'));
+      await tester.ensureVisible(code);
+      expect(tester.widget<Text>(code).data, '2891');
+      expect(find.text('Bàn giao cho tài xế'), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'a READY order refreshes to ASSIGNED without leaving the screen',
+    (tester) async {
+      const dropoff = FoodDropoff(
+        lat: 16.1,
+        lng: 108.22,
+        label: '456 Trần Hưng Đạo',
+      );
+      FoodOrderDetail detail(String status, {String? code}) => FoodOrderDetail(
         id: 'order-placed-1',
-        status: 'ASSIGNED',
+        status: status,
         subtotalVnd: 125000,
         deliveryFareVnd: 25000,
         totalVnd: 150000,
-        dropoff: FoodDropoff(lat: 16.1, lng: 108.22, label: '456 Trần Hưng Đạo'),
-        lines: [],
-        handoverCode: '2891',
+        dropoff: dropoff,
+        lines: const [],
+        handoverCode: code,
       );
-    await _openOrders(tester, food);
-    final card = find.byKey(const Key('merchant-order-order-placed-1'));
-    await tester.ensureVisible(card);
-    await tester.tap(card);
-    await tester.pumpAndSettle();
-    final code = find.byKey(const Key('merchant-handover-code'));
-    await tester.ensureVisible(code);
-    expect(tester.widget<Text>(code).data, '2891');
-    expect(find.text('Bàn giao cho tài xế'), findsWidgets);
-  });
+      final food = FakeFoodClient()
+        ..queueOrders = [
+          MerchantQueueOrder(
+            id: 'order-placed-1',
+            storeId: 'store-1',
+            status: 'READY',
+            deliveryFareVnd: 25000,
+            subtotalVnd: 125000,
+            totalVnd: 150000,
+            dropoff: dropoff,
+            lineCount: 3,
+            createdAt: '2026-10-14T02:20:00.000Z',
+          ),
+        ]
+        ..orderDetail = detail('READY');
+      await _openOrders(tester, food);
+      final card = find.byKey(const Key('merchant-order-order-placed-1'));
+      await tester.ensureVisible(card);
+      await tester.tap(card);
+      await tester.pumpAndSettle();
+      expect(find.text('Đơn đã sẵn sàng'), findsOneWidget);
+      final readsBefore = food.orderReads.length;
 
-  testWidgets('a READY order refreshes to ASSIGNED without leaving the screen', (
-    tester,
-  ) async {
-    const dropoff = FoodDropoff(lat: 16.1, lng: 108.22, label: '456 Trần Hưng Đạo');
-    FoodOrderDetail detail(String status, {String? code}) => FoodOrderDetail(
-      id: 'order-placed-1',
-      status: status,
-      subtotalVnd: 125000,
-      deliveryFareVnd: 25000,
-      totalVnd: 150000,
-      dropoff: dropoff,
-      lines: const [],
-      handoverCode: code,
-    );
-    final food = FakeFoodClient()
-      ..queueOrders = [
-        MerchantQueueOrder(
-          id: 'order-placed-1',
-          storeId: 'store-1',
-          status: 'READY',
-          deliveryFareVnd: 25000,
-          subtotalVnd: 125000,
-          totalVnd: 150000,
-          dropoff: dropoff,
-          lineCount: 3,
-          createdAt: '2026-10-14T02:20:00.000Z',
-        ),
-      ]
-      ..orderDetail = detail('READY');
-    await _openOrders(tester, food);
-    final card = find.byKey(const Key('merchant-order-order-placed-1'));
-    await tester.ensureVisible(card);
-    await tester.tap(card);
-    await tester.pumpAndSettle();
-    expect(find.text('Đơn đã sẵn sàng'), findsOneWidget);
-    final readsBefore = food.orderReads.length;
+      // Still READY on the next poll: nothing changes.
+      await tester.pump(const Duration(seconds: 10));
+      await tester.pumpAndSettle();
+      expect(food.orderReads.length, readsBefore + 1);
+      expect(find.text('Đơn đã sẵn sàng'), findsOneWidget);
 
-    // Still READY on the next poll: nothing changes.
-    await tester.pump(const Duration(seconds: 10));
-    await tester.pumpAndSettle();
-    expect(food.orderReads.length, readsBefore + 1);
-    expect(find.text('Đơn đã sẵn sàng'), findsOneWidget);
+      // A driver accepts: the next poll flips the screen to ASSIGNED.
+      food.orderDetail = detail('ASSIGNED', code: '4417');
+      await tester.pump(const Duration(seconds: 10));
+      await tester.pumpAndSettle();
+      expect(find.text('Đơn đã sẵn sàng'), findsNothing);
+      expect(find.text('Đã có tài xế'), findsWidgets);
+      final code = find.byKey(const Key('merchant-handover-code'));
+      await tester.ensureVisible(code);
+      expect(tester.widget<Text>(code).data, '4417');
 
-    // A driver accepts: the next poll flips the screen to ASSIGNED.
-    food.orderDetail = detail('ASSIGNED', code: '4417');
-    await tester.pump(const Duration(seconds: 10));
-    await tester.pumpAndSettle();
-    expect(find.text('Đơn đã sẵn sàng'), findsNothing);
-    expect(find.text('Đã có tài xế'), findsWidgets);
-    final code = find.byKey(const Key('merchant-handover-code'));
-    await tester.ensureVisible(code);
-    expect(tester.widget<Text>(code).data, '4417');
-
-    // ASSIGNED is terminal for the poll: no more reads.
-    final readsAfter = food.orderReads.length;
-    await tester.pump(const Duration(seconds: 30));
-    await tester.pumpAndSettle();
-    expect(food.orderReads.length, readsAfter);
-  });
-
+      // ASSIGNED is terminal for the poll: no more reads.
+      final readsAfter = food.orderReads.length;
+      await tester.pump(const Duration(seconds: 30));
+      await tester.pumpAndSettle();
+      expect(food.orderReads.length, readsAfter);
+    },
+  );
 
   testWidgets('store socket hint refreshes READY to ASSIGNED without poll', (
     tester,
   ) async {
-    const dropoff = FoodDropoff(lat: 16.1, lng: 108.22, label: '456 Trần Hưng Đạo');
+    const dropoff = FoodDropoff(
+      lat: 16.1,
+      lng: 108.22,
+      label: '456 Trần Hưng Đạo',
+    );
     FoodOrderDetail detail(String status, {String? code}) => FoodOrderDetail(
       id: 'order-placed-1',
       status: status,
@@ -306,6 +324,32 @@ void main() {
     expect(find.text('Đơn đã được xử lý'), findsNothing);
     expect(find.textContaining('thành công'), findsNothing);
   });
+
+  testWidgets(
+    'list quick action accepts PLACED then marks PREPARING ready without opening',
+    (tester) async {
+      final food = FakeFoodClient()..queueOrders = [_placedOrder()];
+      await _openOrders(tester, food);
+      final accept = find.byKey(
+        const Key('merchant-quick-accept-order-placed-1'),
+      );
+      await tester.ensureVisible(accept);
+      await tester.tap(accept);
+      await tester.pumpAndSettle();
+      expect(food.acceptCalls, ['order-placed-1']);
+      expect(find.byKey(const Key('merchant-accept')), findsNothing);
+      final ready = find.byKey(
+        const Key('merchant-quick-ready-order-placed-1'),
+      );
+      await tester.ensureVisible(ready);
+      await tester.tap(ready);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('merchant-quick-ready-order-placed-1')),
+        findsNothing,
+      );
+    },
+  );
 
   testWidgets('404 shows the conflict message and not success', (tester) async {
     final food = FakeFoodClient()
@@ -533,7 +577,7 @@ void main() {
     expect(resumes, findsOneWidget);
     expect(find.text('Tạm ngưng nhận đơn'), findsWidgets);
 
-    await tester.tap(find.byType(AuthBackButton).first);
+    await tester.tap(find.byKey(const Key('header-back')));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(chip, -200);
     expect(
@@ -578,60 +622,73 @@ void main() {
     expect(legacy.schedule.hoursConfigured, isFalse);
   });
 
-  testWidgets('M030 store profile: renames the store and manages the logo (DEC-PROD-045)', (
-    tester,
-  ) async {
-    final food = FakeFoodClient()
-      ..details = {
-        'store-bun-bo': const FoodStoreDetail(
-          id: 'store-bun-bo',
-          name: 'Bún Bò Huế O Cò',
-          items: [],
+  testWidgets(
+    'M030 store profile: renames the store and manages the logo (DEC-PROD-045)',
+    (tester) async {
+      final food = FakeFoodClient()
+        ..details = {
+          'store-bun-bo': const FoodStoreDetail(
+            id: 'store-bun-bo',
+            name: 'Bún Bò Huế O Cò',
+            items: [],
+          ),
+        };
+      await pumpSignedIn(
+        tester,
+        profile: _merchantProfile,
+        foodClient: food,
+        documentImageSource: FakeDocumentImageSource(
+          nextImage: PickedDocumentImage(
+            bytes: Uint8List.fromList(List<int>.filled(64, 1)),
+            contentType: 'image/png',
+          ),
         ),
-      };
-    await pumpSignedIn(
-      tester,
-      profile: _merchantProfile,
-      foodClient: food,
-      documentImageSource: FakeDocumentImageSource(
-        nextImage: PickedDocumentImage(
-          bytes: Uint8List.fromList(List<int>.filled(64, 1)),
-          contentType: 'image/png',
-        ),
-      ),
-      initialLocation: '/merchant',
-    );
-    await tester.tap(find.text('Tài khoản').last);
-    await tester.pumpAndSettle();
-    final row = find.byKey(const Key('account-store-profile'));
-    await tester.scrollUntilVisible(row, 200);
-    await tester.pumpAndSettle();
-    await tester.tap(row);
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('merchant-profile-logo-empty')), findsOneWidget);
-    final name = find.byKey(const Key('merchant-profile-name'));
-    expect(tester.widget<TextField>(name).controller!.text, 'Bún Bò Huế O Cò');
+        initialLocation: '/merchant',
+      );
+      await tester.tap(navLabel('Tôi'));
+      await tester.pumpAndSettle();
+      final row = find.byKey(const Key('account-store-profile'));
+      await tester.scrollUntilVisible(row, 200);
+      await tester.pumpAndSettle();
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('merchant-profile-logo-empty')),
+        findsOneWidget,
+      );
+      final name = find.byKey(const Key('merchant-profile-name'));
+      expect(
+        tester.widget<TextFormField>(name).controller!.text,
+        'Bún Bò Huế O Cò',
+      );
 
-    await tester.enterText(name, 'x');
-    await tester.pump();
-    expect(find.text('Tên quán cần từ 2 đến 120 ký tự.'), findsOneWidget);
-    await tester.enterText(name, '  Bún Bò   Cô Ba  ');
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('merchant-profile-save')));
-    await tester.pumpAndSettle();
-    expect(food.storeProfileCalls, ['Bún Bò Cô Ba']);
-    expect(find.text('Đã lưu tên quán.'), findsOneWidget);
+      await tester.enterText(name, 'x');
+      await tester.pump();
+      expect(find.text('Tên quán cần từ 2 đến 120 ký tự.'), findsOneWidget);
+      await tester.enterText(name, '  Bún Bò   Cô Ba  ');
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('merchant-profile-save')));
+      await tester.pumpAndSettle();
+      expect(food.storeProfileCalls, ['Bún Bò Cô Ba']);
+      expect(find.text('Đã lưu tên quán.'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('merchant-profile-logo-pick')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('merchant-profile-logo')), findsOneWidget);
-    expect(find.text('Đã cập nhật logo.'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('merchant-profile-logo-pick')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('merchant-profile-logo')), findsOneWidget);
+      expect(find.text('Đã cập nhật logo.'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('merchant-profile-logo-remove')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('merchant-profile-logo-empty')), findsOneWidget);
-    expect(find.byKey(const Key('merchant-profile-logo-remove')), findsNothing);
-  });
+      await tester.tap(find.byKey(const Key('merchant-profile-logo-remove')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('merchant-profile-logo-empty')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('merchant-profile-logo-remove')),
+        findsNothing,
+      );
+    },
+  );
 
   test('store detail decodes the M030 logo path', () {
     final store = decodeFoodStoreDetail({
@@ -647,57 +704,58 @@ void main() {
     expect(store.copyWith(clearLogoUrl: true).logoUrl, isNull);
   });
 
-  testWidgets('M030 store location: warns when unset, picks and saves (DEC-PROD-044)', (
-    tester,
-  ) async {
-    final food = FakeFoodClient()
-      ..queueOrders = [_placedOrder()]
-      ..details = {
-        'store-bun-bo': const FoodStoreDetail(
-          id: 'store-bun-bo',
-          name: 'Bún Bò Huế O Cò',
-          items: [],
-        ),
-      };
-    await pumpSignedIn(
-      tester,
-      profile: _merchantProfile,
-      foodClient: food,
-      places: FakePlacesRemoteDataSource(
-        recent: const [
-          PlaceOption(
-            name: 'Chợ Hàn',
-            address: '119 Trần Phú, Hải Châu, Đà Nẵng',
-            lat: 16.068,
-            lng: 108.2235,
-            source: PlaceSource.recent,
+  testWidgets(
+    'M030 store location: warns when unset, picks and saves (DEC-PROD-044)',
+    (tester) async {
+      final food = FakeFoodClient()
+        ..queueOrders = [_placedOrder()]
+        ..details = {
+          'store-bun-bo': const FoodStoreDetail(
+            id: 'store-bun-bo',
+            name: 'Bún Bò Huế O Cò',
+            items: [],
           ),
-        ],
-      ),
-      initialLocation: '/merchant',
-    );
-    final link = find.byKey(const Key('merchant-open-location'));
-    await tester.scrollUntilVisible(link, 200);
-    await Scrollable.ensureVisible(tester.element(link), alignment: 0.5);
-    await tester.pumpAndSettle();
-    await tester.tap(link);
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('merchant-location-unset')), findsOneWidget);
+        };
+      await pumpSignedIn(
+        tester,
+        profile: _merchantProfile,
+        foodClient: food,
+        places: FakePlacesRemoteDataSource(
+          recent: const [
+            PlaceOption(
+              name: 'Chợ Hàn',
+              address: '119 Trần Phú, Hải Châu, Đà Nẵng',
+              lat: 16.068,
+              lng: 108.2235,
+              source: PlaceSource.recent,
+            ),
+          ],
+        ),
+        initialLocation: '/merchant',
+      );
+      final link = find.byKey(const Key('merchant-open-location'));
+      await tester.scrollUntilVisible(link, 200);
+      await Scrollable.ensureVisible(tester.element(link), alignment: 0.5);
+      await tester.pumpAndSettle();
+      await tester.tap(link);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('merchant-location-unset')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('merchant-location-pick')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Chợ Hàn').first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('merchant-location-save')));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('merchant-location-pick')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Chợ Hàn').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('merchant-location-save')));
+      await tester.pumpAndSettle();
 
-    final saved = food.storeLocationCalls.single;
-    expect(saved.$1, 16.068);
-    expect(saved.$2, 108.2235);
-    expect(saved.$3, 'Chợ Hàn, 119 Trần Phú, Hải Châu, Đà Nẵng');
-    expect(find.byKey(const Key('merchant-location-saved')), findsOneWidget);
-    expect(find.byKey(const Key('merchant-location-unset')), findsNothing);
-  });
+      final saved = food.storeLocationCalls.single;
+      expect(saved.$1, 16.068);
+      expect(saved.$2, 108.2235);
+      expect(saved.$3, 'Chợ Hàn, 119 Trần Phú, Hải Châu, Đà Nẵng');
+      expect(find.byKey(const Key('merchant-location-saved')), findsOneWidget);
+      expect(find.byKey(const Key('merchant-location-unset')), findsNothing);
+    },
+  );
 
   test('store detail decodes the pickup point (M030)', () {
     final store = decodeFoodStoreDetail({
@@ -929,50 +987,56 @@ void main() {
     expect(food.storeBusyExtraCalls.single, 30);
   });
 
-  testWidgets('M023 keeps an overnight shift and marks it next day (DEC-PROD-029)', (
-    tester,
-  ) async {
-    const night = StoreDayHours(weekday: 5, opensAt: '18:00', closesAt: '02:00');
-    expect(night.overnight, isTrue);
-    expect(
-      const StoreDayHours(weekday: 6, opensAt: '10:00', closesAt: '24:00').overnight,
-      isFalse,
-    );
-    final food = FakeFoodClient()
-      ..queueOrders = [_placedOrder()]
-      ..details = {
-        'store-bun-bo': const FoodStoreDetail(
-          id: 'store-bun-bo',
-          name: 'Bún Bò Huế O Cò',
-          items: [],
-          schedule: StoreSchedule(
-            hoursConfigured: true,
-            weekly: [night],
+  testWidgets(
+    'M023 keeps an overnight shift and marks it next day (DEC-PROD-029)',
+    (tester) async {
+      const night = StoreDayHours(
+        weekday: 5,
+        opensAt: '18:00',
+        closesAt: '02:00',
+      );
+      expect(night.overnight, isTrue);
+      expect(
+        const StoreDayHours(
+          weekday: 6,
+          opensAt: '10:00',
+          closesAt: '24:00',
+        ).overnight,
+        isFalse,
+      );
+      final food = FakeFoodClient()
+        ..queueOrders = [_placedOrder()]
+        ..details = {
+          'store-bun-bo': const FoodStoreDetail(
+            id: 'store-bun-bo',
+            name: 'Bún Bò Huế O Cò',
+            items: [],
+            schedule: StoreSchedule(hoursConfigured: true, weekly: [night]),
           ),
-        ),
-      };
-    await pumpSignedIn(
-      tester,
-      profile: _merchantProfile,
-      foodClient: food,
-      initialLocation: '/merchant',
-    );
-    final link = find.byKey(const Key('merchant-open-hours'));
-    await tester.scrollUntilVisible(link, 200);
-    await Scrollable.ensureVisible(tester.element(link), alignment: 0.5);
-    await tester.pumpAndSettle();
-    await tester.tap(link);
-    await tester.pumpAndSettle();
-    final marker = find.byKey(const Key('merchant-hours-overnight-5'));
-    await tester.scrollUntilVisible(marker, 100);
-    expect(tester.widget<Text>(marker).data, 'hôm sau');
-    await tester.tap(find.byKey(const Key('merchant-hours-save')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('merchant-hours-error')), findsNothing);
-    final saved = food.storeHoursCalls.single;
-    expect(saved.weekly.single.opensAt, '18:00');
-    expect(saved.weekly.single.closesAt, '02:00');
-  });
+        };
+      await pumpSignedIn(
+        tester,
+        profile: _merchantProfile,
+        foodClient: food,
+        initialLocation: '/merchant',
+      );
+      final link = find.byKey(const Key('merchant-open-hours'));
+      await tester.scrollUntilVisible(link, 200);
+      await Scrollable.ensureVisible(tester.element(link), alignment: 0.5);
+      await tester.pumpAndSettle();
+      await tester.tap(link);
+      await tester.pumpAndSettle();
+      final marker = find.byKey(const Key('merchant-hours-overnight-5'));
+      await tester.scrollUntilVisible(marker, 100);
+      expect(tester.widget<Text>(marker).data, 'hôm sau');
+      await tester.tap(find.byKey(const Key('merchant-hours-save')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('merchant-hours-error')), findsNothing);
+      final saved = food.storeHoursCalls.single;
+      expect(saved.weekly.single.opensAt, '18:00');
+      expect(saved.weekly.single.closesAt, '02:00');
+    },
+  );
 
   testWidgets('store lists label closed and paused stores', (tester) async {
     await tester.pumpWidget(
@@ -998,7 +1062,9 @@ void main() {
                   closedReason: StoreClosedReason.paused,
                 ),
               ),
-              StoreMetaLine(store: FoodStoreSummary(id: 's3', name: 'C')),
+              StoreMetaLine(
+                store: FoodStoreSummary(id: 's3', name: 'C'),
+              ),
             ],
           ),
         ),

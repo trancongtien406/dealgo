@@ -4,10 +4,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/maps/map_lat_lng.dart';
+import '../../../../core/maps/map_markers.dart';
 import '../../../../core/maps/map_port.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_models.dart';
+import '../../../live_location/domain/driver_location.dart';
+import '../../../live_location/presentation/server_phase_route.dart';
 import '../../../food/domain/entities/food_money.dart';
 import '../../../food/domain/params/food_delivery_action.dart';
 import '../../domain/usecases/advance_food_delivery.dart';
@@ -19,32 +22,45 @@ import '../cubit/driver_food_cubit.dart';
 import '../utils/driver_routes.dart';
 import '../widgets/driver_navigate_buttons.dart';
 import '../widgets/driver_food_code_sheet.dart';
+import '../../../ride/presentation/widgets/ride_negotiation_ui.dart';
 import '../widgets/driver_widgets.dart';
+import '../../../../core/design_system/components/handover_ref_badge.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/format/short_ref.dart';
 import '../../../../core/l10n/api_error_text.dart';
+import '../widgets/driver_contact_actions.dart';
+import '../widgets/job_customer_name.dart';
 
 enum _FoodPhase { offer, navigate, wait, pickup, deliver, complete }
 
+/// Phase to reopen a claimed delivery on (relaunch / deep link).
+_FoodPhase _resumePhase(String status) =>
+    status == 'PICKED_UP' ? _FoodPhase.deliver : _FoodPhase.navigate;
+
 class DriverFoodDetailPage extends StatelessWidget {
-  const DriverFoodDetailPage({required this.job, super.key});
+  const DriverFoodDetailPage({required this.job, this.resumed, super.key});
 
   final ReadyFoodJob job;
+
+  /// Set when the driver already holds this order (ASSIGNED / PICKED_UP):
+  /// the page opens straight on the delivery lifecycle.
+  final ClaimedFoodDelivery? resumed;
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (context) =>
           DriverFoodCubit(claimFoodOrder: context.read<ClaimFoodOrder>()),
-      child: _DriverFoodDetailView(job: job),
+      child: _DriverFoodDetailView(job: job, resumed: resumed),
     );
   }
 }
 
 class _DriverFoodDetailView extends StatefulWidget {
-  const _DriverFoodDetailView({required this.job});
+  const _DriverFoodDetailView({required this.job, this.resumed});
 
   final ReadyFoodJob job;
+  final ClaimedFoodDelivery? resumed;
 
   @override
   State<_DriverFoodDetailView> createState() => _DriverFoodDetailPageState();
@@ -57,6 +73,22 @@ class _DriverFoodDetailPageState extends State<_DriverFoodDetailView>
   var _phase = _FoodPhase.offer;
   String? _error;
   ClaimedFoodDelivery? _claimed;
+
+  @override
+  void initState() {
+    super.initState();
+    final resumed = widget.resumed;
+    if (resumed != null) {
+      _claimed = resumed;
+      _phase = _resumePhase(resumed.status);
+      // Back on duty so presence + DriverLocationReporter keep streaming GPS.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ensureDriverOnDuty(context);
+        }
+      });
+    }
+  }
 
   Future<void> _claim() async {
     if (_claiming || _taken || _claimed != null) {
@@ -154,7 +186,12 @@ class _DriverFoodDetailPageState extends State<_DriverFoodDetailView>
       final prompt = codePrompt;
       if (prompt == null) {
         if (ok) {
-          setState(() => _phase = next);
+          // After pickup go straight to "deliver": no extra "arrived at
+          // customer" tap; the delivery code is still asked on complete.
+          setState(
+            () =>
+                _phase = next == _FoodPhase.pickup ? _FoodPhase.deliver : next,
+          );
         }
         return;
       }
@@ -236,6 +273,8 @@ class _DriverFoodDetailPageState extends State<_DriverFoodDetailView>
                           ),
                         ),
                       ),
+                      HandoverRefBadge(orderId: job.id, dense: true),
+                      const SizedBox(width: DealGoSpacing.s8),
                       DriverChip(
                         label: l10n.driverItemsCount(job.lineCount),
                         tone: DriverChipTone.neutral,
@@ -324,6 +363,44 @@ class _DriverFoodDetailPageState extends State<_DriverFoodDetailView>
   }
 }
 
+/// Hand a claimed order back before pickup; it returns to the pool.
+Future<void> releaseClaimedFoodOrder(
+  BuildContext context,
+  String orderId,
+) async {
+  final client = maybeRideNegotiation(context);
+  final token = driverAccessToken(context);
+  if (client == null || token == null || token.isEmpty) {
+    return;
+  }
+  final l10n = AppLocalizations.of(context);
+  final reason = await showReasonSheet(
+    context: context,
+    title: l10n.driverFoodReleaseTitle,
+    hint: l10n.driverFoodReleaseHint,
+    reasons: foodReleaseReasons(l10n),
+  );
+  if (reason == null || !context.mounted) {
+    return;
+  }
+  try {
+    await client.releaseFoodOrder(
+      accessToken: token,
+      orderId: orderId,
+      reason: reason,
+    );
+    if (!context.mounted) {
+      return;
+    }
+    showNegotiationSnack(context, l10n.driverFoodReleaseDone);
+    context.go('/driver/jobs');
+  } catch (error) {
+    if (context.mounted) {
+      showNegotiationSnack(context, negotiationErrorText(context, error));
+    }
+  }
+}
+
 class _FoodLifecycle extends StatelessWidget {
   const _FoodLifecycle({
     required this.job,
@@ -355,21 +432,36 @@ class _FoodLifecycle extends StatelessWidget {
       _FoodPhase.complete => l10n.driverFoodPhaseCompleteTitle,
       _FoodPhase.offer => l10n.driverFoodRequestTitle,
     };
+    final canRelease = maybeRideNegotiation(context) != null;
     final footer = switch (phase) {
       _FoodPhase.navigate => DriverFooter(
-        secondaryLabel: l10n.driverActiveReportIssue,
-        primaryLabel: l10n.driverFoodArrivedStore,
-        primaryKey: const Key('driver-arrived-pickup'),
-        onSecondary: () => context.push(DriverRoutes.failed(job.id)),
-        onPrimary: () => onPhase(_FoodPhase.wait),
-      ),
-      _FoodPhase.wait => DriverFooter(
-        secondaryLabel: l10n.driverActiveReportIssue,
+        secondaryLabel: canRelease
+            ? l10n.driverFoodRelease
+            : l10n.driverActiveReportIssue,
+        secondaryKey: canRelease ? const Key('driver-food-release') : null,
+        // Fewer taps: one button at the store both confirms arrival and the
+        // pickup (handover code still enforced by the server).
         primaryLabel: l10n.driverFoodConfirmPickup,
         primaryKey: const Key('driver-food-pickup'),
         primaryLoading: busy,
         primaryEnabled: !busy,
-        onSecondary: () => context.push(DriverRoutes.failed(job.id)),
+        onSecondary: canRelease
+            ? () => releaseClaimedFoodOrder(context, job.id)
+            : () => context.push(DriverRoutes.failed(job.id)),
+        onPrimary: () => onPhase(_FoodPhase.pickup),
+      ),
+      _FoodPhase.wait => DriverFooter(
+        secondaryLabel: canRelease
+            ? l10n.driverFoodRelease
+            : l10n.driverActiveReportIssue,
+        secondaryKey: canRelease ? const Key('driver-food-release') : null,
+        primaryLabel: l10n.driverFoodConfirmPickup,
+        primaryKey: const Key('driver-food-pickup'),
+        primaryLoading: busy,
+        primaryEnabled: !busy,
+        onSecondary: canRelease
+            ? () => releaseClaimedFoodOrder(context, job.id)
+            : () => context.push(DriverRoutes.failed(job.id)),
         onPrimary: () => onPhase(_FoodPhase.pickup),
       ),
       _FoodPhase.pickup => DriverFooter(
@@ -385,7 +477,8 @@ class _FoodLifecycle extends StatelessWidget {
         primaryKey: const Key('driver-food-complete'),
         primaryLoading: busy,
         primaryEnabled: !busy,
-        onSecondary: () => context.push(DriverRoutes.failed(job.id)),
+        onSecondary: () =>
+            context.push(DriverRoutes.failed(job.id, food: true)),
         onPrimary: () => onPhase(_FoodPhase.complete),
       ),
       _FoodPhase.complete => DriverFooter(
@@ -449,8 +542,11 @@ class _FoodLifecycle extends StatelessWidget {
                             phase == _FoodPhase.deliver
                                 ? l10n.driverHeadToCustomer
                                 : l10n.driverHeadToStore,
-                            style: textTheme.titleMedium?.copyWith(
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.titleSmall?.copyWith(
                               color: Colors.white,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                           Text(
@@ -461,6 +557,8 @@ class _FoodLifecycle extends StatelessWidget {
                                     if (job.pickup?.label.isNotEmpty == true)
                                       job.pickup!.label,
                                   }.join(' · '),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: textTheme.bodySmall?.copyWith(
                               color: Colors.white70,
                             ),
@@ -476,6 +574,28 @@ class _FoodLifecycle extends StatelessWidget {
                 job: job,
                 focusDropoff: phase == _FoodPhase.deliver,
                 showNavigate: true,
+              ),
+              const SizedBox(height: DealGoSpacing.s12),
+            ],
+            if (phase == _FoodPhase.navigate ||
+                phase == _FoodPhase.wait ||
+                phase == _FoodPhase.pickup) ...[
+              Center(child: HandoverRefBadge(orderId: job.id)),
+              const SizedBox(height: DealGoSpacing.s12),
+            ],
+            // Same contact row as a ride: the customer may chat / call about the order.
+            if (phase != _FoodPhase.offer && phase != _FoodPhase.complete) ...[
+              DriverPanel(
+                child: Row(
+                  children: [
+                    const Icon(DealGoIcons.user, color: DealGoColors.primary),
+                    const SizedBox(width: DealGoSpacing.s12),
+                    Expanded(
+                      child: JobCustomerName(jobId: job.id, isFood: true),
+                    ),
+                    DriverContactActions(resourceId: job.id, isFood: true),
+                  ],
+                ),
               ),
               const SizedBox(height: DealGoSpacing.s12),
             ],
@@ -641,15 +761,37 @@ class DriverFoodJobMap extends StatelessWidget {
           borderRadius: BorderRadius.circular(DealGoRadius.card),
           child: SizedBox(
             height: 180,
-            child: context.read<MapPort>().buildMap(
-              center: center,
-              markers: [?store, dropoff],
+            // Road path from Nest (DEC-PROD-045); none → markers only.
+            // After claim: server phase leg (DEC-PROD-031 rev 3, DRAFT).
+            child: ServerPhaseRoute(
+              job: TrackedJob.food,
+              id: job.id,
+              active: showNavigate,
+              approach: showNavigate && !focusDropoff,
+              trip: job.route,
+              approachSeed: job.approachRoute,
+              builder: (context, route) => context.read<MapPort>().buildMap(
+                // Pins are bottom-anchored (~44 px tall): extra top room so they
+                // never touch the card edge on the small inline map.
+                fitPadding: const EdgeInsets.fromLTRB(36, 56, 36, 28),
+                center: center,
+                markers: [?store, dropoff],
+                route: route,
+                stopStyle: MapStopStyle.food,
+                firstMarkerIsPickup: store != null,
+              ),
             ),
           ),
         ),
         if (showNavigate && target != null) ...[
           const SizedBox(height: DealGoSpacing.s8),
-          DriverNavigateButtons(lat: target.lat, lng: target.lng),
+          DriverNavigateButtons(
+            lat: target.lat,
+            lng: target.lng,
+            destinationLabel: focusDropoff
+                ? AppLocalizations.of(context).driverNavToCustomer
+                : AppLocalizations.of(context).driverNavToStore,
+          ),
         ],
         if (store == null) ...[
           const SizedBox(height: DealGoSpacing.s8),

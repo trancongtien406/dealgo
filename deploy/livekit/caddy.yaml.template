@@ -1,0 +1,47 @@
+# Caddy (with the layer4 plugin) on :443. Routes by TLS SNI:
+#   __TURN_DOMAIN__     -> TURN/TLS, TLS ends here, plain TCP to LiveKit :5349
+#   __LIVEKIT_DOMAIN__  -> signalling wss:// and HTTP API, plain to LiveKit :7880
+# Port 80 must be open so the ACME HTTP challenge can get the certificates.
+logging:
+  logs:
+    default:
+      level: INFO
+storage:
+  module: file_system
+  root: /data
+apps:
+  tls:
+    certificates:
+      automate:
+        - __LIVEKIT_DOMAIN__
+        - __TURN_DOMAIN__
+    automation:
+      policies:
+        - issuers:
+            - module: acme
+              email: __ACME_EMAIL__
+  layer4:
+    servers:
+      main:
+        listen: [":443"]
+        routes:
+          - match:
+              - tls:
+                  sni:
+                    - __TURN_DOMAIN__
+            handle:
+              - handler: tls
+              - handler: proxy
+                upstreams:
+                  - dial: ["localhost:5349"]
+          - match:
+              - tls:
+                  sni:
+                    - __LIVEKIT_DOMAIN__
+            handle:
+              - handler: tls
+                connection_policies:
+                  - alpn: ["http/1.1"]
+              - handler: proxy
+                upstreams:
+                  - dial: ["localhost:7880"]

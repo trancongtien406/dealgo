@@ -33,6 +33,26 @@ class DioDriverCardRemoteDataSource implements DriverCardRepository {
       throw apiExceptionFromDio(error);
     }
   }
+
+  @override
+  Future<String> fetchCustomerName({
+    required String accessToken,
+    required String jobId,
+    bool isFood = false,
+  }) async {
+    try {
+      final response = await dio.get<Object?>(
+        isFood
+            ? ApiPaths.foodOrderCustomer(jobId)
+            : ApiPaths.rideCustomer(jobId),
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      );
+      final name = requireSuccessData(response.data)['displayName'];
+      return name is String ? name.trim() : '';
+    } on DioException catch (error) {
+      throw apiExceptionFromDio(error);
+    }
+  }
 }
 
 DriverCard decodeDriverCard(Map<String, Object?> data) {
@@ -62,9 +82,10 @@ DriverCard decodeDriverCard(Map<String, Object?> data) {
 
 /// Test/mock source. Without [card] it behaves like a job with no driver yet.
 class FakeDriverCardRemoteDataSource implements DriverCardRepository {
-  FakeDriverCardRemoteDataSource({this.card});
+  FakeDriverCardRemoteDataSource({this.card, this.customerName = ''});
 
   DriverCard? card;
+  String customerName;
   final calls = <({DriverCardJob job, String jobId})>[];
 
   /// Per-driver cards for offer lists, keyed by offer id.
@@ -88,4 +109,11 @@ class FakeDriverCardRemoteDataSource implements DriverCardRepository {
     }
     return value;
   }
+
+  @override
+  Future<String> fetchCustomerName({
+    required String accessToken,
+    required String jobId,
+    bool isFood = false,
+  }) async => customerName;
 }

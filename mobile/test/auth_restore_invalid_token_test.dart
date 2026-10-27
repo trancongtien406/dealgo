@@ -21,7 +21,7 @@ void main() {
 
     late final AuthCubit auth;
     final dio = createDealGoDio(
-      baseUrl: 'http://api.test',
+      baseUrl: 'https://api.test',
       tokenStore: store,
       onSessionRefreshed: (next) => auth.applyRefreshedTokens(next),
       onUnauthorized: () => auth.signOut(),

@@ -19,6 +19,7 @@ import {
   AdminListErrorBanner,
 } from "@/components/ui/admin-state-ui";
 import { AdminHeaderDateFilter } from "@/components/ui/admin-header-date-filter";
+import type { DateRangeValue } from "@/components/ui/date-picker";
 import { SettlementLinesTable } from "@/features/settlements/components/settlement-lines-table";
 import { settlementSteps } from "@/features/settlements/constants";
 import { useSettlementLinesQuery } from "@/features/settlements/hooks";
@@ -27,7 +28,9 @@ import { isForbiddenError } from "@/lib/api/errors";
 
 export function SettlementsBoard() {
   const [activeTab, setActiveTab] = useState("Bút toán");
-  const linesQuery = useSettlementLinesQuery(1, 50);
+  // Settlement period: batches whose business day falls inside [from, to] (server-side).
+  const [period, setPeriod] = useState<DateRangeValue>({ from: null, to: null });
+  const linesQuery = useSettlementLinesQuery(1, 50, period);
   const forbidden = linesQuery.isError && isForbiddenError(linesQuery.error);
   const lines = useMemo(
     () => linesQuery.data?.items ?? [],
@@ -119,7 +122,9 @@ export function SettlementsBoard() {
             </div>
             <div className="flex flex-wrap gap-2">
               <AdminHeaderDateFilter
-                defaultPreset="this_month"
+                value={period}
+                onChange={setPeriod}
+                defaultPreset="all"
                 labelPrefix="Kỳ đối soát"
               />
               <ExportCsvButton

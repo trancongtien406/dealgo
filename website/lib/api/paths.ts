@@ -1,8 +1,14 @@
 export const apiPaths = {
   opsSession: () => "/api/ops/session",
   opsOverview: () => "/api/ops/overview",
+  opsReports: () => "/api/ops/reports",
   opsMonitor: () => "/api/ops/monitor",
   opsRides: () => "/api/ops/rides",
+  opsChatReview: () => "/api/ops/chat-review",
+  opsPublicPages: () => "/api/ops/public-pages",
+  opsPublicPage: (slug: string, locale: string) =>
+    `/api/ops/public-pages/${encodeURIComponent(slug)}/${encodeURIComponent(locale)}`,
+
   opsRide: (id: string) => `/api/ops/rides/${encodeURIComponent(id)}`,
   opsRideLedger: (id: string) =>
     `/api/ops/rides/${encodeURIComponent(id)}/ledger`,
@@ -35,6 +41,10 @@ export const apiPaths = {
   opsDriver: (id: string) => `/api/ops/drivers/${encodeURIComponent(id)}`,
   opsStores: () => "/api/ops/stores",
   opsStore: (id: string) => `/api/ops/stores/${encodeURIComponent(id)}`,
+  opsStoreStatement: (id: string) =>
+    `/api/ops/food-stores/${encodeURIComponent(id)}/statement`,
+  opsStoreSettlements: (id: string) =>
+    `/api/ops/food-stores/${encodeURIComponent(id)}/settlements`,
   opsCatalogModeration: () => "/api/ops/catalog/moderation",
   opsCatalogItemApprove: (id: string) =>
     `/api/ops/catalog/items/${encodeURIComponent(id)}/approve`,
@@ -56,6 +66,18 @@ export const apiPaths = {
   opsAuthMethods: () => "/api/ops/auth-methods",
   opsAuthMethod: (method: string) =>
     `/api/ops/auth-methods/${encodeURIComponent(method)}`,
+  opsHomeBanners: () => "/api/ops/home-banners",
+  opsHomeBanner: (id: string) =>
+    `/api/ops/home-banners/${encodeURIComponent(id)}`,
+  opsHomeBannerImage: (id: string) =>
+    `/api/ops/home-banners/${encodeURIComponent(id)}/image`,
+  opsHomeBannersReorder: () => "/api/ops/home-banners/reorder",
+  opsRideVehicleClasses: () => "/api/ops/ride-vehicle-classes",
+  opsRideVehicleClass: (code: string) =>
+    `/api/ops/ride-vehicle-classes/${encodeURIComponent(code)}`,
+  opsRideVehicleClassImage: (code: string) =>
+    `/api/ops/ride-vehicle-classes/${encodeURIComponent(code)}/image`,
+  opsMapsProviders: () => "/api/ops/maps-providers",
   opsPlatformSettings: () => "/api/ops/platform-settings",
   opsPlatformSetting: (key: string) =>
     `/api/ops/platform-settings/${encodeURIComponent(key)}`,
@@ -79,6 +101,10 @@ export const apiPaths = {
     `/api/ops/users/${encodeURIComponent(id)}/account-deletion/cancel`,
   opsUserFeeBalance: (id: string) =>
     `/api/ops/users/${encodeURIComponent(id)}/fee-balance`,
+  opsUserDriverBalance: (id: string) =>
+    `/api/ops/users/${encodeURIComponent(id)}/driver-balance`,
+  opsUserDriverPayment: (id: string) =>
+    `/api/ops/users/${encodeURIComponent(id)}/driver-payments`,
   opsUserFeeSettlement: (id: string) =>
     `/api/ops/users/${encodeURIComponent(id)}/fee-settlements`,
   opsZones: () => "/api/ops/zones",

@@ -43,6 +43,7 @@ export function useKycQueueQuery() {
   const [filters] = useKycListFilters();
   const params = {
     status: filters.status,
+    role: "DRIVER" as const,
     q: filters.q,
     page: filters.page,
     limit: filters.limit,
@@ -64,7 +65,8 @@ export function useKycCaseQuery(code: string) {
 export function useApproveKycMutation(code: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => approveKycApplication(code),
+    mutationFn: (vehicleClassCode?: string) =>
+      approveKycApplication(code, vehicleClassCode),
     onSuccess: (updated) => {
       queryClient.setQueryData(kycQueryKeys.detail(code), updated);
       void queryClient.invalidateQueries({ queryKey: kycQueryKeys.all });

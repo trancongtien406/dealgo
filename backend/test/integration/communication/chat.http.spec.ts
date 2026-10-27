@@ -21,6 +21,8 @@ import { MemoryPartnerRepository } from '../../../src/modules/partner/partner.re
 import { RIDE_CLOCK, RIDE_REPOSITORY, type RideClock } from '../../../src/modules/ride/ride.constants.js';
 import { RideModule } from '../../../src/modules/ride/ride.module.js';
 import { MemoryRideRepository } from '../../../src/modules/ride/ride.repository.js';
+import { PLATFORM_SETTINGS_REPOSITORY } from '../../../src/platform/settings/platform-settings.constants.js';
+import { negotiationMechanicsSettings } from '../../support/settings-fixture.js';
 import { ChatModule } from '../../../src/modules/communication/chat/chat.module.js';
 import { CHAT_REPOSITORY } from '../../../src/modules/communication/chat/chat.constants.js';
 import { MemoryChatRepository } from '../../../src/modules/communication/chat/chat.repository.js';
@@ -71,6 +73,8 @@ describe('transaction chat http', () => {
     })
       .overrideProvider(SMS_SENDER)
       .useValue(sms)
+      .overrideProvider(PLATFORM_SETTINGS_REPOSITORY)
+      .useValue(await negotiationMechanicsSettings())
       .overrideProvider(IDENTITY_REPOSITORY)
       .useValue(identity)
       .overrideProvider(RIDE_REPOSITORY)
@@ -123,7 +127,7 @@ describe('transaction chat http', () => {
       .post('/v1/rides')
       .set('Authorization', `Bearer ${customer.token}`)
       .set('Idempotency-Key', 'chat-ride-1')
-      .send({ pickup, dropoff, offeredFareVnd: 30_000 })
+      .send({ pickup, dropoff, offeredFareVnd: 30_000, vehicleClassCode: 'MOTORBIKE'})
       .expect(200);
     const rideId = created.body.data.id as string;
 

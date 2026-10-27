@@ -1,4 +1,6 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { SmsDeliveryError } from '../../integrations/sms/sms-errors.js';
+import { AppReviewLoginService } from './app-review-login.service.js';
 import { ConfigService } from '@nestjs/config';
 import type { AppEnv } from '../../platform/config/env.js';
 import { authError } from './auth-error.js';
@@ -13,12 +15,15 @@ import { accessSecret, fixedEqual, hashOneTimeSecret, randomOtpCode } from '../.
 
 @Injectable()
 export class PhoneAuthService {
+  private readonly logger = new Logger(PhoneAuthService.name);
+
   constructor(
     @Inject(IDENTITY_REPOSITORY) private readonly repository: IdentityRepository,
     @Inject(SMS_SENDER) private readonly sms: SmsSender,
     private readonly sessions: SessionService,
     private readonly config: ConfigService<AppEnv, true>,
     private readonly authMethods: AuthMethodPolicyService,
+    @Optional() private readonly review?: AppReviewLoginService,
   ) {}
 
   async createChallenge(rawPhone: string): Promise<{ challengeId: string; expiresAt: string }> {
@@ -30,7 +35,8 @@ export class PhoneAuthService {
 
     // Unknown phones get no user row until the OTP proves ownership (see verify).
     const existing = await this.repository.findUserByPhone(phone);
-    const code = randomOtpCode();
+    const reviewCode = (await this.review?.fixedCodeFor('phone', phone)) ?? null;
+    const code = reviewCode ?? randomOtpCode();
     const expiresAt = new Date(Date.now() + PHONE_CHALLENGE_TTL_MS);
     const challenge = await this.repository.createPhoneChallenge({
       userId: existing?.id ?? null,
@@ -38,8 +44,28 @@ export class PhoneAuthService {
       codeHash: hashOneTimeSecret(code, this.pepper()),
       expiresAt,
     });
-    await this.sms.sendOtp(phone, code);
+    if (!reviewCode) {
+      await this.sendOtp(phone, code);
+    }
     return { challengeId: challenge.id, expiresAt: expiresAt.toISOString() };
+  }
+
+  private async sendOtp(phone: string, code: string): Promise<void> {
+    try {
+      await this.sms.sendOtp(phone, code);
+    } catch (error) {
+      if (!(error instanceof SmsDeliveryError)) {
+        throw error;
+      }
+      this.logger.warn(error.message);
+      if (error.reason === 'invalid_phone') {
+        throw authError(400, 'VALIDATION_ERROR', 'Phone number cannot receive SMS');
+      }
+      if (error.reason === 'rate_limited') {
+        throw authError(429, 'AUTH_OTP_RATE_LIMITED', 'Too many verification codes for this phone');
+      }
+      throw authError(503, 'SMS_DELIVERY_FAILED', 'Could not send the verification SMS');
+    }
   }
 
   async verify(challengeId: string, code: string): Promise<SessionResult> {
@@ -81,7 +107,11 @@ export class PhoneAuthService {
       await ensureActiveCustomerGrant(this.repository, owner.id);
     }
     const user = await this.repository.markPhoneVerified(owner.id, new Date());
+    if (await this.review?.matches('phone', challenge.phone)) {
+      await this.review?.recordSignIn(user.id, 'phone');
+    }
     return this.sessions.issue(user, 'customer');
+
   }
 
   private async findOrCreateByPhone(phone: string): Promise<UserRecord> {

@@ -3,9 +3,11 @@ import { PrismaService } from '../platform/database/prisma.service.js';
 import { AVATAR_PUBLIC_PREFIX } from '../modules/avatar/avatar.service.js';
 import { MENU_ITEM_PUBLIC_PREFIX } from '../modules/catalog/menu-item-image.service.js';
 import { STORE_LOGO_PUBLIC_PREFIX } from '../modules/catalog/store-logo.service.js';
+import { RIDE_VEHICLE_CLASS_IMAGE_PREFIX } from '../modules/ride-vehicle/ride-vehicle-class-image.js';
+import { HOME_BANNER_IMAGE_PREFIX } from '../modules/home-banner/home-banner.js';
 
 /** Storage prefixes that hold user uploads; nothing outside them is ever touched by the cleanup. */
-export const UPLOAD_PREFIXES = ['partner-applications', 'support-attachments', 'avatars', 'menu-items', 'store-logos'] as const;
+export const UPLOAD_PREFIXES = ['partner-applications', 'support-attachments', 'avatars', 'menu-items', 'store-logos', 'ride-vehicle-classes', 'home-banners'] as const;
 
 export const UPLOAD_REFERENCE_SOURCE = Symbol('UPLOAD_REFERENCE_SOURCE');
 
@@ -32,6 +34,8 @@ export class PrismaUploadReferences implements UploadReferenceSource {
     const avatarPrefix = `${AVATAR_PUBLIC_PREFIX}/`;
     const menuPrefix = `${MENU_ITEM_PUBLIC_PREFIX}/`;
     const logoPrefix = `${STORE_LOGO_PUBLIC_PREFIX}/`;
+    const vehiclePrefix = `${RIDE_VEHICLE_CLASS_IMAGE_PREFIX}/`;
+    const bannerPrefix = `${HOME_BANNER_IMAGE_PREFIX}/`;
     const rows = await db.$queryRaw<{ key: string | null }[]>`
       SELECT d->>'key' AS key
         FROM "partner_applications" p, jsonb_array_elements(
@@ -51,7 +55,15 @@ export class PrismaUploadReferences implements UploadReferenceSource {
       UNION
       SELECT 'store-logos/' || substr(s."logoUrl", ${logoPrefix.length + 1}::int) AS key
         FROM "food_stores" s
-       WHERE s."logoUrl" LIKE ${`${logoPrefix}%`}`;
+       WHERE s."logoUrl" LIKE ${`${logoPrefix}%`}
+      UNION
+      SELECT 'ride-vehicle-classes/' || substr(c."imageUrl", ${vehiclePrefix.length + 1}::int) AS key
+        FROM "ride_vehicle_classes" c
+       WHERE c."imageUrl" LIKE ${`${vehiclePrefix}%`}
+      UNION
+      SELECT 'home-banners/' || substr(b."imageUrl", ${bannerPrefix.length + 1}::int) AS key
+        FROM "home_banners" b
+       WHERE b."imageUrl" LIKE ${`${bannerPrefix}%`}`;
     return new Set(rows.map((row) => row.key).filter((key): key is string => Boolean(key)));
   }
 }

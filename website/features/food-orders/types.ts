@@ -16,6 +16,21 @@ export type FoodOrderLine = {
   options: string;
 };
 
+/** Merchant edit summary for the ops detail. */
+export type FoodOrderChangeSummary = {
+  status: string;
+  statusTone: "brand" | "success" | "danger";
+  reason: string;
+  /** e.g. ["Nước ngọt: 2 → 0 (bỏ món)"] */
+  lines: string[];
+  oldSubtotalVnd: number;
+  newSubtotalVnd: number;
+  newTotalVnd: number;
+  createdAt: string;
+  answerBy: string;
+  respondedAt: string | null;
+};
+
 export type FoodOrderListItem = {
   code: string;
   customer: string;
@@ -36,4 +51,6 @@ export type FoodOrderListItem = {
   /** Real store pickup / customer dropoff coordinates for the route sketch. */
   pickupPoint: { lat: number; lng: number } | null;
   dropoffPoint: { lat: number; lng: number } | null;
+  /** Latest merchant edit (detail only). */
+  change: FoodOrderChangeSummary | null;
 };

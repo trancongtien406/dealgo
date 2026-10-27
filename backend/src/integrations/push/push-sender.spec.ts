@@ -27,6 +27,8 @@ describe('PushSender', () => {
   });
 
   it('unavailable fails closed', async () => {
-    await expect(new UnavailablePushSender().send()).rejects.toThrow(/not configured/);
+    await expect(new UnavailablePushSender().send()).rejects.toThrow(
+      /not configured/,
+    );
   });
 });

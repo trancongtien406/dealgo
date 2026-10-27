@@ -7,8 +7,11 @@ import '../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../core/location/location_service.dart';
+import '../../../core/maps/map_lat_lng.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../address_book/domain/entities/saved_address.dart';
+import '../../places/presentation/map_pin_picker_page.dart';
+import '../../places/presentation/place_picker_page.dart';
 import 'saved_addresses_page.dart' show addressErrorText;
 
 /// Bottom sheet to create or edit an address. Resolves `true` once saved.
@@ -142,6 +145,30 @@ class _AddressFormSheetState extends State<AddressFormSheet> {
     });
   }
 
+  /// Exact spot on the map (gate, alley) instead of the GPS fix.
+  Future<void> _pinOnMap() async {
+    final lat = _lat;
+    final lng = _lng;
+    final place = await pickOnMap(
+      context,
+      purpose: PlacePickPurpose.delivery,
+      initial: lat != null && lng != null
+          ? MapLatLng(lat: lat, lng: lng)
+          : null,
+    );
+    if (!mounted || place == null) {
+      return;
+    }
+    setState(() {
+      _lat = place.lat;
+      _lng = place.lng;
+      _error = null;
+      if (_line.text.trim().isEmpty) {
+        _line.text = place.address.isNotEmpty ? place.address : place.name;
+      }
+    });
+  }
+
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context);
     if (!(_formKey.currentState?.validate() ?? false)) {
@@ -266,6 +293,16 @@ class _AddressFormSheetState extends State<AddressFormSheet> {
                     child: Text(
                       pinned ? l10n.addrBookPinned : l10n.addrBookNoPin,
                       style: textTheme.bodySmall,
+                    ),
+                  ),
+                  IconButton(
+                    key: const Key('address-pin-map'),
+                    tooltip: l10n.mapPickerTitle,
+                    onPressed: _locating ? null : _pinOnMap,
+                    icon: const Icon(
+                      DealGoIcons.map,
+                      size: 20,
+                      color: DealGoColors.primary,
                     ),
                   ),
                   TextButton(

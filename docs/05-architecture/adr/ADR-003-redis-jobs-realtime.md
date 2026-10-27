@@ -15,7 +15,7 @@ related_decisions:
 
 `PROPOSED`.
 
-> Đã triển khai trong code (rà soát 2026-10-18): Redis, BullMQ worker (`backend/src/workers/`) và Socket.IO + Redis adapter. Trạng thái vẫn `PROPOSED` — chủ repo cần quyết định `ACCEPTED`/supersede.
+**Hiện trạng trong code:** Redis, BullMQ worker (`backend/src/workers/`) và Socket.IO + Redis adapter. Quyết định chờ chủ dự án chuyển sang `ACCEPTED` hoặc thay thế.
 
 ## Context
 
@@ -31,4 +31,4 @@ Cần khoá ngắn hạn, presence tài xế, rate limit, job nền (hết hạn
 ## Consequences
 
 - Một instance API có thể chạy thiếu Redis ở dev nếu biến `REDIS_URL` trống: health báo `degraded`, không giả lập thành công job nền.
-- Đa instance sau này dùng Redis adapter cho Socket.IO. Phase 1 chạy một process.
+- Socket.IO dùng Redis adapter (`redis-io-adapter.ts`) để chạy nhiều instance API; worker BullMQ chạy process riêng (`backend/src/workers/`).

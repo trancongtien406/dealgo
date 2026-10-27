@@ -1,6 +1,8 @@
 import { apiFetch } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
 import { apiPaths } from "@/lib/api/paths";
+import { formatOpsDateTime } from "@/lib/ops-time";
+import { setOpsDateRange, type OpsDateRange } from "@/lib/api/ops-date-range";
 import type { PaginatedList } from "@/lib/api/pagination";
 import type { DeliveryStatus } from "@/features/deliveries/types";
 import type { NestFoodOrderView } from "@/features/food-orders/nest-types";
@@ -20,7 +22,7 @@ export type DeliveryItem = {
   dropoffPoint?: { lat: number; lng: number } | null;
 };
 
-export type FetchDeliveriesParams = {
+export type FetchDeliveriesParams = OpsDateRange & {
   page?: number;
   limit?: number;
   q?: string;
@@ -36,6 +38,7 @@ export async function fetchDeliveries(
   if (params.q?.trim()) search.set("q", params.q.trim());
   if (params.status && params.status !== "ALL")
     search.set("status", params.status);
+  setOpsDateRange(search, params);
 
   const envelope = await apiFetch<{
     success: boolean;
@@ -62,6 +65,7 @@ export async function fetchDeliveryByCode(
         | "pickup"
         | "assignedDriverId"
         | "driverProfile"
+        | "createdAt"
       > & {
         dropoff?: { lat?: number; lng?: number; label?: string };
         lines?: Array<{ name: string; quantity: number }>;
@@ -92,7 +96,7 @@ export async function fetchDeliveryByCode(
         ? personLabel(order.driverProfile, "TX", order.assignedDriverId)
         : null,
       status: statusMap[order.status] ?? "WAITING_DRIVER",
-      time: "—",
+      time: formatOpsDateTime(order.createdAt),
       pickupPoint: geoPoint(order.pickup),
       dropoffPoint: geoPoint(order.dropoff),
     };

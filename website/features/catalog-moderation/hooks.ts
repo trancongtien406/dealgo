@@ -8,7 +8,10 @@ import {
   rejectCatalogItem,
   type FetchCatalogModerationParams,
 } from "@/features/catalog-moderation/api";
-import { listSearchParams } from "@/lib/list-search-params";
+import {
+  dateRangeSearchParams,
+  listSearchParams,
+} from "@/lib/list-search-params";
 
 export const catalogModerationQueryKeys = {
   all: ["catalog-moderation"] as const,
@@ -19,6 +22,7 @@ export const catalogModerationQueryKeys = {
 export function useCatalogModerationFilters() {
   return useQueryStates({
     ...listSearchParams,
+    ...dateRangeSearchParams,
     category: parseAsString.withDefault(""),
     status: parseAsString.withDefault("PENDING"),
   });
@@ -32,6 +36,8 @@ export function useCatalogModerationQuery() {
     limit: filters.limit,
     category: filters.category || null,
     status: filters.status || null,
+    from: filters.from || null,
+    to: filters.to || null,
   };
   return useQuery({
     queryKey: catalogModerationQueryKeys.list(params),

@@ -5,6 +5,9 @@ import { PrismaService } from '../database/prisma.service.js';
 import { HealthController } from './health.controller.js';
 import { HealthService } from './health.service.js';
 import { REDIS_PROBE, TcpRedisProbe } from './redis-ping.js';
+import { OpsAlertService } from '../observability/ops-alert.js';
+import { PrismaWorkerHeartbeatStore, WORKER_HEARTBEAT_STORE } from './worker-heartbeat.js';
+import { WorkerWatchdog } from './worker-watchdog.js';
 
 @Module({
   imports: [PrismaModule],
@@ -14,6 +17,9 @@ import { REDIS_PROBE, TcpRedisProbe } from './redis-ping.js';
     TcpRedisProbe,
     { provide: DATABASE_PING, useExisting: PrismaService },
     { provide: REDIS_PROBE, useExisting: TcpRedisProbe },
+    { provide: WORKER_HEARTBEAT_STORE, useClass: PrismaWorkerHeartbeatStore },
+    OpsAlertService,
+    WorkerWatchdog,
   ],
 })
 export class HealthModule {}

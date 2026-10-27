@@ -1,4 +1,7 @@
-import { HttpException, Inject, Injectable, Logger } from '@nestjs/common';
+import { HttpException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { PUSH_SENDER } from '../../integrations/push/push.constants.js';
+import type { PushSender } from '../../integrations/push/push-sender.js';
+import { pushPathFor, type PushRole } from '../communication/notification/push-path.js';
 import { PlatformSettingsService } from '../../platform/settings/platform-settings.service.js';
 import { INBOX_REPOSITORY } from '../communication/inbox/inbox.constants.js';
 import type { InboxRepository } from '../communication/inbox/inbox.repository.js';
@@ -127,6 +130,7 @@ export class SupportTicketService {
     private readonly food: FoodService,
     private readonly settings: PlatformSettingsService,
     private readonly uploads: DocumentStoreService,
+    @Optional() @Inject(PUSH_SENDER) private readonly push?: PushSender,
   ) {}
 
   async create(userId: string, dto: CreateSupportTicketDto): Promise<PublicSupportTicket> {
@@ -425,6 +429,11 @@ export class SupportTicketService {
     if (!ticket.requesterUserId) {
       return;
     }
+    const role: PushRole =
+      ticket.requesterRole === 'DRIVER' || ticket.requesterRole === 'MERCHANT' ? ticket.requesterRole : 'CUSTOMER';
+    // The tap opens this ticket in the requester's own app shell.
+    const path = pushPathFor({ aggregateType: 'SupportTicket', aggregateId: ticket.id, role }) ?? '';
+    const data = { aggregateType: 'SupportTicket', aggregateId: ticket.id, status: ticket.status, role, path };
     try {
       await this.inbox.createMany([
         {
@@ -432,13 +441,22 @@ export class SupportTicketService {
           category: 'SYSTEM',
           title: text.title,
           body: text.body,
-          data: { aggregateType: 'SupportTicket', aggregateId: ticket.id, status: ticket.status },
+          data,
           sourceEventKey,
         },
       ]);
     } catch (error) {
       // The reply is already stored; a missed inbox row must not fail the staff action.
       this.logger.warn(`support inbox write failed for ${ticket.code}: ${String(error)}`);
+    }
+    if (!this.push) {
+      return;
+    }
+    try {
+      // Staff reply / resolution also reaches a backgrounded app (was inbox-only).
+      await this.push.send({ userId: ticket.requesterUserId, title: text.title, body: text.body, data });
+    } catch (error) {
+      this.logger.warn(`support push failed for ${ticket.code}: ${String(error)}`);
     }
   }
 

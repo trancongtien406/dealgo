@@ -6,6 +6,9 @@ abstract final class PartnerDocumentKind {
   static const selfie = 'SELFIE';
   static const license = 'LICENSE';
   static const vehicleReg = 'VEHICLE_REG';
+
+  /// OPEN-006 Car KYC scaffold — checklist only; not a legal determination.
+  static const vehicleInsurance = 'VEHICLE_INSURANCE';
   static const businessLicense = 'BUSINESS_LICENSE';
   static const repIdFront = 'REP_ID_FRONT';
   static const repIdBack = 'REP_ID_BACK';
@@ -14,6 +17,20 @@ abstract final class PartnerDocumentKind {
   static const driverRequired = [idFront, idBack, selfie, license, vehicleReg];
   static const merchantRequired = [businessLicense, repIdFront, repIdBack];
   static const merchantAll = [...merchantRequired, storefront];
+
+  /// Class-appropriate DRIVER checklist (Car adds insurance when applying as Car).
+  static List<String> driverRequiredFor(String vehicleClassCode) {
+    final code = vehicleClassCode.trim().toUpperCase();
+    if (code == 'CAR_4' || code == 'CAR_7') {
+      return [...driverRequired, vehicleInsurance];
+    }
+    return List<String>.from(driverRequired);
+  }
+
+  static bool isCarClass(String vehicleClassCode) {
+    final code = vehicleClassCode.trim().toUpperCase();
+    return code == 'CAR_4' || code == 'CAR_7';
+  }
 }
 
 /// Which document kinds must be re-captured when ops flags a section.
@@ -21,7 +38,10 @@ const partnerIssueSectionKinds = <String, List<String>>{
   'ID_CARD': [PartnerDocumentKind.idFront, PartnerDocumentKind.idBack],
   'SELFIE': [PartnerDocumentKind.selfie],
   'LICENSE': [PartnerDocumentKind.license],
-  'VEHICLE': [PartnerDocumentKind.vehicleReg],
+  'VEHICLE': [
+    PartnerDocumentKind.vehicleReg,
+    PartnerDocumentKind.vehicleInsurance,
+  ],
   'BUSINESS_DOCS': [PartnerDocumentKind.businessLicense],
   'REPRESENTATIVE': [
     PartnerDocumentKind.repIdFront,

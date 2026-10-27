@@ -46,9 +46,7 @@ class SectionTitle extends StatelessWidget {
           Icon(leadingIcon, color: DealGoColors.primary, size: 20),
           const SizedBox(width: DealGoSpacing.s8),
         ],
-        Expanded(
-          child: Text(title, style: textTheme.titleMedium),
-        ),
+        Expanded(child: Text(title, style: textTheme.titleMedium)),
         TextButton(
           onPressed: onAction,
           style: TextButton.styleFrom(
@@ -382,11 +380,7 @@ class _StoreCover extends StatelessWidget {
     const placeholder = ColoredBox(
       color: Color(0xFFFFF4EA),
       child: Center(
-        child: Icon(
-          DealGoIcons.food,
-          color: Color(0xFFEA580C),
-          size: 40,
-        ),
+        child: Icon(DealGoIcons.food, color: Color(0xFFEA580C), size: 40),
       ),
     );
     final resolved = resolveMediaUrl(imageUrl);
@@ -422,7 +416,11 @@ class VoucherBanner extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(DealGoIcons.voucher, color: DealGoColors.primary, size: 28),
+            const Icon(
+              DealGoIcons.voucher,
+              color: DealGoColors.primary,
+              size: 28,
+            ),
             const SizedBox(width: DealGoSpacing.s12),
             Expanded(
               child: Column(
@@ -452,9 +450,8 @@ class VoucherBanner extends StatelessWidget {
             HomeOutlinePillButton(
               key: const Key('home-voucher-see-all'),
               label: l10n.homeVoucherSeeAll,
-              onPressed: () => context.push(
-                AccountRoutes.vouchers('/customer/account'),
-              ),
+              onPressed: () =>
+                  context.push(AccountRoutes.vouchers('/customer/account')),
             ),
           ],
         ),
@@ -522,86 +519,86 @@ class _RecentTripCardState extends State<RecentTripCard> {
       child: InkWell(
         onTap: () => context.go('/customer/trips'),
         child: Padding(
-        padding: const EdgeInsets.all(DealGoSpacing.s16),
-        child: Row(
-          children: [
-            DecoratedBox(
-              decoration: const BoxDecoration(
-                color: DealGoColors.subtlePurple,
-                shape: BoxShape.circle,
-              ),
-              child: SizedBox(
-                width: 44,
-                height: 44,
-                child: Icon(
-                  item?.kind == HistoryKind.food
-                      ? DealGoIcons.food
-                      : DealGoIcons.motorbike,
-                  color: DealGoColors.primary,
+          padding: const EdgeInsets.all(DealGoSpacing.s16),
+          child: Row(
+            children: [
+              DecoratedBox(
+                decoration: const BoxDecoration(
+                  color: DealGoColors.subtlePurple,
+                  shape: BoxShape.circle,
+                ),
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Icon(
+                    item?.kind == HistoryKind.food
+                        ? DealGoIcons.food
+                        : DealGoIcons.motorbike,
+                    color: DealGoColors.primary,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: DealGoSpacing.s12),
-            Expanded(
-              child: item == null
-                  ? Text(
-                      _loading ? '…' : l10n.homeRecentEmpty,
-                      style: textTheme.bodyMedium,
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(item.meta, style: textTheme.bodySmall),
-                        Text(
-                          historyTitle(AppLocalizations.of(context), item),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
+              const SizedBox(width: DealGoSpacing.s12),
+              Expanded(
+                child: item == null
+                    ? Text(
+                        _loading ? '…' : l10n.homeRecentEmpty,
+                        style: textTheme.bodyMedium,
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(item.meta, style: textTheme.bodySmall),
+                          Text(
+                            historyTitle(AppLocalizations.of(context), item),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+              if (item != null) ...[
+                const SizedBox(width: DealGoSpacing.s8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (amount != null)
+                      Text(
+                        formatVnd(amount),
+                        style: textTheme.titleMedium?.copyWith(fontSize: 15),
+                      ),
+                    const SizedBox(height: DealGoSpacing.s4),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: bad
+                            ? DealGoColors.dangerSurface
+                            : DealGoColors.greenSurface,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: DealGoSpacing.s8,
+                          vertical: 2,
+                        ),
+                        child: Text(
+                          historyStatusLabel(l10n, item.status),
+                          style: textTheme.labelSmall?.copyWith(
+                            color: bad
+                                ? DealGoColors.danger
+                                : DealGoColors.brandGreen,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                      ],
-                    ),
-            ),
-            if (item != null) ...[
-              const SizedBox(width: DealGoSpacing.s8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (amount != null)
-                    Text(
-                      formatVnd(amount),
-                      style: textTheme.titleMedium?.copyWith(fontSize: 15),
-                    ),
-                  const SizedBox(height: DealGoSpacing.s4),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: bad
-                          ? DealGoColors.dangerSurface
-                          : DealGoColors.greenSurface,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: DealGoSpacing.s8,
-                        vertical: 2,
-                      ),
-                      child: Text(
-                        historyStatusLabel(l10n, item.status),
-                        style: textTheme.labelSmall?.copyWith(
-                          color: bad
-                              ? DealGoColors.danger
-                              : DealGoColors.brandGreen,
-                          fontWeight: FontWeight.w700,
-                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ],
-          ],
-        ),
+          ),
         ),
       ),
     );

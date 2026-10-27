@@ -35,7 +35,7 @@ related_decisions: [OPEN-001, OPEN-002, OPEN-003, OPEN-006, OPEN-008, OPEN-009, 
 
 # DealGo — Merchant & Catalog Rules / Nghiệp vụ cửa hàng và thực đơn
 
-> **Tình trạng:** `DRAFT` — đề xuất triển khai và tiêu chí kiểm thử, **không phải** chính sách thương mại đã được duyệt. DealGo có **một ứng dụng Flutter với ba vai trò** (Customer, Merchant, Driver) và **Admin Web riêng**; bản MVP bao gồm cả Ride hai bánh và Food. Tài liệu này chỉ đặc tả Merchant và Catalog của Food, không áp quy tắc món ăn cho Ride.
+> **Tình trạng:** `DRAFT` — đề xuất triển khai và tiêu chí kiểm thử, **không phải** chính sách thương mại đã được duyệt. DealGo có **một ứng dụng Flutter với ba vai trò** (Customer, Merchant, Driver) và **Admin Web riêng**; bản MVP bao gồm cả Ride (xe máy, ô tô) và Food. Tài liệu này chỉ đặc tả Merchant và Catalog của Food, không áp quy tắc món ăn cho Ride.
 >
 > **Nguyên tắc tối quan trọng:** Cửa hàng đang mở **không đồng nghĩa** đủ điều kiện nhận đơn; món có trong menu **không đồng nghĩa** còn bán; món còn trong giỏ **không đồng nghĩa** đủ điều kiện checkout; `MERCHANT_READY` **không đồng nghĩa** `DELIVERED`; sửa giá/menu **không được** ghi đè tiền và tên món đã chốt trong đơn cũ.
 >

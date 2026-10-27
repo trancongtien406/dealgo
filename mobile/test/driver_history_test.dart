@@ -50,9 +50,11 @@ void main() {
   testWidgets('shows today earnings, rating and the job history', (
     tester,
   ) async {
-    final now = DateTime.now();
+    // Fixed clock: the summary windows must not depend on the device date.
+    final now = DateTime(2026, 10, 21, 15);
     final history = FakeDriverHistoryRemoteDataSource(
       seed: FakeDriverHistoryRemoteDataSource.sample(now),
+      now: now,
     );
     await _openEarnings(tester, history);
 
@@ -65,7 +67,7 @@ void main() {
     final breakdown = find.byKey(const Key('driver-history-hero-breakdown'));
     expect(
       tester.widget<Text>(breakdown).data,
-      'Tổng cước 60.000đ · Phí nền tảng −6.000đ',
+      'Tổng cước 60.000đ · Hoa hồng DealGo −6.000đ',
     );
     expect(find.textContaining('trước phí'), findsNothing);
     expect(find.text('2 công việc'), findsOneWidget);
@@ -77,13 +79,18 @@ void main() {
       scrollable: _list,
     );
     expect(find.textContaining('5/5 sao'), findsWidgets);
-    expect(find.textContaining('Phí 10% −4.200đ'), findsOneWidget);
+    expect(find.textContaining('Hoa hồng 10% −4.200đ'), findsOneWidget);
     expect(find.text('+37.800đ'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('driver-history-filter-food')));
     await tester.pumpAndSettle();
     expect(find.textContaining('Sân bay Đà Nẵng'), findsNothing);
     expect(find.textContaining('Bún chả cá Bà Lữ'), findsOneWidget);
+    // Food commission is on the delivery fee, labelled as such.
+    expect(
+      find.textContaining('Hoa hồng 10% phí giao −1.800đ'),
+      findsOneWidget,
+    );
     expect(find.textContaining('Đã huỷ'), findsOneWidget);
 
     await tester.scrollUntilVisible(
@@ -91,6 +98,9 @@ void main() {
       -300,
       scrollable: _list,
     );
+    // Scroll the segmented control fully back to the top before tapping.
+    await tester.drag(_list, const Offset(0, 2000));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('7 ngày'));
     await tester.pumpAndSettle();
     final week = tester.widget<Text>(hero).data;
@@ -98,7 +108,7 @@ void main() {
     expect(week, '85.500đ');
     expect(
       tester.widget<Text>(breakdown).data,
-      'Tổng cước 95.000đ · Phí nền tảng −9.500đ',
+      'Tổng cước 95.000đ · Hoa hồng DealGo −9.500đ',
     );
   });
 

@@ -296,8 +296,9 @@ class _CustomerOnboardingPageState extends State<CustomerOnboardingPage> {
                               color: isSelected
                                   ? DealGoColors.primary
                                   : DealGoColors.border,
-                              borderRadius:
-                                  BorderRadius.circular(DealGoRadius.small),
+                              borderRadius: BorderRadius.circular(
+                                DealGoRadius.small,
+                              ),
                             ),
                           );
                         }),

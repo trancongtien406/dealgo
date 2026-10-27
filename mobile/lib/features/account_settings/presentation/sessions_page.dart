@@ -54,18 +54,20 @@ class _SessionsPageState extends State<SessionsPage> {
       final rows = await context.read<AccountSettingsRepository>().sessions(
         accessToken: token,
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           _sessions = rows;
           _loading = false;
           _loadFailure = null;
         });
+      }
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _loading = false;
           _loadFailure = error;
         });
+      }
     }
   }
 
@@ -83,10 +85,11 @@ class _SessionsPageState extends State<SessionsPage> {
         await _load();
       }
     } on ApiException catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => _message = apiErrorText(AppLocalizations.of(context), e),
         );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -105,10 +108,11 @@ class _SessionsPageState extends State<SessionsPage> {
         await _load();
       }
     } on ApiException catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => _message = apiErrorText(AppLocalizations.of(context), e),
         );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

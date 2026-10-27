@@ -4,8 +4,16 @@ import 'presence_remote_datasource.dart';
 class FakePresenceClient implements PresenceClient {
   FakePresenceClient({this.prefs = DriverServicePrefs.defaults});
 
-  final List<({bool online, double? lat, double? lng, bool? rideEnabled, bool? foodEnabled})> calls =
-      [];
+  final List<
+    ({
+      bool online,
+      double? lat,
+      double? lng,
+      bool? rideEnabled,
+      bool? foodEnabled,
+    })
+  >
+  calls = [];
   DriverServicePrefs prefs;
   Object? saveError;
 
@@ -18,7 +26,13 @@ class FakePresenceClient implements PresenceClient {
     bool? rideEnabled,
     bool? foodEnabled,
   }) async {
-    calls.add((online: online, lat: lat, lng: lng, rideEnabled: rideEnabled, foodEnabled: foodEnabled));
+    calls.add((
+      online: online,
+      lat: lat,
+      lng: lng,
+      rideEnabled: rideEnabled,
+      foodEnabled: foodEnabled,
+    ));
     final error = saveError;
     if (error != null) {
       throw error;
@@ -27,5 +41,7 @@ class FakePresenceClient implements PresenceClient {
   }
 
   @override
-  Future<DriverServicePrefs> getServicePrefs({required String accessToken}) async => prefs;
+  Future<DriverServicePrefs> getServicePrefs({
+    required String accessToken,
+  }) async => prefs;
 }

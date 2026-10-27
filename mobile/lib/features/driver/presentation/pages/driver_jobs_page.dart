@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/config/api_base_url.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
@@ -12,6 +13,9 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_money.dart';
 import '../../../food/domain/entities/food_models.dart';
 import '../../../ride/domain/entities/ride_models.dart';
+import '../../../ride/presentation/utils/ride_vehicle_label.dart';
+import '../../../ride/presentation/widgets/ride_negotiation_ui.dart'
+    show customerRatingText;
 import '../../../ride/domain/entities/ride_money.dart';
 import '../cubit/driver_duty_cubit.dart';
 import '../cubit/driver_feed_cubit.dart';
@@ -32,15 +36,28 @@ class DriverJobsPage extends StatefulWidget {
 }
 
 class _DriverJobsPageState extends State<DriverJobsPage> {
+  // Back from the background (e.g. a "new ride nearby" push tapped while the app was
+  // suspended): the list and any old error are from before, so ask again.
+  late final AppLifecycleListener _lifecycle = AppLifecycleListener(
+    onResume: _sync,
+  );
+
   @override
   void initState() {
     super.initState();
+    _lifecycle;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _sync();
       if (mounted) {
         context.read<DriverServicesCubit>().load();
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
   }
 
   void _sync() {
@@ -92,7 +109,7 @@ class _JobsOffline extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return DriverPageFrame(
       title: l10n.driverOpenRequests,
-      onBack: () => driverBack(context),
+      showBack: false,
       body: ListView(
         padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
         children: [
@@ -129,7 +146,7 @@ class _JobsOnline extends StatelessWidget {
 
     return DriverPageFrame(
       title: l10n.driverOpenRequests,
-      onBack: () => driverBack(context),
+      showBack: false,
       footer: ready == null || (ready.rides.isEmpty && ready.food.isEmpty)
           ? null
           : Padding(
@@ -195,7 +212,9 @@ class _JobsOnline extends StatelessWidget {
             DealGoStateView.failure(
               context,
               onRetry: onRetry,
-              cause: failed.sessionExpired ? sessionExpiredFailure : failed.error,
+              cause: failed.sessionExpired
+                  ? sessionExpiredFailure
+                  : failed.error,
               message: failed.sessionExpired
                   ? l10n.errorSessionExpired
                   : apiErrorText(
@@ -270,6 +289,8 @@ class _RideJobCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context);
+    final photo = resolveMediaUrl(ride.imageUrl);
     return DriverPanel(
       elevated: true,
       borderColor: DealGoColors.primary.withValues(alpha: 0.35),
@@ -281,12 +302,34 @@ class _RideJobCard extends StatelessWidget {
           children: [
             Row(
               children: [
+                if (photo != null) ...[
+                  RideVehicleClassPhoto(
+                    imageUrl: ride.imageUrl,
+                    code: ride.vehicleClassCode,
+                    size: 32,
+                  ),
+                  const SizedBox(width: DealGoSpacing.s8),
+                ],
+                // One line: next to two chips on a narrow phone the ref
+                // ("Chuyến #1573") used to break mid-word; shrink instead.
                 Expanded(
-                  child: Text(
-                    AppLocalizations.of(context).rideRef(shortRef(ride.id)),
-                    style: textTheme.titleSmall,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      l10n.rideRef(shortRef(ride.id)),
+                      key: Key('driver-ride-ref-${ride.id}'),
+                      style: textTheme.titleSmall,
+                      maxLines: 1,
+                      softWrap: false,
+                    ),
                   ),
                 ),
+                DriverChip(
+                  label: rideVehicleClassLabel(l10n, ride.vehicleClassCode),
+                  tone: DriverChipTone.neutral,
+                ),
+                const SizedBox(width: DealGoSpacing.s8),
                 DriverChip(
                   label: AppLocalizations.of(context).driverRideChip,
                   tone: DriverChipTone.green,
@@ -305,6 +348,12 @@ class _RideJobCard extends StatelessWidget {
             DriverMoneyRow(
               label: AppLocalizations.of(context).driverReferenceFare,
               value: formatRideVnd(ride.referenceFareVnd),
+            ),
+            // Like inDrive, the rider's rating shows before the driver opens the request.
+            DriverMoneyRow(
+              key: Key('driver-open-customer-rating-${ride.id}'),
+              label: l10n.driverCustomerRating,
+              value: customerRatingText(l10n, ride.customerRating),
             ),
           ],
         ),

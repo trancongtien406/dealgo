@@ -149,7 +149,9 @@ VoucherQuote decodeVoucherQuote(Object? body) {
     finalAmountVnd: finalAmount.toInt(),
     reason: reason is String && reason.isNotEmpty ? reason : null,
     campaignName: name is String && name.isNotEmpty ? name : null,
-    rejectCode: rejectCode is String && rejectCode.isNotEmpty ? rejectCode : null,
+    rejectCode: rejectCode is String && rejectCode.isNotEmpty
+        ? rejectCode
+        : null,
   );
 }
 

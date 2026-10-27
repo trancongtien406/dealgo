@@ -11,10 +11,13 @@ class DioAccountSettingsRemoteDataSource implements AccountSettingsRepository {
 
   final Dio dio;
 
-  Options _auth(String token) => Options(headers: {'Authorization': 'Bearer $token'});
+  Options _auth(String token) =>
+      Options(headers: {'Authorization': 'Bearer $token'});
 
   @override
-  Future<NotificationPrefs> notificationPrefs({required String accessToken}) async {
+  Future<NotificationPrefs> notificationPrefs({
+    required String accessToken,
+  }) async {
     try {
       final res = await dio.get<Object?>(
         ApiPaths.meNotificationPreferences,
@@ -95,10 +98,7 @@ class DioAccountSettingsRemoteDataSource implements AccountSettingsRepository {
     try {
       await dio.post<Object?>(
         ApiPaths.mePassword,
-        data: {
-          'currentPassword': currentPassword,
-          'newPassword': newPassword,
-        },
+        data: {'currentPassword': currentPassword, 'newPassword': newPassword},
         options: _auth(accessToken),
       );
     } on DioException catch (error) {
@@ -118,10 +118,10 @@ class DioAccountSettingsRemoteDataSource implements AccountSettingsRepository {
       await dio.patch<Object?>(
         ApiPaths.me,
         data: {
-          if (displayName != null) 'displayName': displayName,
-          if (email != null) 'email': email,
-          if (dateOfBirth != null) 'dateOfBirth': dateOfBirth,
-          if (gender != null) 'gender': gender,
+          'displayName': ?displayName,
+          'email': ?email,
+          'dateOfBirth': ?dateOfBirth,
+          'gender': ?gender,
         },
         options: _auth(accessToken),
       );
@@ -169,7 +169,7 @@ class DioAccountSettingsRemoteDataSource implements AccountSettingsRepository {
     try {
       await dio.patch<Object?>(
         ApiPaths.meSessionsCurrent,
-        data: {if (deviceLabel != null) 'deviceLabel': deviceLabel},
+        data: {'deviceLabel': ?deviceLabel},
         options: _auth(accessToken),
       );
     } on DioException catch (error) {
@@ -183,33 +183,35 @@ class FakeAccountSettingsRepository implements AccountSettingsRepository {
     NotificationPrefs? prefs,
     List<AccountSession>? sessions,
     this.hasPassword = true,
-  })  : prefs = prefs ??
-            const NotificationPrefs(
-              ride: true,
-              food: true,
-              chat: true,
-              promotion: false,
-              news: false,
-            ),
-        _sessions = sessions ??
-            [
-              AccountSession(
-                id: 'sess-current',
-                channel: 'CUSTOMER',
-                current: true,
-                createdAt: DateTime(2026, 10, 14, 21, 31),
-                lastSeenAt: DateTime(2026, 10, 14, 21, 31),
-                deviceLabel: 'iPhone · DealGo',
-              ),
-              AccountSession(
-                id: 'sess-other',
-                channel: 'CUSTOMER',
-                current: false,
-                createdAt: DateTime(2026, 10, 10),
-                lastSeenAt: DateTime(2026, 10, 14),
-                deviceLabel: 'MacBook · Safari',
-              ),
-            ];
+  }) : prefs =
+           prefs ??
+           const NotificationPrefs(
+             ride: true,
+             food: true,
+             chat: true,
+             promotion: false,
+             news: false,
+           ),
+       _sessions =
+           sessions ??
+           [
+             AccountSession(
+               id: 'sess-current',
+               channel: 'CUSTOMER',
+               current: true,
+               createdAt: DateTime(2026, 10, 14, 21, 31),
+               lastSeenAt: DateTime(2026, 10, 14, 21, 31),
+               deviceLabel: 'iPhone · DealGo',
+             ),
+             AccountSession(
+               id: 'sess-other',
+               channel: 'CUSTOMER',
+               current: false,
+               createdAt: DateTime(2026, 10, 10),
+               lastSeenAt: DateTime(2026, 10, 14),
+               deviceLabel: 'MacBook · Safari',
+             ),
+           ];
 
   NotificationPrefs prefs;
   final List<AccountSession> _sessions;
@@ -221,7 +223,9 @@ class FakeAccountSettingsRepository implements AccountSettingsRepository {
   int passkeysRegistered = 0;
 
   @override
-  Future<NotificationPrefs> notificationPrefs({required String accessToken}) async {
+  Future<NotificationPrefs> notificationPrefs({
+    required String accessToken,
+  }) async {
     calls.add('prefs');
     return prefs;
   }

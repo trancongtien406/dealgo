@@ -35,4 +35,6 @@ export type StoreListItem = {
   acceptSummary: string | null;
   /** Current kitchen estimate in minutes (default prep + BUSY extra). */
   prepMinutes: number | null;
+  /** No map pin → cannot take delivery orders. */
+  locationMissing: boolean;
 };

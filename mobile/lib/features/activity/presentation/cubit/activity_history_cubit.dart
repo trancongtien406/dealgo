@@ -52,7 +52,11 @@ class ActivityHistoryCubit extends Cubit<ActivityHistoryState> {
   Future<void> load({required String? accessToken}) async {
     final token = accessToken?.trim() ?? '';
     if (token.isEmpty) {
-      emit(ActivityHistoryFailure(message: UiMessage((l10n) => l10n.errorSessionExpired)));
+      emit(
+        ActivityHistoryFailure(
+          message: UiMessage((l10n) => l10n.errorSessionExpired),
+        ),
+      );
       return;
     }
     emit(ActivityHistoryLoading(rides: state.rides, food: state.food));
@@ -71,7 +75,10 @@ class ActivityHistoryCubit extends Cubit<ActivityHistoryState> {
     } catch (error) {
       emit(
         ActivityHistoryFailure(
-          message: UiMessage.error(error, fallback: (l10n) => l10n.stateErrorBody),
+          message: UiMessage.error(
+            error,
+            fallback: (l10n) => l10n.stateErrorBody,
+          ),
           rides: state.rides,
           food: state.food,
         ),

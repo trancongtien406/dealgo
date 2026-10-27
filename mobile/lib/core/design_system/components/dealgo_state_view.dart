@@ -81,7 +81,8 @@ class DealGoStateView extends StatelessWidget {
     Key? key,
   }) {
     final l10n = AppLocalizations.of(context);
-    final expired = cause is ApiException &&
+    final expired =
+        cause is ApiException &&
         (cause.statusCode == 401 || cause.errorCode == 'UNAUTHORIZED');
     return DealGoStateView(
       key: key,

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 
 @lazySingleton
@@ -19,8 +20,15 @@ class ConnectivityService {
   Stream<bool> get onStatusChanged => _controller.stream;
 
   Future<void> start() async {
-    final initial = await _connectivity.checkConnectivity();
-    _apply(initial);
+    try {
+      final initial = await _connectivity.checkConnectivity();
+      _apply(initial);
+    } on MissingPluginException {
+      // No platform plugin (widget tests, unsupported host): keep assuming online.
+      return;
+    } on PlatformException {
+      return;
+    }
     await _subscription?.cancel();
     _subscription = _connectivity.onConnectivityChanged.listen(_apply);
   }

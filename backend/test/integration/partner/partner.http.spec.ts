@@ -96,7 +96,7 @@ describe('partner application http', () => {
       .set('Authorization', `Bearer ${driver.token}`)
       .send({
         role: 'DRIVER',
-        metadata: { fullName: 'Nguyen Van A', licenseNumber: 'B2-123' },
+        metadata: { fullName: 'Nguyen Van A', licenseNumber: 'B2-123', vehicleClassCode: 'MOTORBIKE' },
         documents: DRIVER_DOCS,
       })
       .expect(200);
@@ -172,7 +172,7 @@ describe('partner application http', () => {
     const merchantApp = await request(app.getHttpServer())
       .post('/v1/me/partner-applications')
       .set('Authorization', `Bearer ${merchant.token}`)
-      .send({ role: 'MERCHANT', metadata: { shopName: 'Bun Bo' }, documents: MERCHANT_DOCS })
+      .send({ role: 'MERCHANT', metadata: { shopName: 'Bun Bo', shopLat: 16.06, shopLng: 108.22 }, documents: MERCHANT_DOCS })
       .expect(200);
 
     const rejected = await request(app.getHttpServer())
@@ -198,7 +198,7 @@ describe('partner application http', () => {
     const resubmitted = await request(app.getHttpServer())
       .post('/v1/me/partner-applications')
       .set('Authorization', `Bearer ${merchant.token}`)
-      .send({ role: 'MERCHANT', metadata: { shopName: 'Bun Bo' }, documents: [jpeg('STOREFRONT')] })
+      .send({ role: 'MERCHANT', metadata: { shopName: 'Bun Bo', shopLat: 16.06, shopLng: 108.22 }, documents: [jpeg('STOREFRONT')] })
       .expect(200);
     expect(resubmitted.body.data.documents.map((doc: { kind: string }) => doc.kind)).toEqual([
       'BUSINESS_LICENSE',
@@ -215,21 +215,21 @@ describe('partner application http', () => {
     const missing = await request(app.getHttpServer())
       .post('/v1/me/partner-applications')
       .set('Authorization', `Bearer ${user.token}`)
-      .send({ role: 'DRIVER', metadata: {}, documents: DRIVER_DOCS.slice(0, 2) })
+      .send({ role: 'DRIVER', metadata: { vehicleClassCode: 'MOTORBIKE' }, documents: DRIVER_DOCS.slice(0, 2) })
       .expect(400);
     expect(missing.body.errorCode).toBe('PARTNER_DOCUMENTS_REQUIRED');
     expect(missing.body.details.missing).toEqual(['SELFIE', 'LICENSE', 'VEHICLE_REG']);
     await request(app.getHttpServer())
       .post('/v1/me/partner-applications')
       .set('Authorization', `Bearer ${user.token}`)
-      .send({ role: 'DRIVER', metadata: {}, documents: [{ kind: 'PASSPORT', contentBase64: TINY_JPEG_BASE64 }] })
+      .send({ role: 'DRIVER', metadata: { vehicleClassCode: 'MOTORBIKE' }, documents: [{ kind: 'PASSPORT', contentBase64: TINY_JPEG_BASE64 }] })
       .expect(400);
     const wrongBytes = await request(app.getHttpServer())
       .post('/v1/me/partner-applications')
       .set('Authorization', `Bearer ${user.token}`)
       .send({
         role: 'DRIVER',
-        metadata: {},
+        metadata: { vehicleClassCode: 'MOTORBIKE' },
         documents: DRIVER_DOCS.map((doc, i) =>
           i === 0 ? { ...doc, contentBase64: Buffer.from('<svg></svg>').toString('base64') } : doc,
         ),

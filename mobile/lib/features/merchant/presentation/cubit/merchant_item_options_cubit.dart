@@ -103,7 +103,9 @@ class MerchantItemOptionsCubit extends Cubit<MerchantItemOptionsState> {
     final token = accessToken?.trim() ?? '';
     if (token.isEmpty) {
       emit(
-        MerchantItemOptionsFailed(UiMessage((l10n) => l10n.errorSessionExpired)),
+        MerchantItemOptionsFailed(
+          UiMessage((l10n) => l10n.errorSessionExpired),
+        ),
       );
       return;
     }
@@ -228,7 +230,9 @@ class MerchantItemOptionsCubit extends Cubit<MerchantItemOptionsState> {
     if (ready is! MerchantItemOptionsReady || ready.saving) return;
     final token = accessToken?.trim() ?? '';
     if (token.isEmpty) {
-      emit(ready.copyWith(error: UiMessage((l10n) => l10n.errorSessionExpired)));
+      emit(
+        ready.copyWith(error: UiMessage((l10n) => l10n.errorSessionExpired)),
+      );
       return;
     }
     final names = ready.groups.map((g) => g.title.trim().toLowerCase()).toSet();

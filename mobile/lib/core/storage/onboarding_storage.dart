@@ -152,11 +152,9 @@ class SecureOnboardingStorage extends AppOnboardingStorage {
 class MemoryOnboardingStorage implements OnboardingStorage {
   MemoryOnboardingStorage({
     bool initial = false,
-    bool profileSetupCompleted = false,
-    bool permissionsCompleted = false,
-  }) : _seen = initial,
-       _profileSetupCompleted = profileSetupCompleted,
-       _permissionsCompleted = permissionsCompleted;
+    this._profileSetupCompleted = false,
+    this._permissionsCompleted = false,
+  }) : _seen = initial;
 
   bool _seen;
   bool _profileSetupCompleted;

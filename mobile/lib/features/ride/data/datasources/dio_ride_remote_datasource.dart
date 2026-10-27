@@ -48,6 +48,7 @@ class DioRideRemoteDataSource implements RideRemoteDataSource {
           pickup: RidePointModel.fromEntity(request.pickup),
           dropoff: RidePointModel.fromEntity(request.dropoff),
           offeredFareVnd: request.offeredFareVnd,
+          vehicleClassCode: request.vehicleClassCode,
         ).toJson(),
         options: _auth(request.accessToken, request.idempotencyKey),
       ),

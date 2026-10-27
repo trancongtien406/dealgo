@@ -1,3 +1,4 @@
+import { seedVehicleClassOnDriverGrant } from '../../support/driver-class-fixture.js';
 import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import { DriverCardModule } from '../../../src/modules/driver-card/driver-card.module.js';
@@ -16,6 +17,7 @@ describe('driver card http', () => {
 
   beforeAll(async () => {
     harness = await createTestApp([DriverCardModule]);
+    seedVehicleClassOnDriverGrant(harness.app, harness.identity);
     app = harness.app;
   });
 
@@ -30,7 +32,7 @@ describe('driver card http', () => {
       .post('/v1/rides')
       .set('Authorization', `Bearer ${customer.token}`)
       .set('Idempotency-Key', `card-create-${serial}`)
-      .send({ pickup, dropoff, offeredFareVnd: 30_000 })
+      .send({ pickup, dropoff, offeredFareVnd: 30_000, vehicleClassCode: 'MOTORBIKE'})
       .expect(200);
     return created.body.data.id as string;
   }
@@ -61,7 +63,7 @@ describe('driver card http', () => {
       id: randomUUID(),
       userId: driver.userId,
       role: 'DRIVER',
-      metadata: { vehiclePlate: '43B1-678.90', vehicleType: 'Xe máy' },
+      metadata: { vehiclePlate: '43B1-678.90', vehicleType: 'Xe máy', vehicleClassCode: 'MOTORBIKE' },
       documents: [],
       now: new Date(),
     });
@@ -133,7 +135,7 @@ describe('driver card http', () => {
       id: randomUUID(),
       userId: driver.userId,
       role: 'DRIVER',
-      metadata: { vehiclePlate: '43C1-111.22', vehicleType: 'Xe máy' },
+      metadata: { vehiclePlate: '43C1-111.22', vehicleType: 'Xe máy', vehicleClassCode: 'MOTORBIKE' },
       documents: [],
       now: new Date(),
     });
@@ -176,7 +178,7 @@ describe('driver card http', () => {
     const customerRow = rows.find((row) => row.id === customer.userId);
     expect(customerRow).toMatchObject({ vehiclePlate: null, vehicleType: null });
     expect(customerRow).toMatchObject({ completedJobs: 0, finishedJobs: 0, completionRate: null });
-    expect(String(customerRow?.phoneMasked ?? '')).toContain('*');
+    expect(JSON.stringify(customerRow?.phoneMasked ?? '')).toContain('*');
     expect(JSON.stringify(rows)).not.toMatch(/"phone":/);
 
     await harness

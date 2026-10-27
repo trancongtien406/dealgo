@@ -29,6 +29,27 @@ export type NestFoodLine = {
   options?: NestFoodLineOption[];
 };
 
+/** A merchant edit (lower quantity / remove line) the customer answers. */
+export type NestFoodOrderChange = {
+  id: string;
+  status: "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED";
+  reasonCode: string;
+  note: string | null;
+  lines: {
+    lineId: string;
+    name: string;
+    unitPriceVnd: number;
+    fromQuantity: number;
+    toQuantity: number;
+  }[];
+  oldSubtotalVnd: number;
+  newSubtotalVnd: number;
+  newTotalVnd: number;
+  expiresAt: string;
+  respondedAt: string | null;
+  createdAt: string;
+};
+
 export type NestFoodOrderView = {
   id: string;
   customerId: string;
@@ -51,6 +72,10 @@ export type NestFoodOrderView = {
   cancelReason?: { code: string; note: string | null } | null;
   /** DEC-PROD-035: who cancelled (older payloads omit it). */
   cancelledBy?: NestCancelActor | null;
+  /** Ops detail only — latest merchant edit in any status. */
+  latestChange?: NestFoodOrderChange | null;
+  /** ISO placement time (older payloads omit it). */
+  createdAt?: string | null;
 };
 
 export type NestFoodOrderPage = {

@@ -1,4 +1,6 @@
 export const MAPS_PORT = Symbol('MAPS_PORT');
+/** Optional OSM (Photon) street search; null when PLACES_OSM_SEARCH_URL is unset. */
+export const OSM_SEARCH_PORT = Symbol('OSM_SEARCH_PORT');
 
 /** Deterministic Da Nang city-center coords for MAPS_PROVIDER=mock. */
 export const MOCK_DANANG_CENTER = { lat: 16.0544, lng: 108.2022 } as const;

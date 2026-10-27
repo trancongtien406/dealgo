@@ -7,6 +7,7 @@ import {
   type HealthReport,
   type LiveReport,
   type ReadyReport,
+  type WorkerReport,
 } from './health.service.js';
 
 @ApiTags('health')
@@ -40,5 +41,18 @@ export class HealthController {
       response.status(503);
     }
     return report;
+  }
+
+  @Get('worker')
+  @SkipResponseEnvelope()
+  @ApiOperation({
+    summary: 'Background worker heartbeat + outbox lag (503 when stale/missing or lag above OUTBOX_LAG_ALERT_MS)',
+  })
+  async getWorker(@Res({ passthrough: true }) response: Response): Promise<WorkerReport | { status: 'unknown' }> {
+    const report = await this.healthService.worker();
+    if (!report || report.status !== 'up' || (report.outboxLagMs ?? 0) > report.outboxLagAlertMs) {
+      response.status(503);
+    }
+    return report ?? { status: 'unknown' };
   }
 }

@@ -45,13 +45,15 @@ export class MemoryChatRepository implements ChatRepository {
     if (!thread) {
       return { items: [], total: 0 };
     }
-    const sorted = [...thread.messages].sort(
-      (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
-    );
+    // Same contract as Prisma: page 1 = newest `limit`, each page oldest → newest.
+    const newest = thread.messages
+      .map((message, index) => ({ message, index }))
+      .sort((a, b) => b.message.createdAt.getTime() - a.message.createdAt.getTime() || b.index - a.index)
+      .map(({ message }) => message);
     const start = (page - 1) * limit;
     return {
-      items: sorted.slice(start, start + limit),
-      total: sorted.length,
+      items: newest.slice(start, start + limit).reverse(),
+      total: newest.length,
     };
   }
 

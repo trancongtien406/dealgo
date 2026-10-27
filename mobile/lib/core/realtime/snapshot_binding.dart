@@ -44,9 +44,11 @@ class SnapshotBinding {
   bool _matches(SnapshotHint hint) => switch (room) {
     RideSnapshotRoom(:final rideId) => hint.aggregateId == rideId,
     FoodSnapshotRoom(:final orderId) => hint.aggregateId == orderId,
+    // Location rooms carry `driverLocation`, never `snapshot`.
+    RideLocationRoom() || FoodLocationRoom() || RideOffersRoom() => false,
     StoreSnapshotRoom(:final storeId) =>
       hint.aggregateType == 'FoodOrder' &&
-      (hint.storeId == null || hint.storeId == storeId),
+          (hint.storeId == null || hint.storeId == storeId),
   };
 
   Future<void> stop() async {

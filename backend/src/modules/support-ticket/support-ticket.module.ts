@@ -8,6 +8,7 @@ import {
 } from '../../platform/database/index.js';
 import { PlatformSettingsModule } from '../../platform/settings/index.js';
 import { StorageModule } from '../../platform/storage/storage.module.js';
+import { PushModule } from '../../integrations/push/push.module.js';
 import { InboxModule } from '../communication/inbox/inbox.module.js';
 import { FoodModule } from '../food-order/food.module.js';
 import { IdentityModule } from '../identity/index.js';
@@ -32,6 +33,7 @@ import { SupportTicketService } from './support-ticket.service.js';
     PlatformSettingsModule,
     StorageModule,
     InboxModule,
+    PushModule,
     RideModule,
     FoodModule,
   ],

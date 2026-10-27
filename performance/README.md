@@ -5,7 +5,7 @@ Scripts đo latency HTTP của Nest API và seed dữ liệu lớn để stress 
 ## Prerequisites
 
 - Postgres + Redis (docker-compose DealGo)
-- Nest đang chạy (`cd backend && npm run start:dev`) — mặc định `BASE_URL=http://127.0.0.1:3011`
+- Nest đang chạy (`cd backend && npm run start:dev`) — mặc định `BASE_URL=http://127.0.0.1:3001`
 - Demo seed: `cd backend && npm run seed`
 - Scale seed (tùy chọn): `PERF_PROFILE=smoke|load|extreme npm run seed:scale`
 
@@ -30,7 +30,7 @@ cd backend && npx tsx scripts/mint-dev-session.ts --phone=+84902000001
 # Full matrix
 cd performance
 chmod +x run-matrix.sh matrices/*.sh
-BASE_URL=http://127.0.0.1:3011 ./run-matrix.sh
+BASE_URL=http://127.0.0.1:3001 ./run-matrix.sh
 
 # Báo cáo: reports/<RUN_ID>.tsv + .summary.md
 ```

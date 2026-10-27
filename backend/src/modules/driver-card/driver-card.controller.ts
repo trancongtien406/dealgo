@@ -26,6 +26,18 @@ export class DriverCardController {
     return this.cards.forRideOffer(actor, id, offerId);
   }
 
+  @Get('rides/:id/customer')
+  @ApiOperation({ summary: "Customer's name and avatar (assigned driver only)" })
+  rideCustomer(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.cards.rideCustomer(actor.userId, id);
+  }
+
+  @Get('food/orders/:id/customer')
+  @ApiOperation({ summary: "Customer's name and avatar (assigned courier only)" })
+  foodCustomer(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.cards.foodOrderCustomer(actor.userId, id);
+  }
+
   @Get('food/orders/:id/courier')
   @ApiOperation({ summary: "Courier's name, declared vehicle and rating (order customer only)" })
   foodCourier(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {

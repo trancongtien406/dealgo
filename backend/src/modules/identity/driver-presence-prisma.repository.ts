@@ -1,5 +1,6 @@
 import { resolveServiceRegionCode } from '../service-area/service-regions.js';
 import type { PrismaClient } from '../../generated/prisma/client.js';
+import { radiusBox, type DispatchService } from './driver-presence.repository.js';
 import type {
   DriverLocation,
   DriverPresenceRepository,
@@ -66,6 +67,29 @@ export class PrismaDriverPresenceRepository implements DriverPresenceRepository 
   async findByUserId(userId: string): Promise<DriverPresenceView | null> {
     const row = await this.db.driverPresence.findUnique({ where: { userId } });
     return row ? toView(row) : null;
+  }
+
+  async listOnlineNear(input: {
+    service: DispatchService;
+    lat: number;
+    lng: number;
+    radiusKm: number;
+    freshSince: Date;
+    limit: number;
+  }): Promise<DriverPresenceView[]> {
+    const box = radiusBox(input.lat, input.lng, input.radiusKm);
+    const rows = await this.db.driverPresence.findMany({
+      where: {
+        online: true,
+        ...(input.service === 'RIDE' ? { rideEnabled: true } : { foodEnabled: true }),
+        locationAt: { gte: input.freshSince },
+        lat: { gte: box.minLat, lte: box.maxLat },
+        lng: { gte: box.minLng, lte: box.maxLng },
+      },
+      orderBy: { locationAt: 'desc' },
+      take: input.limit,
+    });
+    return rows.map(toView);
   }
 }
 

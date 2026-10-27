@@ -7,7 +7,8 @@
 
 | ID | Quyết định | Trạng thái |
 |---|---|---|
-| `DEC-PROD-001` | MVP gồm **Ride** (xe hai bánh) và **Food** (giao đồ ăn) | `CONFIRMED` |
+| `DEC-PROD-001` | MVP gồm **Ride** (xe máy **và** ô tô per `DG-DEC-VEH-001`) và **Food** (giao đồ ăn) | `CONFIRMED` |
+| `DG-DEC-VEH-001` | Ride vehicle-scope: **MOTORBIKE + CAR** (catalog). OPEN-003/006 stay OPEN. DRAFT/ADMIN_EDITABLE Car fare seeds + Car KYC checklist OK; do **not** claim APPROVED rates or invent secrets. | `OWNER_CONFIRMED` |
 | `DEC-PROD-002` | **Một** app Flutter cho Customer / Merchant / Driver | `CONFIRMED` |
 | `DEC-PROD-003` | Tham khảo luồng công khai Grab/GrabFood/ShopeeFood; **không** sao chép UI hay giả định logic nội bộ | `CONFIRMED` |
 | `DEC-PROD-004` | Cần hồ sơ đủ để triển khai, kiểm thử và vận hành thực tế | `CONFIRMED` |

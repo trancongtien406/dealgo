@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { BrandMark } from "@/components/layout/brand-mark";
 import { OpsIcon } from "@/components/ui/ops-icons";
+import { reportClientError } from "@/lib/observability/sentry-options";
 
 export default function RootError({
   error,
@@ -14,6 +15,7 @@ export default function RootError({
 }) {
   useEffect(() => {
     console.error("[RootError]", error);
+    reportClientError(error);
   }, [error]);
 
   return (

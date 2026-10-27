@@ -54,7 +54,6 @@ export class MenuItemImageService {
       throw imageError(404, 'FOOD_ITEM_NOT_FOUND', 'Item not found');
     }
     const current = await this.ownedItem(actor, itemId);
-    const previous = keyFromMenuItemImageUrl(current.imageUrl);
     const payload = resolvePayload(input);
     if (!payload) {
       throw imageError(400, 'VALIDATION_ERROR', 'contentBase64 or dataUrl is required');

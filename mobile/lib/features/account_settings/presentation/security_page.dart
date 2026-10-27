@@ -10,22 +10,73 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../core/config/app_env.dart';
+import '../../identity/domain/entities/auth_method_policy.dart';
 import '../../identity/domain/entities/auth_state.dart';
+import '../../identity/domain/usecases/get_auth_methods.dart';
 import '../../identity/domain/passkey_platform.dart';
 import '../../identity/presentation/cubit/auth_cubit.dart';
 import '../domain/account_settings.dart';
 import '../../shell/presentation/account_routes.dart';
 
-class SecurityPage extends StatelessWidget {
+class SecurityPage extends StatefulWidget {
   const SecurityPage({super.key, required this.shellPath});
 
   final String shellPath;
 
   @override
+  State<SecurityPage> createState() => _SecurityPageState();
+}
+
+class _SecurityPageState extends State<SecurityPage> {
+  /// Passkey enrolment follows the admin auth-method switch (DEC-PROD-052).
+  bool _passkeyEnabled = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPolicies();
+  }
+
+  Future<void> _loadPolicies() async {
+    try {
+      final policies = await context.read<GetAuthMethods>()();
+      if (!mounted) return;
+      setState(() {
+        _passkeyEnabled = policies.any(
+          (policy) =>
+              policy.method == AuthMethodPolicy.passkey && policy.enabled,
+        );
+      });
+    } catch (_) {
+      // Keep the row; the endpoint still answers AUTH_METHOD_DISABLED.
+    }
+  }
+
+  String get shellPath => widget.shellPath;
+
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final auth = context.watch<AuthCubit>().state;
-    final phone = auth is AuthSignedIn ? (auth.profile.phone ?? '') : '';
+    final profile = auth is AuthSignedIn ? auth.profile : null;
+    final phone = profile?.phone ?? '';
+    final email = profile?.email ?? '';
+    final verified =
+        (profile?.phoneVerifiedAt ?? '').isNotEmpty ||
+        (profile?.emailVerifiedAt ?? '').isNotEmpty;
+    final verifiedChip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: DealGoColors.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        l10n.securityVerified,
+        style: Theme.of(context).textTheme.labelSmall
+            ?.copyWith(color: DealGoColors.primary),
+      ),
+    );
     final textTheme = Theme.of(context).textTheme;
     return Scaffold(
       backgroundColor: DealGoColors.card,
@@ -54,27 +105,24 @@ class SecurityPage extends StatelessWidget {
             const SizedBox(height: 8),
             _Group(
               children: [
-                _Row(
-                  icon: DealGoIcons.phone,
-                  title: l10n.securityPhone,
-                  body: phone.isEmpty ? '—' : phone,
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: DealGoColors.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      l10n.securityVerified,
-                      style: textTheme.labelSmall?.copyWith(
-                        color: DealGoColors.primary,
-                      ),
-                    ),
+                if (phone.isNotEmpty || email.isEmpty)
+                  _Row(
+                    icon: DealGoIcons.phone,
+                    title: l10n.securityPhone,
+                    body: phone.isEmpty ? '—' : phone,
+                    trailing: (profile?.phoneVerifiedAt ?? '').isNotEmpty
+                        ? verifiedChip
+                        : null,
                   ),
-                ),
+                if (email.isNotEmpty)
+                  _Row(
+                    icon: DealGoIcons.mail,
+                    title: l10n.securityEmail,
+                    body: email,
+                    trailing: (profile?.emailVerifiedAt ?? '').isNotEmpty
+                        ? verifiedChip
+                        : null,
+                  ),
                 _Row(
                   icon: DealGoIcons.lock,
                   title: l10n.securityChangePassword,
@@ -82,7 +130,7 @@ class SecurityPage extends StatelessWidget {
                   onTap: () =>
                       context.push(AccountRoutes.changePassword(shellPath)),
                 ),
-                _PasskeyRow(hasPhone: phone.isNotEmpty),
+                if (_passkeyEnabled) _PasskeyRow(hasVerifiedLogin: verified),
                 _Row(
                   icon: DealGoIcons.devices,
                   title: l10n.securitySessions,
@@ -107,7 +155,7 @@ class SecurityPage extends StatelessWidget {
                   title: l10n.securityTerms,
                   body: l10n.securityTermsBody,
                   onTap: () => launchUrl(
-                    Uri.parse('https://dealgo.vn/terms'),
+                    Uri.parse('https://$appLinkHost/terms'),
                     mode: LaunchMode.externalApplication,
                   ),
                 ),
@@ -213,9 +261,9 @@ class _Row extends StatelessWidget {
 /// S025 passkey enrolment (DEC-PROD-045). Wired to the existing registration endpoints;
 /// devices or builds that cannot create passkeys get a calm explanation, never a crash.
 class _PasskeyRow extends StatefulWidget {
-  const _PasskeyRow({required this.hasPhone});
+  const _PasskeyRow({required this.hasVerifiedLogin});
 
-  final bool hasPhone;
+  final bool hasVerifiedLogin;
 
   @override
   State<_PasskeyRow> createState() => _PasskeyRowState();
@@ -234,7 +282,7 @@ class _PasskeyRowState extends State<_PasskeyRow> {
     final l10n = AppLocalizations.of(context);
     final auth = context.read<AuthCubit>().state;
     if (auth is! AuthSignedIn || _busy) return;
-    if (!widget.hasPhone) {
+    if (!widget.hasVerifiedLogin) {
       _say(l10n.securityPasskeyNeedsPhone);
       return;
     }

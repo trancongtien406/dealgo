@@ -1,3 +1,5 @@
+import { lockDriverAssignment } from '../../shared/tx/driver-assignment-lock.js';
+import type { GeoBox } from '../dispatch/dispatch-filter.js';
 import { cancellationCountsAgainstDriver } from '../../shared/cancel-actor.js';
 import type { DriverJobCounts } from '../../shared/driver-job-counts.js';
 import { randomUUID } from 'node:crypto';
@@ -7,7 +9,11 @@ import {
   resolveServiceRegionCode,
 } from '../service-area/service-regions.js';
 import { Prisma, type PrismaClient } from '../../generated/prisma/client.js';
-import { writeOpsActionOutbox, writeStatusOutbox } from '../communication/outbox/outbox.write.js';
+import {
+  writeOpsActionOutbox,
+  writeRideUnassignedOutbox,
+  writeStatusOutbox,
+} from '../communication/outbox/outbox.write.js';
 import { RideRuleError } from './ride.error.js';
 import {
   redeemVoucherInTx,
@@ -29,12 +35,21 @@ import {
   type OpsReassignInput,
   type RideSnapshot,
   type CancelActorName,
+  type CustomerFeeRecord,
+  type DeclineOfferInput,
+  type DriverCancelInput,
+  type NoShowInput,
+  type RaiseFareInput,
+  type RideOfferStatusName,
   type RideStatusName,
+  type RideTimeoutPolicy,
   type SelectInput,
+  type WithdrawOfferInput,
 } from './ride-ledger.js';
 import type { OpsInterveneResult, OpsRidePage, RideRepository } from './ride.repository.js';
 
 type RideTx = Prisma.TransactionClient;
+export { lockDriverAssignment };
 
 class RideAssignmentConflict extends Error {
   constructor() {
@@ -91,18 +106,31 @@ export class PrismaRideRepository implements RideRepository {
     return result.ride;
   }
 
-  async listOpen(now: Date, limit?: number): Promise<OpenRideListing[]> {
+  async listOpen(
+    now: Date,
+    limit?: number,
+    vehicleClassCode?: string,
+    area?: GeoBox,
+  ): Promise<OpenRideListing[]> {
     const take =
       limit !== undefined && Number.isSafeInteger(limit) && limit > 0 ? limit : undefined;
     const rides = await this.db.ride.findMany({
       where: {
         status: 'NEGOTIATING',
         expiresAt: { gt: now },
+        ...(vehicleClassCode ? { vehicleClassCode } : {}),
+        ...(area
+          ? {
+              pickupLat: { gte: area.minLat, lte: area.maxLat },
+              pickupLng: { gte: area.minLng, lte: area.maxLng },
+            }
+          : {}),
       },
       orderBy: [{ expiresAt: 'asc' }, { id: 'asc' }],
       ...(take !== undefined ? { take } : {}),
       select: {
         id: true,
+        customerId: true,
         pickupLat: true,
         pickupLng: true,
         pickupLabel: true,
@@ -111,17 +139,20 @@ export class PrismaRideRepository implements RideRepository {
         dropoffLabel: true,
         offeredFareVnd: true,
         referenceFareVnd: true,
+        vehicleClassCode: true,
         expiresAt: true,
         _count: { select: { offers: true } },
       },
     });
     return rides.map((ride) => ({
       id: ride.id,
+      customerId: ride.customerId,
       status: 'NEGOTIATING',
       pickup: { lat: ride.pickupLat, lng: ride.pickupLng, label: ride.pickupLabel },
       dropoff: { lat: ride.dropoffLat, lng: ride.dropoffLng, label: ride.dropoffLabel },
       offeredFareVnd: ride.offeredFareVnd,
       referenceFareVnd: ride.referenceFareVnd,
+      vehicleClassCode: ride.vehicleClassCode,
       expiresAt: ride.expiresAt,
       offerCount: ride._count.offers,
     }));
@@ -168,6 +199,9 @@ export class PrismaRideRepository implements RideRepository {
             select: { id: true, rideId: true, driverId: true, status: true },
           });
           if (offer && offer.rideId === input.rideId && offer.status === 'PENDING') {
+            // Serialize every assignment of this driver (ride select + food claim) so
+            // two customers cannot both pass the capacity count at the same time.
+            await lockDriverAssignment(tx, offer.driverId);
             const maxJobs = input.maxConcurrentJobs ?? 1;
             const [activeRides, activeFood] = await Promise.all([
               tx.ride.count({
@@ -181,7 +215,8 @@ export class PrismaRideRepository implements RideRepository {
               tx.foodOrder.count({
                 where: {
                   assignedDriverId: offer.driverId,
-                  status: { in: ['ASSIGNED', 'PICKED_UP'] },
+                  // PREPARING counts once a driver was assigned early (food early assign).
+                  status: { in: ['PREPARING', 'ASSIGNED', 'PICKED_UP'] },
                 },
               }),
             ]);
@@ -312,6 +347,127 @@ export class PrismaRideRepository implements RideRepository {
     );
   }
 
+  raiseFare(input: RaiseFareInput): Promise<RideSnapshot> {
+    return this.mutate(input.rideId, (ledger) => ledger.raiseFare(input));
+  }
+
+  declineOffer(input: DeclineOfferInput): Promise<RideSnapshot> {
+    return this.mutate(input.rideId, (ledger) => ledger.declineOffer(input));
+  }
+
+  withdrawOffer(input: WithdrawOfferInput): Promise<RideSnapshot> {
+    return this.mutate(input.rideId, (ledger) => ledger.withdrawOffer(input));
+  }
+
+  driverCancel(input: DriverCancelInput): Promise<RideSnapshot> {
+    return this.mutate(input.rideId, (ledger) => ledger.driverCancel(input), {
+      releaseVoucherAt: input.now,
+    });
+  }
+
+  markNoShow(input: NoShowInput): Promise<RideSnapshot> {
+    return this.mutate(input.rideId, (ledger) => ledger.markNoShow(input), {
+      releaseVoucherAt: input.now,
+    });
+  }
+
+  /** Return rides stuck in ASSIGNED / DRIVER_EN_ROUTE to bidding (worker). */
+  async timeoutDue(input: {
+    now: Date;
+    policy: RideTimeoutPolicy;
+    windowExpiresAt: Date;
+    limit?: number;
+  }): Promise<string[]> {
+    const { now, policy } = input;
+    const or: Prisma.RideWhereInput[] = [];
+    if (policy.assignedTimeoutMinutes > 0) {
+      or.push({
+        status: 'ASSIGNED',
+        statusChangedAt: { lte: new Date(now.getTime() - policy.assignedTimeoutMinutes * 60_000) },
+      });
+    }
+    if (policy.enRouteTimeoutMinutes > 0) {
+      or.push({
+        status: 'DRIVER_EN_ROUTE',
+        statusChangedAt: { lte: new Date(now.getTime() - policy.enRouteTimeoutMinutes * 60_000) },
+      });
+    }
+    if (or.length === 0) {
+      return [];
+    }
+    const due = await this.db.ride.findMany({
+      where: { OR: or },
+      orderBy: [{ statusChangedAt: 'asc' }, { id: 'asc' }],
+      take: Math.min(Math.max(input.limit ?? 100, 1), 500),
+      select: { id: true },
+    });
+    const done: string[] = [];
+    for (const row of due) {
+      try {
+        await this.mutate(
+          row.id,
+          (ledger) =>
+            ledger.systemTimeout({
+              rideId: row.id,
+              now,
+              policy,
+              windowExpiresAt: input.windowExpiresAt,
+            }),
+          { releaseVoucherAt: now },
+        );
+        done.push(row.id);
+      } catch (error) {
+        if (!(error instanceof RideRuleError)) {
+          throw error;
+        }
+      }
+    }
+    return done;
+  }
+
+  async pendingFeeTotal(customerId: string): Promise<number> {
+    const sum = await this.db.customerFeeCharge.aggregate({
+      where: { customerId, status: 'PENDING' },
+      _sum: { amountVnd: true },
+    });
+    return sum._sum.amountVnd ?? 0;
+  }
+
+  private async mutate(
+    rideId: string,
+    apply: (ledger: RideLedger) => Awaited<ReturnType<RideLedger['cancel']>>,
+    options: { releaseVoucherAt?: Date } = {},
+  ): Promise<RideSnapshot> {
+    let outcome: Awaited<ReturnType<RideLedger['cancel']>>;
+    try {
+      outcome = await this.db.$transaction(async (tx) => {
+        const ledger = await this.hydrateRide(tx, rideId);
+        if (!ledger) {
+          return { error: 'RIDE_NOT_FOUND' as const };
+        }
+        const next = apply(ledger);
+        if (next.error || !next.ride) {
+          await this.persist(tx, ledger);
+          return next;
+        }
+        await this.persist(tx, ledger);
+        if (options.releaseVoucherAt) {
+          await releaseVoucherInTx(tx, { entityType: 'RIDE', entityId: rideId }, options.releaseVoucherAt);
+        }
+        return next;
+      });
+    } catch (error) {
+      if (error instanceof RideAssignmentConflict) {
+        throw new RideRuleError('RIDE_STATUS_CONFLICT');
+      }
+      throw error;
+    }
+    if (outcome.error || !outcome.ride) {
+      throw new RideRuleError(outcome.error ?? 'RIDE_NOT_FOUND');
+    }
+    return outcome.ride;
+  }
+
   async listPage(
     page: number,
     limit: number,
@@ -430,7 +586,52 @@ export class PrismaRideRepository implements RideRepository {
       }
       counts.set(row.assignedDriverId, current);
     }
+    // Rides the driver dropped after assignment (self-cancel / timeout) count as finished.
+    const dropped = await this.db.driverJobCancellation.groupBy({
+      by: ['driverId'],
+      where: { driverId: { in: [...driverIds] }, entityType: 'RIDE', actor: { in: ['DRIVER', 'SYSTEM'] } },
+      _count: { _all: true },
+    });
+    for (const row of dropped) {
+      const current = counts.get(row.driverId) ?? { completed: 0, finished: 0 };
+      current.finished += row._count._all;
+      counts.set(row.driverId, current);
+    }
     return counts;
+  }
+
+  async listIdsForDriverInStatuses(driverId: string, statuses: readonly string[]): Promise<string[]> {
+    const rows = await this.db.ride.findMany({
+      where: { assignedDriverId: driverId, status: { in: [...statuses] as never } },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
+  async customerCancelTimes(customerId: string, since: Date): Promise<Date[]> {
+    const rows = await this.db.ride.findMany({
+      where: {
+        customerId,
+        status: 'CANCELLED',
+        cancelledBy: 'CUSTOMER',
+        assignedDriverId: { not: null },
+        statusChangedAt: { gte: since },
+      },
+      select: { statusChangedAt: true },
+      orderBy: { statusChangedAt: 'desc' },
+      take: 50,
+    });
+    return rows.flatMap((row) => (row.statusChangedAt ? [row.statusChangedAt] : []));
+  }
+
+  async listIdsForCustomerInStatuses(customerId: string, statuses: readonly string[]): Promise<string[]> {
+    const rows = await this.db.ride.findMany({
+      where: { customerId, status: { in: [...statuses] as never } },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
   }
 
   async listFinishedForDriver(
@@ -539,7 +740,7 @@ export class PrismaRideRepository implements RideRepository {
     input: DriverLifecycleInput,
     onCompleted?: CompletionHook<RideSnapshot>,
   ): Promise<RideSnapshot> {
-    return this.driverLifecycle(input, (ledger) => ledger.complete(input), onCompleted);
+    return this.driverLifecycle(input, (ledger) => ledger.complete(input), onCompleted, true);
   }
 
   async expireDue(now: Date, limit = 100): Promise<string[]> {
@@ -561,6 +762,12 @@ export class PrismaRideRepository implements RideRepository {
         if (updated.count !== 1) {
           return false;
         }
+        await tx.ride.update({ where: { id: row.id }, data: { statusChangedAt: now } });
+        // Live offers die with the ride.
+        await tx.rideOffer.updateMany({
+          where: { rideId: row.id, status: 'PENDING' },
+          data: { status: 'LOST' },
+        });
         await writeStatusOutbox(tx, {
           aggregateType: 'Ride',
           aggregateId: row.id,
@@ -579,6 +786,7 @@ export class PrismaRideRepository implements RideRepository {
     input: DriverLifecycleInput,
     apply: (ledger: RideLedger) => Awaited<ReturnType<RideLedger['markEnRoute']>>,
     onChanged?: CompletionHook<RideSnapshot>,
+    collectFees = false,
   ): Promise<RideSnapshot> {
     let outcome: Awaited<ReturnType<RideLedger['markEnRoute']>>;
     try {
@@ -587,8 +795,35 @@ export class PrismaRideRepository implements RideRepository {
         if (!ledger) {
           return { error: 'RIDE_NOT_FOUND' as const };
         }
-        const next = apply(ledger);
+        let next = apply(ledger);
+        let collected: CustomerFeeRecord[] = [];
+        if (collectFees && next.ride && !next.error) {
+          // Earlier late-cancel / no-show fees are collected in this ride's cash.
+          collected = await this.lockPendingFees(tx, next.ride.customerId, next.ride.id);
+          if (collected.length > 0) {
+            ledger.collectFees(next.ride.id, collected, input.now);
+            const reread = ledger.read(next.ride.id, input.now);
+            if (reread) {
+              next = {
+                ride: {
+                  ...reread,
+                  collectedFees: collected.map((fee) => ({
+                    id: fee.id,
+                    amountVnd: fee.amountVnd,
+                    beneficiaryDriverId: fee.beneficiaryDriverId,
+                  })),
+                },
+              };
+            }
+          }
+        }
         await this.persist(tx, ledger);
+        if (collected.length > 0) {
+          await tx.customerFeeCharge.updateMany({
+            where: { id: { in: collected.map((fee) => fee.id) }, status: 'PENDING' },
+            data: { status: 'COLLECTED', collectedRideId: input.rideId, collectedAt: input.now },
+          });
+        }
         if (next.ride && !next.error && onChanged) {
           await onChanged(tx, next.ride);
         }
@@ -604,6 +839,34 @@ export class PrismaRideRepository implements RideRepository {
       throw new RideRuleError(outcome.error ?? 'RIDE_NOT_FOUND');
     }
     return outcome.ride;
+  }
+
+  private async lockPendingFees(
+    tx: RideTx,
+    customerId: string,
+    rideId: string,
+  ): Promise<CustomerFeeRecord[]> {
+    await tx.$queryRaw`
+      SELECT id FROM "customer_fee_charges"
+      WHERE "customerId" = CAST(${customerId} AS uuid) AND "status" = 'PENDING'
+      ORDER BY id
+      FOR UPDATE
+    `;
+    const rows = await tx.customerFeeCharge.findMany({
+      where: { customerId, status: 'PENDING', rideId: { not: rideId } },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      customerId: row.customerId,
+      rideId: row.rideId,
+      kind: row.kind,
+      amountVnd: row.amountVnd,
+      beneficiaryDriverId: row.beneficiaryDriverId,
+      status: row.status,
+      collectedRideId: row.collectedRideId,
+      createdAt: row.createdAt,
+    }));
   }
 
   private async findByCustomerKey(
@@ -694,6 +957,7 @@ export class PrismaRideRepository implements RideRepository {
       dropoffLabel: string;
       offeredFareVnd: number;
       referenceFareVnd: number;
+      vehicleClassCode: string;
       agreedFareVnd: number | null;
       discountVnd: number;
       voucherCode: string | null;
@@ -706,15 +970,23 @@ export class PrismaRideRepository implements RideRepository {
       idempotencyKey: string;
       createdAt: Date;
       updatedAt: Date;
+      assignedAt?: Date | null;
+      statusChangedAt?: Date | null;
+      noShow?: boolean;
+      cancelReasonCode?: string | null;
+      priorFeesVnd?: number;
+      fareRaiseCount?: number;
+      repostOfRideId?: string | null;
       offers: Array<{
         id: string;
         rideId: string;
         driverId: string;
         amountVnd: number;
         kind: 'ACCEPT' | 'COUNTER';
-        status: 'PENDING' | 'SELECTED' | 'LOST';
+        status: RideOfferStatusName;
         expiresAt: Date;
         createdAt: Date;
+        editCount?: number;
       }>;
     }>,
     selections: Array<{
@@ -738,6 +1010,7 @@ export class PrismaRideRepository implements RideRepository {
           dropoffLabel: ride.dropoffLabel,
           offeredFareVnd: ride.offeredFareVnd,
           referenceFareVnd: ride.referenceFareVnd,
+          vehicleClassCode: ride.vehicleClassCode,
           agreedFareVnd: ride.agreedFareVnd,
           discountVnd: ride.discountVnd,
           voucherCode: ride.voucherCode,
@@ -750,9 +1023,28 @@ export class PrismaRideRepository implements RideRepository {
           idempotencyKey: ride.idempotencyKey,
           createdAt: ride.createdAt,
           updatedAt: ride.updatedAt,
+          assignedAt: ride.assignedAt ?? null,
+          statusChangedAt: ride.statusChangedAt ?? null,
+          noShow: ride.noShow ?? false,
+          cancelReasonCode: ride.cancelReasonCode ?? null,
+          priorFeesVnd: ride.priorFeesVnd ?? 0,
+          fareRaiseCount: ride.fareRaiseCount ?? 0,
+          repostOfRideId: ride.repostOfRideId ?? null,
         }),
       ),
-      offers: rides.flatMap((ride) => ride.offers),
+      offers: rides.flatMap((ride) =>
+        ride.offers.map((offer) => ({
+          id: offer.id,
+          rideId: offer.rideId,
+          driverId: offer.driverId,
+          amountVnd: offer.amountVnd,
+          kind: offer.kind,
+          status: offer.status,
+          expiresAt: offer.expiresAt,
+          createdAt: offer.createdAt,
+          editCount: offer.editCount ?? 0,
+        })),
+      ),
       selections,
     });
   }
@@ -786,7 +1078,7 @@ export class PrismaRideRepository implements RideRepository {
     let stale = false;
     const updates = changes.rides.filter((ride) => !ride.isNew);
     const inserts = changes.rides.filter((ride) => ride.isNew);
-    const statusEvents: Array<{ id: string; status: RideStatusName }> = [];
+    const statusEvents: Array<{ id: string; status: RideStatusName; keySuffix?: string }> = [];
 
     for (const change of updates) {
       if (change.loadedStatus !== null && change.loadedStatus !== change.row.status) {
@@ -806,7 +1098,13 @@ export class PrismaRideRepository implements RideRepository {
           }
           stale = true;
         } else {
-          statusEvents.push({ id: change.row.id, status: change.row.status });
+          statusEvents.push({
+            id: change.row.id,
+            status: change.row.status,
+            keySuffix: PRE_TRIP_STATUSES.has(change.row.status) && change.row.assignedDriverId
+              ? `${change.row.assignedDriverId}@${change.row.statusChangedAt.getTime()}`
+              : undefined,
+          });
         }
         continue;
       }
@@ -824,9 +1122,24 @@ export class PrismaRideRepository implements RideRepository {
             kind: change.row.kind,
             status: change.row.status,
             expiresAt: change.row.expiresAt,
+            editCount: change.row.editCount,
           },
         });
       }
+    }
+
+    for (const record of changes.cancellations) {
+      await tx.driverJobCancellation.create({
+        data: {
+          entityType: 'RIDE',
+          entityId: record.rideId,
+          driverId: record.driverId,
+          actor: record.actor,
+          reasonCode: record.reasonCode.slice(0, 40),
+          fromStatus: record.fromStatus,
+          createdAt: record.at,
+        },
+      });
     }
 
     for (const change of inserts) {
@@ -845,17 +1158,42 @@ export class PrismaRideRepository implements RideRepository {
       });
     }
 
+    // Fees reference the ride, so they go after ride inserts.
+    if (changes.fees.length > 0) {
+      await tx.customerFeeCharge.createMany({
+        data: changes.fees.map((fee) => ({
+          id: fee.id,
+          customerId: fee.customerId,
+          rideId: fee.rideId,
+          kind: fee.kind,
+          amountVnd: fee.amountVnd,
+          beneficiaryDriverId: fee.beneficiaryDriverId,
+          status: fee.status,
+          createdAt: fee.createdAt,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
     for (const event of statusEvents) {
       await writeStatusOutbox(tx, {
         aggregateType: 'Ride',
         aggregateId: event.id,
         status: event.status,
+        ...(event.keySuffix ? { eventKeySuffix: event.keySuffix } : {}),
       });
+    }
+
+    for (const drop of changes.unassignments) {
+      await writeRideUnassignedOutbox(tx, drop);
     }
 
     return stale;
   }
 }
+
+/** A ride can come back to these after a drop; their outbox keys carry driver + time. */
+const PRE_TRIP_STATUSES = new Set<RideStatusName>(['ASSIGNED', 'DRIVER_EN_ROUTE', 'DRIVER_ARRIVED']);
 
 function rideData(row: {
   id: string;
@@ -868,6 +1206,7 @@ function rideData(row: {
   dropoffLabel: string;
   offeredFareVnd: number;
   referenceFareVnd: number;
+  vehicleClassCode: string;
   agreedFareVnd: number | null;
   status: RideStatusName;
   assignedDriverId: string | null;
@@ -875,8 +1214,12 @@ function rideData(row: {
   expiresAt: Date;
   idempotencyKey: string;
   createdAt: Date;
+  statusChangedAt: Date;
+  repostOfRideId: string | null;
 }) {
   return {
+    statusChangedAt: row.statusChangedAt,
+    repostOfRideId: row.repostOfRideId,
     id: row.id,
     customerId: row.customerId,
     pickupLat: row.pickupLat,
@@ -892,6 +1235,7 @@ function rideData(row: {
     }),
     offeredFareVnd: row.offeredFareVnd,
     referenceFareVnd: row.referenceFareVnd,
+    vehicleClassCode: row.vehicleClassCode,
     agreedFareVnd: row.agreedFareVnd,
     status: row.status,
     assignedDriverId: row.assignedDriverId,
@@ -920,8 +1264,20 @@ function ridePatch(row: {
   assignedDriverId: string | null;
   selectedOfferId: string | null;
   expiresAt: Date;
+  assignedAt: Date | null;
+  statusChangedAt: Date;
+  noShow: boolean;
+  cancelReasonCode: string | null;
+  priorFeesVnd: number;
+  fareRaiseCount: number;
 }) {
   return {
+    assignedAt: row.assignedAt,
+    fareRaiseCount: row.fareRaiseCount,
+    statusChangedAt: row.statusChangedAt,
+    noShow: row.noShow,
+    cancelReasonCode: row.cancelReasonCode,
+    priorFeesVnd: row.priorFeesVnd,
     pickupLat: row.pickupLat,
     pickupLng: row.pickupLng,
     pickupLabel: row.pickupLabel,
@@ -948,12 +1304,14 @@ function offerData(row: {
   driverId: string;
   amountVnd: number;
   kind: 'ACCEPT' | 'COUNTER';
-  status: 'PENDING' | 'SELECTED' | 'LOST';
+  status: RideOfferStatusName;
   expiresAt: Date;
   createdAt: Date;
+  editCount: number;
 }) {
   return row;
 }
+
 
 function isUniqueConflict(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';

@@ -1,128 +1,47 @@
 ---
 doc_id: DG-AI-005
-title: "DealGo — Flutter gap matrix vs dealgo-flutter.mdc"
-version: "0.6.0"
+title: "DealGo — Flutter gap matrix"
+version: "1.0.0"
 status: "ACTIVE"
 owner: "Tech Lead"
-last_updated: "2026-10-14"
+last_updated: "2026-10-26"
 ---
 
 # Flutter gap matrix
 
-> Widget/`analyze` xanh **không** bằng architecture Done. Done = một Dio, ApiPaths, không fake trong presentation, UI → Cubit → client, refresh story trung thực, realtime reconcile bằng REST.
+> Green widget tests / `flutter analyze` are not Done. Done = one shared Dio, `ApiPaths`, no fake data in presentation, UI → Cubit → client, honest refresh, realtime reconciled with REST.
 
-## Verdict
+Current state of `mobile/` (one app with Customer, Driver and Merchant shells). Code is the source of truth.
 
-Architecture remediation + WO2 + **WO3 (P0 missing screens)**:
+## Architecture
 
-- **Auth phone/OTP pages no longer call `IdentityClient`.** `PhoneAuthCubit` owns challenge/verify/resend/mock; login `ShellRoute` provides the Cubit.
-- **One shared Dio** from `createDealGoDio` via DI only.
-- **`lib/core/design_system/`** holds tokens + shared primitives: buttons, card, illustration, **`DealGoChip`**, **`DealGoSegmentedControl`**, **`DealGoBanner`**, **`DealGoTabBar`** (merchant/driver). Customer elevated center stays in `CustomerTabBar`.
-- Feature chips (`DriverChip` / `MerchantChip` / `RideStatusChip` / `OnboardingStatusChip`) are **thin wrappers** over `DealGoChip`. Material `FilterChip`/`ChoiceChip` removed from driver earnings, driver notifications, merchant KYB; activity/inbox/place filters use `DealGoSegmentedControl`.
-- **l10n:** `app_vi.arb` / `app_en.arb` expanded (shell tabs, auth/OTP, role picker, filters, statuses, empty/offline, chat/voice + WO3 P0 screen strings). High-traffic surfaces wired to `AppLocalizations`. Many domain/marketing strings elsewhere still hardcoded VN.
-- **Folder hygiene:** `customer_home_widgets.dart` barrel → `home_hero.dart` / `home_services.dart` / `home_sections.dart` (+ `home_shared.dart`). Feature layout already matches `core/` + `features/*/presentation|data|domain`.
-- **WO3 P0 screens shipped (mock/fixture OK):** C008 offer detail, C012 pickup code, C014 safety, C016/C035 cancel reason pickers, D031 failed delivery, D034 completed job, M022–M024 shop settings, M028 variants shell. Routes in `app_router` + `*_routes.dart`; CTAs wired from offers/tracking/jobs/products.
-- Platform shells (FCM / LiveKit / Maps): unchanged — soft-fail / stub only.
-- Motion scaffold started; M2+ still open.
-- **No claim of production FCM / LiveKit / Maps SDK** — key-fill and `flutterfire configure` still open (ADR-006).
+- `core/network/`: one shared Dio (`createDealGoDio`) injected via `app/di.dart`; `ApiPaths`; envelope + `ApiException`; single-flight token refresh. Release builds refuse `http://` base URLs (`assertSecureApiBaseUrl`).
+- Features follow `features/*/{data,domain,presentation}`; pages talk to Cubits only. Mock data lives in `core/mock/` and is used only when `useMockData` is on.
+- `core/design_system/`: tokens and shared primitives (`DealGoChip`, `DealGoSegmentedControl`, `DealGoBanner`, `DealGoTabBar`, buttons, cards).
+- l10n: `app_vi.arb` / `app_en.arb` via `AppLocalizations`.
 
-### God-page extraction progress (LOC ≈ `wc -l`, 2026-10-14)
+## Feature status
 
-| Page / widgets | Before | After | Status |
-|---|---:|---:|---|
-| `otp_page.dart` | ~1055 | ~226 + `otp_widgets.dart` | Extracted |
-| `customer_home_page.dart` | ~1283 | ~90 | Extracted |
-| `customer_home_widgets.dart` | ~1199 | barrel + 3 files (~350 / ~295 / ~500) | Split (WO2) |
-| `ride_offers_page.dart` | ~1076 | ~424 + widgets | Extracted |
-| `food_checkout_page.dart` | ~902 | ~221 + widgets | Extracted |
+| Area | In code | Gaps |
+|---|---|---|
+| Auth | Phone OTP, passkey, email + password (sign-up OTP, reset); role picker; partner onboarding (driver KYC, merchant KYB) | — |
+| Customer Ride | Fare suggestion, own offer, live driver offers over Socket.IO (no polling), choose driver, pickup code (driver enters it to start), tracking, cancel with reason, share trip, safety page | — |
+| Customer Food | Discovery, store, single-store cart, checkout with voucher, order tracking, order-change card (accept new total or cancel free) | — |
+| Driver | Duty toggle with presence; GPS policy 15 s / 50 m / 60 s; ride bargaining (offer / counter, socket-only outcome); active ride; food pickup and delivery, failed delivery; earnings history with the platform fee per job and per week | The open-jobs list refreshes only on open, duty change or retry; it does not listen to the server's new-request socket event (drivers learn of new requests via push) |
+| Merchant | Orders queue and detail, order-change sheet, catalog CRUD with photos and variants, shop settings | — |
+| Chat / voice | Transaction chat on ride and food tracking. In-app voice calls customer ↔ assigned driver (`features/voice`, `livekit_client`): call button on ride/food tracking and the driver contact actions (shown only when `GET /v1/calls/config` says enabled); full-screen call overlay over every route with accept / decline, mute, speaker, timer; incoming via the Socket.IO `call` event or the `Call.incoming` push; the device ringtone loops with vibration while ringing (`SystemCallRinger`, `flutter_ringtone_player`); native call UI through `flutter_callkit_incoming`: CallKit on iOS (PushKit VoIP push wakes a killed app once the APNs key is set; the PushKit token is uploaded again whenever iOS rotates it) and a self-managed ConnectionService full-screen incoming call on Android (shown from the FCM background handler); answer / decline / hang-up on the native UI drive the same call cubit; mic permission asked on first call, Android 12+ also asks `BLUETOOTH_CONNECT` for headset audio; iOS `audio` + `voip` background modes | CallKit/PushKit cannot be tested on the iOS Simulator and is untested on a device. The APNs key is set in dev, and token auth is accepted on both the sandbox and production hosts (a dummy token returns `BadDeviceToken`). Without the key, iOS falls back to the FCM alert. With VoIP on, iOS rings once (the FCM copy skips iOS). Android gets a data-only call push, so only the native UI shows, and Android 14+ asks once for the full-screen call permission. The R8 release APK and AAB build with the keep rules (debug-signed locally; the release keystore `android/key.properties` does not exist yet). Real-device tests are pending: no iPhone is connected |
+| Push | `firebase_messaging` with `GoogleService-Info.plist` / `google-services.json`; token register / unregister on sign-out; tap opens `data.path` checked against the user's roles, else the inbox | Real-device test of each push type pending |
+| Maps | `flutter_map` raster tiles (Mapbox or `MAP_TILE_URL`), placeholder when no key; route line from `/v1/rides/route`; saved map style (standard / satellite / dark) on Mapbox; shared pick-on-map screen with cached reverse geocoding | No vector map SDK (no 3D buildings / offline packs) |
+| Deep links | `dealgo://` and `https://<app-link-host>/app/*` registered in the Android manifest and iOS entitlements; parsed by `DeepLinkRouterHook` | — |
 
-**Still large pages (not this pass):** `driver_home_page`, `ride_matching_page`, `ride_map_page`, `food_discovery_page`, `food_store_page`, `merchant_order_page`, `place_search_page`, `role_picker_page`. Remaining VN hardcodes outside high-traffic surfaces.
+## Code-health debt
 
-## Phase 4 — FCM + LiveKit + Map ports (1A+2A) — DONE (ports / stubs)
-
-- [x] `PushPort` + `FakePush` / `FcmPush`; soft-fail when Firebase absent
-- [x] `VoiceClient` → voice-session; Cubit + sheet (LiveKit SDK later)
-- [x] Voice button next to chat on ride/food tracking
-- [x] `MapPort` + placeholder; live raster tiles via `MAP_TILE_URL` (flutter_map), soft-fail otherwise
-- [x] `DriverDutyCubit` posts presence on online/offline
-- [x] Customer activity history list endpoints when present
-- [x] Firebase options placeholder + safe bootstrap
-- [x] Notification / deeplink / analytics shells in `core/`
-- [x] Motion scaffold + proof on role picker → customer shell
-
-## Phase 2 — DONE
-
-- [x] Driver/Merchant feature data layers + role-scoped Cubits
-- [x] `flutter_localizations` + ARB `vi` / `en` (expanded in WO2)
-- [x] Snapshot realtime + reconnect → REST in tracking Cubits
-- [x] Partner applications client; KYC/KYB when `!useMockData`
-- [x] Chat ApiPaths + client + DI + tracking sheet
-
-## Phase 3b — merchant catalog write — DONE
-
-- [x] Merchant catalog GET + item create/update/availability write surface
-
-## WO2 — design system + l10n + hygiene — DONE (this pass)
-
-- [x] `DealGoChip` (tones: neutral/brand/success/warning/danger/promo)
-- [x] `DealGoSegmentedControl` (replaces Material filter/choice chip groups)
-- [x] `DealGoBanner` (info/warning/offline/empty)
-- [x] `DealGoTabBar` for merchant/driver; `CustomerTabBar` kept (elevated Đặt)
-- [x] Feature chip wrappers → shared `DealGoChip`
-- [x] ARB vi/en expanded; high-traffic strings localized
-- [x] `customer_home_widgets` split into hero/services/sections
-- [x] WO3 P0 screens: C008, C012, C014, C016, C035, D031, D034, M022–M024, M028
-- [ ] Remaining P0 partials (D023 OTP enter, C036 invoice, driver lifecycle fidelity, M027/M025 photo+DnD done 13f, KYC/KYB depth, maps)
-- [ ] Remaining hardcoded VN on low-traffic / domain marketing copy
-
-## Vi phạm / gaps còn lại
-
-| Mức | Vấn đề |
+| Level | Item |
 |---|---|
-| Med | Real Google Maps / Mapbox SDK not linked (placeholder until key-fill) |
-| Med | Production Firebase / `flutterfire configure` / APNs not done — FCM shell only |
-| Med | LiveKit room join SDK not linked (token + room name stub) |
-| Med | Remaining P0 PARTIAL/MISSING: D023, C036, D021–D030 fidelity, M017/M019, KYC/KYB steps, D036/M021 soft |
-| Med | God-page debt reduced further (home widgets split); other pages still ≥500 LOC; residual VN hardcodes |
-| Med | OS app_links / universal links not registered (parser + hook shell only) |
-| Med | Motion applied to few routes; most screens still default Material transitions |
-| Med | Tab icons still Material (temporary; brand assets not wired to tabs) |
-| Done | MapPort + soft-fail placeholder |
-| Done | PushPort + FcmPush soft-fail + token register path |
-| Done | VoiceClient + tracking voice CTA |
-| Done | Driver presence on duty toggle |
-| Done | Customer ride/food history list client |
-| Done | Merchant owner catalog write surface |
-| Done | Transaction chat sheet on ride/food tracking |
-| Done | design_system under `core/` + chip/segment/banner/tab primitives |
-| Done | Dio clients require injected shared Dio |
-| Done | Shared Dio + ApiPaths + single-flight refresh |
-| Done | Fixtures khỏi presentation |
-| Done | Page network → Cubit |
-| Done | Driver/Merchant feature data layers |
-| Done | Role-scoped feed/queue Cubits |
-| Done | l10n bootstrap + high-traffic auth/shell/OTP/role/filters |
-| Done | Snapshot realtime in tracking Cubits + reconnect → GET |
-| Done | Partner application API wiring |
-| Done | Chat ApiPaths + thin client + DI |
-| Med | Socket client is single-process; Redis adapter / multi-instance not on mobile |
-| Low | Pixel redesign / design fidelity across full screen inventory |
+| Med | Large files over 900 lines: `dio_food_remote_datasource.dart`, `driver_kyc_pages.dart`, `merchant_kyb_pages.dart`, `app/di.dart`, `app_router.dart`, `food_checkout_widgets.dart` |
+| Low | Some low-traffic strings are still hard-coded Vietnamese instead of ARB |
 
-## Phase 1 — infrastructure + boundary — DONE
+## Out of scope
 
-- [x] `core/network/`: shared Dio, ApiPaths, ApiException, envelope
-- [x] Một Dio inject vào Dio*Client; refresh single-flight
-- [x] Fixtures khỏi presentation
-- [x] Cubits + route/page BlocProvider coverage for core flows
-- [x] `app/di.dart`
-
-## Không làm (out of scope this phase)
-
-- Pixel rewrite / redesign of all screens
-- Deferred P1/P2 screens (ratings, wallet, scheduled, promo, supermarket)
-- Remaining P0 PARTIAL fidelity (driver OTP enter, kitchen board, map SDK)
-- UseCase tree rỗng
-- Invent Nest APIs
-- Mock fallback trong release
-- Claim “đã tích hợp production” FCM / LiveKit / Maps SDK
-- Run `flutterfire configure` or ship real Firebase project IDs
+- Inventing backend APIs or mock fallback in release builds.
+- Shipping real Firebase project IDs or secrets in the repo docs.

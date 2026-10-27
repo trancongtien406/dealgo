@@ -26,6 +26,7 @@ const baseRide: NestRideView = {
   dropoff: { lat: 16.07, lng: 108.24, label: "Mỹ Khê, Sơn Trà" },
   offeredFareVnd: 50000,
   referenceFareVnd: 50000,
+  vehicleClassCode: "MOTORBIKE",
   agreedFareVnd: 48000,
   assignedDriverId: "d0000000-0000-4000-8000-000000000000",
   selectedOfferId: null,
@@ -44,6 +45,8 @@ describe("Admin rows use real people + coordinates", () => {
     expect(row.phone).toBe("0901***678");
     expect(row.driver).toBe("Trần B");
     expect(row.plate).toBe("43B1-12345");
+    expect(row.seats).toBe("Xe máy");
+    expect(row.vehicleClassCode).toBe("MOTORBIKE");
     expect(row.pickupPoint).toEqual({ lat: 16.06, lng: 108.2 });
     expect(row.dropoffPoint).toEqual({ lat: 16.07, lng: 108.24 });
   });
@@ -73,6 +76,7 @@ describe("Admin rows use real people + coordinates", () => {
     const row = mapNestDriverToListItem(driver);
     expect(row.service).toBe("Xe · Đồ ăn");
     expect(row.plate).toBe("43B1-12345");
+    expect(row.vehicle).toBe("Xe máy");
     expect(row.vehicleKind).toBe("Xe máy");
     expect(row.rating).toBe(4.8);
     expect(row.trips).toBe(11);

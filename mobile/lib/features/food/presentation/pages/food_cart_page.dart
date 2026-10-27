@@ -45,8 +45,19 @@ class FoodCartPage extends StatelessWidget {
                 children: [
                   if (cart.lines.isEmpty)
                     DealGoStateView(
+                      key: const Key('food-cart-empty'),
                       art: DealGoStateArt.noOrders,
                       title: l10n.foodCartEmpty,
+                      message: l10n.checkoutEmptyBody,
+                      actionLabel: l10n.checkoutBackToMenu,
+                      onAction: () {
+                        final storeId = cart.storeId;
+                        if (storeId != null && storeId.isNotEmpty) {
+                          context.go(FoodRoutes.store(storeId));
+                          return;
+                        }
+                        context.go('/customer/shop');
+                      },
                       compact: true,
                     )
                   else
@@ -129,12 +140,26 @@ class FoodCartPage extends StatelessWidget {
         ),
       ),
       bottomNavigationBar: DealGoBottomBar(
-        child: DealGoPrimaryButton(
-          label: l10n.foodCartContinue,
-          trailingIcon: DealGoIcons.arrowRight,
-          enabled: cart.canCheckout,
-          onPressed: () => context.push(FoodRoutes.checkout),
-        ),
+        child: cart.lines.isEmpty
+            ? DealGoPrimaryButton(
+                key: const Key('food-cart-back-to-menu'),
+                label: l10n.checkoutBackToMenu,
+                trailingIcon: DealGoIcons.arrowRight,
+                onPressed: () {
+                  final storeId = cart.storeId;
+                  if (storeId != null && storeId.isNotEmpty) {
+                    context.go(FoodRoutes.store(storeId));
+                    return;
+                  }
+                  context.go('/customer/shop');
+                },
+              )
+            : DealGoPrimaryButton(
+                label: l10n.foodCartContinue,
+                trailingIcon: DealGoIcons.arrowRight,
+                enabled: cart.canCheckout,
+                onPressed: () => context.push(FoodRoutes.checkout),
+              ),
       ),
     );
   }

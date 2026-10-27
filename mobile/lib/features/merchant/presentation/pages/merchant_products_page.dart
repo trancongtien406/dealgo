@@ -76,7 +76,7 @@ class _MerchantProductsView extends StatelessWidget {
           final creating = ready?.busyItemId == '_create';
           return MerchantPageFrame(
             title: AppLocalizations.of(context).foodStoreTabMenu,
-            onBack: () => merchantBack(context),
+            showBack: false,
             footer: ready == null
                 ? null
                 : Padding(
@@ -97,7 +97,9 @@ class _MerchantProductsView extends StatelessWidget {
                     ),
                   ),
             body: switch (state) {
-              MerchantCatalogLoading() => const DealGoSkeletonList(itemCount: 4),
+              MerchantCatalogLoading() => const DealGoSkeletonList(
+                itemCount: 4,
+              ),
               MerchantCatalogFailed(:final message) => DealGoStateView.failure(
                 context,
                 onRetry: () => context.read<MerchantCatalogCubit>().load(
@@ -124,55 +126,16 @@ Future<void> _showAddItemDialog(BuildContext context, bool busy) async {
   if (busy) return;
   final cubit = context.read<MerchantCatalogCubit>();
   final token = merchantAccessToken(context);
-  final nameController = TextEditingController();
-  final priceController = TextEditingController();
-  final submitted = await showDialog<bool>(
+  // The dialog owns its controllers: disposing them here while the route was
+  // still animating out crashed the app on Save.
+  final result = await showDialog<({String name, String price})>(
     context: context,
-    builder: (dialogContext) {
-      return AlertDialog(
-        title: Text(AppLocalizations.of(context).merchantAddItem),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            DealGoTextField(
-              label: AppLocalizations.of(context).merchantItemName,
-              fieldKey: const Key('merchant-catalog-name'),
-              controller: nameController,
-              textInputAction: TextInputAction.next,
-            ),
-            const SizedBox(height: DealGoSpacing.s12),
-            DealGoTextField(
-              label: AppLocalizations.of(context).merchantItemPrice,
-              fieldKey: const Key('merchant-catalog-price'),
-              controller: priceController,
-              hint: '45000',
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(AppLocalizations.of(context).actionCancel),
-          ),
-          FilledButton(
-            key: const Key('merchant-catalog-create'),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(AppLocalizations.of(context).actionSave),
-          ),
-        ],
-      );
-    },
+    builder: (_) => const MerchantAddItemDialog(),
   );
-  final name = nameController.text;
-  final priceText = priceController.text;
-  nameController.dispose();
-  priceController.dispose();
-  if (submitted != true || !context.mounted) {
+  if (result == null || !context.mounted) {
     return;
   }
-  final price = int.tryParse(priceText);
+  final price = int.tryParse(result.price);
   if (price == null) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -181,7 +144,73 @@ Future<void> _showAddItemDialog(BuildContext context, bool busy) async {
     );
     return;
   }
-  await cubit.createItem(accessToken: token, name: name, priceVnd: price);
+  await cubit.createItem(
+    accessToken: token,
+    name: result.name,
+    priceVnd: price,
+  );
+}
+
+@visibleForTesting
+class MerchantAddItemDialog extends StatefulWidget {
+  const MerchantAddItemDialog({super.key});
+
+  @override
+  State<MerchantAddItemDialog> createState() => _MerchantAddItemDialogState();
+}
+
+class _MerchantAddItemDialogState extends State<MerchantAddItemDialog> {
+  final _name = TextEditingController();
+  final _price = TextEditingController();
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _price.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(l10n.merchantAddItem),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          DealGoTextField(
+            label: l10n.merchantItemName,
+            fieldKey: const Key('merchant-catalog-name'),
+            controller: _name,
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: DealGoSpacing.s12),
+          DealGoTextField(
+            label: l10n.merchantItemPrice,
+            fieldKey: const Key('merchant-catalog-price'),
+            controller: _price,
+            hint: '45000',
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.actionCancel),
+        ),
+        FilledButton(
+          key: const Key('merchant-catalog-create'),
+          onPressed: () {
+            FocusScope.of(context).unfocus();
+            Navigator.of(context).pop((name: _name.text, price: _price.text));
+          },
+          child: Text(l10n.actionSave),
+        ),
+      ],
+    );
+  }
 }
 
 class _CatalogBody extends StatefulWidget {
@@ -315,7 +344,13 @@ class _CatalogBodyState extends State<_CatalogBody> {
         Text(l10n.checkoutItems, style: textTheme.titleMedium),
         const SizedBox(height: DealGoSpacing.s12),
         if (filtered.isEmpty)
-          Text(l10n.merchantProductsEmptyFilter, style: textTheme.bodyMedium)
+          Text(
+            catalog.isEmpty
+                ? l10n.merchantProductsEmptyMenu
+                : l10n.merchantProductsEmptyFilter,
+            key: const Key('merchant-products-empty'),
+            style: textTheme.bodyMedium,
+          )
         else
           for (final item in filtered) ...[
             _ProductRow(

@@ -16,13 +16,17 @@ import { DriverLocationQueryDto } from '../dispatch/driver-location-query.dto.js
 import { CurrentActor, CustomerSessionGuard, type RequestActor } from '../identity/access-auth.guard.js';
 import {
   DeliverFoodOrderDto,
+  FailFoodOrderDto,
+  MerchantStatementQueryDto,
   ListFoodStoresQueryDto,
   MerchantStatsQueryDto,
   OpsPageQueryDto,
   PickupFoodOrderDto,
   PlaceFoodOrderDto,
   QuoteFoodDeliveryDto,
+  ProposeFoodOrderChangeDto,
   RejectFoodOrderDto,
+  ReleaseFoodOrderDto,
 } from './food.dto.js';
 import { foodError } from './food.error.js';
 import { FoodService } from './food.service.js';
@@ -89,6 +93,15 @@ export class FoodController {
     return this.food.listQueue(actor);
   }
 
+  @Get('merchant/statement')
+  @ApiOperation({
+    summary:
+      'Merchant commission statement by Vietnam day (cash received at pickup, commission owed, settlements)',
+  })
+  merchantStatement(@CurrentActor() actor: RequestActor, @Query() query: MerchantStatementQueryDto) {
+    return this.food.merchantStatement(actor, query.from, query.to);
+  }
+
   @Get('merchant/stats')
   @ApiOperation({
     summary:
@@ -137,6 +150,47 @@ export class FoodController {
     return this.food.reject(actor, id, dto);
   }
 
+  @Post('orders/:id/changes')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Merchant lowers quantities / removes out-of-stock lines (PLACED|PREPARING); customer must confirm',
+  })
+  proposeChange(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ProposeFoodOrderChangeDto,
+  ) {
+    return this.food.proposeChange(actor, id, dto);
+  }
+
+  @Get('orders/:id/change')
+  @ApiOperation({ summary: 'Latest merchant edit of the order (customer or store owner), or null' })
+  latestChange(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.food.latestChange(actor, id);
+  }
+
+  @Post('orders/:id/changes/:changeId/accept')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Customer accepts the merchant edit (new total applies)' })
+  acceptChange(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('changeId', ParseUUIDPipe) changeId: string,
+  ) {
+    return this.food.respondChange(actor, id, changeId, true);
+  }
+
+  @Post('orders/:id/changes/:changeId/reject')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Customer declines the merchant edit (order cancelled, no fee)' })
+  rejectChange(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('changeId', ParseUUIDPipe) changeId: string,
+  ) {
+    return this.food.respondChange(actor, id, changeId, false);
+  }
+
   @Post('orders/:id/ready')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Merchant marks ready (PREPARING → READY)' })
@@ -146,9 +200,22 @@ export class FoodController {
 
   @Post('orders/:id/claim')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Driver claims ready order (READY → ASSIGNED)' })
+  @ApiOperation({ summary: 'Driver claims a READY order (→ ASSIGNED) or an early-claimable PREPARING one (stays PREPARING, assigned)' })
   claim(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
     return this.food.claim(actor, id);
+  }
+
+  @Post('orders/:id/release')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Assigned driver hands the order back before pickup (ASSIGNED → READY, early claim → PREPARING); counted as a driver cancellation',
+  })
+  release(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ReleaseFoodOrderDto,
+  ) {
+    return this.food.release(actor, id, dto.reasonCode);
   }
 
   @Post('orders/:id/pickup')
@@ -181,9 +248,13 @@ export class FoodController {
 
   @Post('orders/:id/fail')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Assigned driver marks delivery failed (ASSIGNED|PICKED_UP → FAILED)' })
-  fail(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
-    return this.food.fail(actor, id);
+  @ApiOperation({ summary: 'Assigned driver marks delivery failed after pickup (PICKED_UP → FAILED) with a reason; before pickup use release' })
+  fail(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: FailFoodOrderDto,
+  ) {
+    return this.food.fail(actor, id, dto);
   }
 
   @Post('orders/:id/cancel')

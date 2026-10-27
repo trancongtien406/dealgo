@@ -38,7 +38,7 @@ downstream_planned:
 
 - Chuyển PRD từ câu mô tả nhu cầu sang hành vi **có trigger, tiền điều kiện, output, negative path và acceptance có thể kiểm chứng**.
 - Baseline hiện tại gồm 18 CORE, 12 RIDE, 12 FOOD, 9 MER, 10 DRV, 10 OPS = **71 functional requirements**. Không tự đổi mã; các FR 016–018 CORE và OPS-010 là change theo `DEC-PROD-006/007`.
-- Đối tượng: **Customer, Merchant, Driver trong một app Flutter**, và **Ops/Support/Finance/Admin trong Admin Web tách biệt**. Ride hai bánh và Food đều thuộc mục tiêu MVP.
+- Đối tượng: **Customer, Merchant, Driver trong một app Flutter**, và **Ops/Support/Finance/Admin trong Admin Web tách biệt**. Ride (xe máy, ô tô) và Food đều thuộc mục tiêu MVP.
 - Đây là **functional black-box requirements**, không áp đặt NestJS/Redis/Kafka/BLoC, endpoint, tên enum hay cấu trúc SQL. Contract cụ thể thuộc docs kiến trúc/data/API; không biến ví dụ thành yêu cầu production.
 - PRD là nguồn của ý nghĩa FR và mức ưu tiên; `use-case-catalog.md` là nguồn của UC; `decisions-and-assumptions.md` là nguồn duy nhất về trạng thái `OPEN/RESOLVED`.
 
@@ -417,9 +417,9 @@ Client/API phải phân biệt `initial`, `loading`, `success`, `empty`, `valida
 
 ### 5.2. Customer Ride (12 yêu cầu; FR-RIDE-002/003 bao gồm thương lượng giá)
 
-#### `FR-RIDE-001` — Customer chọn loại Ride hai bánh, pickup và destination.
+#### `FR-RIDE-001` — Customer chọn loại Ride (xe máy, ô tô), pickup và destination.
 - **Nguồn:** `UC-RIDE-001` · **Phạm vi:** `PROPOSED_P0` · **Phụ thuộc PRD:** `CAP-RIDE-01`, `OPEN-001`.
-- **Actor / trigger:** Customer / lựa chọn Ride hai bánh và điểm đi đến.
+- **Actor / trigger:** Customer / lựa chọn Ride (xe máy, ô tô) và điểm đi đến.
 - **Tiền điều kiện / input:** Pickup và destination có định vị, coverage hợp lệ, service ride enabled.
 - **Kết quả chấp nhận:** Hệ thống tạo route intent có điểm xác nhận, không tự tạo chuyến.
 - **Trường hợp từ chối / lỗi:** Điểm không xác định, vùng ngoài phạm vi, 2 điểm bất khả dụng phải yêu cầu chỉnh.

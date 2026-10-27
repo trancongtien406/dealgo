@@ -19,7 +19,6 @@ import 'package:provider/provider.dart';
 import 'support/fake_identity_client.dart';
 import 'support/fake_permission_service.dart';
 import 'support/test_l10n.dart';
-import 'support/memory_token_store.dart';
 
 Widget _wrap(
   Widget child, {
@@ -253,5 +252,4 @@ void main() {
       expect(find.text('Sẽ hỗ trợ tải ảnh trong bản cập nhật'), findsNothing);
     });
   });
-
 }

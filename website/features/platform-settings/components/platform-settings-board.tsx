@@ -40,6 +40,8 @@ import {
   getSettingIcon,
   validateSettingValue,
 } from "../mappers";
+import { CASH_FLOW_KEYS } from "../cash-flow";
+import { CashFlowPanel } from "./cash-flow-panel";
 
 export function PlatformSettingsBoard() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -65,7 +67,15 @@ export function PlatformSettingsBoard() {
   const [banner, setBanner] = useState<string | null>(null);
   const [confirmSave, setConfirmSave] = useState(false);
 
-  const rows = useMemo(() => data ?? [], [data]);
+  const moneyView = activeCategory === "MONEY";
+  // The money tab is a client-side view over every setting (search/source still apply).
+  const rows = useMemo(
+    () =>
+      moneyView
+        ? (data ?? []).filter((row) => CASH_FLOW_KEYS.has(row.key))
+        : (data ?? []),
+    [data, moneyView],
+  );
 
   const dbOverrideCount = useMemo(
     () => (allData ?? rows).filter((r) => r.source === "db").length,
@@ -332,6 +342,8 @@ export function PlatformSettingsBoard() {
             </div>
           ))}
         </div>
+      ) : moneyView && !searchQuery.trim() && sourceFilter === "ALL" ? (
+        <CashFlowPanel rows={rows} onEdit={openEdit} />
       ) : rows.length === 0 ? (
         <AdminEmptyState
           icon="settings"

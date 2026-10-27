@@ -208,8 +208,13 @@ class FakeFoodClient implements FoodClient {
     required String accessToken,
     required String orderId,
     required FoodDeliveryAction action,
+
     /// DEC-PROD-036: handover code (pickup) or delivery code (deliver).
     String? code,
+
+    /// Why the delivery failed (FOOD_FAIL_REASONS) and the note for OTHER.
+    String? failReason,
+    String? failNote,
   }) async {
     advanceCalls.add((orderId: orderId, action: action));
     submittedCodes.add((action: action, code: code));
@@ -239,6 +244,84 @@ class FakeFoodClient implements FoodClient {
         FoodDeliveryAction.deliver => 'DELIVERED',
         FoodDeliveryAction.fail => 'FAILED',
       },
+    );
+  }
+
+  /// Order-change and statement calls, for tests.
+  final List<({String orderId, Map<String, int> quantities})> proposedChanges =
+      [];
+  final List<({String changeId, bool accept})> changeAnswers = [];
+
+  @override
+  Future<FoodOrderChange> proposeOrderChange({
+    required String accessToken,
+    required String orderId,
+    required FoodOrderChangeReason reason,
+    required Map<String, int> quantities,
+    String? note,
+  }) async {
+    proposedChanges.add((orderId: orderId, quantities: Map.of(quantities)));
+    final detail = orderDetail;
+    final lines = <FoodOrderChangeLine>[];
+    var subtotal = detail?.subtotalVnd ?? 0;
+    for (final line in detail?.lines ?? const <FoodOrderLine>[]) {
+      final to = line.id == null ? null : quantities[line.id];
+      if (to == null || to >= line.quantity) continue;
+      subtotal -= line.unitPriceVnd * (line.quantity - to);
+      lines.add(
+        FoodOrderChangeLine(
+          lineId: line.id!,
+          name: line.name,
+          unitPriceVnd: line.unitPriceVnd,
+          fromQuantity: line.quantity,
+          toQuantity: to,
+        ),
+      );
+    }
+    final fare = detail?.deliveryFareVnd ?? 0;
+    return FoodOrderChange(
+      id: 'change-$orderId',
+      status: 'PENDING',
+      reason: reason,
+      note: note,
+      lines: lines,
+      oldSubtotalVnd: detail?.subtotalVnd ?? 0,
+      newSubtotalVnd: subtotal,
+      newDiscountVnd: 0,
+      newTotalVnd: subtotal + fare,
+      expiresAt: DateTime.now().add(const Duration(minutes: 5)),
+    );
+  }
+
+  @override
+  Future<FoodOrderDetail> answerOrderChange({
+    required String accessToken,
+    required String orderId,
+    required String changeId,
+    required bool accept,
+  }) async {
+    changeAnswers.add((changeId: changeId, accept: accept));
+    final detail = orderDetail;
+    if (detail == null) {
+      throw const ApiException(
+        statusCode: 404,
+        message: 'Order change not found',
+        errorCode: 'FOOD_CHANGE_NOT_FOUND',
+      );
+    }
+    return FoodOrderDetail(
+      id: detail.id,
+      status: accept ? detail.status : 'CANCELLED',
+      subtotalVnd: detail.subtotalVnd,
+      deliveryFareVnd: detail.deliveryFareVnd,
+      totalVnd: detail.totalVnd,
+      dropoff: detail.dropoff,
+      lines: detail.lines,
+      storeName: detail.storeName,
+      storeId: detail.storeId,
+      cancelReason: accept
+          ? null
+          : const FoodCancelReason(reason: FoodRejectReason.changeRejected),
     );
   }
 
@@ -650,12 +733,18 @@ class FakeFoodClient implements FoodClient {
   }
 
   final _menuCategories = <MerchantMenuCategory>[
-    const MerchantMenuCategory(id: 'cat-1', name: 'Món chính', position: 0, itemCount: 1),
+    const MerchantMenuCategory(
+      id: 'cat-1',
+      name: 'Món chính',
+      position: 0,
+      itemCount: 1,
+    ),
   ];
 
   @override
-  Future<List<MerchantMenuCategory>> listMerchantMenuCategories(String accessToken) async =>
-      List.of(_menuCategories);
+  Future<List<MerchantMenuCategory>> listMerchantMenuCategories(
+    String accessToken,
+  ) async => List.of(_menuCategories);
 
   @override
   Future<MerchantMenuCategory> createMerchantMenuCategory({
@@ -728,13 +817,15 @@ class FakeFoodClient implements FoodClient {
     for (var i = 0; i < orderedIds.length; i++) {
       final id = orderedIds[i];
       final prev = _menuCategories.firstWhere((c) => c.id == id);
-      next.add(MerchantMenuCategory(
-        id: prev.id,
-        name: prev.name,
-        description: prev.description,
-        position: i,
-        itemCount: prev.itemCount,
-      ));
+      next.add(
+        MerchantMenuCategory(
+          id: prev.id,
+          name: prev.name,
+          description: prev.description,
+          position: i,
+          itemCount: prev.itemCount,
+        ),
+      );
     }
     _menuCategories
       ..clear()
@@ -750,9 +841,7 @@ class FakeFoodClient implements FoodClient {
     String? contentType,
   }) async {
     return _replaceOwnedItem(itemId, (item) {
-      return item.copyWith(
-        imageUrl: '/v1/public/menu-items/$itemId/fake.jpg',
-      );
+      return item.copyWith(imageUrl: '/v1/public/menu-items/$itemId/fake.jpg');
     });
   }
 

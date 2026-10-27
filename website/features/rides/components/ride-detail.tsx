@@ -45,6 +45,8 @@ import {
 } from "@/features/rides/intervene";
 import { rideStatusLabel, rideStatusTone } from "@/features/rides/mappers";
 import { isForbiddenError } from "@/lib/api/errors";
+import { ChatReviewButton } from "@/features/chat-review/components/chat-review-button";
+
 
 type InterveneDialogState = null | "cancel" | "reassign";
 
@@ -123,6 +125,7 @@ export function RideDetail({ code }: { code: string }) {
             actions={
               <>
                 <BackToList href="/rides" />
+                <ChatReviewButton kind="ride" id={code} partnerLabel="Tài xế" />
                 {showReassign ? (
                   <OpsInterveneActionButton
                     tone="brand"
@@ -169,7 +172,10 @@ export function RideDetail({ code }: { code: string }) {
             <SummaryCell label="Hành trình" hint={ride.seats}>
               {ride.pickup} → {ride.dropoff}
             </SummaryCell>
-            <SummaryCell label="Trạng thái" hint={ride.cancelledBy ?? undefined}>
+            <SummaryCell
+              label="Trạng thái"
+              hint={[ride.cancelledBy, ride.cancelReason].filter(Boolean).join(" · ") || undefined}
+            >
               <StatusChip tone={rideStatusTone(ride.status)} dot>
                 {rideStatusLabel(ride.status)}
               </StatusChip>
@@ -234,10 +240,19 @@ export function RideDetail({ code }: { code: string }) {
                 <div className="mt-4 flex min-w-0 flex-col gap-3 rounded-2xl bg-brand/5 p-3 sm:flex-row sm:items-center">
                   <div className="flex items-center gap-3">
                     <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand">
-                      <OpsIcon name="motorcycle" className="size-6" />
+                      <OpsIcon
+                        name={
+                          ride.vehicleClassCode === "CAR_4" ||
+                          ride.vehicleClassCode === "CAR_7" ||
+                          ride.vehicleClassCode === "CAR"
+                            ? "car"
+                            : "motorcycle"
+                        }
+                        className="size-6"
+                      />
                     </span>
                     <p className="font-semibold text-ink">
-                      {ride.seats || "Xe máy hai bánh"}
+                      {ride.seats !== "—" ? ride.seats : "Chưa cập nhật loại xe"}
                     </p>
                   </div>
                   <div className="min-w-0 text-sm sm:ml-auto">

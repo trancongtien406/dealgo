@@ -1,7 +1,8 @@
+import { type OpsDateWindow, prismaDateFilter } from '../operations/ops-date-window.js';
 import { cancellationCountsAgainstDriver } from '../../shared/cancel-actor.js';
 import type { CancelActorName } from '../../shared/cancel-actor.js';
 import type { DriverJobCounts } from '../../shared/driver-job-counts.js';
-import type { CompletionHook } from '../../shared/tx/completion-hook.js';
+import type { CompletionHook, TxHandle } from '../../shared/tx/completion-hook.js';
 import { randomUUID } from 'node:crypto';
 import {
   normalizeRegionFilter,
@@ -10,7 +11,11 @@ import {
 } from '../service-area/service-regions.js';
 import { Prisma, type PrismaClient } from '../../generated/prisma/client.js';
 import { paymentFilterMatchers } from '../payment/ops-payment-filter.js';
-import { writeOpsActionOutbox, writeStatusOutbox } from '../communication/outbox/outbox.write.js';
+import {
+  writeFoodChangeOutbox,
+  writeOpsActionOutbox,
+  writeStatusOutbox,
+} from '../communication/outbox/outbox.write.js';
 import { FoodRuleError } from './food.error.js';
 import { effectiveServiceMode, type StoreServiceMode } from './store-service-mode.js';
 import {
@@ -30,6 +35,10 @@ import {
 } from './store-schedule.js';
 import type {
   CatalogItemInput,
+  FoodFailInput,
+  MerchantSettlementView,
+  MerchantStatementRow,
+  RecordMerchantSettlementInput,
   CreateCatalogItemInput,
   FoodDriverHistoryWindow,
   FoodOrderView,
@@ -45,6 +54,7 @@ import type {
   ReplaceItemOptionsInput,
   QueueOrderSummary,
   MerchantStatsRows,
+  ReadyNearFilter,
   ReadyOrderSummary,
   SetItemAvailabilityInput,
   ListFoodStoresQuery,
@@ -58,10 +68,32 @@ import type {
   UpdateStoreServiceModeInput,
   UpdateStoreAcceptSettingsInput,
   FoodCancelReason,
+  FoodEarlyClaim,
+  FoodTimeoutPolicy,
+  FoodTimedOut,
 } from './food.repository.js';
-import { FOOD_REJECT_REASONS, type FoodRejectReason } from './food.constants.js';
+import {
+  FIXTURE_STORE_PIN,
+  FOOD_CHANGE_EDITABLE_STATUSES,
+  planFoodOrderChange,
+  type FoodOrderChangeLine,
+  type FoodOrderChangeResult,
+  type FoodOrderChangeStatusName,
+  type FoodOrderChangeView,
+  type ProposeFoodOrderChangeInput,
+} from './food.repository.js';
+import {
+  FOOD_REJECT_REASONS,
+  FOOD_SYSTEM_CANCEL_REASONS,
+  FOOD_CHANGE_CANCEL_REASONS,
+  type FoodCancelReasonCode,
+  type FoodSystemCancelReason,
+} from './food.constants.js';
+import { lockDriverAssignment } from '../../shared/tx/driver-assignment-lock.js';
 import {
   DRIVER_HISTORY_FOOD_STATUSES,
+  assertFailWaitOver,
+  earlyClaimOpensAt,
   aggregateStoreCategories,
   filterStoreCategories,
   normalizeStoreCategoryName,
@@ -104,6 +136,10 @@ type OrderRow = {
   cancelNote: string | null;
   cancelledBy?: CancelActorName | null;
   prepMinutes: number | null;
+  pickedUpAt?: Date | null;
+  failReasonCode?: string | null;
+  failNote?: string | null;
+  merchantCashVnd?: number | null;
   createdAt: Date;
   updatedAt: Date;
   store: {
@@ -115,6 +151,7 @@ type OrderRow = {
     addressLabel: string | null;
   };
   lines: {
+    id: string;
     itemId: string;
     name: string;
     unitPriceVnd: number;
@@ -157,6 +194,11 @@ export class PrismaFoodRepository implements FoodRepository {
           ownerId,
           name: 'Bún Bò Huế',
           category: 'pho',
+          // Stores need coordinates to take delivery orders (sandbox demo: Hải Châu).
+          lat: FIXTURE_STORE_PIN.lat,
+          lng: FIXTURE_STORE_PIN.lng,
+          addressLabel: FIXTURE_STORE_PIN.label,
+          serviceRegionCode: resolveServiceRegionCode(FIXTURE_STORE_PIN),
           items: {
             create: items.map((item) => ({
               name: item.name,
@@ -188,10 +230,9 @@ export class PrismaFoodRepository implements FoodRepository {
     )`
       : Prisma.sql`NULL::double precision`;
 
-    const filters: Prisma.Sql[] = [Prisma.sql`TRUE`];
+    // A store without coordinates cannot take delivery orders, so it is not listed.
+    const filters: Prisma.Sql[] = [Prisma.sql`s."lat" IS NOT NULL`, Prisma.sql`s."lng" IS NOT NULL`];
     if (hasGeo) {
-      filters.push(Prisma.sql`s."lat" IS NOT NULL`);
-      filters.push(Prisma.sql`s."lng" IS NOT NULL`);
       filters.push(Prisma.sql`${distanceSql} <= ${query.radiusKm}`);
     }
     if (search) {
@@ -297,6 +338,8 @@ export class PrismaFoodRepository implements FoodRepository {
       region?: string;
       category?: string;
       kyb?: string;
+      /** MISSING = stores without map coordinates. */
+      location?: string;
     },
   ): Promise<OpsStorePage> {
     const and: Prisma.FoodStoreWhereInput[] = [];
@@ -376,6 +419,9 @@ export class PrismaFoodRepository implements FoodRepository {
         });
       }
     }
+    if (filter?.location === 'MISSING') {
+      and.push({ OR: [{ lat: null }, { lng: null }] });
+    }
     const where: Prisma.FoodStoreWhereInput =
       and.length > 0 ? { AND: and } : {};
     const [total, stores] = await Promise.all([
@@ -434,6 +480,7 @@ export class PrismaFoodRepository implements FoodRepository {
     store?: string;
     category?: string;
     status?: string;
+    window?: OpsDateWindow;
   }): Promise<OpsCatalogModerationPage> {
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.max(1, Math.min(50, query.limit ?? 10));
@@ -465,6 +512,10 @@ export class PrismaFoodRepository implements FoodRepository {
         where.moderationStatus = status;
       }
     }
+    const createdAt = prismaDateFilter(query.window);
+    if (createdAt) {
+      where.createdAt = createdAt;
+    }
 
     const [total, rows] = await Promise.all([
       this.db.foodItem.count({ where }),
@@ -485,7 +536,7 @@ export class PrismaFoodRepository implements FoodRepository {
         category: normalizeStoreCategoryName(r.store.category),
         store: r.store.name,
         price: r.priceVnd,
-        submittedAt: 'Hôm nay',
+        submittedAt: r.createdAt.toISOString(),
         status: r.moderationStatus,
         nameReady: true,
         imageReady: true,
@@ -595,9 +646,40 @@ export class PrismaFoodRepository implements FoodRepository {
     if (existing) {
       return existing;
     }
-    const created = await this.db.foodStore.create({
-      data: { ownerId, name },
-      include: storeDetailInclude,
+    // The merchant home + menu screens call this concurrently on first
+    // open; check-then-create created two stores 6 ms apart. Serialize per owner
+    // with a transaction advisory lock and re-check inside it.
+    const created = await this.db.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`food-store-owner:${ownerId}`}))`;
+      const again = await tx.foodStore.findFirst({
+        where: { ownerId },
+        include: storeDetailInclude,
+        orderBy: { createdAt: 'asc' },
+      });
+      if (again) {
+        return again;
+      }
+      // DEC-PROD-048 polish: seed the first store from the approved MERCHANT
+      // application (shop name/address typed at registration) instead of the
+      // generic fallback name.
+      const app = await tx.partnerApplication.findFirst({
+        where: { userId: ownerId, role: 'MERCHANT', status: 'APPROVED' },
+        orderBy: { reviewedAt: 'desc' },
+        select: { metadata: true },
+      });
+      const meta = (app?.metadata ?? {}) as Record<string, unknown>;
+      const shopName =
+        typeof meta.shopName === 'string' && meta.shopName.trim()
+          ? meta.shopName.trim().slice(0, 120)
+          : name;
+      const shopAddress =
+        typeof meta.shopAddress === 'string' && meta.shopAddress.trim()
+          ? meta.shopAddress.trim().slice(0, 200)
+          : undefined;
+      return tx.foodStore.create({
+        data: { ownerId, name: shopName, addressLabel: shopAddress },
+        include: storeDetailInclude,
+      });
     });
     return toStoreDetail(created);
   }
@@ -1105,6 +1187,7 @@ export class PrismaFoodRepository implements FoodRepository {
       store?: string;
       payment?: string;
       zone?: string;
+      window?: OpsDateWindow;
     },
   ): Promise<OpsFoodOrderPage> {
     const and: Prisma.FoodOrderWhereInput[] = [];
@@ -1160,6 +1243,10 @@ export class PrismaFoodRepository implements FoodRepository {
     if (filter?.payment && filter.payment !== 'ALL') {
       const orderIds = await this.foodOrderIdsForPaymentFilter(filter.payment);
       and.push({ id: { in: orderIds } });
+    }
+    const createdAt = prismaDateFilter(filter?.window);
+    if (createdAt) {
+      and.push({ createdAt });
     }
     const where: Prisma.FoodOrderWhereInput =
       and.length > 0 ? { AND: and } : {};
@@ -1243,6 +1330,24 @@ export class PrismaFoodRepository implements FoodRepository {
       counts.set(row.assignedDriverId, current);
     }
     return counts;
+  }
+
+  async listIdsForDriverInStatuses(driverId: string, statuses: readonly string[]): Promise<string[]> {
+    const rows = await this.db.foodOrder.findMany({
+      where: { assignedDriverId: driverId, status: { in: [...statuses] as never } },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
+  async listIdsForCustomerInStatuses(customerId: string, statuses: readonly string[]): Promise<string[]> {
+    const rows = await this.db.foodOrder.findMany({
+      where: { customerId, status: { in: [...statuses] as never } },
+      orderBy: { createdAt: 'desc' },
+      take: 1,
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
   }
 
   async listFinishedForDriver(
@@ -1361,6 +1466,7 @@ export class PrismaFoodRepository implements FoodRepository {
             idempotencyKey: input.idempotencyKey,
             lines: {
               create: lines.map((line) => ({
+                id: line.id,
                 itemId: line.itemId,
                 name: line.name,
                 unitPriceVnd: line.unitPriceVnd,
@@ -1411,16 +1517,46 @@ export class PrismaFoodRepository implements FoodRepository {
     return order ? toView(order) : null;
   }
 
-  async listReady(limit?: number): Promise<ReadyOrderSummary[]> {
+  async listReady(
+    limit?: number,
+    near?: ReadyNearFilter,
+    early?: FoodEarlyClaim,
+  ): Promise<ReadyOrderSummary[]> {
     const take =
       limit !== undefined && Number.isSafeInteger(limit) && limit > 0 ? limit : undefined;
+    // Bounding-box prefilter in SQL; the service still applies the exact haversine radius.
+    let box: Prisma.FoodOrderWhereInput = {};
+    if (near) {
+      const dLat = near.radiusKm / 111.32;
+      const dLng = near.radiusKm / (111.32 * Math.max(Math.cos((near.lat * Math.PI) / 180), 0.01));
+      const lat = { gte: near.lat - dLat, lte: near.lat + dLat };
+      const lng = { gte: near.lng - dLng, lte: near.lng + dLng };
+      box = {
+        OR: [
+          { pickupLat: lat, pickupLng: lng },
+          { pickupLat: null, store: { lat, lng } },
+          { pickupLat: null, store: { lat: null }, dropoffLat: lat, dropoffLng: lng },
+        ],
+      };
+    }
+    // PREPARING rows are prefiltered in SQL (prep set) and checked exactly below.
     const orders = await this.db.foodOrder.findMany({
-      where: { status: 'READY', assignedDriverId: null },
+      where: {
+        assignedDriverId: null,
+        ...(early
+          ? { OR: [{ status: 'READY' }, { status: 'PREPARING', prepMinutes: { not: null } }] }
+          : { status: 'READY' }),
+        ...(near ? { AND: [box] } : {}),
+      },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       ...(take !== undefined ? { take } : {}),
       select: {
         id: true,
         storeId: true,
+        status: true,
+        prepMinutes: true,
+        createdAt: true,
+        acceptedAt: true,
         deliveryFareVnd: true,
         subtotalVnd: true,
         totalVnd: true,
@@ -1434,12 +1570,18 @@ export class PrismaFoodRepository implements FoodRepository {
         _count: { select: { lines: true } },
       },
     });
-    return orders.map((order) => {
+    const claimable = orders.filter((order) => {
+      if (order.status === 'READY') return true;
+      const opensAt = early ? earlyClaimOpensAt(order, early.leadMinutes) : null;
+      return !!early && !!opensAt && opensAt.getTime() <= early.now.getTime();
+    });
+    return claimable.map((order) => {
       const pickup = orderPickup(order);
       return {
         id: order.id,
         storeId: order.storeId,
-        status: 'READY' as const,
+        status: order.status === 'PREPARING' ? ('PREPARING' as const) : ('READY' as const),
+        estimatedReadyAt: estimatedReadyAt(order.acceptedAt ?? order.createdAt, order.prepMinutes ?? null),
         storeName: order.store.name,
         storeAddress: order.store.addressLabel,
         deliveryFareVnd: order.deliveryFareVnd,
@@ -1530,8 +1672,93 @@ export class PrismaFoodRepository implements FoodRepository {
     };
   }
 
+  async deliveredForStatement(storeId: string, from: Date, to: Date): Promise<MerchantStatementRow[]> {
+    const rows = await this.db.foodOrder.findMany({
+      where: { storeId, status: 'DELIVERED', updatedAt: { gte: from, lt: to } },
+      orderBy: { updatedAt: 'asc' },
+      select: {
+        id: true,
+        updatedAt: true,
+        subtotalVnd: true,
+        discountVnd: true,
+        voucherSponsor: true,
+        merchantCashVnd: true,
+        merchantCommissionVnd: true,
+      },
+    });
+    return rows.map((row) => ({
+      orderId: row.id,
+      deliveredAt: row.updatedAt,
+      subtotalVnd: row.subtotalVnd,
+      discountVnd: row.discountVnd,
+      voucherSponsor: (row.voucherSponsor ?? null) as MerchantStatementRow['voucherSponsor'],
+      merchantCashVnd: row.merchantCashVnd ?? null,
+      commissionVnd: row.merchantCommissionVnd ?? null,
+    }));
+  }
+
+  async listMerchantSettlements(storeId: string, limit: number): Promise<MerchantSettlementView[]> {
+    const rows = await this.db.merchantSettlement.findMany({
+      where: { storeId },
+      orderBy: { periodEnd: 'desc' },
+      take: limit,
+    });
+    return rows.map(toSettlementView);
+  }
+
+  async recordMerchantSettlement(input: RecordMerchantSettlementInput): Promise<MerchantSettlementView> {
+    return this.db.$transaction(async (tx) => {
+      // Serialise per store so two Ops clicks cannot record overlapping periods.
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM food_stores WHERE id = ${input.storeId}::uuid FOR UPDATE`;
+      if (locked.length === 0) {
+        throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
+      }
+      const periodStart = dayDate(input.periodStart);
+      const periodEnd = dayDate(input.periodEnd);
+      const overlap = await tx.merchantSettlement.findFirst({
+        where: { storeId: input.storeId, periodStart: { lte: periodEnd }, periodEnd: { gte: periodStart } },
+        select: { id: true },
+      });
+      if (overlap) {
+        throw new FoodRuleError('FOOD_SETTLEMENT_OVERLAP');
+      }
+      const row = await tx.merchantSettlement.create({
+        data: {
+          storeId: input.storeId,
+          periodStart,
+          periodEnd,
+          orderCount: input.orderCount,
+          grossVnd: input.grossVnd,
+          merchantFundedVnd: input.merchantFundedVnd,
+          commissionVnd: input.commissionVnd,
+          netVnd: input.netVnd,
+          actorUserId: input.actorUserId,
+          note: input.note,
+        },
+      });
+      await tx.opsAuditLog.create({
+        data: {
+          id: randomUUID(),
+          actorUserId: input.actorUserId,
+          action: 'MERCHANT_PAYOUT_RECORD',
+          entityType: 'STORE',
+          entityId: input.storeId,
+          reason: input.reason,
+          metadata: {
+            settlementId: row.id,
+            periodStart: input.periodStart,
+            periodEnd: input.periodEnd,
+            commissionVnd: input.commissionVnd,
+          },
+        },
+      });
+      return toSettlementView(row);
+    });
+  }
+
   async accept(orderId: string, ownerId: string): Promise<FoodOrderView> {
-    return this.transition(orderId, ownerId, 'PLACED', 'PREPARING');
+    return this.transition(orderId, ownerId, 'PLACED', 'PREPARING', { acceptedAt: new Date() });
   }
 
   async reject(orderId: string, ownerId: string, reason: FoodCancelReason): Promise<FoodOrderView> {
@@ -1566,18 +1793,70 @@ export class PrismaFoodRepository implements FoodRepository {
   }
 
   async markReady(orderId: string, ownerId: string): Promise<FoodOrderView> {
-    return this.transition(orderId, ownerId, 'PREPARING', 'READY');
+    return this.db.$transaction(async (tx) => {
+      const readyAt = new Date();
+      // An early-claimed order goes straight to ASSIGNED; otherwise it opens for claims.
+      // Not while the customer still has to answer a change.
+      const pendingChange = await tx.foodOrderChange.findFirst({
+        where: { orderId, status: 'PENDING', order: { store: { ownerId } } },
+        select: { id: true },
+      });
+      if (pendingChange) {
+        throw new FoodRuleError('FOOD_CHANGE_PENDING');
+      }
+      const early = await tx.foodOrder.updateMany({
+        where: { id: orderId, status: 'PREPARING', store: { ownerId }, assignedDriverId: { not: null } },
+        data: { status: 'ASSIGNED', readyAt },
+      });
+      const open =
+        early.count === 1
+          ? early
+          : await tx.foodOrder.updateMany({
+              where: { id: orderId, status: 'PREPARING', store: { ownerId }, assignedDriverId: null },
+              data: { status: 'READY', readyAt },
+            });
+      if (open.count === 1) {
+        const order = await this.findOrderIn(tx, orderId);
+        if (!order) {
+          throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
+        }
+        await this.writeFoodStatusOutbox(tx, orderId, order.status, {
+          storeId: order.storeId,
+          ...(order.assignedDriverId ? { assignedDriverId: order.assignedDriverId } : {}),
+        });
+        return order;
+      }
+      const existing = await tx.foodOrder.findFirst({
+        where: { id: orderId, store: { ownerId } },
+        select: { id: true },
+      });
+      if (!existing) {
+        throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
+      }
+      throw new FoodRuleError('FOOD_STATUS_CONFLICT');
+    });
   }
 
   async claim(
     orderId: string,
     driverId: string,
     maxConcurrentJobs = 1,
+    early?: FoodEarlyClaim,
   ): Promise<FoodOrderView> {
     return this.db.$transaction(async (tx) => {
+      // Serialize every job assignment for this driver (ride select / food claim).
+      await lockDriverAssignment(tx, driverId);
       const current = await tx.foodOrder.findUnique({
         where: { id: orderId },
-        select: { id: true, customerId: true, status: true, assignedDriverId: true },
+        select: {
+          id: true,
+          customerId: true,
+          status: true,
+          assignedDriverId: true,
+          prepMinutes: true,
+          createdAt: true,
+          acceptedAt: true,
+        },
       });
       if (!current) {
         throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
@@ -1585,12 +1864,19 @@ export class PrismaFoodRepository implements FoodRepository {
       if (current.customerId === driverId) {
         throw new FoodRuleError('FOOD_SELF_CLAIM');
       }
+      const isEarly = current.status === 'PREPARING' && current.assignedDriverId === null;
+      if (isEarly) {
+        const opensAt = early ? earlyClaimOpensAt(current, early.leadMinutes) : null;
+        if (!early || !opensAt || opensAt.getTime() > early.now.getTime()) {
+          throw new FoodRuleError('FOOD_NOT_YET_CLAIMABLE');
+        }
+      }
 
       const [activeFood, activeRides] = await Promise.all([
         tx.foodOrder.count({
           where: {
             assignedDriverId: driverId,
-            status: { in: ['ASSIGNED', 'PICKED_UP'] },
+            status: { in: ['PREPARING', 'ASSIGNED', 'PICKED_UP'] },
           },
         }),
         tx.ride.count({
@@ -1604,18 +1890,21 @@ export class PrismaFoodRepository implements FoodRepository {
         throw new FoodRuleError('DRIVER_AT_CAPACITY');
       }
 
-      // Atomic claim: READY + unassigned only — concurrent drivers cannot both win.
+      // Atomic claim: READY (or early-claimable PREPARING) + unassigned only — concurrent
+      // drivers cannot both win.
       const updated = await tx.foodOrder.updateMany({
         where: {
           id: orderId,
-          status: 'READY',
+          status: isEarly ? 'PREPARING' : 'READY',
           assignedDriverId: null,
           customerId: { not: driverId },
         },
-        data: { status: 'ASSIGNED', assignedDriverId: driverId },
+        data: isEarly ? { assignedDriverId: driverId } : { status: 'ASSIGNED', assignedDriverId: driverId },
       });
       if (updated.count === 1) {
-        await this.writeFoodStatusOutbox(tx, orderId, 'ASSIGNED', { assignedDriverId: driverId });
+        await this.writeFoodStatusOutbox(tx, orderId, isEarly ? 'PREPARING' : 'ASSIGNED', {
+          assignedDriverId: driverId,
+        });
         const order = await this.findOrderIn(tx, orderId);
         if (!order) {
           throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
@@ -1636,8 +1925,111 @@ export class PrismaFoodRepository implements FoodRepository {
     });
   }
 
-  async pickup(orderId: string, driverId: string): Promise<FoodOrderView> {
-    return this.assignedDriverTransition(orderId, driverId, 'ASSIGNED', 'PICKED_UP');
+  async pickup(
+    orderId: string,
+    driverId: string,
+    snapshot?: { merchantCashVnd: number; at: Date },
+  ): Promise<FoodOrderView> {
+    return this.assignedDriverTransition(orderId, driverId, 'ASSIGNED', 'PICKED_UP', undefined, {
+      pickedUpAt: snapshot?.at ?? new Date(),
+      merchantCashVnd: snapshot?.merchantCashVnd ?? null,
+    });
+  }
+
+  async snapshotCommissionWithin(
+    tx: TxHandle,
+    orderId: string,
+    input: { commissionBps: number; commissionVnd: number },
+  ): Promise<void> {
+    await (tx as Prisma.TransactionClient).foodOrder.update({
+      where: { id: orderId },
+      data: {
+        merchantCommissionBps: input.commissionBps,
+        merchantCommissionVnd: input.commissionVnd,
+      },
+    });
+  }
+
+  async release(orderId: string, driverId: string, reasonCode: string): Promise<FoodOrderView> {
+    return this.db.$transaction(async (tx) => {
+      const current = await tx.foodOrder.findUnique({
+        where: { id: orderId },
+        select: { assignedDriverId: true, status: true },
+      });
+      if (!current) {
+        throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
+      }
+      if (current.assignedDriverId !== driverId) {
+        throw new FoodRuleError('FOOD_NOT_ASSIGNED_DRIVER');
+      }
+      if (current.status !== 'ASSIGNED' && current.status !== 'PREPARING') {
+        throw new FoodRuleError('FOOD_STATUS_CONFLICT');
+      }
+      const to = current.status === 'ASSIGNED' ? 'READY' : 'PREPARING';
+      const updated = await tx.foodOrder.updateMany({
+        where: { id: orderId, assignedDriverId: driverId, status: current.status },
+        data: { status: to, assignedDriverId: null },
+      });
+      if (updated.count !== 1) {
+        throw new FoodRuleError('FOOD_STATUS_CONFLICT');
+      }
+      await tx.driverJobCancellation.create({
+        data: {
+          entityType: 'FOOD_ORDER',
+          entityId: orderId,
+          driverId,
+          actor: 'DRIVER',
+          reasonCode,
+          fromStatus: current.status,
+        },
+      });
+      await this.writeFoodStatusOutbox(tx, orderId, to, { releasedBy: driverId });
+      const order = await this.findOrderIn(tx, orderId);
+      if (!order) {
+        throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
+      }
+      return order;
+    });
+  }
+
+  async timeoutDue(now: Date, policy: FoodTimeoutPolicy, limit = 100): Promise<FoodTimedOut[]> {
+    const placedCutoff = new Date(now.getTime() - policy.merchantAcceptMinutes * 60_000);
+    const readyCutoff = new Date(now.getTime() - policy.unclaimedReadyMinutes * 60_000);
+    const due = await this.db.foodOrder.findMany({
+      where: {
+        OR: [
+          { status: 'PLACED', createdAt: { lte: placedCutoff } },
+          {
+            status: 'READY',
+            assignedDriverId: null,
+            OR: [{ readyAt: { lte: readyCutoff } }, { readyAt: null, updatedAt: { lte: readyCutoff } }],
+          },
+        ],
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+      select: { id: true, status: true },
+    });
+    const out: FoodTimedOut[] = [];
+    for (const row of due) {
+      const reason: FoodSystemCancelReason = row.status === 'PLACED' ? 'MERCHANT_TIMEOUT' : 'NO_DRIVER';
+      const done = await this.db.$transaction(async (tx) => {
+        const updated = await tx.foodOrder.updateMany({
+          where: { id: row.id, status: row.status, assignedDriverId: null },
+          data: { status: 'CANCELLED', cancelledBy: 'SYSTEM', cancelReasonCode: reason },
+        });
+        if (updated.count !== 1) {
+          return false;
+        }
+        await releaseVoucherInTx(tx, { entityType: 'FOOD_ORDER', entityId: row.id });
+        await this.writeFoodStatusOutbox(tx, row.id, 'CANCELLED', { reason });
+        return true;
+      });
+      if (done) {
+        out.push({ orderId: row.id, reason });
+      }
+    }
+    return out;
   }
 
   async deliver(
@@ -1648,11 +2040,16 @@ export class PrismaFoodRepository implements FoodRepository {
     return this.assignedDriverTransition(orderId, driverId, 'PICKED_UP', 'DELIVERED', onDelivered);
   }
 
-  async fail(orderId: string, driverId: string): Promise<FoodOrderView> {
+  async fail(
+    orderId: string,
+    driverId: string,
+    input: FoodFailInput,
+    onFailed?: CompletionHook<FoodOrderView>,
+  ): Promise<FoodOrderView> {
     return this.db.$transaction(async (tx) => {
       const current = await tx.foodOrder.findUnique({
         where: { id: orderId },
-        select: { id: true, assignedDriverId: true, status: true },
+        select: { id: true, assignedDriverId: true, status: true, pickedUpAt: true },
       });
       if (!current) {
         throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
@@ -1660,26 +2057,214 @@ export class PrismaFoodRepository implements FoodRepository {
       if (current.assignedDriverId !== driverId) {
         throw new FoodRuleError('FOOD_NOT_ASSIGNED_DRIVER');
       }
+      if (current.status === 'PICKED_UP') {
+        assertFailWaitOver(current.pickedUpAt, input);
+      }
       const updated = await tx.foodOrder.updateMany({
         where: {
           id: orderId,
           assignedDriverId: driverId,
-          status: { in: ['ASSIGNED', 'PICKED_UP'] },
+          // Only after pickup; before that the driver releases the order.
+          status: 'PICKED_UP',
         },
-        data: { status: 'FAILED' },
+        data: {
+          status: 'FAILED',
+          failedAt: input.now,
+          failReasonCode: input.reasonCode,
+          failNote: input.note,
+        },
       });
       if (updated.count === 1) {
-        await this.writeFoodStatusOutbox(tx, orderId, 'FAILED');
+        await this.writeFoodStatusOutbox(tx, orderId, 'FAILED', {
+          failReasonCode: input.reasonCode,
+        });
         // Confirmed (DEC-PROD-012): a failed delivery gives the voucher use back.
         await releaseVoucherInTx(tx, { entityType: 'FOOD_ORDER', entityId: orderId });
         const order = await this.findOrderIn(tx, orderId);
         if (!order) {
           throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
         }
+        await onFailed?.(tx, order);
         return order;
       }
       throw new FoodRuleError('FOOD_STATUS_CONFLICT');
     });
+  }
+
+  async proposeChange(input: ProposeFoodOrderChangeInput): Promise<FoodOrderChangeResult> {
+    return this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "food_orders" WHERE id = ${input.orderId}::uuid FOR UPDATE`;
+      const owned = await tx.foodOrder.findFirst({
+        where: { id: input.orderId, store: { ownerId: input.ownerId } },
+        select: { id: true },
+      });
+      if (!owned) {
+        throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
+      }
+      const order = await this.findOrderIn(tx, input.orderId);
+      if (!order) {
+        throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
+      }
+      if (!FOOD_CHANGE_EDITABLE_STATUSES.includes(order.status)) {
+        throw new FoodRuleError('FOOD_STATUS_CONFLICT');
+      }
+      const pending = await tx.foodOrderChange.findFirst({
+        where: { orderId: order.id, status: 'PENDING' },
+        select: { id: true },
+      });
+      if (pending) {
+        throw new FoodRuleError('FOOD_CHANGE_PENDING');
+      }
+      const plan = planFoodOrderChange(order, input.lines);
+      const row = await tx.foodOrderChange.create({
+        data: {
+          orderId: order.id,
+          reasonCode: input.reasonCode,
+          note: input.note,
+          lines: plan.lines as unknown as Prisma.InputJsonValue,
+          oldSubtotalVnd: plan.oldSubtotalVnd,
+          newSubtotalVnd: plan.newSubtotalVnd,
+          newDiscountVnd: plan.newDiscountVnd,
+          newTotalVnd: plan.newTotalVnd,
+          expiresAt: input.expiresAt,
+        },
+      });
+      await tx.foodOrder.update({ where: { id: order.id }, data: { updatedAt: new Date() } });
+      await writeFoodChangeOutbox(tx, {
+        orderId: order.id,
+        changeId: row.id,
+        changeStatus: 'PENDING',
+        status: order.status,
+        storeId: order.storeId,
+        expiresAt: row.expiresAt.toISOString(),
+      });
+      return { order, change: toChangeView(row) };
+    });
+  }
+
+  async latestChange(orderId: string): Promise<FoodOrderChangeView | null> {
+    const row = await this.db.foodOrderChange.findFirst({
+      where: { orderId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+    return row ? toChangeView(row) : null;
+  }
+
+  async respondChange(
+    orderId: string,
+    customerId: string,
+    changeId: string,
+    accept: boolean,
+    now: Date,
+  ): Promise<FoodOrderChangeResult> {
+    return this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "food_orders" WHERE id = ${orderId}::uuid FOR UPDATE`;
+      const order = await this.findOrderIn(tx, orderId);
+      if (!order || order.customerId !== customerId) {
+        throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
+      }
+      const row = await tx.foodOrderChange.findFirst({ where: { id: changeId, orderId } });
+      if (!row) {
+        throw new FoodRuleError('FOOD_CHANGE_NOT_FOUND');
+      }
+      const change = toChangeView(row);
+      if (
+        change.status !== 'PENDING' ||
+        !FOOD_CHANGE_EDITABLE_STATUSES.includes(order.status) ||
+        change.expiresAt.getTime() <= now.getTime()
+      ) {
+        throw new FoodRuleError('FOOD_STATUS_CONFLICT');
+      }
+      if (accept) {
+        for (const line of change.lines) {
+          if (line.toQuantity === 0) {
+            await tx.foodOrderLine.deleteMany({ where: { id: line.lineId, orderId } });
+          } else {
+            await tx.foodOrderLine.updateMany({
+              where: { id: line.lineId, orderId },
+              data: { quantity: line.toQuantity },
+            });
+          }
+        }
+        await tx.foodOrder.update({
+          where: { id: orderId },
+          data: {
+            subtotalVnd: change.newSubtotalVnd,
+            discountVnd: change.newDiscountVnd,
+            totalVnd: change.newTotalVnd,
+          },
+        });
+        // Keep the redemption amount in line with what the order really discounts.
+        await tx.promotionRedemption.updateMany({
+          where: { entityType: 'FOOD_ORDER', entityId: orderId, releasedAt: null },
+          data: { discountVnd: change.newDiscountVnd },
+        });
+        await tx.foodOrderChange.update({
+          where: { id: changeId },
+          data: { status: 'ACCEPTED', respondedAt: now },
+        });
+        await writeFoodChangeOutbox(tx, {
+          orderId,
+          changeId,
+          changeStatus: 'ACCEPTED',
+          status: order.status,
+          storeId: order.storeId,
+        });
+      } else {
+        await tx.foodOrderChange.update({
+          where: { id: changeId },
+          data: { status: 'REJECTED', respondedAt: now },
+        });
+        await tx.foodOrder.update({
+          where: { id: orderId },
+          data: { status: 'CANCELLED', cancelledBy: 'CUSTOMER', cancelReasonCode: 'CHANGE_REJECTED' },
+        });
+        await releaseVoucherInTx(tx, { entityType: 'FOOD_ORDER', entityId: orderId });
+        await this.writeFoodStatusOutbox(tx, orderId, 'CANCELLED', { reason: 'CHANGE_REJECTED' });
+      }
+      const updated = await this.findOrderIn(tx, orderId);
+      const after = await tx.foodOrderChange.findUnique({ where: { id: changeId } });
+      if (!updated || !after) {
+        throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
+      }
+      return { order: updated, change: toChangeView(after) };
+    });
+  }
+
+  async expireChanges(now: Date, limit = 100): Promise<string[]> {
+    const due = await this.db.foodOrderChange.findMany({
+      where: { status: 'PENDING', expiresAt: { lte: now } },
+      orderBy: [{ expiresAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+      select: { id: true, orderId: true },
+    });
+    const out: string[] = [];
+    for (const row of due) {
+      const cancelled = await this.db.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "food_orders" WHERE id = ${row.orderId}::uuid FOR UPDATE`;
+        const expired = await tx.foodOrderChange.updateMany({
+          where: { id: row.id, status: 'PENDING' },
+          data: { status: 'EXPIRED', respondedAt: now },
+        });
+        if (expired.count !== 1) {
+          return false;
+        }
+        const updated = await tx.foodOrder.updateMany({
+          where: { id: row.orderId, status: { in: [...FOOD_CHANGE_EDITABLE_STATUSES] } },
+          data: { status: 'CANCELLED', cancelledBy: 'SYSTEM', cancelReasonCode: 'CHANGE_EXPIRED' },
+        });
+        if (updated.count !== 1) {
+          return false;
+        }
+        await releaseVoucherInTx(tx, { entityType: 'FOOD_ORDER', entityId: row.orderId });
+        await this.writeFoodStatusOutbox(tx, row.orderId, 'CANCELLED', { reason: 'CHANGE_EXPIRED' });
+        return true;
+      });
+      if (cancelled) {
+        out.push(row.orderId);
+      }
+    }
+    return out;
   }
 
   async cancel(orderId: string, customerId: string): Promise<FoodOrderView> {
@@ -1823,6 +2408,7 @@ export class PrismaFoodRepository implements FoodRepository {
     from: 'ASSIGNED' | 'PICKED_UP',
     to: 'PICKED_UP' | 'DELIVERED',
     onChanged?: CompletionHook<FoodOrderView>,
+    extra: { pickedUpAt?: Date; merchantCashVnd?: number | null } = {},
   ): Promise<FoodOrderView> {
     return this.db.$transaction(async (tx) => {
       const current = await tx.foodOrder.findUnique({
@@ -1837,7 +2423,7 @@ export class PrismaFoodRepository implements FoodRepository {
       }
       const updated = await tx.foodOrder.updateMany({
         where: { id: orderId, assignedDriverId: driverId, status: from },
-        data: { status: to },
+        data: { status: to, ...extra },
       });
       if (updated.count === 1) {
         await this.writeFoodStatusOutbox(tx, orderId, to);
@@ -1869,11 +2455,12 @@ export class PrismaFoodRepository implements FoodRepository {
     ownerId: string,
     from: 'PLACED' | 'PREPARING',
     to: 'PREPARING' | 'READY',
+    extra: { acceptedAt?: Date } = {},
   ): Promise<FoodOrderView> {
     return this.db.$transaction(async (tx) => {
       const updated = await tx.foodOrder.updateMany({
         where: { id: orderId, status: from, store: { ownerId } },
-        data: { status: to },
+        data: { status: to, ...extra },
       });
       if (updated.count === 1) {
         const order = await this.findOrderIn(tx, orderId);
@@ -2143,6 +2730,32 @@ function orderPickup(order: {
   return null;
 }
 
+/** YYYY-MM-DD → the UTC-midnight Date Prisma stores in a @db.Date column. */
+function dayDate(key: string): Date {
+  return new Date(`${key}T00:00:00.000Z`);
+}
+
+function toSettlementView(row: {
+  id: string;
+  storeId: string;
+  periodStart: Date;
+  periodEnd: Date;
+  orderCount: number;
+  grossVnd: number;
+  merchantFundedVnd: number;
+  commissionVnd: number;
+  netVnd: number;
+  actorUserId: string;
+  note: string | null;
+  createdAt: Date;
+}): MerchantSettlementView {
+  return {
+    ...row,
+    periodStart: row.periodStart.toISOString().slice(0, 10),
+    periodEnd: row.periodEnd.toISOString().slice(0, 10),
+  };
+}
+
 function toView(order: OrderRow): FoodOrderView {
   return {
     id: order.id,
@@ -2165,6 +2778,7 @@ function toView(order: OrderRow): FoodOrderView {
     cancelReason: toCancelReason(order.cancelReasonCode, order.cancelNote),
     cancelledBy: order.cancelledBy ?? null,
     lines: order.lines.map((line) => ({
+      id: line.id,
       itemId: line.itemId,
       name: line.name,
       unitPriceVnd: line.unitPriceVnd,
@@ -2174,6 +2788,12 @@ function toView(order: OrderRow): FoodOrderView {
     })),
     prepMinutes: order.prepMinutes ?? null,
     estimatedReadyAt: estimatedReadyAt(order.createdAt, order.prepMinutes ?? null),
+    pickedUpAt: order.pickedUpAt ?? null,
+    failReason: order.failReasonCode
+      ? { code: order.failReasonCode, note: order.failNote ?? null }
+      : null,
+    merchantCashVnd: order.merchantCashVnd ?? null,
+    createdAt: order.createdAt,
     updatedAt: order.updatedAt,
   };
 }
@@ -2215,6 +2835,44 @@ function toCancelReason(code: string | null, note: string | null): FoodCancelRea
   if (!code) {
     return null;
   }
-  const known = (FOOD_REJECT_REASONS as readonly string[]).includes(code);
-  return { code: (known ? code : 'OTHER') as FoodRejectReason, note: note ?? null };
+  const known = [...FOOD_REJECT_REASONS, ...FOOD_SYSTEM_CANCEL_REASONS, ...FOOD_CHANGE_CANCEL_REASONS] as readonly string[];
+  return {
+    code: (known.includes(code) ? code : 'OTHER') as FoodCancelReasonCode,
+    note: note ?? null,
+  };
+}
+
+type FoodOrderChangeRow = {
+  id: string;
+  orderId: string;
+  status: string;
+  reasonCode: string;
+  note: string | null;
+  lines: Prisma.JsonValue;
+  oldSubtotalVnd: number;
+  newSubtotalVnd: number;
+  newDiscountVnd: number;
+  newTotalVnd: number;
+  expiresAt: Date;
+  respondedAt: Date | null;
+  createdAt: Date;
+};
+
+function toChangeView(row: FoodOrderChangeRow): FoodOrderChangeView {
+  const lines = Array.isArray(row.lines) ? (row.lines as unknown as FoodOrderChangeLine[]) : [];
+  return {
+    id: row.id,
+    orderId: row.orderId,
+    status: row.status as FoodOrderChangeStatusName,
+    reasonCode: row.reasonCode,
+    note: row.note,
+    lines: lines.map((line) => ({ ...line })),
+    oldSubtotalVnd: row.oldSubtotalVnd,
+    newSubtotalVnd: row.newSubtotalVnd,
+    newDiscountVnd: row.newDiscountVnd,
+    newTotalVnd: row.newTotalVnd,
+    expiresAt: row.expiresAt,
+    respondedAt: row.respondedAt,
+    createdAt: row.createdAt,
+  };
 }

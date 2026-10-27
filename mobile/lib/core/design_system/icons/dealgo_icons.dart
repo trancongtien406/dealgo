@@ -26,6 +26,7 @@ abstract final class DealGoIcons {
   static const IconData chartBar = LucideIcons.chartColumn;
   static const IconData chartPie = LucideIcons.chartPie;
   static const IconData chat = LucideIcons.messageCircle;
+  static const IconData chatBubbles = LucideIcons.messagesSquare;
   static const IconData check = LucideIcons.check;
   static const IconData chevronDown = LucideIcons.chevronDown;
   static const IconData chevronRight = LucideIcons.chevronRight;
@@ -76,6 +77,9 @@ abstract final class DealGoIcons {
   static const IconData mail = LucideIcons.mail;
   static const IconData male = LucideIcons.mars;
   static const IconData map = LucideIcons.map;
+  static const IconData layers = LucideIcons.layers;
+  static const IconData moon = LucideIcons.moon;
+  static const IconData earth = LucideIcons.earth;
   static const IconData medical = LucideIcons.stethoscope;
   static const IconData mic = LucideIcons.mic;
   static const IconData more = LucideIcons.ellipsis;
@@ -89,6 +93,7 @@ abstract final class DealGoIcons {
   static const IconData packageOpen = LucideIcons.packageOpen;
   static const IconData pause = LucideIcons.circlePause;
   static const IconData phone = LucideIcons.phone;
+  static const IconData phoneMissed = LucideIcons.phoneMissed;
   static const IconData pickupDot = LucideIcons.circleDot;
   static const IconData pin = LucideIcons.mapPin;
   static const IconData pinFilled = LucideIcons.mapPin;
@@ -100,6 +105,7 @@ abstract final class DealGoIcons {
   static const IconData remove = LucideIcons.minus;
   static const IconData restaurant = LucideIcons.utensils;
   static const IconData route = LucideIcons.route;
+
   /// C001 center “Đặt” / search: scanner frame (corners + box), not scan-line.
   static const IconData scan = LucideIcons.scanBox;
   static const IconData scanLine = LucideIcons.scanLine;

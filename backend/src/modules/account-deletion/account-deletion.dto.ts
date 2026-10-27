@@ -1,5 +1,16 @@
 import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 
 export class ConfirmAccountDeletionDto {
   @ApiPropertyOptional({ description: '6-digit SMS code when method = PHONE_OTP' })
@@ -22,4 +33,17 @@ export class OpsReasonDto {
   @MinLength(3)
   @MaxLength(500)
   reason!: string;
+}
+
+/** Partial cash payment between a driver and DealGo, recorded by Ops. */
+export class OpsDriverPaymentDto extends OpsReasonDto {
+  @ApiProperty({ enum: ['DRIVER_PAID', 'DEALGO_PAID'] })
+  @IsIn(['DRIVER_PAID', 'DEALGO_PAID'])
+  direction!: 'DRIVER_PAID' | 'DEALGO_PAID';
+
+  @ApiProperty({ minimum: 1000, maximum: 50_000_000 })
+  @IsInt()
+  @Min(1000)
+  @Max(50_000_000)
+  amountVnd!: number;
 }

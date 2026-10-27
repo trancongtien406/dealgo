@@ -67,6 +67,14 @@ export class SubmitPartnerApplicationDto {
   documents?: PartnerDocumentDto[];
 }
 
+/** DEC-PROD-048: ops may assign or confirm the driver's vehicle class when approving. */
+export class ApprovePartnerApplicationDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  vehicleClassCode?: string;
+}
+
 export class RejectPartnerApplicationDto {
   @IsString()
   @MinLength(1)

@@ -57,13 +57,31 @@ export type PartnerRepository = {
     reviewIssues: PartnerReviewIssue[];
     reviewedBy: string;
     now: Date;
+    /** Approval only: replaces metadata (e.g. ops-confirmed vehicleClassCode). */
+    metadata?: Record<string, unknown>;
   }): Promise<PartnerApplicationRecord | null>;
+  /** Queues the decision event for the applicant's realtime `user:` room (outbox). */
+  recordStatusEvent(input: PartnerStatusEventInput): Promise<void>;
+};
+
+export type PartnerStatusEventInput = {
+  applicationId: string;
+  userId: string;
+  role: PartnerRoleName;
+  status: 'APPROVED' | 'REJECTED';
+  reviewedAt: Date;
 };
 
 type Stored = PartnerApplicationRecord;
 
 export class MemoryPartnerRepository implements PartnerRepository {
   private readonly byId = new Map<string, Stored>();
+  /** Decision events (tests read this; the Prisma repository writes outbox rows). */
+  readonly statusEvents: PartnerStatusEventInput[] = [];
+
+  async recordStatusEvent(input: PartnerStatusEventInput): Promise<void> {
+    this.statusEvents.push({ ...input });
+  }
 
   async findByUserAndRole(
     userId: string,
@@ -186,6 +204,7 @@ export class MemoryPartnerRepository implements PartnerRepository {
     reviewIssues: PartnerReviewIssue[];
     reviewedBy: string;
     now: Date;
+    metadata?: Record<string, unknown>;
   }): Promise<PartnerApplicationRecord | null> {
     const existing = this.byId.get(input.id);
     // Conditional like the Prisma updateMany: only a SUBMITTED row can be reviewed once.
@@ -194,6 +213,7 @@ export class MemoryPartnerRepository implements PartnerRepository {
     }
     const updated: Stored = {
       ...existing,
+      metadata: input.metadata ? { ...input.metadata } : existing.metadata,
       status: input.status,
       reason: input.reason,
       reviewIssues: input.reviewIssues.map((issue) => ({ ...issue })),

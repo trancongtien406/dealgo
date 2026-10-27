@@ -30,6 +30,16 @@ export type DriverCardView = {
   ratingCount: number;
 };
 
+/**
+ * What the assigned driver sees about the customer on the job: profile name and avatar only
+ * (no phone; calls go through the masked voice/chat channels). Rating rides on the ride view.
+ */
+export type CustomerCardView = {
+  customerId: string;
+  displayName: string;
+  avatarUrl: string | null;
+};
+
 const CARD_FIELD_MAX = 40;
 
 /** Admin row enrichment: who a customer/driver id is, without credentials or full phone. */
@@ -108,6 +118,33 @@ export class DriverCardService {
       throw notFound('DRIVER_NOT_ASSIGNED', 'No driver assigned yet');
     }
     return this.card(subject.driverId);
+  }
+
+  /** The customer of a ride, for its assigned driver only. */
+  async rideCustomer(actorId: string, rideId: string): Promise<CustomerCardView> {
+    const subject = await this.rides.ratingSubject(rideId);
+    if (!subject || !subject.driverId || subject.driverId !== actorId) {
+      throw notFound('RIDE_NOT_FOUND', 'Ride not found');
+    }
+    return this.customerCard(subject.customerId);
+  }
+
+  /** The customer of a food order, for its assigned driver only. */
+  async foodOrderCustomer(actorId: string, orderId: string): Promise<CustomerCardView> {
+    const subject = await this.food.ratingSubject(orderId);
+    if (!subject || !subject.driverId || subject.driverId !== actorId) {
+      throw notFound('FOOD_ORDER_NOT_FOUND', 'Food order not found');
+    }
+    return this.customerCard(subject.customerId);
+  }
+
+  private async customerCard(customerId: string): Promise<CustomerCardView> {
+    const user = await this.identity.findUserById(customerId);
+    return {
+      customerId,
+      displayName: cardText(user?.displayName) ?? '',
+      avatarUrl: user?.avatarUrl ?? null,
+    };
   }
 
   /** Batch lookup for Admin lists (rides, negotiations, drivers). Unknown ids are omitted. */

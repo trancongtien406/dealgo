@@ -1,11 +1,23 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { AppEnv } from '../../platform/config/env.js';
+import { deployEnvOf, type AppEnv } from '../../platform/config/env.js';
 import { IDENTITY_REPOSITORY } from '../identity/identity.constants.js';
 import type { IdentityRepository } from '../identity/identity.repository.js';
-import { PARTNER_REPOSITORY } from './partner.constants.js';
+import {
+  PARTNER_DRIVER_CAR_EXTRA_DOCUMENTS,
+  PARTNER_REPOSITORY,
+} from './partner.constants.js';
 import { partnerError } from './partner.error.js';
-import type { PartnerRepository, PartnerRoleName } from './partner.repository.js';
+import { shopPinFromMetadata } from './partner-shop-pin.js';
+import {
+  isCarVehicleClassCode,
+  vehicleClassCodeFromMetadata,
+} from '../ride-vehicle/ride-vehicle-class.js';
+import type {
+  PartnerApplicationRecord,
+  PartnerRepository,
+  PartnerRoleName,
+} from './partner.repository.js';
 
 @Injectable()
 export class PartnerEligibilityService {
@@ -36,6 +48,32 @@ export class PartnerEligibilityService {
         `An approved ${role === 'DRIVER' ? 'KYC' : 'KYB'} application is required`,
       );
     }
+    if (role === 'DRIVER') {
+      this.assertCarExtraDocsIfRequired(application);
+    }
+  }
+
+  /**
+   * Class a driver may bid on (DG-DEC-VEH-001).
+   * Fail closed: missing application, non-APPROVED (when bypass off), or missing /
+   * unknown vehicleClassCode → null. Callers must skip listOpen / refuse offer.
+   * Never silent-default to MOTORBIKE.
+   */
+  async driverVehicleClassCode(userId: string): Promise<string | null> {
+    const application = await this.partners.findByUserAndRole(userId, 'DRIVER');
+    if (!application) {
+      return null;
+    }
+    if (!this.bypassEnabled() && application.status !== 'APPROVED') {
+      return null;
+    }
+    return vehicleClassCodeFromMetadata(application.metadata);
+  }
+
+  /** The pin from the merchant's KYB application, used to seed a store without coordinates. */
+  async merchantShopPin(userId: string): Promise<{ lat: number; lng: number; label: string | null } | null> {
+    const application = await this.partners.findByUserAndRole(userId, 'MERCHANT');
+    return application ? shopPinFromMetadata(application.metadata) : null;
   }
 
   bypassEnabled(): boolean {
@@ -43,7 +81,47 @@ export class PartnerEligibilityService {
     if (explicit !== undefined) {
       return explicit;
     }
-    const nodeEnv = this.config.get('NODE_ENV', { infer: true });
-    return nodeEnv !== 'production';
+    // Only a local/dev build bypasses by default; staging must exercise real KYC.
+    return (
+      deployEnvOf({
+        DEPLOY_ENV: this.config.get('DEPLOY_ENV', { infer: true }),
+        NODE_ENV: this.config.get('NODE_ENV', { infer: true }),
+      }) === 'local'
+    );
+  }
+
+  /**
+   * OPEN-006 scaffold: fail closed for Car when gate is on and insurance missing.
+   * Does not invent regulatory claims or vendor secrets.
+   */
+  carExtraDocsGateEnabled(): boolean {
+    const explicit = this.config.get('PARTNER_CAR_KYC_EXTRA_DOCS', { infer: true });
+    if (explicit !== undefined) {
+      return explicit;
+    }
+    return this.config.get('NODE_ENV', { infer: true }) === 'production';
+  }
+
+  private assertCarExtraDocsIfRequired(application: PartnerApplicationRecord): void {
+    if (!this.carExtraDocsGateEnabled()) {
+      return;
+    }
+    const code = vehicleClassCodeFromMetadata(application.metadata);
+    if (!code || !isCarVehicleClassCode(code)) {
+      return;
+    }
+    const onFile = new Set(
+      (application.documents ?? [])
+        .map((doc) => doc.kind)
+        .filter((kind): kind is string => typeof kind === 'string' && kind.length > 0),
+    );
+    const missing = PARTNER_DRIVER_CAR_EXTRA_DOCUMENTS.filter((kind) => !onFile.has(kind));
+    if (missing.length > 0) {
+      throw partnerError(
+        403,
+        'PARTNER_KYC_REQUIRED',
+        `Car KYC documents required: ${missing.join(', ')}`,
+      );
+    }
   }
 }

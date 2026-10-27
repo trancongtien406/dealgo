@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
+import { getSupportPage } from "@/features/content-cms/fetch-public-page";
+import { localeFromLang } from "@/features/content-cms/types";
 import { SupportClient } from "./support-client";
 
-export const metadata: Metadata = {
-  title: "Trung tâm Hỗ trợ & Trợ giúp | DealGo",
-  description:
-    "Trung tâm trợ giúp 24/7 của DealGo dành cho Khách hàng, Tài xế đối tác và Đối tác Nhà hàng Quán ăn.",
-};
+type Props = { searchParams: Promise<{ lang?: string | string[] }> };
 
-export default function SupportPage() {
-  return <SupportClient />;
+export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+  const page = await getSupportPage(localeFromLang((await searchParams).lang));
+  return { title: `${page.title} | DealGo`, description: page.summary ?? undefined };
+}
+
+export default async function SupportPage({ searchParams }: Props) {
+  const page = await getSupportPage(localeFromLang((await searchParams).lang));
+  return <SupportClient page={page} />;
 }

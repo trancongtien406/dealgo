@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { publicRequestOrigin } from "@/lib/api/public-origin";
 
 export function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
@@ -20,7 +21,7 @@ export function assertSameOriginMutation(
 }
 
 function sameOriginMutation(request: Request): boolean {
-  const requestHost = safeHost(request.url);
+  const requestHost = safeHost(publicRequestOrigin(request));
   if (!requestHost) {
     return false;
   }

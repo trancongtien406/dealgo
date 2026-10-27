@@ -26,6 +26,8 @@ import { PlatformSettingsModule } from './platform/settings/index.js';
 import { AuditModule } from './platform/audit/index.js';
 import { ServiceAreaModule } from './modules/service-area/index.js';
 import { SupportModule } from './modules/support/index.js';
+import { PublicPagesModule } from './modules/public-pages/index.js';
+import { AppLinksModule } from './modules/app-links/index.js';
 import { SettlementModule } from './modules/settlement/index.js';
 import { NotificationModule } from './modules/communication/notifications/index.js';
 import { MerchantModule } from './modules/merchant/index.js';
@@ -41,10 +43,12 @@ import { DriverCardModule } from './modules/driver-card/index.js';
 import { RideShareModule } from './modules/ride-share/index.js';
 import { AvatarModule } from './modules/avatar/index.js';
 import { SupportTicketModule } from './modules/support-ticket/index.js';
+import { CustomerActivityModule } from './modules/customer-activity/index.js';
 import { DriverHistoryModule } from './modules/driver-history/index.js';
 import { AccountDeletionModule } from './modules/account-deletion/index.js';
 import { AccountSettingsModule } from './modules/account-settings/index.js';
 import { RoutingModule } from './modules/routing/index.js';
+import { HomeBannerModule } from './modules/home-banner/index.js';
 
 function buildThrottlerOptions(config: ConfigService<AppEnv, true>): ThrottlerModuleOptions {
   const throttlers = [
@@ -92,6 +96,8 @@ function buildThrottlerOptions(config: ConfigService<AppEnv, true>): ThrottlerMo
     AuditModule,
     ServiceAreaModule,
     SupportModule,
+    PublicPagesModule,
+    AppLinksModule,
     SettlementModule,
     NotificationModule,
     MerchantModule,
@@ -107,10 +113,12 @@ function buildThrottlerOptions(config: ConfigService<AppEnv, true>): ThrottlerMo
     RideShareModule,
     AvatarModule,
     SupportTicketModule,
+    CustomerActivityModule,
     DriverHistoryModule,
     AccountDeletionModule,
     AccountSettingsModule,
     RoutingModule,
+    HomeBannerModule,
     OpsModule,
   ],
   controllers: [AppController],

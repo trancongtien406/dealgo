@@ -2,84 +2,63 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  fetchCmsDocument,
-  fetchSupportConfig,
-  resetCmsDocument,
-  resetSupportConfig,
-  saveCmsDocument,
-  saveSupportConfig,
+  fetchOpsPublicPage,
+  fetchPublicPageRevisions,
+  publishPublicPage,
+  resetPublicPage,
+  savePublicPageDraft,
 } from "./api";
-import type { ContentDocKey, LegalDocument, SupportConfig } from "./types";
+import type { OpsPublicPageView, PublicPageDraft, PublicPageLocale, PublicPageSlug } from "./types";
 
-export function useCmsDocumentQuery(key: ContentDocKey) {
+const pageKey = (slug: PublicPageSlug, locale: PublicPageLocale) =>
+  ["ops", "public-page", slug, locale] as const;
+const revisionsKey = (slug: PublicPageSlug, locale: PublicPageLocale) =>
+  ["ops", "public-page-revisions", slug, locale] as const;
+
+export function useOpsPublicPageQuery(slug: PublicPageSlug, locale: PublicPageLocale) {
+  return useQuery({ queryKey: pageKey(slug, locale), queryFn: () => fetchOpsPublicPage(slug, locale) });
+}
+
+export function usePublicPageRevisionsQuery(
+  slug: PublicPageSlug,
+  locale: PublicPageLocale,
+  enabled: boolean,
+) {
   return useQuery({
-    queryKey: ["ops", "cms-document", key],
-    queryFn: () => fetchCmsDocument(key),
+    queryKey: revisionsKey(slug, locale),
+    queryFn: () => fetchPublicPageRevisions(slug, locale),
+    enabled,
   });
 }
 
-export function useSaveCmsDocumentMutation() {
+function useStorePage(slug: PublicPageSlug, locale: PublicPageLocale) {
   const queryClient = useQueryClient();
+  return (data: OpsPublicPageView) => {
+    queryClient.setQueryData(pageKey(slug, locale), data);
+    void queryClient.invalidateQueries({ queryKey: revisionsKey(slug, locale) });
+  };
+}
+
+export function useSavePublicPageDraftMutation(slug: PublicPageSlug, locale: PublicPageLocale) {
+  const store = useStorePage(slug, locale);
   return useMutation({
-    mutationFn: ({ doc, reason }: { doc: LegalDocument; reason?: string }) =>
-      saveCmsDocument(doc, reason),
-    onSuccess: (data) => {
-      queryClient.setQueryData(["ops", "cms-document", data.key], data);
-      void queryClient.invalidateQueries({
-        queryKey: ["ops", "cms-document", data.key],
-      });
-    },
+    mutationFn: (draft: PublicPageDraft) => savePublicPageDraft(slug, locale, draft),
+    onSuccess: store,
   });
 }
 
-export function useResetCmsDocumentMutation() {
-  const queryClient = useQueryClient();
+export function usePublishPublicPageMutation(slug: PublicPageSlug, locale: PublicPageLocale) {
+  const store = useStorePage(slug, locale);
   return useMutation({
-    mutationFn: (key: ContentDocKey) => resetCmsDocument(key),
-    onSuccess: (data) => {
-      queryClient.setQueryData(["ops", "cms-document", data.key], data);
-      void queryClient.invalidateQueries({
-        queryKey: ["ops", "cms-document", data.key],
-      });
-    },
+    mutationFn: (reason: string) => publishPublicPage(slug, locale, reason),
+    onSuccess: store,
   });
 }
 
-export function useSupportConfigQuery() {
-  return useQuery({
-    queryKey: ["ops", "cms-support-config"],
-    queryFn: () => fetchSupportConfig(),
-  });
-}
-
-export function useSaveSupportConfigMutation() {
-  const queryClient = useQueryClient();
+export function useResetPublicPageMutation(slug: PublicPageSlug, locale: PublicPageLocale) {
+  const store = useStorePage(slug, locale);
   return useMutation({
-    mutationFn: ({
-      config,
-      reason,
-    }: {
-      config: SupportConfig;
-      reason?: string;
-    }) => saveSupportConfig(config, reason),
-    onSuccess: (data) => {
-      queryClient.setQueryData(["ops", "cms-support-config"], data);
-      void queryClient.invalidateQueries({
-        queryKey: ["ops", "cms-support-config"],
-      });
-    },
-  });
-}
-
-export function useResetSupportConfigMutation() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: () => resetSupportConfig(),
-    onSuccess: (data) => {
-      queryClient.setQueryData(["ops", "cms-support-config"], data);
-      void queryClient.invalidateQueries({
-        queryKey: ["ops", "cms-support-config"],
-      });
-    },
+    mutationFn: () => resetPublicPage(slug, locale),
+    onSuccess: store,
   });
 }

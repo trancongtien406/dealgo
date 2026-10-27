@@ -1,102 +1,25 @@
 import { Logger } from '@nestjs/common';
 import { connect as tlsConnect } from 'node:tls';
 import { connect as netConnect, type Socket } from 'node:net';
-import type { MailSender, PasswordResetCodeMail, SignupCodeMail } from './mail-sender.js';
+import { redactEmail, TemplatedMailSender, type RenderedMail } from './mail-templates.js';
 
 /**
  * Minimal SMTP client for sign-up codes, email verification and password reset (AUTH LOGIN + STARTTLS).
  * Prefer SMTP_URL; discrete SMTP_* vars are folded into SMTP_URL in env aliases.
  */
-export class SmtpMailSender implements MailSender {
+export class SmtpMailSender extends TemplatedMailSender {
   private readonly logger = new Logger(SmtpMailSender.name);
 
   constructor(
     private readonly smtpUrl: string,
     private readonly fromAddress: string,
-  ) {}
-
-  async sendEmailVerification(input: {
-    email: string;
-    verificationId: string;
-    token: string;
-  }): Promise<void> {
-    const subject = 'DealGo email verification';
-    const body = [
-      'Verify your DealGo email with this one-time code:',
-      '',
-      input.token,
-      '',
-      `verificationId=${input.verificationId}`,
-    ].join('\n');
-    await sendSmtpMail({
-      smtpUrl: this.smtpUrl,
-      from: this.fromAddress,
-      to: input.email,
-      subject,
-      text: body,
-    });
-    this.logger.log(`SMTP verification sent to ${input.email}`);
+  ) {
+    super();
   }
 
-  async sendPasswordResetCode(input: PasswordResetCodeMail): Promise<void> {
-    const minutes = Math.max(1, Math.round((input.expiresAt.getTime() - Date.now()) / 60_000));
-    const body = [
-      'Your DealGo password reset code is:',
-      '',
-      input.code,
-      '',
-      `Enter it in the DealGo app within ${minutes} minutes. Do not share it with anyone.`,
-      'If you did not ask to reset your password, ignore this email; your password is unchanged.',
-    ].join('\n');
-    await sendSmtpMail({
-      smtpUrl: this.smtpUrl,
-      from: this.fromAddress,
-      to: input.email,
-      subject: 'DealGo password reset code',
-      text: body,
-    });
-    this.logger.log(`SMTP password reset code sent to ${input.email}`);
-  }
-
-  async sendSignupCode(input: SignupCodeMail): Promise<void> {
-    const activation = input.purpose === 'activation';
-    const minutes = Math.max(1, Math.round((input.expiresAt.getTime() - Date.now()) / 60_000));
-    const body = [
-      activation ? 'Your DealGo email verification code is:' : 'Your DealGo sign-up code is:',
-      '',
-      input.code,
-      '',
-      `It expires in ${minutes} minutes. Do not share it with anyone.`,
-      activation
-        ? 'If you did not just sign in to DealGo, change your password.'
-        : 'If you did not try to create a DealGo account, ignore this email.',
-    ].join('\n');
-    await sendSmtpMail({
-      smtpUrl: this.smtpUrl,
-      from: this.fromAddress,
-      to: input.email,
-      subject: activation ? 'DealGo email verification code' : 'DealGo sign-up code',
-      text: body,
-    });
-    this.logger.log(`SMTP ${activation ? 'activation' : 'signup'} code sent to ${input.email}`);
-  }
-
-  async sendSignupAccountExists(input: { email: string }): Promise<void> {
-    const body = [
-      'Someone tried to create a DealGo account with this email address.',
-      'An account already exists for it, so no new account was created.',
-      '',
-      'If this was you, sign in or reset your password from the app.',
-      'If not, you can ignore this email.',
-    ].join('\n');
-    await sendSmtpMail({
-      smtpUrl: this.smtpUrl,
-      from: this.fromAddress,
-      to: input.email,
-      subject: 'DealGo sign-up attempt',
-      text: body,
-    });
-    this.logger.log(`SMTP signup account-exists notice sent to ${input.email}`);
+  protected async transport(to: string, mail: RenderedMail, kind: string): Promise<void> {
+    await sendSmtpMail({ smtpUrl: this.smtpUrl, from: this.fromAddress, to, subject: mail.subject, text: mail.text });
+    this.logger.log(`SMTP ${kind} mail sent to ${redactEmail(to)}`);
   }
 }
 
@@ -202,9 +125,11 @@ async function deliver(
   const payload = [
     `From: ${input.from}`,
     `To: ${input.to}`,
-    `Subject: ${input.subject}`,
+    `Subject: ${encodeHeader(input.subject)}`,
+    `Date: ${new Date().toUTCString()}`,
     'MIME-Version: 1.0',
     'Content-Type: text/plain; charset=utf-8',
+    'Content-Transfer-Encoding: 8bit',
     '',
     input.text.replace(/^\./gm, '..'),
     '.',
@@ -212,6 +137,11 @@ async function deliver(
   socket.write(`${payload}\r\n`);
   await expectCode(socket, 250);
   await writeLine(socket, 'QUIT');
+}
+
+/** RFC 2047 encoded-word for non-ASCII headers (Vietnamese subjects). */
+export function encodeHeader(value: string): string {
+  return /^[\x20-\x7e]*$/.test(value) ? value : `=?UTF-8?B?${Buffer.from(value, 'utf8').toString('base64')}?=`;
 }
 
 function extractEmail(from: string): string {

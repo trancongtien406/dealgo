@@ -1,10 +1,11 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { AppEnv } from '../../platform/config/index.js';
+import { MapsProviderSettings } from '../../integrations/maps/maps-provider-settings.js';
 
 export const ROUTING_FETCH = Symbol('ROUTING_FETCH');
 
-export type RoutingProviderName = 'none' | 'osrm' | 'mapbox';
+export type RoutingProviderName = 'none' | 'osrm' | 'mapbox' | 'google';
 
 export type RoutePoint = { lat: number; lng: number };
 
@@ -34,9 +35,15 @@ const CACHE_TTL_MS = 10 * 60_000;
 const MAX_ROUTES = 3;
 
 /**
- * DEC-PROD-045 — road geometry for Admin maps behind a configurable provider.
- * The browser never calls OSRM/Mapbox directly; tokens stay server-side.
- * ROUTING_PROVIDER = none (default) | osrm (ROUTING_OSRM_URL, self-hosted) | mapbox (MAPBOX_DIRECTIONS_TOKEN).
+ * DEC-PROD-045 — road geometry for Admin maps and (DRAFT) mobile Ride/Food clients.
+ * Browsers and apps never call OSRM/Mapbox directly; tokens stay server-side.
+ * ROUTING_PROVIDER = none (code default if unset) | mapbox (preferred when MAPBOX_DIRECTIONS_TOKEN set)
+ *   | osrm (ROUTING_OSRM_URL; self-hosted fallback — public demo OSRM is DEV-only).
+ * Owner prefers Mapbox when a Directions token is present; do not confuse with
+ * NEXT_PUBLIC_MAPBOX_TOKEN (Admin tiles) or a misnamed MAPBOX_ACCESS_TOKEN.
+ * Admin › Cài đặt › Bản đồ may switch routing to Google (Routes API) when GOOGLE_MAPS_API_KEY is
+ * set; a Google failure falls back to the env provider above.
+ * When unavailable, clients draw a straight pickup→dropoff line with an illustrative watermark.
  */
 @Injectable()
 export class RoutingService {
@@ -47,11 +54,13 @@ export class RoutingService {
   constructor(
     private readonly config: ConfigService<AppEnv, true>,
     @Optional() @Inject(ROUTING_FETCH) fetcher?: FetchLike,
+    @Optional() private readonly mapsProviders?: MapsProviderSettings,
   ) {
     this.fetcher = fetcher ?? ((url, init) => fetch(url, init));
   }
 
-  provider(): RoutingProviderName {
+  /** The env-configured provider (used when Google is not chosen or fails). */
+  provider(): Exclude<RoutingProviderName, 'google'> {
     const raw = (this.config.get('ROUTING_PROVIDER', { infer: true }) ?? '').trim().toLowerCase();
     if (raw === 'osrm' && this.osrmBase()) return 'osrm';
     if (raw === 'mapbox' && this.mapboxToken()) return 'mapbox';
@@ -59,10 +68,27 @@ export class RoutingService {
   }
 
   async route(from: RoutePoint, to: RoutePoint): Promise<RouteLookup> {
+    const google = this.mapsProviders?.google;
+    if (google && (await this.mapsProviders?.effective('route')) === 'google') {
+      const viaGoogle = await this.cached('google', from, to, async () => {
+        const routes = await google.computeRoutes(from, to);
+        return routes.filter((r) => r.coords.length >= 2);
+      });
+      if (viaGoogle.available) return viaGoogle;
+    }
     const provider = this.provider();
     if (provider === 'none') {
       return { provider, available: false, routes: [] };
     }
+    return this.cached(provider, from, to, () => this.query(provider, from, to));
+  }
+
+  private async cached(
+    provider: Exclude<RoutingProviderName, 'none'>,
+    from: RoutePoint,
+    to: RoutePoint,
+    load: () => Promise<RouteOption[]>,
+  ): Promise<RouteLookup> {
     const key = `${provider};${from.lat.toFixed(5)},${from.lng.toFixed(5)};${to.lat.toFixed(5)},${to.lng.toFixed(5)}`;
     const hit = this.cache.get(key);
     if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
@@ -70,7 +96,7 @@ export class RoutingService {
     }
     let routes: RouteOption[] = [];
     try {
-      routes = await this.query(provider, from, to);
+      routes = (await load()).slice(0, MAX_ROUTES);
     } catch (error) {
       this.logger.warn(`Routing via ${provider} failed: ${(error as Error).message}`);
       return { provider, available: false, routes: [] };
@@ -86,7 +112,7 @@ export class RoutingService {
   }
 
   private async query(
-    provider: Exclude<RoutingProviderName, 'none'>,
+    provider: 'osrm' | 'mapbox',
     from: RoutePoint,
     to: RoutePoint,
   ): Promise<RouteOption[]> {

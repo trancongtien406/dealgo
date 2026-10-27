@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/design_system/components/dealgo_banner.dart';
 import '../../../core/design_system/components/dealgo_card.dart';
@@ -25,6 +28,8 @@ import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/format/date_time_format.dart';
 import '../../../core/format/short_ref.dart';
 import '../../../core/design_system/components/dealgo_app_header.dart';
+import '../../../core/realtime/realtime_refresh_watcher.dart';
+import '../../../core/realtime/snapshot_realtime.dart';
 
 enum _ActivityFilter { all, rides, food, shopping }
 
@@ -54,6 +59,69 @@ class _CustomerActivityView extends StatefulWidget {
 
 class _CustomerActivityViewState extends State<_CustomerActivityView> {
   var _filter = _ActivityFilter.all;
+  StreamSubscription<ActivityHistoryState>? _stateSub;
+  RealtimeRefreshWatcher? _watcher;
+  var _watchedKeys = <String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    final cubit = context.read<ActivityHistoryCubit>();
+    _stateSub = cubit.stream.listen(_syncWatcher);
+    _syncWatcher(cubit.state);
+  }
+
+  @override
+  void dispose() {
+    unawaited(_stateSub?.cancel());
+    final watcher = _watcher;
+    if (watcher != null) {
+      unawaited(watcher.stop());
+    }
+    super.dispose();
+  }
+
+  /// Joins the snapshot room of every unfinished ride/order in the list so a
+  /// status change (e.g. trip completed) refreshes the row without pull-to-refresh.
+  void _syncWatcher(ActivityHistoryState state) {
+    if (state is! ActivityHistoryReady) {
+      return;
+    }
+    final rooms = activeHistoryRooms([...state.rides, ...state.food]);
+    final keys = {for (final room in rooms) room.name};
+    if (keys.length == _watchedKeys.length && keys.containsAll(_watchedKeys)) {
+      return;
+    }
+    _watchedKeys = keys;
+    final previous = _watcher;
+    _watcher = null;
+    if (previous != null) {
+      unawaited(previous.stop());
+    }
+    if (rooms.isEmpty) {
+      return;
+    }
+    SnapshotRealtime? realtime;
+    try {
+      realtime = context.read<SnapshotRealtime>();
+    } catch (_) {
+      return;
+    }
+    final auth = context.read<AuthCubit>().state;
+    final token = auth is AuthSignedIn ? auth.tokens.accessToken : null;
+    if (token == null || token.isEmpty) {
+      return;
+    }
+    final ids = {for (final room in rooms) activeRoomId(room)};
+    final watcher = RealtimeRefreshWatcher(
+      realtime: realtime,
+      rooms: rooms,
+      refresh: () => _reload(context),
+      matchesSnapshot: (hint) => ids.contains(hint.aggregateId),
+    );
+    _watcher = watcher;
+    unawaited(watcher.start(accessToken: token, initialRefresh: false));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -171,7 +239,8 @@ class _CustomerActivityViewState extends State<_CustomerActivityView> {
                         else ...[
                           if (state is ActivityHistoryFailure) ...[
                             DealGoBanner(
-                              tone: requestFailureKind(state.message.error) ==
+                              tone:
+                                  requestFailureKind(state.message.error) ==
                                       RequestFailureKind.offline
                                   ? DealGoBannerTone.offline
                                   : DealGoBannerTone.warning,
@@ -232,6 +301,14 @@ class _HistoryCard extends StatelessWidget {
     final isRide = item.kind == HistoryKind.ride;
     final amount = item.amountVnd;
     return DealGoCard(
+      onTap: () async {
+        await context.push(historyDetailPath(item));
+        if (context.mounted) {
+          final auth = context.read<AuthCubit>().state;
+          final token = auth is AuthSignedIn ? auth.tokens.accessToken : null;
+          await context.read<ActivityHistoryCubit>().load(accessToken: token);
+        }
+      },
       child: Row(
         children: [
           AccountToneIcon(
@@ -282,6 +359,11 @@ class _HistoryCard extends StatelessWidget {
   }
 }
 
+/// Detail route for a history row: food opens order tracking, rides open ride tracking.
+String historyDetailPath(HistoryItem item) => item.kind == HistoryKind.ride
+    ? '/customer/ride/tracking/${item.id}'
+    : '/customer/food/orders/${item.id}';
+
 bool historyStatusIsBad(String status) =>
     const {'CANCELLED', 'EXPIRED', 'FAILED', 'REJECTED'}.contains(status);
 
@@ -316,3 +398,28 @@ String historyStatusLabel(AppLocalizations l10n, String status) {
     _ => l10n.statusInProgress,
   };
 }
+
+/// Unfinished rows whose status can still change; each gets its snapshot room.
+List<SnapshotRoom> activeHistoryRooms(List<HistoryItem> items) => [
+  for (final item in items)
+    if (!historyStatusIsFinal(item.status))
+      item.kind == HistoryKind.ride
+          ? RideSnapshotRoom(item.id)
+          : FoodSnapshotRoom(item.id),
+];
+
+String activeRoomId(SnapshotRoom room) => switch (room) {
+  RideSnapshotRoom(:final rideId) => rideId,
+  FoodSnapshotRoom(:final orderId) => orderId,
+  _ => room.name,
+};
+
+bool historyStatusIsFinal(String status) => const {
+  'COMPLETED',
+  'DELIVERED',
+  'CANCELLED',
+  'EXPIRED',
+  'FAILED',
+  'REJECTED',
+  '',
+}.contains(status);

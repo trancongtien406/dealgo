@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 254 64" role="img" aria-labelledby="title desc">
+  <title id="title">DealGo reversed logo</title>
+  <desc id="desc">DealGo horizontal logo for dark backgrounds.</desc>
+  <rect x="4" y="4" width="56" height="56" rx="17" fill="#fff"/>
+  <path d="M16 19h16c10.5 0 18 6.9 18 17s-7.5 17-18 17H16V42h15.4c4.7 0 7.6-2.2 7.6-6s-2.9-6-7.6-6H16V19Z" fill="#6D28D9"/>
+  <path d="M10 25h14M8 36h13M12 47h12" fill="none" stroke="#A78BFA" stroke-width="5" stroke-linecap="round"/>
+  <path d="M23 42 31 34l8 6" fill="none" stroke="#16A34A" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="23" cy="42" r="3.75" fill="#F97316" stroke="#fff" stroke-width="2"/>
+  <circle cx="31" cy="34" r="3.75" fill="#22C55E" stroke="#fff" stroke-width="2"/>
+  <circle cx="39" cy="40" r="3.75" fill="#22C55E" stroke="#fff" stroke-width="2"/>
+  <text x="76" y="43" fill="#fff" font-family="'Be Vietnam Pro', Inter, system-ui, sans-serif" font-size="37" font-weight="800" letter-spacing="-1.8">DealGo</text>
+</svg>

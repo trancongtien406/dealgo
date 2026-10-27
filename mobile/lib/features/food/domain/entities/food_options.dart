@@ -48,8 +48,11 @@ class FoodLineOption {
     required this.name,
     required this.priceDeltaVnd,
     this.quantity = 1,
+    this.optionId,
   });
 
+  /// Catalog option id at placement (lets "Đặt lại" rebuild the choice).
+  final String? optionId;
   final String groupName;
   final String name;
   final int priceDeltaVnd;
@@ -79,6 +82,7 @@ class FoodOptionSelection {
   }
 
   final List<FoodOptionGroup> groups;
+
   /// groupId → optionId → quantity
   final Map<String, Map<String, int>> _qty;
 
@@ -300,6 +304,9 @@ List<FoodLineOption> decodeFoodLineOptions(Object? raw) {
           quantity: entry['quantity'] is int && (entry['quantity'] as int) > 0
               ? entry['quantity'] as int
               : 1,
+          optionId: entry['optionId'] is String
+              ? entry['optionId'] as String
+              : null,
         ),
   ]);
 }

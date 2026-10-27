@@ -12,7 +12,9 @@ import '../../../../core/network/request_failure.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../l10n/app_localizations.dart';
+
 import 'dart:convert';
+
 import '../../../food/domain/entities/food_models.dart';
 import '../../../onboarding/presentation/document_image_source.dart';
 import '../../../../core/config/api_base_url.dart';
@@ -107,8 +109,8 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage> {
       _imageUrls = item.imageUrls.isNotEmpty
           ? item.imageUrls
           : (item.imageUrl != null && item.imageUrl!.isNotEmpty
-              ? [item.imageUrl!]
-              : const []);
+                ? [item.imageUrl!]
+                : const []);
       _soldCount = item.soldCount;
       setState(() {
         _categories = cats;
@@ -126,7 +128,6 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage> {
     }
   }
 
-
   Future<void> _pickPhoto() async {
     if (_uploadingPhoto || _busy) return;
     final source = context.read<DocumentImageSource>();
@@ -137,7 +138,9 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage> {
       _error = null;
     });
     try {
-      final updated = await context.read<MerchantOrdersRepository>().uploadItemImage(
+      final updated = await context
+          .read<MerchantOrdersRepository>()
+          .uploadItemImage(
             accessToken: merchantAccessToken(context) ?? '',
             itemId: widget.itemId,
             contentBase64: base64Encode(picked.bytes),
@@ -149,8 +152,8 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage> {
         _imageUrls = updated.imageUrls.isNotEmpty
             ? updated.imageUrls
             : (updated.imageUrl != null && updated.imageUrl!.isNotEmpty
-                ? [updated.imageUrl!]
-                : const []);
+                  ? [updated.imageUrl!]
+                  : const []);
         _uploadingPhoto = false;
       });
     } on ApiException catch (e) {
@@ -177,7 +180,9 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage> {
       _error = null;
     });
     try {
-      final updated = await context.read<MerchantOrdersRepository>().clearItemImage(
+      final updated = await context
+          .read<MerchantOrdersRepository>()
+          .clearItemImage(
             accessToken: merchantAccessToken(context) ?? '',
             itemId: widget.itemId,
           );
@@ -224,21 +229,25 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage> {
     });
     try {
       await context.read<MerchantOrdersRepository>().updateCatalogItem(
-            accessToken: merchantAccessToken(context) ?? '',
-            itemId: widget.itemId,
-            name: name,
-            priceVnd: price,
-            available: _available,
-            description: _description.text.trim().isEmpty ? null : _description.text.trim(),
-            prepMinutes: prep,
-            menuCategoryId: _categoryId,
-          );
+        accessToken: merchantAccessToken(context) ?? '',
+        itemId: widget.itemId,
+        name: name,
+        priceVnd: price,
+        available: _available,
+        description: _description.text.trim().isEmpty
+            ? null
+            : _description.text.trim(),
+        prepMinutes: prep,
+        menuCategoryId: _categoryId,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocalizations.of(context).merchantItemSaved)),
       );
       if (continueToVariants) {
-        context.push(MerchantRoutes.itemVariants(widget.itemId, itemName: name));
+        context.push(
+          MerchantRoutes.itemVariants(widget.itemId, itemName: name),
+        );
       } else {
         context.pop(true);
       }
@@ -278,168 +287,185 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage> {
           : SingleChildScrollView(
               padding: merchantPagePadding,
               child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(l10n.merchantItemInfo, style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: DealGoSpacing.s12),
-
-                Text(
-                  _available
-                      ? l10n.merchantEditStatusOnSale
-                      : l10n.merchantEditStatusHidden,
-                  key: const Key('merchant-edit-status'),
-                  style: textTheme.labelLarge?.copyWith(
-                    color: _available
-                        ? DealGoColors.primary
-                        : DealGoColors.danger,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    l10n.merchantItemInfo,
+                    style: Theme.of(context).textTheme.titleSmall,
                   ),
-                ),
-                if (_soldCount > 0) ...[
-                  const SizedBox(height: DealGoSpacing.s4),
-                  Text(l10n.merchantProductsSoldCount('$_soldCount')),
-                ],
-                const SizedBox(height: DealGoSpacing.s12),
-                Text(l10n.merchantItemPhoto, style: textTheme.titleSmall),
-                const SizedBox(height: DealGoSpacing.s8),
-                Text(l10n.merchantEditGalleryHint, style: textTheme.bodySmall),
-                const SizedBox(height: DealGoSpacing.s8),
-                SizedBox(
-                  height: 88,
-                  child: ListView(
-                    key: const Key('merchant-edit-gallery'),
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      for (final url in _imageUrls) ...[
-                        Padding(
-                          padding: const EdgeInsets.only(right: DealGoSpacing.s8),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: SizedBox(
-                              width: 88,
-                              height: 88,
-                              child: Image.network(
-                                resolveMediaUrl(url) ?? url,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    const ColoredBox(
-                                  color: DealGoColors.subtlePurple,
-                                  child: Icon(
-                                    DealGoIcons.restaurant,
-                                    color: DealGoColors.primary,
-                                  ),
+                  const SizedBox(height: DealGoSpacing.s12),
+
+                  Text(
+                    _available
+                        ? l10n.merchantEditStatusOnSale
+                        : l10n.merchantEditStatusHidden,
+                    key: const Key('merchant-edit-status'),
+                    style: textTheme.labelLarge?.copyWith(
+                      color: _available
+                          ? DealGoColors.primary
+                          : DealGoColors.danger,
+                    ),
+                  ),
+                  if (_soldCount > 0) ...[
+                    const SizedBox(height: DealGoSpacing.s4),
+                    Text(l10n.merchantProductsSoldCount('$_soldCount')),
+                  ],
+                  const SizedBox(height: DealGoSpacing.s12),
+                  Text(l10n.merchantItemPhoto, style: textTheme.titleSmall),
+                  const SizedBox(height: DealGoSpacing.s8),
+                  Text(
+                    l10n.merchantEditGalleryHint,
+                    style: textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: DealGoSpacing.s8),
+                  SizedBox(
+                    height: 88,
+                    child: ListView(
+                      key: const Key('merchant-edit-gallery'),
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        for (final url in _imageUrls) ...[
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              right: DealGoSpacing.s8,
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: SizedBox(
+                                width: 88,
+                                height: 88,
+                                child: Image.network(
+                                  resolveMediaUrl(url) ?? url,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      const ColoredBox(
+                                        color: DealGoColors.subtlePurple,
+                                        child: Icon(
+                                          DealGoIcons.restaurant,
+                                          color: DealGoColors.primary,
+                                        ),
+                                      ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
-                      if (_imageUrls.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.only(right: DealGoSpacing.s8),
-                          child: SizedBox(
-                            width: 88,
-                            height: 88,
-                            child: ColoredBox(
-                              color: DealGoColors.subtlePurple,
-                              child: Icon(
-                                DealGoIcons.restaurant,
-                                color: DealGoColors.primary,
+                        ],
+                        if (_imageUrls.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.only(right: DealGoSpacing.s8),
+                            child: SizedBox(
+                              width: 88,
+                              height: 88,
+                              child: ColoredBox(
+                                color: DealGoColors.subtlePurple,
+                                child: Icon(
+                                  DealGoIcons.restaurant,
+                                  color: DealGoColors.primary,
+                                ),
                               ),
                             ),
                           ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: DealGoSpacing.s8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          key: const Key('merchant-edit-photo-pick'),
+                          onPressed: _uploadingPhoto || _busy
+                              ? null
+                              : _pickPhoto,
+                          child: _uploadingPhoto
+                              ? Text(l10n.merchantItemPhotoUploading)
+                              : Text(l10n.merchantItemPhotoPick),
                         ),
+                      ),
+                      if (_imageUrls.isNotEmpty) ...[
+                        const SizedBox(width: DealGoSpacing.s8),
+                        TextButton(
+                          key: const Key('merchant-edit-photo-clear'),
+                          onPressed: _uploadingPhoto || _busy
+                              ? null
+                              : _clearPhoto,
+                          child: Text(l10n.merchantItemPhotoClear),
+                        ),
+                      ],
                     ],
                   ),
-                ),
-                const SizedBox(height: DealGoSpacing.s8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        key: const Key('merchant-edit-photo-pick'),
-                        onPressed:
-                            _uploadingPhoto || _busy ? null : _pickPhoto,
-                        child: _uploadingPhoto
-                            ? Text(l10n.merchantItemPhotoUploading)
-                            : Text(l10n.merchantItemPhotoPick),
-                      ),
+                  const SizedBox(height: DealGoSpacing.s16),
+                  DealGoTextField(
+                    label: l10n.merchantItemName,
+                    fieldKey: const Key('merchant-edit-name'),
+                    controller: _name,
+                  ),
+                  const SizedBox(height: DealGoSpacing.s12),
+                  DealGoTextField(
+                    label: l10n.merchantItemPrice,
+                    fieldKey: const Key('merchant-edit-price'),
+                    controller: _price,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  ),
+                  const SizedBox(height: DealGoSpacing.s12),
+                  DealGoTextField(
+                    label: l10n.merchantItemDescription,
+                    fieldKey: const Key('merchant-edit-description'),
+                    controller: _description,
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: DealGoSpacing.s12),
+                  DealGoTextField(
+                    label: l10n.merchantItemPrep,
+                    fieldKey: const Key('merchant-edit-prep'),
+                    controller: _prep,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  ),
+                  const SizedBox(height: DealGoSpacing.s12),
+                  DropdownButtonFormField<String?>(
+                    key: const Key('merchant-edit-category'),
+                    initialValue: _categoryId,
+                    decoration: InputDecoration(
+                      labelText: l10n.merchantItemCategory,
                     ),
-                    if (_imageUrls.isNotEmpty) ...[
-                      const SizedBox(width: DealGoSpacing.s8),
-                      TextButton(
-                        key: const Key('merchant-edit-photo-clear'),
-                        onPressed:
-                            _uploadingPhoto || _busy ? null : _clearPhoto,
-                        child: Text(l10n.merchantItemPhotoClear),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('—'),
                       ),
+                      for (final cat in _categories)
+                        DropdownMenuItem(value: cat.id, child: Text(cat.name)),
                     ],
-                  ],
-                ),
-                const SizedBox(height: DealGoSpacing.s16),
-                DealGoTextField(
-                  label: l10n.merchantItemName,
-                  fieldKey: const Key('merchant-edit-name'),
-                  controller: _name,
-                ),
-                const SizedBox(height: DealGoSpacing.s12),
-                DealGoTextField(
-                  label: l10n.merchantItemPrice,
-                  fieldKey: const Key('merchant-edit-price'),
-                  controller: _price,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                ),
-                const SizedBox(height: DealGoSpacing.s12),
-                DealGoTextField(
-                  label: l10n.merchantItemDescription,
-                  fieldKey: const Key('merchant-edit-description'),
-                  controller: _description,
-                  maxLines: 3,
-                ),
-                const SizedBox(height: DealGoSpacing.s12),
-                DealGoTextField(
-                  label: l10n.merchantItemPrep,
-                  fieldKey: const Key('merchant-edit-prep'),
-                  controller: _prep,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                ),
-                const SizedBox(height: DealGoSpacing.s12),
-                DropdownButtonFormField<String?>(
-                  key: const Key('merchant-edit-category'),
-                  value: _categoryId,
-                  decoration: InputDecoration(labelText: l10n.merchantItemCategory),
-                  items: [
-                    const DropdownMenuItem<String?>(value: null, child: Text('—')),
-                    for (final cat in _categories)
-                      DropdownMenuItem(value: cat.id, child: Text(cat.name)),
-                  ],
-                  onChanged: (v) => setState(() => _categoryId = v),
-                ),
-                SwitchListTile.adaptive(
-                  key: const Key('merchant-edit-available'),
-                  title: Text(l10n.merchantItemVisible),
-                  subtitle: Text(l10n.merchantItemVisibleBody),
-                  value: _available,
-                  onChanged: (v) => setState(() => _available = v),
-                ),
-                if (_error != null)
-                  Text(_error!, style: TextStyle(color: DealGoColors.danger)),
-                const SizedBox(height: DealGoSpacing.s16),
-                DealGoPrimaryButton(
-                  key: const Key('merchant-edit-save'),
-                  label: l10n.actionSave,
-                  isLoading: _busy,
-                  onPressed: () => _save(continueToVariants: false),
-                ),
-                const SizedBox(height: DealGoSpacing.s8),
-                OutlinedButton(
-                  key: const Key('merchant-edit-continue-variants'),
-                  onPressed: _busy ? null : () => _save(continueToVariants: true),
-                  child: Text(l10n.merchantItemContinue),
-                ),
-              ],
-            ),
+                    onChanged: (v) => setState(() => _categoryId = v),
+                  ),
+                  SwitchListTile.adaptive(
+                    key: const Key('merchant-edit-available'),
+                    title: Text(l10n.merchantItemVisible),
+                    subtitle: Text(l10n.merchantItemVisibleBody),
+                    value: _available,
+                    onChanged: (v) => setState(() => _available = v),
+                  ),
+                  if (_error != null)
+                    Text(_error!, style: TextStyle(color: DealGoColors.danger)),
+                  const SizedBox(height: DealGoSpacing.s16),
+                  DealGoPrimaryButton(
+                    key: const Key('merchant-edit-save'),
+                    label: l10n.actionSave,
+                    isLoading: _busy,
+                    onPressed: () => _save(continueToVariants: false),
+                  ),
+                  const SizedBox(height: DealGoSpacing.s8),
+                  OutlinedButton(
+                    key: const Key('merchant-edit-continue-variants'),
+                    onPressed: _busy
+                        ? null
+                        : () => _save(continueToVariants: true),
+                    child: Text(l10n.merchantItemContinue),
+                  ),
+                ],
+              ),
             ),
     );
   }

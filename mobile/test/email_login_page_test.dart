@@ -161,7 +161,7 @@ void main() {
     expect(client.registerEmailCalls, isNotEmpty);
     expect(client.registerEmailCalls.single.email, 'test@dealgo.vn');
     expect(await store.read(), isNull);
-    expect(navLabel('Trang chủ'), findsNothing);
+    expect(navLabel('Trang'), findsNothing);
     expect(
       find.textContaining('test@dealgo.vn', findRichText: true),
       findsOneWidget,
@@ -175,8 +175,9 @@ void main() {
       (challengeId: 'email-challenge-1', code: '123456'),
     ]);
     expect(client.verifyCalls, isEmpty);
-    expect(navLabel('Trang chủ'), findsOneWidget);
-    expect(find.text('Đặt xe'), findsWidgets);
+    expect(navLabel('Trang'), findsOneWidget);
+    // Single unified ride entry on home (ServiceRow).
+    expect(find.text("Đặt xe"), findsOneWidget);
   });
 
   testWidgets('email register shows the invalid-code pane on a wrong OTP', (
@@ -265,7 +266,7 @@ void main() {
     expect(client.loginEmailCalls, isNotEmpty);
     expect(client.loginEmailCalls.single.email, 'login@dealgo.vn');
     expect(client.passkeyOptionCalls, isEmpty);
-    expect(navLabel('Trang chủ'), findsOneWidget);
+    expect(navLabel('Trang'), findsOneWidget);
   });
 
   testWidgets(
@@ -310,7 +311,7 @@ void main() {
       expect(client.verifyEmailCalls, [
         (challengeId: 'email-activation-1', code: '123456'),
       ]);
-      expect(navLabel('Trang chủ'), findsOneWidget);
+      expect(navLabel('Trang'), findsOneWidget);
     },
   );
 
@@ -386,55 +387,70 @@ void main() {
     expect(find.text('Email hoặc mật khẩu không đúng'), findsOneWidget);
   });
 
-  testWidgets('forgot password: emailed code resets, then login works (DEC-PROD-045)', (
+  testWidgets(
+    'forgot password: emailed code resets, then login works (DEC-PROD-045)',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(430, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final client = FakeIdentityClient(profile: customerProfile)
+        ..seedEmailAccount('forgot@dealgo.vn', 'old-password');
+      await pumpDealGo(tester, client: client);
+
+      await tester.tap(find.byKey(const Key('auth-method-email')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('email-field')),
+        'forgot@dealgo.vn',
+      );
+      await tester.tap(find.byKey(const Key('email-forgot-password-btn')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Đặt lại mật khẩu'), findsWidgets);
+      await tester.tap(find.byKey(const Key('forgot-send-btn')));
+      await tester.pumpAndSettle();
+      expect(client.passwordResetRequests, ['forgot@dealgo.vn']);
+      expect(find.byKey(const Key('forgot-code-field')), findsOneWidget);
+
+      await tester.enterText(find.byKey(const Key('forgot-code-field')), '12');
+      await tester.tap(find.byKey(const Key('forgot-submit-btn')));
+      await tester.pump();
+      expect(find.text('Nhập đủ 6 chữ số của mã.'), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const Key('forgot-code-field')),
+        '000000',
+      );
+      await tester.enterText(
+        find.byKey(const Key('forgot-password-field')),
+        'new-password-1',
+      );
+      await tester.enterText(
+        find.byKey(const Key('forgot-confirm-field')),
+        'new-password-1',
+      );
+      await tester.tap(find.byKey(const Key('forgot-submit-btn')));
+      await tester.pumpAndSettle();
+      expect(find.text('Mã OTP không hợp lệ.'), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const Key('forgot-code-field')),
+        FakeIdentityClient.passwordResetCode,
+      );
+      await tester.tap(find.byKey(const Key('forgot-submit-btn')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('forgot-done')), findsOneWidget);
+      expect(client.passwordResetConfirms.last.newPassword, 'new-password-1');
+
+      await tester.tap(find.byKey(const Key('forgot-back-to-login')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('email-submit-btn')), findsOneWidget);
+    },
+  );
+
+  testWidgets('forgot password: rate limit shows a friendly message', (
     tester,
   ) async {
-    await tester.binding.setSurfaceSize(const Size(430, 1400));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-
-    final client = FakeIdentityClient(profile: customerProfile)
-      ..seedEmailAccount('forgot@dealgo.vn', 'old-password');
-    await pumpDealGo(tester, client: client);
-
-    await tester.tap(find.byKey(const Key('auth-method-email')));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('email-field')), 'forgot@dealgo.vn');
-    await tester.tap(find.byKey(const Key('email-forgot-password-btn')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Đặt lại mật khẩu'), findsWidgets);
-    await tester.tap(find.byKey(const Key('forgot-send-btn')));
-    await tester.pumpAndSettle();
-    expect(client.passwordResetRequests, ['forgot@dealgo.vn']);
-    expect(find.byKey(const Key('forgot-code-field')), findsOneWidget);
-
-    await tester.enterText(find.byKey(const Key('forgot-code-field')), '12');
-    await tester.tap(find.byKey(const Key('forgot-submit-btn')));
-    await tester.pump();
-    expect(find.text('Nhập đủ 6 chữ số của mã.'), findsOneWidget);
-
-    await tester.enterText(find.byKey(const Key('forgot-code-field')), '000000');
-    await tester.enterText(find.byKey(const Key('forgot-password-field')), 'new-password-1');
-    await tester.enterText(find.byKey(const Key('forgot-confirm-field')), 'new-password-1');
-    await tester.tap(find.byKey(const Key('forgot-submit-btn')));
-    await tester.pumpAndSettle();
-    expect(find.text('Mã OTP không hợp lệ.'), findsOneWidget);
-
-    await tester.enterText(
-      find.byKey(const Key('forgot-code-field')),
-      FakeIdentityClient.passwordResetCode,
-    );
-    await tester.tap(find.byKey(const Key('forgot-submit-btn')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('forgot-done')), findsOneWidget);
-    expect(client.passwordResetConfirms.last.newPassword, 'new-password-1');
-
-    await tester.tap(find.byKey(const Key('forgot-back-to-login')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('email-submit-btn')), findsOneWidget);
-  });
-
-  testWidgets('forgot password: rate limit shows a friendly message', (tester) async {
     await tester.binding.setSurfaceSize(const Size(430, 1400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -449,7 +465,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('email-forgot-password-btn')));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('forgot-email-field')), 'a@dealgo.vn');
+    await tester.enterText(
+      find.byKey(const Key('forgot-email-field')),
+      'a@dealgo.vn',
+    );
     await tester.tap(find.byKey(const Key('forgot-send-btn')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('forgot-error')), findsOneWidget);

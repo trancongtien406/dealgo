@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentActor,
@@ -22,6 +22,15 @@ export class MePartnerApplicationsController {
   @ApiOperation({ summary: 'List my KYC/KYB partner applications' })
   listMine(@CurrentActor() actor: RequestActor) {
     return this.partners.listMine(actor.userId);
+  }
+
+  @Get('requirements/:role')
+  @ApiOperation({
+    summary:
+      'DEC-PROD-048: whether KYC/KYB documents are required for a role and which kinds',
+  })
+  requirements(@Param('role') role: string, @Query('vehicleClassCode') vehicleClassCode?: string) {
+    return this.partners.requirements(parseRole(role), vehicleClassCode);
   }
 
   @Get(':role')

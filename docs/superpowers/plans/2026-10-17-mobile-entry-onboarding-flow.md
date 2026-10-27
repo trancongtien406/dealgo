@@ -1,5 +1,7 @@
 # Mobile App Entry & Onboarding Flow (S001–S007) Implementation Plan
 
+> **Trạng thái trong code:** đã có Splash `/splash` là màn khởi đầu và màn hồ sơ `profile_setup_page.dart`; màn cho phép truy cập S006 (`/onboarding/permissions`) mới có hằng route, chưa có trang. Mục "Hiện trạng" bên dưới mô tả bối cảnh lúc viết (2026-10-17).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Hoàn thiện và hiện đại hóa toàn bộ luồng khởi động, onboarding, xác thực và nhập môn của ứng dụng Flutter DealGo theo thiết kế mới (`design/mockups/new/S001.png` đến `S007.png`), đưa người dùng vào thẳng trang người dùng (`/customer`) khi đã có phiên và chuyển vai trò qua trang cá nhân.
@@ -8,7 +10,7 @@
 
 **Tech Stack:** Flutter 3.47.7 (Dart 3.13.5), `go_router`, `flutter_bloc`, `flutter_secure_storage`.
 
-**Spec:** [docs/superpowers/specs/2026-10-17-mobile-app-entry-flow-design.md](file:///Users/mac/mern/personal/dealgo/docs/superpowers/specs/2026-10-17-mobile-app-entry-flow-design.md)
+**Spec:** [docs/superpowers/specs/2026-10-17-mobile-app-entry-flow-design.md](../specs/2026-10-17-mobile-app-entry-flow-design.md)
 
 ## Global Constraints
 

@@ -7,6 +7,7 @@ class CreateRideParams {
     required this.pickup,
     required this.dropoff,
     required this.offeredFareVnd,
+    required this.vehicleClassCode,
   });
 
   final String accessToken;
@@ -14,6 +15,9 @@ class CreateRideParams {
   final RidePoint pickup;
   final RidePoint dropoff;
   final int offeredFareVnd;
+
+  /// Required Ride class (MOTORBIKE | CAR_4 | CAR_7). No silent MOTORBIKE default (DG-DEC-VEH-001).
+  final String vehicleClassCode;
 }
 
 /// Backward-compatible alias for existing tests and call sites.

@@ -39,8 +39,31 @@ abstract interface class FoodRemoteDataSource {
     required String accessToken,
     required String orderId,
     required FoodDeliveryAction action,
+
     /// DEC-PROD-036: handover code (pickup) or delivery code (deliver).
     String? code,
+
+    /// Why the delivery failed (FOOD_FAIL_REASONS) and the note for OTHER.
+    String? failReason,
+    String? failNote,
+  });
+
+  /// Store edits a PLACED/PREPARING order ([quantities] = lineId → new qty,
+  /// lower only; 0 removes). The customer must accept before it applies.
+  Future<FoodOrderChange> proposeOrderChange({
+    required String accessToken,
+    required String orderId,
+    required FoodOrderChangeReason reason,
+    required Map<String, int> quantities,
+    String? note,
+  });
+
+  /// Customer accepts (order updated) or rejects (order cancelled, no fee).
+  Future<FoodOrderDetail> answerOrderChange({
+    required String accessToken,
+    required String orderId,
+    required String changeId,
+    required bool accept,
   });
 
   /// Customer cancel (PLACED only). Returns the order's new `{id, status}`.
@@ -132,8 +155,9 @@ abstract interface class FoodRemoteDataSource {
     required bool available,
   });
 
-
-  Future<List<MerchantMenuCategory>> listMerchantMenuCategories(String accessToken);
+  Future<List<MerchantMenuCategory>> listMerchantMenuCategories(
+    String accessToken,
+  );
 
   Future<MerchantMenuCategory> createMerchantMenuCategory({
     required String accessToken,
@@ -160,7 +184,6 @@ abstract interface class FoodRemoteDataSource {
     String? tab,
     String? q,
   });
-
 
   Future<List<MerchantMenuCategory>> reorderMerchantMenuCategories({
     required String accessToken,

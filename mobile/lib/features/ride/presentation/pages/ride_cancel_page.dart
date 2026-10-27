@@ -65,6 +65,11 @@ class _RideCancelViewState extends State<_RideCancelView> {
   }
 
   void _back() {
+    if (_done) {
+      // The ride is gone; never return to its matching screen.
+      context.go('/customer');
+      return;
+    }
     if (context.canPop()) {
       context.pop();
       return;
@@ -111,7 +116,8 @@ class _RideCancelViewState extends State<_RideCancelView> {
         _message = error is ApiException
             ? apiErrorText(AppLocalizations.of(context), error)
             : l10n.rideCancelSoftFail;
-        _done = true;
+        // Keep the confirm button so the customer can retry.
+        _done = false;
       });
     }
   }
@@ -190,12 +196,15 @@ class _RideCancelViewState extends State<_RideCancelView> {
                       onPressed: () => context.go('/customer'),
                     ),
                   ],
-                  const SizedBox(height: DealGoSpacing.s8),
-                  DealGoSecondaryButton(
-                    label: l10n.rideCancelKeep,
-                    enabled: !_busy,
-                    onPressed: _back,
-                  ),
+                  if (!_done) ...[
+                    const SizedBox(height: DealGoSpacing.s8),
+                    DealGoSecondaryButton(
+                      key: const Key('ride-cancel-keep'),
+                      label: l10n.rideCancelKeep,
+                      enabled: !_busy,
+                      onPressed: _back,
+                    ),
+                  ],
                 ],
               ),
             ),

@@ -1,3 +1,4 @@
+import 'package:dealgo/features/onboarding/data/datasources/partner_requirements_client.dart';
 import 'package:dealgo/features/identity/domain/passkey_platform.dart';
 import 'package:dealgo/features/account_deletion/domain/account_deletion.dart';
 import 'package:dealgo/features/account_settings/domain/account_settings.dart';
@@ -30,12 +31,14 @@ import 'package:dealgo/features/identity/domain/entities/user_profile.dart';
 import 'package:dealgo/features/ride/data/datasources/ride_remote_datasource.dart';
 import 'package:dealgo/features/identity/domain/auth_redirect.dart';
 import 'package:dealgo/features/shell/presentation/customer_tab_bar.dart';
+import 'package:dealgo/core/design_system/components/dealgo_tab_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_food_client.dart';
 import 'fake_identity_client.dart';
 import 'fake_ride_client.dart';
+
 import 'package:dealgo/core/realtime/snapshot_realtime.dart';
 
 PostAuthGate completedPostAuthGate() => PostAuthGate.seeded(
@@ -65,6 +68,7 @@ Future<MemoryTokenStore> pumpDealGo(
   HelpFaqRepository? helpFaqs,
   RideShareRepository? rideShare,
   DocumentImageSource? documentImageSource,
+  PartnerRequirementsSource? partnerRequirements,
   DriverCardRepository? driverCard,
   LocationService? locationOverride,
   PricingRepository? pricing,
@@ -96,6 +100,8 @@ Future<MemoryTokenStore> pumpDealGo(
       helpFaqs: helpFaqs,
       rideShare: rideShare,
       documentImageSource: documentImageSource ?? FakeDocumentImageSource(),
+      partnerRequirements:
+          partnerRequirements ?? const FixedPartnerRequirements(),
       driverCard: driverCard,
       // Tests get a fixed GPS fix unless they pass their own (e.g. denied).
       locationOverride: locationOverride ?? FakeLocationService(),
@@ -134,6 +140,7 @@ Future<MemoryTokenStore> pumpSignedIn(
   HelpFaqRepository? helpFaqs,
   RideShareRepository? rideShare,
   DocumentImageSource? documentImageSource,
+  PartnerRequirementsSource? partnerRequirements,
   DriverCardRepository? driverCard,
   LocationService? locationOverride,
   PricingRepository? pricing,
@@ -144,6 +151,7 @@ Future<MemoryTokenStore> pumpSignedIn(
   bool completePostAuth = true,
   String? initialLocation,
   PasskeyPlatform? passkeyPlatform,
+  FakeIdentityClient? identityClient,
 }) async {
   final store = MemoryTokenStore();
   await store.write(
@@ -154,7 +162,7 @@ Future<MemoryTokenStore> pumpSignedIn(
   );
   await tester.pumpWidget(
     DealGoApp(
-      identityClient: FakeIdentityClient(profile: profile),
+      identityClient: identityClient ?? FakeIdentityClient(profile: profile),
       tokenStore: store,
       passkeyPlatform: passkeyPlatform,
       foodClient: foodClient ?? FakeFoodClient(),
@@ -173,6 +181,8 @@ Future<MemoryTokenStore> pumpSignedIn(
       helpFaqs: helpFaqs,
       rideShare: rideShare,
       documentImageSource: documentImageSource ?? FakeDocumentImageSource(),
+      partnerRequirements:
+          partnerRequirements ?? const FixedPartnerRequirements(),
       driverCard: driverCard,
       // Tests get a fixed GPS fix unless they pass their own (e.g. denied).
       locationOverride: locationOverride ?? FakeLocationService(),
@@ -223,11 +233,21 @@ Future<void> submitOtp(WidgetTester tester, String code) async {
 }
 
 Finder navLabel(String label) {
-  final navigationBar = find.byType(NavigationBar);
-  final scope = navigationBar.evaluate().isNotEmpty
-      ? navigationBar
-      : find.byType(CustomerTabBar);
-  return find.descendant(of: scope, matching: find.text(label));
+  // Customer shell uses CustomerTabBar; merchant/driver use DealGoTabBar.
+  // Material NavigationBar is kept as a legacy fallback.
+  for (final scope in [
+    find.byType(CustomerTabBar),
+    find.byType(DealGoTabBar),
+    find.byType(NavigationBar),
+  ]) {
+    if (scope.evaluate().isNotEmpty) {
+      return find.descendant(of: scope, matching: find.text(label));
+    }
+  }
+  return find.descendant(
+    of: find.byType(DealGoTabBar),
+    matching: find.text(label),
+  );
 }
 
 /// Cart/checkout tests: pick the delivery address via the place picker

@@ -19,6 +19,7 @@ import {
 import {
   OpsPartnerApplicationQueryDto,
   PartnerDocumentParamsDto,
+  ApprovePartnerApplicationDto,
   RejectPartnerApplicationDto,
 } from './partner.dto.js';
 import { SkipResponseEnvelope } from '../../platform/http/skip-response-envelope.js';
@@ -62,8 +63,12 @@ export class OpsPartnerApplicationsController {
   @Post(':id/approve')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Approve submitted KYC/KYB; sets RoleGrant ACTIVE' })
-  approve(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
-    return this.partners.approve(id, actor.userId);
+  approve(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: ApprovePartnerApplicationDto = {},
+  ) {
+    return this.partners.approve(id, actor.userId, body?.vehicleClassCode);
   }
 
   @RequireOpsPermission('kyc.review')

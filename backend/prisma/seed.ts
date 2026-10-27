@@ -15,6 +15,8 @@ import { PrismaClient } from '../src/generated/prisma/client.js';
 import { OPS_FAQ_SEEDS } from '../src/modules/support/ops-faq.seed.js';
 import { INITIAL_PROMOTION_SEED } from '../src/modules/promotion/promotion.seed.js';
 import { PLATFORM_SETTING_SEED_DEFAULTS } from '../src/platform/settings/platform-settings.seed.js';
+import { assertSeedAllowed, resolveSeedPassword } from './seed-guard.js';
+
 import {
   specForKey,
   type PlatformSettingKey,
@@ -23,10 +25,8 @@ import {
 const LOCAL_DATABASE_URL =
   'postgresql://dealgo:dealgo_dev@127.0.0.1:5433/dealgo?schema=public';
 
-export const DEFAULT_SEED_PASSWORD =
-  process.env.SEED_USER_PASSWORD?.trim() ||
-  process.env.OPS_BOOTSTRAP_PASSWORD?.trim() ||
-  'change-me-dev-only';
+/** Resolved in main() after .env is loaded (DEC-PROD-053: no hardcoded fallback). */
+export let DEFAULT_SEED_PASSWORD = '';
 
 const passwordHashCache = new Map<string, Promise<string>>();
 
@@ -394,6 +394,7 @@ async function upsertRide(
 
   const created = await db.ride.create({
     data: {
+      vehicleClassCode: 'MOTORBIKE',
       customerId: input.customerId,
       idempotencyKey: input.idempotencyKey,
       status: input.status,
@@ -700,7 +701,6 @@ async function ensurePlatformSettings(db: PrismaClient): Promise<number> {
   const settings: Array<{ key: string; value: string; valueType: 'string' | 'number' | 'json' }> = [
     { key: 'DRIVER_SEARCH_RADIUS_KM', value: '5', valueType: 'number' },
     { key: 'RIDE_OFFER_TTL_SECONDS', value: '30', valueType: 'number' },
-    { key: 'RIDE_NEGOTIATION_MAX_ROUNDS', value: '3', valueType: 'number' },
     { key: 'RIDE_MIN_FARE_VND', value: '15000', valueType: 'number' },
     { key: 'RIDE_MAX_FARE_VND', value: '1000000', valueType: 'number' },
     { key: 'RIDE_REFERENCE_VND_PER_KM', value: '12000', valueType: 'number' },
@@ -828,6 +828,8 @@ async function ensureChatThread(
 
 async function main(): Promise<void> {
   loadDotEnv();
+  assertSeedAllowed(process.env);
+  DEFAULT_SEED_PASSWORD = resolveSeedPassword(process.env);
   const url = databaseUrl();
   const adapter = new PrismaPg(
     { connectionString: url, max: 4 },

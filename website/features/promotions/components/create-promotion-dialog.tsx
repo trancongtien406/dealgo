@@ -23,12 +23,12 @@ const serviceOptions: readonly SearchSelectOption[] = [
   {
     value: "ALL",
     label: "Toàn hệ thống (Ride & Food)",
-    description: "Áp dụng cho cả chuyến đi xe máy và đơn giao đồ ăn",
+    description: "Áp dụng cho chuyến Ride (xe máy & ô tô) và đơn giao đồ ăn",
   },
   {
     value: "RIDE",
-    label: "Xe 2 bánh (DealGo Ride)",
-    description: "Chỉ áp dụng cho các cuốc xe di chuyển",
+    label: "DealGo Ride (xe máy & ô tô)",
+    description: "Chỉ áp dụng cho cuốc xe di chuyển — không gồm giao đồ ăn",
   },
   {
     value: "FOOD",

@@ -61,20 +61,18 @@ class MerchantOrdersRepositoryImpl implements MerchantOrdersRepository {
   Future<FoodStoreDetail> updateStoreProfile({
     required String accessToken,
     required String name,
-  }) =>
-      _remote.updateStoreProfile(accessToken: accessToken, name: name);
+  }) => _remote.updateStoreProfile(accessToken: accessToken, name: name);
 
   @override
   Future<FoodStoreDetail> uploadStoreLogo({
     required String accessToken,
     required String contentBase64,
     String? contentType,
-  }) =>
-      _remote.uploadStoreLogo(
-        accessToken: accessToken,
-        contentBase64: contentBase64,
-        contentType: contentType,
-      );
+  }) => _remote.uploadStoreLogo(
+    accessToken: accessToken,
+    contentBase64: contentBase64,
+    contentType: contentType,
+  );
 
   @override
   Future<FoodStoreDetail> clearStoreLogo({required String accessToken}) =>
@@ -209,12 +207,11 @@ class MerchantOrdersRepositoryImpl implements MerchantOrdersRepository {
     required String accessToken,
     required String name,
     String? description,
-  }) =>
-      _remote.createMenuCategory(
-        accessToken: accessToken,
-        name: name,
-        description: description,
-      );
+  }) => _remote.createMenuCategory(
+    accessToken: accessToken,
+    name: name,
+    description: description,
+  );
 
   @override
   Future<MerchantMenuCategory> updateMenuCategory({
@@ -222,23 +219,21 @@ class MerchantOrdersRepositoryImpl implements MerchantOrdersRepository {
     required String categoryId,
     required String name,
     String? description,
-  }) =>
-      _remote.updateMenuCategory(
-        accessToken: accessToken,
-        categoryId: categoryId,
-        name: name,
-        description: description,
-      );
+  }) => _remote.updateMenuCategory(
+    accessToken: accessToken,
+    categoryId: categoryId,
+    name: name,
+    description: description,
+  );
 
   @override
   Future<void> deleteMenuCategory({
     required String accessToken,
     required String categoryId,
-  }) =>
-      _remote.deleteMenuCategory(
-        accessToken: accessToken,
-        categoryId: categoryId,
-      );
+  }) => _remote.deleteMenuCategory(
+    accessToken: accessToken,
+    categoryId: categoryId,
+  );
 
   @override
   Future<MerchantHistoryPage> listOrderHistory({
@@ -247,21 +242,22 @@ class MerchantOrdersRepositoryImpl implements MerchantOrdersRepository {
     int limit = 20,
     String? tab,
     String? q,
-  }) =>
-      _remote.listOrderHistory(
-        accessToken: accessToken,
-        page: page,
-        limit: limit,
-        tab: tab,
-        q: q,
-      );
+  }) => _remote.listOrderHistory(
+    accessToken: accessToken,
+    page: page,
+    limit: limit,
+    tab: tab,
+    q: q,
+  );
 
   @override
   Future<List<MerchantMenuCategory>> reorderMenuCategories({
     required String accessToken,
     required List<String> orderedIds,
-  }) =>
-      _remote.reorderMenuCategories(accessToken: accessToken, orderedIds: orderedIds);
+  }) => _remote.reorderMenuCategories(
+    accessToken: accessToken,
+    orderedIds: orderedIds,
+  );
 
   @override
   Future<FoodMenuItem> uploadItemImage({
@@ -269,18 +265,16 @@ class MerchantOrdersRepositoryImpl implements MerchantOrdersRepository {
     required String itemId,
     required String contentBase64,
     String? contentType,
-  }) =>
-      _remote.uploadItemImage(
-        accessToken: accessToken,
-        itemId: itemId,
-        contentBase64: contentBase64,
-        contentType: contentType,
-      );
+  }) => _remote.uploadItemImage(
+    accessToken: accessToken,
+    itemId: itemId,
+    contentBase64: contentBase64,
+    contentType: contentType,
+  );
 
   @override
   Future<FoodMenuItem> clearItemImage({
     required String accessToken,
     required String itemId,
-  }) =>
-      _remote.clearItemImage(accessToken: accessToken, itemId: itemId);
+  }) => _remote.clearItemImage(accessToken: accessToken, itemId: itemId);
 }

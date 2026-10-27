@@ -69,6 +69,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Docker image (website/Dockerfile) sets NEXT_OUTPUT=standalone; local `next start` is unchanged.
+  ...(process.env.NEXT_OUTPUT === "standalone" ? { output: "standalone" as const } : {}),
   // cacheComponents + async admin layout (cookies/Nest probe) left private
   // page client trees stuck on SSR pending without firing React Query.
   // Re-enable once ops session is moved behind a streaming Suspense boundary
@@ -82,6 +84,15 @@ const nextConfig: NextConfig = {
         as: "*.css",
       },
     },
+  },
+  // Passkey / App Links association files come from backend env (DEC-PROD-056).
+  async rewrites() {
+    return [
+      {
+        source: "/.well-known/:file(apple-app-site-association|assetlinks.json)",
+        destination: "/api/public/app-links/:file",
+      },
+    ];
   },
   async headers() {
     return [

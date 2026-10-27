@@ -40,7 +40,11 @@ describe('PartnerService', () => {
 
     const app = await service.submit(user.id, {
       role: 'DRIVER',
-      metadata: { vehiclePlate: '51F-12345', vehicleModel: 'Honda Wave' },
+      metadata: {
+        vehicleClassCode: 'MOTORBIKE',
+        vehiclePlate: '51F-12345',
+        vehicleModel: 'Honda Wave',
+      },
       documents: DRIVER_DOCS,
     });
 
@@ -70,10 +74,22 @@ describe('PartnerService', () => {
     await expect(
       service.submit(user.id, {
         role: 'DRIVER',
-        metadata: {},
+        metadata: { vehicleClassCode: 'MOTORBIKE' },
         documents: DRIVER_DOCS.slice(0, 2),
       }),
     ).rejects.toMatchObject({ response: { errorCode: 'PARTNER_DOCUMENTS_REQUIRED' } });
+    expect(storage.size).toBe(0);
+  });
+
+  it('refuses DRIVER submit without a valid vehicleClassCode (fail closed)', async () => {
+    const { service, user, storage } = await createService();
+    await expect(
+      service.submit(user.id, {
+        role: 'DRIVER',
+        metadata: { vehiclePlate: '51F-12345' },
+        documents: DRIVER_DOCS,
+      }),
+    ).rejects.toMatchObject({ response: { errorCode: 'VALIDATION_ERROR' } });
     expect(storage.size).toBe(0);
   });
 
@@ -82,7 +98,11 @@ describe('PartnerService', () => {
     const docs = [...DRIVER_DOCS] as Array<Record<string, string>>;
     docs[0] = { kind: 'ID_FRONT', contentType: 'image/png', contentBase64: TINY_JPEG_BASE64 };
     await expect(
-      service.submit(user.id, { role: 'DRIVER', metadata: {}, documents: docs as never[] }),
+      service.submit(user.id, {
+        role: 'DRIVER',
+        metadata: { vehicleClassCode: 'MOTORBIKE' },
+        documents: docs as never[],
+      }),
     ).rejects.toMatchObject({ status: 415 });
   });
 
@@ -91,7 +111,7 @@ describe('PartnerService', () => {
 
     const app = await service.submit(user.id, {
       role: 'DRIVER',
-      metadata: { vehiclePlate: '51F-12345' },
+      metadata: { vehicleClassCode: 'MOTORBIKE', vehiclePlate: '51F-12345' },
       documents: DRIVER_DOCS,
     });
 
@@ -111,7 +131,7 @@ describe('PartnerService', () => {
 
     const app = await service.submit(user.id, {
       role: 'MERCHANT',
-      metadata: { shopName: 'Quán ăn chưa đăng ký' },
+      metadata: { shopName: 'Quán ăn chưa đăng ký', shopLat: 16.06, shopLng: 108.22 },
       documents: MERCHANT_DOCS,
     });
 
@@ -135,7 +155,7 @@ describe('PartnerService', () => {
 
     const resubmitted = await service.submit(user.id, {
       role: 'MERCHANT',
-      metadata: { shopName: 'Quán ăn đã đăng ký' },
+      metadata: { shopName: 'Quán ăn đã đăng ký', shopLat: 16.06, shopLng: 108.22 },
       documents: [MERCHANT_DOCS[0]!],
     });
     expect(resubmitted.status).toBe('SUBMITTED');
@@ -154,11 +174,74 @@ describe('PartnerService', () => {
     const { service, user } = await createService();
     const app = await service.submit(user.id, {
       role: 'DRIVER',
-      metadata: {},
+      metadata: { vehicleClassCode: 'MOTORBIKE' },
       documents: DRIVER_DOCS,
     });
     await expect(
       service.reject(app.id, 'ops', 'x', [{ section: 'SHOP_INFO', note: 'n' }]),
     ).rejects.toMatchObject({ status: 400 });
   });
+
+  it('requires VEHICLE_INSURANCE for CAR_4 when PARTNER_CAR_KYC_EXTRA_DOCS gate is on', async () => {
+    const partners = new MemoryPartnerRepository();
+    const identity = new MemoryIdentityRepository();
+    const { store, storage } = createTestDocumentStore();
+    const user = await identity.createUser({
+      email: 'car@dealgo.vn',
+      phone: '+84988776656',
+      displayName: 'Car Tai Xe',
+    });
+    const config = {
+      get(key: string) {
+        if (key === 'PARTNER_CAR_KYC_EXTRA_DOCS') return true;
+        if (key === 'NODE_ENV') return 'test';
+        return undefined;
+      },
+    } as never;
+    const service = new PartnerService(partners, identity, store, config);
+
+    await expect(
+      service.submit(user.id, {
+        role: 'DRIVER',
+        metadata: { vehicleClassCode: 'CAR_4', vehiclePlate: '51A-12345' },
+        documents: DRIVER_DOCS,
+      }),
+    ).rejects.toMatchObject({ response: { errorCode: 'PARTNER_DOCUMENTS_REQUIRED' } });
+    expect(storage.size).toBe(0);
+
+    const withInsurance = [...DRIVER_DOCS, jpeg('VEHICLE_INSURANCE')] as never[];
+    const app = await service.submit(user.id, {
+      role: 'DRIVER',
+      metadata: { vehicleClassCode: 'CAR_4', vehiclePlate: '51A-12345' },
+      documents: withInsurance,
+    });
+    expect(app.status).toBe('SUBMITTED');
+    expect(app.documents.map((d) => d.kind)).toContain('VEHICLE_INSURANCE');
+  });
+
+  it('does not require VEHICLE_INSURANCE for MOTORBIKE even when Car gate is on', async () => {
+    const partners = new MemoryPartnerRepository();
+    const identity = new MemoryIdentityRepository();
+    const { store } = createTestDocumentStore();
+    const user = await identity.createUser({
+      email: 'bike@dealgo.vn',
+      phone: '+84988776657',
+      displayName: 'Bike Tai Xe',
+    });
+    const config = {
+      get(key: string) {
+        if (key === 'PARTNER_CAR_KYC_EXTRA_DOCS') return true;
+        if (key === 'NODE_ENV') return 'test';
+        return undefined;
+      },
+    } as never;
+    const service = new PartnerService(partners, identity, store, config);
+    const app = await service.submit(user.id, {
+      role: 'DRIVER',
+      metadata: { vehicleClassCode: 'MOTORBIKE', vehiclePlate: '51F-12345' },
+      documents: DRIVER_DOCS,
+    });
+    expect(app.status).toBe('SUBMITTED');
+  });
+
 });

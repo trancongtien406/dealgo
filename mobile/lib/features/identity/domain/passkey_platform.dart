@@ -8,7 +8,8 @@ class PasskeyPlatformException implements Exception {
   final String? detail;
 
   @override
-  String toString() => 'PasskeyPlatformException($kind${detail == null ? '' : ': $detail'})';
+  String toString() =>
+      'PasskeyPlatformException($kind${detail == null ? '' : ': $detail'})';
 }
 
 /// Platform WebAuthn / passkey authenticator boundary.

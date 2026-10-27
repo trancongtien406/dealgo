@@ -1,3 +1,5 @@
+import '../../../core/config/api_base_url.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -88,10 +90,9 @@ class _DriverCardTileState extends State<DriverCardTile> {
         ? l10n.rideTrackDriverFallback
         : card.displayName;
     final average = card?.ratingAverage;
-    final rating = card == null
+    // Rating only when real ratings exist (no "0 sao" placeholder).
+    final rating = (card == null || average == null || card.ratingCount == 0)
         ? null
-        : (average == null || card.ratingCount == 0)
-        ? l10n.driverCardNoRating
         : l10n.driverCardRating(
             formatRatingAverage(context, average),
             card.ratingCount,
@@ -101,7 +102,11 @@ class _DriverCardTileState extends State<DriverCardTile> {
       key: const Key('driver-card-tile'),
       children: [
         CircleAvatar(
+          radius: 24,
           backgroundColor: DealGoColors.subtlePurple,
+          foregroundImage: resolveMediaUrl(card?.avatarUrl) == null
+              ? null
+              : NetworkImage(resolveMediaUrl(card?.avatarUrl)!),
           child: Text(
             name.characters.first.toUpperCase(),
             style: const TextStyle(
@@ -124,7 +129,10 @@ class _DriverCardTileState extends State<DriverCardTile> {
                 Text(
                   vehicle,
                   key: const Key('driver-card-vehicle'),
-                  style: textTheme.bodySmall,
+                  style: textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: DealGoColors.text,
+                  ),
                 ),
               if (rating != null)
                 Row(

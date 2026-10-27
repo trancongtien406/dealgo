@@ -208,6 +208,17 @@ export class AccountDeletionService {
     return { amountVnd: settled.amountVnd, settledThrough: settled.settledThrough.toISOString() };
   }
 
+  async recordDriverPayment(input: {
+    actorUserId: string;
+    driverId: string;
+    direction: 'DRIVER_PAID' | 'DEALGO_PAID';
+    amountVnd: number;
+    reason: string;
+  }): Promise<{ id: string; adjustmentVnd: number }> {
+    await this.requireUser(input.driverId);
+    return this.repository.recordDriverPayment({ ...input, reason: input.reason.trim(), at: new Date() });
+  }
+
   /** Purge worker: anonymize accounts whose grace period has ended. Returns how many. */
   async purgeDue(now = new Date(), limit = 50): Promise<number> {
     const due = await this.repository.listDue(now, limit);

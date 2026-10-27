@@ -49,7 +49,7 @@ describePg('store service mode (postgres)', () => {
     const tag = Date.now().toString().slice(-7);
     const owner = await db.user.create({ data: { displayName: 'Pause Owner' } });
     const customer = await db.user.create({ data: { displayName: 'Pause Customer', phone: `+8494${tag}` } });
-    const store = await db.foodStore.create({ data: { ownerId: owner.id, name: `Pause ${tag}` } });
+    const store = await db.foodStore.create({ data: { ownerId: owner.id, name: `Pause ${tag}`, lat: 16.06, lng: 108.22, addressLabel: 'Hải Châu' } });
     const item = await db.foodItem.create({
       data: { storeId: store.id, name: 'Bánh mì', priceVnd: 20_000, moderationStatus: 'APPROVED' },
     });
@@ -90,11 +90,11 @@ describePg('store service mode (postgres)', () => {
     const customer = await db.user.create({ data: { displayName: 'Hours Customer', phone: `+8495${tag.slice(-7)}` } });
     const [o1, o2, o3] = await Promise.all([owner('A'), owner('B'), owner('C')]);
     // Name order would be A, B, C; A is closed today, B is paused, C is open.
-    const a = await db.foodStore.create({ data: { ownerId: o1.id, name: `${tag} A` } });
+    const a = await db.foodStore.create({ data: { ownerId: o1.id, name: `${tag} A`, lat: 16.06, lng: 108.22, addressLabel: 'Hải Châu' } });
     const b = await db.foodStore.create({
-      data: { ownerId: o2.id, name: `${tag} B`, serviceMode: 'PAUSED' },
+      data: { ownerId: o2.id, name: `${tag} B`, lat: 16.06, lng: 108.22, addressLabel: 'Hải Châu', serviceMode: 'PAUSED' },
     });
-    const c = await db.foodStore.create({ data: { ownerId: o3.id, name: `${tag} C` } });
+    const c = await db.foodStore.create({ data: { ownerId: o3.id, name: `${tag} C`, lat: 16.06, lng: 108.22, addressLabel: 'Hải Châu' } });
     const item = await db.foodItem.create({ data: { storeId: a.id, name: 'Phở', priceVnd: 40_000 } });
 
     const saved = await repo.updateStoreSchedule({
@@ -147,7 +147,7 @@ describePg('store service mode (postgres)', () => {
     }
     const tag = `Night${Date.now().toString().slice(-7)}`;
     const owner = await db.user.create({ data: { displayName: 'Night Owner' } });
-    const store = await db.foodStore.create({ data: { ownerId: owner.id, name: `${tag} Quán Đêm` } });
+    const store = await db.foodStore.create({ data: { ownerId: owner.id, name: `${tag} Quán Đêm`, lat: 16.06, lng: 108.22, addressLabel: 'Hải Châu' } });
     // Yesterday 23:00 → today (now + 30 min); no row for today, so only the spill-over opens it.
     const overnight = {
       hoursConfigured: true,

@@ -1,65 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 512" role="img" aria-labelledby="title desc">
+  <title id="title">DealGo</title>
+  <desc id="desc">DealGo primary horizontal logo for light backgrounds.</desc>
   <defs>
-    <!-- Background Gradient for Icon Mark -->
-    <linearGradient id="logo-bg" x1="0" y1="4" x2="40" y2="44" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#1e1b4b" />
-      <stop offset="50%" stop-color="#2e1065" />
-      <stop offset="100%" stop-color="#090a0f" />
-    </linearGradient>
-
-    <!-- Deal Swoosh (Purple) -->
-    <linearGradient id="logo-deal" x1="6" y1="10" x2="30" y2="30" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#c084fc" />
-      <stop offset="100%" stop-color="#6d28d9" />
-    </linearGradient>
-
-    <!-- Go Swoosh (Green) -->
-    <linearGradient id="logo-go" x1="34" y1="34" x2="10" y2="14" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#34d399" />
-      <stop offset="100%" stop-color="#059669" />
-    </linearGradient>
-
-    <!-- Food Accent Dot -->
-    <linearGradient id="logo-food" x1="18" y1="18" x2="24" y2="24" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#fb923c" />
-      <stop offset="100%" stop-color="#ea580c" />
-    </linearGradient>
+    <linearGradient id="purple" x1="70" y1="70" x2="430" y2="450" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#5B21B6"/></linearGradient>
+    <linearGradient id="green" x1="235" y1="160" x2="380" y2="365" gradientUnits="userSpaceOnUse"><stop stop-color="#16C85B"/><stop offset="1" stop-color="#08A84B"/></linearGradient>
   </defs>
-
-  <!-- Left Icon Mark -->
-  <g transform="translate(4, 4)">
-    <rect width="40" height="40" rx="11" fill="url(#logo-bg)" />
-    <rect x="0.5" y="0.5" width="39" height="39" rx="10.5" stroke="#ffffff" stroke-opacity="0.1" stroke-width="1" />
-
-    <!-- Deal Wave Arc -->
-    <path
-      d="M12 20C12 14.5 16.5 10 22 10C25.5 10 28.5 11.8 30.2 14.7C30.7 15.6 30.3 16.8 29.3 17.1C28.3 17.4 27.2 16.7 26.8 15.8C25.7 13.6 23.4 12.2 20.8 12.2C16.5 12.2 13.2 15.6 13.2 20C13.2 21.9 13.9 23.6 15.1 25C15.8 25.9 15.5 27.2 14.4 27.6C13.3 28.1 12.1 27.4 11.4 26.4C10.5 24.5 10 22.3 10 20H12Z"
-      fill="url(#logo-deal)"
-    />
-
-    <!-- Go Wave Arc -->
-    <path
-      d="M28 20C28 25.5 23.5 30 18 30C14.5 30 11.5 28.2 9.8 25.3C9.3 24.4 9.7 23.2 10.7 22.9C11.7 22.6 12.8 23.3 13.2 24.2C14.3 26.4 16.6 27.8 19.2 27.8C23.5 27.8 26.8 24.4 26.8 20C26.8 18.1 26.1 16.4 24.9 15C24.2 14.1 24.5 12.8 25.6 12.4C26.7 11.9 27.9 12.6 28.6 13.6C29.5 15.5 30 17.7 30 20H28Z"
-      fill="url(#logo-go)"
-    />
-
-    <!-- Interlocking Hub / Stylized D -->
-    <path
-      d="M16.5 15.5H21C23.5 15.5 25.5 17.5 25.5 20C25.5 22.5 23.5 24.5 21 24.5H16.5V15.5ZM19 18V22H20.8C21.9 22 23 21.1 23 20C23 18.9 21.9 18 20.8 18H19Z"
-      fill="#ffffff"
-    />
-
-    <!-- Food / Deal Spark Dot -->
-    <circle cx="24.5" cy="15" r="2" fill="url(#logo-food)" />
+  <g>
+    <path fill="url(#purple)" d="M155 68h116c116 0 199 76 199 188s-83 188-199 188H155a32 32 0 0 1 0-64h111c76 0 132-47 132-124s-56-124-132-124H155a32 32 0 0 1 0-64Z"/>
+    <rect x="56" y="154" width="176" height="58" rx="29" fill="url(#purple)"/><rect x="25" y="232" width="78" height="58" rx="29" fill="url(#purple)"/><rect x="122" y="232" width="132" height="58" rx="29" fill="url(#purple)"/><rect x="72" y="310" width="174" height="58" rx="29" fill="url(#purple)"/>
+    <path d="M238 178h35c51 0 87 31 87 78s-36 78-87 78h-35" fill="none" stroke="#fff" stroke-width="66" stroke-linecap="round"/>
+    <path d="m240 327 82-70-70-64" fill="none" stroke="#fff" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/><path d="m240 327 82-70-70-64" fill="none" stroke="url(#green)" stroke-width="31" stroke-linecap="round" stroke-linejoin="round"/>
+    <g fill="url(#green)" stroke="#fff" stroke-width="13"><circle cx="240" cy="327" r="35"/><circle cx="322" cy="257" r="35"/><circle cx="252" cy="193" r="35"/></g>
+    <g fill="#fff"><circle cx="240" cy="327" r="10"/><circle cx="322" cy="257" r="10"/><circle cx="252" cy="193" r="10"/></g>
   </g>
-
-  <!-- Typography Wordmark -->
-  <g transform="translate(56, 0)">
-    <text x="0" y="31" font-family="system-ui, -apple-system, 'Inter', sans-serif" font-weight="900" font-size="26" letter-spacing="-0.75">
-      <tspan fill="#6d28d9">Deal</tspan><tspan fill="#16a34a">Go</tspan>
-    </text>
-    <text x="1.5" y="42" font-family="system-ui, -apple-system, 'Inter', sans-serif" font-weight="600" font-size="8.5" letter-spacing="1.5" fill="#787c99">
-      RIDE &amp; FOOD PLATFORM
-    </text>
-  </g>
+  <text x="535" y="362" font-family="'Be Vietnam Pro', Arial, sans-serif" font-size="286" font-weight="800" letter-spacing="-18"><tspan fill="#6D28D9">Deal</tspan><tspan fill="#10B956">Go</tspan></text>
 </svg>

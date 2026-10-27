@@ -28,7 +28,12 @@ class FoodCartLine {
 
   int get lineTotalVnd => unitPriceVnd * quantity;
 
-  FoodCartLine copyWith({String? name, int? unitPriceVnd, int? quantity, String? imageUrl}) {
+  FoodCartLine copyWith({
+    String? name,
+    int? unitPriceVnd,
+    int? quantity,
+    String? imageUrl,
+  }) {
     return FoodCartLine(
       itemId: itemId,
       name: name ?? this.name,
@@ -416,6 +421,63 @@ class FoodCartCubit extends Cubit<FoodCartState> {
         idempotencyKey: createFoodIdempotencyKey(),
       ),
     );
+  }
+
+  /// "Đặt lại": replaces the cart with an old order's lines, re-priced from
+  /// the live [store] catalog. Unavailable dishes / stale choices are dropped.
+  /// Returns how many old lines could not be restored. The server re-prices
+  /// everything again at placement.
+  int reorder(FoodOrderDetail order, FoodStoreDetail store) {
+    final byId = {for (final item in store.items) item.id: item};
+    final lines = <FoodCartLine>[];
+    var dropped = 0;
+    for (final old in order.lines) {
+      final item = byId[old.itemId];
+      if (item == null || !item.available) {
+        dropped++;
+        continue;
+      }
+      final optionIds = <String>[
+        for (final option in old.options)
+          if (option.optionId != null)
+            for (var i = 0; i < option.quantity; i++) option.optionId!,
+      ];
+      if (optionIds.length !=
+          old.options.fold<int>(0, (sum, o) => sum + o.quantity)) {
+        dropped++;
+        continue;
+      }
+      final delta = foodOptionDelta(item.optionGroups, optionIds);
+      if (delta == null ||
+          (optionIds.isEmpty && item.optionGroups.any((g) => g.required))) {
+        dropped++;
+        continue;
+      }
+      final quantity = old.quantity.clamp(1, foodLineQuantityMax);
+      lines.add(
+        FoodCartLine(
+          itemId: foodCartLineId(item.id, optionIds),
+          name: optionIds.isEmpty
+              ? item.name
+              : [item.name, ...old.options.map((o) => o.name)].join(' · '),
+          unitPriceVnd: item.priceVnd + delta,
+          quantity: quantity,
+          catalogItemId: item.id,
+          optionIds: List.unmodifiable(optionIds),
+          imageUrl: item.imageUrl,
+        ),
+      );
+    }
+    emit(
+      state.copyWith(
+        storeId: store.id,
+        storeName: store.name,
+        lines: List.unmodifiable(lines),
+        clearStore: lines.isEmpty,
+        idempotencyKey: createFoodIdempotencyKey(),
+      ),
+    );
+    return dropped;
   }
 
   /// Stores (or clears, with null) the voucher quote shown at checkout.

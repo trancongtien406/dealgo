@@ -81,7 +81,7 @@ describe('ops overview http', () => {
     await request(app.getHttpServer()).get('/v1/ops/monitor/snapshot').expect(401);
   });
 
-  it('returns overview KPI shape with null money fields', async () => {
+  it('returns overview KPI shape with numeric money fields', async () => {
     const res = await request(app.getHttpServer())
       .get('/v1/ops/overview')
       .set('Authorization', `Bearer ${token}`)
@@ -104,8 +104,8 @@ describe('ops overview http', () => {
         driversOnline: expect.any(Number),
         storesTotal: expect.any(Number),
         exceptionsOpen: expect.any(Number),
-        revenueVnd: null,
-        commissionVnd: null,
+        revenueVnd: expect.any(Number),
+        commissionVnd: expect.any(Number),
         todayTimezone: 'Asia/Ho_Chi_Minh',
         generatedAt: expect.any(String),
         hourlyTrend: expect.objectContaining({
@@ -118,6 +118,42 @@ describe('ops overview http', () => {
     );
     expect(res.body.data.hourlyTrend.buckets.length).toBeLessThanOrEqual(24);
     expect(res.body.data.recentActivity.length).toBeLessThanOrEqual(8);
+  });
+
+  it('returns a per-day report for a Vietnam day range and validates it', async () => {
+    await request(app.getHttpServer()).get('/v1/ops/reports').expect(401);
+    const admin = token;
+
+    const res = await request(app.getHttpServer())
+      .get('/v1/ops/reports?from=2026-10-01&to=2026-10-03')
+      .set('Authorization', `Bearer ${admin}`)
+      .expect(200);
+    expect(res.body.data).toEqual(
+      expect.objectContaining({
+        from: '2026-10-01',
+        to: '2026-10-03',
+        timezone: 'Asia/Ho_Chi_Minh',
+        totals: expect.objectContaining({
+          ridesCompleted: expect.any(Number),
+          revenueVnd: expect.any(Number),
+          commissionVnd: expect.any(Number),
+        }),
+      }),
+    );
+    expect(res.body.data.daily.map((d: { day: string }) => d.day)).toEqual([
+      '2026-10-01',
+      '2026-10-02',
+      '2026-10-03',
+    ]);
+
+    await request(app.getHttpServer())
+      .get('/v1/ops/reports?from=2026-10-05&to=2026-10-01')
+      .set('Authorization', `Bearer ${admin}`)
+      .expect(400);
+    await request(app.getHttpServer())
+      .get('/v1/ops/reports?from=yesterday')
+      .set('Authorization', `Bearer ${admin}`)
+      .expect(400);
   });
 
   it('returns monitor snapshot shape', async () => {

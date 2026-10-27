@@ -179,3 +179,21 @@ describe('DriverHistoryService', () => {
     );
   });
 });
+
+describe('DriverHistoryService.activeJob', () => {
+  const identity = { listGrants: async () => [{ id: 'g', role: 'DRIVER', status: 'ACTIVE' }] };
+  const make = (rideIds: string[], orderIds: string[]) =>
+    new DriverHistoryService(
+      identity as never,
+      new MemoryRatingRepository(),
+      { trackingRideIdsForDriver: async () => rideIds } as never,
+      { trackingOrderIdsForDriver: async () => orderIds } as never,
+      {} as never,
+    );
+
+  it('returns the in-progress ride first, else the food order, else null', async () => {
+    expect(await make(['r1'], ['o1']).activeJob('drv')).toEqual({ job: { kind: 'RIDE', id: 'r1' } });
+    expect(await make([], ['o1']).activeJob('drv')).toEqual({ job: { kind: 'FOOD_ORDER', id: 'o1' } });
+    expect(await make([], []).activeJob('drv')).toEqual({ job: null });
+  });
+});

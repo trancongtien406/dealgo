@@ -1,10 +1,10 @@
 ---
 doc_id: DG-AI-012
 title: "DealGo — System audit mindmap (agent navigation & runtime sync)"
-version: "2.0.1"
+version: "3.0.0"
 status: "ACTIVE"
 owner: "Tech Lead"
-last_updated: "2026-10-18"
+last_updated: "2026-10-26"
 related:
   - docs/10-ai-execution/backend-gap-matrix.md
   - docs/10-ai-execution/admin-web-gap-matrix.md
@@ -17,12 +17,12 @@ related:
 > 
 > **Quy tắc đọc:**
 > - Runtime = controller/BFF/feature code đang thực thi thực tế trong repository.
-> - Toàn bộ các lỗ hổng nghiêm trọng (C1–C6, H1–H14, M1–M14) thuộc phạm vi code implementation đã được khắc phục và kiểm tra thực tế (327 backend tests PASS, 39 website tests PASS, TypeScript & Next.js production build 0 errors).
+> - Mục 4 liệt kê bất biến runtime phải giữ; trạng thái test lấy từ CI, không ghi số liệu cứng ở đây.
 > - Các chính sách tiền tệ/pháp lý chưa chốt được neo vào hệ thống cấu hình `OPEN-*` (Platform Settings), không tự ý bịa logic nghiệp vụ khi chưa có ADR/Charter phê duyệt.
 
 ---
 
-## 0. Mermaid mindmap (Hệ thống sau chuẩn hóa)
+## 0. Mermaid mindmap
 
 ```mermaid
 mindmap
@@ -142,7 +142,9 @@ Tất cả các bảng bên dưới đều đã kết nối dữ liệu thật (
 | Food Order | `modules/food-order/food.controller.ts` | stores, place → accept → ready → claim → pickup → deliver / cancel |
 | Merchant Catalog | `modules/catalog/merchant-catalog.controller.ts` | Quản lý món ăn, vị trí cửa hàng |
 | Promotions Client | `modules/promotion/promotion-client.controller.ts` | `POST /v1/promotions/validate` báo giá giảm cho mã (yêu cầu customer session; chỉ quote, chưa ghi redemption) |
-| Chat | `modules/communication/chat/chat.controller.ts` | `/v1/rides|:food/orders/:id/messages` |
+| Chat | `modules/communication/chat/chat.controller.ts` | `/v1/rides|:food/orders/:id/messages` (trang 1 = 50 tin mới nhất); tin mới phát socket `chatMessage` tới `user:` của khách + tài xế |
+| Phase route | `modules/communication/realtime/phase-route.service.ts`, `routing/phase-route-cache.ts` | Một tuyến mỗi pha (cache), re-route khi lệch theo `ROUTE_OFF_ROUTE_THRESHOLD_M` / `ROUTE_REROUTE_MIN_INTERVAL_SECONDS`; socket `routeUpdated` |
+| Voice calls | `integrations/voice/voice.controller.ts` | `POST /v1/rides/:id/calls`, `POST /v1/food/orders/:id/calls`, `GET /v1/calls/config`, `GET /v1/calls/:id`, `POST /v1/calls/:id/accept|decline|end` (LiveKit, `DEC-PROD-064`) |
 | Webhooks | `modules/payment/payment-webhook.controller.ts` | `/v1/payments/webhooks/vnpay\|momo` |
 
 ### 3.2 Ops & Administration APIs
@@ -180,81 +182,72 @@ Tất cả các bảng bên dưới đều đã kết nối dữ liệu thật (
 
 ---
 
-## 4. Báo cáo đối soát các lỗ hổng (Findings Reconciliation)
+## 4. Bất biến hệ thống phải giữ (Runtime invariants)
 
-Toàn bộ các lỗ hổng phát hiện trong các kỳ audit trước đã được rà soát và đóng lại như sau:
+Các điểm dưới đây là hành vi hiện tại của code. Khi sửa code, không được làm hỏng chúng; mỗi dòng có test hoặc cơ chế kiểm soát tương ứng.
 
-### 4.1 Nhóm CRITICAL — Đã hoàn tất (RESOLVED)
+### 4.1 Dữ liệu thật, không fixture
 
-| Mã | Nội dung lỗ hổng trước đây | Trạng thái hiện tại & Bằng chứng kiểm thử |
-|---|---|---|
-| **C1** | Catalog approve/reject trả thành công giả lập, không ghi DB | **ĐÃ XỬ LÝ TRIỆT ĐỂ:** Bổ sung enum `FoodItemModerationStatus` vào Prisma schema & migration. NestJS `food.service.ts` cập nhật trạng thái món ăn thật. Website BFF & UI có nút duyệt/từ chối kèm phản hồi toast. |
-| **C2** | Đơn ăn tin cậy giá ship `deliveryFareVnd` gửi từ client | **ĐÃ XỬ LÝ TRIỆT ĐỂ:** Backend tính toán độc lập qua `quoteDeliveryFare(storeId, dropoff)` dựa trên cự ly haversine và bảng giá vùng. Bỏ qua hoàn toàn dữ liệu client gửi lên. |
-| **C3** | Giải quyết khiếu nại (Dispute resolve) không tạo bản ghi hoàn tiền hay sổ cái | **ĐÃ XỬ LÝ TRIỆT ĐỂ:** Phương thức `resolvePersisted` tạo bản ghi `RefundRequest` và hạch toán bút toán Sandbox Ledger Journal (`postSandboxRefundJournal`) trong cùng một database transaction. |
-| **C4** | Lịch sử hoạt động khách hàng (Customer activities) trả fixture giả lập | **ĐÃ XỬ LÝ TRIỆT ĐỂ:** `getCustomerActivities` trong `ops-users.service.ts` truy vấn trực tiếp bảng `Ride` và `FoodOrder` thực tế từ cơ sở dữ liệu. |
-| **C5** | Trang khuyến mãi (Promotions) mượn thông báo giả làm voucher | **ĐÃ XỬ LÝ TRIỆT ĐỂ:** Xây dựng module độc lập `PromotionModule` tại NestJS, lưu Postgres (bảng `promotions`, repository Prisma; dữ liệu mẫu chỉ qua `prisma/seed.ts`), DTO, controller quản trị `/v1/ops/promotions`, giao diện tạo voucher mới, bật/tắt trạng thái. Chưa có redemption/`userLimit` enforcement và audit log cho thay đổi khuyến mãi. |
-| **C6** | Trang báo cáo (Reports) tự nhân hệ số kỳ ảo và dùng số liệu bịa | **ĐÃ XỬ LÝ TRIỆT ĐỂ:** Loại bỏ hoàn toàn hệ số nhân kỳ; trích xuất trung thực từ Ops Overview Snapshot kèm nhãn cảnh báo minh bạch phạm vi dữ liệu vận hành. |
+| Phân hệ | Hành vi hiện tại |
+|---|---|
+| Kiểm duyệt món | Duyệt/từ chối ghi trạng thái `FoodItemModerationStatus` vào DB; BFF `/api/ops/catalog/items/:id/approve|reject`. Không sinh dữ liệu mẫu khi DB trống. |
+| Khiếu nại & hoàn tiền | `DisputeCase` và `RefundRequest` lưu Postgres; resolve tạo `RefundRequest` và bút toán ledger. Hoàn tiền chỉ là bản ghi, chưa chuyển tiền thật. |
+| Giao dịch | `ops-transactions.service.ts` chỉ đọc bảng `PaymentIntent`. |
+| Hoạt động khách hàng | `getCustomerActivities` đọc trực tiếp `Ride` và `FoodOrder`. |
+| Khuyến mãi | `PromotionModule` lưu bảng `promotions`; `validate` yêu cầu phiên khách (`CustomerSessionGuard`), `customerId` lấy từ phiên. |
+| Báo cáo / Tổng quan | Số liệu lấy từ snapshot vận hành thật; `revenueVnd`/`commissionVnd` ở Tổng quan trả `null`. Số liệu hoa hồng xem ở Dòng tiền › Đối soát. |
+| Nội dung CMS | Lưu DB qua API Nest, không lưu `localStorage`. |
 
-### 4.2 Nhóm HIGH — Đã hoàn tất (RESOLVED)
+### 4.2 Tiền và giá
 
-| Mã | Nội dung lỗ hổng trước đây | Trạng thái hiện tại & Bằng chứng kiểm thử |
-|---|---|---|
-| **H1** | Disputes/Refunds chỉ lưu trong bộ nhớ RAM, mất khi restart | **ĐÃ XỬ LÝ:** Đã lưu vết bền vững vào bảng Prisma `DisputeCase` và `RefundRequest`. |
-| **H2** | Transactions trộn fixture ảo với giao dịch thật | **ĐÃ XỬ LÝ:** `ops-transactions.service.ts` chỉ truy vấn trực tiếp từ bảng `PaymentIntent`. |
-| **H7** | Catalog moderation khi DB trống thì sinh fixture Highlands Coffee | **ĐÃ XỬ LÝ:** Đã gỡ bỏ dữ liệu mẫu; tích hợp danh mục trực tiếp từ `useLiveCatalogCategoryOptions`. |
-| **H8** | Store approvals không có giao diện phê duyệt, link sai id | **ĐÃ XỬ LÝ:** Hoàn thiện `StoreApprovalsBoard` có form duyệt, từ chối kèm lý do bắt buộc; không còn link nhầm sang store id. |
-| **H9** | Notifications các nút duyệt/gửi chỉ hiện toast giả, thiếu BFF | **ĐÃ XỬ LÝ:** Đã bổ sung đầy đủ BFF `/api/ops/notifications/[code]/approve`, `reject`, `route.ts` (POST) và modal gửi lý do kiểm toán. |
-| **H10** | Catalog moderation thiếu BFF/UI mutate | **ĐÃ XỬ LÝ:** Đã bổ sung `/api/ops/catalog/items/:id/approve` và `reject`, kích hoạt trực tiếp từ giao diện. |
-| **H11** | Tài liệu gap matrix cũ mô tả sai dữ liệu là fixture | **ĐÃ XỬ LÝ:** Cập nhật đồng bộ toàn bộ tài liệu theo hiện trạng runtime. |
-| **H12** | Outbox relay thiếu dependency injection khiến bỏ qua push status | **ĐÃ XỬ LÝ:** `OutboxModule` đã import đầy đủ `PushModule`, `RealtimeModule`, `RideModule`, `FoodModule`. |
-| **H13** | Outbox đọc `processedAt=null` có nguy cơ gửi trùng khi đa luồng | **ĐÃ XỬ LÝ:** `PrismaOutboxRepository` đã sử dụng câu lệnh SQL nguyên tử `WITH claimable AS (...) FOR UPDATE SKIP LOCKED` và cập nhật `lockedAt`. |
-| **H14** | CI integration chạy đường dẫn file cũ trước khi refactor | **ĐÃ XỬ LÝ:** `.github/workflows/backend.yml` đã được cập nhật đường dẫn chính xác theo các module mới. |
+| Quy tắc | Hành vi hiện tại |
+|---|---|
+| Phí giao Food | Server tự tính bằng `quoteDeliveryFare(storeId, dropoff)`; không nhận phí từ client. |
+| Tham số tiền | Hoa hồng, phí huỷ, voucher, chu kỳ đối soát là cài đặt Admin ([bản đồ cài đặt](open-admin-settings-map.md)). |
+| Ledger | Bút toán ghi cùng transaction DB với thay đổi trạng thái; idempotent. |
 
-### 4.3 Nhóm MEDIUM — Đã hoàn tất (RESOLVED)
+### 4.3 Xác thực và phân quyền
 
-| Mã | Nội dung | Kết quả xử lý |
-|---|---|---|
-| **M1** | Các bộ lọc chết trên thanh công cụ | Đã rà soát và loại bỏ các option không hỗ trợ khỏi giao diện bảng. |
-| **M2** | Tham số `RIDE_NEGOTIATION_MAX_ROUNDS` không được áp dụng | Đã kiểm tra và ép điều kiện chặn vòng trả giá trong `ride-ledger.ts`. |
-| **M3** | Bộ lọc Deliveries cargo/mode bị bỏ qua | Đã tinh gọn toolbar chỉ hiển thị trạng thái và từ khóa tìm kiếm thực tế. |
-| **M4** | Trạng thái Refund trên UI lệch enum backend | Đã đồng bộ `refundStatusOptions` chuẩn các giá trị của NestJS. |
-| **M5** | Zones rules giới hạn 50 dòng | Đã đồng bộ xử lý lọc và phân trang mượt mà giữa BFF và giao diện. |
-| **M6** | Content CMS lưu ở localStorage của trình duyệt | Đã chuyển sang lưu trữ trên cơ sở dữ liệu thông qua API Notifications CMS của NestJS. |
-| **M7** | Phân quyền nhân sự không có API danh sách chờ duyệt | Đã xây dựng `GET /v1/ops/role-grants` và component `StaffPendingGrants` để duyệt quyền. |
-| **M9** | `OpsSessionGuard` không kiểm tra lại quyền sau khi login | Đã bổ sung bước kiểm tra quyền `OPS` trạng thái `ACTIVE` từ DB trên mỗi request. |
-| **M11** | Nhận đơn giao đồ ăn không kiểm tra lại KYC | `PartnerEligibilityService` đã chặn các đối tác chưa được duyệt KYC/KYB hợp lệ. |
-| **M13** | ServiceArea và Support phụ thuộc chéo vào Operations để ghi log | Đã tách `AuditLogsModule` về tầng `platform/audit` dùng chung. |
-| **M14** | `StandaloneWorkerModule` import thừa | Đã tinh gọn cấu hình chỉ nạp `WorkersModule` (+ `ThrottlerModule` vì `ThrottlerGuard` được provider dùng chung inject; thiếu nó worker không boot). |
+| Quy tắc | Hành vi hiện tại |
+|---|---|
+| Đăng ký email | Hai bước bằng OTP email; Account chỉ tạo sau khi xác minh; đăng nhập chỉ cho email đã xác minh; có luồng quên mật khẩu (`password_resets`). |
+| OTP SĐT | Challenge không tạo user; xác minh lần đầu cấp `CUSTOMER` `ACTIVE` ở mọi môi trường. |
+| Role bị tạm ngưng | User không tự mở lại grant `SUSPENDED` (403 `ROLE_GRANT_SUSPENDED`). |
+| Phiên ops | `OpsSessionGuard` kiểm tra grant `OPS` `ACTIVE` từ DB mỗi request; quyền chi tiết theo ma trận RBAC (`GET /v1/ops/staff/rbac-matrix`). Duyệt quyền chờ qua `GET /v1/ops/role-grants`. |
+| KYC/KYB | `PartnerEligibilityService` chặn tài xế/quán chưa được duyệt khi xem và nhận đơn (trừ khi `PARTNER_ELIGIBILITY_BYPASS` ở môi trường local). |
 
-### 4.4 Rà soát 2026-10-18 (đã sửa trong code)
+### 4.4 Hạ tầng
 
-| Mã | Nội dung | Kết quả |
-|---|---|---|
-| **R1** | Promotions chỉ nằm trong bộ nhớ; `validate` không cần đăng nhập, nhận `customerId` từ body | Bảng `promotions` + migration; `validate` dùng `CustomerSessionGuard`, `customerId` lấy từ session; BFF POST/PATCH promotions kiểm same-origin |
-| **R2** | Đăng ký email tự đánh dấu verified | Đăng ký email hai bước bằng OTP qua email (Account chỉ tạo sau verify); login chỉ cho email đã verify; thêm luồng quên mật khẩu (`password_resets`) |
-| **R3** | OTP phone tạo user trước khi verify; CUSTOMER chỉ auto ngoài production | Challenge không tạo user; verify lần đầu cấp `CUSTOMER` `ACTIVE` mọi môi trường |
-| **R4** | User tự mở lại grant `SUSPENDED` | 403 `ROLE_GRANT_SUSPENDED` |
-| **R5** | Avatar base64 2 MB vượt body limit 100kb (500) | 3mb riêng cho `/v1/me/avatar`; lỗi body-parser trả 413/400 |
-| **R6** | Pool Prisma cố định; `GET /` trả `Hello World!`; 11 lỗi tsc ở `ride-ledger.spec.ts`; CI thiếu typecheck/lint | `DATABASE_POOL_MAX`; `DealGo API`; tsc 0 lỗi; CI thêm typecheck + lint |
-| **R7** | CI website đặt `NEXT_PUBLIC_NEST_API_URL` không dùng; CSP hardcode localhost | Bỏ biến; CSP `connect-src` dựng từ env (localhost chỉ ở dev) |
+| Quy tắc | Hành vi hiện tại |
+|---|---|
+| Outbox | `PrismaOutboxRepository` claim bằng `FOR UPDATE SKIP LOCKED`, không gửi trùng khi nhiều worker. `OutboxModule` nạp `PushModule`, `RealtimeModule`, `RideModule`, `FoodModule`. |
+| Worker | `StandaloneWorkerModule` chỉ nạp `WorkersModule` và `ThrottlerModule`. |
+| Audit | `AuditLogsModule` ở `platform/audit`, dùng chung cho mọi module. |
+| Body limit | `/v1/me/avatar` nhận tới 3 MB; lỗi body-parser trả 413/400. |
+| CSP website | `connect-src` dựng từ env; `localhost` chỉ có ở dev. |
+| Pool DB | `DATABASE_POOL_MAX` mỗi process. |
 
-Còn mở: form hỗ trợ công khai chưa có endpoint backend; ops RBAC chi tiết; adapter SMS production; `food-claim.race.spec.ts` đỏ khi chạy Postgres (có từ trước).
+### 4.5 Việc còn mở
+
+- Ma trận RBAC ops chi tiết theo vai trò nhân sự vẫn đang hoàn thiện.
+- Hoàn tiền thật qua cổng thanh toán chưa có (`OPEN-002`).
+- Danh sách khoảng trống theo từng phần: [backend](backend-gap-matrix.md), [Admin web](admin-web-gap-matrix.md), [Flutter](mobile-flutter-gap-matrix.md).
 
 ---
 
 ## 5. Danh mục chính sách `OPEN-*` (Governed Knobs)
 
-Các nghiệp vụ nhạy cảm về mặt pháp lý và thanh toán được quản trị an toàn thông qua cấu hình tham số tại `/settings/platform` thay vì hardcode trong code:
+Tham số nghiệp vụ nhạy cảm được quản lý bằng cài đặt Admin tại `/settings/platform` (Cài đặt › Tham số) thay vì hằng số trong code. Danh sách đầy đủ: [bản đồ cài đặt Admin](open-admin-settings-map.md).
 
 | Mã | Nội dung chính sách | Cơ chế kỹ thuật hiện tại | Lưu ý cho Agent |
 |---|---|---|---|
-| `OPEN-001` | Ranh giới khu vực dịch vụ | Bảng `service_regions` & `/v1/ops/zones` | Bounding box toạ độ; không tự chế thuật toán geofencing phức tạp |
-| `OPEN-002` | Tích hợp cổng thanh toán trực tuyến | COD + Sandbox Ledger; cổng MoMo/VNPay ở dạng mock | Không tự tuyên bố đã capture tiền thật từ ngân hàng khi chưa có key sản xuất |
-| `OPEN-003` | Biểu phí & hoa hồng nền tảng | Giới hạn Min/Max fare theo km; `revenueVnd`/`commissionVnd` trả null | Không tự bịa công thức chia tiền hoa hồng tài xế/quán ăn |
-| `OPEN-004` | Thuật toán điều phối cuốc | Bán kính quét GPS + thời gian chờ TTL | Coi là tham số cấu hình vận hành, không phải logic cố định |
-| `OPEN-005` | Giới hạn đơn nhận đồng thời | `MAX_CONCURRENT_JOBS_PER_DRIVER` | Đã cưỡng chế kiểm tra khi tài xế nhận cuốc/đơn |
-| `OPEN-006` | Phê duyệt đối tác pháp nhân | Quy trình xét duyệt KYC/KYB có kiểm toán | Sandbox auto-ACTIVE ở môi trường dev; kiểm tra nghiêm ngặt khi chạy thật |
-| `OPEN-019` | Giới hạn vòng thương lượng giá | `RIDE_NEGOTIATION_MAX_ROUNDS` | Đã cưỡng chế dừng phiên đàm phán khi chạm ngưỡng |
+| `OPEN-001` | Ranh giới khu vực dịch vụ | Bảng `service_regions`, Admin › Khu vực & Giá (`/v1/ops/zones`) | Không tự chế thuật toán geofencing |
+| `OPEN-002` | Cổng thanh toán trực tuyến | Ra mắt chỉ tiền mặt (`PAYMENT_PROVIDER=cash-only`); VNPAY/MoMo mới tạo intent chuyển hướng | Không tuyên bố đã thu tiền thật |
+| `OPEN-003` | Biểu phí và hoa hồng | Khoảng giá theo hạng xe; hoa hồng xe máy / ô tô / tài xế giao đồ ăn / quán là cài đặt Admin | Giá trị mặc định là DRAFT, chờ chủ dự án duyệt |
+| `OPEN-004` | Điều phối | Tài xế tự xem yêu cầu trong bán kính `DRIVER_SEARCH_RADIUS_KM` và trả giá; không tự ghép | Giữ mô hình trả giá kiểu inDrive |
+| `OPEN-005` | Số việc đồng thời | `MAX_CONCURRENT_JOBS_PER_DRIVER` (tính cả chuyến và đơn) | Đã kiểm tra khi chọn tài xế và khi nhận đơn |
+| `OPEN-006` | Duyệt đối tác | KYC/KYB có audit; tài xế ô tô cần thêm bảo hiểm (`PARTNER_CAR_KYC_EXTRA_DOCS`) | Môi trường local có thể bỏ qua duyệt |
+| `OPEN-019` | Giới hạn trả giá | `RIDE_OFFER_TTL_SECONDS`, `RIDE_MAX_OFFER_EDITS_PER_DRIVER`, `RIDE_COUNTER_MAX_PERCENT_OF_OFFER`, `RIDE_MAX_LIVE_OFFERS_PER_RIDE` | Số liệu chờ PO duyệt |
 
 ---
 
@@ -270,13 +263,13 @@ Các nghiệp vụ nhạy cảm về mặt pháp lý và thanh toán được qu
 ### Backend (`backend/`)
 - Modules nghiệp vụ: `backend/src/modules/{identity,partner,ride,food-order,delivery,merchant,catalog,pricing,promotion,payment,ledger,settlement,service-area,support,operations}/`
 - Giao tiếp & sự kiện: `backend/src/modules/communication/{chat,notifications,outbox,realtime}/`
+- Tích hợp ngoài: `backend/src/integrations/{email,maps,object-storage,payment-gateways,push,sms,voice}/` (gọi thoại LiveKit ở `voice/`)
 - Nền tảng cốt lõi: `backend/src/platform/{audit,cache,config,database,health,http,observability,queue,security,settings}/`
 - Tiến trình nền: `backend/src/workers/{worker-main,workers.module,workers.bootstrap,ride-expiry.service}.ts`
 
 ---
 
-## 7. Tổng kết trạng thái hệ thống
+## 7. Cách giữ tài liệu này đúng
 
-- **Tính toàn vẹn giao diện:** 100% các trang trong bảng điều hướng Admin Web đều hoạt động đồng bộ với API backend, có đầy đủ trạng thái Loading, Empty, Forbidden và Error Banner.
-- **Tính chuẩn xác dữ liệu:** Không còn tình trạng dùng dữ liệu giả mạo (fixture/masquerade) ở các phân hệ cốt lõi. Khuyến mãi đã có module riêng, kiểm duyệt món đã ghi vào DB thật, khiếu nại đã hạch toán sổ cái, nội dung văn bản pháp lý đã lưu trên CMS backend.
-- **Tính ổn định & kiểm thử:** Toàn bộ test suite ở cả hai phân hệ backend và website đều đạt trạng thái **PASS 100%**, bản build Next.js hoàn thành mượt mà không có bất kỳ lỗi biên dịch hay cảnh báo kiểu dữ liệu nào.
+- Khi thêm trang Admin, route BFF hoặc module Nest: cập nhật bảng mục 2–3 trong cùng thay đổi.
+- Khi thay đổi một bất biến ở mục 4: sửa dòng tương ứng để nó mô tả hành vi mới, không ghi chú lịch sử; lịch sử nằm ở git và changelog của sổ quyết định.

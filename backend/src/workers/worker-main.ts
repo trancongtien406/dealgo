@@ -5,6 +5,13 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { loadEnv } from '../platform/config/index.js';
 import { WorkersModule } from './workers.module.js';
+import {
+  captureServerError,
+  createAppLogger,
+  flushSentry,
+  initSentry,
+  sentryOptionsFromEnv,
+} from '../platform/observability/index.js';
 
 @Module({
   imports: [
@@ -23,13 +30,18 @@ export class StandaloneWorkerModule {}
 async function bootstrap() {
   const logger = new Logger('WorkerMain');
   logger.log('Starting DealGo standalone background worker process...');
-  const app = await NestFactory.createApplicationContext(StandaloneWorkerModule);
+  initSentry(sentryOptionsFromEnv(process.env, 'worker'));
+  const app = await NestFactory.createApplicationContext(StandaloneWorkerModule, {
+    logger: createAppLogger(),
+  });
   app.enableShutdownHooks();
   logger.log('DealGo background workers are active (outbox, ride-expiry, schedulers).');
 }
 
 if (process.env.NODE_ENV !== 'test') {
-  bootstrap().catch((err) => {
+  bootstrap().catch(async (err) => {
+    captureServerError(err, { phase: 'worker-boot' });
+    await flushSentry();
     // eslint-disable-next-line no-console
     console.error('Fatal error in worker-main:', err);
     process.exit(1);

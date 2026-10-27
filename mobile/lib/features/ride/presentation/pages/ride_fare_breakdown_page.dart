@@ -7,6 +7,7 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/ride_money.dart';
 import '../../domain/entities/ride_vehicle.dart';
+import '../utils/ride_vehicle_label.dart';
 import '../utils/ride_routes.dart';
 import '../widgets/ride_widgets.dart';
 import 'ride_route_overview_page.dart';
@@ -75,11 +76,11 @@ class RideFareBreakdownPage extends StatelessWidget {
                                 DealGoRadius.input,
                               ),
                             ),
-                            child: const SizedBox(
+                            child: SizedBox(
                               width: 56,
                               height: 56,
                               child: Icon(
-                                DealGoIcons.motorbike,
+                                rideVehicleClassIcon(quote.vehicleClassCode),
                                 color: DealGoColors.primary,
                               ),
                             ),
@@ -90,7 +91,11 @@ class RideFareBreakdownPage extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  l10n.rideVehicleBikeTitle,
+                                  quote.vehicleClassName ??
+                                      rideVehicleClassLabel(
+                                        l10n,
+                                        quote.vehicleClassCode,
+                                      ),
                                   style: textTheme.titleMedium,
                                 ),
                                 const SizedBox(height: DealGoSpacing.s8),
@@ -119,6 +124,23 @@ class RideFareBreakdownPage extends StatelessWidget {
                       children: [
                         RideSectionTitle(l10n.rideFareComponentsTitle),
                         const SizedBox(height: DealGoSpacing.s12),
+                        if (quote.baseFareVnd > 0)
+                          RideMoneyLine(
+                            label: l10n.rideFareOpening,
+                            amount: formatRideVnd(quote.baseFareVnd),
+                          ),
+                        if (quote.perKmVnd > 0)
+                          RideMoneyLine(
+                            label: l10n.rideFarePerKm,
+                            amount: formatRideVnd(quote.perKmVnd),
+                          ),
+                        if (quote.perMinuteVnd > 0 && quote.durationMin > 0)
+                          RideMoneyLine(
+                            label: l10n.rideFareTime(quote.durationMin),
+                            amount: formatRideVnd(
+                              quote.perMinuteVnd * quote.durationMin,
+                            ),
+                          ),
                         RideMoneyLine(
                           label: l10n.rideRouteDistance,
                           amount: l10n.rideDistanceKm(

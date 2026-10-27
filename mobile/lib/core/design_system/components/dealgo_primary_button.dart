@@ -17,6 +17,7 @@ class DealGoPrimaryButton extends StatefulWidget {
     this.trailingIcon,
     this.leadingIcon,
     this.haptic = true,
+    this.compact = false,
     super.key,
   });
 
@@ -27,6 +28,9 @@ class DealGoPrimaryButton extends StatefulWidget {
   final IconData? trailingIcon;
   final IconData? leadingIcon;
   final bool haptic;
+
+  /// Slightly shorter CTA for dense bottom sheets (still ≥ 48 logical px).
+  final bool compact;
 
   @override
   State<DealGoPrimaryButton> createState() => _DealGoPrimaryButtonState();
@@ -61,11 +65,16 @@ class _DealGoPrimaryButtonState extends State<DealGoPrimaryButton> {
       style: ButtonStyle(
         animationDuration: Duration.zero,
         elevation: const WidgetStatePropertyAll(0),
-        minimumSize: const WidgetStatePropertyAll(
-          Size(DealGoDimensions.minTapTarget, DealGoDimensions.buttonMinHeight),
+        minimumSize: WidgetStatePropertyAll(
+          Size(
+            DealGoDimensions.minTapTarget,
+            widget.compact ? 48 : DealGoDimensions.buttonMinHeight,
+          ),
         ),
-        padding: const WidgetStatePropertyAll(
-          EdgeInsets.symmetric(horizontal: DealGoSpacing.s20),
+        padding: WidgetStatePropertyAll(
+          EdgeInsets.symmetric(
+            horizontal: widget.compact ? DealGoSpacing.s16 : DealGoSpacing.s20,
+          ),
         ),
         foregroundColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.disabled) && !widget.isLoading
@@ -80,10 +89,10 @@ class _DealGoPrimaryButtonState extends State<DealGoPrimaryButton> {
         shape: WidgetStatePropertyAll(
           RoundedRectangleBorder(borderRadius: radius),
         ),
-        textStyle: const WidgetStatePropertyAll(
+        textStyle: WidgetStatePropertyAll(
           TextStyle(
             fontFamily: DealGoTypography.fontFamily,
-            fontSize: 16,
+            fontSize: widget.compact ? 15 : 16,
             height: 1.25,
             fontWeight: FontWeight.w700,
           ),
@@ -176,7 +185,9 @@ class _ButtonLabel extends StatelessWidget {
           Icon(leadingIcon, size: 18),
           const SizedBox(width: DealGoSpacing.s8),
         ],
-        Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: labelText)),
+        Flexible(
+          child: FittedBox(fit: BoxFit.scaleDown, child: labelText),
+        ),
         if (trailingIcon != null) ...[
           const SizedBox(width: DealGoSpacing.s8),
           Icon(trailingIcon, size: 18),

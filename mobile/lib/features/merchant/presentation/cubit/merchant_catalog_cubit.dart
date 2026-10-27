@@ -59,7 +59,9 @@ class MerchantCatalogCubit extends Cubit<MerchantCatalogState> {
   Future<void> load(String? accessToken) async {
     final token = accessToken?.trim() ?? '';
     if (token.isEmpty) {
-      emit(MerchantCatalogFailed(UiMessage((l10n) => l10n.errorSessionExpired)));
+      emit(
+        MerchantCatalogFailed(UiMessage((l10n) => l10n.errorSessionExpired)),
+      );
       return;
     }
     emit(const MerchantCatalogLoading());
@@ -90,7 +92,11 @@ class MerchantCatalogCubit extends Cubit<MerchantCatalogState> {
     }
     final token = accessToken?.trim() ?? '';
     if (token.isEmpty) {
-      emit(ready.copyWith(actionError: UiMessage((l10n) => l10n.errorSessionExpired)));
+      emit(
+        ready.copyWith(
+          actionError: UiMessage((l10n) => l10n.errorSessionExpired),
+        ),
+      );
       return;
     }
     emit(ready.copyWith(busyItemId: itemId, clearActionError: true));
@@ -123,7 +129,10 @@ class MerchantCatalogCubit extends Cubit<MerchantCatalogState> {
       if (!isClosed && state is MerchantCatalogReady) {
         emit(
           (state as MerchantCatalogReady).copyWith(
-            actionError: UiMessage.error(error, fallback: (l10n) => l10n.merchantItemUpdateFailed),
+            actionError: UiMessage.error(
+              error,
+              fallback: (l10n) => l10n.merchantItemUpdateFailed,
+            ),
             clearBusyItemId: true,
           ),
         );
@@ -142,12 +151,20 @@ class MerchantCatalogCubit extends Cubit<MerchantCatalogState> {
     }
     final token = accessToken?.trim() ?? '';
     if (token.isEmpty) {
-      emit(ready.copyWith(actionError: UiMessage((l10n) => l10n.errorSessionExpired)));
+      emit(
+        ready.copyWith(
+          actionError: UiMessage((l10n) => l10n.errorSessionExpired),
+        ),
+      );
       return;
     }
     final trimmed = name.trim();
     if (trimmed.isEmpty || priceVnd < 1) {
-      emit(ready.copyWith(actionError: UiMessage((l10n) => l10n.merchantItemInvalid)));
+      emit(
+        ready.copyWith(
+          actionError: UiMessage((l10n) => l10n.merchantItemInvalid),
+        ),
+      );
       return;
     }
     emit(ready.copyWith(busyItemId: '_create', clearActionError: true));
@@ -186,7 +203,10 @@ class MerchantCatalogCubit extends Cubit<MerchantCatalogState> {
       if (!isClosed && state is MerchantCatalogReady) {
         emit(
           (state as MerchantCatalogReady).copyWith(
-            actionError: UiMessage.error(error, fallback: (l10n) => l10n.merchantItemCreateFailed),
+            actionError: UiMessage.error(
+              error,
+              fallback: (l10n) => l10n.merchantItemCreateFailed,
+            ),
             clearBusyItemId: true,
           ),
         );

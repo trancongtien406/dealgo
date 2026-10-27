@@ -3,7 +3,7 @@ import { MemoryLedgerRepository } from '../ledger/ledger.repository.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { percentToBps, splitFare } from './earnings.math.js';
 import { MemoryEarningsRepository } from './earnings.repository.js';
-import { EarningsService } from './earnings.service.js';
+import { driverCommissionSettingKey, EarningsService } from './earnings.service.js';
 
 function setup(rates: Record<string, number>) {
   const ledgerRepo = new MemoryLedgerRepository();
@@ -47,8 +47,8 @@ describe('earnings math', () => {
 describe('EarningsService', () => {
   it('snapshots the rate per service and posts a balanced fee journal once', async () => {
     const { service, ledgerRepo } = setup({
-      PLATFORM_FEE_RIDE_PERCENT: 12.5,
-      PLATFORM_FEE_FOOD_PERCENT: 10,
+      RIDE_COMMISSION_BIKE_PERCENT: 12.5,
+      FOOD_DRIVER_COMMISSION_PERCENT: 10,
     });
     const ride = await record(service, job('r1', 42_000));
     expect(ride).toMatchObject({ feeBps: 1250, feeVnd: 5250, netVnd: 36_750 });
@@ -70,9 +70,9 @@ describe('EarningsService', () => {
   });
 
   it('keeps history when the admin changes the rate later', async () => {
-    const { service, rates } = setup({ PLATFORM_FEE_RIDE_PERCENT: 10 });
+    const { service, rates } = setup({ RIDE_COMMISSION_BIKE_PERCENT: 10 });
     await record(service, job('r1', 50_000));
-    rates.PLATFORM_FEE_RIDE_PERCENT = 30;
+    rates.RIDE_COMMISSION_BIKE_PERCENT = 30;
     await record(service, job('r2', 50_000));
     const map = await service.findMany([
       { entityType: 'RIDE', entityId: 'r1' },
@@ -83,14 +83,31 @@ describe('EarningsService', () => {
   });
 
   it('records a zero fee without a journal and refuses an invalid rate', async () => {
-    const { service, ledgerRepo } = setup({ PLATFORM_FEE_RIDE_PERCENT: 0 });
+    const { service, ledgerRepo } = setup({ RIDE_COMMISSION_BIKE_PERCENT: 0 });
     expect(await record(service, job('r1', 30_000))).toMatchObject({
       feeVnd: 0,
       netVnd: 30_000,
     });
     expect(await ledgerRepo.findByEntity('RIDE', 'r1', 'DRIVER_PLATFORM_FEE_ACCRUED')).toBeNull();
     // An out-of-range rate fails loudly before the completion transaction opens.
-    const broken = setup({ PLATFORM_FEE_RIDE_PERCENT: 250 });
+    const broken = setup({ RIDE_COMMISSION_BIKE_PERCENT: 250 });
     await expect(broken.service.currentFeeBps('RIDE')).rejects.toThrow();
+  });
+
+  it('Picks the commission per service (motorbike, car, food delivery)', async () => {
+    expect(driverCommissionSettingKey('RIDE', 'MOTORBIKE')).toBe('RIDE_COMMISSION_BIKE_PERCENT');
+    expect(driverCommissionSettingKey('RIDE', 'BIKE_PLUS')).toBe('RIDE_COMMISSION_BIKE_PERCENT');
+    expect(driverCommissionSettingKey('RIDE', undefined)).toBe('RIDE_COMMISSION_BIKE_PERCENT');
+    expect(driverCommissionSettingKey('RIDE', 'CAR_4')).toBe('RIDE_COMMISSION_CAR_PERCENT');
+    expect(driverCommissionSettingKey('RIDE', 'CAR_7')).toBe('RIDE_COMMISSION_CAR_PERCENT');
+    expect(driverCommissionSettingKey('FOOD_ORDER', 'CAR_4')).toBe('FOOD_DRIVER_COMMISSION_PERCENT');
+    const { service } = setup({
+      RIDE_COMMISSION_BIKE_PERCENT: 10,
+      RIDE_COMMISSION_CAR_PERCENT: 15,
+      FOOD_DRIVER_COMMISSION_PERCENT: 0,
+    });
+    expect(await service.currentFeeBps('RIDE', 'MOTORBIKE')).toBe(1000);
+    expect(await service.currentFeeBps('RIDE', 'CAR_4')).toBe(1500);
+    expect(await service.currentFeeBps('FOOD_ORDER')).toBe(0);
   });
 });

@@ -15,13 +15,12 @@ const CHART_CONFIG = {
   top: 8,
   bottom: 28,
   right: 16,
-  max: 240,
 } as const;
 
 interface ReportsActivityChartProps {
   services: readonly ServiceActivity[];
   activityTotal: number;
-  trendHours: readonly string[];
+  trendDays: readonly string[];
   trendSeries: readonly {
     label: string;
     tone: string;
@@ -34,7 +33,7 @@ interface ReportsActivityChartProps {
 export function ReportsActivityChart({
   services,
   activityTotal,
-  trendHours,
+  trendDays,
   trendSeries,
   isError,
   isPending,
@@ -45,14 +44,14 @@ export function ReportsActivityChart({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-ink">
-              Xu hướng hoạt động theo khung giờ
+              Xu hướng theo ngày
             </h2>
             <p className="mt-1 text-sm text-muted">
               {isError
                 ? "Không thể tải dữ liệu"
                 : isPending
-                  ? "Đang đồng bộ snapshot…"
-                  : "Số lượng mới phát sinh · snapshot overview"}
+                  ? "Đang tải báo cáo…"
+                  : "Chuyến/đơn kết thúc mỗi ngày (giờ Việt Nam)"}
             </p>
           </div>
         </div>
@@ -86,8 +85,8 @@ export function ReportsActivityChart({
                 </li>
               ))}
             </ul>
-            <HourlyTrend
-              hours={trendHours}
+            <DailyTrend
+              days={trendDays}
               series={trendSeries.map((seriesItem) => ({
                 label: seriesItem.label,
                 accent:
@@ -100,7 +99,6 @@ export function ReportsActivityChart({
                         : ("brand" as Accent),
                 shape: [...seriesItem.values],
               }))}
-              multiplier={1}
             />
           </>
         )}
@@ -109,7 +107,7 @@ export function ReportsActivityChart({
       <section className="min-w-0 rounded-2xl border border-border bg-white p-4 shadow-sm sm:p-5">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-base font-semibold text-ink">Cơ cấu hoạt động</h2>
-          <p className="shrink-0 text-sm font-medium text-brand">Snapshot</p>
+          <p className="shrink-0 text-sm font-medium text-brand">Trong kỳ</p>
         </div>
         <p className="mt-1 text-sm text-muted">
           Tỷ trọng trên {countFormat.format(activityTotal)} hoạt động
@@ -217,20 +215,31 @@ function ActivityDonut({
   );
 }
 
-function HourlyTrend({
-  hours,
+/** Rounds the largest value up to a readable axis maximum (at least 4). */
+export function niceAxisMax(value: number): number {
+  if (!Number.isFinite(value) || value <= 4) {
+    return 4;
+  }
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  const step = [1, 2, 2.5, 5, 10].find((m) => m * magnitude >= value) ?? 10;
+  return step * magnitude;
+}
+
+function DailyTrend({
+  days: hours,
   series,
-  multiplier = 1,
 }: {
-  hours: readonly string[];
+  days: readonly string[];
   series: readonly { label: string; accent: Accent; shape: number[] }[];
-  multiplier?: number;
 }) {
   const plotWidth = CHART_CONFIG.width - CHART_CONFIG.left - CHART_CONFIG.right;
   const plotHeight =
     CHART_CONFIG.height - CHART_CONFIG.top - CHART_CONFIG.bottom;
   const baseline = CHART_CONFIG.top + plotHeight;
-  const ticks = [0, 60, 120, 180, 240];
+  const axisMax = niceAxisMax(
+    Math.max(0, ...series.flatMap((seriesItem) => seriesItem.shape)),
+  );
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => axisMax * ratio);
   const hourLabels = hours.length > 0 ? hours : ["—"];
   const chartSeries =
     series.length > 0
@@ -241,17 +250,17 @@ function HourlyTrend({
     <div className="mt-4 min-w-0 overflow-x-auto">
       {hours.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted">
-          Chưa có xu hướng theo giờ từ tổng quan vận hành.
+          Chưa có dữ liệu trong kỳ đã chọn.
         </p>
       ) : null}
       <svg
         viewBox={`0 0 ${CHART_CONFIG.width} ${CHART_CONFIG.height}`}
         role="img"
-        aria-label="Biểu đồ hoạt động theo giờ"
+        aria-label="Biểu đồ hoạt động theo ngày"
         className="h-auto min-w-[36rem] w-full"
       >
         {ticks.map((tick) => {
-          const yCoordinate = calculateYCoordinate(tick, plotHeight);
+          const yCoordinate = calculateYCoordinate(tick, plotHeight, axisMax);
           return (
             <g key={tick}>
               <line
@@ -306,10 +315,7 @@ function HourlyTrend({
         {chartSeries.map((seriesItem) => {
           const points = seriesItem.shape.map((value, index) => ({
             x: calculateXCoordinate(index, plotWidth, hourLabels.length),
-            y: calculateYCoordinate(
-              Math.min(240, Math.round(value * Math.min(multiplier, 1.2))),
-              plotHeight,
-            ),
+            y: calculateYCoordinate(value, plotHeight, axisMax),
           }));
           return (
             <g key={seriesItem.label} className={lineTone[seriesItem.accent]}>
@@ -344,11 +350,12 @@ function calculateXCoordinate(
   return CHART_CONFIG.left + (index / denominator) * plotWidth;
 }
 
-function calculateYCoordinate(value: number, plotHeight: number): number {
-  return (
-    CHART_CONFIG.top +
-    (1 - Math.min(value, CHART_CONFIG.max) / CHART_CONFIG.max) * plotHeight
-  );
+function calculateYCoordinate(
+  value: number,
+  plotHeight: number,
+  max: number,
+): number {
+  return CHART_CONFIG.top + (1 - Math.min(value, max) / max) * plotHeight;
 }
 
 function generateSmoothLinePath(

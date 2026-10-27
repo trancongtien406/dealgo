@@ -1,3 +1,4 @@
+import { PROD_ENV_OK } from '../../../test/fixtures/prod-env.js';
 import { ConfigService } from '@nestjs/config';
 import { loadEnv, type AppEnv } from '../config/env.js';
 import { HealthService } from './health.service.js';
@@ -53,11 +54,7 @@ describe('HealthService', () => {
   it('ready is not_ready in production when redis is down', async () => {
     const config = new ConfigService<AppEnv, true>(
       loadEnv({
-        NODE_ENV: 'production',
-        JWT_ACCESS_SECRET: 'prod-secret-must-be-long-enough',
-        SMS_PROVIDER: 'esms',
-        PUSH_PROVIDER: 'fcm',
-        PAYMENT_PROVIDER: 'vnpay',
+        ...PROD_ENV_OK,
         DATABASE_URL: 'postgresql://dealgo:dealgo_dev@localhost:5432/dealgo',
         REDIS_URL: 'redis://localhost:6379',
       }),

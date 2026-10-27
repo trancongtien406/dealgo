@@ -1,4 +1,6 @@
+import '../../core/push/new_job_alert.dart';
 import '../../core/realtime/snapshot_realtime.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -19,6 +21,7 @@ import '../../features/driver/domain/usecases/list_ready_driver_orders.dart';
 import '../../features/driver/presentation/cubit/driver_feed_cubit.dart';
 import '../../features/driver/presentation/pages/driver_active_ride_page.dart';
 import '../../features/driver/presentation/pages/driver_food_page.dart';
+import '../../features/driver/presentation/pages/driver_food_resume_page.dart';
 import '../../features/driver/presentation/pages/driver_job_completed_page.dart';
 import '../../features/driver/presentation/pages/driver_job_failed_page.dart';
 import '../../features/driver/presentation/pages/driver_passenger_otp_page.dart';
@@ -27,7 +30,10 @@ import '../../features/driver/presentation/pages/driver_services_page.dart';
 import '../../features/driver/presentation/utils/driver_routes.dart';
 import '../../features/driver/presentation/widgets/driver_widgets.dart';
 import '../../features/food/domain/entities/food_models.dart';
+import '../../features/merchant/domain/usecases/accept_merchant_order.dart';
+import '../../features/merchant/domain/usecases/get_merchant_catalog.dart';
 import '../../features/merchant/domain/usecases/list_merchant_order_queue.dart';
+import '../../features/merchant/domain/usecases/mark_merchant_order_ready.dart';
 import '../../features/merchant/presentation/pages/merchant_accept_settings_page.dart';
 import '../../features/merchant/presentation/pages/merchant_busy_page.dart';
 import '../../features/merchant/presentation/pages/merchant_hours_page.dart';
@@ -38,6 +44,7 @@ import '../../features/merchant/presentation/pages/merchant_item_edit_page.dart'
 import '../../features/merchant/presentation/pages/merchant_categories_page.dart';
 import '../../features/merchant/presentation/pages/merchant_history_page.dart';
 import '../../features/merchant/presentation/pages/merchant_order_page.dart';
+import '../../features/merchant/presentation/pages/merchant_order_resume_page.dart';
 import '../../features/merchant/presentation/cubit/merchant_queue_cubit.dart';
 import '../../features/merchant/presentation/utils/merchant_routes.dart';
 import '../../features/food/presentation/pages/food_cancel_page.dart';
@@ -87,6 +94,7 @@ import '../../features/identity/presentation/pages/otp_page.dart';
 import '../../features/identity/presentation/cubit/phone_auth_cubit.dart';
 import '../../features/identity/presentation/pages/phone_input_page.dart';
 import '../../features/identity/presentation/pages/phone_login_page.dart';
+import '../../core/deeplink/deep_link_gate.dart';
 import '../../features/identity/presentation/pages/splash_page.dart';
 import '../../features/onboarding/presentation/pages/customer_onboarding_page.dart';
 import '../../features/onboarding/presentation/pages/profile_setup_page.dart';
@@ -112,14 +120,18 @@ GoRouter createAppRouter({
   required Listenable refreshListenable,
   PostAuthGate? postAuth,
   String initialLocation = AuthRoutes.splash,
+  DeepLinkGate? deepLinks,
 }) {
   final rootNavigatorKey = GlobalKey<NavigatorState>();
-  return GoRouter(
+  final router = GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: initialLocation,
     refreshListenable: refreshListenable,
     redirect: (context, state) =>
+        deepLinks?.intercept(state.uri) ??
         authRedirect(auth.state, state.uri, postAuth: postAuth),
+    // Unknown/broken deep links must not show GoRouter's debug page.
+    errorBuilder: (context, state) => const DealGoRouteNotFoundPage(),
     routes: [
       GoRoute(
         path: AuthRoutes.splash,
@@ -255,7 +267,7 @@ GoRouter createAppRouter({
           final storeId = state.pathParameters['storeId'] ?? '';
           return dealgoFadeSlidePage(
             key: state.pageKey,
-            child: FoodStorePage(storeId: storeId),
+            child: FoodStorePage(key: ValueKey(storeId), storeId: storeId),
           );
         },
         routes: [
@@ -273,7 +285,7 @@ GoRouter createAppRouter({
               final storeId = state.pathParameters['storeId'] ?? '';
               return dealgoFadeSlidePage(
                 key: state.pageKey,
-                child: FoodStorePage(storeId: storeId),
+                child: FoodStorePage(key: ValueKey(storeId), storeId: storeId),
               );
             },
           ),
@@ -313,7 +325,8 @@ GoRouter createAppRouter({
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (context, state) {
           final extra = state.extra;
-          return dealgoFadeSlidePage(
+          // Platform page: iOS edge swipe-back + Android back (custom fades have no swipe).
+          return MaterialPage(
             key: state.pageKey,
             child: PlacePickerPage(
               purpose: switch (extra) {
@@ -322,6 +335,7 @@ GoRouter createAppRouter({
                 _ => PlacePickPurpose.dropoff,
               },
               initialQuery: extra is PlacePickRequest ? extra.initialQuery : '',
+              near: extra is PlacePickRequest ? extra.near : null,
             ),
           );
         },
@@ -398,7 +412,7 @@ GoRouter createAppRouter({
           final rideId = state.pathParameters['rideId'] ?? '';
           return dealgoFadeSlidePage(
             key: state.pageKey,
-            child: RideMatchingPage(rideId: rideId),
+            child: RideMatchingPage(key: ValueKey(rideId), rideId: rideId),
           );
         },
       ),
@@ -409,7 +423,7 @@ GoRouter createAppRouter({
           final rideId = state.pathParameters['rideId'] ?? '';
           return dealgoFadeSlidePage(
             key: state.pageKey,
-            child: RideTrackingPage(rideId: rideId),
+            child: RideTrackingPage(key: ValueKey(rideId), rideId: rideId),
           );
         },
         routes: [
@@ -420,7 +434,10 @@ GoRouter createAppRouter({
               final rideId = state.pathParameters['rideId'] ?? '';
               return dealgoFadeSlidePage(
                 key: state.pageKey,
-                child: RidePickupCodePage(rideId: rideId),
+                child: RidePickupCodePage(
+                  key: ValueKey(rideId),
+                  rideId: rideId,
+                ),
               );
             },
           ),
@@ -431,7 +448,7 @@ GoRouter createAppRouter({
               final rideId = state.pathParameters['rideId'] ?? '';
               return dealgoFadeSlidePage(
                 key: state.pageKey,
-                child: RideSafetyPage(rideId: rideId),
+                child: RideSafetyPage(key: ValueKey(rideId), rideId: rideId),
               );
             },
           ),
@@ -444,7 +461,7 @@ GoRouter createAppRouter({
           final rideId = state.pathParameters['rideId'] ?? '';
           return dealgoFadeSlidePage(
             key: state.pageKey,
-            child: RideCancelPage(rideId: rideId),
+            child: RideCancelPage(key: ValueKey(rideId), rideId: rideId),
           );
         },
       ),
@@ -455,7 +472,7 @@ GoRouter createAppRouter({
           final rideId = state.pathParameters['rideId'] ?? '';
           return dealgoFadeSlidePage(
             key: state.pageKey,
-            child: RideReceiptPage(rideId: rideId),
+            child: RideReceiptPage(key: ValueKey(rideId), rideId: rideId),
           );
         },
       ),
@@ -466,7 +483,7 @@ GoRouter createAppRouter({
           final orderId = state.pathParameters['orderId'] ?? '';
           return dealgoFadeSlidePage(
             key: state.pageKey,
-            child: FoodTrackingPage(orderId: orderId),
+            child: FoodTrackingPage(key: ValueKey(orderId), orderId: orderId),
           );
         },
         routes: [
@@ -477,7 +494,10 @@ GoRouter createAppRouter({
               final orderId = state.pathParameters['orderId'] ?? '';
               return dealgoFadeSlidePage(
                 key: state.pageKey,
-                child: FoodInvoicePage(orderId: orderId),
+                child: FoodInvoicePage(
+                  key: ValueKey(orderId),
+                  orderId: orderId,
+                ),
               );
             },
           ),
@@ -488,7 +508,7 @@ GoRouter createAppRouter({
               final orderId = state.pathParameters['orderId'] ?? '';
               return dealgoFadeSlidePage(
                 key: state.pageKey,
-                child: FoodCancelPage(orderId: orderId),
+                child: FoodCancelPage(key: ValueKey(orderId), orderId: orderId),
               );
             },
           ),
@@ -501,7 +521,7 @@ GoRouter createAppRouter({
           final rideId = state.pathParameters['rideId'] ?? '';
           return dealgoFadeSlidePage(
             key: state.pageKey,
-            child: RideOffersPage(rideId: rideId),
+            child: RideOffersPage(key: ValueKey(rideId), rideId: rideId),
           );
         },
         routes: [
@@ -591,10 +611,29 @@ GoRouter createAppRouter({
             parentNavigatorKey: rootNavigatorKey,
             builder: (context, state) => const MerchantKybRejectedPage(),
           ),
+          GoRoute(
+            path: 'pin',
+            parentNavigatorKey: rootNavigatorKey,
+            builder: (context, state) =>
+                const PlacePickerPage(purpose: PlacePickPurpose.storeLocation),
+          ),
         ],
       ),
     ],
   );
+  // Links and push taps are checked against this route table so an unknown
+  // page falls back to a real one instead of the not-found page.
+  deepLinks?.bindRoutes((location) => routeExists(router, location));
+  return router;
+}
+
+/// True when [router] has a page for [location] (path + query).
+bool routeExists(GoRouter router, String location) {
+  final uri = Uri.tryParse(location);
+  if (uri == null || !uri.path.startsWith('/')) {
+    return false;
+  }
+  return !router.configuration.findMatch(uri).isError;
 }
 
 OpenRide? _openRide(BuildContext context, GoRouterState state) {
@@ -672,7 +711,10 @@ ShellRoute _driverScopedShell() {
               if (ride == null) {
                 return const DriverMissingJobPage();
               }
-              return DriverOfferPage(ride: ride);
+              return DriverOfferPage(
+                ride: ride,
+                quickAccept: state.uri.queryParameters['accept'] == '1',
+              );
             },
           ),
           GoRoute(
@@ -716,7 +758,9 @@ ShellRoute _driverScopedShell() {
         builder: (context, state) {
           final job = _readyFood(context, state);
           if (job == null) {
-            return const DriverMissingJobPage();
+            return DriverFoodResumePage(
+              orderId: state.pathParameters['orderId'] ?? '',
+            );
           }
           return DriverFoodDetailPage(job: job);
         },
@@ -725,7 +769,10 @@ ShellRoute _driverScopedShell() {
         path: '/driver/jobs/failed/:jobId',
         builder: (context, state) {
           final jobId = state.pathParameters['jobId'] ?? '';
-          return DriverJobFailedPage(jobId: jobId);
+          return DriverJobFailedPage(
+            jobId: jobId,
+            food: state.uri.queryParameters['kind'] == 'food',
+          );
         },
       ),
       GoRoute(
@@ -752,6 +799,13 @@ ShellRoute _merchantScopedShell() {
         create: (context) => MerchantQueueCubit(
           listMerchantOrderQueue: context.read<ListMerchantOrderQueue>(),
           realtime: context.read<SnapshotRealtime>(),
+          acceptMerchantOrder: context.read<AcceptMerchantOrder>(),
+          markMerchantOrderReady: context.read<MarkMerchantOrderReady>(),
+          resolveStoreId: (token) async =>
+              (await context.read<GetMerchantCatalog>()(token)).id,
+          onNewOrders: () => unawaited(
+            NewJobAlert.instance.handleSocket(NewJobAlertKind.merchantOrder),
+          ),
         ),
         child: child,
       );
@@ -763,7 +817,10 @@ ShellRoute _merchantScopedShell() {
         builder: (context, state) {
           final order = _merchantOrder(context, state);
           if (order == null) {
-            return const MerchantMissingOrderPage();
+            // A push tap can land here before the queue has loaded.
+            return MerchantOrderResumePage(
+              orderId: state.pathParameters['orderId'] ?? '',
+            );
           }
           return MerchantOrderPage(order: order);
         },
@@ -928,4 +985,43 @@ List<GoRoute> _accountOverlayRoutes(
       builder: (context, state) => const ChangePasswordPage(),
     ),
   ];
+}
+
+/// Friendly fallback for unknown or malformed deep links.
+class DealGoRouteNotFoundPage extends StatelessWidget {
+  const DealGoRouteNotFoundPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.link_off_rounded, size: 48),
+              const SizedBox(height: 12),
+              Text(
+                'Không tìm thấy trang',
+                key: const Key('route-not-found-title'),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Liên kết không hợp lệ hoặc đã hết hạn.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () => context.go('/'),
+                child: const Text('Về trang chủ'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

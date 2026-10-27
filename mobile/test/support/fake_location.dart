@@ -18,12 +18,17 @@ class FakeLocationService extends LocationService {
       denied = true,
       super(AppPermissionService());
 
-  final double lat;
-  final double lng;
+  // Mutable so tests can move the fix between ticks.
+  double lat;
+  double lng;
   final bool denied;
 
   @override
   Future<bool> ensurePermission() async => !denied;
+
+  /// Same fix without the prompt, as the real service does once granted.
+  @override
+  Future<Position?> quietPosition() => currentPosition();
 
   @override
   Future<Position?> currentPosition({

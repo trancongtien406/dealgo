@@ -16,6 +16,7 @@ import { AuthMethodPolicyService } from './auth-method-policy.service.js';
 import { IDENTITY_REPOSITORY, PASSKEY_CHALLENGE_TTL_MS } from './identity.constants.js';
 import { UniqueConflictError, type IdentityRepository } from './identity.repository.js';
 import { SessionService, type SessionResult } from './session.service.js';
+import { webauthnExpectedOrigins } from '../app-links/app-links.js';
 
 @Injectable()
 export class PasskeyService {
@@ -28,11 +29,11 @@ export class PasskeyService {
 
   async registrationOptions(userId: string): Promise<Awaited<ReturnType<typeof generateRegistrationOptions>>> {
     await this.authMethods.assertEnabled('PASSKEY');
-    const user = await this.requirePhoneUser(userId);
+    const user = await this.requireVerifiedUser(userId);
     const existing = await this.repository.listPasskeys(user.id);
     const options = await generateRegistrationOptions({
       ...this.relyingParty(),
-      userName: user.phone ?? user.id,
+      userName: (user.phoneVerifiedAt ? user.phone : null) ?? (user.emailVerifiedAt ? user.email : null) ?? user.id,
       userDisplayName: user.displayName,
       userID: Buffer.from(user.id),
       attestationType: 'none',
@@ -59,7 +60,7 @@ export class PasskeyService {
     response: RegistrationResponseJSON,
   ): Promise<{ credentialId: string }> {
     await this.authMethods.assertEnabled('PASSKEY');
-    const user = await this.requirePhoneUser(userId);
+    const user = await this.requireVerifiedUser(userId);
     const ceremony = await this.repository.findOpenPasskeyChallenge(user.id, 'REGISTRATION');
     if (!ceremony || ceremony.expiresAt <= new Date()) {
       throw authError(401, 'AUTH_PASSKEY_INVALID', 'Passkey verification failed');
@@ -71,7 +72,7 @@ export class PasskeyService {
       verification = await verifyRegistrationResponse({
         response,
         expectedChallenge: ceremony.challenge,
-        expectedOrigin: relyingParty.origin,
+        expectedOrigin: relyingParty.origins,
         expectedRPID: relyingParty.rpID,
         requireUserVerification: true,
       });
@@ -140,7 +141,7 @@ export class PasskeyService {
       verification = await verifyAuthenticationResponse({
         response,
         expectedChallenge: ceremony.challenge,
-        expectedOrigin: relyingParty.origin,
+        expectedOrigin: relyingParty.origins,
         expectedRPID: relyingParty.rpID,
         requireUserVerification: true,
         credential: {
@@ -202,7 +203,7 @@ export class PasskeyService {
       verification = await verifyRegistrationResponse({
         response,
         expectedChallenge: ceremony.challenge,
-        expectedOrigin: rp.origin,
+        expectedOrigin: rp.origins,
         expectedRPID: rp.rpID,
         requireUserVerification: true,
       });
@@ -235,22 +236,26 @@ export class PasskeyService {
     }
   }
 
-  private async requirePhoneUser(userId: string) {
+  private async requireVerifiedUser(userId: string) {
     const user = await this.repository.findUserById(userId);
-    if (!user || !user.phoneVerifiedAt) {
-      throw authError(403, 'FORBIDDEN', 'A verified phone session is required');
+    // Phone OTP and email sign-up are independently toggleable (DEC-PROD-052); either verified
+    // identifier is enough to bind a passkey, so an email + passkey launch works without SMS.
+    if (!user || (!user.phoneVerifiedAt && !user.emailVerifiedAt)) {
+      throw authError(403, 'FORBIDDEN', 'A verified phone or email session is required');
     }
     return user;
   }
 
-  private relyingParty(): { rpID: string; rpName: string; origin: string } {
+  private relyingParty(): { rpID: string; rpName: string; origins: string[] } {
     const rpID = this.config.get('WEBAUTHN_RP_ID', { infer: true });
     const rpName = this.config.get('WEBAUTHN_RP_NAME', { infer: true });
-    const origin = this.config.get('WEBAUTHN_ORIGIN', { infer: true });
-    if (!rpID || !rpName || !origin) {
+    const origins = webauthnExpectedOrigins(this.config.get('WEBAUTHN_ORIGIN', { infer: true }), {
+      APP_LINKS_ANDROID_CERT_SHA256: this.config.get('APP_LINKS_ANDROID_CERT_SHA256', { infer: true }),
+    });
+    if (!rpID || !rpName || origins.length === 0) {
       throw authError(500, 'WEBAUTHN_NOT_CONFIGURED', 'Passkey is not configured');
     }
-    return { rpID, rpName, origin };
+    return { rpID, rpName, origins };
   }
 }
 

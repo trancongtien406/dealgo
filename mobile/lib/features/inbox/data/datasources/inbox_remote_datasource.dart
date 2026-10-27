@@ -125,6 +125,8 @@ InboxNotification? _decodeItem(Object? raw) {
     aggregateType: text('aggregateType'),
     aggregateId: text('aggregateId'),
     status: text('status'),
+    path: text('path'),
+    role: text('role'),
   );
 }
 

@@ -31,6 +31,11 @@ export const FOOD_RULES = {
     status: 409,
     message: 'Driver is at max concurrent jobs',
   },
+  FOOD_NOT_YET_CLAIMABLE: {
+    status: 409,
+    message: 'The order is not close enough to ready to be claimed yet',
+  },
+  FOOD_TOO_FAR: { status: 422, message: 'The drop-off is beyond the maximum delivery distance' },
   FOOD_SELF_CLAIM: { status: 403, message: 'You cannot claim your own order' },
   FOOD_NOT_ASSIGNED_DRIVER: {
     status: 403,
@@ -41,6 +46,25 @@ export const FOOD_RULES = {
     message: 'Only the store owner may manage this catalog',
   },
   FOOD_CATEGORY_NOT_FOUND: { status: 404, message: 'Menu category not found' },
+  FOOD_FAIL_TOO_EARLY: {
+    status: 409,
+    message: 'Wait for the customer a little longer before reporting them unreachable',
+  },
+  FOOD_CHANGE_PENDING: {
+    status: 409,
+    message: 'An order change is waiting for the customer',
+  },
+  FOOD_CHANGE_INVALID: { status: 400, message: 'The order change is not valid' },
+  FOOD_CHANGE_NOT_FOUND: { status: 404, message: 'Order change not found' },
+  FOOD_OUTSIDE_SERVICE_ZONE: { status: 422, message: 'This address is outside the DealGo service area' },
+  FOOD_SETTLEMENT_OVERLAP: {
+    status: 409,
+    message: 'A settlement already covers part of this period for the store',
+  },
+  FOOD_STORE_LOCATION_REQUIRED: {
+    status: 409,
+    message: 'The store needs a map location before it can take delivery orders',
+  },
   FOOD_CATEGORY_REORDER_INVALID: {
     status: 400,
     message: 'Category reorder list must include every category once',

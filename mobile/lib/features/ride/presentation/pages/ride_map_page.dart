@@ -8,6 +8,7 @@ import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/maps/map_controls.dart';
 import '../../../../core/maps/map_lat_lng.dart';
 import '../../../../core/maps/map_port.dart';
 import '../../../../l10n/app_localizations.dart';
@@ -20,12 +21,11 @@ import '../cubit/ride_destination.dart';
 import '../cubit/ride_session.dart';
 import '../utils/ride_routes.dart';
 import '../widgets/ride_widgets.dart';
-import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 const _suggestionLimit = 5;
 
-/// Fast ride entry (Grab / inDrive style): GPS pickup in background, destination
-/// first, auto-advance to route when both points are ready.
+/// Fast ride entry (inDrive-like): GPS pickup in background, destination first,
+/// then map + sheet for confirm before class/fare.
 class RideMapPage extends StatefulWidget {
   const RideMapPage({super.key});
 
@@ -38,8 +38,6 @@ class _RideMapPageState extends State<RideMapPage> {
   PlaceOption? _dropoff;
   var _locating = false;
   var _suggestions = const <PlaceOption>[];
-  var _autoAdvanced = false;
-
   @override
   void initState() {
     super.initState();
@@ -116,7 +114,13 @@ class _RideMapPageState extends State<RideMapPage> {
   }
 
   Future<void> _pickDropoff({bool autoOpen = false}) async {
-    final place = await pickPlace(context, PlacePickPurpose.dropoff);
+    // Drop-off results rank around the pickup, not wherever the phone is.
+    final pickup = _pickup;
+    final place = await pickPlace(
+      context,
+      PlacePickPurpose.dropoff,
+      near: pickup == null ? null : MapLatLng(lat: pickup.lat, lng: pickup.lng),
+    );
     if (!mounted) {
       return;
     }
@@ -150,7 +154,6 @@ class _RideMapPageState extends State<RideMapPage> {
       final pickup = _pickup;
       _pickup = _dropoff;
       _dropoff = pickup;
-      _autoAdvanced = false;
     });
   }
 
@@ -181,11 +184,9 @@ class _RideMapPageState extends State<RideMapPage> {
   }
 
   void _tryAutoAdvance() {
-    if (_autoAdvanced || _places == null || _samePlace) {
-      return;
-    }
-    _autoAdvanced = true;
-    _continue();
+    // inDrive-like: keep map + sheet visible with A/B filled; user taps CTA.
+    // (Previously auto-pushed to fare and skipped the confirmation sheet.)
+    return;
   }
 
   void _continue() {
@@ -193,15 +194,18 @@ class _RideMapPageState extends State<RideMapPage> {
     if (places == null || _samePlace) {
       return;
     }
-    context.push(RideRoutes.routeOverview, extra: places);
+    // inDrive-like hot path: A/B → class+fare sheet (skip overview hop).
+    context.push(RideRoutes.fare, extra: places);
   }
 
+  /// Book is a tab root with the bar hidden: back returns to Home (the tab
+  /// keeps its state in the indexed stack) unless something sits above it.
   void _back() {
     if (context.canPop()) {
       context.pop();
-      return;
+    } else {
+      context.go('/customer');
     }
-    context.go('/customer');
   }
 
   @override
@@ -224,65 +228,77 @@ class _RideMapPageState extends State<RideMapPage> {
         if (place != null) {
           setState(() {
             _dropoff = place;
-            _autoAdvanced = false;
           });
           _tryAutoAdvance();
         }
       },
-      child: Material(
-        color: DealGoColors.canvas,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: context.read<MapPort>().buildMap(
-                center: center,
-                markers: [
-                  if (pickup != null)
-                    MapLatLng(lat: pickup.lat, lng: pickup.lng),
-                  if (dropoff != null)
-                    MapLatLng(lat: dropoff.lat, lng: dropoff.lng),
-                ],
-              ),
-            ),
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: DealGoAppHeader(
-                title: l10n.rideBookTitle,
-                onBack: _back,
-
-                backgroundColor: DealGoColors.card.withValues(alpha: 0.94),
-                applySafeArea: true,
-              ),
-            ),
-            Positioned(
-              right: DealGoDimensions.pageGutter,
-              bottom: MediaQuery.sizeOf(context).height * 0.38 + 8,
-              child: Material(
-                color: DealGoColors.card,
-                shape: const CircleBorder(),
-                elevation: 2,
-                child: IconButton(
-                  tooltip: l10n.mapRecenter,
-                  onPressed: _locating ? null : _locatePickup,
-                  icon: const Icon(
-                    DealGoIcons.myLocation,
-                    color: DealGoColors.primary,
-                  ),
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) {
+            _back();
+          }
+        },
+        child: Material(
+          color: DealGoColors.canvas,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Builder(
+                  builder: (context) {
+                    final media = MediaQuery.of(context);
+                    return context.read<MapPort>().buildMap(
+                      center: center,
+                      markers: [
+                        if (pickup != null)
+                          MapLatLng(lat: pickup.lat, lng: pickup.lng),
+                        if (dropoff != null)
+                          MapLatLng(lat: dropoff.lat, lng: dropoff.lng),
+                      ],
+                      // Road line is drawn on the overview/fare screens from
+                      // Mapbox coords; never a straight A→B here.
+                      route: const [],
+                      fitPadding: EdgeInsets.fromLTRB(
+                        40,
+                        // Status bar + the full stop pin (chip above the tip) + margin.
+                        media.padding.top + 80,
+                        40,
+                        media.size.height * 0.44,
+                      ),
+                    );
+                  },
                 ),
               ),
-            ),
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: FractionallySizedBox(
-                heightFactor: 0.42,
-                widthFactor: 1,
-                child: RideBottomSheet(
-                  child: Column(
+              // Tab root with the bar hidden: map stays full-bleed, floating
+              // back on the left, map controls on the right.
+              Positioned(
+                left: DealGoDimensions.pageGutter,
+                top: MediaQuery.paddingOf(context).top + DealGoSpacing.s8,
+                child: MapBackButton(
+                  key: const Key('ride-map-back'),
+                  onPressed: _back,
+                ),
+              ),
+              Positioned(
+                right: DealGoDimensions.pageGutter,
+                top: MediaQuery.paddingOf(context).top + DealGoSpacing.s8,
+                child: MapSideControls(
+                  stylesAvailable: mapStylesAvailable(context.read<MapPort>()),
+                  locateKey: const Key('ride-map-recenter'),
+                  onLocate: _locating ? null : _locatePickup,
+                ),
+              ),
+              RideDraggableSheet(
+                initialChildSize: 0.42,
+                minChildSize: 0.26,
+                maxChildSize: 0.86,
+                snapSizes: const [0.26, 0.42, 0.68],
+                builder: (context, scrollController) {
+                  return Column(
                     children: [
                       Expanded(
                         child: ListView(
+                          controller: scrollController,
                           padding: const EdgeInsets.fromLTRB(
                             DealGoDimensions.pageGutter,
                             DealGoSpacing.s12,
@@ -419,6 +435,7 @@ class _RideMapPageState extends State<RideMapPage> {
                               const SizedBox(height: DealGoSpacing.s12),
                               DealGoSecondaryButton(
                                 label: l10n.rideOpenPendingOffers,
+                                compact: true,
                                 onPressed: () => context.push(
                                   RideRoutes.offers(pendingRideId),
                                 ),
@@ -437,19 +454,20 @@ class _RideMapPageState extends State<RideMapPage> {
                         ),
                         child: DealGoPrimaryButton(
                           key: const Key('ride-open-route-overview'),
-                          label: l10n.rideCheckRoute,
+                          label: l10n.rideRouteContinueBooking,
                           trailingIcon: DealGoIcons.arrowRight,
+                          compact: true,
                           enabled: _places != null && !_samePlace,
                           isLoading: _locating && _dropoff != null,
                           onPressed: _continue,
                         ),
                       ),
                     ],
-                  ),
-                ),
+                  );
+                },
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

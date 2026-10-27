@@ -8,6 +8,7 @@ import '../../domain/entities/food_models.dart';
 import '../../../merchant/domain/entities/merchant_menu_models.dart';
 import '../models/place_food_order_body.dart';
 import 'food_remote_datasource.dart';
+import '../../../../core/maps/route_geometry.dart';
 
 class DioFoodRemoteDataSource implements FoodRemoteDataSource {
   DioFoodRemoteDataSource({required this.dio});
@@ -100,8 +101,13 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
     required String accessToken,
     required String orderId,
     required FoodDeliveryAction action,
+
     /// DEC-PROD-036: handover code (pickup) or delivery code (deliver).
     String? code,
+
+    /// Why the delivery failed (FOOD_FAIL_REASONS) and the note for OTHER.
+    String? failReason,
+    String? failNote,
   }) {
     return _send(
       () => dio.post<Object?>(
@@ -109,11 +115,78 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
         data: switch ((action, code)) {
           (FoodDeliveryAction.pickup, final String c) => {'handoverCode': c},
           (FoodDeliveryAction.deliver, final String c) => {'deliveryCode': c},
+          // The server requires a reason to mark FAILED.
+          (FoodDeliveryAction.fail, _) => {
+            'reasonCode': failReason ?? 'OTHER',
+            if (failNote != null && failNote.trim().isNotEmpty)
+              'note': failNote.trim(),
+          },
           _ => null,
         },
         options: _auth(accessToken),
       ),
       decodeClaimedFoodDelivery,
+    );
+  }
+
+  @override
+  Future<FoodOrderChange> proposeOrderChange({
+    required String accessToken,
+    required String orderId,
+    required FoodOrderChangeReason reason,
+    required Map<String, int> quantities,
+    String? note,
+  }) {
+    final trimmed = note?.trim();
+    return _send(
+      () => dio.post<Object?>(
+        ApiPaths.foodOrderChanges(orderId),
+        data: {
+          'reasonCode': reason.wire,
+          if (trimmed != null && trimmed.isNotEmpty) 'note': trimmed,
+          'lines': [
+            for (final entry in quantities.entries)
+              {'lineId': entry.key, 'toQuantity': entry.value},
+          ],
+        },
+        options: _auth(accessToken),
+      ),
+      (body) {
+        final change = decodeFoodOrderChange(
+          asJsonMap(_successPayload(body))?['change'],
+        );
+        if (change == null) {
+          throw const ApiException(
+            statusCode: 200,
+            message: 'Invalid response',
+            errorCode: 'INVALID_RESPONSE',
+          );
+        }
+        return change;
+      },
+    );
+  }
+
+  @override
+  Future<FoodOrderDetail> answerOrderChange({
+    required String accessToken,
+    required String orderId,
+    required String changeId,
+    required bool accept,
+  }) {
+    return _send(
+      () => dio.post<Object?>(
+        ApiPaths.foodOrderChangeAnswer(
+          orderId,
+          changeId,
+          accept ? 'accept' : 'reject',
+        ),
+        options: _auth(accessToken),
+      ),
+      (body) => decodeFoodOrderDetail({
+        'success': true,
+        'data': asJsonMap(_successPayload(body))?['order'],
+      }),
     );
   }
 
@@ -387,7 +460,9 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
   }
 
   @override
-  Future<List<MerchantMenuCategory>> listMerchantMenuCategories(String accessToken) {
+  Future<List<MerchantMenuCategory>> listMerchantMenuCategories(
+    String accessToken,
+  ) {
     return _send(
       () => dio.get<Object?>(
         ApiPaths.foodMerchantMenuCategories,
@@ -455,19 +530,12 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
     return _send(
       () => dio.get<Object?>(
         ApiPaths.foodMerchantOrdersHistory,
-        queryParameters: {
-          'page': page,
-          'limit': limit,
-          'tab': ?tab,
-          'q': ?q,
-        },
+        queryParameters: {'page': page, 'limit': limit, 'tab': ?tab, 'q': ?q},
         options: _auth(accessToken),
       ),
       decodeMerchantHistoryPage,
     );
   }
-
-
 
   @override
   Future<List<MerchantMenuCategory>> reorderMerchantMenuCategories({
@@ -494,10 +562,7 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
     return _send(
       () => dio.post<Object?>(
         ApiPaths.foodMerchantItemImage(itemId),
-        data: {
-          'contentBase64': contentBase64,
-          'contentType': ?contentType,
-        },
+        data: {'contentBase64': contentBase64, 'contentType': ?contentType},
         options: _auth(accessToken),
       ),
       decodeFoodMenuItem,
@@ -624,6 +689,7 @@ ReadyFoodJob? _readyJob(Object? raw) {
       map['pickup'] ?? map['store'],
       fallbackLabel: cleanAddress ?? cleanName ?? '',
     ),
+    route: RouteGeometry.tryParse(map['route']),
   );
 }
 
@@ -826,7 +892,9 @@ List<FoodStoreSummary> decodeFoodStoreList(Object? body) {
           category: category is String && category.isNotEmpty ? category : null,
           distanceKm: distance is num ? distance.toDouble() : null,
           closedReason: StoreClosedReason.fromWire(map['closedReason']),
-          imageUrl: map['imageUrl'] is String ? map['imageUrl'] as String : null,
+          imageUrl: map['imageUrl'] is String
+              ? map['imageUrl'] as String
+              : null,
         ),
       );
     }
@@ -979,7 +1047,9 @@ FoodMenuItem? _menuItem(Object? raw) {
     name: itemName,
     priceVnd: price,
     available: available,
-    description: map['description'] is String ? map['description'] as String : null,
+    description: map['description'] is String
+        ? map['description'] as String
+        : null,
     prepMinutes: _asInt(map['prepMinutes']),
     imageUrl: map['imageUrl'] is String ? map['imageUrl'] as String : null,
     imageUrls: [
@@ -988,8 +1058,9 @@ FoodMenuItem? _menuItem(Object? raw) {
           if (u is String && u.isNotEmpty) u,
     ],
     soldCount: map['soldCount'] is int ? map['soldCount'] as int : 0,
-    menuCategoryId:
-        map['menuCategoryId'] is String ? map['menuCategoryId'] as String : null,
+    menuCategoryId: map['menuCategoryId'] is String
+        ? map['menuCategoryId'] as String
+        : null,
     optionGroups: decodeFoodOptionGroups(map['optionGroups']),
   );
 }
@@ -1036,6 +1107,7 @@ FoodOrderDetail decodeFoodOrderDetail(Object? body) {
     dropoff: dropoff,
     lines: _decodeLines(data['lines']),
     storeName: data['storeName'] is String ? data['storeName'] as String : null,
+    storeId: data['storeId'] is String ? data['storeId'] as String : null,
     assignedDriverId: data['assignedDriverId'] is String
         ? data['assignedDriverId'] as String
         : null,
@@ -1047,6 +1119,17 @@ FoodOrderDetail decodeFoodOrderDetail(Object? body) {
     estimatedReadyAt: data['estimatedReadyAt'] is String
         ? DateTime.tryParse(data['estimatedReadyAt'] as String)
         : null,
+    pickup: decodeFoodPickupPoint(
+      data['pickup'] ?? data['store'],
+      fallbackLabel:
+          data['storeAddress'] is String &&
+              (data['storeAddress'] as String).trim().isNotEmpty
+          ? (data['storeAddress'] as String).trim()
+          : (data['storeName'] is String ? (data['storeName'] as String) : ''),
+    ),
+    route: RouteGeometry.tryParse(data['route']),
+    approachRoute: RouteGeometry.tryParse(data['approachRoute']),
+    pendingChange: decodeFoodOrderChange(data['pendingChange']),
   );
 }
 
@@ -1110,11 +1193,14 @@ List<FoodOrderLine> _decodeLines(Object? raw) {
         quantity != null) {
       lines.add(
         FoodOrderLine(
+          id: map['id'] is String ? map['id'] as String : null,
           itemId: itemId,
           name: name,
           unitPriceVnd: unit,
           quantity: quantity,
-          imageUrl: map['imageUrl'] is String ? map['imageUrl'] as String : null,
+          imageUrl: map['imageUrl'] is String
+              ? map['imageUrl'] as String
+              : null,
           options: decodeFoodLineOptions(map['options']),
         ),
       );
@@ -1177,12 +1263,13 @@ FoodCancelReason? decodeFoodCancelReason(Object? raw) {
   );
 }
 
-
 List<MerchantMenuCategory> decodeMerchantMenuCategories(Object? body) {
   final data = _successPayload(body);
   final list = data is List
       ? data
-      : (asJsonMap(data)?['items'] is List ? asJsonMap(data)!['items'] as List : null);
+      : (asJsonMap(data)?['items'] is List
+            ? asJsonMap(data)!['items'] as List
+            : null);
   if (list == null) {
     throw const ApiException(
       statusCode: 200,
@@ -1208,7 +1295,9 @@ MerchantMenuCategory? decodeMerchantMenuCategory(Object? raw) {
   return MerchantMenuCategory(
     id: id,
     name: name,
-    description: map['description'] is String ? map['description'] as String : null,
+    description: map['description'] is String
+        ? map['description'] as String
+        : null,
     position: position is int ? position : int.tryParse('$position') ?? 0,
     itemCount: map['itemCount'] is int
         ? map['itemCount'] as int
@@ -1252,10 +1341,18 @@ MerchantHistoryPage decodeMerchantHistoryPage(Object? body) {
           status: status,
           subtotalVnd: _asInt(map['subtotalVnd']) ?? 0,
           totalVnd: _asInt(map['totalVnd']) ?? 0,
-          createdAt: DateTime.tryParse('${map['createdAt']}') ?? DateTime.fromMillisecondsSinceEpoch(0),
-          finishedAt: DateTime.tryParse('${map['finishedAt']}') ?? DateTime.fromMillisecondsSinceEpoch(0),
-          customerName: map['customerName'] is String ? map['customerName'] as String : null,
-          lineSummary: map['lineSummary'] is String ? map['lineSummary'] as String : '',
+          createdAt:
+              DateTime.tryParse('${map['createdAt']}') ??
+              DateTime.fromMillisecondsSinceEpoch(0),
+          finishedAt:
+              DateTime.tryParse('${map['finishedAt']}') ??
+              DateTime.fromMillisecondsSinceEpoch(0),
+          customerName: map['customerName'] is String
+              ? map['customerName'] as String
+              : null,
+          lineSummary: map['lineSummary'] is String
+              ? map['lineSummary'] as String
+              : '',
         ),
       );
     }
@@ -1267,5 +1364,67 @@ MerchantHistoryPage decodeMerchantHistoryPage(Object? body) {
     total: _asInt(data['total']) ?? items.length,
     deliveredCount: _asInt(data['deliveredCount']) ?? 0,
     deliveredRevenueVnd: _asInt(data['deliveredRevenueVnd']) ?? 0,
+  );
+}
+
+/// `{id,status,reasonCode,note,lines,…,expiresAt}`; null when absent/invalid.
+FoodOrderChange? decodeFoodOrderChange(Object? raw) {
+  final map = asJsonMap(raw);
+  if (map == null) return null;
+  final id = map['id'];
+  final status = map['status'];
+  final expiresAt = map['expiresAt'] is String
+      ? DateTime.tryParse(map['expiresAt'] as String)
+      : null;
+  final oldSubtotal = _asInt(map['oldSubtotalVnd']);
+  final newSubtotal = _asInt(map['newSubtotalVnd']);
+  final newTotal = _asInt(map['newTotalVnd']);
+  if (id is! String ||
+      status is! String ||
+      expiresAt == null ||
+      oldSubtotal == null ||
+      newSubtotal == null ||
+      newTotal == null) {
+    return null;
+  }
+  final lines = <FoodOrderChangeLine>[];
+  final rawLines = map['lines'];
+  if (rawLines is List) {
+    for (final entry in rawLines) {
+      final line = asJsonMap(entry);
+      final lineId = line?['lineId'];
+      final name = line?['name'];
+      final unit = _asInt(line?['unitPriceVnd']);
+      final from = _asInt(line?['fromQuantity']);
+      final to = _asInt(line?['toQuantity']);
+      if (lineId is String &&
+          name is String &&
+          unit != null &&
+          from != null &&
+          to != null) {
+        lines.add(
+          FoodOrderChangeLine(
+            lineId: lineId,
+            name: name,
+            unitPriceVnd: unit,
+            fromQuantity: from,
+            toQuantity: to,
+          ),
+        );
+      }
+    }
+  }
+  final note = map['note'];
+  return FoodOrderChange(
+    id: id,
+    status: status,
+    reason: FoodOrderChangeReason.fromWire(map['reasonCode']),
+    note: note is String && note.trim().isNotEmpty ? note.trim() : null,
+    lines: List.unmodifiable(lines),
+    oldSubtotalVnd: oldSubtotal,
+    newSubtotalVnd: newSubtotal,
+    newDiscountVnd: _asInt(map['newDiscountVnd']) ?? 0,
+    newTotalVnd: newTotal,
+    expiresAt: expiresAt,
   );
 }

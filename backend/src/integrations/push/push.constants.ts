@@ -11,6 +11,7 @@ export const PUSH_NOTABLE_RIDE_STATUSES = new Set([
 ]);
 
 export const PUSH_NOTABLE_FOOD_STATUSES = new Set([
+  'PLACED',
   'PREPARING',
   'READY',
   'ASSIGNED',

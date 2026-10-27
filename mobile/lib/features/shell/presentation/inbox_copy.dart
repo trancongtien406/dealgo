@@ -4,11 +4,16 @@ import '../../inbox/domain/entities/inbox_notification.dart';
 typedef InboxCopy = ({String title, String body});
 
 /// Localized title/body for status notifications; falls back to the server copy.
+///
+/// The ride / food status tables are the customer's copy ("a driver accepted
+/// your ride"). Rows the server wrote for a driver or merchant ("the customer
+/// picked you", "new order") keep their server copy.
 InboxCopy inboxCopy(AppLocalizations l10n, InboxNotification item) {
   final status = item.status;
+  final forCustomer = item.role == null || item.role == 'CUSTOMER';
   final InboxCopy? mapped = switch (item.aggregateType) {
-    'Ride' => _ride(l10n, status),
-    'FoodOrder' => _food(l10n, status),
+    'Ride' when forCustomer => _ride(l10n, status),
+    'FoodOrder' when forCustomer => _food(l10n, status),
     'SupportTicket' => (
       title: status == 'RESOLVED'
           ? l10n.inboxSupportResolvedTitle

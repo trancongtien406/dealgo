@@ -1,6 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
-import { normalizeFcmPrivateKey, type FcmCredentials } from './fcm-push-sender.js';
+import {
+  normalizeFcmPrivateKey,
+  type FcmCredentials,
+} from './fcm-push-sender.js';
 
 export type FcmCredentialSource = {
   projectId?: string;
@@ -15,14 +18,17 @@ export type FcmCredentialSource = {
  * from a Google service-account JSON via FCM_SERVICE_ACCOUNT_PATH or
  * GOOGLE_APPLICATION_CREDENTIALS (relative paths resolve from process.cwd()).
  */
-export function resolveFcmCredentials(source: FcmCredentialSource): FcmCredentials | null {
+export function resolveFcmCredentials(
+  source: FcmCredentialSource,
+): FcmCredentials | null {
   const fromEnv = credentialsFromFields(source);
   if (fromEnv) {
     return fromEnv;
   }
 
   const pathHint =
-    blank(source.serviceAccountPath) ?? blank(source.googleApplicationCredentials);
+    blank(source.serviceAccountPath) ??
+    blank(source.googleApplicationCredentials);
   if (!pathHint) {
     return null;
   }
@@ -30,7 +36,9 @@ export function resolveFcmCredentials(source: FcmCredentialSource): FcmCredentia
   return credentialsFromServiceAccountFile(resolveCredentialPath(pathHint));
 }
 
-export function credentialsFromServiceAccountFile(absolutePath: string): FcmCredentials | null {
+export function credentialsFromServiceAccountFile(
+  absolutePath: string,
+): FcmCredentials | null {
   if (!existsSync(absolutePath)) {
     return null;
   }
@@ -47,7 +55,8 @@ export function credentialsFromServiceAccountFile(absolutePath: string): FcmCred
   }
 
   const record = parsed as Record<string, unknown>;
-  const projectId = typeof record.project_id === 'string' ? record.project_id.trim() : '';
+  const projectId =
+    typeof record.project_id === 'string' ? record.project_id.trim() : '';
   const clientEmail =
     typeof record.client_email === 'string' ? record.client_email.trim() : '';
   // Do not trim PEM: trailing newlines are part of typical service-account JSON.
@@ -65,7 +74,9 @@ export function credentialsFromServiceAccountFile(absolutePath: string): FcmCred
   };
 }
 
-function credentialsFromFields(source: FcmCredentialSource): FcmCredentials | null {
+function credentialsFromFields(
+  source: FcmCredentialSource,
+): FcmCredentials | null {
   const projectId = blank(source.projectId);
   const clientEmail = blank(source.clientEmail);
   const privateKey = pemField(source.privateKey);

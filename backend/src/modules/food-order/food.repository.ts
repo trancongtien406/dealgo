@@ -1,7 +1,8 @@
+import { type OpsDateWindow, inDateWindow } from '../operations/ops-date-window.js';
 import { cancellationCountsAgainstDriver } from '../../shared/cancel-actor.js';
 import type { CancelActorName } from '../../shared/cancel-actor.js';
 import type { DriverJobCounts } from '../../shared/driver-job-counts.js';
-import type { CompletionHook } from '../../shared/tx/completion-hook.js';
+import type { CompletionHook, TxHandle } from '../../shared/tx/completion-hook.js';
 import { randomUUID } from 'node:crypto';
 import { pageOffset } from '../../shared/pagination/pagination.js';
 import {
@@ -10,6 +11,13 @@ import {
 } from '../service-area/service-regions.js';
 import { haversineKm } from '../ride/ride-geo.js';
 import { FoodRuleError } from './food.error.js';
+
+export interface ReadyNearFilter {
+  lat: number;
+  lng: number;
+  radiusKm: number;
+}
+
 import {
   effectiveServiceMode,
   type StoreServiceMode,
@@ -32,7 +40,7 @@ import {
   prepMinutesFor,
   type StoreAcceptSettings,
 } from './store-accept.js';
-import { OPEN_FOOD_STATUSES, type FoodOrderStatusName, type FoodRejectReason } from './food.constants.js';
+import { OPEN_FOOD_STATUSES, type FoodOrderStatusName, type FoodCancelReasonCode, type FoodSystemCancelReason } from './food.constants.js';
 import {
   VoucherRejectedError,
   type VoucherRedeemer,
@@ -47,6 +55,8 @@ import {
 } from './food-options.js';
 
 export type FoodLineView = {
+  /** Line id, so the merchant can edit one line of an order. */
+  id: string;
   itemId: string;
   name: string;
   /** Base price + chosen option deltas, per unit, at placement. */
@@ -325,10 +335,72 @@ export type FoodOrderView = {
   /** Kitchen estimate snapshotted at placement (DEC-PROD-028); null on legacy orders. */
   prepMinutes: number | null;
   estimatedReadyAt: Date | null;
+  /** When the driver picked the order up (null before / legacy). */
+  pickedUpAt: Date | null;
+  /** Set only when FAILED. */
+  failReason: { code: string; note: string | null } | null;
+  /** Cash the driver paid the store at pickup (snapshot). */
+  merchantCashVnd: number | null;
+  /** When the order was placed (Admin list time column, date filters). */
+  createdAt: Date;
   updatedAt: Date;
 };
 
-export type FoodCancelReason = { code: FoodRejectReason; note: string | null };
+/** One edited line; toQuantity 0 removes it. */
+export type FoodOrderChangeLine = {
+  lineId: string;
+  itemId: string;
+  name: string;
+  unitPriceVnd: number;
+  fromQuantity: number;
+  toQuantity: number;
+};
+
+export type FoodOrderChangeStatusName = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
+
+export type FoodOrderChangeView = {
+  id: string;
+  orderId: string;
+  status: FoodOrderChangeStatusName;
+  reasonCode: string;
+  note: string | null;
+  lines: FoodOrderChangeLine[];
+  oldSubtotalVnd: number;
+  newSubtotalVnd: number;
+  newDiscountVnd: number;
+  newTotalVnd: number;
+  expiresAt: Date;
+  respondedAt: Date | null;
+  createdAt: Date;
+};
+
+export type ProposeFoodOrderChangeInput = {
+  orderId: string;
+  ownerId: string;
+  reasonCode: string;
+  note: string | null;
+  lines: { lineId: string; toQuantity: number }[];
+  expiresAt: Date;
+};
+
+export type FoodOrderChangeResult = { order: FoodOrderView; change: FoodOrderChangeView };
+
+/** Failure input resolved by the service. */
+export type FoodFailInput = {
+  reasonCode: string;
+  note: string | null;
+  /** CUSTOMER_UNREACHABLE requires now - pickedUpAt >= this many minutes. */
+  minWaitMinutes: number;
+  now: Date;
+};
+
+export type FoodCancelReason = { code: FoodCancelReasonCode; note: string | null };
+
+/** A PREPARING order may be claimed `leadMinutes` before its estimated ready time. */
+export type FoodEarlyClaim = { leadMinutes: number; now: Date };
+
+export type FoodTimeoutPolicy = { merchantAcceptMinutes: number; unclaimedReadyMinutes: number };
+export type FoodTimedOut = { orderId: string; reason: FoodSystemCancelReason };
 
 /** Driver history window: finished jobs, newest first. */
 export type FoodDriverHistoryWindow = {
@@ -410,7 +482,9 @@ export type OpsFoodOrderPage = {
 export type ReadyOrderSummary = {
   id: string;
   storeId: string;
-  status: 'READY';
+  /** PREPARING = early-claimable: ready within FOOD_EARLY_ASSIGN_LEAD_MINUTES. */
+  status: 'READY' | 'PREPARING';
+  estimatedReadyAt?: Date | null;
   storeName: string;
   storeAddress: string | null;
   deliveryFareVnd: number;
@@ -451,6 +525,43 @@ export type MerchantStatsRows = {
   topItems: Array<{ name: string; quantity: number }>;
 };
 
+/** One delivered order in a merchant statement window. */
+export type MerchantStatementRow = {
+  orderId: string;
+  deliveredAt: Date;
+  subtotalVnd: number;
+  discountVnd: number;
+  voucherSponsor: VoucherSponsor | null;
+  /** Cash snapshot at pickup (null on orders picked up before the cash snapshot existed). */
+  merchantCashVnd: number | null;
+  /** Commission snapshot at delivery (null on older orders = 0). */
+  commissionVnd: number | null;
+};
+
+/** Ops-recorded commission settlement for a store and ICT period. */
+export type MerchantSettlementView = {
+  id: string;
+  storeId: string;
+  /** YYYY-MM-DD (Asia/Ho_Chi_Minh), inclusive. */
+  periodStart: string;
+  periodEnd: string;
+  orderCount: number;
+  grossVnd: number;
+  merchantFundedVnd: number;
+  commissionVnd: number;
+  netVnd: number;
+  actorUserId: string;
+  note: string | null;
+  createdAt: Date;
+};
+
+export type RecordMerchantSettlementInput = Omit<MerchantSettlementView, 'id' | 'createdAt'> & {
+  reason: string;
+};
+
+/** Sandbox demo store pin (Hải Châu, Đà Nẵng). */
+export const FIXTURE_STORE_PIN = { lat: 16.0544, lng: 108.2022, label: 'Hải Châu, Đà Nẵng' } as const;
+
 export type PlaceFoodLineInput = { itemId: string; quantity: number; optionIds?: string[] };
 
 export type PlaceFoodInput = {
@@ -478,6 +589,8 @@ export interface FoodRepository {
       region?: string;
       category?: string;
       kyb?: string;
+      /** MISSING = stores without map coordinates. */
+      location?: string;
     },
   ): Promise<OpsStorePage>;
   listCatalogModeration(query: {
@@ -487,6 +600,7 @@ export interface FoodRepository {
     store?: string;
     category?: string;
     status?: string;
+    window?: OpsDateWindow;
   }): Promise<OpsCatalogModerationPage>;
   listStoreCategories(query: {
     page?: number;
@@ -541,10 +655,24 @@ export interface FoodRepository {
   ): Promise<{ id: string; available: boolean; moderationStatus: string } | null>;
   place(input: PlaceFoodInput): Promise<FoodOrderView>;
   findOrder(orderId: string): Promise<FoodOrderView | null>;
-  listReady(limit?: number): Promise<ReadyOrderSummary[]>;
+  /**
+   * Oldest-first READY, unassigned orders. With `near`, only orders whose pickup point
+   * (pickup ?? store ?? dropoff) lies within `radiusKm` are counted toward `limit`, so new
+   * nearby orders are not hidden behind a backlog of far-away older ones.
+   */
+  listReady(
+    limit?: number,
+    near?: ReadyNearFilter,
+    early?: FoodEarlyClaim,
+  ): Promise<ReadyOrderSummary[]>;
   listQueue(ownerId: string): Promise<QueueOrderSummary[]>;
   /** Owner-scoped finished orders since `since` (by last status change), open count, top items. */
   merchantStats(ownerId: string, since: Date, topLimit: number): Promise<MerchantStatsRows>;
+  /** DELIVERED orders of a store finished in [from, to). */
+  deliveredForStatement(storeId: string, from: Date, to: Date): Promise<MerchantStatementRow[]>;
+  listMerchantSettlements(storeId: string, limit: number): Promise<MerchantSettlementView[]>;
+  /** Rejects overlapping periods (FOOD_SETTLEMENT_OVERLAP); writes the Ops audit row. */
+  recordMerchantSettlement(input: RecordMerchantSettlementInput): Promise<MerchantSettlementView>;
   listOrdersPage(
     page: number,
     limit: number,
@@ -555,6 +683,7 @@ export interface FoodRepository {
       store?: string;
       payment?: string;
       zone?: string;
+      window?: OpsDateWindow;
     },
   ): Promise<OpsFoodOrderPage>;
   listOrdersForCustomer(
@@ -564,20 +693,67 @@ export interface FoodRepository {
   ): Promise<OpsFoodOrderPage>;
   /** DELIVERED/FAILED/CANCELLED orders still assigned to the driver, newest updatedAt first. */
   listFinishedForDriver(driverId: string, window: FoodDriverHistoryWindow): Promise<FoodOrderView[]>;
+  /** Order ids assigned to the driver in one of [statuses] (live location fan-out). */
+  listIdsForDriverInStatuses?(driverId: string, statuses: readonly string[]): Promise<string[]>;
+  /** Customer's order ids in one of [statuses], newest first (relaunch resume, DEC-PROD-057). */
+  listIdsForCustomerInStatuses?(customerId: string, statuses: readonly string[]): Promise<string[]>;
   /** Lifetime DELIVERED / terminal order counts per assigned driver (Admin stats). */
   countFinishedForDrivers(driverIds: readonly string[]): Promise<Map<string, DriverJobCounts>>;
   accept(orderId: string, ownerId: string): Promise<FoodOrderView>;
   markReady(orderId: string, ownerId: string): Promise<FoodOrderView>;
-  claim(orderId: string, driverId: string, maxConcurrentJobs?: number): Promise<FoodOrderView>;
-  pickup(orderId: string, driverId: string): Promise<FoodOrderView>;
+  claim(
+    orderId: string,
+    driverId: string,
+    maxConcurrentJobs?: number,
+    early?: FoodEarlyClaim,
+  ): Promise<FoodOrderView>;
+  /** Assigned driver hands the order back before pickup (counts as a driver cancel). */
+  release(orderId: string, driverId: string, reasonCode: string): Promise<FoodOrderView>;
+  /** Worker: PLACED never accepted → MERCHANT_TIMEOUT; READY never claimed → NO_DRIVER. */
+  timeoutDue(now: Date, policy: FoodTimeoutPolicy, limit?: number): Promise<FoodTimedOut[]>;
+  /** Snapshots pickedUpAt + merchantCashVnd (cash paid to the store). */
+  pickup(
+    orderId: string,
+    driverId: string,
+    snapshot?: { merchantCashVnd: number; at: Date },
+  ): Promise<FoodOrderView>;
+  /** Commission snapshot written inside the delivery transaction. */
+  snapshotCommissionWithin(
+    tx: TxHandle,
+    orderId: string,
+    input: { commissionBps: number; commissionVnd: number },
+  ): Promise<void>;
   /** `onDelivered` runs in the delivery transaction; if it throws the order stays PICKED_UP. */
   deliver(
     orderId: string,
     driverId: string,
     onDelivered?: CompletionHook<FoodOrderView>,
   ): Promise<FoodOrderView>;
-  fail(orderId: string, driverId: string): Promise<FoodOrderView>;
+  /** Only after pickup, with a reason; `onFailed` runs in the same transaction. */
+  fail(
+    orderId: string,
+    driverId: string,
+    input: FoodFailInput,
+    onFailed?: CompletionHook<FoodOrderView>,
+  ): Promise<FoodOrderView>;
   cancel(orderId: string, customerId: string): Promise<FoodOrderView>;
+  /**
+   * Merchant edits a PLACED/PREPARING order (lower quantities / remove lines).
+   * One PENDING change per order (FOOD_CHANGE_PENDING); ready is blocked until it is answered.
+   */
+  proposeChange(input: ProposeFoodOrderChangeInput): Promise<FoodOrderChangeResult>;
+  /** Latest change of the order (any status), or null. */
+  latestChange(orderId: string): Promise<FoodOrderChangeView | null>;
+  /** Customer answers the PENDING change: accept applies it, reject cancels the order (no fee). */
+  respondChange(
+    orderId: string,
+    customerId: string,
+    changeId: string,
+    accept: boolean,
+    now: Date,
+  ): Promise<FoodOrderChangeResult>;
+  /** Worker: PENDING changes past expiresAt → EXPIRED and the order CANCELLED (SYSTEM). */
+  expireChanges(now: Date, limit?: number): Promise<string[]>;
   /** Store owner declines a PLACED order (→ CANCELLED, voucher released). */
   reject(orderId: string, ownerId: string, reason: FoodCancelReason): Promise<FoodOrderView>;
   opsCancel(
@@ -620,8 +796,36 @@ function memoryAvailability(store: StoredStore, now = new Date()): StoreAvailabi
 type StoredItem = StoreItemView & {
   storeId: string;
   moderationStatus: CatalogModerationStatus;
+  createdAt?: Date;
 };
-type StoredOrder = FoodOrderView & { idempotencyKey: string; createdAt: Date };
+type StoredOrder = FoodOrderView & {
+  merchantCommissionBps?: number | null;
+  merchantCommissionVnd?: number | null;
+  idempotencyKey: string;
+  createdAt: Date;
+  acceptedAt?: Date | null;
+  readyAt?: Date | null;
+};
+
+/** Earliest instant a PREPARING order may be claimed; null = not early-claimable. */
+export function earlyClaimOpensAt(
+  order: { prepMinutes: number | null; createdAt: Date; acceptedAt?: Date | null },
+  leadMinutes: number,
+): Date | null {
+  if (order.prepMinutes === null || order.prepMinutes === undefined) {
+    return null;
+  }
+  const start = (order.acceptedAt ?? order.createdAt).getTime();
+  return new Date(start + (order.prepMinutes - Math.max(0, leadMinutes)) * 60_000);
+}
+
+export type MemoryDriverJobCancellation = {
+  orderId: string;
+  driverId: string;
+  reasonCode: string;
+  fromStatus: string;
+  createdAt: Date;
+};
 
 function touchOrder(order: StoredOrder): void {
   order.updatedAt = new Date();
@@ -634,7 +838,21 @@ export class MemoryFoodRepository implements FoodRepository {
 
   private readonly stores: StoredStore[] = [];
   private readonly items: StoredItem[] = [];
+  private readonly seededAt = new Date();
   private readonly orders: StoredOrder[] = [];
+
+  async listIdsForDriverInStatuses(driverId: string, statuses: readonly string[]): Promise<string[]> {
+    return this.orders
+      .filter((order) => order.assignedDriverId === driverId && statuses.includes(order.status))
+      .map((order) => order.id);
+  }
+
+  async listIdsForCustomerInStatuses(customerId: string, statuses: readonly string[]): Promise<string[]> {
+    return this.orders
+      .filter((order) => order.customerId === customerId && statuses.includes(order.status))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .map((order) => order.id);
+  }
 
   async hasStore(): Promise<boolean> {
     return this.stores.length > 0;
@@ -649,8 +867,9 @@ export class MemoryFoodRepository implements FoodRepository {
       id: storeId,
       name: 'Bún Bò Huế',
       ownerId,
-      lat: null,
-      lng: null,
+      lat: FIXTURE_STORE_PIN.lat,
+      lng: FIXTURE_STORE_PIN.lng,
+      addressLabel: FIXTURE_STORE_PIN.label,
       category: 'pho',
       createdAt: new Date(),
     });
@@ -679,7 +898,8 @@ export class MemoryFoodRepository implements FoodRepository {
     const hasGeo = query.lat !== undefined && query.lng !== undefined;
     const origin = hasGeo ? { lat: query.lat!, lng: query.lng! } : null;
 
-    let filtered = this.stores.map((store) => {
+    // Stores without coordinates are not orderable, so browse hides them.
+    let filtered = this.stores.filter((store) => store.lat != null && store.lng != null).map((store) => {
       const distanceKm =
         origin && store.lat !== null && store.lng !== null
           ? haversineKm(origin, { lat: store.lat, lng: store.lng })
@@ -755,6 +975,8 @@ export class MemoryFoodRepository implements FoodRepository {
       region?: string;
       category?: string;
       kyb?: string;
+      /** MISSING = stores without map coordinates. */
+      location?: string;
     },
   ): Promise<OpsStorePage> {
     let filtered = [...this.stores];
@@ -777,6 +999,9 @@ export class MemoryFoodRepository implements FoodRepository {
         (s.category ?? '').toLowerCase().includes(c),
       );
     }
+    if (filter?.location === 'MISSING') {
+      filtered = filtered.filter((s) => s.lat == null || s.lng == null);
+    }
     const sorted = filtered.sort(
       (left, right) =>
         right.createdAt.getTime() - left.createdAt.getTime() || left.id.localeCompare(right.id),
@@ -796,6 +1021,7 @@ export class MemoryFoodRepository implements FoodRepository {
     store?: string;
     category?: string;
     status?: string;
+    window?: OpsDateWindow;
   }): Promise<OpsCatalogModerationPage> {
     const combined: OpsCatalogModerationItem[] = [];
     for (const item of this.items) {
@@ -807,7 +1033,7 @@ export class MemoryFoodRepository implements FoodRepository {
         category: normalizeStoreCategoryName(st?.category),
         store: st ? st.name : 'Cửa hàng DealGo',
         price: item.priceVnd,
-        submittedAt: 'Hôm nay',
+        submittedAt: (item.createdAt ?? this.seededAt).toISOString(),
         status: item.moderationStatus,
         nameReady: true,
         imageReady: true,
@@ -959,6 +1185,9 @@ export class MemoryFoodRepository implements FoodRepository {
       lines,
       prepMinutes: estimatedPrepMinutes,
       estimatedReadyAt: estimatedReadyAt(placedAt, estimatedPrepMinutes),
+      pickedUpAt: null,
+      failReason: null,
+      merchantCashVnd: null,
       idempotencyKey: input.idempotencyKey,
       createdAt: placedAt,
       updatedAt: placedAt,
@@ -972,9 +1201,21 @@ export class MemoryFoodRepository implements FoodRepository {
     return order ? copyOrder(order) : null;
   }
 
-  async listReady(limit?: number): Promise<ReadyOrderSummary[]> {
-    const rows = this.orders
-      .filter((order) => order.status === 'READY' && order.assignedDriverId === null)
+  async listReady(
+    limit?: number,
+    near?: ReadyNearFilter,
+    early?: FoodEarlyClaim,
+  ): Promise<ReadyOrderSummary[]> {
+    const earlyOpen = (order: StoredOrder): boolean => {
+      const opensAt = early ? earlyClaimOpensAt(order, early.leadMinutes) : null;
+      return !!early && !!opensAt && opensAt.getTime() <= early.now.getTime();
+    };
+    let rows = this.orders
+      .filter(
+        (order) =>
+          order.assignedDriverId === null &&
+          (order.status === 'READY' || (order.status === 'PREPARING' && earlyOpen(order))),
+      )
       .sort(byCreatedAt)
       .map((order) => {
         const store = this.stores.find((entry) => entry.id === order.storeId);
@@ -986,7 +1227,8 @@ export class MemoryFoodRepository implements FoodRepository {
         return {
           id: order.id,
           storeId: order.storeId,
-          status: 'READY' as const,
+          status: order.status === 'PREPARING' ? ('PREPARING' as const) : ('READY' as const),
+          estimatedReadyAt: order.estimatedReadyAt,
           storeName: store?.name ?? order.storeName ?? '',
           storeAddress: store?.addressLabel ?? null,
           deliveryFareVnd: order.deliveryFareVnd,
@@ -998,6 +1240,10 @@ export class MemoryFoodRepository implements FoodRepository {
           lineCount: order.lines.length,
         };
       });
+    if (near) {
+      const origin = { lat: near.lat, lng: near.lng };
+      rows = rows.filter((row) => haversineKm(origin, row.store ?? row.dropoff) <= near.radiusKm);
+    }
     if (limit !== undefined && Number.isSafeInteger(limit) && limit > 0) {
       return rows.slice(0, limit);
     }
@@ -1051,6 +1297,55 @@ export class MemoryFoodRepository implements FoodRepository {
         .sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name))
         .slice(0, topLimit),
     };
+  }
+
+  readonly merchantSettlements: MerchantSettlementView[] = [];
+
+  async deliveredForStatement(storeId: string, from: Date, to: Date): Promise<MerchantStatementRow[]> {
+    return this.orders
+      .filter(
+        (order) =>
+          order.storeId === storeId &&
+          order.status === 'DELIVERED' &&
+          order.updatedAt >= from &&
+          order.updatedAt < to,
+      )
+      .map((order) => ({
+        orderId: order.id,
+        deliveredAt: new Date(order.updatedAt),
+        subtotalVnd: order.subtotalVnd,
+        discountVnd: order.discountVnd,
+        voucherSponsor: order.voucherSponsor ?? null,
+        merchantCashVnd: order.merchantCashVnd ?? null,
+        commissionVnd: order.merchantCommissionVnd ?? null,
+      }));
+  }
+
+  async listMerchantSettlements(storeId: string, limit: number): Promise<MerchantSettlementView[]> {
+    return this.merchantSettlements
+      .filter((row) => row.storeId === storeId)
+      .sort((a, b) => b.periodEnd.localeCompare(a.periodEnd))
+      .slice(0, limit)
+      .map((row) => ({ ...row }));
+  }
+
+  async recordMerchantSettlement(input: RecordMerchantSettlementInput): Promise<MerchantSettlementView> {
+    const overlaps = this.merchantSettlements.some(
+      (row) =>
+        row.storeId === input.storeId &&
+        row.periodStart <= input.periodEnd &&
+        row.periodEnd >= input.periodStart,
+    );
+    if (!this.stores.some((store) => store.id === input.storeId)) {
+      throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
+    }
+    if (overlaps) {
+      throw new FoodRuleError('FOOD_SETTLEMENT_OVERLAP');
+    }
+    const { reason: _reason, ...rest } = input;
+    const row: MerchantSettlementView = { ...rest, id: randomUUID(), createdAt: new Date() };
+    this.merchantSettlements.push(row);
+    return { ...row };
   }
 
   async findStoreByOwner(ownerId: string): Promise<StoreDetail | null> {
@@ -1207,6 +1502,7 @@ export class MemoryFoodRepository implements FoodRepository {
       priceVnd: input.priceVnd,
       available,
       moderationStatus: available ? 'APPROVED' : 'PENDING',
+      createdAt: new Date(),
       description: input.description ?? null,
       prepMinutes: input.prepMinutes ?? null,
       imageUrl: input.imageUrl ?? null,
@@ -1412,9 +1708,12 @@ export class MemoryFoodRepository implements FoodRepository {
       store?: string;
       payment?: string;
       zone?: string;
+      window?: OpsDateWindow;
     },
   ): Promise<OpsFoodOrderPage> {
-    let sorted = [...this.orders].sort(byCreatedAtDesc);
+    let sorted = [...this.orders]
+      .filter((o) => inDateWindow(o.createdAt, filter?.window))
+      .sort(byCreatedAtDesc);
     if (filter?.statuses && filter.statuses.length > 0) {
       const allowed = new Set(
         filter.statuses.map((s) => s.trim().toUpperCase()).filter(Boolean),
@@ -1530,6 +1829,7 @@ export class MemoryFoodRepository implements FoodRepository {
       throw new FoodRuleError('FOOD_STATUS_CONFLICT');
     }
     order.status = 'PREPARING';
+    order.acceptedAt = new Date();
     touchOrder(order);
     return copyOrder(order);
   }
@@ -1552,12 +1852,24 @@ export class MemoryFoodRepository implements FoodRepository {
     if (order.status !== 'PREPARING') {
       throw new FoodRuleError('FOOD_STATUS_CONFLICT');
     }
-    order.status = 'READY';
+    if (this.changes.some((change) => change.orderId === orderId && change.status === 'PENDING')) {
+      throw new FoodRuleError('FOOD_CHANGE_PENDING');
+    }
+    // A driver claimed early → straight to ASSIGNED; otherwise open for claims.
+    order.status = order.assignedDriverId ? 'ASSIGNED' : 'READY';
+    order.readyAt = new Date();
     touchOrder(order);
     return copyOrder(order);
   }
 
-  async claim(orderId: string, driverId: string, maxConcurrentJobs = 1): Promise<FoodOrderView> {
+  readonly driverCancellations: MemoryDriverJobCancellation[] = [];
+
+  async claim(
+    orderId: string,
+    driverId: string,
+    maxConcurrentJobs = 1,
+    early?: FoodEarlyClaim,
+  ): Promise<FoodOrderView> {
     const order = this.orders.find((entry) => entry.id === orderId);
     if (!order) {
       throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
@@ -1565,28 +1877,99 @@ export class MemoryFoodRepository implements FoodRepository {
     if (order.customerId === driverId) {
       throw new FoodRuleError('FOOD_SELF_CLAIM');
     }
-    if (order.status === 'ASSIGNED') {
+    if (order.status === 'ASSIGNED' || order.assignedDriverId !== null) {
       throw new FoodRuleError('FOOD_ALREADY_ASSIGNED');
     }
-    if (order.status !== 'READY' || order.assignedDriverId !== null) {
+    const isEarly = order.status === 'PREPARING';
+    if (order.status !== 'READY' && !isEarly) {
       throw new FoodRuleError('FOOD_STATUS_CONFLICT');
+    }
+    if (isEarly) {
+      const opensAt = early ? earlyClaimOpensAt(order, early.leadMinutes) : null;
+      if (!early || !opensAt || opensAt.getTime() > early.now.getTime()) {
+        throw new FoodRuleError('FOOD_NOT_YET_CLAIMABLE');
+      }
     }
     const active = this.orders.filter(
       (entry) =>
         entry.assignedDriverId === driverId &&
-        (entry.status === 'ASSIGNED' || entry.status === 'PICKED_UP'),
+        (entry.status === 'PREPARING' || entry.status === 'ASSIGNED' || entry.status === 'PICKED_UP'),
     ).length;
     if (active >= maxConcurrentJobs) {
       throw new FoodRuleError('DRIVER_AT_CAPACITY');
     }
-    order.status = 'ASSIGNED';
+    if (!isEarly) {
+      order.status = 'ASSIGNED';
+    }
     order.assignedDriverId = driverId;
     touchOrder(order);
     return copyOrder(order);
   }
 
-  async pickup(orderId: string, driverId: string): Promise<FoodOrderView> {
+  async release(orderId: string, driverId: string, reasonCode: string): Promise<FoodOrderView> {
+    const order = this.requireAssignedDriver(orderId, driverId);
+    if (order.status !== 'ASSIGNED' && order.status !== 'PREPARING') {
+      throw new FoodRuleError('FOOD_STATUS_CONFLICT');
+    }
+    const fromStatus = order.status;
+    order.status = order.status === 'ASSIGNED' ? 'READY' : 'PREPARING';
+    order.assignedDriverId = null;
+    this.driverCancellations.push({ orderId, driverId, reasonCode, fromStatus, createdAt: new Date() });
+    touchOrder(order);
+    return copyOrder(order);
+  }
+
+  async timeoutDue(now: Date, policy: FoodTimeoutPolicy, limit = 100): Promise<FoodTimedOut[]> {
+    const out: FoodTimedOut[] = [];
+    const placedCutoff = now.getTime() - policy.merchantAcceptMinutes * 60_000;
+    const readyCutoff = now.getTime() - policy.unclaimedReadyMinutes * 60_000;
+    for (const order of [...this.orders].sort(byCreatedAt)) {
+      if (out.length >= limit) break;
+      let reason: FoodSystemCancelReason | null = null;
+      if (order.status === 'PLACED' && order.createdAt.getTime() <= placedCutoff) {
+        reason = 'MERCHANT_TIMEOUT';
+      } else if (
+        order.status === 'READY' &&
+        order.assignedDriverId === null &&
+        (order.readyAt ?? order.updatedAt).getTime() <= readyCutoff
+      ) {
+        reason = 'NO_DRIVER';
+      }
+      if (!reason) continue;
+      order.status = 'CANCELLED';
+      order.cancelledBy = 'SYSTEM';
+      order.cancelReason = { code: reason, note: null };
+      await this.vouchers?.release({ entityType: 'FOOD_ORDER', entityId: order.id });
+      order.updatedAt = now;
+      out.push({ orderId: order.id, reason });
+    }
+    return out;
+  }
+
+  async pickup(
+    orderId: string,
+    driverId: string,
+    snapshot?: { merchantCashVnd: number; at: Date },
+  ): Promise<FoodOrderView> {
+    const order = this.requireAssignedDriver(orderId, driverId);
+    if (order.status !== 'ASSIGNED') {
+      throw new FoodRuleError('FOOD_STATUS_CONFLICT');
+    }
+    order.pickedUpAt = snapshot?.at ?? new Date();
+    order.merchantCashVnd = snapshot?.merchantCashVnd ?? null;
     return this.assignedDriverTransition(orderId, driverId, 'ASSIGNED', 'PICKED_UP');
+  }
+
+  async snapshotCommissionWithin(
+    _tx: TxHandle,
+    orderId: string,
+    input: { commissionBps: number; commissionVnd: number },
+  ): Promise<void> {
+    const order = this.orders.find((entry) => entry.id === orderId);
+    if (order) {
+      order.merchantCommissionBps = input.commissionBps;
+      order.merchantCommissionVnd = input.commissionVnd;
+    }
   }
 
   async deliver(
@@ -1606,16 +1989,121 @@ export class MemoryFoodRepository implements FoodRepository {
     return copyOrder(order);
   }
 
-  async fail(orderId: string, driverId: string): Promise<FoodOrderView> {
+  async fail(
+    orderId: string,
+    driverId: string,
+    input: FoodFailInput,
+    onFailed?: CompletionHook<FoodOrderView>,
+  ): Promise<FoodOrderView> {
     const order = this.requireAssignedDriver(orderId, driverId);
-    if (order.status !== 'ASSIGNED' && order.status !== 'PICKED_UP') {
+    // Before pickup the driver releases instead (the food is still at the store).
+    if (order.status !== 'PICKED_UP') {
       throw new FoodRuleError('FOOD_STATUS_CONFLICT');
     }
+    assertFailWaitOver(order.pickedUpAt, input);
+    const failed: FoodOrderView = {
+      ...copyOrder(order),
+      status: 'FAILED',
+      failReason: { code: input.reasonCode, note: input.note },
+    };
+    await onFailed?.(null, failed);
     order.status = 'FAILED';
+    order.failReason = { code: input.reasonCode, note: input.note };
     // Confirmed (DEC-PROD-012): a failed delivery gives the voucher use back.
     await this.vouchers?.release({ entityType: 'FOOD_ORDER', entityId: order.id });
     touchOrder(order);
     return copyOrder(order);
+  }
+
+  readonly changes: FoodOrderChangeView[] = [];
+
+  async proposeChange(input: ProposeFoodOrderChangeInput): Promise<FoodOrderChangeResult> {
+    const order = this.requireOwned(input.orderId, input.ownerId);
+    if (!FOOD_CHANGE_EDITABLE_STATUSES.includes(order.status)) {
+      throw new FoodRuleError('FOOD_STATUS_CONFLICT');
+    }
+    if (this.changes.some((change) => change.orderId === order.id && change.status === 'PENDING')) {
+      throw new FoodRuleError('FOOD_CHANGE_PENDING');
+    }
+    const plan = planFoodOrderChange(order, input.lines);
+    const change: FoodOrderChangeView = {
+      id: randomUUID(),
+      orderId: order.id,
+      status: 'PENDING',
+      reasonCode: input.reasonCode,
+      note: input.note,
+      ...plan,
+      expiresAt: input.expiresAt,
+      respondedAt: null,
+      createdAt: new Date(),
+    };
+    this.changes.push(change);
+    touchOrder(order);
+    return { order: copyOrder(order), change: copyChange(change) };
+  }
+
+  async latestChange(orderId: string): Promise<FoodOrderChangeView | null> {
+    const rows = this.changes.filter((change) => change.orderId === orderId);
+    const latest = rows.at(-1);
+    return latest ? copyChange(latest) : null;
+  }
+
+  async respondChange(
+    orderId: string,
+    customerId: string,
+    changeId: string,
+    accept: boolean,
+    now: Date,
+  ): Promise<FoodOrderChangeResult> {
+    const order = this.orders.find((entry) => entry.id === orderId && entry.customerId === customerId);
+    if (!order) {
+      throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
+    }
+    const change = this.changes.find((entry) => entry.id === changeId && entry.orderId === orderId);
+    if (!change) {
+      throw new FoodRuleError('FOOD_CHANGE_NOT_FOUND');
+    }
+    if (change.status !== 'PENDING' || !FOOD_CHANGE_EDITABLE_STATUSES.includes(order.status)) {
+      throw new FoodRuleError('FOOD_STATUS_CONFLICT');
+    }
+    if (change.expiresAt.getTime() <= now.getTime()) {
+      throw new FoodRuleError('FOOD_STATUS_CONFLICT');
+    }
+    change.respondedAt = now;
+    if (accept) {
+      change.status = 'ACCEPTED';
+      order.lines = applyFoodOrderChangeLines(order.lines, change.lines);
+      order.subtotalVnd = change.newSubtotalVnd;
+      order.discountVnd = change.newDiscountVnd;
+      order.totalVnd = change.newTotalVnd;
+    } else {
+      change.status = 'REJECTED';
+      order.status = 'CANCELLED';
+      order.cancelledBy = 'CUSTOMER';
+      order.cancelReason = { code: 'CHANGE_REJECTED', note: null };
+      await this.vouchers?.release({ entityType: 'FOOD_ORDER', entityId: order.id });
+    }
+    touchOrder(order);
+    return { order: copyOrder(order), change: copyChange(change) };
+  }
+
+  async expireChanges(now: Date, limit = 100): Promise<string[]> {
+    const out: string[] = [];
+    for (const change of this.changes) {
+      if (out.length >= limit) break;
+      if (change.status !== 'PENDING' || change.expiresAt.getTime() > now.getTime()) continue;
+      change.status = 'EXPIRED';
+      change.respondedAt = now;
+      const order = this.orders.find((entry) => entry.id === change.orderId);
+      if (!order || !FOOD_CHANGE_EDITABLE_STATUSES.includes(order.status)) continue;
+      order.status = 'CANCELLED';
+      order.cancelledBy = 'SYSTEM';
+      order.cancelReason = { code: 'CHANGE_EXPIRED', note: null };
+      await this.vouchers?.release({ entityType: 'FOOD_ORDER', entityId: order.id });
+      order.updatedAt = now;
+      out.push(order.id);
+    }
+    return out;
   }
 
   async cancel(orderId: string, customerId: string): Promise<FoodOrderView> {
@@ -1828,6 +2316,7 @@ export function snapshotFoodLines(
     }
     const priced = priceOptionSelection(item.optionGroups, line.optionIds ?? []);
     return {
+      id: randomUUID(),
       itemId: item.id,
       name: item.name,
       unitPriceVnd: item.priceVnd + priced.deltaVnd,
@@ -1836,6 +2325,16 @@ export function snapshotFoodLines(
       options: priced.options,
     };
   });
+}
+
+function copyChange(change: FoodOrderChangeView): FoodOrderChangeView {
+  return {
+    ...change,
+    lines: change.lines.map((line) => ({ ...line })),
+    expiresAt: new Date(change.expiresAt),
+    respondedAt: change.respondedAt ? new Date(change.respondedAt) : null,
+    createdAt: new Date(change.createdAt),
+  };
 }
 
 function copyOrder(order: StoredOrder): FoodOrderView {
@@ -1864,8 +2363,87 @@ function copyOrder(order: StoredOrder): FoodOrderView {
     })),
     prepMinutes: order.prepMinutes ?? null,
     estimatedReadyAt: order.estimatedReadyAt ? new Date(order.estimatedReadyAt) : null,
+    pickedUpAt: order.pickedUpAt ? new Date(order.pickedUpAt) : null,
+    failReason: order.failReason ? { ...order.failReason } : null,
+    merchantCashVnd: order.merchantCashVnd ?? null,
+    createdAt: new Date(order.createdAt),
     updatedAt: new Date(order.updatedAt),
   };
+}
+
+/** Statuses in which the kitchen can still edit an order. */
+export const FOOD_CHANGE_EDITABLE_STATUSES: readonly FoodOrderStatusName[] = ['PLACED', 'PREPARING'];
+
+/**
+ * Validates a merchant edit and prices it. Only lower quantities / removals
+ * (the kitchen cannot add items for the customer); at least one line must remain, otherwise the
+ * merchant should reject the order. The voucher discount is capped at the new subtotal.
+ */
+export function planFoodOrderChange(
+  order: Pick<FoodOrderView, 'lines' | 'subtotalVnd' | 'discountVnd' | 'deliveryFareVnd'>,
+  requested: { lineId: string; toQuantity: number }[],
+): Pick<FoodOrderChangeView, 'lines' | 'oldSubtotalVnd' | 'newSubtotalVnd' | 'newDiscountVnd' | 'newTotalVnd'> {
+  if (requested.length === 0) {
+    throw new FoodRuleError('FOOD_CHANGE_INVALID');
+  }
+  const seen = new Set<string>();
+  const lines: FoodOrderChangeLine[] = [];
+  for (const entry of requested) {
+    const line = order.lines.find((candidate) => candidate.id === entry.lineId);
+    if (
+      !line ||
+      seen.has(entry.lineId) ||
+      !Number.isInteger(entry.toQuantity) ||
+      entry.toQuantity < 0 ||
+      entry.toQuantity >= line.quantity
+    ) {
+      throw new FoodRuleError('FOOD_CHANGE_INVALID');
+    }
+    seen.add(entry.lineId);
+    lines.push({
+      lineId: line.id,
+      itemId: line.itemId,
+      name: line.name,
+      unitPriceVnd: line.unitPriceVnd,
+      fromQuantity: line.quantity,
+      toQuantity: entry.toQuantity,
+    });
+  }
+  const newSubtotalVnd = order.lines.reduce((sum, line) => {
+    const edit = lines.find((entry) => entry.lineId === line.id);
+    return sum + line.unitPriceVnd * (edit ? edit.toQuantity : line.quantity);
+  }, 0);
+  if (newSubtotalVnd <= 0) {
+    throw new FoodRuleError('FOOD_CHANGE_INVALID');
+  }
+  const newDiscountVnd = Math.min(order.discountVnd, newSubtotalVnd);
+  return {
+    lines,
+    oldSubtotalVnd: order.subtotalVnd,
+    newSubtotalVnd,
+    newDiscountVnd,
+    newTotalVnd: Math.max(0, newSubtotalVnd + order.deliveryFareVnd - newDiscountVnd),
+  };
+}
+
+/** Applies accepted change lines to order lines (drops 0-quantity lines). */
+export function applyFoodOrderChangeLines(lines: FoodLineView[], change: FoodOrderChangeLine[]): FoodLineView[] {
+  return lines
+    .map((line) => {
+      const edit = change.find((entry) => entry.lineId === line.id);
+      return edit ? { ...line, quantity: edit.toQuantity } : line;
+    })
+    .filter((line) => line.quantity > 0);
+}
+
+/** "customer unreachable" only after the minimum wait since pickup. */
+export function assertFailWaitOver(pickedUpAt: Date | null, input: FoodFailInput): void {
+  if (input.reasonCode !== 'CUSTOMER_UNREACHABLE' || input.minWaitMinutes <= 0 || !pickedUpAt) {
+    return;
+  }
+  if (input.now.getTime() - pickedUpAt.getTime() < input.minWaitMinutes * 60_000) {
+    throw new FoodRuleError('FOOD_FAIL_TOO_EARLY');
+  }
 }
 
 export const DEFAULT_CATALOG_MODERATION_ITEMS: OpsCatalogModerationItem[] = [
@@ -2000,12 +2578,13 @@ export function filterCatalogModerationItems(
     store?: string;
     category?: string;
     status?: string;
+    window?: OpsDateWindow;
   },
 ): OpsCatalogModerationPage {
   const page = Math.max(1, query.page ?? 1);
   const limit = Math.max(1, Math.min(50, query.limit ?? 10));
 
-  let filtered = [...items];
+  let filtered = items.filter((i) => inDateWindow(new Date(i.submittedAt), query.window));
   if (query.status && query.status !== 'ALL') {
     filtered = filtered.filter((i) => i.status === query.status);
   }

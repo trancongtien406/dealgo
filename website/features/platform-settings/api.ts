@@ -11,7 +11,8 @@ export async function fetchPlatformSettings(
 ): Promise<PlatformSettingRow[]> {
   const sp = new URLSearchParams();
   if (params?.q?.trim()) sp.set("q", params.q.trim());
-  if (params?.category && params.category !== "ALL")
+  // "MONEY" is a client-side view (cash-flow section), not a backend category.
+  if (params?.category && params.category !== "ALL" && params.category !== "MONEY")
     sp.set("category", params.category);
   if (params?.source && params.source !== "ALL")
     sp.set("source", params.source);

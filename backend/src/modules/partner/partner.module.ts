@@ -10,10 +10,18 @@ import { PartnerEligibilityService } from './partner-eligibility.service.js';
 import { MemoryPartnerRepository, type PartnerRepository } from './partner.repository.js';
 import { PartnerService } from './partner.service.js';
 import { PrismaPartnerRepository } from './partner-prisma.repository.js';
+import { RideVehicleClassModule } from '../ride-vehicle/ride-vehicle-class.module.js';
+import { PlatformSettingsModule } from '../../platform/settings/platform-settings.module.js';
 import { StorageModule } from '../../platform/storage/storage.module.js';
 
 @Module({
-  imports: [PrismaModule, IdentityModule, StorageModule],
+  imports: [
+    PrismaModule,
+    IdentityModule,
+    StorageModule,
+    RideVehicleClassModule,
+    PlatformSettingsModule,
+  ],
   controllers: [MePartnerApplicationsController, OpsPartnerApplicationsController],
   providers: [
     {

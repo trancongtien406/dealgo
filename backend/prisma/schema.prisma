@@ -46,9 +46,9 @@ enum UserGender {
 }
 
 model User {
-  id                          String                   @id @default(uuid()) @db.Uuid
-  email                       String?                  @unique
-  phone                       String?                  @unique
+  id                          String                      @id @default(uuid()) @db.Uuid
+  email                       String?                     @unique
+  phone                       String?                     @unique
   displayName                 String
   dateOfBirth                 DateTime?
   gender                      UserGender?
@@ -60,11 +60,11 @@ model User {
   /// PII is anonymized by the purge worker at/after this instant (grace period).
   purgeAfter                  DateTime?
   purgedAt                    DateTime?
-  createdAt                   DateTime                 @default(now())
-  updatedAt                   DateTime                 @updatedAt
+  createdAt                   DateTime                    @default(now())
+  updatedAt                   DateTime                    @updatedAt
   accountDeletionRequests     AccountDeletionRequest[]
-  driverFeeSettlements        DriverFeeSettlement[]    @relation("DriverFeeSettlementDriver")
-  driverFeeSettlementsActed   DriverFeeSettlement[]    @relation("DriverFeeSettlementActor")
+  driverFeeSettlements        DriverFeeSettlement[]       @relation("DriverFeeSettlementDriver")
+  driverFeeSettlementsActed   DriverFeeSettlement[]       @relation("DriverFeeSettlementActor")
   roleGrants                  RoleGrant[]
   phoneChallenges             PhoneChallenge[]
   emailVerifications          EmailVerification[]
@@ -75,30 +75,31 @@ model User {
   sessions                    Session[]
   opsCredential               OpsCredential?
   customerCredential          CustomerCredential?
-  customerRides               Ride[]                   @relation("CustomerRides")
-  assignedRides               Ride[]                   @relation("AssignedRides")
-  driverOffers                RideOffer[]              @relation("DriverOffers")
-  rideSelections              RideSelection[]          @relation("CustomerRideSelections")
+  customerRides               Ride[]                      @relation("CustomerRides")
+  assignedRides               Ride[]                      @relation("AssignedRides")
+  driverOffers                RideOffer[]                 @relation("DriverOffers")
+  rideSelections              RideSelection[]             @relation("CustomerRideSelections")
   ownedStores                 FoodStore[]
-  customerFoodOrders          FoodOrder[]              @relation("CustomerFoodOrders")
-  assignedFoodOrders          FoodOrder[]              @relation("AssignedFoodOrders")
-  partnerApplications         PartnerApplication[]     @relation("ApplicantPartnerApplications")
-  reviewedPartnerApplications PartnerApplication[]     @relation("ReviewedPartnerApplications")
+  customerFoodOrders          FoodOrder[]                 @relation("CustomerFoodOrders")
+  assignedFoodOrders          FoodOrder[]                 @relation("AssignedFoodOrders")
+  partnerApplications         PartnerApplication[]        @relation("ApplicantPartnerApplications")
+  reviewedPartnerApplications PartnerApplication[]        @relation("ReviewedPartnerApplications")
   chatMessages                ChatMessage[]
   driverPresence              DriverPresence?
-  opsAuditLogs                OpsAuditLog[]            @relation("OpsAuditActor")
-  authMethodPolicies          AuthMethodPolicy[]       @relation("AuthMethodPolicyActor")
+  opsAuditLogs                OpsAuditLog[]               @relation("OpsAuditActor")
+  authMethodPolicies          AuthMethodPolicy[]          @relation("AuthMethodPolicyActor")
   pushDeviceTokens            PushDeviceToken[]
-  platformSettings            PlatformSetting[]        @relation("PlatformSettingActor")
-  opsFaqCreated               OpsFaqEntry[]            @relation("OpsFaqCreatedBy")
-  opsFaqUpdated               OpsFaqEntry[]            @relation("OpsFaqUpdatedBy")
+  platformSettings            PlatformSetting[]           @relation("PlatformSettingActor")
+  opsFaqCreated               OpsFaqEntry[]               @relation("OpsFaqCreatedBy")
+  opsFaqUpdated               OpsFaqEntry[]               @relation("OpsFaqUpdatedBy")
   notifications               UserNotification[]
   notificationPreference      UserNotificationPreference?
 
-  savedAddresses SavedAddress[]
-  ratingsGiven   ServiceRating[]
-  jobEarnings    JobEarning[]
-  supportTickets SupportTicket[] @relation("SupportTicketRequester")
+  savedAddresses     SavedAddress[]
+  placeSearchHistory PlaceSearchHistory[]
+  ratingsGiven       ServiceRating[]
+  jobEarnings        JobEarning[]
+  supportTickets     SupportTicket[]      @relation("SupportTicketRequester")
 
   @@map("users")
 }
@@ -301,15 +302,15 @@ model Session {
 }
 
 model OpsCredential {
-  userId       String   @id @db.Uuid
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String       @id @db.Uuid
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   passwordHash String?
   /// DEC-PROD-036: may reset other ops users' passwords (bootstrap operator).
-  superAdmin   Boolean  @default(false)
+  superAdmin   Boolean      @default(false)
   /// DEC-PROD-043: coarse ops role; superAdmin bypasses all permission checks.
   staffRole    OpsStaffRole @default(ADMIN)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
   @@map("ops_credentials")
 }
@@ -360,6 +361,10 @@ enum RideOfferStatus {
   PENDING
   SELECTED
   LOST
+  /// The customer declined this offer; the driver cannot re-offer on this ride.
+  DECLINED
+  /// The driver withdrew a pending offer (may offer again while the ride negotiates).
+  WITHDRAWN
 }
 
 // Partial unique index rides_one_negotiating_per_customer is defined in SQL.
@@ -376,6 +381,12 @@ model Ride {
   serviceRegionCode String?           @db.VarChar(8)
   offeredFareVnd    Int
   referenceFareVnd  Int
+  /// Class code copied at booking. No FK: disabling a class must not erase history.
+  /// OPEN (DG-DEC-VEH-001): historical @default("MOTORBIKE") kept to avoid live migrate;
+  /// app/API must set an explicit catalog class on create — do not rely on the DB default.
+  /// TODO: migration to drop @default once backfill verified.
+  /// No default — every write path passes the class the customer chose.
+  vehicleClassCode  String            @db.VarChar(32)
   agreedFareVnd     Int?
   /// DEC-PROD-024: voucher reserved at offer selection; the customer pays agreedFareVnd - discountVnd.
   discountVnd       Int               @default(0)
@@ -388,6 +399,20 @@ model Ride {
   selectedOfferId   String?           @unique @db.Uuid
   selectedOffer     RideOffer?        @relation("SelectedOffer", fields: [selectedOfferId], references: [id], onDelete: Restrict)
   expiresAt         DateTime
+  /// When the current driver was assigned (late-cancel fee window).
+  assignedAt        DateTime?
+  /// Last status transition (assignment/en-route timeouts, no-show wait).
+  statusChangedAt   DateTime?
+  /// Customer did not show up (cancelledBy=CUSTOMER).
+  noShow            Boolean           @default(false)
+  /// Reason code for cancellations/returns (driver cancel, timeout, no-show).
+  cancelReasonCode  String?           @db.VarChar(40)
+  /// Earlier unpaid customer fees collected in this ride's cash (set at completion).
+  priorFeesVnd      Int               @default(0)
+  /// Customer fare raises so far; each raise opens a new negotiation round.
+  fareRaiseCount    Int               @default(0)
+  /// The EXPIRED ride this request re-posts (one-tap re-post).
+  repostOfRideId    String?           @db.Uuid
   idempotencyKey    String            @db.VarChar(200)
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
@@ -406,7 +431,31 @@ model Ride {
   @@index([createdAt])
   @@index([serviceRegionCode])
   @@index([serviceRegionCode, status, updatedAt])
+  @@index([status, vehicleClassCode])
   @@map("rides")
+}
+
+/// Reference fare and bid window for one ride class. Ops-editable.
+/// Not an approved OPEN-003 tariff: the customer still bids inside the window.
+model RideVehicleClass {
+  code            String   @id @db.VarChar(32)
+  name            String   @db.VarChar(80)
+  seats           Int
+  enabled         Boolean  @default(true)
+  baseFareVnd     Int
+  perKmVnd        Int
+  perMinuteVnd    Int
+  minFareVnd      Int
+  maxFareVnd      Int
+  assumedSpeedKmh Int
+  sortOrder       Int      @default(0)
+  /// Public path such as /v1/public/ride-vehicle-classes/MOTORBIKE/<file>.
+  imageUrl        String?  @db.VarChar(200)
+  updatedByUserId String?  @db.Uuid
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("ride_vehicle_classes")
 }
 
 /// DEC-PROD-017: server-issued pickup code. Shown only to the ride's customer; the assigned
@@ -433,6 +482,8 @@ model RideOffer {
   kind            RideOfferKind
   status          RideOfferStatus
   expiresAt       DateTime
+  /// Times the driver changed this offer after the first one (RIDE_MAX_OFFER_EDITS_PER_DRIVER).
+  editCount       Int             @default(0)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   selectedForRide Ride?           @relation("SelectedOffer")
@@ -582,6 +633,8 @@ model FoodItem {
   soldCount        Int                      @default(0)
   available        Boolean                  @default(true)
   moderationStatus FoodItemModerationStatus @default(APPROVED)
+  /// When the merchant submitted the item; the Ops catalog review date filter uses it.
+  createdAt        DateTime                 @default(now())
   optionGroups     FoodOptionGroup[]
 
   @@index([storeId])
@@ -623,42 +676,58 @@ model FoodOption {
 
 // Partial unique index food_orders_one_open_per_customer is defined in SQL.
 model FoodOrder {
-  id                String            @id @default(uuid()) @db.Uuid
-  customerId        String            @db.Uuid
-  customer          User              @relation("CustomerFoodOrders", fields: [customerId], references: [id], onDelete: Restrict)
-  storeId           String            @db.Uuid
-  store             FoodStore         @relation(fields: [storeId], references: [id], onDelete: Restrict)
-  status            FoodOrderStatus
-  deliveryFareVnd   Int
-  subtotalVnd       Int
-  discountVnd       Int               @default(0)
-  voucherCode       String?           @db.VarChar(40)
+  id                    String            @id @default(uuid()) @db.Uuid
+  customerId            String            @db.Uuid
+  customer              User              @relation("CustomerFoodOrders", fields: [customerId], references: [id], onDelete: Restrict)
+  storeId               String            @db.Uuid
+  store                 FoodStore         @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  status                FoodOrderStatus
+  deliveryFareVnd       Int
+  subtotalVnd           Int
+  discountVnd           Int               @default(0)
+  voucherCode           String?           @db.VarChar(40)
   /// Who funds discountVnd, snapshotted from the campaign at placement (DEC-PROD-015).
-  voucherSponsor    PromotionSponsor?
-  totalVnd          Int
-  dropoffLat        Float
-  dropoffLng        Float
-  dropoffLabel      String            @db.VarChar(160)
+  voucherSponsor        PromotionSponsor?
+  totalVnd              Int
+  dropoffLat            Float
+  dropoffLng            Float
+  dropoffLabel          String            @db.VarChar(160)
   /// Store pickup point snapshotted at placement (DEC-PROD-034); null when the store had no coordinates.
-  pickupLat         Float?
-  pickupLng         Float?
-  pickupLabel       String?           @db.VarChar(200)
-  serviceRegionCode String?           @db.VarChar(8)
+  pickupLat             Float?
+  pickupLng             Float?
+  pickupLabel           String?           @db.VarChar(200)
+  serviceRegionCode     String?           @db.VarChar(8)
   /// Merchant decline reason (FOOD_REJECT_REASONS) and optional note; null unless the store rejected (DEC-PROD-021).
-  cancelReasonCode  String?           @db.VarChar(32)
-  cancelNote        String?           @db.VarChar(200)
-  cancelledBy       CancelActor?
+  cancelReasonCode      String?           @db.VarChar(32)
+  cancelNote            String?           @db.VarChar(200)
+  cancelledBy           CancelActor?
   /// DEC-PROD-036: server-issued delivery / handover codes.
-  codes             FoodOrderCode[]
-  assignedDriverId  String?           @db.Uuid
-  assignedDriver    User?             @relation("AssignedFoodOrders", fields: [assignedDriverId], references: [id], onDelete: Restrict)
-  idempotencyKey    String            @db.VarChar(200)
+  codes                 FoodOrderCode[]
+  assignedDriverId      String?           @db.Uuid
+  assignedDriver        User?             @relation("AssignedFoodOrders", fields: [assignedDriverId], references: [id], onDelete: Restrict)
+  idempotencyKey        String            @db.VarChar(200)
   /// Prep estimate snapshotted at placement (store default + BUSY extra); null on legacy rows.
-  prepMinutes       Int?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  lines             FoodOrderLine[]
-  chatThread        ChatThread?
+  prepMinutes           Int?
+  /// Merchant accepted (PLACED→PREPARING); early driver assignment uses acceptedAt + prepMinutes.
+  acceptedAt            DateTime?
+  /// Merchant marked the order ready (unclaimed-ready timeout).
+  readyAt               DateTime?
+  /// Driver picked the order up; failed delivery only after this.
+  pickedUpAt            DateTime?
+  failedAt              DateTime?
+  /// FOOD_FAIL_REASONS code + note (ShopeeFood failed-order flow).
+  failReasonCode        String?           @db.VarChar(32)
+  failNote              String?           @db.VarChar(300)
+  /// Cash the driver paid the merchant at pickup (subtotal − merchant-funded discount).
+  merchantCashVnd       Int?
+  /// Merchant commission snapshot at delivery (percent × 100, and VND).
+  merchantCommissionBps Int?
+  merchantCommissionVnd Int?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  lines                 FoodOrderLine[]
+  changes               FoodOrderChange[]
+  chatThread            ChatThread?
 
   @@unique([customerId, idempotencyKey])
   @@index([storeId, status])
@@ -740,6 +809,8 @@ enum LedgerJournalEvent {
   PROMOTION_DISCOUNT_FUNDED
   /// Platform fee on a completed COD job: driver owes DealGo the fee (receivable vs revenue).
   DRIVER_PLATFORM_FEE_ACCRUED
+  /// Commission the merchant owes DealGo on a delivered food order (receivable vs revenue).
+  MERCHANT_COMMISSION_ACCRUED
 }
 
 enum LedgerJournalStatus {
@@ -802,13 +873,17 @@ model ChatThread {
 }
 
 model ChatMessage {
-  id           String     @id @default(uuid()) @db.Uuid
-  threadId     String     @db.Uuid
-  thread       ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  senderUserId String     @db.Uuid
-  sender       User       @relation(fields: [senderUserId], references: [id], onDelete: Restrict)
-  body         String     @db.VarChar(2000)
-  createdAt    DateTime   @default(now())
+  id             String     @id @default(uuid()) @db.Uuid
+  threadId       String     @db.Uuid
+  thread         ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderUserId   String     @db.Uuid
+  sender         User       @relation(fields: [senderUserId], references: [id], onDelete: Restrict)
+  /// Legacy plaintext; null once encrypted (DRAFT chat at-rest encryption).
+  body           String?    @db.VarChar(2000)
+  /// base64(iv|tag|ciphertext), AES-256-GCM.
+  bodyCiphertext String?    @map("body_ciphertext") @db.Text
+  keyVersion     Int?       @map("key_version")
+  createdAt      DateTime   @default(now())
 
   @@index([threadId, createdAt])
   @@map("chat_messages")
@@ -855,14 +930,16 @@ model UserNotification {
 /// S024 (DEC-PROD-038): per-category push/inbox opt-in. Missing row = defaults (ride/food/chat on, promo/news off).
 /// SYSTEM / security notices are always delivered and are not stored here.
 model UserNotificationPreference {
-  userId     String   @id @db.Uuid
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ride       Boolean  @default(true)
-  food       Boolean  @default(true)
-  chat       Boolean  @default(true)
-  promotion  Boolean  @default(false)
-  news       Boolean  @default(false)
-  updatedAt  DateTime @updatedAt
+  userId      String   @id @db.Uuid
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ride        Boolean  @default(true)
+  food        Boolean  @default(true)
+  chat        Boolean  @default(true)
+  promotion   Boolean  @default(false)
+  news        Boolean  @default(false)
+  /// r26: spoken new-job sound for driver/merchant pushes (off = default sound).
+  newJobSound Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
 
   @@map("user_notification_preferences")
 }
@@ -938,6 +1015,33 @@ model VoiceSession {
   @@map("voice_sessions")
 }
 
+// In-app voice call between a customer and the assigned driver of a ride / food order
+// (DEC-PROD-007). One open call (RINGING / ACCEPTED) per trip: partial unique index
+// voice_calls_one_open_per_aggregate is defined in SQL. Audio is never recorded.
+model VoiceCall {
+  id            String    @id @default(uuid()) @db.Uuid
+  aggregateType String    @db.VarChar(32)
+  aggregateId   String    @db.Uuid
+  roomName      String    @db.VarChar(160)
+  callerUserId  String    @db.Uuid
+  calleeUserId  String    @db.Uuid
+  /// CUSTOMER or DRIVER: the caller's side of the trip.
+  callerRole    String    @db.VarChar(16)
+  /// RINGING, ACCEPTED, DECLINED, MISSED or ENDED.
+  status        String    @db.VarChar(16)
+  ringUntil     DateTime
+  answeredAt    DateTime?
+  endedAt       DateTime?
+  /// NO_ANSWER, CANCELLED, HANGUP or STALE.
+  endReason     String?   @db.VarChar(32)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([aggregateType, aggregateId, createdAt])
+  @@index([calleeUserId, createdAt])
+  @@map("voice_calls")
+}
+
 // Driver online/offline + last known coords for dispatch filtering (ADR-003 presence).
 model DriverPresence {
   userId            String    @id @db.Uuid
@@ -971,6 +1075,12 @@ enum OpsAuditEntityType {
   SUPPORT_TICKET
   OPS_STAFF
   USER
+  CHAT_THREAD
+  PUBLIC_PAGE
+  STORE
+  /// entityId = rideVehicleClassAuditId(code) (UUID v5); metadata.code holds the class code.
+  RIDE_VEHICLE_CLASS
+  HOME_BANNER
 }
 
 enum OpsAuditAction {
@@ -990,6 +1100,16 @@ enum OpsAuditAction {
   OPS_STAFF_ROLE_ASSIGN
   ACCOUNT_DELETION_CANCEL
   DRIVER_FEE_SETTLE
+  APP_REVIEW_LOGIN
+  CHAT_REVIEW
+  PUBLIC_PAGE_PUBLISH
+  DRIVER_BALANCE_PAYMENT
+  MERCHANT_PAYOUT_RECORD
+  RIDE_VEHICLE_CLASS_UPDATE
+  HOME_BANNER_CREATE
+  HOME_BANNER_UPDATE
+  HOME_BANNER_DELETE
+  HOME_BANNER_REORDER
 }
 
 enum ServiceRegionStatus {
@@ -1409,6 +1529,78 @@ model SavedAddress {
   @@map("saved_addresses")
 }
 
+// Places a user picked from search (server-side so it survives reinstalls).
+// One row per place (placeKey = folded name + ~110 m cell); the service keeps
+// the newest 20 per user. Only places the user chose are stored, never raw
+// provider result lists.
+model PlaceSearchHistory {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  placeKey   String   @db.VarChar(200)
+  name       String   @db.VarChar(160)
+  address    String   @db.VarChar(300)
+  lat        Float
+  lng        Float
+  useCount   Int      @default(1)
+  lastUsedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, placeKey])
+  @@index([userId, lastUsedAt(sort: Desc)])
+  @@map("place_search_history")
+}
+
+enum HomeBannerService {
+  ALL
+  RIDE
+  FOOD
+}
+
+enum HomeBannerAudience {
+  CUSTOMER
+  DRIVER
+  MERCHANT
+}
+
+// Admin-managed home-screen banners. A banner shows on the home of every role in
+// `audiences` while active and inside [startsAt, endsAt); `regionCode` null = all
+// regions. `ctaUrl` is an allowlisted in-app path (/customer/..., dealgo://...) or https.
+model HomeBanner {
+  id              String               @id @default(uuid()) @db.Uuid
+  title           String               @db.VarChar(80)
+  subtitle        String?              @db.VarChar(160)
+  imageUrl        String?              @db.VarChar(300)
+  ctaUrl          String?              @db.VarChar(500)
+  audiences       HomeBannerAudience[]
+  service         HomeBannerService    @default(ALL)
+  regionCode      String?              @db.VarChar(8)
+  startsAt        DateTime?
+  endsAt          DateTime?
+  sortOrder       Int                  @default(0)
+  active          Boolean              @default(false)
+  createdByUserId String?              @db.Uuid
+  updatedByUserId String?              @db.Uuid
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  stats           HomeBannerDailyStat[]
+
+  @@index([active, sortOrder])
+  @@map("home_banners")
+}
+
+// Impression / click counters per banner per day (Asia/Ho_Chi_Minh calendar day).
+model HomeBannerDailyStat {
+  bannerId    String     @db.Uuid
+  banner      HomeBanner @relation(fields: [bannerId], references: [id], onDelete: Cascade)
+  day         DateTime   @db.Date
+  impressions Int        @default(0)
+  clicks      Int        @default(0)
+
+  @@id([bannerId, day])
+  @@map("home_banner_daily_stats")
+}
+
 enum RatingSubjectType {
   RIDE
   FOOD_ORDER
@@ -1608,4 +1800,190 @@ model DriverFeeSettlement {
 
   @@index([driverId, settledThrough(sort: Desc)])
   @@map("driver_fee_settlements")
+}
+
+enum PublicPageStatus {
+  DRAFT
+  PUBLISHED
+}
+
+// Admin-editable public pages (privacy, terms, support, …) per locale (DEC-PROD-056).
+// The working copy lives here; every publish snapshots a numbered PublicPageRevision.
+model PublicPage {
+  id              String               @id @default(uuid()) @db.Uuid
+  slug            String               @db.VarChar(60)
+  locale          String               @db.VarChar(5)
+  title           String               @db.VarChar(200)
+  summary         String?              @db.VarChar(500)
+  /// JSON content validated per slug (legal sections or support config; DEC-PROD-055).
+  body            String               @db.Text
+  status          PublicPageStatus     @default(DRAFT)
+  /// Latest published version; 0 = never published.
+  version         Int                  @default(0)
+  effectiveAt     DateTime?
+  publishedAt     DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  updatedByUserId String?              @db.Uuid
+  revisions       PublicPageRevision[]
+
+  @@unique([slug, locale])
+  @@map("public_pages")
+}
+
+model PublicPageRevision {
+  id                String     @id @default(uuid()) @db.Uuid
+  pageId            String     @db.Uuid
+  page              PublicPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  version           Int
+  title             String     @db.VarChar(200)
+  summary           String?    @db.VarChar(500)
+  body              String     @db.Text
+  effectiveAt       DateTime?
+  publishedAt       DateTime   @default(now())
+  publishedByUserId String?    @db.Uuid
+
+  @@unique([pageId, version])
+  @@map("public_page_revisions")
+}
+
+// Worker liveness for /health/ready (DEC-PROD-054). One row per worker process role.
+model WorkerHeartbeat {
+  name      String   @id @db.VarChar(60)
+  instance  String   @db.VarChar(120)
+  startedAt DateTime
+  beatAt    DateTime
+  meta      Json     @default("{}")
+
+  @@map("worker_heartbeats")
+}
+
+/// A driver gave up an assigned job (ride returned to bidding / food order released).
+/// Counted in the driver's completion rate. actor=DRIVER (self) or SYSTEM (timeout).
+model DriverJobCancellation {
+  id         String           @id @default(uuid()) @db.Uuid
+  entityType LedgerEntityType
+  entityId   String           @db.Uuid
+  driverId   String           @db.Uuid
+  actor      CancelActor
+  reasonCode String           @db.VarChar(40)
+  fromStatus String           @db.VarChar(32)
+  createdAt  DateTime         @default(now())
+
+  @@index([driverId, createdAt(sort: Desc)])
+  @@index([entityType, entityId])
+  @@map("driver_job_cancellations")
+}
+
+enum CustomerFeeKind {
+  LATE_CANCEL
+  NO_SHOW
+}
+
+enum CustomerFeeStatus {
+  PENDING
+  COLLECTED
+  WAIVED
+}
+
+/// Fee owed by a customer for a late cancel / no-show. Cash-only app,
+/// so it is added to the customer's next completed ride and passed to the affected driver.
+model CustomerFeeCharge {
+  id                  String            @id @default(uuid()) @db.Uuid
+  customerId          String            @db.Uuid
+  rideId              String            @db.Uuid
+  kind                CustomerFeeKind
+  amountVnd           Int
+  beneficiaryDriverId String?           @db.Uuid
+  status              CustomerFeeStatus @default(PENDING)
+  collectedRideId     String?           @db.Uuid
+  createdAt           DateTime          @default(now())
+  collectedAt         DateTime?
+
+  @@unique([rideId, kind])
+  @@index([customerId, status])
+  @@map("customer_fee_charges")
+}
+
+/// Signed driver<->platform balance movements besides platform fees.
+/// amountVnd > 0: the driver owes DealGo; < 0: DealGo owes the driver (credit).
+/// Summed with job_earnings.feeVnd after the last DriverFeeSettlement.
+model DriverBalanceAdjustment {
+  id         String   @id @default(uuid()) @db.Uuid
+  driverId   String   @db.Uuid
+  amountVnd  Int
+  kind       String   @db.VarChar(40)
+  refType    String   @db.VarChar(20)
+  refId      String   @db.Uuid
+  occurredAt DateTime
+  createdAt  DateTime @default(now())
+
+  @@unique([kind, refType, refId, driverId])
+  @@index([driverId, occurredAt])
+  @@map("driver_balance_adjustments")
+}
+
+/// The driver rates the customer after a completed ride (one per ride).
+model CustomerRating {
+  id         String   @id @default(uuid()) @db.Uuid
+  rideId     String   @unique @db.Uuid
+  customerId String   @db.Uuid
+  driverId   String   @db.Uuid
+  stars      Int      @db.SmallInt
+  tags       String[] @db.VarChar(40)
+  comment    String?  @db.VarChar(300)
+  createdAt  DateTime @default(now())
+
+  @@index([customerId])
+  @@map("customer_ratings")
+}
+
+enum FoodOrderChangeStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+/// Merchant edits an order (item out of stock / quantity); the customer confirms or the order is cancelled.
+model FoodOrderChange {
+  id             String                @id @default(uuid()) @db.Uuid
+  orderId        String                @db.Uuid
+  order          FoodOrder             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status         FoodOrderChangeStatus @default(PENDING)
+  reasonCode     String                @db.VarChar(32)
+  note           String?               @db.VarChar(200)
+  /// [{lineId, name, fromQuantity, toQuantity}] — toQuantity 0 removes the line.
+  lines          Json
+  oldSubtotalVnd Int
+  newSubtotalVnd Int
+  newDiscountVnd Int
+  newTotalVnd    Int
+  expiresAt      DateTime
+  respondedAt    DateTime?
+  createdAt      DateTime              @default(now())
+
+  @@index([orderId, createdAt(sort: Desc)])
+  @@index([status, expiresAt])
+  @@map("food_order_changes")
+}
+
+/// Merchant payout statement per store and ICT period (Ops records the payment).
+model MerchantSettlement {
+  id                String   @id @default(uuid()) @db.Uuid
+  storeId           String   @db.Uuid
+  periodStart       DateTime @db.Date
+  periodEnd         DateTime @db.Date
+  orderCount        Int
+  grossVnd          Int
+  merchantFundedVnd Int
+  commissionVnd     Int
+  netVnd            Int
+  actorUserId       String   @db.Uuid
+  note              String?  @db.VarChar(500)
+  createdAt         DateTime @default(now())
+
+  @@unique([storeId, periodStart, periodEnd])
+  @@index([storeId, periodEnd(sort: Desc)])
+  @@map("merchant_settlements")
 }

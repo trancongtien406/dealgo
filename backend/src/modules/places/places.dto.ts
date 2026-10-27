@@ -38,4 +38,40 @@ export class SearchPlacesQueryDto {
   @Min(1)
   @Max(10)
   limit?: number;
+
+  @ApiPropertyOptional({ description: 'Caller latitude for proximity bias', example: 10.7745 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsLatitude()
+  lat?: number;
+
+  @ApiPropertyOptional({ description: 'Caller longitude for proximity bias', example: 106.703 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsLongitude()
+  lng?: number;
+}
+
+export class RecordPlaceHistoryDto {
+  @ApiProperty({ maxLength: 160, example: '12 Nguyễn Hoàng' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(160)
+  name!: string;
+
+  @ApiPropertyOptional({ maxLength: 300, example: '12 Nguyễn Hoàng, Hòa Cường, Đà Nẵng' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  address?: string;
+
+  @ApiProperty({ example: 16.0603 })
+  @Type(() => Number)
+  @IsLatitude()
+  lat!: number;
+
+  @ApiProperty({ example: 108.2101 })
+  @Type(() => Number)
+  @IsLongitude()
+  lng!: number;
 }

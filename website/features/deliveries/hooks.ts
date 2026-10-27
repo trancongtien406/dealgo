@@ -7,7 +7,10 @@ import {
   fetchDeliveries,
   fetchDeliveryByCode,
 } from "@/features/deliveries/api";
-import { listSearchParams } from "@/lib/list-search-params";
+import {
+  dateRangeSearchParams,
+  listSearchParams,
+} from "@/lib/list-search-params";
 
 export const deliveriesQueryKeys = {
   all: ["deliveries"] as const,
@@ -16,6 +19,8 @@ export const deliveriesQueryKeys = {
     page: number;
     limit: number;
     status?: string | null;
+    from?: string | null;
+    to?: string | null;
   }) => ["deliveries", "list", filters] as const,
   detail: (code: string) => ["deliveries", "detail", code] as const,
 };
@@ -23,6 +28,7 @@ export const deliveriesQueryKeys = {
 export function useDeliveriesFilters() {
   return useQueryStates({
     ...listSearchParams,
+    ...dateRangeSearchParams,
     status: parseAsString.withDefault(""),
   });
 }
@@ -34,6 +40,8 @@ export function useDeliveriesQuery() {
     page: filters.page,
     limit: filters.limit,
     status: filters.status || null,
+    from: filters.from || null,
+    to: filters.to || null,
   };
   return useQuery({
     queryKey: deliveriesQueryKeys.list(queryParams),

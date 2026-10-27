@@ -22,13 +22,17 @@ import { OpsAuthService } from '../../src/modules/identity/ops-auth.service.js';
 import { MockSmsSender } from '../../src/integrations/sms/sms-sender.js';
 import { PrismaModule } from '../../src/platform/database/prisma.module.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
+import { PARTNER_REPOSITORY } from '../../src/modules/partner/partner.constants.js';
+import type { PartnerRepository } from '../../src/modules/partner/partner.repository.js';
 import { RideModule } from '../../src/modules/ride/ride.module.js';
 
 const hasDatabase = Boolean(process.env.DATABASE_URL?.trim());
 const describePg = hasDatabase ? describe : describe.skip;
 
 const pickup = { lat: 16.047079, lng: 108.20623, label: 'Hải Châu' };
-const dropoff = { lat: 16.06, lng: 108.22, label: 'Sơn Trà' };
+// Fare floor (80 % of reference): keep the trip short so the fixed 30k bid clears the floor
+// whatever per-km price the local DB vehicle class carries.
+const dropoff = { lat: 16.05, lng: 108.208, label: 'Hải Châu 2' };
 const OPS_EMAIL = `ops-ride-voucher-${Date.now()}@dealgo.test`;
 const OPS_PASSWORD = 'correct-horse-battery';
 
@@ -90,7 +94,7 @@ describePg('ride voucher (postgres)', () => {
       select(a.customer.token, a.rideId, a.offerId, code),
       select(b.customer.token, b.rideId, b.offerId, code),
     ]);
-    const statuses = results.map((r) => r.status).sort();
+    const statuses = results.map((r) => r.status).sort((a, b) => a - b);
     expect(statuses).toEqual([200, 422]);
     expect(results.find((r) => r.status === 422)?.body.errorCode).toBe('VOUCHER_USAGE_EXHAUSTED');
     const promo = await prisma.db()!.promotion.findUnique({ where: { code } });
@@ -220,8 +224,8 @@ describePg('ride voucher (postgres)', () => {
       .post('/v1/rides')
       .set('Authorization', `Bearer ${customer.token}`)
       .set('Idempotency-Key', `idem-rv-create-${randomUUID()}`)
-      .send({ pickup, dropoff, offeredFareVnd: 30_000 })
-      .expect(200);
+      .send({ pickup, dropoff, offeredFareVnd: 30_000, vehicleClassCode: 'MOTORBIKE'});
+    if (created.status !== 200) throw new Error(`create ride ${created.status}: ${JSON.stringify(created.body)}`);
     const rideId = created.body.data.id as string;
     const offerId = await offer(driver.token, rideId, fare);
     return { customer, driver, rideId, offerId };
@@ -253,6 +257,18 @@ describePg('ride voucher (postgres)', () => {
       if (!(error instanceof UniqueConflictError)) {
         throw error;
       }
+    }
+    // DG-DEC-VEH-001: offers fail closed without a DRIVER application carrying the class.
+    const partners = app.get<PartnerRepository>(PARTNER_REPOSITORY);
+    if (!(await partners.findByUserAndRole(driver.userId, 'DRIVER'))) {
+      await partners.upsertSubmit({
+        id: randomUUID(),
+        userId: driver.userId,
+        role: 'DRIVER',
+        metadata: { vehicleClassCode: 'MOTORBIKE' },
+        documents: [],
+        now: new Date(),
+      });
     }
     return driver;
   }

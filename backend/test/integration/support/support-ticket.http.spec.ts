@@ -165,7 +165,7 @@ describe('support tickets http', () => {
       .post('/v1/rides')
       .set('Authorization', `Bearer ${customer.token}`)
       .set('Idempotency-Key', 'support-ride-1')
-      .send({ pickup, dropoff, offeredFareVnd: 30_000 })
+      .send({ pickup, dropoff, offeredFareVnd: 30_000, vehicleClassCode: 'MOTORBIKE'})
       .expect(200);
     const rideId = ride.body.data.id as string;
 

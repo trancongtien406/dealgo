@@ -191,7 +191,18 @@ export function CatalogModerationBoard() {
             <OpsIcon name="arrowRight" className="size-4 rotate-180" />
             Cây danh mục
           </PreviewLink>
-          <AdminHeaderDateFilter defaultPreset="today" />
+          <AdminHeaderDateFilter
+            value={{ from: filters.from || null, to: filters.to || null }}
+            onChange={(range) => {
+              void setFilters({
+                from: range.from ?? "",
+                to: range.to ?? "",
+                page: 1,
+              });
+            }}
+            defaultPreset="all"
+            labelPrefix="Ngày gửi"
+          />
           <ExportCsvButton
             filename="catalog-moderation.csv"
             headers={["Mã", "Tên", "Cửa hàng", "Trạng thái"]}
@@ -288,6 +299,8 @@ export function CatalogModerationBoard() {
                   category: "",
                   status: "PENDING",
                   q: "",
+                  from: "",
+                  to: "",
                   page: 1,
                 });
               }}
@@ -320,6 +333,8 @@ export function CatalogModerationBoard() {
                   category: "",
                   status: "PENDING",
                   q: "",
+                  from: "",
+                  to: "",
                   page: 1,
                 });
               }}

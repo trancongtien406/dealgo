@@ -4,7 +4,6 @@
   "actionCancel": "Cancel",
   "actionContinue": "Continue",
   "actionSeeAll": "See all",
-  "actionExplore": "Explore now",
   "actionBookRideNow": "Book a ride",
   "actionBack": "Back",
   "actionChangePhone": "Change phone number",
@@ -72,9 +71,30 @@
   "chatInputHint": "Type a message",
   "chatContact": "Message",
   "voiceCall": "Voice call",
-  "voiceTitle": "In-trip voice call",
-  "voiceRoomLabel": "Room",
-  "voiceStubHint": "In-app calling is coming soon.",
+  "voiceCalling": "Calling…",
+  "voiceConnecting": "Connecting…",
+  "voiceIncoming": "Incoming call",
+  "voiceReconnecting": "Weak signal, reconnecting…",
+  "voicePeerCustomer": "Customer",
+  "voicePeerDriver": "Driver",
+  "voiceAccept": "Answer",
+  "voiceDecline": "Decline",
+  "voiceHangUp": "End",
+  "voiceMute": "Mute",
+  "voiceUnmute": "Unmute",
+  "voiceSpeaker": "Speaker",
+  "voiceEndedHungUp": "Call ended",
+  "voiceEndedDeclined": "Call declined",
+  "voiceEndedNoAnswer": "No answer",
+  "voiceEndedMissed": "Missed call",
+  "voiceEndedTripClosed": "The trip has ended, so the call stopped",
+  "voiceEndedConnectionLost": "Call connection lost",
+  "voiceMicDenied": "Microphone access is needed for calls. Turn it on in Settings.",
+  "apiErrVoiceDisabled": "In-app calling is turned off right now.",
+  "apiErrVoiceUnavailable": "Calling isn't available right now. Please use chat.",
+  "apiErrVoiceBusy": "There is already a call for this trip.",
+  "apiErrVoiceNoCounterpart": "No driver has taken this trip yet.",
+  "apiErrVoiceWindowClosed": "Calls are only available while the trip is in progress.",
   "bannerOfflineTitle": "You’re offline",
   "commonSelected": "Selected",
   "actionSeeDetail": "View details →",
@@ -149,7 +169,7 @@
   "driverServicesOnlineTitle": "Online",
   "driverServicesOnlineBody": "Ready to receive new requests",
   "driverServicesApprovedSection": "Approved services",
-  "driverServicesRideTitle": "Passenger rides (motorbike)",
+  "driverServicesRideTitle": "Passenger rides (bike & car)",
   "driverServicesRideBody": "Nearby trips · Flexible pricing",
   "driverServicesFoodTitle": "Food delivery",
   "driverServicesFoodBody": "Pick up from Shop and deliver to customer",
@@ -173,7 +193,7 @@
   "driverOtpHeadline": "Verify passenger boarding",
   "driverOtpBody": "Enter the 4-digit code from the passenger to start the trip.",
   "driverOtpVerifyTitle": "Passenger verification",
-  "driverOtpValidFor": "OTP is valid only for trip #{rideId}",
+  "driverOtpValidFor": "OTP is valid only for trip {rideId}",
   "@driverOtpValidFor": {
     "placeholders": {
       "rideId": {
@@ -187,7 +207,7 @@
   "driverOtpPrivacy": "Do not share the pickup OTP in chat or with unrelated people.",
   "driverOtpConfirm": "Confirm and start trip",
   "driverOtpWaitingChip": "WAITING",
-  "driverActiveNavTitle": "Navigate to pickup",
+  "driverActiveNavTitle": "Heading to pickup",
   "driverActiveArrivedTitle": "Arrived at pickup",
   "driverActiveOnTripTitle": "Trip in progress",
   "driverActiveCompleteTitle": "End trip",
@@ -198,7 +218,7 @@
   "driverActiveCompleteCta": "Complete / collect payment",
   "driverActiveCompleteBody": "Collect the fare agreed with the customer.",
   "driverActiveReportIssue": "Report issue",
-  "driverFoodPhaseNavTitle": "Navigate to store",
+  "driverFoodPhaseNavTitle": "Heading to store",
   "driverFoodPhaseWaitTitle": "Waiting at store",
   "driverFoodPhasePickupTitle": "Confirm pickup",
   "driverFoodPhaseDeliverTitle": "Deliver to customer",
@@ -213,7 +233,7 @@
   "driverFoodCompleteBody": "COD is collected on behalf of the shop and settled with DealGo.",
   "driverFoodIncomePending": "Updated after settlement",
   "driverFoodNoClientFee": "Your net income shows after settlement.",
-  "driverFoodCodCollect": "COD to collect on delivery",
+  "driverFoodCodCollect": "Collect (COD)",
   "merchantRejectOrder": "Reject",
   "merchantAcceptOrder": "Confirm order",
   "merchantRejectConfirmTitle": "Reject this order?",
@@ -268,8 +288,9 @@
   "rideRouteSwapTooltip": "Swap pickup and dropoff",
   "rideRouteDistance": "Distance",
   "rideRouteRefPrice": "Ref. price",
-  "rideRoutePriceHint": "Official price appears when you choose a vehicle.",
+  "rideRoutePriceHint": "Suggested fares depend on vehicle class; you propose your offer next.",
   "rideRouteContinueVehicle": "Continue to vehicles",
+  "rideRouteContinueBooking": "Choose vehicle & offer",
   "rideFareBreakdownTitle": "Fare details",
   "rideFareEstimatedFee": "Estimated fee",
   "rideFareComponentsTitle": "Fare components",
@@ -308,7 +329,7 @@
   "foodInvoiceDelivered": "Delivered successfully",
   "foodInvoiceOrderId": "Order",
   "foodInvoiceSyncChip": "v1 · Synced",
-  "foodInvoiceDeliveredChip": "DELIVERED",
+  "foodInvoiceDeliveredChip": "Delivered",
   "foodInvoiceStore": "Store",
   "foodInvoiceRecipient": "Recipient",
   "foodInvoiceItemsTitle": "Items received",
@@ -329,8 +350,15 @@
     }
   },
   "foodInvoiceRateCta": "Rate order",
+  "foodInvoiceTrackCta": "Track order",
+  "foodInvoiceItemsTitleOpen": "Items",
+  "foodInvoiceCodDue": "Total due",
+  "checkoutEmptyBody": "Add items before checking out.",
+  "checkoutBackToMenu": "Back to menu",
   "foodTrackingStatusTitle": "Live status",
   "foodTrackingMapChip": "Order is being delivered",
+  "foodTrackingMapWaitingDriver": "Waiting for driver location",
+  "foodTrackingMapEmptyHint": "Dropoff is ready. Store coordinates are not on the map yet.",
   "foodTrackingDriverTitle": "Driver delivering",
   "foodTrackingPayOnDelivery": "Pay on delivery",
   "foodTrackingCodDue": "Due on delivery",
@@ -400,7 +428,11 @@
   "splashTagline": "Go anywhere · Eat everything",
   "splashPreparing": "Getting things ready for you...",
   "serviceRideTitle": "Ride",
-  "serviceRideBlurb": "Go anywhere\nsafe and easy",
+  "serviceRideBlurb": "Bike · Car · Bid your fare",
+  "homeServiceBikeTitle": "Motorbike",
+  "homeServiceBikeBlurb": "Quick · 1 passenger",
+  "homeServiceCarTitle": "Car",
+  "homeServiceCarBlurb": "4 & 7 seats",
   "serviceFoodTitle": "Food",
   "serviceFoodBlurb": "Thousands of dishes\nevery day",
   "onbSlide1Title": "One app,\n",
@@ -537,8 +569,8 @@
   "driverServiceFood": "Food delivery",
   "driverJobTakenHint": "Refresh the list to see other requests.",
   "driverOtpMatched": "Code matches — starting the trip.",
-  "driverHeadToPickup": "Head to pickup",
-  "driverFollowRoute": "Follow the route to the destination",
+  "driverHeadToPickup": "Pickup point",
+  "driverFollowRoute": "Drop-off point",
   "driverPassenger": "Customer",
   "driverPickupLabel": "Pickup",
   "driverDropoffLabel": "Destination",
@@ -887,7 +919,7 @@
       }
     }
   },
-  "drvHistGrossLine": "Gross fares {gross} · Platform fee −{fee}",
+  "drvHistGrossLine": "Gross fares {gross} · DealGo commission −{fee}",
   "@drvHistGrossLine": {
     "placeholders": {
       "gross": {
@@ -899,7 +931,18 @@
     }
   },
   "drvHistNetNote": "Net after fees · excludes COD collected",
-  "drvHistItemFee": "Fee {percent}% −{fee}",
+  "drvHistItemFee": "Commission {percent}% −{fee}",
+  "drvHistItemFeeFood": "Commission {percent}% of delivery fee −{fee}",
+  "@drvHistItemFeeFood": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      },
+      "fee": {
+        "type": "String"
+      }
+    }
+  },
   "@drvHistItemFee": {
     "placeholders": {
       "percent": {
@@ -938,6 +981,15 @@
   "placeSearchUnavailable": "Place search is unavailable right now. Use your current location or a saved address.",
   "placeSearchError": "Couldn't load search results.",
   "placeNothingYet": "Search for a place or use your current location to start.",
+  "placeHistoryTitle": "Recent",
+  "placeHistoryClear": "Clear",
+  "placeHistoryDelete": "Remove from history",
+  "placeHistoryClearTitle": "Clear search history?",
+  "placeHistoryClearBody": "Places you picked will be removed on all your devices.",
+  "placeHistoryClearConfirm": "Clear history",
+  "placeApproximate": "Approximate house number · check the pin",
+  "placeDistanceKm": "{km} km",
+  "@placeDistanceKm": {"placeholders": {"km": {"type": "String"}}},
   "rideBookTitle": "Book a ride",
   "rideBookSubtitle": "Explore the city with DealGo",
   "rideModeNow": "Ride now",
@@ -975,6 +1027,26 @@
   "rideFareReferenceExplain": "The reference fare uses the distance and DealGo's price table. You can propose another amount within the allowed range.",
   "rideFareAllowedRange": "Allowed range",
   "rideVehicleBikeTitle": "Motorbike",
+  "rideVehicleCar4Title": "4-seat car",
+  "rideVehicleCar7Title": "7-seat car",
+  "rideVehicleSeats": "{count} seats",
+  "@rideVehicleSeats": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "rideFareOpening": "Opening fare",
+  "rideFarePerKm": "Per kilometre",
+  "rideFareTime": "Time ({minutes} min)",
+  "@rideFareTime": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "rideVehicleBikeSubtitle": "Quick · 1 passenger",
   "rideVehicleFrom": "From {amount}",
   "@rideVehicleFrom": {
@@ -987,11 +1059,13 @@
   "rideVehicleTitle": "Choose a vehicle",
   "rideVehicleRouteTitle": "Your route",
   "rideVehicleContinue": "View fare details",
+  "rideVehicleContinueToOffer": "Propose your fare",
+  "rideVehicleClassesUnavailable": "No vehicle classes are available right now. Pull to refresh or try again shortly.",
   "homeQuickBookTitle": "Quick ride",
   "homeQuickBookPickup": "123 Nguyen Van Linh, Hai Chau, Da Nang",
-  "homeQuickBookVehicle": "4-seater",
+  "homeQuickBookVehicle": "Bike & Car",
   "homeQuickBookEstimate": "Estimate",
-  "homeQuickBookEtaPrice": "~ 42,000đ",
+  "homeQuickBookEtaPrice": "After places",
   "homeQuickBookEtaTime": "Time ~ 12 min",
   "foodCartTitle": "Cart",
   "foodCartEmpty": "Your cart is empty",
@@ -1351,7 +1425,7 @@
   "driverOpenHistory": "View trip history",
   "driverCompletedNotFound": "This job isn't in your history yet",
   "driverCompletedNotFoundHint": "History updates after a job ends. Try again in a few minutes.",
-  "driverCompletedFeeLabel": "Platform fee",
+  "driverCompletedFeeLabel": "DealGo commission",
   "driverCompletedNetLabel": "You earn",
   "merchantOrderTitle": "Order details",
   "merchantOrderNotFound": "Order not found",
@@ -1401,7 +1475,15 @@
       }
     }
   },
-  "driverCompletedFeePercentLabel": "Platform fee ({percent}%)",
+  "driverCompletedFeePercentLabel": "DealGo commission ({percent}%)",
+  "driverCompletedFoodFeePercentLabel": "DealGo commission on delivery fee ({percent}%)",
+  "@driverCompletedFoodFeePercentLabel": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
   "@driverCompletedFeePercentLabel": {
     "placeholders": {
       "percent": {
@@ -1457,6 +1539,7 @@
   "partnerKindSelfie": "Selfie",
   "partnerKindLicense": "Driving licence",
   "partnerKindVehicleReg": "Vehicle registration",
+  "partnerKindVehicleInsurance": "Vehicle insurance (photo)",
   "partnerKindBusinessLicense": "Business licence",
   "partnerKindRepIdFront": "Representative ID — front",
   "partnerKindRepIdBack": "Representative ID — back",
@@ -1480,6 +1563,8 @@
   "partnerResubmitNote": "Only retake the requested documents; the others stay on your application.",
   "partnerTimelineSubmitted": "Application sent",
   "partnerTimelineReview": "Document review",
+  "partnerTimelineReviewQuick": "Admin approval",
+  "kycStatusTitleQuick": "Driver registration status",
   "partnerTimelineReviewing": "Under review",
   "partnerTimelineReviewed": "Reviewed",
   "partnerTimelineDone": "Done",
@@ -1565,7 +1650,8 @@
   "kycVehiclePlate": "Plate number",
   "kycVehicleBrand": "Brand",
   "kycVehicleModel": "Model",
-  "kycVehicleNote": "DealGo currently accepts motorbikes only.",
+  "kycVehicleNote": "DealGo Ride accepts motorbikes and cars. Food delivery eligibility is separate.",
+  "kycVehicleInsuranceNote": "Car applications need a vehicle insurance photo when this checklist is on. This is an app checklist only — not a legal or regulatory determination.",
   "kycReviewProfile": "Profile",
   "kycReviewDriver": "Driver details",
   "kycReviewServices": "Services",
@@ -1639,6 +1725,9 @@
   "kybTypeNote": "Categories and requirements can vary by type and area.",
   "kybShopName": "Shop name",
   "kybShopAddress": "Address",
+  "kybShopPin": "Pin your store on the map",
+  "kybShopPinRequired": "Required: drivers use this point to pick up orders.",
+  "kybShopPinChange": "Pinned. Tap to change.",
   "kybShopType": "Type",
   "kybRepName": "Representative's full name",
   "kybRepNote": "The representative is responsible for the details given to DealGo.",
@@ -1711,6 +1800,46 @@
     }
   },
   "merchantStatsNote": "Sales are the food subtotal of delivered orders, in Vietnam time; delivery fees excluded.",
+  "merchantStatementTitle": "DealGo commission",
+  "merchantStatementCash": "Cash from drivers ({count} orders)",
+  "@merchantStatementCash": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantStatementCommission": "Commission ({percent}%)",
+  "@merchantStatementCommission": {
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      }
+    }
+  },
+  "merchantStatementNet": "Store keeps",
+  "merchantStatementCycle": "Settled every {days} days",
+  "@merchantStatementCycle": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantStatementUnsettled": "Commission not yet paid",
+  "merchantStatementAllPaid": "Commission for this period is fully paid.",
+  "merchantStatementLastPaid": "Last payment: {period} · {amount}",
+  "@merchantStatementLastPaid": {
+    "placeholders": {
+      "period": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "merchantStatementNote": "Drivers pay the food amount to the store at pickup; the store pays the commission to DealGo. Contact support if the figures look wrong.",
   "merchantStatsFailed": "Could not load statistics. Pull to retry.",
   "merchantStatsRetry": "Retry",
   "merchantOrderCustomerName": "Customer: {name}",
@@ -1742,7 +1871,7 @@
   "merchantQueueNewToConfirm": "New orders to confirm",
   "merchantQueueToHandle": "Orders to handle",
   "merchantQueueOthers": "Other orders",
-  "merchantQueueNewChip": "NEW · Awaiting shop",
+  "merchantQueueNewChip": "New order",
   "merchantQueueDeliverTo": "Deliver to",
   "merchantQueueItemsFood": "Items · Food",
   "merchantQueueDeliveryFee": "Delivery fee",
@@ -1922,12 +2051,20 @@
   "foodTrackingReconnectNote": "When you're back online, the app loads the latest order status.",
   "foodCancelledBrowse": "Choose another store",
   "rideMatchingReceiving": "Receiving offers",
-  "rideMatchingSearching": "Finding drivers",
+  "rideMatchingSearching": "Waiting for offers",
   "rideMatchingLoadFailed": "Could not load the request. The trip status has not changed.",
   "rideMatchingSent": "Offer sent",
   "rideMatchingWaiting": "Waiting for drivers to make offers...",
   "rideMatchingWaitingHint": "Matching offers will appear here so you can compare and pick your driver.",
   "rideStatusLabel": "Status",
+  "rideStatusNegotiating": "Negotiating",
+  "rideStatusAssigned": "Driver assigned",
+  "rideStatusDriverEnRoute": "Driver on the way",
+  "rideStatusDriverArrived": "Driver arrived",
+  "rideStatusInTrip": "Trip in progress",
+  "rideStatusCompleted": "Completed",
+  "rideStatusCancelled": "Cancelled",
+  "rideStatusExpired": "Expired",
   "rideNoOffersTitle": "No driver offers yet",
   "rideNoOffersMessage": "There are no valid offers for this request in your area yet.",
   "rideProgress": "Progress",
@@ -1967,10 +2104,21 @@
   "rideConfirmPriceNote": "If the fare changes, DealGo asks you to review and confirm again before it applies.",
   "rideFarePendingExists": "You already have a pending offer. Open it or cancel it before sending a new fare.",
   "rideFareSendFailed": "Could not send your offer.",
-  "rideFareTitle": "Propose your fare",
+  "rideFareTitle": "Your fare",
   "rideBookingInfo": "Booking details",
   "rideFareAsk": "The fare you want to offer",
   "rideYourOffer": "Your offer",
+  "rideSuggestedFare": "Suggested fare {amount}",
+  "@rideSuggestedFare": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "rideSuggestedFareShort": "Suggested",
+  "rideSuggestedFareHint": "Choose a vehicle, then set the fare you want to offer.",
+  "ridePickVehicleClassFirst": "Choose a vehicle class (bike or car) before sending your offer.",
   "rideEnterAmount": "Enter amount",
   "rideFairNegotiation": "Transparent negotiation",
   "rideFairNegotiationNote": "Drivers may offer a different fare. You only pay the amount of the offer you chose and confirmed.",
@@ -2037,7 +2185,7 @@
       }
     }
   },
-  "rideSendOffer": "Send offer {amount}",
+  "rideSendOffer": "Find a driver · {amount}",
   "@rideSendOffer": {
     "placeholders": {
       "amount": {
@@ -2045,6 +2193,24 @@
       }
     }
   },
+  "rideFindDriverCta": "Find a driver · {amount}",
+  "@rideFindDriverCta": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "rideFindDriverPlain": "Find a driver",
+  "rideRecommendedFareLabel": "Recommended fare {amount}",
+  "@rideRecommendedFareLabel": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "rideFareAdjustHint": "Tap − / + or enter an amount. Drivers may accept or counter.",
   "rideVehicleMotorbike": "Motorbike",
   "rideOfferKindAccept": "Matches your offer",
   "rideOfferKindCounter": "Counter-offer",
@@ -2065,6 +2231,7 @@
     }
   },
   "driverVehicleUnknown": "No plate number in your driver application",
+  "driverVehicleNotOnFile": "No vehicle on file yet",
   "driverServicesSaved": "Saved. The job list only shows the services you have switched on.",
   "driverServicesSaveFailed": "Your choice was not saved. Check your connection and try again.",
   "driverHomeTitle": "Driver overview",
@@ -2090,8 +2257,17 @@
   "driverOnDutyMapLabel": "Taking jobs",
   "driverRideLoadFailed": "Could not load the ride. Check your connection and try again.",
   "driverRideDetailTitle": "Ride request details",
+  "driverCounterOffer": "Counter offer",
+  "driverAcceptAtPrice": "Accept {price}",
+  "@driverAcceptAtPrice": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
   "driverMakeOffer": "Make an offer",
-  "driverRideChip": "Ride · Motorbike",
+  "driverRideChip": "Ride · Bike & Car",
   "driverCustomerFare": "Customer's fare",
   "driverReferenceFare": "Reference fare",
   "driverOfferCount": "Offers so far",
@@ -2246,12 +2422,11 @@
     }
   },
   "homeSearchHint": "Search places, stores, dishes...",
-  "homeHeroTitle": "One app,\nendless options",
-  "homeHeroSubtitle": "Ride • Shop • Delivery\nEveryday convenience in Da Nang",
-  "homeHeroCity": "~ Da Nang, always close by",
   "homeServiceFoodSub": "Thousands of stores,\ndelivered",
   "voiceOpenFailed": "Couldn't start the call. Please try again.",
   "mapIllustrative": "Illustrative map",
+  "mapRouteRoadFollowed": "Road route",
+  "mapRouteStraightFallback": "Straight-line preview",
   "rideVoucherTitle": "Voucher",
   "rideVoucherNote": "The code is reserved when you pick a driver and returned if the trip is cancelled.",
   "rideVoucherLine": "Voucher {code}",
@@ -2537,7 +2712,48 @@
   "driverFoodNoStorePoint": "The store has no map point yet — follow its address.",
   "driverNavGoogleMaps": "Google Maps",
   "driverNavWaze": "Waze",
-  "driverNavOpenFailed": "Couldn't open a navigation app. Follow the in-app map.",
+  "driverNavAppleMaps": "Apple Maps",
+  "chatRoleDriver": "Driver",
+  "chatRoleCustomer": "Customer",
+  "chatCallAction": "Call",
+  "chatCloseAction": "Close",
+  "chatSendAction": "Send",
+  "chatStatusSending": "Sending",
+  "chatStatusSent": "Sent",
+  "chatStatusFailed": "Not sent · Tap to retry",
+  "chatToday": "Today",
+  "chatYesterday": "Yesterday",
+  "chatEmptyBody": "Send a message to coordinate quickly",
+  "chatUnreadCount": "{count} new messages",
+  "@chatUnreadCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatQuickDriverComing": "I'm on my way",
+  "chatQuickDriverDelivering": "I'm on my way with your order",
+  "chatQuickDriverArrived": "I've arrived",
+  "chatQuickDriverWait": "Give me 2 minutes",
+  "chatQuickCustomerGate": "I'm at the gate",
+  "chatQuickCustomerComing": "Coming out now",
+  "chatQuickCustomerWhere": "Where are you?",
+  "chatQuickCustomerLeaveAtGate": "Please leave it at the gate",
+  "driverNavOpenFailed": "Couldn't open a navigation app. Check Google Maps or Waze on this phone.",
+  "driverNavOpen": "Navigate",
+  "driverNavSheetTitle": "Navigate with",
+  "driverNavWeb": "Google Maps (browser)",
+  "driverNavLastUsed": "Last used",
+  "driverNavToPickup": "To the pickup point",
+  "driverNavToDropoff": "To the drop-off point",
+  "driverNavToStore": "To the store",
+  "driverNavToCustomer": "To the customer",
+  "driverRideUnassignedTitle": "This ride was handed to another driver",
+  "driverRideUnassignedStartTimeout": "You didn't start heading to the pickup in time.",
+  "driverRideUnassignedArriveTimeout": "You didn't reach the pickup in time.",
+  "driverRideUnassignedOps": "DealGo support reassigned the ride.",
+  "driverRideUnassignedGeneric": "The ride was reopened for new offers.",
   "driverFoodDeliveryCodeTitle": "Delivery code",
   "driverFoodDeliveryCodeBody": "Ask the customer for the 4-digit code in their DealGo app to complete the delivery.",
   "driverFoodHandoverCodeTitle": "Handover code",
@@ -2683,6 +2899,8 @@
   "notifPrefsFoodBody": "Confirm, prepare and deliver",
   "notifPrefsChat": "Messages and calls",
   "notifPrefsChatBody": "Messages from people on your trips/orders",
+  "notifPrefsNewJobSound": "New job sound",
+  "notifPrefsNewJobSoundBody": "Play the spoken \"DealGo, có cuốc mới\" alert for new rides, deliveries and store orders. Turn off to use the phone's default sound.",
   "notifPrefsOther": "Other",
   "notifPrefsPromo": "Offers and promotions",
   "notifPrefsPromoBody": "Discount codes and new campaigns",
@@ -2699,6 +2917,7 @@
   "securityLoginSection": "Sign-in and verification",
   "securityPhone": "Phone number",
   "securityVerified": "Verified",
+  "securityEmail": "Email",
   "securityPasskey": "Passkey",
   "securityPasskeyBody": "Sign in with biometrics or a device key",
   "securitySessions": "Devices and sessions",
@@ -2812,6 +3031,7 @@
   "merchantProductsFilterOnSale": "On sale",
   "merchantProductsFilterHidden": "Hidden / draft",
   "merchantProductsEmptyFilter": "No items match this filter",
+  "merchantProductsEmptyMenu": "No items yet. Tap “Add item” to start selling.",
   "merchantOptionsChoiceMaxQty": "Max quantity per line",
   "merchantOptionsMaxQty": "Max ×{count}",
   "@merchantOptionsMaxQty": {
@@ -2827,7 +3047,8 @@
   "merchantEditStatusOnSale": "On sale",
   "merchantLocationTitle": "Store location",
   "merchantLocationIntro": "Drivers use this point to pick up orders; the delivery fee is measured from here.",
-  "merchantLocationUnset": "Your store has no location yet. Drivers get no exact pickup point and the delivery fee uses the default.",
+  "merchantLocationUnset": "Your store is not pinned, so it is hidden and cannot take orders. Pin it so drivers find the pickup point.",
+  "merchantLocationPinNow": "Pin now",
   "merchantLocationUnsetValue": "Not set",
   "merchantLocationPickHint": "Tap to search an address or use the map",
   "merchantLocationPendingHint": "Not saved — tap Save location",
@@ -2842,7 +3063,9 @@
   "forgotPasswordCodeSent": "If {email} has a password account, a 6-digit code was sent to it. The code is valid for a few minutes.",
   "@forgotPasswordCodeSent": {
     "placeholders": {
-      "email": {"type": "String"}
+      "email": {
+        "type": "String"
+      }
     }
   },
   "forgotPasswordCodeLabel": "6-digit code from the email",
@@ -2861,7 +3084,7 @@
   "securityPasskeyExists": "This device already has a passkey for your account.",
   "securityPasskeyFailed": "Could not add the passkey. Please try again.",
   "securityPasskeyDisabled": "Passkey sign-in is turned off for now.",
-  "securityPasskeyNeedsPhone": "Verify your phone number before adding a passkey.",
+  "securityPasskeyNeedsPhone": "Verify your phone number or email before adding a passkey.",
   "merchantProfileTitle": "Store profile",
   "merchantProfileIntro": "Name and logo customers see in the store list and on your store page.",
   "merchantProfileName": "Store name",
@@ -2875,5 +3098,246 @@
   "merchantProfileLogoRemove": "Remove logo",
   "merchantProfileLogoSaved": "Logo updated.",
   "merchantProfileLogoRemoved": "Logo removed.",
-  "accountStoreProfileBody": "Store name and logo"
+  "accountStoreProfileBody": "Store name and logo",
+  "foodReorderConfirmTitle": "Reorder this order?",
+  "foodReorderConfirmBody": "Items from this order go into your cart at current prices. You can review before placing.",
+  "actionReorder": "Reorder",
+  "foodReorderNone": "None of the old order's dishes are available now",
+  "foodReorderPartial": "{count} unavailable item(s) were left out",
+  "@foodReorderPartial": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "kycQuickModeBanner": "Quick sign-up: no documents needed. Admin will review and confirm your vehicle class.",
+  "kybQuickModeBanner": "Quick sign-up: no documents needed. Admin will review your store.",
+  "handoverRefLabel": "Handover code",
+  "handoverRefSemantics": "Handover code {ref}",
+  "@handoverRefSemantics": {
+    "placeholders": {
+      "ref": {
+        "type": "String"
+      }
+    }
+  },
+  "rideRebookAction": "Rebook ride",
+  "trackEtaMinutes": "~{minutes} min",
+  "trackStepFinding": "Finding",
+  "trackStepComing": "Coming",
+  "trackStepArrived": "Arrived",
+  "trackStepOnTrip": "On trip",
+  "trackStepDone": "Done",
+  "trackStepPlaced": "Placed",
+  "trackStepPreparing": "Cooking",
+  "trackStepReady": "Ready",
+  "trackStepDriverToStore": "Driver to store",
+  "trackStepDelivering": "On the way",
+  "trackStepDelivered": "Delivered",
+  "trackDeliveryCodeLabel": "Delivery code",
+  "trackItemsMore": "+{count} more",
+  "@trackEtaMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "@trackItemsMore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "foodStageFindingDriver": "Finding a driver",
+  "foodStageDriverToStore": "Driver heading to the store",
+  "foodStageDeliveringToYou": "Driver is on the way to you",
+  "accountSignOutConfirmTitle": "Sign out of DealGo?",
+  "accountSignOutConfirmBody": "You will need your phone number and an OTP code to sign in again.",
+  "accountSignOutCancel": "Cancel",
+  "rideOfferConfirmTitle": "Choose this driver?",
+  "rideOfferConfirmBody": "Fare {amount}. The driver will be assigned to your ride right away.",
+  "@rideOfferConfirmBody": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "rideOfferConfirmAction": "Choose driver",
+  "rideOfferConfirmCancel": "Review",
+  "rideRaiseFare": "Raise fare",
+  "rideRaiseFareTitle": "Raise your offer",
+  "rideRaiseFareBody": "Drivers see the new price right away. Current price: {amount}",
+  "@rideRaiseFareBody": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "rideRaiseFareStep": "+{amount}",
+  "@rideRaiseFareStep": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "rideRaiseFareDone": "Fare raised to {amount}",
+  "@rideRaiseFareDone": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "rideDeclineOffer": "Decline this price",
+  "rideDeclineOfferDone": "Offer declined. The driver can send a new price.",
+  "driverWithdrawOffer": "Withdraw offer",
+  "driverWithdrawOfferDone": "Offer withdrawn",
+  "driverCustomerRating": "Customer rating",
+  "driverCustomerRatingValue": "{average}★ ({count} ratings)",
+  "@driverCustomerRatingValue": {
+    "placeholders": {
+      "average": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "driverCustomerRatingNone": "New customer – no ratings yet",
+  "driverCancelRide": "Cancel ride",
+  "driverCancelReasonTitle": "Why are you cancelling?",
+  "driverCancelHint": "Cancelling an accepted ride counts toward your cancellation rate.",
+  "driverCancelReasonCustomerUnreachable": "Can't reach the customer",
+  "driverCancelReasonPickupTooFar": "Pickup is too far",
+  "driverCancelReasonVehicleProblem": "Vehicle problem",
+  "driverCancelReasonSafetyConcern": "Safety concern",
+  "driverCancelReasonCustomerAsked": "Customer asked to cancel",
+  "driverCancelReasonOther": "Other reason",
+  "driverCancelDone": "Ride cancelled",
+  "driverNoShow": "Customer didn't show",
+  "driverNoShowBody": "Use this only after waiting at the pickup point. The server checks the wait time and may charge the customer a no-show fee.",
+  "driverNoShowDone": "No-show recorded. The ride is closed.",
+  "driverRateCustomerTitle": "Rate the customer",
+  "driverRateCustomerSubmit": "Send rating",
+  "driverRateCustomerDone": "Rating sent – thank you!",
+  "driverRateCustomerYours": "Your rating: {stars}★",
+  "@driverRateCustomerYours": {
+    "placeholders": {
+      "stars": {
+        "type": "int"
+      }
+    }
+  },
+  "driverRateTagOnTime": "On time",
+  "driverRateTagPolite": "Polite",
+  "driverRateTagClearPickup": "Clear pickup",
+  "driverRateTagLate": "Kept me waiting",
+  "driverRateTagRude": "Rude",
+  "driverRateTagWrongPickup": "Wrong pickup point",
+  "driverFoodRelease": "Return order",
+  "driverFoodReleaseTitle": "Why return this order?",
+  "driverFoodReleaseHint": "The order goes back to other drivers. Returning counts as a cancellation.",
+  "driverFoodReleaseStoreTooSlow": "Store is too slow",
+  "driverFoodReleaseStoreClosed": "Store is closed",
+  "driverFoodReleaseVehicleProblem": "Vehicle problem",
+  "driverFoodReleaseSafetyConcern": "Safety concern",
+  "driverFoodReleaseOther": "Other reason",
+  "driverFoodReleaseDone": "Order returned",
+  "driverFailNoteLabel": "What happened? (required)",
+  "driverFailNoteRequired": "Please describe what happened.",
+  "driverFailAbsentHint": "Call and message the customer first. You can report \"customer unreachable\" only after waiting at the drop-off for a few minutes.",
+  "driverFoodFailedDone": "Delivery reported as failed",
+  "apiErrLiveOffersFull": "This ride already has the maximum number of offers. Try again shortly.",
+  "apiErrFareRaiseLimit": "You can't raise the fare any more for this ride.",
+  "apiErrCancelCooldown": "You've cancelled several rides recently. Please wait a little before booking again.",
+  "apiErrRepostInvalid": "This ride can't be reposted.",
+  "apiErrFailTooEarly": "Wait at the drop-off a few more minutes before reporting the customer unreachable.",
+  "apiErrFailNoteRequired": "Please add a note describing the problem.",
+  "apiErrStoreLocationRequired": "This store hasn't set its location yet.",
+  "apiErrDriverLocationStale": "We don't have your current location yet. Turn on location and pull to refresh.",
+  "apiErrOutsideServiceZone": "This address is outside our service area.",
+  "apiErrTooFar": "The delivery address is too far from this store.",
+  "apiErrSettlementOverlap": "This period overlaps an existing statement.",
+  "apiErrSettlementPeriodOpen": "This period hasn't ended yet.",
+  "apiErrShopLocationRequired": "Pin your shop location on the map to continue.",
+  "apiErrChangePending": "There's already an order change waiting for the customer.",
+  "apiErrChangeInvalid": "This change isn't allowed. You can only lower quantities or remove items.",
+  "apiErrChangeNotFound": "This change is no longer waiting for an answer.",
+  "foodCancelChangeRejected": "You declined the store's change",
+  "foodCancelChangeExpired": "The store's change wasn't answered in time",
+  "foodChangeTitle": "The store changed your order",
+  "foodChangeReasonOutOfStock": "Some items are sold out",
+  "foodChangeReasonNotEnough": "Not enough portions left",
+  "foodChangeReasonOther": "Other reason",
+  "foodChangeLineRemoved": "Removed",
+  "foodChangeNewTotal": "New total",
+  "foodChangeAnswerBy": "Answer by {time}, otherwise the order is cancelled for free.",
+  "@foodChangeAnswerBy": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "foodChangeAccept": "Accept",
+  "foodChangeReject": "Cancel order",
+  "foodChangeRejectConfirmTitle": "Cancel this order?",
+  "foodChangeRejectConfirmBody": "The order will be cancelled at no cost to you.",
+  "merchantEditOrder": "Report sold-out items",
+  "merchantEditOrderHint": "Lower quantities or remove items. The customer must accept before you continue.",
+  "merchantEditOrderNote": "Note for the customer",
+  "merchantEditOrderAllRemoved": "To remove every item, reject the order instead.",
+  "merchantEditOrderNewSubtotal": "New food value: {amount}",
+  "@merchantEditOrderNewSubtotal": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "merchantEditOrderSend": "Send to customer",
+  "merchantChangePending": "Waiting for the customer to accept the change (new total {total}) until {time}.",
+  "@merchantChangePending": {
+    "placeholders": {
+      "total": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "pushForegroundOpen": "View",
+  "mapPinPickup": "Pickup",
+  "mapPinDropoff": "Drop-off",
+  "mapPinStore": "Store",
+  "mapPinHome": "Deliver",
+  "@mapPinPickup": {
+    "description": "Short chip above the pickup pin on maps."
+  },
+  "mapPickerTitle": "Pick on map",
+  "mapPickerConfirm": "Use this location",
+  "mapPickerPinned": "Pinned location",
+  "mapPickerSearch": "Search places",
+  "mapStyleTitle": "Map style",
+  "mapStyleStandard": "Standard",
+  "mapStyleSatellite": "Satellite",
+  "mapStyleDark": "Dark",
+  "mapOpenSettings": "Settings",
+  "homeBannerSlideLabel": "Banner {index} of {count}: {title}",
+  "@homeBannerSlideLabel": {
+    "description": "Screen-reader label of one home banner slide.",
+    "placeholders": {
+      "index": {"type": "int"},
+      "count": {"type": "int"},
+      "title": {"type": "String"}
+    }
+  }
 }

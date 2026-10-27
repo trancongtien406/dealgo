@@ -7,6 +7,7 @@ import {
   OPS_REFRESH_COOKIE,
   opsSessionCookieOptions,
 } from "@/lib/ops-cookies";
+import { publicRequestOrigin } from "@/lib/api/public-origin";
 
 const MAX_REFRESH_COOKIE_AGE = 60 * 60 * 24 * 30;
 const MAX_TOKEN_CHARS = 4_096;
@@ -29,9 +30,9 @@ async function refreshSession(request: Request): Promise<NextResponse> {
     new URL(request.url).searchParams.get("next"),
   );
   const loginRedirect = () =>
-    NextResponse.redirect(new URL("/login", request.url), 303);
+    NextResponse.redirect(new URL("/login", publicRequestOrigin(request)), 303);
   const successRedirect = () =>
-    NextResponse.redirect(new URL(nextPath, request.url), 303);
+    NextResponse.redirect(new URL(nextPath, publicRequestOrigin(request)), 303);
 
   // GET is used for same-origin navigation from requireOpsSession / proxy.
   // Reject cross-site navigations that could rotate refresh via CSRF.
@@ -158,7 +159,7 @@ function isSameSiteNavigation(request: Request): boolean {
     return site === "same-origin" || site === "same-site" || site === "none";
   }
 
-  const requestOrigin = new URL(request.url).origin;
+  const requestOrigin = publicRequestOrigin(request);
   const origin = request.headers.get("origin");
   if (origin) {
     try {

@@ -8,6 +8,7 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
+import '../../../places/presentation/current_place.dart';
 import '../../../places/presentation/place_picker_page.dart';
 import '../../../pricing/domain/pricing.dart';
 import '../cubit/food_cart_cubit.dart';
@@ -32,7 +33,38 @@ class _FoodDropoffTileState extends State<FoodDropoffTile> {
   @override
   void initState() {
     super.initState();
-    _maybeQuote(context.read<FoodCartCubit>().state);
+    final cart = context.read<FoodCartCubit>().state;
+    _maybeQuote(cart);
+    if (widget.enabled && !cart.hasDropoff) {
+      // Smart default: deliver to where the customer is now.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          unawaited(_locateDefault());
+        }
+      });
+    }
+  }
+
+  Future<void> _locateDefault() async {
+    final auth = context.read<AuthCubit>().state;
+    final token = auth is AuthSignedIn ? auth.tokens.accessToken : null;
+    final cubit = context.read<FoodCartCubit>();
+    try {
+      final result = await locateCurrentPlace(context, accessToken: token)
+          .timeout(
+            const Duration(seconds: 8),
+            onTimeout: () => const CurrentPlaceFailed(),
+          );
+      if (!mounted || cubit.state.hasDropoff) {
+        return;
+      }
+      if (result is CurrentPlaceFound) {
+        final place = result.place;
+        cubit.setDropoff(label: place.label, lat: place.lat, lng: place.lng);
+      }
+    } catch (_) {
+      // No location service (tests / denied): the customer picks manually.
+    }
   }
 
   String? _quoteKey(FoodCartState cart) {

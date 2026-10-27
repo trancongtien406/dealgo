@@ -7,6 +7,11 @@ export type NotificationPrefs = {
   chat: boolean;
   promotion: boolean;
   news: boolean;
+  /**
+   * Driver / merchant: new ride, food job or store order plays the spoken DealGo sound.
+   * Off = the device default sound (the push itself still follows ride/food).
+   */
+  newJobSound: boolean;
 };
 
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
@@ -15,6 +20,7 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   chat: true,
   promotion: false,
   news: false,
+  newJobSound: true,
 };
 
 export function prefKeyForCategory(category: string): PrefKey | 'always' {

@@ -44,7 +44,10 @@ class SavedAddressesCubit extends Cubit<SavedAddressesState> {
     final token = accessToken();
     if (token == null) {
       emit(
-        const SavedAddressesFailed(offline: false, cause: sessionExpiredFailure),
+        const SavedAddressesFailed(
+          offline: false,
+          cause: sessionExpiredFailure,
+        ),
       );
       return;
     }

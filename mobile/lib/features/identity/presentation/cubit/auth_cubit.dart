@@ -10,14 +10,11 @@ import '../../domain/usecases/fetch_me.dart';
 
 class AuthCubit extends Cubit<AuthState> {
   AuthCubit({
-    required FetchMe fetchMe,
+    required this._fetchMe,
     required this.tokens,
-    IdentityRepository? identityRepository,
-    PostAuthGate? postAuth,
-  }) : _fetchMe = fetchMe,
-       _identityRepository = identityRepository,
-       _postAuth = postAuth,
-       super(const AuthRestoring());
+    this._identityRepository,
+    this._postAuth,
+  }) : super(const AuthRestoring());
 
   final FetchMe _fetchMe;
   final TokenStore tokens;
@@ -95,6 +92,21 @@ class AuthCubit extends Cubit<AuthState> {
     emit(AuthSignedIn(tokens: current.tokens, profile: profile));
   }
 
+  /// Re-reads `/v1/me` so newly approved partner grants open their shell
+  /// without a fresh sign-in. Failures keep the current profile.
+  Future<void> refreshProfile() async {
+    final current = state;
+    if (current is! AuthSignedIn || isClosed) {
+      return;
+    }
+    try {
+      final profile = await _fetchMe(current.tokens.accessToken);
+      await applyUpdatedProfile(profile);
+    } on Exception {
+      return;
+    }
+  }
+
   void _emitSignedIn(StoredTokens tokens, UserProfile profile) {
     if (isClosed) {
       return;
@@ -102,9 +114,19 @@ class AuthCubit extends Cubit<AuthState> {
     emit(AuthSignedIn(tokens: tokens, profile: profile));
   }
 
+  /// Runs with the still-valid access token right before sign-out (push unregister).
+  Future<void> Function(String accessToken)? beforeSignOut;
+
   Future<void> signOut() async {
     final current = state;
     if (current is AuthSignedIn) {
+      final hook = beforeSignOut;
+      if (hook != null) {
+        try {
+          await hook(current.tokens.accessToken)
+              .timeout(const Duration(seconds: 3));
+        } catch (_) {}
+      }
       final repo = _identityRepository;
       if (repo != null) {
         try {

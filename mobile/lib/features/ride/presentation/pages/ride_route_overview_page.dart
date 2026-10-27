@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design_system/components/dealgo_info_tip.dart';
 import '../../../../core/design_system/components/dealgo_banner.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
@@ -15,9 +16,12 @@ import '../../../pricing/domain/pricing.dart';
 import '../../domain/entities/ride_models.dart';
 import '../../domain/entities/ride_money.dart';
 import '../utils/ride_routes.dart';
+import '../utils/ride_vehicle_label.dart';
 import '../widgets/ride_widgets.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
+import '../../../../core/maps/route_geometry.dart';
+import '../../../../core/smoke/ride_smoke_flags.dart';
 
 /// C003 — route overview before vehicle selection, priced by the server.
 class RideRouteOverviewPage extends StatefulWidget {
@@ -41,6 +45,12 @@ class _RideRouteOverviewPageState extends State<RideRouteOverviewPage> {
     _quote = widget.places.quote;
     if (_quote == null) {
       unawaited(_load());
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _continue(context);
+        }
+      });
     }
   }
 
@@ -67,6 +77,13 @@ class _RideRouteOverviewPageState extends State<RideRouteOverviewPage> {
       );
       if (mounted) {
         setState(() => _quote = quote);
+        // Hot path / deep-link: skip manual "continue" tap (inDrive-like).
+        RideSmokeFlags.autoContinueAfterQuote = false;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _continue(context);
+          }
+        });
       }
     } catch (_) {
       if (mounted) {
@@ -80,7 +97,8 @@ class _RideRouteOverviewPageState extends State<RideRouteOverviewPage> {
     if (quote == null) {
       return;
     }
-    context.push(RideRoutes.vehicle, extra: places.withQuote(quote));
+    // Hot path: class + bid on one screen (skip separate vehicle / breakdown hops).
+    context.push(RideRoutes.fare, extra: places.withQuote(quote));
   }
 
   void _back(BuildContext context) {
@@ -136,6 +154,18 @@ class _RideRouteOverviewPageState extends State<RideRouteOverviewPage> {
                                   lng: places.dropoff.lng,
                                 ),
                               ],
+                              route: (quote?.route ?? RouteGeometry.unavailable)
+                                  .polylineOr([
+                                    MapLatLng(
+                                      lat: places.pickup.lat,
+                                      lng: places.pickup.lng,
+                                    ),
+                                    MapLatLng(
+                                      lat: places.dropoff.lat,
+                                      lng: places.dropoff.lng,
+                                    ),
+                                  ]),
+                              pulseRoute: true,
                             ),
                             if (quote != null)
                               Align(
@@ -145,8 +175,10 @@ class _RideRouteOverviewPageState extends State<RideRouteOverviewPage> {
                                   child: DealGoChip(
                                     label: distance,
                                     tone: DealGoChipTone.brand,
-                                    leading: const Icon(
-                                      DealGoIcons.motorbike,
+                                    leading: Icon(
+                                      rideVehicleClassIcon(
+                                        places.vehicleClassCode,
+                                      ),
                                       size: 14,
                                       color: DealGoColors.primary,
                                     ),
@@ -234,13 +266,15 @@ class _RideRouteOverviewPageState extends State<RideRouteOverviewPage> {
                       const SizedBox(height: DealGoSpacing.s12),
                       Text(l10n.rideQuoteLoading, style: textTheme.bodySmall),
                     ] else if (!_failed) ...[
-                      const SizedBox(height: DealGoSpacing.s12),
-                      RideInfoBanner(message: l10n.rideRoutePriceHint),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: DealGoInfoTip(message: l10n.rideRoutePriceHint),
+                      ),
                     ],
                     const SizedBox(height: DealGoSpacing.s16),
                     DealGoPrimaryButton(
-                      key: const Key('ride-open-vehicle'),
-                      label: l10n.rideRouteContinueVehicle,
+                      key: const Key('ride-continue-booking'),
+                      label: l10n.rideRouteContinueBooking,
                       trailingIcon: DealGoIcons.arrowRight,
                       enabled: quote != null,
                       onPressed: () => _continue(context),

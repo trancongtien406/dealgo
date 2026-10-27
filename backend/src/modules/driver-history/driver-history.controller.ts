@@ -27,3 +27,17 @@ export class DriverHistoryController {
     return this.history.summary(actor.userId);
   }
 }
+
+@ApiTags('driver')
+@ApiBearerAuth()
+@Controller('v1/driver')
+@UseGuards(CustomerSessionGuard)
+export class DriverActiveJobController {
+  constructor(private readonly history: DriverHistoryService) {}
+
+  @Get('active-job')
+  @ApiOperation({ summary: 'In-progress ride or food delivery assigned to the driver ({job:null} when idle)' })
+  activeJob(@CurrentActor() actor: RequestActor) {
+    return this.history.activeJob(actor.userId);
+  }
+}

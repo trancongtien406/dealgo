@@ -16,6 +16,7 @@ import type {
   StoreItemView,
 } from '../food-order/food.repository.js';
 import { FoodService } from '../food-order/food.service.js';
+import { opsDateWindow } from '../operations/ops-date-window.js';
 
 @Injectable()
 export class CatalogService {
@@ -66,7 +67,15 @@ export class CatalogService {
   }
 
   listModeration(query: OpsCatalogModerationQueryDto): Promise<OpsCatalogModerationPage> {
-    return this.food.listCatalogModeration(query);
+    return this.food.listCatalogModeration({
+      page: query.page,
+      limit: query.limit,
+      q: query.q,
+      store: query.store,
+      category: query.category,
+      status: query.status,
+      window: opsDateWindow(query),
+    });
   }
 
   approveItem(

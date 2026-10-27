@@ -72,7 +72,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: DealGoColors.card,
-      appBar: DealGoAppHeader(title: l10n.changePasswordHeader, applySafeArea: true),
+      appBar: DealGoAppHeader(
+        title: l10n.changePasswordHeader,
+        applySafeArea: true,
+      ),
       body: SafeArea(
         top: false,
         child: ListView(

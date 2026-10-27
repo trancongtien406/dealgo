@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/network/request_failure.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_models.dart';
@@ -17,8 +18,11 @@ class MerchantQueueLoadingView extends StatelessWidget {
   Widget build(BuildContext context) {
     return MerchantPageFrame(
       title: title,
-      onBack: () => merchantBack(context),
-      body: Center(child: Text(AppLocalizations.of(context).merchantLoadingOrders)),
+      showBack: false,
+      body: const Padding(
+        padding: merchantPagePadding,
+        child: DealGoSkeletonList(itemCount: 4),
+      ),
     );
   }
 }
@@ -38,7 +42,7 @@ class MerchantIneligibleView extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return MerchantPageFrame(
       title: title,
-      onBack: () => merchantBack(context),
+      showBack: false,
       footer: MerchantPrimaryBar(
         buttonKey: const Key('merchant-retry-queue'),
         label: AppLocalizations.of(context).actionRetry,
@@ -72,7 +76,7 @@ class MerchantQueueEmptyView extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return MerchantPageFrame(
       title: l10n.merchantQueueTitle,
-      onBack: () => merchantBack(context),
+      showBack: false,
       footer: MerchantPrimaryBar(
         buttonKey: const Key('merchant-check-orders'),
         label: l10n.merchantReloadOrders,
@@ -88,8 +92,6 @@ class MerchantQueueEmptyView extends StatelessWidget {
             title: l10n.merchantNoNewOrders,
             message: l10n.merchantNoNewOrdersBody,
           ),
-          const SizedBox(height: DealGoSpacing.s12),
-          MerchantNote(message: l10n.merchantNoNewOrdersNote),
         ],
       ),
     );

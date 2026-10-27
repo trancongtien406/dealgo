@@ -1,0 +1,62 @@
+# Production layout EXAMPLE (DEC-PROD-053). Not used by dev; nothing here deploys anything.
+# Copy to docker-compose.prod.yml on the server, provide backend/.env.production and
+# website/.env.production (see docs/09-operations/secrets-and-env.md), then:
+#   docker compose -f docker-compose.prod.yml run --rm migrate
+#   docker compose -f docker-compose.prod.yml up -d api worker website
+# Postgres/Redis are expected to be managed services (DATABASE_URL / REDIS_URL in the env file).
+services:
+  migrate:
+    build: { context: ./backend, target: migrate }
+    env_file: ./backend/.env.production
+    restart: "no"
+    profiles: ["migrate"]
+
+  api:
+    build: { context: ./backend, target: api }
+    env_file: ./backend/.env.production
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      LOG_FORMAT: json
+      TRUST_PROXY: "1"
+    ports: ["127.0.0.1:3001:3001"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 30s
+
+  worker:
+    build: { context: ./backend, target: worker }
+    env_file: ./backend/.env.production
+    environment:
+      NODE_ENV: production
+      LOG_FORMAT: json
+    restart: unless-stopped
+    depends_on:
+      api: { condition: service_healthy }
+    # Heartbeat is written to the DB; the API reports it (503 when stale or outbox lag too high).
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://api:3001/health/worker').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  website:
+    build:
+      context: ./website
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
+        NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN:-}
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+    env_file: ./website/.env.production
+    environment:
+      NODE_ENV: production
+      DEALGO_API_BASE_URL: http://api:3001
+    ports: ["127.0.0.1:3000:3000"]
+    restart: unless-stopped
+    depends_on:
+      api: { condition: service_healthy }

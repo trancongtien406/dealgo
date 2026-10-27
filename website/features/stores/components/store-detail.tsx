@@ -31,6 +31,7 @@ import {
   TextAction,
 } from "@/components/ui/admin-detail-ui";
 import { isForbiddenError } from "@/lib/api/errors";
+import { StoreStatementPanel } from "@/features/stores/components/store-statement-panel";
 
 function EmptyPanel({ message = "Chưa có dữ liệu" }: { message?: string }) {
   return (
@@ -450,14 +451,17 @@ export function StoreDetail({ code }: { code: string }) {
                           Tổng quan tài chính & đối soát
                         </h3>
                         <p className="text-xs text-muted">
-                          Chưa có số liệu tài chính trên hồ sơ cửa hàng.
+                          Sao kê hoa hồng theo ngày (giờ Việt Nam).
                         </p>
                       </div>
                       <PreviewLink href="/settlements" tone="brand" compact>
                         Vào trang đối soát
                       </PreviewLink>
                     </div>
-                    <EmptyPanel />
+                    <StoreStatementPanel
+                      storeId={store.code}
+                      storeName={store.name}
+                    />
                   </div>
                 )}
 

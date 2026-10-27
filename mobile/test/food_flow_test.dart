@@ -8,6 +8,8 @@ import 'package:dealgo/features/food/presentation/cubit/food_cart_cubit.dart';
 import 'package:dealgo/core/network/api_exception.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:dealgo/features/food/presentation/utils/food_routes.dart';
 
 import 'support/auth_test_harness.dart';
 import 'support/fake_food_client.dart';
@@ -131,7 +133,7 @@ void main() {
       find.byWidgetPredicate(
         (widget) =>
             widget is Semantics &&
-            widget.properties.label == 'Mua hàng' &&
+            widget.properties.label == 'Mua' &&
             widget.properties.selected == true,
       ),
       findsWidgets,
@@ -227,6 +229,31 @@ void main() {
     expect(find.text('61.000đ'), findsOneWidget);
     expect(find.text('Bạn đang ngoại tuyến'), findsNothing);
   });
+
+  testWidgets('empty checkout shows clear empty state and back-to-menu CTA', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final food = _catalogClient();
+    await pumpSignedIn(
+      tester,
+      profile: customerProfile,
+      foodClient: food,
+      pricing: FakePricingRemoteDataSource(deliveryFareVnd: 25000),
+    );
+    final context = tester.element(find.byType(Scaffold).first);
+    GoRouter.of(context).push(FoodRoutes.checkout);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('food-checkout-empty')), findsOneWidget);
+    expect(find.text('Giỏ hàng trống'), findsOneWidget);
+    expect(find.text('Hãy chọn món trước khi thanh toán.'), findsOneWidget);
+    expect(find.byKey(const Key('state-view-action')), findsOneWidget);
+    expect(find.text('Quay lại thực đơn'), findsOneWidget);
+    expect(find.byKey(const Key('food-place-order')), findsNothing);
+    expect(find.textContaining('Đặt hàng · 0đ'), findsNothing);
+  });
 }
 
 FakeFoodClient _catalogClient() {
@@ -255,7 +282,7 @@ Future<void> _openCheckout(WidgetTester tester, FakeFoodClient food) async {
     foodClient: food,
     pricing: FakePricingRemoteDataSource(deliveryFareVnd: 25000),
   );
-  await tester.tap(navLabel('Mua hàng'));
+  await tester.tap(navLabel('Mua'));
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const Key('food-store-card-$_storeId')));
   await tester.pumpAndSettle();
@@ -269,8 +296,6 @@ Future<void> _openCheckout(WidgetTester tester, FakeFoodClient food) async {
   await tester.tap(find.text('Xem giỏ hàng'));
   await tester.pumpAndSettle();
   await chooseDeliveryAddress(tester);
-  await tester.tap(find.text('Tiếp tục thanh toán'));
-  await tester.pumpAndSettle();
   expect(find.text('60.000đ'), findsWidgets);
   expect(find.text('25.000đ'), findsWidgets);
 }

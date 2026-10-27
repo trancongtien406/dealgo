@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../utils/partner_status_listener.dart';
+import '../../../../core/config/api_base_url.dart';
 import '../../../../core/design_system/components/dealgo_card.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
@@ -9,6 +11,7 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
+import '../../../pricing/domain/pricing.dart';
 import '../../domain/entities/partner_documents.dart';
 import '../../domain/entities/partner_onboarding.dart';
 import '../cubit/driver_kyc_cubit.dart';
@@ -24,7 +27,8 @@ Future<void> _loadDriverKyc(BuildContext context) async {
   if (auth is AuthSignedIn) {
     cubit.seedFromProfile(auth.profile);
   }
-  await cubit.refresh().timeout(const Duration(seconds: 12));
+  await Future.wait([cubit.refresh(), cubit.loadRequirements()])
+      .timeout(const Duration(seconds: 12));
 }
 
 bool _isDriverKycPath(String path) {
@@ -304,9 +308,17 @@ class _DriverKycIntroPageState extends State<DriverKycIntroPage> {
             subtitle: l10n.kycIntroEarnBody,
           ),
           const SizedBox(height: DealGoSpacing.s16),
-          OnboardingInfoBanner(
-            message: l10n.kycIntroRequirements,
-            icon: DealGoIcons.shield,
+          BlocBuilder<DriverKycCubit, DriverKycState>(
+            buildWhen: (a, b) => a.documentsRequired != b.documentsRequired,
+            builder: (context, state) => OnboardingInfoBanner(
+              key: const Key('kyc-intro-requirements'),
+              message: state.documentsRequired
+                  ? l10n.kycIntroRequirements
+                  : l10n.kycQuickModeBanner,
+              icon: state.documentsRequired
+                  ? DealGoIcons.shield
+                  : DealGoIcons.bolt,
+            ),
           ),
         ],
       ),
@@ -452,7 +464,23 @@ class DriverKycStatusPage extends StatefulWidget {
   State<DriverKycStatusPage> createState() => _DriverKycStatusPageState();
 }
 
-class _DriverKycStatusPageState extends State<DriverKycStatusPage> {
+class _DriverKycStatusPageState extends State<DriverKycStatusPage>
+    with WidgetsBindingObserver, PartnerStatusListener<DriverKycStatusPage> {
+  @override
+  String get partnerStatusRole => 'DRIVER';
+
+  @override
+  bool get pendingStatusActive {
+    final status = context.read<DriverKycCubit>().state.status;
+    return status != PartnerApplicationStatus.active &&
+        status != PartnerApplicationStatus.rejected &&
+        status != PartnerApplicationStatus.draft;
+  }
+
+  @override
+  Future<void> refreshPendingStatus() =>
+      context.read<DriverKycCubit>().refresh();
+
   @override
   void initState() {
     super.initState();
@@ -473,7 +501,9 @@ class _DriverKycStatusPageState extends State<DriverKycStatusPage> {
         final isDraft = state.status == PartnerApplicationStatus.draft;
         final textTheme = Theme.of(context).textTheme;
         return OnboardingScaffold(
-          title: l10n.kycStatusTitle,
+          title: state.documentsRequired
+              ? l10n.kycStatusTitle
+              : l10n.kycStatusTitleQuick,
           roleBadge: l10n.kycRoleBadge,
           onBack: () => _leaveDriverKyc(context),
           footer: Column(
@@ -495,7 +525,11 @@ class _DriverKycStatusPageState extends State<DriverKycStatusPage> {
               else
                 OnboardingContinueBar(
                   label: l10n.kycTrackCta,
-                  onPressed: () => context.go('/driver'),
+                  onPressed: () async {
+                    final router = GoRouter.of(context);
+                    await context.read<AuthCubit>().refreshProfile();
+                    router.go('/driver');
+                  },
                 ),
             ],
           ),
@@ -564,7 +598,9 @@ class _DriverKycStatusPageState extends State<DriverKycStatusPage> {
                 ),
                 const SizedBox(height: DealGoSpacing.s12),
                 PartnerTimelineRow(
-                  title: l10n.partnerTimelineReview,
+                  title: state.documentsRequired
+                      ? l10n.partnerTimelineReview
+                      : l10n.partnerTimelineReviewQuick,
                   subtitle: isActive || isRejected
                       ? l10n.partnerTimelineReviewed
                       : l10n.partnerTimelineReviewing,
@@ -795,35 +831,37 @@ class _PersonalStep extends StatelessWidget {
           hint: l10n.kycFullNameHint,
           onChanged: cubit.setFullName,
         ),
-        const SizedBox(height: DealGoSpacing.s12),
-        OnboardingMockField(
-          label: l10n.kycBirthDate,
-          value: state.birthDate,
-          required: true,
-          fieldKey: const Key('kyc-birth-date'),
-          hint: 'dd/mm/yyyy',
-          keyboardType: TextInputType.datetime,
-          onChanged: cubit.setBirthDate,
-          trailing: const Icon(
-            DealGoIcons.calendar,
-            size: 18,
-            color: DealGoColors.textSecondary,
+        if (state.documentsRequired) ...[
+          const SizedBox(height: DealGoSpacing.s12),
+          OnboardingMockField(
+            label: l10n.kycBirthDate,
+            value: state.birthDate,
+            required: true,
+            fieldKey: const Key('kyc-birth-date'),
+            hint: 'dd/mm/yyyy',
+            keyboardType: TextInputType.datetime,
+            onChanged: cubit.setBirthDate,
+            trailing: const Icon(
+              DealGoIcons.calendar,
+              size: 18,
+              color: DealGoColors.textSecondary,
+            ),
           ),
-        ),
-        const SizedBox(height: DealGoSpacing.s12),
-        OnboardingMockField(
-          label: l10n.kycNationality,
-          value: l10n.kycNationalityVn,
-          required: true,
-        ),
-        const SizedBox(height: DealGoSpacing.s12),
-        OnboardingMockField(
-          label: l10n.kycAddress,
-          value: state.address,
-          required: true,
-          fieldKey: const Key('kyc-address'),
-          onChanged: cubit.setAddress,
-        ),
+          const SizedBox(height: DealGoSpacing.s12),
+          OnboardingMockField(
+            label: l10n.kycNationality,
+            value: l10n.kycNationalityVn,
+            required: true,
+          ),
+          const SizedBox(height: DealGoSpacing.s12),
+          OnboardingMockField(
+            label: l10n.kycAddress,
+            value: state.address,
+            required: true,
+            fieldKey: const Key('kyc-address'),
+            onChanged: cubit.setAddress,
+          ),
+        ],
         const SizedBox(height: DealGoSpacing.s16),
         OnboardingInfoBanner(
           message: l10n.kycPrivacyNote,
@@ -913,22 +951,110 @@ class _LicenseStep extends StatelessWidget {
   }
 }
 
-class _VehicleStep extends StatelessWidget {
+class _VehicleClassChipLabel extends StatelessWidget {
+  const _VehicleClassChipLabel({required this.name, this.imageUrl});
+
+  final String name;
+  final String? imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final resolved = resolveMediaUrl(imageUrl);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (resolved != null) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(DealGoRadius.input),
+            child: Image.network(
+              resolved,
+              width: 24,
+              height: 24,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+            ),
+          ),
+          const SizedBox(width: DealGoSpacing.s8),
+        ],
+        Text(name),
+      ],
+    );
+  }
+}
+
+class _VehicleStep extends StatefulWidget {
   const _VehicleStep({required this.state});
 
   final DriverKycState state;
 
   @override
+  State<_VehicleStep> createState() => _VehicleStepState();
+}
+
+class _VehicleStepState extends State<_VehicleStep> {
+  static const _fallback = [
+    RideVehicleClassOption(code: 'MOTORBIKE', name: 'Xe máy', seats: 1),
+    RideVehicleClassOption(code: 'CAR_4', name: 'Xe 4 chỗ', seats: 4),
+    RideVehicleClassOption(code: 'CAR_7', name: 'Xe 7 chỗ', seats: 7),
+  ];
+
+  List<RideVehicleClassOption> _classes = _fallback;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadClasses());
+  }
+
+  Future<void> _loadClasses() async {
+    final auth = context.read<AuthCubit>().state;
+    if (auth is! AuthSignedIn) {
+      return;
+    }
+    try {
+      final classes = await context
+          .read<PricingRepository>()
+          .listVehicleClasses(accessToken: auth.tokens.accessToken);
+      if (!mounted || classes.isEmpty) {
+        return;
+      }
+      setState(() => _classes = classes);
+    } catch (_) {
+      // Keep the built-in classes so registration can still name a vehicle.
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final cubit = context.read<DriverKycCubit>();
+    final state = widget.state;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        OnboardingMockField(
-          label: l10n.kycVehicleType,
-          value: state.vehicleType,
-          required: true,
+        Text(
+          l10n.kycVehicleType,
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        const SizedBox(height: DealGoSpacing.s8),
+        Wrap(
+          spacing: DealGoSpacing.s8,
+          runSpacing: DealGoSpacing.s8,
+          children: [
+            for (final vehicle in _classes)
+              ChoiceChip(
+                key: Key('kyc-vehicle-${vehicle.code}'),
+                label: _VehicleClassChipLabel(
+                  name: vehicle.name,
+                  imageUrl: vehicle.imageUrl,
+                ),
+                selected: state.vehicleClassCode == vehicle.code,
+                onSelected: (_) => cubit.setVehicleClass(
+                  code: vehicle.code,
+                  name: vehicle.name,
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: DealGoSpacing.s12),
         OnboardingMockField(
@@ -964,8 +1090,23 @@ class _VehicleStep extends StatelessWidget {
           ],
         ),
         const SizedBox(height: DealGoSpacing.s16),
-        _DocSlots(state: state, kinds: const [PartnerDocumentKind.vehicleReg]),
-        OnboardingInfoBanner(message: l10n.kycVehicleNote),
+        if (state.documentsRequired) ...[
+          _DocSlots(
+            state: state,
+            kinds: [
+              PartnerDocumentKind.vehicleReg,
+              if (PartnerDocumentKind.isCarClass(state.vehicleClassCode ?? ''))
+                PartnerDocumentKind.vehicleInsurance,
+            ],
+          ),
+          OnboardingInfoBanner(message: l10n.kycVehicleNote),
+          if (PartnerDocumentKind.isCarClass(state.vehicleClassCode ?? ''))
+            OnboardingInfoBanner(message: l10n.kycVehicleInsuranceNote),
+        ] else
+          OnboardingInfoBanner(
+            message: l10n.kycQuickModeBanner,
+            icon: DealGoIcons.bolt,
+          ),
       ],
     );
   }
@@ -1016,7 +1157,9 @@ class _ReviewStep extends StatelessWidget {
               PartnerReviewRow(
                 title: l10n.kycReviewDriver,
                 subtitle: state.fullName,
-                ok: state.canContinuePersonal && state.canContinueIdNumber,
+                ok:
+                    state.canContinuePersonal &&
+                    (!state.documentsRequired || state.canContinueIdNumber),
               ),
               PartnerReviewRow(
                 title: l10n.kycReviewServices,
@@ -1026,43 +1169,50 @@ class _ReviewStep extends StatelessWidget {
               PartnerReviewRow(
                 title: l10n.kycStepVehicle,
                 subtitle: [
+                  state.vehicleType ?? '',
                   state.vehiclePlate,
                   state.vehicleBrand,
                   state.vehicleModel,
                 ].where((v) => v.trim().isNotEmpty).join(' · '),
-                ok: state.canContinueVehicle,
+                ok: state.canContinueVehicleStep,
               ),
-              PartnerReviewRow(
-                title: l10n.kycReviewBank,
-                subtitle: state.bankAccountNumber.isEmpty
-                    ? ''
-                    : '${state.bankName} · ${partnerMaskAccount(state.bankAccountNumber)}',
-                ok: state.canContinueBank,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: DealGoSpacing.s12),
-        DealGoCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(l10n.partnerReviewTitleDocs, style: textTheme.titleMedium),
-              const SizedBox(height: DealGoSpacing.s12),
-              for (final kind in PartnerDocumentKind.driverRequired)
-                InkWell(
-                  onTap: () => cubit.goToStep(_stepForKind(kind)),
-                  child: PartnerReviewRow(
-                    title: partnerDocumentLabel(l10n, kind),
-                    subtitle: '',
-                    ok: state.documents.has(kind),
-                  ),
+              if (state.documentsRequired)
+                PartnerReviewRow(
+                  title: l10n.kycReviewBank,
+                  subtitle: state.bankAccountNumber.isEmpty
+                      ? ''
+                      : '${state.bankName} · ${partnerMaskAccount(state.bankAccountNumber)}',
+                  ok: state.canContinueBank,
                 ),
             ],
           ),
         ),
         const SizedBox(height: DealGoSpacing.s12),
-        OnboardingInfoBanner(message: l10n.kycReviewNote),
+        if (state.documentsRequired)
+          DealGoCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l10n.partnerReviewTitleDocs, style: textTheme.titleMedium),
+                const SizedBox(height: DealGoSpacing.s12),
+                for (final kind in state.requiredDriverDocumentKinds)
+                  InkWell(
+                    onTap: () => cubit.goToStep(_stepForKind(kind)),
+                    child: PartnerReviewRow(
+                      title: partnerDocumentLabel(l10n, kind),
+                      subtitle: '',
+                      ok: state.documents.has(kind),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        const SizedBox(height: DealGoSpacing.s12),
+        OnboardingInfoBanner(
+          message: state.documentsRequired
+              ? l10n.kycReviewNote
+              : l10n.kycQuickModeBanner,
+        ),
       ],
     );
   }
@@ -1072,6 +1222,7 @@ class _ReviewStep extends StatelessWidget {
       PartnerDocumentKind.selfie => DriverKycStep.selfie,
       PartnerDocumentKind.license => DriverKycStep.license,
       PartnerDocumentKind.vehicleReg => DriverKycStep.vehicle,
+      PartnerDocumentKind.vehicleInsurance => DriverKycStep.vehicle,
       _ => DriverKycStep.identity,
     };
   }

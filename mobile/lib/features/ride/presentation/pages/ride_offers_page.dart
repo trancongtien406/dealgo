@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design_system/components/dealgo_dialog.dart';
+import '../../../../core/design_system/components/dealgo_haptics.dart';
 import '../../../../core/network/api_error_l10n.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/network/request_failure.dart';
@@ -20,9 +24,11 @@ import '../widgets/ride_offers_widgets.dart';
 import '../utils/ride_routes.dart';
 import '../cubit/ride_session.dart';
 import '../widgets/ride_widgets.dart';
+import '../widgets/ride_negotiation_ui.dart';
 import '../../../../core/l10n/api_error_text.dart';
 import '../../../promotion/domain/entities/voucher_quote.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
+import '../../../../core/realtime/snapshot_realtime.dart';
 
 class RideOffersPage extends StatelessWidget {
   const RideOffersPage({required this.rideId, this.clock, super.key});
@@ -37,9 +43,18 @@ class RideOffersPage extends StatelessWidget {
         getRide: context.read<GetRide>(),
         selectRideOffer: context.read<SelectRideOffer>(),
         cancelRide: context.read<CancelRide>(),
+        realtime: _maybeRealtime(context),
       ),
       child: _RideOffersView(rideId: rideId, clock: clock),
     );
+  }
+}
+
+SnapshotRealtime? _maybeRealtime(BuildContext context) {
+  try {
+    return context.read<SnapshotRealtime>();
+  } catch (_) {
+    return null;
   }
 }
 
@@ -82,10 +97,42 @@ class _RideOffersPageState extends State<_RideOffersView> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _load();
+      _watch();
+    });
   }
 
-  Future<void> _load() async {
+  var _watching = false;
+
+  void _watch() {
+    if (!mounted || _watching) {
+      return;
+    }
+    final token = rideAccessToken(context);
+    if (token == null) {
+      return;
+    }
+    _watching = true;
+    context
+        .read<RideOffersCubit>()
+        .watch(
+          accessToken: token,
+          rideId: widget.rideId,
+          refresh: () async {
+            final ride = _ride;
+            if (!mounted ||
+                _busy ||
+                (ride != null && ride.status != RideStatus.negotiating)) {
+              return;
+            }
+            await _load(silent: true);
+          },
+        )
+        .catchError((Object _) {});
+  }
+
+  Future<void> _load({bool silent = false}) async {
     final token = rideAccessToken(context);
     if (token == null) {
       setState(() {
@@ -96,12 +143,14 @@ class _RideOffersPageState extends State<_RideOffersView> {
       });
       return;
     }
-    setState(() {
-      _loading = true;
-      _offline = false;
-      _message = null;
-      _block = null;
-    });
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _offline = false;
+        _message = null;
+        _block = null;
+      });
+    }
     try {
       final ride = await context.read<RideOffersCubit>().load(
         accessToken: token,
@@ -127,7 +176,7 @@ class _RideOffersPageState extends State<_RideOffersView> {
         if (!mounted) {
           return;
         }
-        await context.push(RideRoutes.tracking(ride.id));
+        unawaited(context.push(RideRoutes.tracking(ride.id)));
         return;
       }
       final selectable = _selectable(ride);
@@ -137,7 +186,7 @@ class _RideOffersPageState extends State<_RideOffersView> {
         _selectedOfferId = _keepSelection(selectable);
       });
     } catch (error) {
-      if (!mounted) {
+      if (!mounted || silent) {
         return;
       }
       setState(() {
@@ -197,6 +246,26 @@ class _RideOffersPageState extends State<_RideOffersView> {
       return;
     }
     final chosen = offer;
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDealGoConfirmDialog(
+      context: context,
+      title: l10n.rideOfferConfirmTitle,
+      body: l10n.rideOfferConfirmBody(
+        formatRideVnd(
+          rideCashAfterVoucher(chosen.amountVnd, _voucherDiscountVnd),
+        ),
+      ),
+      confirmLabel: l10n.rideOfferConfirmAction,
+      cancelLabel: l10n.rideOfferConfirmCancel,
+      confirmKey: const Key('ride-offer-confirm'),
+    );
+    if (!confirmed || !mounted || _busy) {
+      return;
+    }
+    if (!rideOfferSelectable(chosen, _now)) {
+      setState(() => _block = const OfferBlock.expired());
+      return;
+    }
     final token = rideAccessToken(context);
     if (token == null) {
       setState(() => _message = sessionExpiredMessage(context));
@@ -231,11 +300,18 @@ class _RideOffersPageState extends State<_RideOffersView> {
         return;
       }
       context.read<RideSessionCubit>().clear();
+      DealGoHaptics.success();
       setState(() {
         _busy = false;
         _ride = updated;
         _selectKey = null;
       });
+      if (agreed == chosen.amountVnd && updated.discountVnd == 0) {
+        // Price unchanged and no voucher to read back: the separate "confirmed" screen was a dead-end
+        // extra tap before tracking. Go straight to tracking.
+        await context.push(RideRoutes.tracking(updated.id));
+        return;
+      }
       await context.push(
         RideRoutes.confirm(updated.id),
         extra: RideConfirmArgs(
@@ -335,6 +411,92 @@ class _RideOffersPageState extends State<_RideOffersView> {
     }
   }
 
+  /// Raise the fare in place; drivers see it over the socket.
+  Future<void> _raiseFare(RideView ride) async {
+    final client = maybeRideNegotiation(context);
+    final token = rideAccessToken(context);
+    if (_busy || client == null || token == null) {
+      return;
+    }
+    final amount = await showRaiseFareSheet(
+      context: context,
+      currentFareVnd: ride.offeredFareVnd,
+      formatVnd: formatRideVnd,
+    );
+    if (amount == null || !mounted) {
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _message = null;
+    });
+    try {
+      await client.raiseFare(
+        accessToken: token,
+        rideId: ride.id,
+        amountVnd: amount,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() => _busy = false);
+      showNegotiationSnack(
+        context,
+        AppLocalizations.of(context).rideRaiseFareDone(formatRideVnd(amount)),
+      );
+      await _load(silent: true);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _busy = false;
+        _message = negotiationErrorText(context, error);
+      });
+    }
+  }
+
+  /// Decline the selected offer without cancelling the ride.
+  Future<void> _declineSelected(RideView ride) async {
+    final client = maybeRideNegotiation(context);
+    final token = rideAccessToken(context);
+    final offerId = _selectedOfferId;
+    if (_busy || client == null || token == null || offerId == null) {
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _message = null;
+    });
+    try {
+      await client.declineOffer(
+        accessToken: token,
+        rideId: ride.id,
+        offerId: offerId,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _busy = false;
+        _selectedOfferId = null;
+      });
+      showNegotiationSnack(
+        context,
+        AppLocalizations.of(context).rideDeclineOfferDone,
+      );
+      await _load(silent: true);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _busy = false;
+        _message = negotiationErrorText(context, error);
+      });
+    }
+  }
+
   void _changeFare(RideView ride) {
     context.push(
       RideRoutes.fare,
@@ -366,7 +528,10 @@ class _RideOffersPageState extends State<_RideOffersView> {
     if (_loading && ride == null) {
       return Column(
         children: [
-          DealGoAppHeader(title: AppLocalizations.of(context).rideDriverOffers, onBack: _back),
+          DealGoAppHeader(
+            title: AppLocalizations.of(context).rideDriverOffers,
+            onBack: _back,
+          ),
           const Expanded(child: Center(child: CircularProgressIndicator())),
         ],
       );
@@ -425,13 +590,16 @@ class _RideOffersPageState extends State<_RideOffersView> {
                 formatRideVnd(rideCashAfterVoucher(agreed, ride.discountVnd)),
               ),
         onBack: _back,
-        actionLabel: agreed == null ? null : AppLocalizations.of(context).rideTrack,
+        actionLabel: agreed == null
+            ? null
+            : AppLocalizations.of(context).rideTrack,
         onAction: agreed == null
             ? null
             : () => context.push(RideRoutes.tracking(ride.id)),
       );
     }
     final offers = _selectable(ride);
+    final negotiation = maybeRideNegotiation(context);
     if (offers.isEmpty) {
       return EmptyOffers(
         ride: ride,
@@ -442,6 +610,7 @@ class _RideOffersPageState extends State<_RideOffersView> {
         onRetry: _load,
         onChangeFare: () => _changeFare(ride),
         onCancel: _cancel,
+        onRaiseFare: negotiation == null ? null : () => _raiseFare(ride),
       );
     }
     return OfferList(
@@ -455,6 +624,10 @@ class _RideOffersPageState extends State<_RideOffersView> {
       onSelectOffer: (id) => setState(() => _selectedOfferId = id),
       onConfirm: _select,
       onCancel: _cancel,
+      onRaiseFare: negotiation == null ? null : () => _raiseFare(ride),
+      onDeclineSelected: negotiation == null
+          ? null
+          : () => _declineSelected(ride),
       onVoucherQuote: _onVoucherQuote,
       voucherCode: _voucherCode,
       voucherDiscountVnd: _voucherDiscountVnd,

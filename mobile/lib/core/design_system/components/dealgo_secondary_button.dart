@@ -11,6 +11,7 @@ class DealGoSecondaryButton extends StatelessWidget {
     this.enabled = true,
     this.leadingIcon,
     this.tone = DealGoSecondaryTone.brand,
+    this.compact = false,
     super.key,
   });
 
@@ -19,6 +20,7 @@ class DealGoSecondaryButton extends StatelessWidget {
   final bool enabled;
   final IconData? leadingIcon;
   final DealGoSecondaryTone tone;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -41,11 +43,16 @@ class DealGoSecondaryButton extends StatelessWidget {
       style: ButtonStyle(
         animationDuration: Duration.zero,
         elevation: const WidgetStatePropertyAll(0),
-        minimumSize: const WidgetStatePropertyAll(
-          Size(DealGoDimensions.minTapTarget, DealGoDimensions.buttonMinHeight),
+        minimumSize: WidgetStatePropertyAll(
+          Size(
+            DealGoDimensions.minTapTarget,
+            compact ? 48 : DealGoDimensions.buttonMinHeight,
+          ),
         ),
-        padding: const WidgetStatePropertyAll(
-          EdgeInsets.symmetric(horizontal: DealGoSpacing.s16),
+        padding: WidgetStatePropertyAll(
+          EdgeInsets.symmetric(
+            horizontal: compact ? DealGoSpacing.s12 : DealGoSpacing.s16,
+          ),
         ),
         foregroundColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.disabled)

@@ -23,10 +23,21 @@ void main() {
       );
     });
 
-    test('parses https app host', () {
+    test('parses https app links under /app on the unified host', () {
       expect(
-        parser.parse(Uri.parse('https://app.dealgo.vn/driver/jobs')),
-        '/driver/jobs',
+        parser.parse(Uri.parse('https://dealgo.vn/app/driver/jobs?x=1')),
+        '/driver/jobs?x=1',
+      );
+      expect(
+        parser.parse(Uri.parse('https://www.dealgo.vn/app/customer/home')),
+        '/customer/home',
+      );
+      expect(parser.parse(Uri.parse('https://dealgo.vn/privacy')), isNull);
+      expect(parser.parse(Uri.parse('http://dealgo.vn/app/x')), isNull);
+      expect(
+        const DeepLinkParser(host: 'staging.dealgo.vn')
+            .parse(Uri.parse('https://staging.dealgo.vn/app/customer/home')),
+        '/customer/home',
       );
     });
 

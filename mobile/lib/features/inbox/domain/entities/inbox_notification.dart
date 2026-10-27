@@ -27,6 +27,8 @@ class InboxNotification {
     this.aggregateType,
     this.aggregateId,
     this.status,
+    this.path,
+    this.role,
   });
 
   final String id;
@@ -41,6 +43,13 @@ class InboxNotification {
   final String? aggregateId;
   final String? status;
 
+  /// In-app page the server named for this recipient (may be absent).
+  final String? path;
+
+  /// Recipient role the server wrote this row for (`CUSTOMER` / `DRIVER` /
+  /// `MERCHANT`); absent on legacy rows.
+  final String? role;
+
   InboxNotification markedRead() {
     return InboxNotification(
       id: id,
@@ -52,6 +61,8 @@ class InboxNotification {
       aggregateType: aggregateType,
       aggregateId: aggregateId,
       status: status,
+      path: path,
+      role: role,
     );
   }
 }

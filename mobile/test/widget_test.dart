@@ -1,4 +1,5 @@
 import 'package:dealgo/features/identity/domain/auth_redirect.dart';
+import 'package:dealgo/core/design_system/components/dealgo_tab_bar.dart';
 import 'package:dealgo/features/shell/presentation/customer_tab_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,9 +28,11 @@ void main() {
     expect(find.text('Tìm hiểu thêm'), findsOneWidget);
   });
 
-  testWidgets('tapping Khách hàng shows customer nav label Trang chủ', (
+  testWidgets('tapping Khách hàng shows customer nav label Trang', (
     tester,
   ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await pumpSignedIn(
       tester,
       profile: multiRoleProfile,
@@ -42,13 +45,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(CustomerTabBar), findsOneWidget);
-    expect(navLabel('Trang chủ'), findsOneWidget);
-    expect(navLabel('Chuyến đi'), findsOneWidget);
+    expect(navLabel('Trang'), findsOneWidget);
+    expect(navLabel('Chuyến'), findsOneWidget);
     expect(navLabel('Đặt'), findsOneWidget);
-    expect(navLabel('Mua hàng'), findsOneWidget);
-    expect(navLabel('Tài khoản'), findsOneWidget);
+    expect(navLabel('Mua'), findsOneWidget);
+    expect(navLabel('Tôi'), findsOneWidget);
     expect(find.text('DealGo'), findsWidgets);
-    expect(find.text('Đặt xe'), findsWidgets);
+    // Single unified ride entry on home (ServiceRow).
+    expect(find.text("Đặt xe"), findsOneWidget);
     expect(find.text('Đồ ăn'), findsWidgets);
   });
 
@@ -68,7 +72,7 @@ void main() {
 
     await _switchRole(tester, 'Cửa hàng');
 
-    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(DealGoTabBar), findsOneWidget);
     expect(navLabel('Tổng quan'), findsOneWidget);
     expect(navLabel('Thực đơn'), findsOneWidget);
     expect(navLabel('Đặt'), findsNothing);
@@ -76,7 +80,7 @@ void main() {
 
     await _switchRole(tester, 'Tài xế');
 
-    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(DealGoTabBar), findsOneWidget);
     expect(navLabel('Việc nhận'), findsOneWidget);
     expect(navLabel('Thu nhập'), findsOneWidget);
     expect(navLabel('Đặt'), findsNothing);
@@ -99,9 +103,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(CustomerTabBar), findsOneWidget);
-      expect(navLabel('Trang chủ'), findsOneWidget);
+      expect(navLabel('Trang'), findsOneWidget);
 
-      await tester.tap(navLabel('Tài khoản'));
+      await tester.tap(navLabel('Tôi'));
       await tester.pumpAndSettle();
       expect(find.text('Đổi vai trò'), findsOneWidget);
     },
@@ -109,7 +113,7 @@ void main() {
 }
 
 Future<void> _switchRole(WidgetTester tester, String roleTitle) async {
-  await tester.tap(navLabel('Tài khoản'));
+  await tester.tap(navLabel('Tôi'));
   await tester.pumpAndSettle();
   await tester.ensureVisible(find.text('Đổi vai trò'));
   await tester.tap(find.text('Đổi vai trò'));

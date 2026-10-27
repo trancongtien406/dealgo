@@ -1,5 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { describe, expect, it, vi } from 'vitest';
+import type { GoogleMapsPort } from '../../integrations/maps/google-maps.js';
+import { MapsProviderSettings } from '../../integrations/maps/maps-provider-settings.js';
 import { parseDirections, RoutingService } from './routing.service.js';
 
 const FROM = { lat: 16.0544, lng: 108.2022 };
@@ -66,6 +68,29 @@ describe('RoutingService (DEC-PROD-045)', () => {
     expect(await svc.route(FROM, TO)).toEqual({ provider: 'mapbox', available: false, routes: [] });
     expect(fetcher.mock.calls[0]![0]).toContain('api.mapbox.com/directions/v5/mapbox/driving/');
     expect(fetcher.mock.calls[0]![0]).toContain('access_token=pk.secret');
+  });
+
+  it('uses Google routes when the admin chose Google, else falls back to the env provider', async () => {
+    const config = new ConfigService({ ROUTING_PROVIDER: 'osrm', ROUTING_OSRM_URL: 'http://osrm.internal:5000' });
+    const fetcher = vi.fn(async (_url: string) => ({ ok: true, status: 200, json: async () => OSRM_BODY }));
+    const googleRoute = { coords: [[16.0544, 108.2022], [16.0592, 108.2435]] as [number, number][], distanceM: 5100, durationSec: 600, summary: '' };
+    const computeRoutes = vi.fn(async () => [googleRoute]);
+    let choice = 'google';
+    const selector = new MapsProviderSettings(
+      { getString: async () => choice },
+      { computeRoutes } as unknown as GoogleMapsPort,
+    );
+    const svc = new RoutingService(config as never, fetcher, selector);
+    expect(await svc.route(FROM, TO)).toEqual({ provider: 'google', available: true, routes: [googleRoute] });
+    expect(fetcher).not.toHaveBeenCalled();
+
+    computeRoutes.mockRejectedValueOnce(new Error('quota'));
+    const other = { lat: 16.07, lng: 108.25 };
+    expect((await svc.route(FROM, other)).provider).toBe('osrm');
+
+    choice = 'mapbox';
+    expect((await svc.route(TO, FROM)).provider).toBe('osrm');
+    expect(computeRoutes).toHaveBeenCalledTimes(2);
   });
 
   it('ignores malformed provider payloads', () => {

@@ -1,10 +1,10 @@
 ---
 doc_id: DG-AI-001
 title: "DealGo — Implementation roadmap"
-version: "0.1.0"
+version: "0.2.0"
 status: "PROPOSED"
 owner: "Tech Lead"
-last_updated: "2026-10-14"
+last_updated: "2026-10-26"
 related_decisions:
   - DEC-PROD-001
   - DEC-PROD-002
@@ -30,4 +30,4 @@ Chính sách giá, vùng thương mại, pháp lý đối tác và vendor thật
 | 7 | Realtime snapshot, push mock, chat theo giao dịch, thoại mock | Backend, Flutter |
 | 8 | Ma trận test P0, CI, runbook local | Test, Backend |
 
-**Trạng thái thật (2026-10-14):** Backend foundation ~**90%+** after **Phase H+I** (FCM/LiveKit/PSP stubs, ops cancel/reassign, presence, history, store geo, auth-method flags). Admin detail intervene + auth-methods live; customers/drivers/stores still fixture. Flutter: architecture remediation (one Dio, `core/design_system`, FCM/deeplink/analytics/motion shells) — **không** claim production Firebase. Owner **1A** giữ `DEC-PROD-007`; **2A** adapters + `TEST_ONLY` env — **không** coi là policy `OPEN-*` đã duyệt. Test xanh ≠ Done.
+**Hiện trạng:** cả 9 phase đã có trong code ở mức MVP: Ride trả giá kiểu inDrive (xe máy, ô tô), Food, Admin vận hành, ledger tiền mặt, realtime Socket.IO, push FCM, chat theo giao dịch. Gọi thoại mới có token LiveKit phía server; app chưa nối SDK âm thanh. Chưa có thu tiền online thật và payout. Phần còn thiếu theo từng mảng: [backend](backend-gap-matrix.md), [Admin web](admin-web-gap-matrix.md), [Flutter](mobile-flutter-gap-matrix.md). Test xanh chưa có nghĩa là xong: tiêu chí hoàn thành vẫn theo từng phase ở bảng trên.

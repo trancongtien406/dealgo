@@ -27,7 +27,10 @@ export type AdminNavHref =
   | "/settings/platform"
   | "/settings/faqs"
   | "/settings/auth-methods"
+  | "/settings/maps"
+  | "/settings/vehicle-classes"
   | "/settings/content"
+  | "/settings/home-banners"
   | "/drivers/kyc"
   | "/stores/approvals"
   | "/catalog/moderation"
@@ -216,7 +219,10 @@ export const adminNavSections: readonly AdminNavSection[] = [
           { label: "Tham số", href: "/settings/platform" },
           { label: "Chính sách OPEN", href: "/settings/faqs" },
           { label: "Đăng nhập", href: "/settings/auth-methods" },
+          { label: "Bản đồ", href: "/settings/maps" },
+          { label: "Loại xe", href: "/settings/vehicle-classes" },
           { label: "Nội dung & Pháp lý", href: "/settings/content" },
+          { label: "Banner trang chủ", href: "/settings/home-banners" },
         ],
       },
     ],
@@ -252,6 +258,24 @@ export const adminCommandExtras: readonly AdminNavItem[] = [
     icon: "lock",
     href: "/settings/auth-methods",
     keywords: ["auth methods", "login"],
+  },
+  {
+    label: "Nhà cung cấp bản đồ",
+    icon: "pin",
+    href: "/settings/maps",
+    keywords: ["maps", "bản đồ", "google", "mapbox", "địa chỉ"],
+  },
+  {
+    label: "Loại xe",
+    icon: "car",
+    href: "/settings/vehicle-classes",
+    keywords: ["vehicle", "xe", "giá"],
+  },
+  {
+    label: "Banner trang chủ app",
+    icon: "categories",
+    href: "/settings/home-banners",
+    keywords: ["banner", "home", "carousel", "khuyến mãi", "quảng cáo"],
   },
   {
     label: "Hàng đợi KYC tài xế",

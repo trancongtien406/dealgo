@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Spoken new-job sounds are only referenced by name from FCM payloads and channel URIs;
+     keep them through resource shrinking. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/dealgo_new_ride,@raw/dealgo_new_food_job,@raw/dealgo_merchant_new_order" />

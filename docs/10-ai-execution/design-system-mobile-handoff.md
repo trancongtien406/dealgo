@@ -102,26 +102,36 @@ touch: min 48h target
 
 ---
 
-## 3. `DealGoTabBar` / bottom nav — REQUIRED polish
+## 3. `DealGoTabBar` / bottom nav
 
-**Exists:** `RoleShell` + `ShellTab` paths for customer / merchant / driver.
+**Code:** `core/design_system/components/dealgo_tab_bar.dart` (widget + `DealGoNotchedBarPainter`), metrics in `dealgo_nav_insets.dart`. `RoleShell` renders it for every role; `CustomerTabBar` is a thin wrapper that binds it to the customer `StatefulNavigationShell`.
 
-**Gaps vs mockups**
+| Role | Tabs (labels from l10n) | Notes |
+|---|---|---|
+| Customer | Trang · Chuyến · Đặt · Mua · Tôi | Bar hidden on the full-screen “Đặt” tab |
+| Driver | Tổng quan · Việc nhận · Thu nhập · Thông báo · Tôi | Badge supported per destination |
+| Merchant | Tổng quan · Đơn hàng · Thực đơn · Thống kê · Tôi | |
 
-| Role | Mockup tabs | Code today | Action |
-|---|---|---|---|
-| Customer C001 | Trang chủ · Chuyến đi · **Đặt** (center elevate) · Mua hàng · Tài khoản | Same labels; Material icons; center not elevated FAB | Elevate center “Đặt”; optional QR asset from batch02 |
-| Driver D016 | Tổng quan · Công việc · Thu nhập · Thông báo · Tài khoản | Labels: Trang chủ / Công việc / … | Align label “Tổng quan” with D016 if product agrees; icons from assets if available |
-| Merchant M013 | (shell) Tổng quan · Đơn hàng · Sản phẩm · Thống kê · Tài khoản | Matches | Tokenize active purple + label weight |
+**Shape**
 
-**Tokens**
+- Floating pill: inset `kDealGoNavSideMargin` (12) from the screen sides, height `kDealGoNavBarHeight` (58), radius `DealGoRadius.card`, fill `card`, 1 px `border` stroke, soft purple drop shadow.
+- Active tab: 48 dp circle (gradient `primaryLight → primary`, white selected icon) raised `kDealGoNavOverhang` (20) above the pill top, sitting in a concave notch (`CircularNotchedRectangle` intersected with the rounded pill, 5 dp gap).
+- Every tab shows icon + 11 sp label inside the pill; inactive = outline icon + `textSecondary` w500, active label = `primary` w700. The active outline icon fades out under the circle.
+- Badge: `DealGoTabDestination.badgeCount` (> 99 → “99+”), `danger` fill.
 
-- Active: `DealGoColors.primary` icon + label weight 600  
-- Inactive: `textSecondary`  
-- Bar surface: white + top hairline `border`  
-- Center customer: circle `primary` ~56dp, white icon, slight elevation; do not use default `NavigationDestination` FAB styling only
+**Behaviour**
 
-**Icons:** Prefer `design/assets/batch01/svg/role_*.svg` / batch02 service PNGs where mock shows custom art; otherwise keep outlined Material **but** document as temporary. Do not mix stroke weights across tabs.
+- Notch + circle slide to the selected tab with `DealGoMotion.medium` (280 ms) / `DealGoMotion.standard` (easeOutCubic); reduced motion jumps without animating.
+- Selecting a different tab fires `DealGoHaptics.selection()`.
+- Semantics per tab: button, selected state, label (badge as value); each tab is a full-height column ≥ 44 pt wide.
+- Label text scale is clamped to `kTabBarMaxTextScale` (1.15) by `RoleShell`.
+
+**Insets / content clearance**
+
+- `DealGoNavBarMetrics` = overhang + bar + bottom gap. Bottom gap: iOS `max(inset − 10, 8)` (pill sits in the home-indicator zone), Android `inset + 6` (above gesture/3-button nav), no inset → 10.
+- `RoleShell` uses `extendBody: true` (the raised circle overlaps content) and wraps the branch in `FloatingNavBody`: the body ends at the pill top (`contentClearance`) and pages receive zero bottom padding. With the keyboard open no clearance is added.
+
+**Tests:** `test/dealgo_tab_bar_test.dart` (selection, notch position, reduced motion, semantics, badge, labels, body clearance), `test/bottom_nav_insets_test.dart` (metrics per platform/inset), `test/large_text_chrome_test.dart` (five tabs at accessibility XL). PNG previews: `flutter test test/nav_bar_preview_test.dart --dart-define=NAV_PREVIEW_DIR=<dir>`.
 
 ---
 
@@ -246,7 +256,7 @@ Typography: follow `dealgo_theme.dart` text theme; titles bold; prices primary +
 2. `DealGoSegmentedControl` → replace FilterChip/ChoiceChip/AccountFilterChip call sites  
 3. `DealGoBanner` info/warning/offline/empty  
 4. `DealGoCard` selected/emphasis variants  
-5. `DealGoTabBar` center elevate + icon pass  
+5. `DealGoTabBar` floating notched bar (implemented, see §3)  
 6. Primary/Secondary size variants  
 7. Motion: extend fade-slide + sheet to remaining P0 routes  
 

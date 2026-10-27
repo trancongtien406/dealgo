@@ -184,8 +184,8 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
                             excludeFromSemantics: true,
                             errorBuilder: (context, error, stackTrace) =>
                                 const ColoredBox(
-                              color: DealGoColors.subtlePurple,
-                            ),
+                                  color: DealGoColors.subtlePurple,
+                                ),
                           ),
                         ),
                       ),

@@ -36,6 +36,7 @@ import {
 } from "@/features/stores/mappers";
 import {
   storeKybOptions,
+  storeLocationOptions,
   storeStatusOptions,
   useLiveCatalogCategoryOptions,
   useLiveRegionFilterOptions,
@@ -74,6 +75,7 @@ export function StoresList() {
       region: "ALL",
       category: "ALL",
       kyb: "ALL",
+      location: "ALL",
       page: 1,
     });
   };
@@ -263,6 +265,18 @@ export function StoresList() {
               }}
             />
           </AdminFilterField>
+          <AdminFilterField>
+            <SearchSelect
+              label="Vị trí quán"
+              icon="pin"
+              value={filters.location === "ALL" ? null : filters.location}
+              options={storeLocationOptions.filter((o) => o.value !== "ALL")}
+              placeholder="Tất cả"
+              onChange={(next) => {
+                void setFilters({ location: next ?? "ALL", page: 1 });
+              }}
+            />
+          </AdminFilterField>
           <div className="flex shrink-0 items-end">
             <button
               type="button"
@@ -360,7 +374,15 @@ export function StoresList() {
                       </AdminTableCell>
                       <AdminTableCell>{store.category}</AdminTableCell>
                       <AdminTableCell>{store.owner}</AdminTableCell>
-                      <AdminTableCell>{store.area}</AdminTableCell>
+                      <AdminTableCell>
+                        {store.locationMissing ? (
+                          <StatusChip tone="danger">
+                            Chưa ghim vị trí
+                          </StatusChip>
+                        ) : (
+                          store.area
+                        )}
+                      </AdminTableCell>
                       <AdminTableCell align="right" className="tabular-nums">
                         {store.orders === null
                           ? "—"

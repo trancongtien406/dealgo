@@ -41,6 +41,7 @@ class DriverPageFrame extends StatelessWidget {
     this.footer,
     this.onBack,
     this.trailing,
+    this.showBack = true,
     this.insetBottom = false,
     super.key,
   });
@@ -51,11 +52,16 @@ class DriverPageFrame extends StatelessWidget {
   final Widget? footer;
   final VoidCallback? onBack;
   final Widget? trailing;
+
+  /// False on bottom-nav tab roots (home / jobs / earnings / notifications).
+  final bool showBack;
   final bool insetBottom;
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
+    // Material ancestor: full-screen driver routes (e.g. passenger OTP) are not
+    // wrapped by a Scaffold, and TextField/InkWell require one.
+    return Material(
       color: DealGoColors.canvas,
       child: SafeArea(
         bottom: insetBottom,
@@ -67,6 +73,7 @@ class DriverPageFrame extends StatelessWidget {
               subtitle: subtitle,
               onBack: onBack,
               trailing: trailing,
+              showBack: showBack,
             ),
             Expanded(child: body),
             ?footer,
@@ -83,6 +90,7 @@ class DriverHeader extends StatelessWidget {
     this.subtitle,
     this.onBack,
     this.trailing,
+    this.showBack = true,
     super.key,
   });
 
@@ -90,15 +98,19 @@ class DriverHeader extends StatelessWidget {
   final String? subtitle;
   final VoidCallback? onBack;
   final Widget? trailing;
+  final bool showBack;
 
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.maybeOf(context)?.canPop() ?? false;
+    // Never let a non-null onBack alone force the chevron — tab roots often
+    // pass onBack for multi-role fallback while the branch cannot pop.
+    final effectiveShow = showBack && canPop;
     return DealGoAppHeader(
       title: title,
       subtitle: subtitle,
-      onBack: onBack ?? (canPop ? () => driverBack(context) : null),
-      showBack: canPop || onBack != null,
+      onBack: effectiveShow ? (onBack ?? () => driverBack(context)) : null,
+      showBack: effectiveShow,
       trailing: trailing,
     );
   }
@@ -252,26 +264,29 @@ class DriverMoneyRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: DealGoSpacing.s4),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
         children: [
           Expanded(
             child: Text(
               label,
-              style: emphasize ? textTheme.titleMedium : textTheme.bodyMedium,
+              style: textTheme.bodyMedium?.copyWith(
+                color: DealGoColors.textSecondary,
+                fontWeight: emphasize ? FontWeight.w600 : FontWeight.w500,
+              ),
             ),
           ),
           const SizedBox(width: DealGoSpacing.s8),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: emphasize
-                  ? textTheme.titleMedium?.copyWith(
-                      color: DealGoColors.primary,
-                      fontWeight: FontWeight.w800,
-                    )
-                  : textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
+          // Amounts are short; never let them squeeze the label into 2 lines.
+          Text(
+            value,
+            textAlign: TextAlign.end,
+            style: emphasize
+                ? textTheme.titleSmall?.copyWith(
+                    color: DealGoColors.primary,
+                    fontWeight: FontWeight.w800,
+                  )
+                : textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -309,6 +324,7 @@ class DriverFooter extends StatelessWidget {
     required this.onSecondary,
     required this.onPrimary,
     this.primaryKey,
+    this.secondaryKey,
     this.primaryEnabled = true,
     this.primaryLoading = false,
     super.key,
@@ -319,6 +335,7 @@ class DriverFooter extends StatelessWidget {
   final VoidCallback onSecondary;
   final VoidCallback onPrimary;
   final Key? primaryKey;
+  final Key? secondaryKey;
   final bool primaryEnabled;
   final bool primaryLoading;
 
@@ -335,6 +352,7 @@ class DriverFooter extends StatelessWidget {
         children: [
           Expanded(
             child: DealGoSecondaryButton(
+              key: secondaryKey,
               label: secondaryLabel,
               onPressed: onSecondary,
             ),

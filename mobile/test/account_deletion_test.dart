@@ -12,7 +12,7 @@ Future<void> _openDelete(
   FakeAccountDeletionRepository repo,
 ) async {
   await pumpSignedIn(tester, profile: customerProfile, accountDeletion: repo);
-  await tester.tap(navLabel('Tài khoản'));
+  await tester.tap(navLabel('Tôi'));
   await tester.pumpAndSettle();
   final row = find.byKey(const ValueKey('account-delete-row'));
   await tester.ensureVisible(row);
@@ -146,7 +146,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('delete-done')));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('delete-account-done')), findsNothing);
-      expect(navLabel('Tài khoản'), findsNothing);
+      expect(navLabel('Tôi'), findsNothing);
     },
   );
 

@@ -21,7 +21,8 @@ class DriverServicesState {
 
   bool get dirty => prefs != saved;
   bool get busy =>
-      status == DriverServicesStatus.loading || status == DriverServicesStatus.saving;
+      status == DriverServicesStatus.loading ||
+      status == DriverServicesStatus.saving;
 
   DriverServicesState copyWith({
     DriverServicePrefs? prefs,
@@ -62,7 +63,13 @@ class DriverServicesCubit extends Cubit<DriverServicesState> {
     try {
       final prefs = await repository.getServicePrefs(accessToken: token);
       if (!isClosed) {
-        emit(DriverServicesState(prefs: prefs, saved: prefs, status: DriverServicesStatus.ready));
+        emit(
+          DriverServicesState(
+            prefs: prefs,
+            saved: prefs,
+            status: DriverServicesStatus.ready,
+          ),
+        );
       }
     } catch (_) {
       if (!isClosed) {
@@ -72,18 +79,26 @@ class DriverServicesCubit extends Cubit<DriverServicesState> {
   }
 
   void setRide(bool value) => emit(
-    state.copyWith(prefs: state.prefs.copyWith(rideEnabled: value), status: DriverServicesStatus.ready),
+    state.copyWith(
+      prefs: state.prefs.copyWith(rideEnabled: value),
+      status: DriverServicesStatus.ready,
+    ),
   );
 
   void setFood(bool value) => emit(
-    state.copyWith(prefs: state.prefs.copyWith(foodEnabled: value), status: DriverServicesStatus.ready),
+    state.copyWith(
+      prefs: state.prefs.copyWith(foodEnabled: value),
+      status: DriverServicesStatus.ready,
+    ),
   );
 
   /// Sends the switches with the current online state; returns false when it did not stick.
   Future<bool> save() async {
     final repository = _repository;
     final token = _token;
-    if (repository == null || token == null || state.status == DriverServicesStatus.saving) {
+    if (repository == null ||
+        token == null ||
+        state.status == DriverServicesStatus.saving) {
       return false;
     }
     final wanted = state.prefs;
@@ -96,7 +111,13 @@ class DriverServicesCubit extends Cubit<DriverServicesState> {
         foodEnabled: wanted.foodEnabled,
       );
       if (!isClosed) {
-        emit(DriverServicesState(prefs: state.prefs, saved: wanted, status: DriverServicesStatus.saved));
+        emit(
+          DriverServicesState(
+            prefs: state.prefs,
+            saved: wanted,
+            status: DriverServicesStatus.saved,
+          ),
+        );
       }
       return true;
     } catch (_) {

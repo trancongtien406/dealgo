@@ -26,6 +26,24 @@ describe('driver history http', () => {
     expect(res.body.errorCode).toBe('ROLE_NOT_ACTIVE');
   });
 
+  it('active-job: 401 without session, 403 for non-drivers, {job:null} when idle', async () => {
+    await harness.http().get('/v1/driver/active-job').expect(401);
+    const customer = await harness.login();
+    await harness
+      .http()
+      .get('/v1/driver/active-job')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(403);
+    const driver = await harness.login();
+    await harness.identity.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');
+    const res = await harness
+      .http()
+      .get('/v1/driver/active-job')
+      .set('Authorization', `Bearer ${driver.token}`)
+      .expect(200);
+    expect(res.body.data).toEqual({ job: null });
+  });
+
   it('returns an empty first page and validates the query', async () => {
     const driver = await harness.login();
     await harness.identity.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');

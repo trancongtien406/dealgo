@@ -14,7 +14,19 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DriverLocationQueryDto } from '../dispatch/driver-location-query.dto.js';
 import { CurrentActor, CustomerSessionGuard, type RequestActor } from '../identity/access-auth.guard.js';
-import { CreateOfferDto, CreateRideDto, QuoteRideDto, RidePageQueryDto, SelectOfferDto, StartTripDto } from './ride.dto.js';
+import {
+  CreateOfferDto,
+  CreateRideDto,
+  DeclineOfferDto,
+  DriverCancelRideDto,
+  QuoteRideDto,
+  RaiseFareDto,
+  RateCustomerDto,
+  RidePageQueryDto,
+  RideRouteQueryDto,
+  SelectOfferDto,
+  StartTripDto,
+} from './ride.dto.js';
 import { rideError } from './ride.error.js';
 import { RideService } from './ride.service.js';
 
@@ -49,13 +61,41 @@ export class RideController {
     return this.rides.listForCustomer(actor, query.page, query.limit);
   }
 
+  @Get('vehicle-classes')
+  @ApiOperation({ summary: 'Enabled ride vehicle classes for booking and driver registration' })
+  vehicleClasses() {
+    return this.rides.listVehicleClasses();
+  }
+
+  @Get('pending-fees')
+  @ApiOperation({
+    summary: 'Customer unpaid late-cancel / no-show fees (added to the next completed ride cash)',
+  })
+  pendingFees(@CurrentActor() actor: RequestActor) {
+    return this.rides.pendingFees(actor);
+  }
+
   @Get('open')
   @ApiOperation({
     summary:
-      'List open negotiating rides for drivers. Optional lat/lng filters by DRIVER_SEARCH_RADIUS_KM; without coords returns a capped recent list (DISPATCH_FALLBACK_LIMIT). Offline presence returns empty.',
+      'List open negotiating rides near the driver (query lat/lng or the fresh presence fix) within DRIVER_SEARCH_RADIUS_KM, nearest first. With DISPATCH_REQUIRE_FRESH_PRESENCE a missing/stale fix is 409 DRIVER_LOCATION_STALE; over DRIVER_DEBT_LIMIT_VND is 403.',
   })
   listOpen(@CurrentActor() actor: RequestActor, @Query() query: DriverLocationQueryDto) {
     return this.rides.listOpen(actor, query);
+  }
+
+
+  @Get('route')
+  @ApiOperation({
+    summary:
+      'Road geometry for the app via Nest ROUTING_PROVIDER (DEC-PROD-045). available=false → draw a straight line.',
+  })
+  route(@CurrentActor() actor: RequestActor, @Query() query: RideRouteQueryDto) {
+    return this.rides.routeGeometry(
+      actor,
+      { lat: query.fromLat, lng: query.fromLng },
+      { lat: query.toLat, lng: query.toLng },
+    );
   }
 
   @Get(':id')
@@ -143,10 +183,78 @@ export class RideController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Customer cancels while NEGOTIATING or before IN_TRIP (ASSIGNED / DRIVER_EN_ROUTE / DRIVER_ARRIVED)',
+      'Customer cancels while NEGOTIATING or before IN_TRIP. After RIDE_FREE_CANCEL_MINUTES from assignment (or once the driver arrived) a class late-cancel fee is recorded.',
   })
   cancel(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
     return this.rides.cancel(actor, id);
+  }
+
+  @Post(':id/fare')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Customer raises the bid while NEGOTIATING (extends the request window)' })
+  raiseFare(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RaiseFareDto,
+  ) {
+    return this.rides.raiseFare(actor, id, dto);
+  }
+
+  @Post(':id/offers/decline')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Customer rejects one driver's offer" })
+  declineOffer(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: DeclineOfferDto,
+  ) {
+    return this.rides.declineOffer(actor, id, dto);
+  }
+
+  @Post(':id/offers/withdraw')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Driver withdraws their pending offer' })
+  withdrawOffer(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.rides.withdrawOffer(actor, id);
+  }
+
+  @Post(':id/driver-cancel')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Assigned driver cancels before the trip starts (reason required); the ride goes back to bidding',
+  })
+  driverCancel(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: DriverCancelRideDto,
+  ) {
+    return this.rides.driverCancel(actor, id, dto);
+  }
+
+  @Post(':id/no-show')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Driver reports a customer no-show after waiting RIDE_NO_SHOW_WAIT_MINUTES at pickup',
+  })
+  markNoShow(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.rides.markNoShow(actor, id);
+  }
+
+  @Get(':id/customer-rating')
+  @ApiOperation({ summary: "Assigned driver: own rating of this ride's customer and the customer's average" })
+  customerRating(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.rides.customerRatingForRide(actor, id);
+  }
+
+  @Post(':id/customer-rating')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Assigned driver rates the customer once (completed or no-show ride)' })
+  rateCustomer(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RateCustomerDto,
+  ) {
+    return this.rides.rateCustomer(actor, id, dto);
   }
 }
 

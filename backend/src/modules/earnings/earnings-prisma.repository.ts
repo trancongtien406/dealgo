@@ -2,6 +2,12 @@ import { Prisma, type PrismaClient } from '../../generated/prisma/client.js';
 import type { EarningEntityType } from './earnings.constants.js';
 import type { TxHandle } from '../../shared/tx/completion-hook.js';
 import {
+  driverBalanceOf,
+  type BalanceAdjustment,
+  type BalanceAdjustmentInput,
+  type DriverBalance,
+} from './driver-balance.js';
+import {
   earningKey,
   type EarningsRepository,
   type JobEarning,
@@ -59,6 +65,33 @@ export class PrismaEarningsRepository implements EarningsRepository {
     // No P2002 recovery here: an error would abort the transaction anyway, and the caller holds
     // the ride/order row lock, so a second writer for the same job cannot interleave.
     return toEarning(existing ?? (await client.jobEarning.create({ data: input })));
+  }
+
+  async adjustWithin(tx: TxHandle, input: BalanceAdjustmentInput): Promise<void> {
+    const client = (tx as Prisma.TransactionClient | null) ?? this.db;
+    await client.driverBalanceAdjustment.createMany({ data: [input], skipDuplicates: true });
+  }
+
+  balanceOf(driverId: string): Promise<DriverBalance> {
+    return driverBalanceOf(this.db, driverId);
+  }
+
+  async listAdjustments(driverId: string, limit: number): Promise<BalanceAdjustment[]> {
+    return this.db.driverBalanceAdjustment.findMany({
+      where: { driverId },
+      orderBy: { occurredAt: 'desc' },
+      take: limit,
+    });
+  }
+
+  async jobOutcomesSince(driverId: string, since: Date): Promise<{ cancelled: number; completed: number }> {
+    const [cancelled, completed] = await Promise.all([
+      this.db.driverJobCancellation.count({
+        where: { driverId, actor: { in: ['DRIVER', 'SYSTEM'] }, createdAt: { gte: since } },
+      }),
+      this.db.jobEarning.count({ where: { driverId, completedAt: { gte: since } } }),
+    ]);
+    return { cancelled, completed };
   }
 
   async find(entityType: EarningEntityType, entityId: string): Promise<JobEarning | null> {

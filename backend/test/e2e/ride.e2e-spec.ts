@@ -13,6 +13,8 @@ import {
   MemoryIdentityRepository,
   type IdentityRepository,
 } from '../../src/modules/identity/identity.repository.js';
+import { PARTNER_REPOSITORY } from '../../src/modules/partner/partner.constants.js';
+import { MemoryPartnerRepository } from '../../src/modules/partner/partner.repository.js';
 import { RIDE_REPOSITORY } from '../../src/modules/ride/ride.constants.js';
 import { MemoryRideRepository } from '../../src/modules/ride/ride.repository.js';
 import { LEDGER_REPOSITORY } from '../../src/modules/ledger/ledger.constants.js';
@@ -46,6 +48,8 @@ describe('Ride End-to-End Flow (e2e)', () => {
       .useValue(new MemoryLedgerRepository())
       .overrideProvider(PAYMENT_REPOSITORY)
       .useValue(new MemoryPaymentRepository())
+      .overrideProvider(PARTNER_REPOSITORY)
+      .useValue(new MemoryPartnerRepository())
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -67,6 +71,17 @@ describe('Ride End-to-End Flow (e2e)', () => {
     });
     for (const role of roles) {
       await identityRepo.insertGrant(user.id, role, 'ACTIVE');
+    }
+    if (roles.includes('DRIVER')) {
+      // DG-DEC-VEH-001: offers fail closed without a DRIVER application carrying the class.
+      await app.get(PARTNER_REPOSITORY).upsertSubmit({
+        id: randomUUID(),
+        userId: user.id,
+        role: 'DRIVER',
+        metadata: { vehicleClassCode: 'MOTORBIKE' },
+        documents: [],
+        now: new Date(),
+      });
     }
     const session = await identityRepo.createSession({
       userId: user.id,
@@ -99,6 +114,7 @@ describe('Ride End-to-End Flow (e2e)', () => {
         pickup: { lat: 10.7769, lng: 106.7009, label: 'Ben Thanh' },
         dropoff: { lat: 10.7725, lng: 106.698, label: 'Bitexco' },
         offeredFareVnd: 25000,
+        vehicleClassCode: 'MOTORBIKE',
       })
       .expect(401);
   });
@@ -116,6 +132,7 @@ describe('Ride End-to-End Flow (e2e)', () => {
         pickup: { lat: 10.7769, lng: 106.7009, label: 'Ben Thanh' },
         dropoff: { lat: 10.7725, lng: 106.698, label: 'Bitexco' },
         offeredFareVnd: 25000,
+        vehicleClassCode: 'MOTORBIKE',
       })
       .expect(200);
     expect(createRes.body.data.status).toBe('NEGOTIATING');

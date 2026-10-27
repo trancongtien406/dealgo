@@ -7,6 +7,7 @@ interface ReportsServiceBreakdownProps {
   services: readonly ServiceActivity[];
   activityTotal: number;
   largestService: number;
+  range: { from: string; to: string };
   isPending: boolean;
   isError: boolean;
 }
@@ -15,6 +16,7 @@ export function ReportsServiceBreakdown({
   services,
   activityTotal,
   largestService,
+  range,
   isPending,
   isError,
 }: ReportsServiceBreakdownProps) {
@@ -101,13 +103,17 @@ export function ReportsServiceBreakdown({
           <div>
             <dt className="text-muted">Phạm vi</dt>
             <dd className="mt-0.5 font-medium text-ink">
-              Snapshot overview toàn hệ thống
+              {range.from === range.to
+                ? range.from
+                : `${range.from} → ${range.to}`}{" "}
+              · giờ Việt Nam
             </dd>
           </div>
           <div>
             <dt className="text-muted">Nguồn sự thật</dt>
             <dd className="mt-0.5 leading-5 text-ink">
-              GET /v1/ops/overview — không nhân kỳ / không lọc khu vực giả.
+              GET /v1/ops/reports — chuyến/đơn tính theo ngày kết thúc; doanh thu là
+              giá trị đặt chỗ (GMV), hoa hồng gồm phí tài xế và hoa hồng quán.
             </dd>
           </div>
           <div>

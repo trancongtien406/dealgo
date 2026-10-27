@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../ride/presentation/utils/ride_vehicle_label.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
@@ -41,9 +42,10 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
     final kyc = context.watch<DriverKycCubit>().state;
     final prefs = services.prefs;
     final onCount = (prefs.rideEnabled ? 1 : 0) + (prefs.foodEnabled ? 1 : 0);
-    final vehicleName = [kyc.vehicleBrand.trim(), kyc.vehicleModel.trim()]
-        .where((part) => part.isNotEmpty)
-        .join(' ');
+    final vehicleName = [
+      kyc.vehicleBrand.trim(),
+      kyc.vehicleModel.trim(),
+    ].where((part) => part.isNotEmpty).join(' ');
     final plate = kyc.vehiclePlate.trim();
 
     return Scaffold(
@@ -84,12 +86,16 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
             ),
             const SizedBox(height: DealGoSpacing.s16),
             DriverPanel(
-              color: online ? DealGoColors.greenSurface : DealGoColors.amberSurface,
+              color: online
+                  ? DealGoColors.greenSurface
+                  : DealGoColors.amberSurface,
               child: Row(
                 children: [
                   Icon(
                     online ? DealGoIcons.success : DealGoIcons.bolt,
-                    color: online ? DealGoColors.brandGreen : DealGoColors.amber,
+                    color: online
+                        ? DealGoColors.brandGreen
+                        : DealGoColors.amber,
                   ),
                   const SizedBox(width: DealGoSpacing.s12),
                   Expanded(
@@ -97,11 +103,15 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          online ? l10n.driverServicesOnlineTitle : l10n.driverServicesOfflineTitle,
+                          online
+                              ? l10n.driverServicesOnlineTitle
+                              : l10n.driverServicesOfflineTitle,
                           style: textTheme.titleMedium,
                         ),
                         Text(
-                          online ? l10n.driverServicesOnlineBody : l10n.driverServicesOfflineBody,
+                          online
+                              ? l10n.driverServicesOnlineBody
+                              : l10n.driverServicesOfflineBody,
                           style: textTheme.bodySmall,
                         ),
                       ],
@@ -165,7 +175,9 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
                     value: prefs.rideEnabled,
                     onChanged: services.busy
                         ? null
-                        : (value) => context.read<DriverServicesCubit>().setRide(value),
+                        : (value) => context
+                              .read<DriverServicesCubit>()
+                              .setRide(value),
                   ),
                   const Divider(height: 1),
                   _ServiceRow(
@@ -178,7 +190,9 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
                     value: prefs.foodEnabled,
                     onChanged: services.busy
                         ? null
-                        : (value) => context.read<DriverServicesCubit>().setFood(value),
+                        : (value) => context
+                              .read<DriverServicesCubit>()
+                              .setFood(value),
                   ),
                 ],
               ),
@@ -201,7 +215,10 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
                         ),
                       ),
                       DriverChip(
-                        label: l10n.rideVehicleMotorbike,
+                        label: rideVehicleClassLabel(
+                          l10n,
+                          kyc.vehicleClassCode,
+                        ),
                         tone: DriverChipTone.neutral,
                       ),
                     ],
@@ -209,8 +226,10 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
                   const SizedBox(height: DealGoSpacing.s12),
                   Row(
                     children: [
-                      const Icon(
-                        DealGoIcons.motorbike,
+                      Icon(
+                        (kyc.vehicleClassCode ?? '').startsWith('CAR')
+                            ? DealGoIcons.car
+                            : DealGoIcons.motorbike,
                         color: DealGoColors.brandGreen,
                       ),
                       const SizedBox(width: DealGoSpacing.s12),
@@ -220,7 +239,12 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              vehicleName.isNotEmpty ? vehicleName : l10n.rideVehicleMotorbike,
+                              vehicleName.isNotEmpty
+                                  ? vehicleName
+                                  : rideVehicleClassLabel(
+                                      l10n,
+                                      kyc.vehicleClassCode,
+                                    ),
                               style: textTheme.titleMedium,
                             ),
                             Text(
@@ -355,8 +379,11 @@ class _ServiceRow extends StatelessWidget {
                 DriverChip(
                   label: registered
                       ? AppLocalizations.of(context).driverServicesApprovedChip
-                      : AppLocalizations.of(context).driverServicesNotRegistered,
-                  tone: registered ? DriverChipTone.green : DriverChipTone.neutral,
+                      : AppLocalizations.of(context)
+                            .driverServicesNotRegistered,
+                  tone: registered
+                      ? DriverChipTone.green
+                      : DriverChipTone.neutral,
                 ),
               ],
             ),

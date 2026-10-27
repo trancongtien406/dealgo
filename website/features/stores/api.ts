@@ -7,6 +7,10 @@ import type { StoreListItem } from "@/features/stores/types";
 import { apiFetch } from "@/lib/api/client";
 import type { PaginatedList } from "@/lib/api/pagination";
 import { apiPaths } from "@/lib/api/paths";
+import {
+  parseMerchantStatement,
+  type MerchantStatement,
+} from "@/lib/merchant-statement";
 
 export type FetchStoresParams = {
   page?: number;
@@ -16,6 +20,8 @@ export type FetchStoresParams = {
   region?: string | null;
   category?: string | null;
   kyb?: string | null;
+  /** "MISSING" = stores without map coordinates. */
+  location?: string | null;
 };
 
 export async function fetchStores(
@@ -65,6 +71,9 @@ async function fetchStoresFromBff(
   if (params.kyb && params.kyb !== "ALL") {
     search.set("kyb", params.kyb);
   }
+  if (params.location === "MISSING") {
+    search.set("location", "MISSING");
+  }
   const envelope = await apiFetch<{
     success: boolean;
     data: NestOpsStorePage;
@@ -86,4 +95,27 @@ function isNotFound(error: unknown): boolean {
     "code" in error &&
     (error as { code: string }).code === "NOT_FOUND"
   );
+}
+
+/** Commission statement for one store over an ICT day range. */
+export async function fetchStoreStatement(
+  storeId: string,
+  range: { from: string; to: string },
+): Promise<MerchantStatement> {
+  const search = new URLSearchParams(range);
+  const envelope = await apiFetch<{ success: boolean; data: unknown }>(
+    `${apiPaths.opsStoreStatement(storeId)}?${search.toString()}`,
+  );
+  return parseMerchantStatement(envelope.data);
+}
+
+/** Record that the store paid the commission for closed days (audited). */
+export async function recordStoreSettlement(
+  storeId: string,
+  input: { from: string; to: string; reason: string; note?: string },
+): Promise<void> {
+  await apiFetch(apiPaths.opsStoreSettlements(storeId), {
+    method: "POST",
+    body: input,
+  });
 }

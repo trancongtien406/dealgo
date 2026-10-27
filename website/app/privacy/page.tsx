@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
-import { PrivacyClient } from "./privacy-client";
+import { LegalPageView } from "@/features/content-cms/components/legal-page-view";
+import { getLegalPage } from "@/features/content-cms/fetch-public-page";
+import { localeFromLang } from "@/features/content-cms/types";
 
-export const metadata: Metadata = {
-  title: "Chính sách Quyền riêng tư | DealGo",
-  description:
-    "Chính sách bảo mật dữ liệu cá nhân, vị trí GPS và thông tin giao dịch của nền tảng DealGo tuân thủ Nghị định 13/2023/NĐ-CP.",
-};
+type Props = { searchParams: Promise<{ lang?: string | string[] }> };
 
-export default function PrivacyPage() {
-  return <PrivacyClient />;
+export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+  const page = await getLegalPage("privacy", localeFromLang((await searchParams).lang));
+  return { title: `${page.title} | DealGo`, description: page.summary ?? undefined };
+}
+
+export default async function PrivacyPage({ searchParams }: Props) {
+  const page = await getLegalPage("privacy", localeFromLang((await searchParams).lang));
+  return <LegalPageView page={page} />;
 }

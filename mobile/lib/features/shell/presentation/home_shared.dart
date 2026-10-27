@@ -37,11 +37,7 @@ class HomePillButton extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
           ),
           const SizedBox(width: DealGoSpacing.s4),
           const Icon(DealGoIcons.arrowRight, size: 16),

@@ -1,47 +1,135 @@
 import '../../domain/entities/voice_models.dart';
 import 'voice_remote_datasource.dart';
 
+/// In-memory call API for mock builds and tests. Tests drive the callee side
+/// by calling [ring] and read what the app sent from [actions].
 class FakeVoiceClient implements VoiceClient {
-  FakeVoiceClient({this.session});
+  FakeVoiceClient({this.enabled = true, this.userId = 'me'});
 
-  VoiceSession? session;
-  final List<String> rideCalls = [];
-  final List<String> foodCalls = [];
+  bool enabled;
+  String userId;
   Object? error;
+  final Map<String, VoiceCall> calls = {};
+  final List<String> actions = [];
+  int _seq = 0;
 
-  @override
-  Future<VoiceSession> createRideVoiceSession({
-    required String accessToken,
-    required String rideId,
-  }) async {
-    rideCalls.add(rideId);
+  VoiceSession _session(VoiceCall call) => VoiceSession(
+    roomName:
+        'dealgo-${call.kind == VoiceThreadKind.ride ? 'ride' : 'food'}-${call.aggregateId}',
+    token: 'fake-livekit-token',
+    url: 'ws://livekit.fake:7880',
+  );
+
+  /// Adds an incoming RINGING call for [userId] and returns it.
+  VoiceCall ring({
+    VoiceThreadKind kind = VoiceThreadKind.ride,
+    String aggregateId = 'ride-1',
+    String callerUserId = 'peer',
+    bool callerIsCustomer = false,
+  }) {
+    final call = VoiceCall(
+      id: 'call-${++_seq}',
+      kind: kind,
+      aggregateId: aggregateId,
+      status: VoiceCallStatus.ringing,
+      callerUserId: callerUserId,
+      calleeUserId: userId,
+      callerIsCustomer: callerIsCustomer,
+      ringUntil: DateTime.now().add(const Duration(seconds: 40)),
+    );
+    calls[call.id] = call;
+    return call;
+  }
+
+  VoiceCall _set(VoiceCall c, VoiceCallStatus status, [String? reason]) {
+    final next = VoiceCall(
+      id: c.id,
+      kind: c.kind,
+      aggregateId: c.aggregateId,
+      status: status,
+      callerUserId: c.callerUserId,
+      calleeUserId: c.calleeUserId,
+      callerIsCustomer: c.callerIsCustomer,
+      ringUntil: c.ringUntil,
+      endReason: reason,
+    );
+    calls[c.id] = next;
+    return next;
+  }
+
+  void _throwIfFailing() {
     final err = error;
     if (err != null) {
       throw err;
     }
-    return session ??
-        VoiceSession(
-          roomName: 'ride-$rideId',
-          token: 'fake-livekit-token',
-          url: 'wss://livekit.example/fake',
-        );
   }
 
   @override
-  Future<VoiceSession> createFoodOrderVoiceSession({
+  Future<VoiceCallConfig> config({required String accessToken}) async =>
+      VoiceCallConfig(enabled: enabled, ringSeconds: 40);
+
+  @override
+  Future<VoiceCallJoin> start({
     required String accessToken,
-    required String orderId,
+    required VoiceThreadKind kind,
+    required String resourceId,
   }) async {
-    foodCalls.add(orderId);
-    final err = error;
-    if (err != null) {
-      throw err;
-    }
-    return session ??
-        VoiceSession(
-          roomName: 'food-$orderId',
-          token: 'fake-livekit-token',
-          url: 'wss://livekit.example/fake',
-        );
+    actions.add('start:$resourceId');
+    _throwIfFailing();
+    final call = VoiceCall(
+      id: 'call-${++_seq}',
+      kind: kind,
+      aggregateId: resourceId,
+      status: VoiceCallStatus.ringing,
+      callerUserId: userId,
+      calleeUserId: 'peer',
+      callerIsCustomer: true,
+      ringUntil: DateTime.now().add(const Duration(seconds: 40)),
+    );
+    calls[call.id] = call;
+    return VoiceCallJoin(call: call, session: _session(call));
+  }
+
+  @override
+  Future<VoiceCall> get({
+    required String accessToken,
+    required String callId,
+  }) async {
+    _throwIfFailing();
+    return calls[callId]!;
+  }
+
+  @override
+  Future<VoiceCallJoin> accept({
+    required String accessToken,
+    required String callId,
+  }) async {
+    actions.add('accept:$callId');
+    _throwIfFailing();
+    final call = _set(calls[callId]!, VoiceCallStatus.accepted);
+    return VoiceCallJoin(call: call, session: _session(call));
+  }
+
+  @override
+  Future<VoiceCall> decline({
+    required String accessToken,
+    required String callId,
+  }) async {
+    actions.add('decline:$callId');
+    _throwIfFailing();
+    return _set(calls[callId]!, VoiceCallStatus.declined, 'DECLINED');
+  }
+
+  @override
+  Future<VoiceCall> end({
+    required String accessToken,
+    required String callId,
+  }) async {
+    actions.add('end:$callId');
+    _throwIfFailing();
+    final call = calls[callId]!;
+    return call.status == VoiceCallStatus.ringing
+        ? _set(call, VoiceCallStatus.missed, 'CANCELLED')
+        : _set(call, VoiceCallStatus.ended, 'HANGUP');
   }
 }

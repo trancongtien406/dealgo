@@ -58,14 +58,21 @@ class DefaultDriverJobsClient implements DriverJobsClient {
     required String accessToken,
     required String orderId,
     required FoodDeliveryAction action,
+
     /// DEC-PROD-036: handover code (pickup) or delivery code (deliver).
     String? code,
+
+    /// Why the delivery failed (FOOD_FAIL_REASONS) and the note for OTHER.
+    String? failReason,
+    String? failNote,
   }) {
     return food.advanceDelivery(
       accessToken: accessToken,
       orderId: orderId,
       action: action,
       code: code,
+      failReason: failReason,
+      failNote: failNote,
     );
   }
 }

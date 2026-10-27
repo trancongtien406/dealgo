@@ -93,6 +93,7 @@ export function mapNestPartnerApplicationToKycCase(
     submittedAt: formatOpsDate(app.submittedAt ?? app.createdAt),
 
     phoneMasked:
+      app.applicantPhone ||
       readString(app.metadata, "phoneMasked") ||
       readString(app.metadata, "phone") ||
       "—",
@@ -123,6 +124,9 @@ export function mapNestPartnerApplicationToKycCase(
         : app.status === "APPROVED"
           ? "Merchant · Đã duyệt"
           : "Merchant · Chờ xử lý",
+    vehicleClassCode:
+      app.role === "DRIVER" ? readString(app.metadata, "vehicleClassCode") || null : null,
+    documentsWaived: app.metadata?.documentsWaived === true,
     activated: app.status === "APPROVED",
     details,
     documents: mapPartnerDocuments(app),

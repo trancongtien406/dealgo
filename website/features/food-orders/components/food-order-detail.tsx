@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ChatReviewButton } from "@/features/chat-review/components/chat-review-button";
 import {
   useCancelFoodOrderMutation,
   useFoodOrderDetailQuery,
@@ -126,6 +127,12 @@ export function FoodOrderDetail({ code }: { code: string }) {
             actions={
               <>
                 <BackToList href="/food-orders" />
+                <ChatReviewButton
+                  kind="food"
+                  id={code}
+                  partnerLabel="Tài xế/Cửa hàng"
+                />
+
                 {showReassign ? (
                   <OpsInterveneActionButton
                     tone="brand"
@@ -184,10 +191,7 @@ export function FoodOrderDetail({ code }: { code: string }) {
               <StatusChip tone="brand">{order.payment}</StatusChip>
             </SummaryCell>
             {order.cancelReason ? (
-              <SummaryCell
-                label="Lý do quán từ chối"
-                hint="Khách thấy lý do này"
-              >
+              <SummaryCell label="Lý do huỷ" hint="Khách thấy lý do này">
                 <span className="text-sm font-semibold text-danger">
                   {order.cancelReason}
                 </span>
@@ -277,6 +281,43 @@ export function FoodOrderDetail({ code }: { code: string }) {
                   </ul>
                 )}
               </DetailSection>
+              {order.change ? (
+                <DetailSection
+                  id="food-change"
+                  title="Quán sửa đơn"
+                  extra={
+                    <StatusChip tone={order.change.statusTone}>
+                      {order.change.status}
+                    </StatusChip>
+                  }
+                >
+                  <FieldList
+                    rows={[
+                      { label: "Lý do", value: order.change.reason },
+                      {
+                        label: "Món thay đổi",
+                        value: order.change.lines.join("; "),
+                      },
+                      {
+                        label: "Tạm tính",
+                        value: `${vnd(order.change.oldSubtotalVnd)} → ${vnd(order.change.newSubtotalVnd)}`,
+                      },
+                      {
+                        label: "Tổng mới",
+                        value: vnd(order.change.newTotalVnd),
+                      },
+                      {
+                        label: "Gửi lúc",
+                        value: `${order.change.createdAt} · hạn ${order.change.answerBy}`,
+                      },
+                      {
+                        label: "Khách trả lời",
+                        value: order.change.respondedAt ?? "—",
+                      },
+                    ]}
+                  />
+                </DetailSection>
+              ) : null}
               <DetailSection
                 id="food-payment"
                 title="Chi tiết thanh toán & đối soát"

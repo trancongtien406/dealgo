@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/config/api_base_url.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
@@ -10,6 +11,7 @@ import '../../../../core/network/api_exception.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
 import '../../domain/entities/ride_models.dart';
+import '../utils/ride_vehicle_label.dart';
 import '../../../../l10n/app_localizations.dart';
 
 String? rideAccessToken(BuildContext context) {
@@ -99,6 +101,93 @@ class RideBottomSheet extends StatelessWidget {
       child: child,
     );
   }
+}
+
+/// Floating circular back — unused on map/fare/waiting (system back only).
+/// Kept for rare recovery screens; prefer no chrome on map-first hot path.
+class RideMapBackButton extends StatelessWidget {
+  const RideMapBackButton({this.onPressed, super.key});
+
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final top = MediaQuery.paddingOf(context).top;
+    return Positioned(
+      top: top + DealGoSpacing.s8,
+      left: DealGoDimensions.pageGutter,
+      child: Material(
+        color: DealGoColors.card.withValues(alpha: 0.96),
+        elevation: 2,
+        shadowColor: DealGoColors.text.withValues(alpha: 0.18),
+        shape: const CircleBorder(),
+        child: IconButton(
+          key: const Key('header-back'),
+          tooltip: l10n.actionBack,
+          onPressed: onPressed ?? () => Navigator.maybeOf(context)?.maybePop(),
+          icon: const Icon(
+            DealGoIcons.back,
+            color: DealGoColors.text,
+            size: 22,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// inDrive-like persistent sheet: drag + snap sizes over a full-bleed map.
+/// Prefer this over [showModalBottomSheet] for book / fare / waiting (map stays
+/// interactive; sheet is not a dismissible modal).
+class RideDraggableSheet extends StatelessWidget {
+  const RideDraggableSheet({
+    required this.builder,
+    this.initialChildSize = 0.46,
+    this.minChildSize = 0.28,
+    this.maxChildSize = 0.88,
+    this.snapSizes = const [0.28, 0.46, 0.72],
+    super.key,
+  });
+
+  final Widget Function(BuildContext context, ScrollController controller)
+  builder;
+  final double initialChildSize;
+  final double minChildSize;
+  final double maxChildSize;
+  final List<double> snapSizes;
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: initialChildSize,
+      minChildSize: minChildSize,
+      maxChildSize: maxChildSize,
+      snap: true,
+      snapSizes: snapSizes,
+      builder: (context, controller) {
+        return RideBottomSheet(child: builder(context, controller));
+      },
+    );
+  }
+}
+
+/// Optional helper: present a one-shot picker sheet (not used on map hot path).
+Future<T?> showRideModalSheet<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  bool isDismissible = true,
+}) {
+  return showModalBottomSheet<T>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    isDismissible: isDismissible,
+    backgroundColor: Colors.transparent,
+    builder: (context) {
+      return RideBottomSheet(child: builder(context));
+    },
+  );
 }
 
 class RideSectionTitle extends StatelessWidget {
@@ -435,15 +524,22 @@ enum RideChipTone { neutral, danger, warning, green, purple }
 
 /// Thin feature wrapper over [DealGoChip].
 class RideStatusChip extends StatelessWidget {
-  const RideStatusChip({required this.label, required this.tone, super.key});
+  const RideStatusChip({
+    required this.label,
+    required this.tone,
+    this.leading,
+    super.key,
+  });
 
   final String label;
   final RideChipTone tone;
+  final Widget? leading;
 
   @override
   Widget build(BuildContext context) {
     return DealGoChip(
       label: label,
+      leading: leading,
       tone: switch (tone) {
         RideChipTone.neutral => DealGoChipTone.neutral,
         RideChipTone.danger => DealGoChipTone.danger,
@@ -514,6 +610,7 @@ class RideDualActions extends StatelessWidget {
     required this.onPrimary,
     this.primaryKey,
     this.enabled = true,
+    this.compact = true,
     super.key,
   });
 
@@ -523,6 +620,7 @@ class RideDualActions extends StatelessWidget {
   final VoidCallback onPrimary;
   final Key? primaryKey;
   final bool enabled;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -531,6 +629,7 @@ class RideDualActions extends StatelessWidget {
         Expanded(
           child: DealGoSecondaryButton(
             label: secondaryLabel,
+            compact: compact,
             enabled: enabled,
             onPressed: onSecondary,
           ),
@@ -540,6 +639,7 @@ class RideDualActions extends StatelessWidget {
           child: DealGoPrimaryButton(
             key: primaryKey,
             label: primaryLabel,
+            compact: compact,
             enabled: enabled,
             onPressed: onPrimary,
           ),
@@ -578,22 +678,39 @@ class RideRoutePanel extends StatelessWidget {
   const RideRoutePanel({
     required this.pickup,
     required this.dropoff,
+    this.vehicleClassCode,
+    this.imageUrl,
     super.key,
   });
 
   final String pickup;
   final String dropoff;
+  final String? vehicleClassCode;
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final photo = resolveMediaUrl(imageUrl);
     return RidePanel(
       color: DealGoColors.lavender,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           RideStatusChip(
-            label: AppLocalizations.of(context).rideVehicleMotorbike,
+            label: rideVehicleClassLabel(l10n, vehicleClassCode),
             tone: RideChipTone.purple,
+            leading: photo == null
+                ? Icon(
+                    rideVehicleClassIcon(vehicleClassCode),
+                    size: 14,
+                    color: DealGoColors.primary,
+                  )
+                : RideVehicleClassPhoto(
+                    imageUrl: imageUrl,
+                    code: vehicleClassCode,
+                    size: 18,
+                  ),
           ),
           const SizedBox(height: DealGoSpacing.s12),
           RideStopList(pickup: pickup, dropoff: dropoff),

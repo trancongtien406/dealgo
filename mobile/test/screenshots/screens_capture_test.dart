@@ -161,7 +161,11 @@ FakeFoodClient _food() =>
           deliveryFareVnd: 18000,
           subtotalVnd: 100000,
           totalVnd: 118000,
-          dropoff: FoodDropoff(lat: 16.0544, lng: 108.2022, label: '45 Lê Duẩn, Hải Châu'),
+          dropoff: FoodDropoff(
+            lat: 16.0544,
+            lng: 108.2022,
+            label: '45 Lê Duẩn, Hải Châu',
+          ),
           lineCount: 2,
         ),
       ]
@@ -172,7 +176,11 @@ FakeFoodClient _food() =>
         subtotalVnd: 100000,
         deliveryFareVnd: 15000,
         totalVnd: 115000,
-        dropoff: FoodDropoff(lat: 16.07, lng: 108.22, label: '45 Lê Duẩn, Hải Châu'),
+        dropoff: FoodDropoff(
+          lat: 16.07,
+          lng: 108.22,
+          label: '45 Lê Duẩn, Hải Châu',
+        ),
         lines: [
           FoodOrderLine(
             itemId: 'i1',
@@ -180,8 +188,16 @@ FakeFoodClient _food() =>
             unitPriceVnd: 77000,
             quantity: 1,
             options: [
-              FoodLineOption(groupName: 'Size', name: 'Lớn', priceDeltaVnd: 10000),
-              FoodLineOption(groupName: 'Topping', name: 'Thêm chả cá', priceDeltaVnd: 12000),
+              FoodLineOption(
+                groupName: 'Size',
+                name: 'Lớn',
+                priceDeltaVnd: 10000,
+              ),
+              FoodLineOption(
+                groupName: 'Topping',
+                name: 'Thêm chả cá',
+                priceDeltaVnd: 12000,
+              ),
             ],
           ),
           FoodOrderLine(
@@ -297,15 +313,19 @@ Future<void> _settleImages(WidgetTester tester) async {
 }
 
 Future<void> _fillDeleteForm(WidgetTester tester) async {
-  final list = find.descendant(
-    of: find.byKey(const ValueKey('delete-account-form')),
-    matching: find.byType(Scrollable),
-  ).first;
+  final list = find
+      .descendant(
+        of: find.byKey(const ValueKey('delete-account-form')),
+        matching: find.byType(Scrollable),
+      )
+      .first;
   final backup = find.byKey(const ValueKey('delete-check-backup'));
   await tester.scrollUntilVisible(backup, 120, scrollable: list);
   await tester.ensureVisible(backup);
   await tester.pumpAndSettle();
-  await tester.tap(find.descendant(of: backup, matching: find.byType(Checkbox)));
+  await tester.tap(
+    find.descendant(of: backup, matching: find.byType(Checkbox)),
+  );
   await tester.pump();
   final word = find.byKey(const ValueKey('delete-confirm-word'));
   await tester.scrollUntilVisible(word, 120, scrollable: list);
@@ -332,8 +352,16 @@ Future<void> _shoot(WidgetTester tester, String name) async {
 
 /// DEC-PROD-024 shots: a negotiating ride with one offer, and a finished discounted ride.
 RideView? _voucherShotRide(String id) {
-  const pickup = RidePoint(lat: 16.0544, lng: 108.2022, label: '123 Lê Lợi, Hải Châu');
-  const dropoff = RidePoint(lat: 16.0439, lng: 108.1994, label: 'Sân bay Quốc tế Đà Nẵng');
+  const pickup = RidePoint(
+    lat: 16.0544,
+    lng: 108.2022,
+    label: '123 Lê Lợi, Hải Châu',
+  );
+  const dropoff = RidePoint(
+    lat: 16.0439,
+    lng: 108.1994,
+    label: 'Sân bay Quốc tế Đà Nẵng',
+  );
   if (id == 'ride-voucher') {
     return const RideView(
       id: 'ride-voucher',
@@ -403,28 +431,30 @@ Future<void> _pump(
         tokenStore: store,
         foodClient: food ?? _food(),
         rideClient: FakeRideClient()
-          ..onGet = ((id) => _voucherShotRide(id) ?? RideView(
-            id: id,
-            status: RideStatus.driverEnRoute,
-            pickup: const RidePoint(
-              lat: 16.0544,
-              lng: 108.2022,
-              label: '123 Lê Lợi, Hải Châu',
-            ),
-            dropoff: const RidePoint(
-              lat: 16.0439,
-              lng: 108.1994,
-              label: 'Sân bay Quốc tế Đà Nẵng',
-            ),
-            offeredFareVnd: 42000,
-            referenceFareVnd: 40000,
-            agreedFareVnd: 45000,
-            assignedDriverId: 'driver-1',
-            selectedOfferId: null,
-            expiresAt: '2030-01-01T00:00:00.000Z',
-            offers: const [],
-            pickupCode: '4821',
-          ))
+          ..onGet = ((id) =>
+              _voucherShotRide(id) ??
+              RideView(
+                id: id,
+                status: RideStatus.driverEnRoute,
+                pickup: const RidePoint(
+                  lat: 16.0544,
+                  lng: 108.2022,
+                  label: '123 Lê Lợi, Hải Châu',
+                ),
+                dropoff: const RidePoint(
+                  lat: 16.0439,
+                  lng: 108.1994,
+                  label: 'Sân bay Quốc tế Đà Nẵng',
+                ),
+                offeredFareVnd: 42000,
+                referenceFareVnd: 40000,
+                agreedFareVnd: 45000,
+                assignedDriverId: 'driver-1',
+                selectedOfferId: null,
+                expiresAt: '2030-01-01T00:00:00.000Z',
+                offers: const [],
+                pickupCode: '4821',
+              ))
           ..openRides = const [
             OpenRide(
               id: 'ride-open-1',
@@ -689,10 +719,30 @@ void main() {
     ),
     '56_driver_delivery_code': ('/driver', _driver, null, null),
     '57_merchant_handover_code': ('/merchant', _merchant, 'Đơn hàng', null),
-    '58_delete_account': ('/customer', _customer, 'Tài khoản', 'delete-account'),
-    '59_delete_account_filled': ('/customer', _customer, 'Tài khoản', 'delete-account'),
-    '60_delete_account_verify': ('/customer', _customer, 'Tài khoản', 'delete-account'),
-    '61_delete_account_done': ('/customer', _customer, 'Tài khoản', 'delete-account'),
+    '58_delete_account': (
+      '/customer',
+      _customer,
+      'Tài khoản',
+      'delete-account',
+    ),
+    '59_delete_account_filled': (
+      '/customer',
+      _customer,
+      'Tài khoản',
+      'delete-account',
+    ),
+    '60_delete_account_verify': (
+      '/customer',
+      _customer,
+      'Tài khoản',
+      'delete-account',
+    ),
+    '61_delete_account_done': (
+      '/customer',
+      _customer,
+      'Tài khoản',
+      'delete-account',
+    ),
   };
 
   // DEC-PROD-036 shots need their own order state.
@@ -960,7 +1010,10 @@ void main() {
       await _fillDeleteForm(tester);
       await tester.tap(find.byKey(const ValueKey('delete-continue')));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byKey(const ValueKey('delete-secret')), '123456');
+      await tester.enterText(
+        find.byKey(const ValueKey('delete-secret')),
+        '123456',
+      );
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('delete-confirm')));
       await tester.pumpAndSettle();

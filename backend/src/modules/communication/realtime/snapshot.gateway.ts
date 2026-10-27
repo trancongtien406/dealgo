@@ -15,6 +15,7 @@ import type { AppEnv } from '../../../platform/config/env.js';
 import { resolveAllowedOrigins } from '../../../platform/http/local-dev-cors.js';
 import {
   parseSnapshotRoom,
+  roomForUser,
   SUBSCRIBE_EVENT,
   UNSUBSCRIBE_EVENT,
 } from './realtime.constants.js';
@@ -29,6 +30,8 @@ type ActorSocket = Socket & {
       sessionId: string;
       channel: string;
     };
+    /** Resolves once handleConnection finished auth (messages can arrive before it). */
+    authReady?: Promise<void>;
   };
 };
 
@@ -68,6 +71,7 @@ export class SnapshotGateway implements OnGatewayInit, OnGatewayConnection, OnMo
 
   afterInit(server: Server): void {
     this.fanout.bindServer(server);
+    this.fanout.bindAccessCheck((userId, room) => this.access.canJoinRoom(userId, room));
     void this.attachAdapter(server);
     this.sessionAuditTimer = setInterval(async () => {
       try {
@@ -98,15 +102,24 @@ export class SnapshotGateway implements OnGatewayInit, OnGatewayConnection, OnMo
     this.redisClients = [];
   }
 
-  async handleConnection(client: ActorSocket): Promise<void> {
-    try {
-      const actor = await this.access.authenticateSocket(client);
-      client.data.actor = actor;
-    } catch (error) {
-      const code = error instanceof SocketAuthError ? error.code : 'UNAUTHORIZED';
-      client.emit('error', { code, message: 'Authentication required' });
-      client.disconnect(true);
-    }
+  handleConnection(client: ActorSocket): Promise<void> {
+    // Socket.IO delivers `connect` to the client before this async auth finishes, so a
+    // subscribe sent right after connect (first join or resubscribe after reconnect)
+    // used to see no actor and get UNAUTHORIZED. subscribe() awaits this promise.
+    const ready = (async () => {
+      try {
+        const actor = await this.access.authenticateSocket(client);
+        client.data.actor = actor;
+        // Private per-user room for account-level pushes (partner approval).
+        await client.join(roomForUser(actor.userId));
+      } catch (error) {
+        const code = error instanceof SocketAuthError ? error.code : 'UNAUTHORIZED';
+        client.emit('error', { code, message: 'Authentication required' });
+        client.disconnect(true);
+      }
+    })();
+    client.data.authReady = ready;
+    return ready;
   }
 
   @SubscribeMessage(SUBSCRIBE_EVENT)
@@ -114,6 +127,7 @@ export class SnapshotGateway implements OnGatewayInit, OnGatewayConnection, OnMo
     @ConnectedSocket() client: ActorSocket,
     @MessageBody() body: { room?: string },
   ): Promise<{ ok: true; room: string } | { ok: false; code: string }> {
+    await client.data.authReady;
     const actor = client.data.actor;
     if (!actor) {
       return { ok: false, code: 'UNAUTHORIZED' };

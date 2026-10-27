@@ -1,5 +1,4 @@
 "use client";
-import { useState } from "react";
 
 import Link from "next/link";
 import { OpsIcon } from "@/components/ui/ops-icons";
@@ -63,10 +62,13 @@ import {
 
 export function TransactionsList() {
   const [filters, setFilters] = useTransactionListFilters();
-  const [dateRange, setDateRange] = useState<DateRangeValue>({
-    from: null,
-    to: null,
-  });
+  const dateRange: DateRangeValue = {
+    from: filters.from || null,
+    to: filters.to || null,
+  };
+  const setDateRange = (range: DateRangeValue) => {
+    void setFilters({ from: range.from ?? "", to: range.to ?? "", page: 1 });
+  };
   const { data, isPending, isError, error, refetch } = useTransactionsQuery();
   const items = data?.items ?? [];
   const total = data?.total ?? items.length;
@@ -96,8 +98,9 @@ export function TransactionsList() {
   });
 
   const resetFilters = () => {
-    setDateRange({ from: null, to: null });
     void setFilters({
+      from: "",
+      to: "",
       q: "",
       status: "ALL",
       service: "ALL",
@@ -136,7 +139,11 @@ export function TransactionsList() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <AdminHeaderDateFilter defaultPreset="today" />
+          <AdminHeaderDateFilter
+            value={dateRange}
+            onChange={setDateRange}
+            defaultPreset="all"
+          />
           <ExportCsvButton
             filename="transactions.csv"
             headers={["Mã", "Trạng thái"]}

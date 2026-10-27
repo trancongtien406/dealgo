@@ -49,7 +49,7 @@ upstream_docs:
 
 > **Trạng thái:** `DRAFT`, phiên bản `0.1.0`, ngày 11/10/2026. **Tất cả persona dưới đây là `PROTO` — giả thuyết thiết kế**, được tổng hợp từ phạm vi DealGo, nghiên cứu thứ cấp và các tình huống nghiệp vụ; **chưa** có nghiên cứu định tính trực tiếp với người dùng DealGo. Mẫu nhân vật, hành vi, độ ưu tiên và pain point **không phải kết quả khảo sát, không phải số liệu thị trường**, không được dùng làm bằng chứng xác nhận product–market fit.
 >
-> **Phạm vi đã xác nhận:** `DEC-PROD-001`: MVP có Ride **xe hai bánh chở khách** + Food **đặt món giao tận nơi**. `DEC-PROD-002`: **một ứng dụng Flutter** cho Customer, Merchant, Driver; **Admin Web** là kênh nội bộ riêng. Bảy quyết định `DEC-PROD-001..007` không được sửa bởi tài liệu này; `DEC-PROD-005` xác nhận thương lượng giá Ride, `006` auth methods, `007` chat/call.
+> **Phạm vi đã xác nhận:** `DEC-PROD-001`: MVP có Ride **chở khách bằng xe máy, ô tô** + Food **đặt món giao tận nơi**. `DEC-PROD-002`: **một ứng dụng Flutter** cho Customer, Merchant, Driver; **Admin Web** là kênh nội bộ riêng. Bảy quyết định `DEC-PROD-001..007` không được sửa bởi tài liệu này; `DEC-PROD-005` xác nhận thương lượng giá Ride, `006` auth methods, `007` chat/call.
 >
 > **Nguồn chuẩn:** file này định nghĩa các **nhóm người dùng, nhu cầu và giả thuyết hành vi**. Quy tắc quyền, phí, số job, hủy/hoàn, bằng chứng giao hàng, SLA, pháp lý và release vẫn do Governance / Domain / Workflow / Contract docs và phê duyệt quyết định chi phối. Một persona **không tự tạo FR, business policy hoặc quyền truy cập**.
 
@@ -155,7 +155,7 @@ Mỗi phát hiện sau khi nghiên cứu thực tế cần lưu: `evidence_id`, 
 
 | Trường | Nội dung |
 |---|---|
-| Bối cảnh kích hoạt | Có điểm đi/đến rõ ràng, muốn xác nhận nhanh một chuyến chở khách bằng xe hai bánh |
+| Bối cảnh kích hoạt | Có điểm đi/đến rõ ràng, muốn xác nhận nhanh một chuyến chở khách bằng xe máy hoặc ô tô |
 | JTBD | **Khi** cần đến một địa điểm, **tôi muốn** biết giá và xe có đang tới không, **để** tự tin quyết định di chuyển |
 | `NEED-C-R01` | Biết **giá/điều kiện** trước khi gửi yêu cầu; estimate vs confirmed phải rõ |
 | `NEED-C-R02` | Nhận trạng thái tìm tài xế, không chờ vô hạn hay tưởng có xe khi chưa có |
@@ -448,7 +448,7 @@ Mỗi phát hiện sau khi nghiên cứu thực tế cần lưu: `evidence_id`, 
 
 | Stage | Hành động người dùng | Kỳ vọng / moment of truth | Frontstage UI | Backstage service | Failure/recovery |
 |---|---|---|---|---|---|
-| Discover | Vào Ride | Biết dịch vụ hai bánh đang có thể dùng | Ride entry, location permission | Serviceability/location | Outside zone / denied GPS |
+| Discover | Vào Ride | Biết dịch vụ Ride và hạng xe đang có thể dùng | Ride entry, location permission | Serviceability/location | Outside zone / denied GPS |
 | Plan | Nhập điểm đón/đến | Pin đúng và giải thích rõ | Map, pickup details | Geocoding/routes | GPS drift, address unresolved |
 | Evaluate | Xem giá và ETA dự đoán | Hiểu điều kiện trước đặt | Quote/breakdown | Pricing/quote snapshot | Quote expired / price changed |
 | Request | Xác nhận đặt | Không bị tạo hai chuyến | Submit + progress | Idempotency + RideRequest | Double tap/retry/timeout |

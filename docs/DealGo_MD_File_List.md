@@ -1,7 +1,7 @@
 # DealGo — Danh sách file Markdown cho 213 màn hình cốt lõi (+10 Merchant Portal)
 
 > Đây là danh sách **file dự kiến tạo**, không khẳng định các file màn hình đã tồn tại. Quy ước: 1 màn hình = 1 file `.md`.
-> Ảnh giao diện nằm trong `design/`. Thư mục đó chỉ còn ảnh đã chọn: mockup PNG, biến thể trạng thái và minh họa. Không dùng HTML, prompt hay script trong `design/` làm nguồn triển khai.
+> Ảnh giao diện nằm trong `design/`. Thư mục đó chỉ chứa ảnh đã chọn: mockup PNG màn hình và minh họa. Biến thể trạng thái (loading, trống, lỗi, hết hạn…) chỉ được liệt kê theo tên, chưa có ảnh; app hiển thị chúng qua `DealGoStateView` (`mobile/lib/core/design_system/components/dealgo_state_view.dart`). Không dùng HTML, prompt hay script trong `design/` làm nguồn triển khai.
 
 ## 1. Bảng thống kê phạm vi & Hiện trạng thiết kế
 
@@ -13,7 +13,7 @@
 | **Shipper / Tài xế** | Mobile | 45 | 45/45 | 7 | [`../design/mockups/screens/driver/`](../design/mockups/screens/driver/) |
 | **Landing Page** | Web công khai | 13 | Chưa có ảnh | — | Kênh Web công khai |
 | **Admin Dashboard** | Web quản trị | 35 | 35/35 | — | [`../design/mockups/screens/admin/`](../design/mockups/screens/admin/) |
-| **Tổng cốt lõi** | **165 Mobile + 48 Web** | **213** | **200 PNG màn hình** | **29 PNG trong `screens/states/`** | Ảnh là nguồn nhìn |
+| **Tổng cốt lõi** | **165 Mobile + 48 Web** | **213** | **200 PNG màn hình** | **29 biến thể (chưa có ảnh)** | Ảnh là nguồn nhìn |
 | **Merchant Portal** | Web đối tác — giai đoạn sau | 10 | Kế hoạch sau MVP | N/A | N/A | Kênh Web đối tác |
 | **Tổng khi bổ sung Merchant Portal** | **213 + 10** | **223** | | | | |
 
@@ -23,7 +23,7 @@
 - **Web cốt lõi (48 trang):** 13 trang Landing Page giới thiệu DealGo và 35 trang Admin Dashboard vận hành hệ thống (Next.js 16 tại `../website/`, trong đó toàn bộ 35/35 trang Admin đã có mockup PNG độ phân giải 1600×1180 tại [`../design/mockups/screens/admin/`](../design/mockups/screens/admin/)).
 - **Merchant Portal (10 trang):** Dành cho cửa hàng/quán ăn trên Web ở giai đoạn sau; không gộp vào 213 màn hình cốt lõi ban đầu.
 - **Nguyên tắc phân định:** Landing Page giới thiệu dịch vụ, cách hoạt động, đối tác và ứng dụng; không triển khai luồng đặt xe/đồ ăn của app trên website.
-- **Responsive & UI States:** Responsive layouts, tab, modal, dialog, bottom sheet và các trạng thái loading/empty/error không cộng thành màn hình riêng. Biến thể lỗi/chờ được quản lý qua `DealGoScreenState`.
+- **Responsive & UI States:** Responsive layouts, tab, modal, dialog, bottom sheet và các trạng thái loading/empty/error không cộng thành màn hình riêng. Biến thể lỗi/chờ được quản lý qua `DealGoStateView` (`mobile/lib/core/design_system/components/dealgo_state_view.dart`).
 - **Ảnh neo nhận diện:** `C001`, `C004`, `C028`, `S007`, `M013`, `D016` trong `design/mockups/screens/`. Nhìn ảnh, không lấy luật nghiệp vụ từ tên file.
 
 ---
@@ -34,10 +34,9 @@
 |---|---|
 | Màn mobile | `design/mockups/screens/shared`, `customer`, `merchant`, `driver` |
 | Màn admin | `design/mockups/screens/admin` |
-| Trạng thái (loading, trống, lỗi, hết hạn, KYC) | `design/mockups/screens/states` |
 | Minh họa | `design/assets/batch01` (svg, png, ảnh món), `design/assets/batch02/png` |
 
-Ride MVP là xe hai bánh. Bộ ảnh không còn minh họa sedan, SUV hay xe 7 chỗ.
+Ride MVP gồm xe máy và ô tô (`MOTORBIKE`, `CAR_4`, `CAR_7`, `DG-DEC-VEH-001`). Bộ mockup chủ yếu minh họa xe máy; biểu tượng xe theo hạng nằm trong code app (`mobile/lib/core/maps/map_markers.dart`).
 
 ---
 
@@ -50,7 +49,7 @@ Ride MVP là xe hai bánh. Bộ ảnh không còn minh họa sedan, SUV hay xe 7
 | **S001** | Khởi động, kiểm tra phiên và điều hướng | [`S001.png`](../design/mockups/screens/shared/S001.png) | PNG | 1000×2036 | — | — | `S001-khoi-dong-kiem-tra-phien-va-dieu-huong.md` |
 | **S002** | Giới thiệu DealGo (Onboarding) | [`S002.png`](../design/mockups/screens/shared/S002.png) | PNG | 1000×2036 | — | `role_customer`, `role_shop`, `role_driver` | `S002-gioi-thieu-dealgo-onboarding.md` |
 | **S003** | Nhập số điện thoại đăng nhập / đăng ký | [`S003.png`](../design/mockups/screens/shared/S003.png) | PNG | 1000×2036 | — | — | `S003-nhap-so-dien-thoai-dang-nhap-dang-ky.md` |
-| **S004** | Xác minh mã OTP | [`S004.png`](../design/mockups/screens/shared/S004.png) | PNG | 1000×2036 | [`otp_invalid`](../design/mockups/screens/states/S004__otp_invalid.png)<br>[`resend_cooldown`](../design/mockups/screens/states/S004__resend_cooldown.png) | — | `S004-xac-minh-ma-otp.md` |
+| **S004** | Xác minh mã OTP | [`S004.png`](../design/mockups/screens/shared/S004.png) | PNG | 1000×2036 | `otp_invalid`<br>`resend_cooldown` | — | `S004-xac-minh-ma-otp.md` |
 | **S005** | Hoàn thiện hồ sơ cơ bản lần đầu | [`S005.png`](../design/mockups/screens/shared/S005.png) | PNG | 1000×2036 | — | — | `S005-hoan-thien-ho-so-co-ban-lan-dau.md` |
 | **S006** | Giải thích và quản lý cấp quyền ban đầu | [`S006.png`](../design/mockups/screens/shared/S006.png) | PNG | 1000×2036 | — | — | `S006-giai-thich-va-quan-ly-cap-quyen-ban-dau.md` |
 | ⭐ **S007** | **Trung tâm vai trò và đăng ký quyền mới** *(Golden Ref)* | [`S007.png`](../design/mockups/screens/shared/S007.png) | PNG | 1000×2036 | — | `role_customer`, `role_shop`, `role_driver` | `S007-trung-tam-vai-tro-va-dang-ky-quyen-moi.md` |
@@ -61,9 +60,9 @@ Ride MVP là xe hai bánh. Bộ ảnh không còn minh họa sedan, SUV hay xe 7
 | **S012** | Chỉnh sửa hồ sơ cá nhân | [`S012.png`](../design/mockups/screens/shared/S012.png) | PNG | 1000×2036 | — | — | `S012-chinh-sua-ho-so-ca-nhan.md` |
 | **S013** | Sổ địa chỉ đã lưu | [`S013.png`](../design/mockups/screens/shared/S013.png) | PNG | 1000×2036 | — | — | `S013-so-dia-chi-da-luu.md` |
 | **S014** | Thêm / chỉnh sửa địa chỉ đã lưu | [`S014.png`](../design/mockups/screens/shared/S014.png) | PNG | 1000×2036 | — | — | `S014-them-chinh-sua-dia-chi-da-luu.md` |
-| **S015** | Tìm kiếm địa điểm, địa chỉ | [`S015.png`](../design/mockups/screens/shared/S015.png) | PNG | 1000×2036 | [`search_empty`](../design/mockups/screens/states/S015__search_empty.png) | `state_no_search`, `state_offline` | `S015-tim-kiem-dia-diem-dia-chi.md` |
-| **S016** | Chọn ghim trên bản đồ | [`S016.png`](../design/mockups/screens/shared/S016.png) | PNG | 1000×2036 | [`location_denied`](../design/mockups/screens/states/S016__location_denied.png) | `state_no_search`, `state_offline` | `S016-chon-ghim-tren-ban-do.md` |
-| **S017** | Danh sách phương thức thanh toán | [`S017.png`](../design/mockups/screens/shared/S017.png) | PNG | 1000×2036 | [`payment_unavailable`](../design/mockups/screens/states/S017__payment_unavailable.png) | `state_payment_error`, `state_offline` | `S017-danh-sach-phuong-thuc-thanh-toan.md` |
+| **S015** | Tìm kiếm địa điểm, địa chỉ | [`S015.png`](../design/mockups/screens/shared/S015.png) | PNG | 1000×2036 | `search_empty` | `state_no_search`, `state_offline` | `S015-tim-kiem-dia-diem-dia-chi.md` |
+| **S016** | Chọn ghim trên bản đồ | [`S016.png`](../design/mockups/screens/shared/S016.png) | PNG | 1000×2036 | `location_denied` | `state_no_search`, `state_offline` | `S016-chon-ghim-tren-ban-do.md` |
+| **S017** | Danh sách phương thức thanh toán | [`S017.png`](../design/mockups/screens/shared/S017.png) | PNG | 1000×2036 | `payment_unavailable` | `state_payment_error`, `state_offline` | `S017-danh-sach-phuong-thuc-thanh-toan.md` |
 | **S018** | Thêm / liên kết phương thức thanh toán | [`S018.png`](../design/mockups/screens/shared/S018.png) | PNG | 1000×2036 | — | `state_payment_error`, `state_offline` | `S018-them-lien-ket-phuong-thuc-thanh-toan.md` |
 | **S019** | Trung tâm hỗ trợ và câu hỏi thường gặp | [`S019.png`](../design/mockups/screens/shared/S019.png) | PNG | 1000×2036 | — | — | `S019-trung-tam-ho-tro-va-cau-hoi-thuong-gap.md` |
 | **S020** | Chi tiết bài hướng dẫn trợ giúp | [`S020.png`](../design/mockups/screens/shared/S020.png) | PNG | 1000×2036 | — | — | `S020-chi-tiet-bai-huong-dan-tro-giup.md` |
@@ -81,16 +80,16 @@ Ride MVP là xe hai bánh. Bộ ảnh không còn minh họa sedan, SUV hay xe 7
 | Mã | Tên màn hình / Chức năng | Mockup PNG (`design/`) | Nguồn | Kích thước | UI State Variants (Ph 19.4) | Assets Ánh xạ | File MD dự kiến (`docs/screens/`) |
 |:---:|---|:---:|:---:|:---:|---|---|---|
 | ⭐ **C001** | **Trang chủ DealGo (Customer Home / Brand Anchor)** *(Golden Ref)* | [`C001.png`](../design/mockups/screens/customer/C001.png) | PNG | 941×1672 | — | `banner_danang_hero`, `card_ride`, `card_food`, `banner_promo_gift` | `C001-trang-chu-dealgo.md` |
-| **C002** | Bản đồ đặt xe và bắt đầu chọn hành trình | [`C002.png`](../design/mockups/screens/customer/C002.png) | PNG | 1000×2000 | [`map_loading`](../design/mockups/screens/states/C002__map_loading.png) | `vehicle_motorbike`, `accent_pickup_route` | `C002-ban-do-dat-xe-va-bat-dau-chon-hanh-trinh.md` |
+| **C002** | Bản đồ đặt xe và bắt đầu chọn hành trình | [`C002.png`](../design/mockups/screens/customer/C002.png) | PNG | 1000×2000 | `map_loading` | `vehicle_motorbike`, `accent_pickup_route` | `C002-ban-do-dat-xe-va-bat-dau-chon-hanh-trinh.md` |
 | **C003** | Tổng quan điểm đón, điểm đến và tuyến | [`C003.png`](../design/mockups/screens/customer/C003.png) | PNG | 1000×2000 | — | `vehicle_motorbike`, `accent_pickup_route` | `C003-tong-quan-diem-don-diem-den-va-tuyen.md` |
 | ⭐ **C004** | **Chọn loại phương tiện và dịch vụ** *(Golden Ref)* | [`C004.png`](../design/mockups/screens/customer/C004.png) | PNG | 1000×2000 | — | `vehicle_motorbike`, `accent_pickup_route` | `C004-chon-loai-phuong-tien-va-dich-vu.md` |
 | **C005** | Chi tiết giá cước, phụ phí và điều kiện | [`C005.png`](../design/mockups/screens/customer/C005.png) | PNG | 941×1672 | — | `vehicle_motorbike`, `state_no_driver`, `state_quote_expired` | `C005-chi-tiet-gia-cuoc-phu-phi-va-dieu-kien.md` |
 | **C006** | Tự đề xuất giá chuyến (Fare Bidding) | [`C006.png`](../design/mockups/screens/customer/C006.png) | PNG | 941×1672 | — | `vehicle_motorbike`, `state_no_driver`, `state_quote_expired` | `C006-tu-de-xuat-gia-chuyen.md` |
-| **C007** | Danh sách tài xế chào giá (Driver Offers) | [`C007.png`](../design/mockups/screens/customer/C007.png) | PNG | 941×1672 | [`offers_empty`](../design/mockups/screens/states/C007__offers_empty.png)<br>[`quote_expired`](../design/mockups/screens/states/C007__quote_expired.png)<br>[`quote_taken`](../design/mockups/screens/states/C007__quote_taken.png) | `vehicle_motorbike`, `state_no_driver`, `state_quote_expired` | `C007-danh-sach-tai-xe-chao-gia.md` |
+| **C007** | Danh sách tài xế chào giá (Driver Offers) | [`C007.png`](../design/mockups/screens/customer/C007.png) | PNG | 941×1672 | `offers_empty`<br>`quote_expired`<br>`quote_taken` | `vehicle_motorbike`, `state_no_driver`, `state_quote_expired` | `C007-danh-sach-tai-xe-chao-gia.md` |
 | **C008** | Chi tiết báo giá và tài xế | [`C008.png`](../design/mockups/screens/customer/C008.png) | PNG | 941×1672 | — | `vehicle_motorbike`, `state_no_driver`, `state_quote_expired` | `C008-chi-tiet-bao-gia-va-tai-xe.md` |
-| **C009** | Xác nhận chuyến và phương thức thanh toán | [`C009.png`](../design/mockups/screens/customer/C009.png) | PNG | 941×1672 | [`fare_changed`](../design/mockups/screens/states/C009__fare_changed.png) | `vehicle_motorbike`, `state_no_driver`, `state_quote_expired` | `C009-xac-nhan-chuyen-va-phuong-thuc-thanh-toan.md` |
-| **C010** | Đang tìm tài xế (Matching) | [`C010.png`](../design/mockups/screens/customer/C010.png) | PNG | 941×1672 | [`matching_timeout`](../design/mockups/screens/states/C010__matching_timeout.png) | `vehicle_motorbike`, `state_no_driver`, `state_quote_expired` | `C010-dang-tim-tai-xe-matching.md` |
-| **C011** | Tài xế đã nhận, đang đến đón | [`C011.png`](../design/mockups/screens/customer/C011.png) | PNG | 941×1672 | [`tracking_offline`](../design/mockups/screens/states/C011__tracking_offline.png) | `vehicle_motorbike`, `state_no_driver`, `state_quote_expired` | `C011-tai-xe-da-nhan-dang-den-don.md` |
+| **C009** | Xác nhận chuyến và phương thức thanh toán | [`C009.png`](../design/mockups/screens/customer/C009.png) | PNG | 941×1672 | `fare_changed` | `vehicle_motorbike`, `state_no_driver`, `state_quote_expired` | `C009-xac-nhan-chuyen-va-phuong-thuc-thanh-toan.md` |
+| **C010** | Đang tìm tài xế (Matching) | [`C010.png`](../design/mockups/screens/customer/C010.png) | PNG | 941×1672 | `matching_timeout` | `vehicle_motorbike`, `state_no_driver`, `state_quote_expired` | `C010-dang-tim-tai-xe-matching.md` |
+| **C011** | Tài xế đã nhận, đang đến đón | [`C011.png`](../design/mockups/screens/customer/C011.png) | PNG | 941×1672 | `tracking_offline` | `vehicle_motorbike`, `state_no_driver`, `state_quote_expired` | `C011-tai-xe-da-nhan-dang-den-don.md` |
 | **C012** | Xác thực mã đón khách (Pickup OTP) | [`C012.png`](../design/mockups/screens/customer/C012.png) | PNG | 1000×2036 | — | — | `C012-xac-thuc-ma-don-khach.md` |
 | **C013** | Bản đồ chuyến xe đang chạy | [`C013.png`](../design/mockups/screens/customer/C013.png) | PNG | 1000×2036 | — | `accent_pickup_route` | `C013-ban-do-chuyen-xe-dang-chay.md` |
 | **C014** | Trung tâm an toàn chuyến đi | [`C014.png`](../design/mockups/screens/customer/C014.png) | PNG | 1000×2036 | — | — | `C014-trung-tam-an-toan-chuyen-di.md` |
@@ -107,12 +106,12 @@ Ride MVP là xe hai bánh. Bộ ảnh không còn minh họa sedan, SUV hay xe 7
 | **C025** | Chi tiết quán, cửa hàng và menu | [`C025.png`](../design/mockups/screens/customer/C025.png) | PNG | 1000×2036 | — | `card_food`, `role_food`, `state_no_search`, photos | `C025-chi-tiet-quan-cua-hang-va-menu.md` |
 | **C026** | Chi tiết món, sản phẩm và tùy chọn | [`C026.png`](../design/mockups/screens/customer/C026.png) | PNG | 1000×2036 | — | `card_food`, `role_food`, `state_no_search`, photos | `C026-chi-tiet-mon-san-pham-va-tuy-chon.md` |
 | **C027** | Giỏ hàng hiện tại | [`C027.png`](../design/mockups/screens/customer/C027.png) | PNG | 1000×2036 | — | `card_food`, `role_food`, `state_no_search`, photos | `C027-gio-hang-hien-tai.md` |
-| ⭐ **C028** | **Checkout đơn đồ ăn / mua hàng** *(Golden Ref)* | [`C028.png`](../design/mockups/screens/customer/C028.png) | PNG | 1000×2036 | [`checkout_offline`](../design/mockups/screens/states/C028__checkout_offline.png)<br>[`checkout_repriced`](../design/mockups/screens/states/C028__checkout_repriced.png)<br>[`submitting`](../design/mockups/screens/states/C028__submitting.png) | `card_food`, `role_food`, `state_no_search`, photos | `C028-checkout-don-do-an-mua-hang.md` |
+| ⭐ **C028** | **Checkout đơn đồ ăn / mua hàng** *(Golden Ref)* | [`C028.png`](../design/mockups/screens/customer/C028.png) | PNG | 1000×2036 | `checkout_offline`<br>`checkout_repriced`<br>`submitting` | `card_food`, `role_food`, `state_no_search`, photos | `C028-checkout-don-do-an-mua-hang.md` |
 | **C029** | Chọn voucher áp dụng đơn | [`C029.png`](../design/mockups/screens/customer/C029.png) | PNG | 1000×2036 | — | — | `C029-chon-voucher-ap-dung-don.md` |
 | **C030** | Đề xuất phí giao hàng (Delivery Fee Bidding) | [`C030.png`](../design/mockups/screens/customer/C030.png) | PNG | 1000×2036 | — | — | `C030-de-xuat-phi-giao-hang.md` |
 | **C031** | Danh sách báo giá giao của tài xế | [`C031.png`](../design/mockups/screens/customer/C031.png) | PNG | 1000×2036 | — | — | `C031-danh-sach-bao-gia-giao-cua-tai-xe.md` |
 | **C032** | Xác nhận đơn và đặt hàng thành công | [`C032.png`](../design/mockups/screens/customer/C032.png) | PNG | 1000×2036 | — | `state_success`, `accent_promo_gift`, `state_no_orders`, photos | `C032-xac-nhan-don-va-dat-hang-thanh-cong.md` |
-| **C033** | Theo dõi đơn: chuẩn bị món & đang giao | [`C033.png`](../design/mockups/screens/customer/C033.png) | PNG | 1000×2036 | [`tracking_reconnect`](../design/mockups/screens/states/C033__tracking_reconnect.png) | `state_success`, `accent_promo_gift`, `state_no_orders`, photos | `C033-theo-doi-thuc-don-chuan-bi-dang-giao.md` |
+| **C033** | Theo dõi đơn: chuẩn bị món & đang giao | [`C033.png`](../design/mockups/screens/customer/C033.png) | PNG | 1000×2036 | `tracking_reconnect` | `state_success`, `accent_promo_gift`, `state_no_orders`, photos | `C033-theo-doi-thuc-don-chuan-bi-dang-giao.md` |
 | **C034** | Xác nhận đề nghị thay món hoặc giá | [`C034.png`](../design/mockups/screens/customer/C034.png) | PNG | 1000×2036 | — | — | `C034-xac-nhan-de-nghi-thay-mon-hoac-gia.md` |
 | **C035** | Hủy đơn và chọn lý do | [`C035.png`](../design/mockups/screens/customer/C035.png) | PNG | 1000×2036 | — | — | `C035-huy-don-va-chon-ly-do.md` |
 | **C036** | Chi tiết đơn đồ ăn / hóa đơn | [`C036.png`](../design/mockups/screens/customer/C036.png) | PNG | 1000×2036 | — | `state_success`, `accent_promo_gift`, `state_no_orders`, photos | `C036-chi-tiet-don-do-an-hoa-don.md` |
@@ -147,11 +146,11 @@ Ride MVP là xe hai bánh. Bộ ảnh không còn minh họa sedan, SUV hay xe 7
 | **M012** | Bổ sung, sửa và nộp lại hồ sơ | [`M012.png`](../design/mockups/screens/merchant/M012.png) | PNG | 1000×2036 | — | `role_shop`, `state_kyc_pending`, `state_kyc_rejected` | `M012-bo-sung-sua-va-nop-lai-ho-so.md` |
 | ⭐ **M013** | **Dashboard Shop tổng quan (Merchant Shell)** *(Golden Ref)* | [`M013.png`](../design/mockups/screens/merchant/M013.png) | PNG | 1000×2036 | — | `role_shop`, `state_kyc_pending`, `state_kyc_rejected` | `M013-dashboard-shop-tong-quan.md` |
 | **M014** | Chọn cửa hàng / chi nhánh đang quản lý | [`M014.png`](../design/mockups/screens/merchant/M014.png) | PNG | 1000×2036 | — | — | `M014-chon-cua-hang-chi-nhanh-dang-quan-ly.md` |
-| **M015** | Hàng đợi đơn mới, đang làm, đã xong | [`M015.png`](../design/mockups/screens/merchant/M015.png) | PNG | 1000×2036 | [`queue_empty`](../design/mockups/screens/states/M015__queue_empty.png)<br>[`queue_error`](../design/mockups/screens/states/M015__queue_error.png) | `state_no_orders`, photos | `M015-hang-doi-don-moi-dang-lam-da-xong.md` |
-| **M016** | Chi tiết đơn mới và quyết định xác nhận | [`M016.png`](../design/mockups/screens/merchant/M016.png) | PNG | 1000×2036 | [`accept_conflict`](../design/mockups/screens/states/M016__accept_conflict.png) | — | `M016-chi-tiet-don-moi-va-quyet-dinh-xac-nhan.md` |
+| **M015** | Hàng đợi đơn mới, đang làm, đã xong | [`M015.png`](../design/mockups/screens/merchant/M015.png) | PNG | 1000×2036 | `queue_empty`<br>`queue_error` | `state_no_orders`, photos | `M015-hang-doi-don-moi-dang-lam-da-xong.md` |
+| **M016** | Chi tiết đơn mới và quyết định xác nhận | [`M016.png`](../design/mockups/screens/merchant/M016.png) | PNG | 1000×2036 | `accept_conflict` | — | `M016-chi-tiet-don-moi-va-quyet-dinh-xac-nhan.md` |
 | **M017** | Danh sách bếp đang chế biến | [`M017.png`](../design/mockups/screens/merchant/M017.png) | PNG | 1000×2036 | — | — | `M017-danh-sach-bep-dang-che-bien.md` |
 | **M018** | Điều chỉnh món / giá và chờ khách duyệt | [`M018.png`](../design/mockups/screens/merchant/M018.png) | PNG | 1000×2036 | — | — | `M018-dieu-chinh-mon-gia-va-cho-khach-duyet.md` |
-| **M019** | Bàn giao đơn & đối chiếu mã tài xế | [`M019.png`](../design/mockups/screens/merchant/M019.png) | PNG | 1000×2036 | [`handoff_code_wrong`](../design/mockups/screens/states/M019__handoff_code_wrong.png) | — | `M019-ban-giao-don-va-doi-chieu-ma-tai-xe.md` |
+| **M019** | Bàn giao đơn & đối chiếu mã tài xế | [`M019.png`](../design/mockups/screens/merchant/M019.png) | PNG | 1000×2036 | `handoff_code_wrong` | — | `M019-ban-giao-don-va-doi-chieu-ma-tai-xe.md` |
 | **M020** | Lịch sử đơn của Shop | [`M020.png`](../design/mockups/screens/merchant/M020.png) | PNG | 1000×2036 | — | — | `M020-lich-su-don-cua-shop.md` |
 | **M021** | Chi tiết đơn hủy, bồi hoàn & xử lý tranh chấp | [`M021.png`](../design/mockups/screens/merchant/M021.png) | PNG | 1000×2036 | — | — | `M021-chi-tiet-don-huy-boi-hoan-va-xu-ly-tranh-chap.md` |
 | **M022** | Cấu hình nhận đơn tự động / thủ công | [`M022.png`](../design/mockups/screens/merchant/M022.png) | PNG | 1000×2036 | — | — | `M022-cau-hinh-nhan-don-tu-dong-thu-cong.md` |
@@ -197,21 +196,21 @@ Ride MVP là xe hai bánh. Bộ ảnh không còn minh họa sedan, SUV hay xe 7
 | **D013** | Kết quả xét duyệt & tình trạng tài khoản | [`D013.png`](../design/mockups/screens/driver/D013.png) | PNG | 1000×2036 | — | — | `D013-ket-qua-xet-duyet-tinh-trang-tai-khoan.md` |
 | **D014** | Nộp lại hồ sơ sau khi bị từ chối | [`D014.png`](../design/mockups/screens/driver/D014.png) | PNG | 1000×2036 | — | — | `D014-nop-lai-ho-so-sau-khi-bi-tu-choi.md` |
 | **D015** | Giấy tờ sắp hết hạn và tái xác minh | [`D015.png`](../design/mockups/screens/driver/D015.png) | PNG | 1000×2036 | — | — | `D015-giay-to-sap-het-han-va-tai-xac-minh.md` |
-| ⭐ **D016** | **Dashboard Tài xế: Bản đồ & Online/Offline** *(Golden Ref)* | [`D016.png`](../design/mockups/screens/driver/D016.png) | PNG | 1000×2036 | [`driver_offline`](../design/mockups/screens/states/D016__driver_offline.png)<br>[`ineligible_expired`](../design/mockups/screens/states/D016__ineligible_expired.png) | `role_driver`, `vehicle_delivery`, `accent_pickup_route` | `D016-dashboard-tai-xe-ban-do-va-online-offline.md` |
+| ⭐ **D016** | **Dashboard Tài xế: Bản đồ & Online/Offline** *(Golden Ref)* | [`D016.png`](../design/mockups/screens/driver/D016.png) | PNG | 1000×2036 | `driver_offline`<br>`ineligible_expired` | `role_driver`, `vehicle_delivery`, `accent_pickup_route` | `D016-dashboard-tai-xe-ban-do-va-online-offline.md` |
 | **D017** | Chọn / bật loại dịch vụ được phép nhận | [`D017.png`](../design/mockups/screens/driver/D017.png) | PNG | 1000×2036 | — | — | `D017-chon-bat-loai-dich-vu-duoc-phep-nhan.md` |
-| **D018** | Danh sách yêu cầu đang mở (Job Feed) | [`D018.png`](../design/mockups/screens/driver/D018.png) | PNG | 1000×2036 | [`job_taken`](../design/mockups/screens/states/D018__job_taken.png) | `state_no_driver`, `state_no_orders` | `D018-danh-sach-yeu-cau-dang-mo.md` |
+| **D018** | Danh sách yêu cầu đang mở (Job Feed) | [`D018.png`](../design/mockups/screens/driver/D018.png) | PNG | 1000×2036 | `job_taken` | `state_no_driver`, `state_no_orders` | `D018-danh-sach-yeu-cau-dang-mo.md` |
 | **D019** | Chi tiết yêu cầu công việc & thu nhập | [`D019.png`](../design/mockups/screens/driver/D019.png) | PNG | 1000×2036 | — | — | `D019-chi-tiet-yeu-cau-cong-viec-va-thu-nhap.md` |
 | **D020** | Báo giá / trả giá với khách (Fare Offer) | [`D020.png`](../design/mockups/screens/driver/D020.png) | PNG | 1000×2036 | — | — | `D020-bao-gia-tra-gia-voi-khach.md` |
 | **D021** | Chuyến xe đã nhận: tóm tắt & điều hướng đón | [`D021.png`](../design/mockups/screens/driver/D021.png) | PNG | 1000×2036 | — | `role_driver`, `vehicle_delivery`, `accent_pickup_route` | `D021-chuyen-xe-da-nhan-tom-tat-va-dieu-huong-don.md` |
 | **D022** | Đã đến điểm đón & quản lý thời gian chờ | [`D022.png`](../design/mockups/screens/driver/D022.png) | PNG | 1000×2036 | — | — | `D022-da-den-diem-don-va-quan-ly-thoi-gian-cho.md` |
-| **D023** | Nhập xác minh OTP hành khách | [`D023.png`](../design/mockups/screens/driver/D023.png) | PNG | 1000×2036 | [`passenger_otp_wrong`](../design/mockups/screens/states/D023__passenger_otp_wrong.png) | — | `D023-nhap-xac-minh-otp-hanh-khach.md` |
+| **D023** | Nhập xác minh OTP hành khách | [`D023.png`](../design/mockups/screens/driver/D023.png) | PNG | 1000×2036 | `passenger_otp_wrong` | — | `D023-nhap-xac-minh-otp-hanh-khach.md` |
 | **D024** | Bản đồ điều hướng chuyến xe đang chạy | [`D024.png`](../design/mockups/screens/driver/D024.png) | PNG | 1000×2036 | — | — | `D024-ban-do-dieu-huong-chuyen-xe-dang-chay.md` |
 | **D025** | Kết thúc chuyến & xác nhận thu tiền | [`D025.png`](../design/mockups/screens/driver/D025.png) | PNG | 1000×2036 | — | — | `D025-ket-thuc-chuyen-va-xac-nhan-thu-tien.md` |
 | **D026** | Điều hướng tới cửa hàng lấy đơn | [`D026.png`](../design/mockups/screens/driver/D026.png) | PNG | 1000×2036 | — | — | `D026-dieu-huong-toi-cua-hang-lay-don.md` |
 | **D027** | Đến quán chờ món và báo chậm | [`D027.png`](../design/mockups/screens/driver/D027.png) | PNG | 1000×2036 | — | — | `D027-den-quan-cho-mon-va-bao-cham.md` |
 | **D028** | Xác nhận lấy món và số lượng gói | [`D028.png`](../design/mockups/screens/driver/D028.png) | PNG | 1000×2036 | — | — | `D028-xac-nhan-lay-mon-va-so-luong-goi.md` |
 | **D029** | Bản đồ giao tới khách | [`D029.png`](../design/mockups/screens/driver/D029.png) | PNG | 1000×2036 | — | `accent_pickup_route` | `D029-ban-do-giao-toi-khach.md` |
-| **D030** | Hoàn tất giao: OTP / ảnh chứng nhận | [`D030.png`](../design/mockups/screens/driver/D030.png) | PNG | 1000×2036 | [`cod_unconfirmed`](../design/mockups/screens/states/D030__cod_unconfirmed.png) | `state_success` | `D030-hoan-tat-giao-otp-anh-chung-nhan.md` |
+| **D030** | Hoàn tất giao: OTP / ảnh chứng nhận | [`D030.png`](../design/mockups/screens/driver/D030.png) | PNG | 1000×2036 | `cod_unconfirmed` | `state_success` | `D030-hoan-tat-giao-otp-anh-chung-nhan.md` |
 | **D031** | Giao thất bại & xử lý hàng chưa giao | [`D031.png`](../design/mockups/screens/driver/D031.png) | PNG | 1000×2036 | — | — | `D031-giao-that-bai-va-xu-ly-hang-chua-giao.md` |
 | **D032** | Công việc đang chạy & nhiệm vụ giữ chỗ | [`D032.png`](../design/mockups/screens/driver/D032.png) | PNG | 1000×2036 | — | — | `D032-cong-viec-dang-chay-va-cac-nhiem-vu-duoc-giu-cho.md` |
 | **D033** | Lịch sử công việc tài xế | [`D033.png`](../design/mockups/screens/driver/D033.png) | PNG | 1000×2036 | — | `state_no_driver`, `state_no_orders` | `D033-lich-su-cong-viec-tai-xe.md` |
@@ -312,7 +311,7 @@ Ride MVP là xe hai bánh. Bộ ảnh không còn minh họa sedan, SUV hay xe 7
 ## 4. Hướng dẫn sử dụng ma trận này cho AI Agents & Developers
 
 1. **Tra cứu Mockup gốc:** Khi xây dựng giao diện cho màn hình Mobile bất kỳ, bấm trực tiếp vào cột **Mockup PNG** để xem file ảnh thiết kế độ phân giải cao.
-2. **Kiểm tra trạng thái lỗi/rỗng (Edge Cases):** Trước khi code, kiểm tra cột **UI State Variants (Ph 19.4)**. Nếu màn hình có biến thể trạng thái (ví dụ OTP sai, hết hạn quote, mất mạng), bắt buộc phải xử lý state tương ứng theo `DealGoScreenState`.
+2. **Kiểm tra trạng thái lỗi/rỗng (Edge Cases):** Trước khi code, kiểm tra cột **UI State Variants (Ph 19.4)**. Nếu màn hình có biến thể trạng thái (ví dụ OTP sai, hết hạn quote, mất mạng), bắt buộc phải xử lý state tương ứng theo `DealGoStateView` (`mobile/lib/core/design_system/components/dealgo_state_view.dart`).
 3. **Sử dụng đúng Asset:** Tra cứu cột **Assets Ánh xạ** để chọn đúng hình ảnh minh họa, icon phương tiện trong `design/assets/batch01/` thay vì dùng placeholder tự tạo.
 4. **Ưu tiên 6 Golden Reference:** Triển khai theo thứ tự ưu tiên: hoàn thiện 6 màn Golden trước (`C001`, `C004`, `C028`, `S007`, `M013`, `D016`) để đóng băng token và component dùng chung trước khi nhân rộng ra các màn còn lại.
 5. **Quy tắc liên kết tài liệu:** Danh mục này là tài liệu kiểm kê tham chiếu. Đặc tả chi tiết hành vi và nghiệp vụ từng màn hình sẽ được hợp nhất vào kế hoạch nhóm `04-experience/` theo chuẩn Governance tại [`00-governance/README.md`](00-governance/README.md#04--experience-6-tệp).

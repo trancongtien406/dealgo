@@ -26,7 +26,7 @@ related_decisions:
 
 # DealGo — Glossary / Từ điển thuật ngữ nghiệp vụ
 
-> **Mục đích:** Thống nhất một ngôn ngữ giữa Product, UI/UX, Flutter, Backend, QA, Data, Ops và AI coding agent để triển khai **Ride hai bánh + Food** trên **một app Flutter có ba vai trò Customer / Merchant / Driver** và một kênh Admin Web.
+> **Mục đích:** Thống nhất một ngôn ngữ giữa Product, UI/UX, Flutter, Backend, QA, Data, Ops và AI coding agent để triển khai **Ride (xe máy, ô tô) + Food** trên **một app Flutter có ba vai trò Customer / Merchant / Driver** và một kênh Admin Web.
 >
 > **Trạng thái:** `DRAFT`. Các tên domain, type, bảng dữ liệu và enum nêu tại đây là **quy ước ngôn ngữ đề xuất**, **không** tự động trở thành schema, endpoint hay chính sách đã duyệt. Tài liệu này định nghĩa *ý nghĩa từ*; business rule ở `02-domain/*`, state machine và workflow ở `03-workflows/*`, giao diện ở `04-experience/*`, API/schema ở `06-data-api/*`.
 
@@ -82,7 +82,7 @@ flowchart LR
 | Thuật ngữ chuẩn | Giải nghĩa trong DealGo | Phân biệt / ghi chú |
 |---|---|---|
 | **DealGo** | Tên sản phẩm/nền tảng. | Không đồng nghĩa một dịch vụ Ride riêng lẻ. |
-| **Ride** | Dịch vụ kết nối khách với tài xế chở khách bằng xe hai bánh. | Không gọi là `Delivery`. `CONFIRMED`. |
+| **Ride** | Dịch vụ kết nối khách với tài xế chở khách bằng xe máy hoặc ô tô (hạng xe `MOTORBIKE`, `CAR_4`, `CAR_7`). | Không gọi là `Delivery`. `CONFIRMED`. |
 | **Food** | Dịch vụ khách đặt món từ Merchant và được Driver giao. | Không mở rộng mặc định thành GrabMart/giao bưu kiện. `CONFIRMED`. |
 | **Customer** | Vai trò người đặt Ride hoặc Food. | Một `User` có thể sở hữu Customer role. `CONFIRMED`. |
 | **Merchant** | Vai trò đối tác kinh doanh thực phẩm/món ăn. | Không nhầm người giữ vai trò Merchant với một `Store` cụ thể. `CONFIRMED`. |

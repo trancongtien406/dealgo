@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design_system/components/dealgo_banner.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_models.dart';
@@ -90,10 +91,11 @@ class _MerchantHomePageState extends State<MerchantHomePage> {
         title: l10n.merchantHomeTitle,
         onRetry: _load,
       ),
-      MerchantQueueFailed(:final saved, :final syncedAt) =>
+      MerchantQueueFailed(:final saved, :final syncedAt, :final cause) =>
         MerchantQueueErrorView(
           saved: saved,
           syncedAt: syncedAt,
+          cause: cause,
           onRetry: _load,
         ),
       MerchantQueueReady(:final orders) => _Dashboard(
@@ -123,10 +125,23 @@ class _Dashboard extends StatelessWidget {
     final store = ready?.store;
     return MerchantPageFrame(
       title: l10n.merchantHomeTitle,
-      onBack: () => merchantBack(context),
+      showBack: false,
       body: ListView(
         padding: merchantPagePadding,
         children: [
+          if (store != null && !store.hasLocation) ...[
+            DealGoBanner(
+              key: const Key('merchant-home-pin-missing'),
+              tone: DealGoBannerTone.warning,
+              message: l10n.merchantLocationUnset,
+              actionLabel: l10n.merchantLocationPinNow,
+              onAction: () async {
+                await context.push(MerchantRoutes.location);
+                onRefresh();
+              },
+            ),
+            const SizedBox(height: DealGoSpacing.s12),
+          ],
           MerchantPanel(
             child: Row(
               children: [

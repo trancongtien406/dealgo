@@ -17,6 +17,10 @@ import '../core/maps/create_map_port.dart';
 import '../core/maps/map_port.dart';
 import '../core/network/connectivity_service.dart';
 import '../core/network/dealgo_dio.dart';
+import '../features/driver/data/datasources/driver_active_job_client.dart';
+import '../features/ride/data/datasources/customer_active_trip_client.dart';
+import '../features/ride/data/datasources/ride_negotiation_clients.dart';
+import '../features/ride/domain/negotiation/ride_negotiation_client.dart';
 import '../core/notifications/notification_router.dart';
 import '../core/permissions/app_permission_service.dart';
 import '../core/push/fake_push.dart';
@@ -79,8 +83,13 @@ import '../features/support/data/support_remote_datasource.dart';
 import '../features/support/domain/support_ticket.dart';
 import '../features/driver_card/domain/driver_card.dart';
 import '../features/pricing/domain/pricing.dart';
+import '../features/home_banner/data/home_banner_remote_datasource.dart';
+import '../features/home_banner/data/home_banner_tracker.dart';
+import '../features/home_banner/domain/home_banner.dart';
 import '../features/places/data/places_remote_datasource.dart';
 import '../features/live_location/data/driver_location_remote_datasource.dart';
+import '../features/live_location/domain/map_routing.dart';
+import '../features/live_location/data/map_routing_remote_datasource.dart';
 import '../features/live_location/domain/driver_location.dart';
 import '../features/live_location/presentation/driver_location_reporter.dart';
 import '../features/pricing/data/pricing_remote_datasource.dart';
@@ -129,6 +138,7 @@ import '../features/merchant/domain/usecases/replace_merchant_item_options.dart'
 import '../features/merchant/domain/usecases/set_merchant_item_availability.dart';
 import '../features/onboarding/data/datasources/dio_partner_applications_remote_datasource.dart';
 import '../features/onboarding/data/datasources/fake_partner_applications_client.dart';
+import '../features/onboarding/data/datasources/partner_requirements_client.dart';
 import '../features/onboarding/data/datasources/partner_applications_remote_datasource.dart';
 import '../features/onboarding/data/repositories/partner_applications_repository_impl.dart';
 import '../features/onboarding/domain/repositories/partner_applications_repository.dart';
@@ -158,14 +168,24 @@ import '../features/ride/domain/usecases/list_open_rides.dart';
 import '../features/ride/domain/usecases/select_ride_offer.dart';
 import '../features/ride/domain/usecases/submit_ride_offer.dart';
 import '../features/ride/presentation/cubit/ride_destination.dart';
+import '../features/ride/presentation/cubit/ride_vehicle_pref.dart';
 import '../features/ride/presentation/cubit/ride_session.dart';
+import '../features/voice/data/native/callkit_native_call_ui.dart';
+import '../features/voice/domain/ports/native_call_ui.dart';
 import '../features/voice/data/datasources/dio_voice_remote_datasource.dart';
 import '../features/voice/data/datasources/fake_voice_client.dart';
 import '../features/voice/data/datasources/voice_remote_datasource.dart';
 import '../features/voice/data/repositories/voice_repository_impl.dart';
 import '../features/voice/domain/repositories/voice_repository.dart';
-import '../features/voice/domain/usecases/create_food_order_voice_session.dart';
-import '../features/voice/domain/usecases/create_ride_voice_session.dart';
+import '../features/voice/data/media/fake_voice_media_engine.dart';
+import '../features/voice/data/media/livekit_voice_media_engine.dart';
+import '../features/voice/domain/ports/voice_media_engine.dart';
+import '../features/voice/domain/usecases/answer_voice_call.dart';
+import '../features/voice/domain/usecases/end_voice_call.dart';
+import '../features/voice/domain/usecases/get_voice_call.dart';
+import '../features/voice/domain/usecases/get_voice_call_config.dart';
+import '../features/voice/domain/usecases/start_voice_call.dart';
+import '../features/voice/presentation/cubit/voice_call_cubit.dart';
 
 class DealGoDependencies {
   DealGoDependencies._(this._locator);
@@ -174,6 +194,10 @@ class DealGoDependencies {
 
   TokenStore get tokenStore => _locator<TokenStore>();
   Dio get dio => _locator<Dio>();
+  DriverActiveJobSource get driverActiveJob =>
+      _locator<DriverActiveJobSource>();
+  CustomerActiveTripSource get customerActiveTrip =>
+      _locator<CustomerActiveTripSource>();
   IdentityClient get identityClient => _locator<IdentityClient>();
   IdentityRepository get identityRepository => _locator<IdentityRepository>();
   FoodClient get foodClient => _locator<FoodClient>();
@@ -209,6 +233,7 @@ class DealGoDependencies {
   ChatRepository get chatRepository => _locator<ChatRepository>();
   VoiceClient get voiceClient => _locator<VoiceClient>();
   VoiceRepository get voiceRepository => _locator<VoiceRepository>();
+  VoiceCallCubit get voiceCallCubit => _locator<VoiceCallCubit>();
   PresenceClient get presenceClient => _locator<PresenceClient>();
   PresenceRepository get presenceRepository => _locator<PresenceRepository>();
   HistoryClient get historyClient => _locator<HistoryClient>();
@@ -217,6 +242,8 @@ class DealGoDependencies {
   MapPort get mapPort => _locator<MapPort>();
   ExternalNavigator get externalNavigator => _locator<ExternalNavigator>();
   SnapshotRealtime get realtime => _locator<SnapshotRealtime>();
+  RideNegotiationClient get rideNegotiation =>
+      _locator<RideNegotiationClient>();
   AnalyticsPort get analytics => _locator<AnalyticsPort>();
   NotificationRouter get notificationRouter => _locator<NotificationRouter>();
   AuthCubit get authCubit => _locator<AuthCubit>();
@@ -263,6 +290,7 @@ class DealGoDependencies {
     PricingRepository? pricing,
     PlacesRepository? places,
     DocumentImageSource? documentImageSource,
+    PartnerRequirementsSource? partnerRequirements,
     MerchantStatsRepository? merchantStats,
     DriverLocationRepository? driverLocation,
   }) {
@@ -301,6 +329,7 @@ class DealGoDependencies {
       pricing: pricing,
       places: places,
       documentImageSource: documentImageSource,
+      partnerRequirements: partnerRequirements,
       merchantStats: merchantStats,
       driverLocation: driverLocation,
     );
@@ -342,6 +371,7 @@ class DealGoDependencies {
       pricing: pricing,
       places: places,
       documentImageSource: documentImageSource,
+      partnerRequirements: partnerRequirements,
       merchantStats: merchantStats,
       driverLocation: driverLocation,
       skipLeafServices: true,
@@ -413,6 +443,7 @@ class DealGoDependencies {
     PricingRepository? pricing,
     PlacesRepository? places,
     DocumentImageSource? documentImageSource,
+    PartnerRequirementsSource? partnerRequirements,
     MerchantStatsRepository? merchantStats,
     DriverLocationRepository? driverLocation,
   }) {
@@ -424,14 +455,22 @@ class DealGoDependencies {
     }
     final tokens = tokenStore ?? SecureTokenStore();
     late final AuthCubit auth;
+    final sessionRefresher = SessionRefresher();
     final dio = createDealGoDio(
       tokenStore: tokens,
+      sessionRefresher: sessionRefresher,
       onSessionRefreshed: (next) => auth.applyRefreshedTokens(next),
       onUnauthorized: () => auth.signOut(),
     );
 
     final useOverrides =
         identityClient != null || foodClient != null || rideClient != null;
+
+    // System call screen (CallKit / ConnectionService); never in tests, mock
+    // builds or on the web.
+    final NativeCallUi nativeCallUi = useOverrides || useMockData || kIsWeb
+        ? const NoopNativeCallUi()
+        : CallkitNativeCallUi();
 
     final identity = identityClient ?? DioIdentityRemoteDataSource(dio: dio);
     final food = foodClient ?? DioFoodRemoteDataSource(dio: dio);
@@ -487,10 +526,26 @@ class DealGoDependencies {
       history =
           historyClient ??
           (useMockData ? FakeHistoryClient() : DioHistoryClient(dio: dio));
-      pushPort = push ?? (useMockData ? FakePush() : FcmPush(dio: dio));
+      pushPort =
+          push ??
+          (useMockData
+              ? FakePush()
+              : FcmPush(
+                  dio: dio,
+                  voipToken: nativeCallUi.voipPushToken,
+                  voipTokenChanges: nativeCallUi.voipTokenChanges,
+                  prepareCalls: nativeCallUi.ensureFullScreenCalls,
+                ));
       snapshot =
           realtime ??
-          (useMockData ? FakeSnapshotRealtime() : SocketSnapshotRealtime());
+          (useMockData
+              ? FakeSnapshotRealtime()
+              : SocketSnapshotRealtime(
+                  readAccessToken: () async =>
+                      (await tokens.read())?.accessToken,
+                  refreshAccessToken: () =>
+                      refreshRealtimeToken(sessionRefresher, auth.signOut),
+                ));
       analyticsPort =
           analytics ??
           (useMockData
@@ -538,6 +593,10 @@ class DealGoDependencies {
                 recent: FakePlacesRemoteDataSource.sampleRecent,
               )
             : DioPlacesRemoteDataSource(dio: dio));
+    final HomeBannerRepository homeBannerRepository =
+        useOverrides || useMockData
+        ? FakeHomeBannerRepository()
+        : DioHomeBannerRepository(dio: dio);
     final pricingRepository =
         pricing ??
         (useOverrides || useMockData
@@ -558,6 +617,9 @@ class DealGoDependencies {
         (useOverrides || useMockData
             ? FakeDriverLocationRemoteDataSource()
             : DioDriverLocationRemoteDataSource(dio: dio));
+    final mapRoutingRepository = useOverrides || useMockData
+        ? FakeMapRoutingRemoteDataSource()
+        : DioMapRoutingRemoteDataSource(dio: dio);
     final helpFaqRepository =
         helpFaqs ??
         (useOverrides || useMockData
@@ -583,6 +645,11 @@ class DealGoDependencies {
         (useOverrides || useMockData
             ? FakeAccountSettingsRepository()
             : DioAccountSettingsRemoteDataSource(dio: dio));
+    // Raise fare / decline / withdraw / driver cancel / no-show /
+    // customer rating / food release.
+    final RideNegotiationClient rideNegotiation = useOverrides || useMockData
+        ? FakeRideNegotiationClient()
+        : DioRideNegotiationClient(dio: dio);
     final inboxRepository = InboxRepositoryImpl(
       inboxRemote ??
           (useOverrides
@@ -618,6 +685,16 @@ class DealGoDependencies {
 
     put<TokenStore>(tokens);
     put<Dio>(dio);
+    put<DriverActiveJobSource>(
+      useOverrides || useMockData
+          ? FakeDriverActiveJobSource()
+          : DioDriverActiveJobSource(dio: dio),
+    );
+    put<CustomerActiveTripSource>(
+      useOverrides || useMockData
+          ? FakeCustomerActiveTripSource()
+          : DioCustomerActiveTripSource(dio: dio),
+    );
     put<IdentityRemoteDataSource>(identity);
     put<IdentityRepository>(identityRepository);
     put<PasskeyPlatform>(passkeys);
@@ -641,12 +718,21 @@ class DealGoDependencies {
     put<MerchantStatsRepository>(merchantStatsRepository);
     put<DriverHistoryRepository>(driverHistoryRepository);
     put<PlacesRepository>(placesRepository);
+    put<HomeBannerRepository>(homeBannerRepository);
+    put<HomeBannerTracker>(
+      HomeBannerTracker(
+        repository: homeBannerRepository,
+        analytics: analyticsPort,
+      ),
+    );
     put<PricingRepository>(pricingRepository);
     put<DriverLocationRepository>(driverLocationRepository);
+    put<MapRoutingRepository>(mapRoutingRepository);
     put<DriverCardRepository>(driverCardRepository);
     put<SupportRepository>(supportRepository);
     put<AccountDeletionRepository>(accountDeletionRepository);
     put<AccountSettingsRepository>(accountSettingsRepository);
+    put<RideNegotiationClient>(rideNegotiation);
     put<HelpFaqRepository>(helpFaqRepository);
     put<RideShareRepository>(rideShareRepository);
     put<ListInboxNotifications>(ListInboxNotifications(inboxRepository));
@@ -715,6 +801,12 @@ class DealGoDependencies {
     put<DocumentImageSource>(
       documentImageSource ?? ImagePickerDocumentSource(),
     );
+    put<PartnerRequirementsSource>(
+      partnerRequirements ??
+          (useMockData
+              ? const FixedPartnerRequirements()
+              : PartnerRequirementsClient(dio)),
+    );
     put<SubmitPartnerApplication>(
       SubmitPartnerApplication(partnerApplicationsRepository),
     );
@@ -726,9 +818,31 @@ class DealGoDependencies {
     put<SendFoodOrderChatMessage>(SendFoodOrderChatMessage(chatRepository));
     put<VoiceClient>(voice);
     put<VoiceRepository>(voiceRepository);
-    put<CreateRideVoiceSession>(CreateRideVoiceSession(voiceRepository));
-    put<CreateFoodOrderVoiceSession>(
-      CreateFoodOrderVoiceSession(voiceRepository),
+    // Tests and mock builds never touch the microphone or a LiveKit server.
+    final VoiceMediaEngine voiceMedia = useOverrides || useMockData
+        ? FakeVoiceMediaEngine()
+        : LiveKitVoiceMediaEngine();
+    put<VoiceMediaEngine>(voiceMedia);
+    put<VoiceCallCubit>(
+      VoiceCallCubit(
+        startVoiceCall: StartVoiceCall(voiceRepository),
+        answerVoiceCall: AnswerVoiceCall(voiceRepository),
+        endVoiceCall: EndVoiceCall(voiceRepository),
+        getVoiceCall: GetVoiceCall(voiceRepository),
+        getVoiceCallConfig: GetVoiceCallConfig(voiceRepository),
+        media: voiceMedia,
+        callEvents: snapshot.callEvents,
+        reconnects: snapshot.reconnects,
+        accessToken: () {
+          final state = auth.state;
+          return state is AuthSignedIn ? state.tokens.accessToken : null;
+        },
+        currentUserId: () {
+          final state = auth.state;
+          return state is AuthSignedIn ? state.profile.id : null;
+        },
+        nativeCallUi: nativeCallUi,
+      ),
     );
     put<PresenceClient>(presence);
     put<PresenceRepository>(presenceRepository);
@@ -802,6 +916,12 @@ class DealGoDependencies {
         RepositoryProvider<PlacesRepository>.value(
           value: _locator<PlacesRepository>(),
         ),
+        RepositoryProvider<HomeBannerRepository>.value(
+          value: _locator<HomeBannerRepository>(),
+        ),
+        RepositoryProvider<HomeBannerTracker>.value(
+          value: _locator<HomeBannerTracker>(),
+        ),
         RepositoryProvider<DriverCardRepository>.value(
           value: _locator<DriverCardRepository>(),
         ),
@@ -828,6 +948,9 @@ class DealGoDependencies {
         ),
         RepositoryProvider<DriverLocationRepository>.value(
           value: _locator<DriverLocationRepository>(),
+        ),
+        RepositoryProvider<MapRoutingRepository>.value(
+          value: _locator<MapRoutingRepository>(),
         ),
         RepositoryProvider<ListInboxNotifications>.value(
           value: _locator<ListInboxNotifications>(),
@@ -951,12 +1074,6 @@ class DealGoDependencies {
         ),
         RepositoryProvider<VoiceClient>.value(value: voiceClient),
         RepositoryProvider<VoiceRepository>.value(value: voiceRepository),
-        RepositoryProvider<CreateRideVoiceSession>.value(
-          value: _locator<CreateRideVoiceSession>(),
-        ),
-        RepositoryProvider<CreateFoodOrderVoiceSession>.value(
-          value: _locator<CreateFoodOrderVoiceSession>(),
-        ),
         RepositoryProvider<PresenceClient>.value(value: presenceClient),
         RepositoryProvider<PresenceRepository>.value(value: presenceRepository),
         RepositoryProvider<SetPresence>.value(value: _locator<SetPresence>()),
@@ -972,6 +1089,7 @@ class DealGoDependencies {
         RepositoryProvider<MapPort>.value(value: mapPort),
         RepositoryProvider<ExternalNavigator>.value(value: externalNavigator),
         RepositoryProvider<SnapshotRealtime>.value(value: realtime),
+        RepositoryProvider<RideNegotiationClient>.value(value: rideNegotiation),
         RepositoryProvider<AnalyticsPort>.value(value: analytics),
         RepositoryProvider<NotificationRouter>.value(value: notificationRouter),
         RepositoryProvider<ConnectivityService>.value(value: connectivity),
@@ -981,13 +1099,26 @@ class DealGoDependencies {
       child: MultiBlocProvider(
         providers: [
           BlocProvider<AuthCubit>.value(value: authCubit),
+          BlocProvider<VoiceCallCubit>.value(value: voiceCallCubit),
           BlocProvider(create: (_) => FoodCartCubit()),
           BlocProvider(create: (_) => RideSessionCubit()),
           BlocProvider(create: (_) => RideDestinationCubit()),
+          BlocProvider(create: (_) => RideVehiclePrefCubit()),
           BlocProvider(
             create: (_) => DriverDutyCubit(
               setPresence: _locator<SetPresence>(),
               accessToken: _accessToken,
+              fetchServerOnline: () async {
+                final token = _accessToken()?.trim() ?? '';
+                if (token.isEmpty) {
+                  return null;
+                }
+                final prefs = await _locator<PresenceRepository>()
+                    .getServicePrefs(accessToken: token);
+                return prefs.online;
+              },
+              reconnects: _locator<SnapshotRealtime>().reconnects,
+              syncOnResume: true,
               locationReporter: DriverLocationReporter(
                 repository: _locator<DriverLocationRepository>(),
                 location: _locator<LocationService>(),
@@ -1007,6 +1138,8 @@ class DealGoDependencies {
               submitPartnerApplication: _locator<SubmitPartnerApplication>(),
               getMyPartnerApplication: _locator<GetMyPartnerApplication>(),
               accessToken: _accessToken,
+              loadDocumentsRequired:
+                  _locator<PartnerRequirementsSource>().documentsRequired,
               useMock: useMockData,
             ),
           ),
@@ -1015,6 +1148,8 @@ class DealGoDependencies {
               submitPartnerApplication: _locator<SubmitPartnerApplication>(),
               getMyPartnerApplication: _locator<GetMyPartnerApplication>(),
               accessToken: _accessToken,
+              loadDocumentsRequired:
+                  _locator<PartnerRequirementsSource>().documentsRequired,
               useMock: useMockData,
             ),
           ),
@@ -1049,6 +1184,7 @@ class DealGoDependencies {
     if (_locator.isRegistered<SnapshotSessionBinder>()) {
       await snapshotSessionBinder.stop();
     }
+    await voiceCallCubit.close();
     await authCubit.close();
     if (_locator.isRegistered<ConnectivityService>()) {
       await _locator<ConnectivityService>().dispose();

@@ -78,7 +78,7 @@ void main() {
     );
     expect(find.byKey(const Key('driver-completed-back-jobs')), findsOneWidget);
     expect(find.text('Hải Châu → Sân bay'), findsOneWidget);
-    expect(find.text('Phí nền tảng (10%)'), findsOneWidget);
+    expect(find.text('Hoa hồng DealGo (10%)'), findsOneWidget);
     expect(find.text('45.000đ'), findsOneWidget);
     expect(find.text('Chuyến #JOB1'), findsOneWidget);
   });

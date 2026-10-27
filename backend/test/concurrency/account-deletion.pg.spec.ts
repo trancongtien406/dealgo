@@ -52,6 +52,7 @@ describePg('account deletion (postgres)', () => {
   const ride = (customerId: string, status: 'NEGOTIATING' | 'ASSIGNED' | 'COMPLETED', driverId: string | null, tag: string) =>
     prisma.db()!.ride.create({
       data: {
+        vehicleClassCode: 'MOTORBIKE',
         id: randomUUID(),
         customerId,
         pickupLat: 16.05,

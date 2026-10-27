@@ -1,10 +1,10 @@
 ---
 doc_id: DG-ARCH-001
 title: "DealGo — System overview"
-version: "0.1.1"
+version: "0.2.0"
 status: "PROPOSED"
 owner: "Tech Lead"
-last_updated: "2026-10-18"
+last_updated: "2026-10-26"
 related_decisions:
   - ADR-001
   - ADR-002
@@ -25,10 +25,11 @@ Flutter app (Customer | Merchant | Driver)
         |
         | HTTPS + Socket.IO
         v
-NestJS modular monolith  ---- Redis (lock, queue, presence)
+NestJS modular monolith  ---- Redis (lock, queue, presence, Socket.IO adapter)
         |                 ---- PostgreSQL (trạng thái, sổ cái)
         |
-NestJS worker (BullMQ: outbox, ride expiry) -- cùng PostgreSQL/Redis
+NestJS worker (BullMQ: outbox relay, ride expiry, chat retention,
+               account purge, upload cleanup, heartbeat) -- cùng PostgreSQL/Redis
         |
 Admin Web (Next.js BFF) -- cookie session --> cùng API
 ```
@@ -36,7 +37,7 @@ Admin Web (Next.js BFF) -- cookie session --> cùng API
 ## Ranh giới
 
 - Flutter và Admin Web hiển thị và gửi ý định. Chúng không chốt giá, không tự gán tài xế, không tự ghi sổ.
-- `RideTrip` và `FoodOrder` là hai aggregate. Không dùng chung một máy trạng thái.
+- `Ride` và `FoodOrder` là hai aggregate. Không dùng chung một máy trạng thái.
 - Admin không nằm trong app Flutter.
 - Trình duyệt Admin chỉ gọi Route Handlers cùng origin; BFF gọi Nest phía server (`DEALGO_API_BASE_URL`). Mutation cookie kiểm tra same-origin.
 - API và worker là hai process, mỗi process một pool Prisma (`DATABASE_POOL_MAX`, mặc định 10).
