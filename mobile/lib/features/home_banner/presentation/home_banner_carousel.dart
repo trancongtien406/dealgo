@@ -284,7 +284,6 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
                     semanticsLabel: l10n.homeBannerSlideLabel(
                       index + 1,
                       banners.length,
-                      banners[index].title,
                     ),
                     onTap: banners[index].cta == null
                         ? null
@@ -333,7 +332,6 @@ class _BannerPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     final url = resolveMediaUrl(banner.imageUrl);
     const fallback = DecoratedBox(
       decoration: BoxDecoration(
@@ -367,63 +365,6 @@ class _BannerPage extends StatelessWidget {
                 },
                 errorBuilder: (context, error, stack) => fallback,
               ),
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [
-                    Color(0xB81E0B4B),
-                    Color(0x401E0B4B),
-                    Color(0x00000000),
-                  ],
-                  stops: [0, 0.48, 0.72],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                DealGoSpacing.s16,
-                DealGoSpacing.s12,
-                DealGoSpacing.s16,
-                DealGoSpacing.s20,
-              ),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: FractionallySizedBox(
-                  widthFactor: 0.6,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        banner.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.titleMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 17,
-                          height: 1.18,
-                        ),
-                      ),
-                      if (banner.subtitle != null) ...[
-                        const SizedBox(height: DealGoSpacing.s4),
-                        Text(
-                          banner.subtitle!,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: textTheme.bodySmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.92),
-                            height: 1.25,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
           ],
         ),
       ),

@@ -16,8 +16,6 @@ const NOW = new Date('2026-10-27T03:00:00.000Z');
 function banner(overrides: Partial<HomeBanner> = {}): HomeBanner {
   return {
     id: overrides.id ?? '00000000-0000-4000-8000-000000000001',
-    title: 'Ưu đãi',
-    subtitle: null,
     imageUrl: '/v1/public/home-banners/images/x/y.png',
     ctaUrl: null,
     audiences: ['CUSTOMER'],
@@ -143,14 +141,14 @@ describe('HomeBannerService', () => {
   it('creates inactive, requires an image to activate, then serves it publicly', async () => {
     const { repo, service } = makeService();
     const created = await service.create(
-      { title: 'Giảm 30% GoFood', audiences: ['CUSTOMER'], service: 'FOOD', ctaUrl: 'dealgo://customer/shop' },
+      { audiences: ['CUSTOMER'], service: 'FOOD', ctaUrl: 'dealgo://customer/shop' },
       'ops-1',
     );
     expect(created.state).toBe('INACTIVE');
     expect(created.ctaUrl).toBe('/customer/shop');
     await expect(service.update(created.id, { active: true }, 'ops-1')).rejects.toThrow(/image/);
     await expect(
-      service.create({ title: 'x', audiences: ['CUSTOMER'], active: true }, 'ops-1'),
+      service.create({ audiences: ['CUSTOMER'], active: true }, 'ops-1'),
     ).rejects.toThrow(/image/);
 
     const withImage = await service.uploadImage(created.id, { dataUrl: `data:image/png;base64,${PNG}` }, 'ops-1');
@@ -159,7 +157,7 @@ describe('HomeBannerService', () => {
 
     const items = await service.listPublic({ role: 'CUSTOMER' });
     expect(items).toEqual([
-      expect.objectContaining({ id: created.id, cta: { kind: 'app', target: '/customer/shop' }, service: 'FOOD' }),
+      { id: created.id, imageUrl: withImage.imageUrl, cta: { kind: 'app', target: '/customer/shop' }, service: 'FOOD' },
     ]);
     expect(await service.listPublic({ role: 'DRIVER' })).toEqual([]);
     expect(repo.audits.map((a) => a.action)).toEqual([
@@ -176,17 +174,17 @@ describe('HomeBannerService', () => {
   it('rejects unknown regions, bad windows and empty patches', async () => {
     const { service } = makeService();
     await expect(
-      service.create({ title: 'x', audiences: ['CUSTOMER'], regionCode: 'ZZ' }, 'ops-1'),
+      service.create({ audiences: ['CUSTOMER'], regionCode: 'ZZ' }, 'ops-1'),
     ).rejects.toThrow(/region/);
     await expect(
       service.create(
-        { title: 'x', audiences: ['CUSTOMER'], startsAt: '2026-11-02T00:00:00Z', endsAt: '2026-11-01T00:00:00Z' },
+        { audiences: ['CUSTOMER'], startsAt: '2026-11-02T00:00:00Z', endsAt: '2026-11-01T00:00:00Z' },
         'ops-1',
       ),
     ).rejects.toThrow(/endsAt/);
-    const ok = await service.create({ title: 'x', audiences: ['CUSTOMER'], regionCode: 'dn' }, 'ops-1');
+    const ok = await service.create({ audiences: ['CUSTOMER'], regionCode: 'dn' }, 'ops-1');
     expect(ok.regionCode).toBe('DN');
-    await expect(service.update(ok.id, { title: 'x' }, 'ops-1')).rejects.toThrow(/No banner field/);
+    await expect(service.update(ok.id, { regionCode: 'DN' }, 'ops-1')).rejects.toThrow(/No banner field/);
     await expect(service.update(ok.id, { audiences: ['DRIVER'], ctaUrl: '/customer/shop' }, 'ops-1')).rejects.toThrow(
       /CTA/,
     );
@@ -194,7 +192,7 @@ describe('HomeBannerService', () => {
 
   it('resolves the region from lat/lng', async () => {
     const { service } = makeService();
-    const b = await service.create({ title: 'ĐN', audiences: ['CUSTOMER'], regionCode: 'DN' }, 'ops-1');
+    const b = await service.create({ audiences: ['CUSTOMER'], regionCode: 'DN' }, 'ops-1');
     await service.uploadImage(b.id, { contentBase64: PNG, contentType: 'image/png' }, 'ops-1');
     await service.update(b.id, { active: true }, 'ops-1');
     expect(await service.listPublic({ role: 'CUSTOMER', lat: 16.06, lng: 108.22 })).toHaveLength(1);
@@ -204,15 +202,15 @@ describe('HomeBannerService', () => {
 
   it('reorders, counts live events and deletes with the image', async () => {
     const { repo, service, stored } = makeService();
-    const a = await service.create({ title: 'A', audiences: ['CUSTOMER'] }, 'ops-1');
-    const b = await service.create({ title: 'B', audiences: ['CUSTOMER'] }, 'ops-1');
+    const a = await service.create({ audiences: ['CUSTOMER'] }, 'ops-1');
+    const b = await service.create({ audiences: ['CUSTOMER'] }, 'ops-1');
     for (const id of [a.id, b.id]) {
       await service.uploadImage(id, { contentBase64: PNG, contentType: 'image/png' }, 'ops-1');
       await service.update(id, { active: true }, 'ops-1');
     }
     const ordered = await service.reorder([b.id, a.id], 'ops-2');
-    expect(ordered.map((x) => x.title)).toEqual(['B', 'A']);
-    expect((await service.listPublic({ role: 'CUSTOMER' })).map((x) => x.title)).toEqual(['B', 'A']);
+    expect(ordered.map((x) => x.id)).toEqual([b.id, a.id]);
+    expect((await service.listPublic({ role: 'CUSTOMER' })).map((x) => x.id)).toEqual([b.id, a.id]);
     await expect(service.reorder(['00000000-0000-4000-8000-00000000ffff'], 'ops-2')).rejects.toThrow(/Unknown/);
 
     const res = await service.recordEvents([
@@ -229,6 +227,6 @@ describe('HomeBannerService', () => {
     await service.remove(a.id, 'ops-3');
     expect(stored.size).toBe(1);
     expect(repo.audits.at(-1)).toMatchObject({ action: 'HOME_BANNER_DELETE', actorUserId: 'ops-3' });
-    expect((await service.listPublic({ role: 'CUSTOMER' })).map((x) => x.title)).toEqual(['B']);
+    expect((await service.listPublic({ role: 'CUSTOMER' })).map((x) => x.id)).toEqual([b.id]);
   });
 });

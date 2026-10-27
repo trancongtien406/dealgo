@@ -2370,5 +2370,5 @@
   "mapStyleSatellite": "Vệ tinh",
   "mapStyleDark": "Tối",
   "mapOpenSettings": "Cài đặt",
-  "homeBannerSlideLabel": "Banner {index}/{count}: {title}"
+  "homeBannerSlideLabel": "Banner {index}/{count}"
 }

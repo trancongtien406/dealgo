@@ -1,8 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  applyBoxDrag,
+  type BoxHandle,
+  type GeoBox,
+} from "@/components/ui/map-box-edit";
 import { OpsIcon } from "@/components/ui/ops-icons";
 import { useTheme } from "@/components/theme/theme-provider";
+import {
+  MAP_STYLE_STORAGE_KEY,
+  TILE_LAYER_LABELS,
+  nextTileLayer,
+  resolveTileLayer,
+  sanitizeTileLayer,
+  tileUrl,
+  type TileLayerChoice,
+} from "@/components/ui/map-tile-layers";
 
 export type MapCoordinate = [number, number]; // [lat, lng]
 
@@ -64,6 +78,18 @@ export type RealMapViewProps = {
     distanceKm: number;
     durationMin: number;
   }) => void;
+  /** Top-left badge text (defaults to "Đà Nẵng"). */
+  badgeLabel?: string;
+  /**
+   * Admin zone form: an editable lat/lng box. Drag the body to move, a corner
+   * to resize; while `drawing`, press-and-drag on the map draws a new box.
+   */
+  editBox?: {
+    value: GeoBox | null;
+    onChange: (next: GeoBox) => void;
+    drawing?: boolean;
+    onDrawEnd?: () => void;
+  };
 };
 
 // Coordinate math for Slippy Map tiles (Web Mercator EPSG:3857)
@@ -95,7 +121,7 @@ export function worldPixelToLatLng(
 
 /**
  * Mapbox is opt-in: only `NEXT_PUBLIC_MAPBOX_TOKEN` (website/.env.local) enables
- * it for tiles. Without it Admin maps use OSM/Carto tiles with attribution. Road routes
+ * it for tiles. Without it Admin maps use keyless OSM tiles (map-tile-layers.ts). Road routes
  * always come from Nest (`ROUTING_PROVIDER`, DEC-PROD-045); none → straight line.
  */
 const MAPBOX_DEFAULT_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN?.trim() || "";
@@ -305,6 +331,8 @@ export function RealMapView({
   showAttribution = true,
   showDriverProgress = true,
   onRouteMetricsChange,
+  badgeLabel = "Đà Nẵng",
+  editBox,
 }: RealMapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(initialZoom);
@@ -313,9 +341,34 @@ export function RealMapView({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null);
-  const [tileLayer, setTileLayer] = useState<
-    "auto" | "mapbox" | "osm" | "carto" | "dark"
-  >("auto");
+  const [tileLayer, setTileLayer] = useState<TileLayerChoice>("auto");
+  const hasMapboxToken = Boolean(MAPBOX_DEFAULT_TOKEN);
+
+  // Remember the admin's base-layer choice across map views.
+  useEffect(() => {
+    try {
+      const stored = sanitizeTileLayer(
+        window.localStorage.getItem(MAP_STYLE_STORAGE_KEY),
+        hasMapboxToken,
+      );
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (stored !== "auto") setTileLayer(stored);
+    } catch {
+      // storage unavailable: keep auto
+    }
+  }, [hasMapboxToken]);
+
+  const cycleTileLayer = useCallback(() => {
+    setTileLayer((prev) => {
+      const next = nextTileLayer(prev, hasMapboxToken);
+      try {
+        window.localStorage.setItem(MAP_STYLE_STORAGE_KEY, next);
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, [hasMapboxToken]);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Multi-route state: Fastest route and alternative options
@@ -346,16 +399,10 @@ export function RealMapView({
   }
   const isDark = themeContext ? themeContext.resolvedTheme === "dark" : false;
 
-  const effectiveTileLayer =
-    tileLayer === "auto"
-      ? Boolean(MAPBOX_DEFAULT_TOKEN)
-        ? "mapbox"
-        : isDark
-          ? "dark"
-          : "osm"
-      : tileLayer === "mapbox" && !MAPBOX_DEFAULT_TOKEN
-        ? "osm"
-        : tileLayer;
+  const resolvedLayer = useMemo(
+    () => resolveTileLayer(tileLayer, hasMapboxToken, isDark),
+    [tileLayer, hasMapboxToken, isDark],
+  );
 
   const centerLat = center[0];
   const centerLng = center[1];
@@ -549,8 +596,76 @@ export function RealMapView({
   const touchStartDistRef = useRef<number | null>(null);
   const touchStartZoomRef = useRef<number>(zoom);
 
+  // Zone box editing: active drag (ref for event-time reads, state for cursor)
+  const boxDragRef = useRef<{
+    handle: BoxHandle;
+    start: GeoBox;
+    from: [number, number];
+  } | null>(null);
+  const [boxDragging, setBoxDragging] = useState(false);
+
+  const clientToLatLng = (clientX: number, clientY: number): [number, number] | null => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+    const c = latLngToWorldPixel(currentCenter[0], currentCenter[1], zoom);
+    return worldPixelToLatLng(
+      c.x + (clientX - rect.left) - dimensions.width / 2,
+      c.y + (clientY - rect.top) - dimensions.height / 2,
+      zoom,
+    );
+  };
+
+  const startBoxDrag = (
+    handle: BoxHandle,
+    clientX: number,
+    clientY: number,
+    e?: { stopPropagation: () => void },
+  ) => {
+    if (!editBox) return false;
+    const from = clientToLatLng(clientX, clientY);
+    if (!from) return false;
+    e?.stopPropagation();
+    boxDragRef.current = {
+      handle,
+      start: editBox.value ?? {
+        minLat: from[0],
+        maxLat: from[0],
+        minLng: from[1],
+        maxLng: from[1],
+      },
+      from,
+    };
+    setBoxDragging(true);
+    setIsDragging(false);
+    return true;
+  };
+
+  const moveBoxDrag = (clientX: number, clientY: number) => {
+    const drag = boxDragRef.current;
+    if (!drag || !editBox) return false;
+    const to = clientToLatLng(clientX, clientY);
+    if (to) editBox.onChange(applyBoxDrag(drag.start, drag.handle, drag.from, to));
+    return true;
+  };
+
+  const endBoxDrag = () => {
+    const drag = boxDragRef.current;
+    if (!drag) return false;
+    boxDragRef.current = null;
+    setBoxDragging(false);
+    if (drag.handle === "draw") editBox?.onDrawEnd?.();
+    return true;
+  };
+
   const handleTouchStart = (e: React.TouchEvent) => {
     if (!interactive) return;
+    if (
+      e.touches.length === 1 &&
+      editBox?.drawing &&
+      startBoxDrag("draw", e.touches[0].clientX, e.touches[0].clientY)
+    ) {
+      return;
+    }
     if (e.touches.length === 2) {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
@@ -564,6 +679,9 @@ export function RealMapView({
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!interactive) return;
+    if (e.touches.length === 1 && moveBoxDrag(e.touches[0].clientX, e.touches[0].clientY)) {
+      return;
+    }
     if (e.touches.length === 2 && touchStartDistRef.current) {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
@@ -600,6 +718,7 @@ export function RealMapView({
   };
 
   const handleTouchEnd = () => {
+    endBoxDrag();
     touchStartDistRef.current = null;
     setIsDragging(false);
   };
@@ -607,11 +726,13 @@ export function RealMapView({
   // Drag pan handlers
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!interactive || e.button !== 0) return;
+    if (editBox?.drawing && startBoxDrag("draw", e.clientX, e.clientY)) return;
     setIsDragging(true);
     setDragStart({ x: e.clientX, y: e.clientY });
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
+    if (moveBoxDrag(e.clientX, e.clientY)) return;
     if (!isDragging || !interactive) return;
     const dx = e.clientX - dragStart.x;
     const dy = e.clientY - dragStart.y;
@@ -623,6 +744,7 @@ export function RealMapView({
   };
 
   const handleMouseUp = () => {
+    endBoxDrag();
     setIsDragging(false);
   };
 
@@ -705,15 +827,7 @@ export function RealMapView({
         const left = halfW + (tx * 256 - centerPixelTileZ.x) * scale;
         const top = halfH + (ty * 256 - centerPixelTileZ.y) * scale;
 
-        let url = `https://tile.openstreetmap.org/${tileZoom}/${wrappedX}/${ty}.png`;
-        if (effectiveTileLayer === "mapbox" && MAPBOX_DEFAULT_TOKEN) {
-          const styleId = isDark ? "dark-v11" : "streets-v12";
-          url = `https://api.mapbox.com/styles/v1/mapbox/${styleId}/tiles/256/${tileZoom}/${wrappedX}/${ty}@2x?access_token=${MAPBOX_DEFAULT_TOKEN}`;
-        } else if (effectiveTileLayer === "dark") {
-          url = `https://basemaps.cartocdn.com/dark_all/${tileZoom}/${wrappedX}/${ty}.png`;
-        } else if (effectiveTileLayer === "carto") {
-          url = `https://basemaps.cartocdn.com/rastertiles/voyager/${tileZoom}/${wrappedX}/${ty}.png`;
-        }
+        const url = tileUrl(resolvedLayer, tileZoom, wrappedX, ty, MAPBOX_DEFAULT_TOKEN);
 
         list.push({
           x: wrappedX,
@@ -721,7 +835,7 @@ export function RealMapView({
           left,
           top,
           size: tileSize,
-          key: `${tileZoom}-${wrappedX}-${ty}-${effectiveTileLayer}-${isDark ? "dark" : "light"}`,
+          key: `${tileZoom}-${wrappedX}-${ty}-${resolvedLayer.kind === "mapbox" ? resolvedLayer.styleId : "osm"}`,
           url,
         });
       }
@@ -730,9 +844,9 @@ export function RealMapView({
   }, [
     centerPixelTileZ.x,
     centerPixelTileZ.y,
-    effectiveTileLayer,
+    resolvedLayer,
     h,
-    isDark,
+    
     scale,
     tileZoom,
     width,
@@ -796,6 +910,25 @@ export function RealMapView({
     };
   }, [activeRouteCoords, project, showDriverProgress]);
 
+  // Screen geometry of the editable zone box (if any)
+  const editBoxShape = (() => {
+    const b = editBox?.value;
+    if (!b) return null;
+    const tl = project(b.maxLat, b.minLng);
+    const br = project(b.minLat, b.maxLng);
+    const x = Math.min(tl.x, br.x);
+    const y = Math.min(tl.y, br.y);
+    const w = Math.abs(br.x - tl.x);
+    const h = Math.abs(br.y - tl.y);
+    const corners: Array<{ handle: BoxHandle; cx: number; cy: number; cursor: string }> = [
+      { handle: "nw", cx: x, cy: y, cursor: "nwse-resize" },
+      { handle: "ne", cx: x + w, cy: y, cursor: "nesw-resize" },
+      { handle: "sw", cx: x, cy: y + h, cursor: "nesw-resize" },
+      { handle: "se", cx: x + w, cy: y + h, cursor: "nwse-resize" },
+    ];
+    return { x, y, w, h, corners, live: !editBox?.drawing };
+  })();
+
   return (
     <div
       ref={containerRef}
@@ -814,7 +947,9 @@ export function RealMapView({
       }}
       className={`relative isolate overflow-hidden rounded-2xl border border-border bg-[#e5e3df] select-none ${
         interactive
-          ? isDragging
+          ? editBox?.drawing || boxDragging
+            ? "cursor-crosshair"
+            : isDragging
             ? "cursor-grabbing"
             : "cursor-grab"
           : "cursor-default"
@@ -915,6 +1050,55 @@ export function RealMapView({
             </g>
           );
         })}
+
+        {/* Editable zone box (Admin › Khu vực form) */}
+        {editBoxShape ? (
+          <g
+            data-testid="map-edit-box"
+            className={editBoxShape.live ? "pointer-events-auto" : "pointer-events-none"}
+          >
+            <rect
+              x={editBoxShape.x}
+              y={editBoxShape.y}
+              width={editBoxShape.w}
+              height={editBoxShape.h}
+              fill="rgba(234, 88, 12, 0.14)"
+              stroke="#ea580c"
+              strokeWidth={2.5}
+              style={{ cursor: "move" }}
+              onMouseDown={(e) => {
+                if (e.button === 0) startBoxDrag("move", e.clientX, e.clientY, e);
+              }}
+              onTouchStart={(e) => {
+                if (e.touches.length === 1) {
+                  startBoxDrag("move", e.touches[0].clientX, e.touches[0].clientY, e);
+                }
+              }}
+            />
+            {editBoxShape.live &&
+              editBoxShape.corners.map((c) => (
+                <circle
+                  key={c.handle}
+                  data-handle={c.handle}
+                  cx={c.cx}
+                  cy={c.cy}
+                  r={7}
+                  fill="#fff"
+                  stroke="#ea580c"
+                  strokeWidth={2.5}
+                  style={{ cursor: c.cursor }}
+                  onMouseDown={(e) => {
+                    if (e.button === 0) startBoxDrag(c.handle, e.clientX, e.clientY, e);
+                  }}
+                  onTouchStart={(e) => {
+                    if (e.touches.length === 1) {
+                      startBoxDrag(c.handle, e.touches[0].clientX, e.touches[0].clientY, e);
+                    }
+                  }}
+                />
+              ))}
+          </g>
+        ) : null}
 
         {/* Alternative Routes (Selectable dashed paths) */}
         {alternativeRoutes.map((alt) => (
@@ -1214,24 +1398,12 @@ export function RealMapView({
             type="button"
             title={`Chế độ bản đồ: ${
               tileLayer === "auto"
-                ? `Tự động (${effectiveTileLayer.toUpperCase()})`
-                : tileLayer.toUpperCase()
-            }`}
-            onClick={() =>
-              setTileLayer((prev) =>
-                prev === "auto"
-                  ? MAPBOX_DEFAULT_TOKEN
-                    ? "mapbox"
-                    : "osm"
-                  : prev === "mapbox"
-                    ? "osm"
-                    : prev === "osm"
-                      ? "carto"
-                      : prev === "carto"
-                        ? "dark"
-                        : "auto",
-              )
-            }
+                ? `Tự động (${resolvedLayer.label})`
+                : TILE_LAYER_LABELS[tileLayer]
+            }${hasMapboxToken ? "" : " · cần NEXT_PUBLIC_MAPBOX_TOKEN để đổi kiểu"}`}
+            aria-label="Đổi kiểu bản đồ"
+            disabled={!hasMapboxToken}
+            onClick={cycleTileLayer}
             className="flex size-8 items-center justify-center rounded-lg border border-border bg-white/95 text-ink shadow-sm hover:bg-white cursor-pointer backdrop-blur-xs transition-colors"
           >
             <OpsIcon name="monitor" className="size-4 text-ink" />
@@ -1255,9 +1427,9 @@ export function RealMapView({
       <div className="absolute top-3 left-3 z-10 flex flex-wrap items-center gap-2 pointer-events-auto">
         <div className="flex items-center gap-2 rounded-xl border border-border/80 bg-white/95 px-3 py-1.5 shadow-sm backdrop-blur-xs">
           <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs font-bold text-ink">Đà Nẵng</span>
+          <span className="text-xs font-bold text-ink">{badgeLabel}</span>
           <span className="text-[10px] text-muted">
-            | Zoom {zoom.toFixed(1)} · {effectiveTileLayer.toUpperCase()}
+            | Zoom {zoom.toFixed(1)} · {resolvedLayer.label}
           </span>
           {isLoadingRoute && (
             <span className="text-[10px] font-medium text-brand animate-pulse">
@@ -1306,7 +1478,7 @@ export function RealMapView({
             máy chủ DealGo
           </span>
           <span className="rounded bg-white/80 px-1.5 py-0.5 text-[9px] text-muted shadow-2xs backdrop-blur-xs">
-            {effectiveTileLayer === "mapbox" ? (
+            {resolvedLayer.kind === "mapbox" ? (
               <>
                 ©{" "}
                 <a
@@ -1326,6 +1498,7 @@ export function RealMapView({
                 >
                   OpenStreetMap
                 </a>
+                {resolvedLayer.styleId === "satellite-streets-v12" && <> · © Maxar</>}
               </>
             ) : (
               <>

@@ -38,7 +38,7 @@ void main() {
   });
 
   group('S001 DealGoSplashScreen', () {
-    testWidgets('renders brand slogan and floating service highlights', (
+    testWidgets('is the brand launch screen: purple + DealGo mark only', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -46,10 +46,12 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('Đi muôn nơi · Ăn vạn món'), findsOneWidget);
-      expect(find.text('Đặt xe'), findsOneWidget);
-      expect(find.text('Đồ ăn'), findsOneWidget);
-      expect(find.text('Đang chuẩn bị trải nghiệm của bạn...'), findsOneWidget);
+      expect(find.byKey(const Key('dealgo-launch-screen')), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('Đang chuẩn bị trải nghiệm của bạn...'),
+        findsOneWidget,
+      );
+      expect(find.text('Đặt xe'), findsNothing);
     });
   });
 

@@ -4,8 +4,6 @@ export const HOME_BANNER_ID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const BODY_KEYS = [
-  "title",
-  "subtitle",
   "ctaUrl",
   "audiences",
   "service",

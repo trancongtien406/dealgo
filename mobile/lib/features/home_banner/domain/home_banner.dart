@@ -13,21 +13,19 @@ class HomeBannerCta {
 }
 
 /// One admin-managed home banner, as served by `GET /v1/public/home-banners`.
+///
+/// Banners are image-only: any wording is designed into the art itself.
 class HomeBanner {
   const HomeBanner({
     required this.id,
-    required this.title,
     required this.imageUrl,
-    this.subtitle,
     this.cta,
     this.service = 'ALL',
   });
 
   final String id;
-  final String title;
-  final String? subtitle;
 
-  /// Server path or absolute URL of the 2:1 image (text-free art).
+  /// Server path or absolute URL of the 2:1 image.
   final String imageUrl;
   final HomeBannerCta? cta;
   final String service;
@@ -71,23 +69,17 @@ List<HomeBanner> decodeHomeBanners(Map<String, Object?>? data) {
       continue;
     }
     final id = raw['id'];
-    final title = raw['title'];
     final image = raw['imageUrl'];
-    if (id is! String || title is! String || image is! String) {
+    if (id is! String || image is! String) {
       continue;
     }
     if (id.isEmpty || image.isEmpty) {
       continue;
     }
-    final subtitle = raw['subtitle'];
     final service = raw['service'];
     out.add(
       HomeBanner(
         id: id,
-        title: title,
-        subtitle: subtitle is String && subtitle.trim().isNotEmpty
-            ? subtitle
-            : null,
         imageUrl: image,
         cta: _decodeCta(raw['cta']),
         service: service is String ? service : 'ALL',

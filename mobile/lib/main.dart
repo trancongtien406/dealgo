@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
@@ -7,6 +9,7 @@ import 'core/design_system/components/dealgo_nav_insets.dart';
 import 'core/auth/secure_token_store.dart';
 import 'core/auth/token_store.dart';
 import 'core/config/app_env.dart';
+import 'core/launch/launch_splash.dart';
 import 'core/mock/mock_seed.dart';
 import 'core/observability/crash_reporting.dart';
 import 'core/push/fcm_push.dart';
@@ -17,6 +20,8 @@ Future<void> main() => runWithCrashReporting(_start);
 
 Future<void> _start() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Native launch screen stays until DealGoApp knows the first route.
+  LaunchSplash.hold();
   enableAndroidEdgeToEdge();
   await CustomerBookingPrefs.warmUp();
   await _initFirebaseSafely();
@@ -67,7 +72,13 @@ Future<void> _initFirebaseSafely() async {
         options: DefaultFirebaseOptions.currentPlatform,
       );
     }
-    await configureFcmMessaging();
+    // Handler registration + iOS presentation options are not needed for
+    // the first frame; do not keep the launch screen waiting on them.
+    unawaited(
+      configureFcmMessaging().catchError((Object error) {
+        if (kDebugMode) debugPrint('FCM configure skipped: $error');
+      }),
+    );
   } catch (error, stack) {
     if (kDebugMode) {
       debugPrint('Firebase init skipped: $error');

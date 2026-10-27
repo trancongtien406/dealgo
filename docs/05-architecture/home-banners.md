@@ -14,10 +14,13 @@ bật/tắt trên web admin tại **Cài đặt → Banner trang chủ** (`/sett
 
 ## Dữ liệu (`backend/prisma/schema.prisma`)
 
-- `HomeBanner`: `title`, `subtitle?`, `imageKey?`, `ctaUrl?`, `audiences[]` (CUSTOMER/DRIVER/MERCHANT),
+- `HomeBanner` (**chỉ ảnh**, không có tiêu đề/phụ đề): `imageUrl?`, `ctaUrl?`, `audiences[]` (CUSTOMER/DRIVER/MERCHANT),
   `service` (ALL/RIDE/FOOD), `regionCode?`, `startsAt?`/`endsAt?`, `sortOrder`, `active`, người tạo/sửa.
+- `regionCode` là khoá ngoại tới `ServiceRegion.code` (`ON DELETE RESTRICT`, `ON UPDATE CASCADE`): banner chỉ nhắm
+  được các khu vực đang quản lý ở **Khu vực** (`/zones`); `null` = mọi khu vực. Không có danh sách vùng riêng cho banner.
 - `HomeBannerDailyStat`: bộ đếm `impressions`/`clicks` theo banner và theo ngày (giờ Việt Nam, UTC+7).
-- Migration `20261112090000_home_banners`. Thao tác admin ghi audit `HOME_BANNER_CREATE/UPDATE/DELETE/REORDER`.
+- Migration `20261112090000_home_banners`, rồi `20261114090000_home_banner_image_only_region_fk` (bỏ cột `title`/`subtitle`,
+  đưa `regionCode` không còn khớp về `null`, thêm FK + index). Thao tác admin ghi audit `HOME_BANNER_CREATE/UPDATE/DELETE/REORDER`.
 
 ## Trạng thái
 
@@ -46,9 +49,9 @@ bật/tắt trên web admin tại **Cài đặt → Banner trang chủ** (`/sett
 Công khai (không cần đăng nhập):
 
 - `GET /v1/public/home-banners?role=CUSTOMER&service=&region=&lat=&lng=` →
-  `{ items: [{ id, title, subtitle, imageUrl, cta: { kind: app|web, target } | null, service }] }`.
+  `{ items: [{ id, imageUrl, cta: { kind: app|web, target } | null, service }] }`.
   Chỉ banner `LIVE`, đúng vai trò, đúng dịch vụ (hoặc ALL), và không gắn vùng hoặc đúng vùng
-  (vùng lấy từ `region` hoặc suy từ `lat`/`lng`; không biết vùng → chỉ banner không gắn vùng). Tối đa 8, theo `sortOrder`.
+  (vùng lấy từ `region` hoặc suy từ `lat`/`lng` theo khung các khu vực trong DB; không biết vùng → chỉ banner không gắn vùng). Tối đa 8, theo `sortOrder`.
   Cache trong server 30 s; `Cache-Control: public, max-age=60`.
 - `GET /v1/public/home-banners/images/<id>/<uuid>.<ext>`: ảnh (tên file đổi mỗi lần tải lên nên cache lâu được).
 - `POST /v1/public/home-banners/events` `{ events: [{ bannerId, type: IMPRESSION|CLICK }] }` (≤ 50, giới hạn 60 lần/phút/IP).
@@ -60,12 +63,16 @@ Web admin gọi qua BFF `website/app/api/ops/home-banners/*` (kiểm tra same-or
 
 ## Ảnh
 
-- Tỉ lệ 2:1, khuyến nghị 1200×600, **không chữ trong ảnh**: app tự vẽ tiêu đề/phụ đề trên lớp gradient tím bên trái.
-  Bản xem trước trên web admin dựng đúng khung này.
+- Banner **chỉ là ảnh**: chữ (nếu cần) thiết kế sẵn trong ảnh; app không vẽ tiêu đề, phụ đề hay lớp gradient.
+- Tỉ lệ 2:1, khuyến nghị 1200×600, JPEG/PNG/WebP ≤ 2 MB. Web admin đọc kích thước ảnh khi chọn và cảnh báo
+  (không chặn) nếu lệch 2:1 quá 10% hoặc rộng dưới 800 px. Tạo banner mới bắt buộc chọn ảnh.
+- Trình đọc màn hình: app đọc "Banner {i}/{n}" (không có văn bản thay thế riêng cho từng ảnh).
+- Admin: danh sách nhận diện banner bằng ảnh thu nhỏ + số thứ tự + chip vai trò/dịch vụ/khu vực; ô **Khu vực** lấy
+  từ `/api/ops/zones?status=ALL` (khu vực PLANNED ghi "sắp mở").
 
 ## Mobile (`mobile/lib/features/home_banner/`)
 
-- `HomeBannerCarousel` (trang chủ khách hàng, ngay dưới ô tìm kiếm): khung 2:1, bo góc 20.
+- `HomeBannerCarousel` (trang chủ khách hàng, ngay dưới ô tìm kiếm): khung 2:1, bo góc 20, chỉ ảnh (không chữ đè).
   - Đang tải: khối skeleton. Rỗng hoặc lỗi: ẩn hẳn (không chừa khoảng trống).
   - Tự chuyển mỗi 5 s khi có ≥ 2 banner; dừng khi người dùng chạm giữ, khi trang bị che/khác tab (`TickerMode`),
     khi app ở nền, và khi hệ thống bật giảm chuyển động.

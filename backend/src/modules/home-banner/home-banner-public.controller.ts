@@ -28,7 +28,7 @@ export class PublicHomeBannerController {
   @Header('Cache-Control', `public, max-age=${HOME_BANNER_PUBLIC_MAX_AGE_S}`)
   @ApiOperation({
     summary:
-      'Live home banners for one role (CUSTOMER/DRIVER/MERCHANT), optional service and region (code or lat/lng); { items[{id,title,subtitle,imageUrl,cta{kind:app|web,target},service}] }',
+      'Live home banners for one role (CUSTOMER/DRIVER/MERCHANT), optional service and region (code or lat/lng); { items[{id,imageUrl,cta{kind:app|web,target},service}] }',
   })
   async list(@Query() query: ListPublicHomeBannersQuery) {
     return { items: await this.banners.listPublic(query) };

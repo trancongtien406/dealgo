@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark mode launch screen: deep brand purple (DealGoColors.primaryDeep), less glare. -->
+    <color name="splash_background">#4C1D95</color>
+    <color name="window_background">#FBFAFD</color>
+</resources>

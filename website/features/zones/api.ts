@@ -52,6 +52,30 @@ export async function patchZone(
   return res.data;
 }
 
+export type ZonePlaceHit = {
+  lat: number;
+  lng: number;
+  name: string;
+  address?: string;
+};
+
+/** Backend place search (same providers as the app) for the zone form. */
+export async function searchZonePlaces(
+  q: string,
+  near?: { lat: number; lng: number },
+): Promise<ZonePlaceHit[]> {
+  const search = new URLSearchParams({ q: q.trim() });
+  if (near) {
+    search.set("lat", String(near.lat));
+    search.set("lng", String(near.lng));
+  }
+  const res = await apiFetch<{
+    success: boolean;
+    data: { items?: ZonePlaceHit[]; available?: boolean };
+  }>(`${apiPaths.opsPlacesSearch()}?${search.toString()}`);
+  return res.data.items ?? [];
+}
+
 export async function fetchZoneRules(
   params: FetchZoneRulesParams,
 ): Promise<PaginatedList<ZoneRule>> {

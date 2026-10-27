@@ -7404,7 +7404,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mapOpenSettings => 'Settings';
 
   @override
-  String homeBannerSlideLabel(int index, int count, String title) {
-    return 'Banner $index of $count: $title';
+  String homeBannerSlideLabel(int index, int count) {
+    return 'Banner $index of $count';
   }
 }

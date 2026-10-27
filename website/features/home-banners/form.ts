@@ -152,8 +152,6 @@ export function formatIct(iso: string | null): string {
 
 export function emptyHomeBannerDraft(): HomeBannerDraft {
   return {
-    title: "",
-    subtitle: "",
     ctaUrl: "",
     audiences: ["CUSTOMER"],
     service: "ALL",
@@ -165,8 +163,6 @@ export function emptyHomeBannerDraft(): HomeBannerDraft {
 
 export function draftFromHomeBanner(row: HomeBannerRow): HomeBannerDraft {
   return {
-    title: row.title,
-    subtitle: row.subtitle ?? "",
     ctaUrl: row.ctaUrl ?? "",
     audiences: [...row.audiences],
     service: row.service,
@@ -180,14 +176,6 @@ export type DraftCheck =
   { ok: true; payload: HomeBannerPayload } | { ok: false; message: string };
 
 export function checkHomeBannerDraft(draft: HomeBannerDraft): DraftCheck {
-  const title = draft.title.trim();
-  if (title.length < 2 || title.length > 80) {
-    return { ok: false, message: "Tiêu đề cần 2–80 ký tự." };
-  }
-  const subtitle = draft.subtitle.trim();
-  if (subtitle.length > 160) {
-    return { ok: false, message: "Mô tả tối đa 160 ký tự." };
-  }
   if (draft.audiences.length === 0) {
     return { ok: false, message: "Chọn ít nhất một nhóm người dùng." };
   }
@@ -212,8 +200,6 @@ export function checkHomeBannerDraft(draft: HomeBannerDraft): DraftCheck {
   return {
     ok: true,
     payload: {
-      title,
-      subtitle: subtitle || null,
       ctaUrl: draft.ctaUrl.trim() || null,
       audiences: [...draft.audiences],
       service: draft.service,
@@ -262,8 +248,6 @@ export function diffHomeBannerPayload(
   const patch: Partial<HomeBannerPayload> = {};
   const same = (a: string | null, b: string | null) =>
     a === b || (a !== null && b !== null && Date.parse(a) === Date.parse(b));
-  if (row.title !== payload.title) patch.title = payload.title;
-  if (row.subtitle !== payload.subtitle) patch.subtitle = payload.subtitle;
   if ((row.ctaUrl ?? null) !== payload.ctaUrl) patch.ctaUrl = payload.ctaUrl;
   if (
     [...row.audiences].sort().join() !== [...payload.audiences].sort().join()
@@ -277,4 +261,25 @@ export function diffHomeBannerPayload(
   if (!same(row.startsAt, payload.startsAt)) patch.startsAt = payload.startsAt;
   if (!same(row.endsAt, payload.endsAt)) patch.endsAt = payload.endsAt;
   return patch;
+}
+
+/** Banner art is shown at 2:1 (cover); ±10% still looks right after cropping. */
+export const HOME_BANNER_RATIO = 2;
+
+/** Warning for an image whose shape will be cropped badly; null when fine. */
+export function homeBannerImageSizeProblem(
+  width: number,
+  height: number,
+): string | null {
+  if (!(width > 0 && height > 0)) {
+    return "Không đọc được kích thước ảnh.";
+  }
+  const ratio = width / height;
+  if (Math.abs(ratio - HOME_BANNER_RATIO) / HOME_BANNER_RATIO > 0.1) {
+    return `Ảnh ${width}×${height} không đúng tỉ lệ 2:1 nên sẽ bị cắt. Nên dùng 1200×600.`;
+  }
+  if (width < 800) {
+    return `Ảnh ${width}×${height} hơi nhỏ, có thể mờ trên điện thoại. Nên dùng 1200×600.`;
+  }
+  return null;
 }

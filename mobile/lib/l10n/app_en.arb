@@ -3331,13 +3331,12 @@
   "mapStyleSatellite": "Satellite",
   "mapStyleDark": "Dark",
   "mapOpenSettings": "Settings",
-  "homeBannerSlideLabel": "Banner {index} of {count}: {title}",
+  "homeBannerSlideLabel": "Banner {index} of {count}",
   "@homeBannerSlideLabel": {
     "description": "Screen-reader label of one home banner slide.",
     "placeholders": {
       "index": {"type": "int"},
-      "count": {"type": "int"},
-      "title": {"type": "String"}
+      "count": {"type": "int"}
     }
   }
 }

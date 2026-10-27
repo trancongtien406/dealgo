@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
-  <title id="title">DealGo app icon</title><desc id="desc">DealGo route mark on a rounded purple tile.</desc>
-  <defs><linearGradient id="bg" x1="130" y1="100" x2="900" y2="930" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#5B21B6"/></linearGradient><linearGradient id="green" x1="390" y1="315" x2="690" y2="725" gradientUnits="userSpaceOnUse"><stop stop-color="#20D86B"/><stop offset="1" stop-color="#08A84B"/></linearGradient></defs>
-  <rect x="72" y="72" width="880" height="880" rx="240" fill="url(#bg)"/>
-  <path d="M320 278h226c171 0 286 96 286 234S717 746 546 746H320" fill="none" stroke="#fff" stroke-width="118" stroke-linecap="round"/>
-  <path d="M173 364h224M145 512h205M190 660h190" fill="none" stroke="#fff" stroke-width="82" stroke-linecap="round"/>
-  <path d="m414 662 166-145-144-132" fill="none" stroke="#fff" stroke-width="106" stroke-linecap="round" stroke-linejoin="round"/><path d="m414 662 166-145-144-132" fill="none" stroke="url(#green)" stroke-width="59" stroke-linecap="round" stroke-linejoin="round"/>
-  <g fill="url(#green)" stroke="#fff" stroke-width="25"><circle cx="414" cy="662" r="70"/><circle cx="580" cy="517" r="70"/><circle cx="436" cy="385" r="70"/></g><g fill="#fff"><circle cx="414" cy="662" r="20"/><circle cx="580" cy="517" r="20"/><circle cx="436" cy="385" r="20"/></g>
-</svg>

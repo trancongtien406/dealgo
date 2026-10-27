@@ -78,6 +78,7 @@ related_decisions:
   - DEC-PROD-063
   - DEC-PROD-064
   - DEC-PROD-065
+  - DEC-PROD-066
   - OPEN-001
   - OPEN-002
   - OPEN-003
@@ -416,6 +417,17 @@ Status: `DRAFT` (2026-10-27, owner: "không có chọn role trước để họ 
 | Đổi vai trò | `DRAFT` | Trang cá nhân › Vai trò mở `/roles` để chuyển sang vai trò đã được cấp. Chuyến/đơn tài xế đang chạy vẫn tự mở lại khi mở app. |
 | Trở thành tài xế / cửa hàng | `DRAFT` | Chỉ từ Trang cá nhân (dòng Tài xế đối tác / Cửa hàng đối tác → KYC/KYB). Backend vẫn cấp `CUSTOMER` `ACTIVE` khi đăng ký; không cần tham số role. |
 | Deep link / push | `DRAFT` | Link vào trang của vai trò người dùng có thì mở đúng trang đó; link tới vai trò không có thì về trang chủ khách hàng. |
+
+#### `DEC-PROD-066` — Màn hình mở app (launch screen) theo thương hiệu, không màn trắng
+
+Status: `DRAFT` (2026-10-27, owner hỏi về màn trắng thoáng qua khi mở app).
+
+| Mục | Status | Quy tắc |
+|---|---|---|
+| Màn hình mở app | `DRAFT` | Nền tím thương hiệu `#6D28D9` (chế độ tối `#4C1D95`) + biểu tượng DealGo (chữ D trắng, tuyến xanh) ở giữa. Không chữ, không ảnh minh hoạ, không thanh tiến trình. Giống cách Grab/Be/Shopee làm. |
+| Một màn duy nhất | `DRAFT` | Màn native (iOS LaunchScreen, Android launch theme / SplashScreen Android 12+) giữ đến khi app biết trang đầu tiên (khôi phục phiên + cờ sau đăng nhập xong), rồi chuyển thẳng sang trang đó. Route `/splash` của Flutter trông y hệt màn native; không có thời gian chờ tối thiểu. |
+| Không treo | `DRAFT` | Màn native nhả sau tối đa 3 giây; khôi phục phiên quá 6 giây thì vào trang đăng nhập (phiên vẫn được áp dụng khi xong). |
+| Trang đầu | `DRAFT` | Dữ liệu chậm thì trang đầu hiện skeleton, không quay lại spinner toàn màn. |
 
 ### 5.2. Quyết định đã bị thay thế
 

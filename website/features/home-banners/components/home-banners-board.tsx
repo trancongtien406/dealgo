@@ -28,6 +28,7 @@ import {
   formatCtr,
   formatIct,
   homeBannerCtaProblem,
+  homeBannerImageSizeProblem,
   homeBannerImageSrc,
   moveHomeBannerId,
 } from "@/features/home-banners/form";
@@ -47,10 +48,9 @@ import type {
 } from "@/features/home-banners/types";
 import { ApiError, isForbiddenError } from "@/lib/api/errors";
 import { countFormat } from "@/lib/admin-format";
-import {
-  ALL_SERVICE_REGION_CODES,
-  serviceRegionLabel,
-} from "@/lib/service-region-labels";
+import { useZonesQuery } from "@/features/zones/hooks";
+import type { ZoneItem } from "@/features/zones/types";
+import { serviceRegionLabel } from "@/lib/service-region-labels";
 
 const STATE_TONE: Record<
   HomeBannerState,
@@ -77,6 +77,11 @@ export function HomeBannersBoard() {
   const [editing, setEditing] = useState<HomeBannerRow | "new" | null>(null);
   const [deleting, setDeleting] = useState<HomeBannerRow | null>(null);
   const busy = patchMutation.isPending || reorderMutation.isPending;
+  // Region targeting reuses the zones managed at /zones (single source of truth).
+  const zonesQuery = useZonesQuery("ALL");
+  const zones = useMemo(() => zonesQuery.data ?? [], [zonesQuery.data]);
+  const regionName = (code: string) =>
+    zones.find((z) => z.code === code)?.label ?? serviceRegionLabel(code);
 
   const move = (id: string, delta: -1 | 1) => {
     const next = moveHomeBannerId(
@@ -178,7 +183,11 @@ export function HomeBannersBoard() {
                 <div className="aspect-[2/1] w-full shrink-0 overflow-hidden rounded-xl bg-canvas md:w-56">
                   {src ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={src} alt="" className="size-full object-cover" />
+                    <img
+                      src={src}
+                      alt={`Banner ${index + 1}`}
+                      className="size-full object-cover"
+                    />
                   ) : (
                     <div className="grid size-full place-items-center text-xs text-muted">
                       Chưa có ảnh
@@ -207,16 +216,13 @@ export function HomeBannersBoard() {
                     </QuietChip>
                     <QuietChip>
                       {row.regionCode
-                        ? serviceRegionLabel(row.regionCode)
+                        ? regionName(row.regionCode)
                         : "Mọi khu vực"}
                     </QuietChip>
                   </div>
-                  <h2 className="truncate text-base font-semibold text-ink">
-                    {row.title}
+                  <h2 className="text-base font-semibold text-ink">
+                    Banner {index + 1}
                   </h2>
-                  {row.subtitle ? (
-                    <p className="text-sm text-muted">{row.subtitle}</p>
-                  ) : null}
                   <p className="truncate text-xs text-muted">
                     Liên kết: {row.ctaUrl ?? "—"} · {formatIct(row.startsAt)} →{" "}
                     {formatIct(row.endsAt)}
@@ -287,7 +293,7 @@ export function HomeBannersBoard() {
       <ConfirmDialog
         open={deleting !== null}
         title="Xoá banner?"
-        description={`"${deleting?.title ?? ""}" sẽ biến mất khỏi app và ảnh bị xoá. Không hoàn tác được.`}
+        description="Banner sẽ biến mất khỏi app và ảnh bị xoá. Không hoàn tác được."
         confirmLabel="Xoá"
         pending={deleteMutation.isPending}
         onClose={() => setDeleting(null)}
@@ -306,6 +312,7 @@ export function HomeBannersBoard() {
       {editing ? (
         <HomeBannerEditor
           row={editing === "new" ? null : editing}
+          zones={zones}
           onClose={() => setEditing(null)}
         />
       ) : null}
@@ -315,9 +322,11 @@ export function HomeBannersBoard() {
 
 function HomeBannerEditor({
   row,
+  zones,
   onClose,
 }: {
   row: HomeBannerRow | null;
+  zones: ZoneItem[];
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState<HomeBannerDraft>(() =>
@@ -327,6 +336,7 @@ function HomeBannerEditor({
     null,
   );
   const [problem, setProblem] = useState<string | null>(null);
+  const [imageWarning, setImageWarning] = useState<string | null>(null);
   const createMutation = useCreateHomeBannerMutation();
   const patchMutation = usePatchHomeBannerMutation();
   const uploadMutation = useUploadHomeBannerImageMutation();
@@ -351,6 +361,7 @@ function HomeBannerEditor({
 
   const pickFile = async (picked: File | undefined) => {
     setProblem(null);
+    setImageWarning(null);
     if (!picked) return;
     if (!["image/jpeg", "image/png", "image/webp"].includes(picked.type)) {
       setProblem("Chọn ảnh JPEG, PNG hoặc WebP.");
@@ -361,13 +372,20 @@ function HomeBannerEditor({
       return;
     }
     try {
-      setFile({ name: picked.name, dataUrl: await readDataUrl(picked) });
+      const dataUrl = await readDataUrl(picked);
+      setFile({ name: picked.name, dataUrl });
+      const size = await readImageSize(dataUrl).catch(() => ({ w: 0, h: 0 }));
+      setImageWarning(homeBannerImageSizeProblem(size.w, size.h));
     } catch {
       setProblem("Không đọc được ảnh.");
     }
   };
 
   const save = async () => {
+    if (!row && !file) {
+      setProblem("Chọn ảnh banner.");
+      return;
+    }
     const check = checkHomeBannerDraft(draft);
     if (!check.ok) {
       setProblem(check.message);
@@ -412,23 +430,21 @@ function HomeBannerEditor({
             {row ? "Sửa banner" : "Thêm banner"}
           </h2>
           <label className="block text-sm font-medium text-ink">
-            Tiêu đề
+            Ảnh banner{row ? "" : " *"}
             <input
-              className={input}
-              maxLength={80}
-              value={draft.title}
-              onChange={(e) => set("title", e.target.value)}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="mt-1 block w-full text-sm"
+              onChange={(e) => void pickFile(e.target.files?.[0])}
             />
           </label>
-          <label className="block text-sm font-medium text-ink">
-            Mô tả ngắn (tuỳ chọn)
-            <input
-              className={input}
-              maxLength={160}
-              value={draft.subtitle}
-              onChange={(e) => set("subtitle", e.target.value)}
-            />
-          </label>
+          <p
+            className={`text-xs ${imageWarning ? "text-food" : "text-muted"}`}
+            role={imageWarning ? "status" : undefined}
+          >
+            {imageWarning ??
+              `${HOME_BANNER_IMAGE_HINT} Chữ (nếu có) thiết kế sẵn trong ảnh.`}
+          </p>
           <fieldset className="text-sm text-ink">
             <legend className="font-medium">Hiển thị cho</legend>
             <div className="mt-1 flex flex-wrap gap-2">
@@ -472,11 +488,18 @@ function HomeBannerEditor({
                 onChange={(e) => set("regionCode", e.target.value)}
               >
                 <option value="">Mọi khu vực</option>
-                {ALL_SERVICE_REGION_CODES.map((code) => (
-                  <option key={code} value={code}>
-                    {serviceRegionLabel(code)}
+                {zones.map((z) => (
+                  <option key={z.code} value={z.code}>
+                    {z.label}
+                    {z.status === "ACTIVE" ? "" : " (sắp mở)"}
                   </option>
                 ))}
+                {draft.regionCode &&
+                !zones.some((z) => z.code === draft.regionCode) ? (
+                  <option value={draft.regionCode}>
+                    {serviceRegionLabel(draft.regionCode)}
+                  </option>
+                ) : null}
               </select>
             </label>
             <label className="block text-sm font-medium text-ink">
@@ -514,18 +537,6 @@ function HomeBannerEditor({
                 .slice(0, 4)
                 .join(", ")}. Liên kết https mở trong trình duyệt của app.`}
           </p>
-          <label className="block text-sm font-medium text-ink">
-            Ảnh banner
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="mt-1 block w-full text-sm"
-              onChange={(e) => void pickFile(e.target.files?.[0])}
-            />
-          </label>
-          <p className="text-xs text-muted">
-            {HOME_BANNER_IMAGE_HINT} Banner chỉ bật được khi đã có ảnh.
-          </p>
           {problem ? (
             <p
               className="rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger"
@@ -561,7 +572,7 @@ function HomeBannerEditor({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={previewSrc}
-                  alt=""
+                  alt="Xem trước banner"
                   className="size-full object-cover"
                 />
               ) : (
@@ -569,17 +580,6 @@ function HomeBannerEditor({
                   Ảnh 2:1
                 </div>
               )}
-              <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/20 to-transparent" />
-              <div className="absolute inset-y-0 left-0 flex w-2/3 flex-col justify-end p-3">
-                <p className="line-clamp-2 text-sm font-bold leading-tight text-white">
-                  {draft.title || "Tiêu đề banner"}
-                </p>
-                {draft.subtitle ? (
-                  <p className="mt-0.5 line-clamp-2 text-[11px] leading-tight text-white/85">
-                    {draft.subtitle}
-                  </p>
-                ) : null}
-              </div>
             </div>
             <div className="mt-2 flex justify-center gap-1">
               <span className="h-1.5 w-4 rounded-full bg-brand" />
@@ -594,6 +594,15 @@ function HomeBannerEditor({
       </div>
     </div>
   );
+}
+
+function readImageSize(src: string): Promise<{ w: number; h: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = () => reject(new Error("decode"));
+    img.src = src;
+  });
 }
 
 function readDataUrl(file: File): Promise<string> {

@@ -13523,8 +13523,8 @@ abstract class AppLocalizations {
   /// Screen-reader label of one home banner slide.
   ///
   /// In en, this message translates to:
-  /// **'Banner {index} of {count}: {title}'**
-  String homeBannerSlideLabel(int index, int count, String title);
+  /// **'Banner {index} of {count}'**
+  String homeBannerSlideLabel(int index, int count);
 }
 
 class _AppLocalizationsDelegate

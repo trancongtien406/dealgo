@@ -16,8 +16,6 @@ export type HomeBannerAudit = {
 
 export type HomeBannerFields = Pick<
   HomeBanner,
-  | 'title'
-  | 'subtitle'
   | 'imageUrl'
   | 'ctaUrl'
   | 'audiences'
@@ -159,8 +157,6 @@ type Row = Awaited<ReturnType<PrismaClient['homeBanner']['findFirstOrThrow']>>;
 function fromRecord(row: Row): HomeBanner {
   return {
     id: row.id,
-    title: row.title,
-    subtitle: row.subtitle,
     imageUrl: row.imageUrl,
     ctaUrl: row.ctaUrl,
     audiences: [...row.audiences],

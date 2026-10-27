@@ -1,6 +1,6 @@
 import { vnd, type StatusTone } from "@/lib/admin-format";
 import { formatOpsDateTime } from "@/lib/ops-time";
-import { CITY_COORDS, DEFAULT_CENTER } from "@/features/zones/constants";
+import { DEFAULT_CENTER } from "@/features/zones/constants";
 import type {
   PriceStatus,
   ZoneItem,
@@ -65,7 +65,13 @@ export function resolveCityCenter(
   ) {
     return [zone.centerLat, zone.centerLng];
   }
-  return CITY_COORDS[zone.code] ?? DEFAULT_CENTER;
+  if (zone.bbox) {
+    return [
+      (zone.bbox.minLat + zone.bbox.maxLat) / 2,
+      (zone.bbox.minLng + zone.bbox.maxLng) / 2,
+    ];
+  }
+  return DEFAULT_CENTER;
 }
 
 export const formatUpdatedAt = formatOpsDateTime;

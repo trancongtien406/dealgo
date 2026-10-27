@@ -8,8 +8,6 @@ export type HomeBannerCounts = { impressions: number; clicks: number };
 /** Row from Nest `GET /v1/ops/home-banners`. */
 export type HomeBannerRow = {
   id: string;
-  title: string;
-  subtitle: string | null;
   imageUrl: string | null;
   ctaUrl: string | null;
   audiences: HomeBannerAudience[];
@@ -27,8 +25,6 @@ export type HomeBannerRow = {
 
 /** Editable form state; dates are `datetime-local` strings in ICT. */
 export type HomeBannerDraft = {
-  title: string;
-  subtitle: string;
   ctaUrl: string;
   audiences: HomeBannerAudience[];
   service: HomeBannerService;
@@ -38,8 +34,6 @@ export type HomeBannerDraft = {
 };
 
 export type HomeBannerPayload = {
-  title: string;
-  subtitle: string | null;
   ctaUrl: string | null;
   audiences: HomeBannerAudience[];
   service: HomeBannerService;

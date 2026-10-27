@@ -108,6 +108,7 @@ export const apiPaths = {
   opsUserFeeSettlement: (id: string) =>
     `/api/ops/users/${encodeURIComponent(id)}/fee-settlements`,
   opsZones: () => "/api/ops/zones",
+  opsPlacesSearch: () => "/api/ops/places/search",
   opsZonesRules: () => "/api/ops/zones/rules",
   opsRefunds: () => "/api/ops/refunds",
   opsPromotions: () => "/api/ops/promotions",

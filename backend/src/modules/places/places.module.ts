@@ -14,12 +14,18 @@ import {
 } from './place-history.repository.js';
 import { PlaceHistoryService } from './place-history.service.js';
 import { OpsMapsProvidersController } from './ops-maps-providers.controller.js';
+import { OpsPlacesController } from './ops-places.controller.js';
 import { PlacesController } from './places.controller.js';
 import { PlacesService } from './places.service.js';
 
 @Module({
   imports: [MapsModule, IdentityModule, PrismaModule, PlatformSettingsModule],
-  controllers: [PlacesController, PlaceHistoryController, OpsMapsProvidersController],
+  controllers: [
+    PlacesController,
+    PlaceHistoryController,
+    OpsMapsProvidersController,
+    OpsPlacesController,
+  ],
   providers: [
     PlacesService,
     PlaceHistoryService,

@@ -39,8 +39,6 @@ import type {
 
 export type PublicHomeBannerView = {
   id: string;
-  title: string;
-  subtitle: string | null;
   imageUrl: string;
   cta: HomeBannerCta | null;
   service: HomeBannerServiceScope;
@@ -82,8 +80,6 @@ function normalizeRegion(value: string | null | undefined): string | null | unde
 function toPublic(row: HomeBanner): PublicHomeBannerView {
   return {
     id: row.id,
-    title: row.title,
-    subtitle: row.subtitle,
     imageUrl: row.imageUrl!,
     cta: homeBannerCtaView(row.ctaUrl),
     service: row.service,
@@ -167,8 +163,6 @@ export class HomeBannerService {
   async create(input: CreateHomeBannerDto, actorUserId: string): Promise<OpsHomeBannerView> {
     const rows = await this.banners.list();
     const fields: HomeBannerFields = {
-      title: input.title.trim(),
-      subtitle: input.subtitle?.trim() || null,
       imageUrl: null,
       ctaUrl: normalizeHomeBannerCta(input.ctaUrl, input.audiences),
       audiences: [...new Set(input.audiences)],
@@ -179,9 +173,6 @@ export class HomeBannerService {
       sortOrder: input.sortOrder ?? (rows.length ? Math.max(...rows.map((r) => r.sortOrder)) + 10 : 0),
       active: false,
     };
-    if (!fields.title) {
-      throw homeBannerError(400, 'VALIDATION_ERROR', 'Title is required');
-    }
     if (input.active) {
       throw homeBannerError(400, 'HOME_BANNER_IMAGE_REQUIRED', 'Upload an image before activating the banner');
     }
@@ -189,7 +180,7 @@ export class HomeBannerService {
     const saved = await this.banners.create(fields, actorUserId, {
       action: 'HOME_BANNER_CREATE',
       reason: input.reason?.trim() || 'Tạo banner trang chủ',
-      metadata: { title: fields.title, audiences: fields.audiences, service: fields.service },
+      metadata: { audiences: fields.audiences, service: fields.service },
     });
     this.invalidate();
     return this.toOps(saved, this.clock());
@@ -198,8 +189,6 @@ export class HomeBannerService {
   async update(id: string, patch: PatchHomeBannerDto, actorUserId: string): Promise<OpsHomeBannerView> {
     const current = await this.require(id);
     const next: Partial<HomeBannerFields> = {};
-    if (patch.title !== undefined) next.title = patch.title.trim();
-    if (patch.subtitle !== undefined) next.subtitle = patch.subtitle?.trim() || null;
     if (patch.audiences !== undefined) next.audiences = [...new Set(patch.audiences)];
     if (patch.service !== undefined) next.service = patch.service;
     if (patch.regionCode !== undefined) next.regionCode = normalizeRegion(patch.regionCode) ?? null;
@@ -210,9 +199,6 @@ export class HomeBannerService {
     const audiences = next.audiences ?? current.audiences;
     if (patch.ctaUrl !== undefined || patch.audiences !== undefined) {
       next.ctaUrl = normalizeHomeBannerCta(patch.ctaUrl !== undefined ? patch.ctaUrl : current.ctaUrl, audiences);
-    }
-    if (next.title === '') {
-      throw homeBannerError(400, 'VALIDATION_ERROR', 'Title is required');
     }
     if ((next.active ?? current.active) && !current.imageUrl) {
       throw homeBannerError(400, 'HOME_BANNER_IMAGE_REQUIRED', 'Upload an image before activating the banner');
@@ -240,7 +226,7 @@ export class HomeBannerService {
     await this.banners.delete(id, actorUserId, {
       action: 'HOME_BANNER_DELETE',
       reason: 'Xoá banner trang chủ',
-      metadata: { title: current.title, imageUrl: current.imageUrl },
+      metadata: { imageUrl: current.imageUrl },
     });
     const key = keyFromHomeBannerImageUrl(current.imageUrl);
     if (key) {
@@ -355,7 +341,7 @@ export class HomeBannerService {
 
 function comparable(value: unknown): unknown {
   if (value instanceof Date) return value.toISOString();
-  if (Array.isArray(value)) return [...value].sort().join(',');
+  if (Array.isArray(value)) return value.map(String).sort((a, b) => a.localeCompare(b)).join(',');
   return value;
 }
 

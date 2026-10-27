@@ -13,11 +13,12 @@ describe("pickHomeBannerBody", () => {
     expect(
       pickHomeBannerBody({
         title: "X",
+        ctaUrl: "/customer/shop",
         regionCode: null,
         imageUrl: "/x",
         id: A,
       }),
-    ).toEqual({ ok: true, value: { title: "X", regionCode: null } });
+    ).toEqual({ ok: true, value: { ctaUrl: "/customer/shop", regionCode: null } });
   });
 
   it("rejects non-objects and empty patches", () => {

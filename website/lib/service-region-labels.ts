@@ -1,30 +1,8 @@
-export const ACTIVE_SERVICE_REGION_CODES = ["DN", "HCM", "HN", "HP"] as const;
-export type ActiveServiceRegionCode =
-  (typeof ACTIVE_SERVICE_REGION_CODES)[number];
-
-export const ALL_SERVICE_REGION_CODES = [
-  "DN",
-  "HCM",
-  "HN",
-  "HP",
-  "CT",
-  "HUE",
-  "NT",
-  "VT",
-  "DAD",
-  "QNI",
-  "BD",
-  "DNA",
-] as const;
+/**
+ * Region codes, labels and boxes all come from the zones managed at /zones
+ * (`/api/ops/zones` → `registerServiceRegions`); nothing is hardcoded here.
+ */
 export type ServiceRegionCode = string;
-
-/** Fallback city centers keyed by Nest serviceRegionCode. */
-export const CITY_COORDS: Record<string, [number, number]> = {
-  DN: [16.0544, 108.2022],
-  HCM: [10.8231, 106.6297],
-  HN: [21.0285, 105.8542],
-  HP: [20.8449, 106.6881],
-};
 
 export const DEFAULT_CENTER: [number, number] = [16.0544, 108.2022];
 
@@ -71,14 +49,6 @@ export function serviceRegionLabel(
     return SERVICE_REGION_LABELS[key];
   }
   return code;
-}
-
-export function isServiceRegionActive(
-  code: string | null | undefined,
-): boolean {
-  if (!code) return false;
-  const key = code.trim().toUpperCase();
-  return (ACTIVE_SERVICE_REGION_CODES as readonly string[]).includes(key);
 }
 
 export function resolveServiceRegionCodeFromCoords(

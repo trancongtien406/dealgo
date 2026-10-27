@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 import '../core/auth/post_auth_gate.dart';
 import '../core/auth/token_store.dart';
 import '../core/deeplink/deep_link_gate.dart';
+import '../core/launch/launch_splash.dart';
 import '../core/deeplink/deep_link_router_hook.dart';
 import '../features/identity/domain/entities/app_role.dart';
 import '../core/push/push_port.dart';
@@ -208,6 +209,8 @@ class _DealGoAppState extends State<DealGoApp> {
       deepLinks: DeepLinkGate(notifications: _deps.notificationRouter),
     );
     _deepLinks = DeepLinkRouterHook()..attach(_router);
+    _router.routerDelegate.addListener(_maybeReleaseLaunch);
+    _refresh.addListener(_maybeReleaseLaunch);
     _registerSmokeNavigateHook();
     _deps.notificationRouter
       ..bindNavigator(_router.go)
@@ -268,6 +271,18 @@ class _DealGoAppState extends State<DealGoApp> {
     unawaited(_postAuth.load());
     unawaited(_deps.authCubit.restore());
     unawaited(_deps.connectivity.start());
+  }
+
+  /// Lets Flutter paint its first frame (dropping the native launch screen)
+  /// once the cold-start route is decided; see [LaunchSplash].
+  void _maybeReleaseLaunch() {
+    if (!LaunchSplash.isHeld) return;
+    final ready = launchRouteReady(
+      auth: _deps.authCubit.state,
+      postAuthLoaded: _postAuth.isLoaded,
+      location: _router.routerDelegate.currentConfiguration.uri.path,
+    );
+    if (ready) LaunchSplash.release();
   }
 
   bool _promptingPermissions = false;
@@ -504,6 +519,8 @@ class _DealGoAppState extends State<DealGoApp> {
   @override
   void dispose() {
     _refresh.removeListener(_flushPendingPushTap);
+    _refresh.removeListener(_maybeReleaseLaunch);
+    _router.routerDelegate.removeListener(_maybeReleaseLaunch);
     _postAuth.removeListener(_maybePromptRuntimePermissions);
     _postAuth.removeListener(_maybeResumeDriverJob);
     _driverResume.reset();

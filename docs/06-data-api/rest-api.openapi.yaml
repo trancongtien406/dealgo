@@ -2971,6 +2971,48 @@ paths:
       summary: "Ops batch lookup: display name, masked phone and KYC-approved vehicle for user ids (Admin ride/driver rows)"
       tags:
         - ops
+  /v1/ops/places/search:
+    get:
+      operationId: search
+      parameters:
+        - name: q
+          required: true
+          in: query
+          schema:
+            minLength: 2
+            maxLength: 120
+            example: chợ hàn
+            type: string
+        - name: limit
+          required: false
+          in: query
+          schema:
+            minimum: 1
+            maximum: 10
+            default: 8
+            type: number
+        - name: lat
+          required: false
+          in: query
+          description: Caller latitude for proximity bias
+          schema:
+            example: 10.7745
+            type: number
+        - name: lng
+          required: false
+          in: query
+          description: Caller longitude for proximity bias
+          schema:
+            example: 106.703
+            type: number
+      responses:
+        "200":
+          description: ""
+      security:
+        - bearer: []
+      summary: Search places for the zone form (zones.write); { items[{lat,lng,name,address,provider}], available }
+      tags:
+        - ops
   /v1/ops/platform-settings:
     get:
       operationId: list
@@ -4122,7 +4164,7 @@ paths:
       responses:
         "200":
           description: ""
-      summary: Live home banners for one role (CUSTOMER/DRIVER/MERCHANT), optional service and region (code or lat/lng); { items[{id,title,subtitle,imageUrl,cta{kind:app|web,target},service}] }
+      summary: Live home banners for one role (CUSTOMER/DRIVER/MERCHANT), optional service and region (code or lat/lng); { items[{id,imageUrl,cta{kind:app|web,target},service}] }
       tags: &a85
         - home-banners
   /v1/public/home-banners/events:

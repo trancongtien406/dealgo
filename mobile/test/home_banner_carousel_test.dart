@@ -42,21 +42,18 @@ class _SlowRepo extends FakeHomeBannerRepository {
 const _banners = [
   HomeBanner(
     id: 'b1',
-    title: 'Đi xe máy',
-    subtitle: 'Gần bạn',
     imageUrl: 'https://img.test/b1.png',
     cta: HomeBannerCta(kind: HomeBannerCtaKind.app, target: '/customer/shop'),
   ),
   HomeBanner(
     id: 'b2',
-    title: 'Món ngon',
     imageUrl: 'https://img.test/b2.png',
     cta: HomeBannerCta(
       kind: HomeBannerCtaKind.web,
       target: 'https://dealgo.vn/',
     ),
   ),
-  HomeBanner(id: 'b3', title: 'Voucher', imageUrl: 'https://img.test/b3.png'),
+  HomeBanner(id: 'b3', imageUrl: 'https://img.test/b3.png'),
 ];
 
 Future<({HomeBannerTracker tracker, List<Uri> opened})> _pump(
@@ -136,24 +133,20 @@ void main() {
         'items': [
           {
             'id': 'a',
-            'title': 'A',
-            'subtitle': ' ',
             'imageUrl': '/v1/public/home-banners/images/a/x.png',
             'cta': {'kind': 'app', 'target': '/customer/book'},
             'service': 'RIDE',
           },
-          {'id': 'b', 'title': 'B'},
+          {'id': 'b'},
           'junk',
           {
             'id': 'c',
-            'title': 'C',
             'imageUrl': 'https://x/c.png',
             'cta': {'kind': 'web', 'target': 'http://insecure'},
           },
         ],
       });
       expect(out.map((b) => b.id), ['a', 'c']);
-      expect(out.first.subtitle, isNull);
       expect(out.first.cta?.kind, HomeBannerCtaKind.app);
       expect(out.first.service, 'RIDE');
       expect(out.last.cta, isNull);
@@ -223,7 +216,20 @@ void main() {
     expect(find.byKey(const Key('home-banner-dot-2')), findsOneWidget);
     expect(find.byKey(const Key('home-banner-dot-3')), findsNothing);
     expect(_activeDot(tester), 0);
-    expect(find.text('Đi xe máy'), findsOneWidget);
+    // Image-only slides: no text overlay, generic screen-reader label.
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is Semantics && w.properties.label == 'Banner 1/3',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('home-banner-carousel')),
+        matching: find.byType(Text),
+      ),
+      findsNothing,
+    );
 
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();

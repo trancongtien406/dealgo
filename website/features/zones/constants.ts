@@ -28,4 +28,4 @@ export const ZONE_RULE_TABLE_COLUMNS = [
 
 export const ZONE_RULE_COLUMN_COUNT = ZONE_RULE_TABLE_COLUMNS.length;
 
-export { CITY_COORDS, DEFAULT_CENTER } from "@/lib/service-region-labels";
+export { DEFAULT_CENTER } from "@/lib/service-region-labels";

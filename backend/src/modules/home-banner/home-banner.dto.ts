@@ -28,17 +28,6 @@ import {
 } from './home-banner.js';
 
 export class CreateHomeBannerDto {
-  @IsString()
-  @MinLength(1)
-  @MaxLength(80)
-  title!: string;
-
-  @IsOptional()
-  @ValidateIf((_, v) => v !== null)
-  @IsString()
-  @MaxLength(160)
-  subtitle?: string | null;
-
   /** In-app path (/customer/shop), dealgo:// link or https:// URL. */
   @IsOptional()
   @ValidateIf((_, v) => v !== null)
@@ -92,18 +81,6 @@ export class CreateHomeBannerDto {
 }
 
 export class PatchHomeBannerDto {
-  @IsOptional()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(80)
-  title?: string;
-
-  @IsOptional()
-  @ValidateIf((_, v) => v !== null)
-  @IsString()
-  @MaxLength(160)
-  subtitle?: string | null;
-
   @IsOptional()
   @ValidateIf((_, v) => v !== null)
   @IsString()

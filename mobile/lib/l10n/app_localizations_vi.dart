@@ -7368,7 +7368,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get mapOpenSettings => 'Cài đặt';
 
   @override
-  String homeBannerSlideLabel(int index, int count, String title) {
-    return 'Banner $index/$count: $title';
+  String homeBannerSlideLabel(int index, int count) {
+    return 'Banner $index/$count';
   }
 }

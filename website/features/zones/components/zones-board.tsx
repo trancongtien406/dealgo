@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
+import { ZoneFormModal } from "@/features/zones/components/zone-form-modal";
 import {
   formatUpdatedAt,
   priceStatusLabel,
@@ -9,7 +10,7 @@ import {
   zoneServiceLabel,
   zoneServiceTone,
 } from "@/features/zones/mappers";
-import type { CreateZoneInput, ZoneItem } from "@/features/zones/types";
+import type { ZoneItem } from "@/features/zones/types";
 import {
   useCreateZoneMutation,
   usePatchZoneMutation,
@@ -43,6 +44,7 @@ import { isForbiddenError } from "@/lib/api/errors";
 import {
   LazyRealMapView,
   type MapMarker,
+  type MapPolygon,
 } from "@/components/ui/lazy-real-map-view";
 
 import {
@@ -74,6 +76,7 @@ export function ZonesBoard() {
   const [pageSize, setPageSize] = useState<PageSize>(10);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingZone, setEditingZone] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
 
   const {
@@ -83,6 +86,9 @@ export function ZonesBoard() {
     error: zonesQueryError,
     refetch: refetchZones,
   } = useZonesQuery(zoneTab);
+
+  // Every zone (any status) for code uniqueness / overlap hints in the form.
+  const { data: allZones = [] } = useZonesQuery("ALL");
 
   const createZoneMutation = useCreateZoneMutation();
   const patchZoneMutation = usePatchZoneMutation();
@@ -146,6 +152,27 @@ export function ZonesBoard() {
           detail: `${zone.demandCount} nhu cầu 24h · ${zone.demandRideCount} xe · ${zone.demandFoodCount} ăn`,
         };
       }),
+    [zones, selectedZone?.code],
+  );
+
+  const mapPolygons: MapPolygon[] = useMemo(
+    () =>
+      zones
+        .filter((zone) => zone.bbox)
+        .map((zone) => {
+          const b = zone.bbox!;
+          return {
+            id: zone.code,
+            name: zone.label,
+            active: selectedZone?.code === zone.code,
+            coords: [
+              [b.maxLat, b.minLng],
+              [b.maxLat, b.maxLng],
+              [b.minLat, b.maxLng],
+              [b.minLat, b.minLng],
+            ],
+          };
+        }),
     [zones, selectedZone?.code],
   );
 
@@ -391,6 +418,9 @@ export function ZonesBoard() {
                   zoom={mapZoom}
                   height={360}
                   markers={mapMarkers}
+                  polygons={mapPolygons}
+                  onPolygonSelect={setSelectedCode}
+                  badgeLabel={selectedZone?.label ?? "Khu vực"}
                   showControls
                   showAttribution
                 />
@@ -445,6 +475,13 @@ export function ZonesBoard() {
 
               {selectedZone ? (
                 <div className="mt-4 space-y-2 border-t border-border pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditingZone(true)}
+                    className="w-full cursor-pointer rounded-xl bg-canvas px-3 py-2 text-xs font-semibold text-ink transition-colors hover:bg-border/60"
+                  >
+                    Sửa tên / vùng trên bản đồ
+                  </button>
                   <button
                     type="button"
                     onClick={() => setShowStatusModal(true)}
@@ -657,15 +694,32 @@ export function ZonesBoard() {
         </>
       )}
 
-      {/* Modal: Thêm khu vực mới */}
-      {showCreateModal ? (
-        <CreateZoneModal
-          onClose={() => setShowCreateModal(false)}
-          onSubmit={async (input) => {
-            await createZoneMutation.mutateAsync(input);
+      {/* Modal: Thêm / sửa khu vực */}
+      {showCreateModal || (editingZone && selectedZone) ? (
+        <ZoneFormModal
+          key={showCreateModal ? "create" : selectedZone?.code}
+          zone={showCreateModal ? undefined : (selectedZone ?? undefined)}
+          zones={allZones}
+          onClose={() => {
             setShowCreateModal(false);
+            setEditingZone(false);
           }}
-          isSubmitting={createZoneMutation.isPending}
+          onSubmit={async (submit) => {
+            if (submit.kind === "create") {
+              const created = await createZoneMutation.mutateAsync(submit.input);
+              setShowCreateModal(false);
+              setSelectedCode(created?.code ?? submit.input.code);
+            } else {
+              await patchZoneMutation.mutateAsync({
+                code: submit.code,
+                input: submit.input,
+              });
+              setEditingZone(false);
+            }
+          }}
+          isSubmitting={
+            createZoneMutation.isPending || patchZoneMutation.isPending
+          }
         />
       ) : null}
 
@@ -695,291 +749,6 @@ function InfoRow({ label, value }: { label: string; value: ReactNode }) {
     <div className="flex items-start justify-between gap-3 border-t border-border py-2.5 text-sm">
       <dt className="shrink-0 text-muted">{label}</dt>
       <dd className="min-w-0 text-right font-medium text-ink">{value}</dd>
-    </div>
-  );
-}
-
-function CreateZoneModal({
-  onClose,
-  onSubmit,
-  isSubmitting,
-}: {
-  onClose: () => void;
-  onSubmit: (input: CreateZoneInput) => Promise<void>;
-  isSubmitting: boolean;
-}) {
-  const [code, setCode] = useState("");
-  const [label, setLabel] = useState("");
-  const [centerLat, setCenterLat] = useState("");
-  const [centerLng, setCenterLng] = useState("");
-  const [minLat, setMinLat] = useState("");
-  const [maxLat, setMaxLat] = useState("");
-  const [minLng, setMinLng] = useState("");
-  const [maxLng, setMaxLng] = useState("");
-  const [status, setStatus] = useState<"ACTIVE" | "PLANNED">("ACTIVE");
-  const [reason, setReason] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  const autoFillBbox = () => {
-    const lat = parseFloat(centerLat);
-    const lng = parseFloat(centerLng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      setError("Vui lòng nhập toạ độ tâm hợp lệ trước khi tự tính BBox.");
-      return;
-    }
-    setError(null);
-    setMinLat((lat - 0.15).toFixed(4));
-    setMaxLat((lat + 0.15).toFixed(4));
-    setMinLng((lng - 0.15).toFixed(4));
-    setMaxLng((lng + 0.15).toFixed(4));
-  };
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    const cLat = parseFloat(centerLat);
-    const cLng = parseFloat(centerLng);
-    const miLat = parseFloat(minLat);
-    const maLat = parseFloat(maxLat);
-    const miLng = parseFloat(minLng);
-    const maLng = parseFloat(maxLng);
-
-    if (!code.trim() || !label.trim() || !reason.trim()) {
-      setError("Vui lòng điền đầy đủ mã, tên khu vực và lý do.");
-      return;
-    }
-
-    if (
-      !Number.isFinite(cLat) ||
-      !Number.isFinite(cLng) ||
-      !Number.isFinite(miLat) ||
-      !Number.isFinite(maLat) ||
-      !Number.isFinite(miLng) ||
-      !Number.isFinite(maLng)
-    ) {
-      setError("Toạ độ và khung BBox phải là số hợp lệ.");
-      return;
-    }
-
-    try {
-      await onSubmit({
-        code: code.trim().toUpperCase(),
-        label: label.trim(),
-        centerLat: cLat,
-        centerLng: cLng,
-        bbox: { minLat: miLat, maxLat: maLat, minLng: miLng, maxLng: maLng },
-        status,
-        reason: reason.trim(),
-      });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Không thể tạo khu vực.";
-      setError(msg);
-    }
-  };
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="create-zone-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
-    >
-      <div
-        className="fixed inset-0 bg-ink/40 backdrop-blur-xs"
-        onClick={onClose}
-      />
-      <div className="relative z-10 w-full max-w-lg rounded-2xl border border-border bg-white p-6 shadow-2xl my-8">
-        <div className="flex items-start justify-between gap-3 border-b border-border pb-4">
-          <div className="min-w-0">
-            <h3 id="create-zone-title" className="text-lg font-bold text-ink">
-              Thêm khu vực hoạt động mới
-            </h3>
-            <p className="mt-1 text-sm text-muted">
-              Định nghĩa mã, tâm và khung ranh giới sơ bộ cho khu vực mới.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1 text-muted hover:bg-canvas hover:text-ink cursor-pointer"
-          >
-            <OpsIcon name="close" className="size-5" />
-          </button>
-        </div>
-
-        {error ? (
-          <div className="mt-4 rounded-xl bg-red-500/10 p-3 text-sm text-red-600">
-            {error}
-          </div>
-        ) : null}
-
-        <form onSubmit={(e) => void handleSubmit(e)} className="mt-4 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-ink">
-                Mã vùng (2–8 ký tự) *
-              </label>
-              <input
-                type="text"
-                required
-                maxLength={8}
-                value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
-                placeholder="VD: QN, BD, VT"
-                className={`mt-1 h-9 w-full rounded-xl border border-border px-3 text-sm font-semibold uppercase text-brand placeholder:text-muted ${focusRing}`}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-ink">
-                Tên hiển thị *
-              </label>
-              <input
-                type="text"
-                required
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder="VD: Quảng Ngãi"
-                className={`mt-1 h-9 w-full rounded-xl border border-border px-3 text-sm text-ink placeholder:text-muted ${focusRing}`}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-ink">
-                Vĩ độ tâm (Center Lat) *
-              </label>
-              <input
-                type="number"
-                step="any"
-                required
-                value={centerLat}
-                onChange={(e) => setCenterLat(e.target.value)}
-                placeholder="VD: 15.1200"
-                className={`mt-1 h-9 w-full rounded-xl border border-border px-3 text-sm text-ink placeholder:text-muted ${focusRing}`}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-ink">
-                Kinh độ tâm (Center Lng) *
-              </label>
-              <input
-                type="number"
-                step="any"
-                required
-                value={centerLng}
-                onChange={(e) => setCenterLng(e.target.value)}
-                placeholder="VD: 108.8000"
-                className={`mt-1 h-9 w-full rounded-xl border border-border px-3 text-sm text-ink placeholder:text-muted ${focusRing}`}
-              />
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-border bg-canvas/40 p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-ink">
-                Khung toạ độ BBox (min/max)
-              </span>
-              <button
-                type="button"
-                onClick={autoFillBbox}
-                className="text-xs font-medium text-brand hover:underline cursor-pointer"
-              >
-                Gợi ý từ tâm (±0.15°)
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                type="number"
-                step="any"
-                required
-                value={minLat}
-                onChange={(e) => setMinLat(e.target.value)}
-                placeholder="Min Lat (VD: 15.00)"
-                className={`h-8 w-full rounded-lg border border-border bg-white px-2.5 text-xs text-ink ${focusRing}`}
-              />
-              <input
-                type="number"
-                step="any"
-                required
-                value={maxLat}
-                onChange={(e) => setMaxLat(e.target.value)}
-                placeholder="Max Lat (VD: 15.25)"
-                className={`h-8 w-full rounded-lg border border-border bg-white px-2.5 text-xs text-ink ${focusRing}`}
-              />
-              <input
-                type="number"
-                step="any"
-                required
-                value={minLng}
-                onChange={(e) => setMinLng(e.target.value)}
-                placeholder="Min Lng (VD: 108.70)"
-                className={`h-8 w-full rounded-lg border border-border bg-white px-2.5 text-xs text-ink ${focusRing}`}
-              />
-              <input
-                type="number"
-                step="any"
-                required
-                value={maxLng}
-                onChange={(e) => setMaxLng(e.target.value)}
-                placeholder="Max Lng (VD: 108.95)"
-                className={`h-8 w-full rounded-lg border border-border bg-white px-2.5 text-xs text-ink ${focusRing}`}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-ink">
-                Trạng thái ban đầu
-              </label>
-              <select
-                value={status}
-                onChange={(e) =>
-                  setStatus(e.target.value as "ACTIVE" | "PLANNED")
-                }
-                className={`mt-1 h-9 w-full rounded-xl border border-border bg-white px-3 text-sm text-ink ${focusRing}`}
-              >
-                <option value="ACTIVE">ACTIVE (Đang phục vụ)</option>
-                <option value="PLANNED">PLANNED (Kế hoạch / Thử nghiệm)</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-ink">
-                Lý do tạo (Audit log) *
-              </label>
-              <input
-                type="text"
-                required
-                minLength={3}
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="VD: Mở rộng pilot khu vực mới"
-                className={`mt-1 h-9 w-full rounded-xl border border-border px-3 text-sm text-ink placeholder:text-muted ${focusRing}`}
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="rounded-xl bg-canvas px-4 py-2 text-xs font-semibold text-ink hover:bg-border/60 cursor-pointer"
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="rounded-xl bg-brand px-4 py-2 text-xs font-semibold text-white hover:bg-brand/90 disabled:opacity-50 cursor-pointer"
-            >
-              {isSubmitting ? "Đang lưu…" : "Tạo khu vực"}
-            </button>
-          </div>
-        </form>
-      </div>
     </div>
   );
 }

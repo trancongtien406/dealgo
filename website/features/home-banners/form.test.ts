@@ -7,6 +7,7 @@ import {
   formatCtr,
   formatIct,
   homeBannerCtaProblem,
+  homeBannerImageSizeProblem,
   homeBannerImageSrc,
   ictInputToIso,
   isoToIctInput,
@@ -16,8 +17,6 @@ import type { HomeBannerRow } from "@/features/home-banners/types";
 
 const row: HomeBannerRow = {
   id: "11111111-1111-4111-8111-111111111111",
-  title: "Đi xe máy",
-  subtitle: null,
   imageUrl:
     "/v1/public/home-banners/images/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222.png",
   ctaUrl: "/customer/book",
@@ -90,15 +89,12 @@ describe("checkHomeBannerDraft", () => {
   it("builds a trimmed payload", () => {
     const result = checkHomeBannerDraft({
       ...emptyHomeBannerDraft(),
-      title: "  Ưu đãi  ",
       ctaUrl: " /customer/shop ",
       startsAt: "2026-11-01T08:00",
     });
     expect(result).toEqual({
       ok: true,
       payload: {
-        title: "Ưu đãi",
-        subtitle: null,
         ctaUrl: "/customer/shop",
         audiences: ["CUSTOMER"],
         service: "ALL",
@@ -109,21 +105,17 @@ describe("checkHomeBannerDraft", () => {
     });
   });
 
-  it("rejects a short title, no audience and an end before the start", () => {
-    expect(
-      checkHomeBannerDraft({ ...emptyHomeBannerDraft(), title: "A" }).ok,
-    ).toBe(false);
+  it("needs no text and rejects no audience or an end before the start", () => {
+    expect(checkHomeBannerDraft(emptyHomeBannerDraft()).ok).toBe(true);
     expect(
       checkHomeBannerDraft({
         ...emptyHomeBannerDraft(),
-        title: "Ưu đãi",
         audiences: [],
       }).ok,
     ).toBe(false);
     expect(
       checkHomeBannerDraft({
         ...emptyHomeBannerDraft(),
-        title: "Ưu đãi",
         startsAt: "2026-11-02T08:00",
         endsAt: "2026-11-01T08:00",
       }).ok,
@@ -140,9 +132,22 @@ describe("diffHomeBannerPayload", () => {
       diffHomeBannerPayload(row, {
         ...check.payload,
         regionCode: null,
-        title: "Mới",
+        ctaUrl: null,
       }),
-    ).toEqual({ regionCode: null, title: "Mới" });
+    ).toEqual({ regionCode: null, ctaUrl: null });
+  });
+});
+
+describe("homeBannerImageSizeProblem", () => {
+  it("accepts ~2:1 art of a usable width", () => {
+    expect(homeBannerImageSizeProblem(1200, 600)).toBeNull();
+    expect(homeBannerImageSizeProblem(1080, 560)).toBeNull();
+  });
+
+  it("warns about wrong ratios, tiny images and unreadable sizes", () => {
+    expect(homeBannerImageSizeProblem(1080, 1080)).toMatch(/2:1/);
+    expect(homeBannerImageSizeProblem(600, 300)).toMatch(/nhỏ/);
+    expect(homeBannerImageSizeProblem(0, 0)).toMatch(/kích thước/);
   });
 });
 

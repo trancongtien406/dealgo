@@ -1122,19 +1122,20 @@ enum ServiceRegionStatus {
 // coarse classifier, not a production geofence polygon. Rows are never deleted
 // (history references the code) — disable by setting status = PLANNED.
 model ServiceRegion {
-  id        String              @id @default(uuid()) @db.Uuid
-  code      String              @unique @db.VarChar(8)
-  label     String              @db.VarChar(80)
-  centerLat Float
-  centerLng Float
-  minLat    Float
-  maxLat    Float
-  minLng    Float
-  maxLng    Float
-  status    ServiceRegionStatus @default(PLANNED)
-  sortOrder Int                 @default(0)
-  createdAt DateTime            @default(now())
-  updatedAt DateTime            @updatedAt
+  id          String              @id @default(uuid()) @db.Uuid
+  code        String              @unique @db.VarChar(8)
+  label       String              @db.VarChar(80)
+  centerLat   Float
+  centerLng   Float
+  minLat      Float
+  maxLat      Float
+  minLng      Float
+  maxLng      Float
+  status      ServiceRegionStatus @default(PLANNED)
+  sortOrder   Int                 @default(0)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  homeBanners HomeBanner[]
 
   @@index([status, sortOrder])
   @@map("service_regions")
@@ -1567,25 +1568,25 @@ enum HomeBannerAudience {
 // `audiences` while active and inside [startsAt, endsAt); `regionCode` null = all
 // regions. `ctaUrl` is an allowlisted in-app path (/customer/..., dealgo://...) or https.
 model HomeBanner {
-  id              String               @id @default(uuid()) @db.Uuid
-  title           String               @db.VarChar(80)
-  subtitle        String?              @db.VarChar(160)
-  imageUrl        String?              @db.VarChar(300)
-  ctaUrl          String?              @db.VarChar(500)
+  id              String                @id @default(uuid()) @db.Uuid
+  imageUrl        String?               @db.VarChar(300)
+  ctaUrl          String?               @db.VarChar(500)
   audiences       HomeBannerAudience[]
-  service         HomeBannerService    @default(ALL)
-  regionCode      String?              @db.VarChar(8)
+  service         HomeBannerService     @default(ALL)
+  regionCode      String?               @db.VarChar(8)
+  region          ServiceRegion?        @relation(fields: [regionCode], references: [code], onDelete: Restrict, onUpdate: Cascade)
   startsAt        DateTime?
   endsAt          DateTime?
-  sortOrder       Int                  @default(0)
-  active          Boolean              @default(false)
-  createdByUserId String?              @db.Uuid
-  updatedByUserId String?              @db.Uuid
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
+  sortOrder       Int                   @default(0)
+  active          Boolean               @default(false)
+  createdByUserId String?               @db.Uuid
+  updatedByUserId String?               @db.Uuid
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
   stats           HomeBannerDailyStat[]
 
   @@index([active, sortOrder])
+  @@index([regionCode])
   @@map("home_banners")
 }
 

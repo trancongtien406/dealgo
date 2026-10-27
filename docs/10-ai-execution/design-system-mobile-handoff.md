@@ -264,3 +264,21 @@ Typography: follow `dealgo_theme.dart` text theme; titles bold; prices primary +
 **Verification:** Golden frames C001, C004, C007, C028, D016, M015, S007 side-by-side; `flutter analyze`; widget tests for chip/segment semantics.
 
 **NOT_VERIFIED:** device screenshots, WCAG contrast lab measurement, custom icon SVG rasterization in Flutter.
+
+## 11. Launch screen (cold start)
+
+Rule: `DEC-PROD-066`. One brand screen from tap to first page; never a white frame or a second splash.
+
+| Piece | Where | Value |
+|---|---|---|
+| Background | iOS `Assets.xcassets/LaunchBackground.colorset` (light/dark), Android `values/colors.xml` + `values-night/colors.xml` `splash_background`, Dart `dealGoLaunchBackground()` | `#6D28D9` (`DealGoColors.primary`), dark `#4C1D95` (`primaryDeep`) |
+| Mark | iOS `LaunchImage.imageset`, Android `drawable-*dpi/launch_mark.png`, Dart `assets/images/launch_mark.png` | `design/brand/v3/app-icon.svg` without its tile, on a 288-unit canvas (Android 12 icon spec: mark inside the 192 dp circle). Same canvas everywhere so native and Flutter line up. |
+| Android 12+ | `values-v31` and `values-night-v31` `styles.xml` | `windowSplashScreenBackground`, `windowSplashScreenAnimatedIcon`. The night folder is required: `night` outranks API level in resource lookup. |
+| Pre-Android 12 | `drawable/launch_background.xml` (+ `drawable-v21`) | Layer list: colour + centred bitmap. `NormalTheme` window background is the app canvas `#FBFAFD`, not white. |
+| Hand-off | `lib/core/launch/launch_splash.dart`, `main.dart`, `DealGoApp._maybeReleaseLaunch` | `deferFirstFrame()` before `runApp`; `allowFirstFrame()` once `launchRouteReady` (auth restored, post-auth flags loaded, router left `/splash`) or after 3 s. |
+| `/splash` route | `splash_page.dart` | Pixel twin of the native screen; routes as soon as the session restore finishes (cap 6 s). Kept because deep links park on `/splash` and the login page reuses it while a session restores. |
+
+Do: keep work before `runApp` to what the first page needs (prefs warm-up, Firebase init); FCM handler setup runs after.
+Don't: add a minimum splash duration, a spinner, or a light Scaffold behind the launch route.
+Regenerate the PNGs from the SVG (Chromium render, transparent background) if the mark changes.
+

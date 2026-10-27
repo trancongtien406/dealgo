@@ -82,3 +82,8 @@ Admin chọn nhà cung cấp cho từng chức năng ở **Cài đặt › Bản
 - Chỉ lưu địa điểm người dùng đã chọn (không lưu danh sách kết quả của nhà cung cấp). Địa điểm đã lưu (Nhà/Công ty) và "vị trí hiện tại" không ghi vào lịch sử.
 - App: cache cục bộ (`SharedPreferences` key `dealgo.placeHistory.v1`) hiện ngay, rồi làm mới từ server; xoá khi đăng xuất.
   Hiện ở mục "Gần đây" của màn "Bạn muốn đi đâu" (xoá từng dòng, "Xóa hết" có xác nhận) và trong ô tìm kiếm của màn chọn trên bản đồ (5 dòng khi ô trống).
+
+## Tìm địa điểm cho Admin (form khu vực)
+
+`GET /v1/ops/places/search?q=&lat=&lng=` (quyền `zones.write`, qua BFF `/api/ops/places/search`) dùng chung
+`PlacesService.search` với app, cùng nhà cung cấp theo `MAPS_SEARCH_PROVIDER`. Chỉ dùng để đặt tâm/khung vùng phục vụ.

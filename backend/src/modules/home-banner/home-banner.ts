@@ -20,8 +20,7 @@ export const HOME_BANNER_PUBLIC_MAX_AGE_S = 60;
 
 export type HomeBanner = {
   id: string;
-  title: string;
-  subtitle: string | null;
+  /** 2:1 image-only art; any wording lives in the image itself. */
   imageUrl: string | null;
   ctaUrl: string | null;
   audiences: HomeBannerAudience[];
