@@ -1,7 +1,7 @@
 ---
 doc_id: DG-GOV-004
 title: "DealGo — Decisions, Assumptions & Open Issues / Sổ quyết định và giả định"
-version: "0.4.3"
+version: "0.4.4"
 status: "DRAFT"
 owner: "Product Owner / Tech Lead"
 reviewers:
@@ -77,6 +77,7 @@ related_decisions:
   - DEC-PROD-062
   - DEC-PROD-063
   - DEC-PROD-064
+  - DEC-PROD-065
   - OPEN-001
   - OPEN-002
   - OPEN-003
@@ -265,7 +266,7 @@ Mỗi dòng mô tả **quy tắc đang áp dụng** theo code hiện tại. `DEC
 | `DEC-PROD-055` | **Trang công khai do admin chỉnh sửa (CMS).** Điều khoản, quyền riêng tư, hỗ trợ: nội dung vi/en theo phiên bản, nháp → xuất bản (có lý do, audit, quyền `content.write`); website render server-side từ CMS, có nội dung mặc định khi chưa xuất bản. | `DRAFT` (chủ dự án duyệt hướng đi 2026-10-26) | Nội dung mặc định là bản nháp, cần pháp lý duyệt trước khi ra mắt. | `backend/src/modules/public-pages/*`, `website/features/content-cms/*`. |
 | `DEC-PROD-056` | **Lưu chat 90 ngày + xem lại chat có kiểm soát.** Worker xoá tin nhắn cũ hơn `CHAT_RETENTION_DAYS` (cài đặt admin, mặc định 90 — ASSUMED theo cửa sổ khiếu nại/hoàn tiền). Nhân viên có quyền `chat.review` xem bản giải mã của một chuyến/đơn sau khi nhập lý do; mỗi lần xem ghi audit. | `DRAFT` (chủ dự án duyệt hướng đi 2026-10-26) | Không có E2E (`DEC-PROD-063`). Số ngày cần pháp lý xác nhận. | `workers/chat-retention.service.ts`, `communication/chat/chat-review.*`, `website/features/chat-review/*`. |
 | `DEC-PROD-057` | **Khách mở lại app tự quay về chuyến/đơn đang chạy.** `GET /v1/customer/active-trip` trả chuyến (ưu tiên) hoặc đơn Food đang mở; app mở màn ghép tài xế/theo dõi/đơn một lần mỗi phiên, thử lại có backoff. | `DRAFT` (chủ dự án duyệt hướng đi 2026-10-26) | Không mở khi đang ở màn tài xế/quán hoặc đã ở màn chuyến/đơn. | `backend/src/modules/customer-activity/*`, `mobile/lib/features/ride/presentation/utils/customer_trip_resumer.dart`. |
-| `DEC-PROD-058` | **Một domain cho deep link + passkey.** `APP_LINK_HOST` (mặc định `dealgo.vn`, đường dẫn `/app/*`) dùng chung cho universal/app links và WebAuthn RP ID; AASA + `assetlinks.json` sinh từ env (`APP_LINKS_*`); `WEBAUTHN_ORIGIN` nhận danh sách, origin Android suy ra từ SHA-256 chứng chỉ release. | `DRAFT` (chủ dự án duyệt hướng đi 2026-10-26) | Domain cũ `dealgo.app`/`app.dealgo.vn` bỏ khỏi parser. Phải cấu hình cùng giá trị ở gradle/xcconfig/env. | `backend/src/modules/app-links/*`, `mobile/lib/core/config/app_env.dart`, `AndroidManifest.xml`, `ios/Runner/*.entitlements`. |
+| `DEC-PROD-058` | **Một domain cho deep link + passkey.** `APP_LINK_HOST` (mặc định `dealgo.trancongtien.com`, đường dẫn `/app/*`) dùng chung cho universal/app links và WebAuthn RP ID; AASA + `assetlinks.json` sinh từ env (`APP_LINKS_*`); `WEBAUTHN_ORIGIN` nhận danh sách, origin Android suy ra từ SHA-256 chứng chỉ release. | `DRAFT` (chủ dự án duyệt hướng đi 2026-10-26) | Domain cũ `dealgo.app`/`app.dealgo.vn` bỏ khỏi parser. Phải cấu hình cùng giá trị ở gradle/xcconfig/env. | `backend/src/modules/app-links/*`, `mobile/lib/core/config/app_env.dart`, `AndroidManifest.xml`, `ios/Runner/*.entitlements`. |
 
 **Phân biệt baseline:** `Admin Web` đã thuộc kế hoạch và cần được phân tích để vận hành; số **37 trang admin** và khoảng **165 màn mobile** là *inventory tham chiếu*, **không** là 37/165 cam kết P0. Mọi nâng baseline thành cam kết release phải qua `scope-release-plan.md` và phê duyệt.
 
@@ -404,6 +405,17 @@ Status: `DRAFT` (2026-10-26, owner yêu cầu "micro phải có để nói bên 
 | Bật / tắt | `DRAFT` | Cài đặt Admin `VOICE_CALLS_ENABLED` (mặc định bật). Tắt → app ẩn nút gọi, API trả `VOICE_DISABLED`. |
 | Quyền máy | `DRAFT` | iOS `NSMicrophoneUsageDescription` + `UIBackgroundModes: audio` (giữ cuộc gọi khi khoá màn hình, ghi trong App Review notes); Android `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS`, quyền mạng và Bluetooth. Hỏi quyền micro lần đầu gọi hoặc nghe máy. |
 | Hạ tầng production | `OPEN` | Chọn LiveKit Cloud hay tự host (cần TLS `wss://` và TURN), điền `LIVEKIT_*`. Chưa thử trên máy thật. |
+
+#### `DEC-PROD-065` — Không chọn vai trò trước khi vào trang chủ
+
+Status: `DRAFT` (2026-10-27, owner: "không có chọn role trước để họ vào trang chủ nhanh hơn").
+
+| Mục | Status | Quy tắc |
+|---|---|---|
+| Vào app | `DRAFT` | Đăng ký, đăng nhập, mở lại app: xong hồ sơ là vào thẳng `/customer` (`entryPathFor`). Không có màn chọn vai trò trên đường vào, kể cả tài khoản có nhiều vai trò. Tài khoản không có `CUSTOMER` (không xảy ra với đăng ký thường) vào trang của vai trò đầu tiên. |
+| Đổi vai trò | `DRAFT` | Trang cá nhân › Vai trò mở `/roles` để chuyển sang vai trò đã được cấp. Chuyến/đơn tài xế đang chạy vẫn tự mở lại khi mở app. |
+| Trở thành tài xế / cửa hàng | `DRAFT` | Chỉ từ Trang cá nhân (dòng Tài xế đối tác / Cửa hàng đối tác → KYC/KYB). Backend vẫn cấp `CUSTOMER` `ACTIVE` khi đăng ký; không cần tham số role. |
+| Deep link / push | `DRAFT` | Link vào trang của vai trò người dùng có thì mở đúng trang đó; link tới vai trò không có thì về trang chủ khách hàng. |
 
 ### 5.2. Quyết định đã bị thay thế
 
@@ -825,6 +837,7 @@ Phân cấp này **tương thích** `BLOCKER-L0..L2` trong `scope-release-plan.m
 | Date | Version | Status | Changes |
 |---|---|---|---|
 | 2026-10-26 | 0.4.2 | `DRAFT` | `DEC-PROD-031`/`035`: bỏ dẫn đường trong app, một tuyến mỗi pha có cache, re-route chỉ khi lệch (`ROUTE_OFF_ROUTE_THRESHOLD_M` 150 m, `ROUTE_REROUTE_MIN_INTERVAL_SECONDS` 120 s), bỏ làm mới 120 s; thêm nút Apple Maps; ETA khách tính theo phần tuyến còn lại. |
+| 2026-10-27 | 0.4.4 | `DRAFT` | Thêm `DEC-PROD-065`: không có bước chọn vai trò trước trang chủ; đổi vai trò và đăng ký đối tác qua Trang cá nhân. |
 | 2026-10-27 | 0.4.3 | `DRAFT` | `DEC-PROD-035`: các nút Google Maps / Apple Maps / Waze gộp thành một nút "Điều hướng" mở bottom sheet (app có trên máy + Google Maps web, app dùng lần trước lên đầu). |
 | 2026-10-26 | 0.4.1 | `DRAFT` | Thêm `DEC-PROD-064`: gọi thoại LiveKit khách ↔ tài xế khi chuyến/đơn đang chạy; sửa tham chiếu test mobile trong `DEC-PROD-021`. |
 | 2026-10-26 | 0.4.0 | `DRAFT` | Viết lại sổ theo hiện trạng code: mỗi quyết định nêu quy tắc đang áp dụng, bỏ ghi chú vá; sắp xếp Decision Register theo ID; gộp các mục chat encryption, vòng đời/điều phối, thương lượng/huỷ/đối soát và dòng tiền/hoa hồng thành `DEC-PROD-059..063` (§5.1); chuyển `DEC-PROD-006/014` sang §5.2 (đã thay thế); `DG-DEC-VEH-001` đóng mục default MOTORBIKE (đã bỏ default trong schema); cập nhật hiện trạng `OPEN-001/003/004/005/006/010/011/018/019`. |

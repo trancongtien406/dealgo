@@ -123,3 +123,6 @@ temp/
 
 # Apple APNs auth keys (AuthKey_<id>.p8): secret, never commit
 *.p8
+
+# local sync/backup scratch dirs
+dealgo-r*-sync/

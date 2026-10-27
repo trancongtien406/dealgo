@@ -51,7 +51,7 @@ android {
         versionName = flutter.versionName
         // Unified app-link / passkey domain (DEC-PROD-058); override with -PdealgoAppLinkHost=…
         manifestPlaceholders["appLinkHost"] =
-            (project.findProperty("dealgoAppLinkHost") as String?) ?: "dealgo.vn"
+            (project.findProperty("dealgoAppLinkHost") as String?) ?: "dealgo.trancongtien.com"
     }
 
     signingConfigs {

@@ -59,7 +59,7 @@ Rules (`canonicalDeepLinkLocation` and `resolveLinkLocation`):
 - Short forms are expanded: `/customer/rides/<id>` and `/customer/ride/<id>` → `/customer/ride/tracking/<id>`, `/driver/rides/<id>?chat=1` → `/driver/rides/<id>/active?chat=1` (the active trip carries the chat).
 - A real screen for the signed-in role opens as is.
 - Bare role links (`dealgo://driver`, `dealgo://customer`, `dealgo://merchant`) and unknown pages under the user's role open that role's home.
-- A link for a role the user does not have: account pages (`/<role>/account/...`) open the same page in the user's own role, everything else opens the user's start page (their home, or the role picker when they have several roles).
+- A link for a role the user does not have: account pages (`/<role>/account/...`) open the same page in the user's own role, everything else opens the user's start page (the customer home; other roles are opened from the profile page).
 - `dealgo://` and `dealgo://app` alone just open the app.
 - Cold start or signed out: the link is kept, the app signs in first and then applies the same rules, so a link never opens a screen of another role.
 - Test on a simulator: `xcrun simctl openurl <udid> 'dealgo://driver/jobs'`. Unit tests: `test/deep_link_inventory_test.dart`, `test/deep_link_chat_test.dart`, `test/push_route_test.dart`.

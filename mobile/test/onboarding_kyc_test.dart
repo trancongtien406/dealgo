@@ -63,6 +63,13 @@ void main() {
   ) async {
     await pumpSignedIn(tester, profile: demoMultiRoleProfile);
 
+    // No role picker at entry: customer home first, switch from the profile.
+    expect(find.byType(CustomerTabBar), findsOneWidget);
+    await tester.tap(navLabel('Tôi'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Đổi vai trò'));
+    await tester.tap(find.text('Đổi vai trò'));
+    await tester.pumpAndSettle();
     expect(
       find.text('Bạn muốn dùng DealGo theo vai trò nào?', findRichText: true),
       findsOneWidget,

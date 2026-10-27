@@ -1,9 +1,17 @@
-/// Local Nest listens on 3001 (Admin Web takes 3000). Override with
-/// `--dart-define=API_BASE_URL=...` when the API runs elsewhere
-/// (Android emulator: `http://10.0.2.2:3001`).
+import 'package:flutter/foundation.dart' show kReleaseMode;
+
+/// Production API on the VPS (Socket.IO uses the same host over wss).
+const prodApiBaseUrl = 'https://api-dealgo.trancongtien.com';
+
+/// Local Nest listens on 3001 (Admin Web takes 3000).
+const devApiBaseUrl = 'http://localhost:3001';
+
+/// Release builds default to [prodApiBaseUrl]; debug/profile to [devApiBaseUrl].
+/// Override with `--dart-define=API_BASE_URL=...` (Android emulator:
+/// `http://10.0.2.2:3001`, staging, etc.).
 const apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'http://localhost:3001',
+  defaultValue: kReleaseMode ? prodApiBaseUrl : devApiBaseUrl,
 );
 
 /// Chat and all API traffic must use TLS outside local debug.

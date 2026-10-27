@@ -88,20 +88,14 @@ void main() {
   });
 
   testWidgets(
-    'multi-role user lands on role picker then can open customer shell',
+    'multi-role user lands on customer home without a role picker',
     (tester) async {
       await pumpSignedIn(tester, profile: multiRoleProfile);
 
       expect(
         find.text('Bạn muốn dùng DealGo theo vai trò nào?', findRichText: true),
-        findsOneWidget,
+        findsNothing,
       );
-      expect(find.byType(CustomerTabBar), findsNothing);
-
-      await tester.ensureVisible(find.text('Tiếp tục'));
-      await tester.tap(find.text('Tiếp tục'));
-      await tester.pumpAndSettle();
-
       expect(find.byType(CustomerTabBar), findsOneWidget);
       expect(navLabel('Trang'), findsOneWidget);
 

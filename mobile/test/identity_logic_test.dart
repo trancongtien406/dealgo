@@ -29,7 +29,9 @@ void main() {
     expect(sandboxProfile.activeAppRoles, isEmpty);
     expect(entryPathFor(sandboxProfile.activeAppRoles), '/customer');
     expect(entryPathFor(customerProfile.activeAppRoles), '/customer');
-    expect(entryPathFor(multiRoleProfile.activeAppRoles), '/roles');
+    expect(entryPathFor(multiRoleProfile.activeAppRoles), '/customer');
+    expect(entryPathFor(const [AppRole.driver]), '/driver');
+    expect(entryPathFor(const [AppRole.merchant, AppRole.driver]), '/merchant');
   });
 
   test(
@@ -100,7 +102,7 @@ void main() {
       );
       expect(
         authRedirect(many, Uri.parse('/login'), profileSetupCompleted: true),
-        '/roles',
+        '/customer',
       );
       expect(
         authRedirect(many, Uri.parse('/roles'), profileSetupCompleted: true),

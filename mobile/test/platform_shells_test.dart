@@ -25,15 +25,15 @@ void main() {
 
     test('parses https app links under /app on the unified host', () {
       expect(
-        parser.parse(Uri.parse('https://dealgo.vn/app/driver/jobs?x=1')),
+        parser.parse(Uri.parse('https://dealgo.trancongtien.com/app/driver/jobs?x=1')),
         '/driver/jobs?x=1',
       );
       expect(
-        parser.parse(Uri.parse('https://www.dealgo.vn/app/customer/home')),
+        parser.parse(Uri.parse('https://www.dealgo.trancongtien.com/app/customer/home')),
         '/customer/home',
       );
-      expect(parser.parse(Uri.parse('https://dealgo.vn/privacy')), isNull);
-      expect(parser.parse(Uri.parse('http://dealgo.vn/app/x')), isNull);
+      expect(parser.parse(Uri.parse('https://dealgo.trancongtien.com/privacy')), isNull);
+      expect(parser.parse(Uri.parse('http://dealgo.trancongtien.com/app/x')), isNull);
       expect(
         const DeepLinkParser(host: 'staging.dealgo.vn')
             .parse(Uri.parse('https://staging.dealgo.vn/app/customer/home')),

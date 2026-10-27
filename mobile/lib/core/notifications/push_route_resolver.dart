@@ -42,7 +42,7 @@ String? resolvePushLocation(Map<String, Object?> data, List<AppRole> roles) {
 /// Otherwise the link never lands on a dead or foreign page: an unknown page
 /// in one of the user's shells opens that shell's home, an account page of
 /// another shell moves into the user's own, and anything else opens the
-/// user's entry page (their only home, or the role picker).
+/// user's entry page (the customer home, see [entryPathFor]).
 String resolveLinkLocation(
   String location,
   List<AppRole> roles, {

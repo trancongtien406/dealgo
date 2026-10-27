@@ -46,7 +46,7 @@ Sao chép từ `backend/.env.example`. Cột "Production" nêu điều kiện m�
 | `TRUST_PROXY` | tắt | Khi sau load balancer | Số hop (vd `1`) hoặc CSV subnet / `loopback`. Sai giá trị → rate limit và IP trong audit sai |
 | `CORS_ALLOWED_ORIGINS` | — | Đặt origin thật | CSV. Production dùng đúng danh sách này; ngoài production luôn cộng thêm `http://localhost:3000`, `http://localhost:3001`. Áp dụng cho cả HTTP và Socket.IO |
 | `SWAGGER_ENABLED` | bật ngoài production | — | Swagger UI ở `/docs`. Không đặt → tắt ở production; `true`/`false` ghi đè |
-| `PUBLIC_WEB_BASE_URL` | — | Nên có | Origin website cho link chia sẻ chuyến (vd `https://dealgo.vn`) |
+| `PUBLIC_WEB_BASE_URL` | — | Nên có | Origin website cho link chia sẻ chuyến (production `https://dealgo.trancongtien.com`) |
 
 ### Xác thực
 
@@ -177,11 +177,11 @@ Phiên ops lưu trong cookie do BFF `/api/ops/session` đặt; không lưu token
 
 | Biến | Mặc định | Vai trò |
 |---|---|---|
-| `API_BASE_URL` | `http://localhost:3001` | Origin Nest, trùng `PORT` mặc định của backend; `mobile/tool/run_dev.sh` dùng cùng mặc định. Android emulator: `http://10.0.2.2:3001`. Bản release từ chối `http://`; bản debug chỉ cho `http://` với `localhost`, `127.0.0.1`, `10.0.2.2` |
+| `API_BASE_URL` | debug/profile `http://localhost:3001`; release `https://api-dealgo.trancongtien.com` | Origin Nest (REST + Socket.IO cùng host), trùng `PORT` mặc định của backend; `mobile/tool/run_dev.sh` dùng cùng mặc định. Android emulator: `http://10.0.2.2:3001`. Bản release từ chối `http://`; bản debug chỉ cho `http://` với `localhost`, `127.0.0.1`, `10.0.2.2` |
 | `USE_MOCK_DATA` | `false` | `true` = dùng client giả và dữ liệu seed, không cần backend |
 | `MAPS_API_KEY` | — | **Bắt buộc cho mọi bản build dùng bản đồ thật** (debug, simulator, release). Token Mapbox public `pk.*`; tile mặc định Mapbox Streets `streets-v12`. `mobile/tool/run_dev.sh` truyền sẵn từ `MAPBOX_ACCESS_TOKEN`; lệnh `flutter build`/`flutter run` tự gõ phải thêm `--dart-define=MAPS_API_KEY=…` và `MAP_ATTRIBUTION`. Thiếu → bản đồ minh hoạ (`PlaceholderMapPort`): không có tile, nhưng điểm đón/đến và tuyến vẫn vẽ đúng toạ độ thật theo phép chiếu. Tuyến đường luôn lấy từ server (routing) |
 | `MAP_TILE_URL`, `MAP_ATTRIBUTION` | — | Ghi đè nguồn tile (`https://…/{z}/{x}/{y}…{key}`). Không dùng tile OSM công cộng cho production. Bản đồ giữ một tile provider suốt vòng đời màn hình; chỉ lớp tuyến chạy hiệu ứng, nên tile không tải lại theo từng khung hình |
-| `APP_LINK_HOST` | `dealgo.vn` | Domain universal link + passkey; phải trùng `dealgoAppLinkHost` (`android/gradle.properties`), `DEALGO_APP_LINK_HOST` (`ios/Flutter/*.xcconfig`) và `WEBAUTHN_RP_ID` |
+| `APP_LINK_HOST` | `dealgo.trancongtien.com` | Domain universal link + passkey; phải trùng `dealgoAppLinkHost` (`android/gradle.properties`), `DEALGO_APP_LINK_HOST` (`ios/Flutter/*.xcconfig`) và `WEBAUTHN_RP_ID` |
 | `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE` | trống, `production`/`development` theo build, `0` | Crash reporting; DSN trống = tắt |
 | `SMOKE_ACCESS_TOKEN`, `SMOKE_REFRESH_TOKEN` | — | Chỉ cho smoke test tự động |
 

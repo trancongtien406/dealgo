@@ -18,14 +18,14 @@ enum AppRole {
   }
 }
 
+/// Start page after sign-in / profile setup: always the customer home when
+/// the user has it (every sign-up gets CUSTOMER). No role picker step; other
+/// roles are opened from the profile page (`/roles` switcher).
 String entryPathFor(List<AppRole> roles) {
-  if (roles.length > 1) {
-    return '/roles';
+  if (roles.isEmpty || roles.contains(AppRole.customer)) {
+    return AppRole.customer.homePath;
   }
-  if (roles.length == 1) {
-    return roles.single.homePath;
-  }
-  return AppRole.customer.homePath;
+  return roles.first.homePath;
 }
 
 bool shellAllows(String path, List<AppRole> roles) {

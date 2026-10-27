@@ -190,6 +190,17 @@ Upgrading Photon: bump `PHOTON_VERSION` in `photon/Dockerfile`, rebuild, re-run 
 tied to its Photon version), restart `dealgo-photon`. Optional cron (1st of month, 03:30):
 `30 3 1 * * cd /opt/dealgo && docker compose --profile photon-import run --rm dealgo-photon-import > photon-import.log 2>&1 && docker compose restart dealgo-photon`
 
+## Mobile app against this VPS
+
+Release builds of `mobile/` default to `https://api-dealgo.trancongtien.com` (REST + Socket.IO) and
+`APP_LINK_HOST=dealgo.trancongtien.com`; LiveKit's `wss://livekit-dealgo.trancongtien.com` comes from
+`LIVEKIT_URL` in `env/backend.env`. Build commands: [`mobile/README.md`](../../mobile/README.md#build-production).
+
+App-link files are served by Nest through the website at `https://dealgo.trancongtien.com/.well-known/…`:
+- `apple-app-site-association`: from `APP_LINKS_IOS_APP_IDS` (`6J3522877H.com.trancongtien.dealgo`).
+- `assetlinks.json`: returns 404 until `APP_LINKS_ANDROID_CERT_SHA256` is set. Set it from the release keystore
+  or the Play App Signing certificate, then recreate `dealgo-api`. There is no release keystore yet.
+
 ## Verify
 
 ```bash

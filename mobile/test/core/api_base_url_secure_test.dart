@@ -1,4 +1,5 @@
 import 'package:dealgo/core/config/api_base_url.dart';
+import 'package:dealgo/core/config/app_env.dart';
 import 'package:dealgo/core/network/dio_log.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -22,6 +23,14 @@ void main() {
       () => assertSecureApiBaseUrl('http://192.168.1.5:3001', isRelease: false),
       throwsStateError,
     );
+  });
+
+  test('production defaults point at the VPS domains', () {
+    expect(prodApiBaseUrl, 'https://api-dealgo.trancongtien.com');
+    assertSecureApiBaseUrl(prodApiBaseUrl, isRelease: true);
+    // Tests run in debug: no API_BASE_URL define → local Nest.
+    expect(apiBaseUrl, devApiBaseUrl);
+    expect(appLinkHost, 'dealgo.trancongtien.com');
   });
 
   test('debug log redacts chat message body', () {

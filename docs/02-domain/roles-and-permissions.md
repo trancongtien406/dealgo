@@ -540,7 +540,7 @@ JSON trên chỉ minh họa **sự tách biệt quyết định và dữ liệu 
 
 | Trường hợp | UI hành vi đề xuất | Backend phải thực thi |
 |---|---|---|
-| Login vào account có nhiều role | Chọn role đã cấp hoặc role mặc định được xác nhận | Trả eligible roles/scopes, không tin local role enumeration. |
+| Login / đăng ký (một hay nhiều role) | Vào thẳng trang chủ khách hàng, **không** có bước chọn role; đổi sang role khác đã cấp ở Trang cá nhân › Vai trò (`/roles`), đăng ký tài xế/cửa hàng ở Trang cá nhân (`DEC-PROD-065`) | Trả eligible roles/scopes, không tin local role enumeration. |
 | Vào Merchant role pending review | Hiển thị tiến độ onboarding | Từ chối create/update commercial actions chưa đủ quyền. |
 | Chuyển Driver → Customer khi có active Ride/Delivery | Hiển thị cảnh báo trạng thái job và cách quay lại | Không ngắt job, không xóa assignment và không cấp thêm concurrency. |
 | Account suspended/revoked khi app foreground | Refresh grants; hiện màn bị hạn chế | Deny tất cả action mới không được phép. |

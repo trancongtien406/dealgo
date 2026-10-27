@@ -314,7 +314,7 @@ class FakeAccountSettingsRepository implements AccountSettingsRepository {
     if (error != null) throw error;
     return {
       'challenge': 'fake-challenge',
-      'rp': {'name': 'DealGo', 'id': 'dealgo.vn'},
+      'rp': {'name': 'DealGo', 'id': 'dealgo.trancongtien.com'},
       'user': {'id': 'dXNlcg', 'name': '+84900000000', 'displayName': 'DealGo'},
       'pubKeyCredParams': [
         {'type': 'public-key', 'alg': -7},
