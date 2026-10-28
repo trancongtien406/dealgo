@@ -47,6 +47,10 @@ String? _byCode(AppLocalizations l10n, String code) => switch (code) {
   'ROLE_NOT_ACTIVE' => l10n.apiErrRoleNotActive,
   'ROLE_GRANT_SUSPENDED' => l10n.apiErrRoleSuspended,
   'VALIDATION_ERROR' => l10n.apiErrValidation,
+  'RIDE_ROUTE_CHANGED' => l10n.rideRouteChanged,
+  'RIDE_STOPS_LOCKED' => l10n.rideStopsLocked,
+  'RIDE_STOPS_DISABLED' || 'RIDE_TOO_MANY_STOPS' => l10n.rideStopsUnavailable,
+  'RIDE_STOPS_PENDING' => l10n.driverStopsPendingError,
   'UPLOAD_TOO_LARGE' => l10n.apiErrTooLarge,
   'UPLOAD_TYPE_NOT_ALLOWED' ||
   'UPLOAD_TYPE_MISMATCH' ||

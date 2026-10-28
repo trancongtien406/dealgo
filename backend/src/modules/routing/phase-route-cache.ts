@@ -9,6 +9,8 @@ export type CachedPhaseRoute = {
   route: RouteGeometryView;
   /** Epoch ms of the Directions lookup (throttle clock for the next re-route). */
   at: number;
+  /** Multi-stop TRIP: stops still ahead; a change (stop departed) forces a fresh leg. */
+  viaKey?: string;
 };
 
 /** A job lasts well under this; older entries are dropped on read. */

@@ -6828,4 +6828,85 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get draftRestoredNote => 'Đã khôi phục bản nháp chưa gửi.';
+
+  @override
+  String rideStopNumbered(int n) {
+    return 'Điểm dừng $n';
+  }
+
+  @override
+  String get rideAddStop => 'Thêm điểm dừng';
+
+  @override
+  String get rideRemoveStop => 'Xoá điểm dừng';
+
+  @override
+  String get rideMoveStopUp => 'Đưa điểm dừng lên trước';
+
+  @override
+  String rideStopsMax(int n) {
+    return 'Tối đa $n điểm dừng';
+  }
+
+  @override
+  String rideStopFeeNote(String fee) {
+    return 'Mỗi điểm dừng cộng thêm $fee';
+  }
+
+  @override
+  String get rideStopFeeLine => 'Phụ phí điểm dừng';
+
+  @override
+  String get rideWaitFeeLine => 'Phí chờ tại điểm dừng';
+
+  @override
+  String get rideStopPending => 'Chưa đến';
+
+  @override
+  String get rideStopArrived => 'Tài xế đang chờ';
+
+  @override
+  String get rideStopDeparted => 'Đã xong';
+
+  @override
+  String rideStopsCount(int n) {
+    return '+$n điểm dừng';
+  }
+
+  @override
+  String get rideRouteChanged =>
+      'Khách vừa đổi lộ trình. Xem lại và trả giá lại nhé.';
+
+  @override
+  String get rideStopsLocked => 'Chỉ đổi điểm dừng được trước khi chọn tài xế.';
+
+  @override
+  String get rideStopsUnavailable => 'Dịch vụ này hiện chưa hỗ trợ điểm dừng.';
+
+  @override
+  String driverStopArrive(int n) {
+    return 'Đã đến điểm dừng $n';
+  }
+
+  @override
+  String driverStopDepart(int n) {
+    return 'Rời điểm dừng $n';
+  }
+
+  @override
+  String get driverStopsTitle => 'Các điểm dừng';
+
+  @override
+  String driverStopFreeWait(int m, String fee) {
+    return 'Chờ miễn phí $m phút, sau đó $fee/phút';
+  }
+
+  @override
+  String driverNavigateToStop(int n) {
+    return 'Chỉ đường tới điểm dừng $n';
+  }
+
+  @override
+  String get driverStopsPendingError =>
+      'Hoàn tất các điểm dừng trước khi kết thúc chuyến.';
 }

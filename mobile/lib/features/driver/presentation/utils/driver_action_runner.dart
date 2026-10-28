@@ -38,6 +38,8 @@ mixin DriverActionRunner<T extends StatefulWidget> on State<T> {
         'RIDE_PICKUP_CODE_LOCKED' => l10n.driverOtpLocked,
         'FOOD_DELIVERY_CODE_LOCKED' ||
         'FOOD_HANDOVER_CODE_LOCKED' => l10n.driverFoodCodeLocked,
+        'RIDE_STOPS_PENDING' => l10n.driverStopsPendingError,
+        'RIDE_ROUTE_CHANGED' => l10n.rideRouteChanged,
         _ => switch (error.statusCode) {
           401 => l10n.errorSessionExpired,
           409 => l10n.driverActionConflict,

@@ -146,13 +146,24 @@ class _RideFarePageState extends State<_RideFareView> {
           lng: _places.dropoff.lng,
           label: _places.dropoff.label,
         ),
+        stops: [
+          for (final s in _places.stops)
+            (lat: s.lat, lng: s.lng, label: s.label),
+        ],
       );
       if (!mounted) {
         return;
       }
+      // Multi-stop: classes whose service cannot carry these stops are hidden.
       final options = quote.options.isNotEmpty
-          ? List<RideQuote>.from(quote.options)
+          ? [
+              for (final o in quote.options)
+                if (o.available) o,
+            ]
           : [quote];
+      if (options.isEmpty) {
+        options.add(quote);
+      }
       final preferredCode = _places.vehicleClassCode?.trim().isNotEmpty == true
           ? _places.vehicleClassCode!.trim()
           : CustomerBookingPrefs.lastVehicleClass ?? quote.vehicleClassCode;
@@ -191,6 +202,7 @@ class _RideFarePageState extends State<_RideFareView> {
         dropoff: _places.dropoff,
         quote: option,
         vehicleClassCode: option.vehicleClassCode,
+        stops: _places.stops,
       );
       _fare.text = '${option.referenceFareVnd}';
       _message = null;
@@ -258,7 +270,8 @@ class _RideFarePageState extends State<_RideFareView> {
         previous.offeredFareVnd == amount &&
         previous.vehicleClassCode == vehicleClassCode &&
         previous.pickup.label == pickup.label &&
-        previous.dropoff.label == dropoff.label) {
+        previous.dropoff.label == dropoff.label &&
+        _sameStops(previous.stops, _places.stops)) {
       request = previous;
     } else {
       request = CreateRideRequest(
@@ -268,6 +281,7 @@ class _RideFarePageState extends State<_RideFareView> {
         dropoff: dropoff,
         offeredFareVnd: amount,
         vehicleClassCode: vehicleClassCode,
+        stops: _places.stops,
       );
     }
     _attempt = request;
@@ -401,6 +415,7 @@ class _RideFarePageState extends State<_RideFareView> {
                           RideStopList(
                             pickup: _places.pickup.label,
                             dropoff: _places.dropoff.label,
+                            stops: [for (final s in _places.stops) s.label],
                           ),
                           const SizedBox(height: DealGoSpacing.s12),
                           Row(
@@ -838,4 +853,12 @@ class _FarePreset extends StatelessWidget {
       ),
     );
   }
+}
+
+bool _sameStops(List<RidePoint> a, List<RidePoint> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i].lat != b[i].lat || a[i].lng != b[i].lng) return false;
+  }
+  return true;
 }

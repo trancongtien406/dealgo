@@ -347,6 +347,14 @@ class _RideJobCard extends StatelessWidget {
             const SizedBox(height: DealGoSpacing.s12),
             Text(ride.pickup.label, style: textTheme.titleMedium),
             Text(ride.dropoff.label, style: textTheme.bodySmall),
+            if (ride.stops.isNotEmpty)
+              Text(
+                AppLocalizations.of(context).rideStopsCount(ride.stops.length),
+                key: Key('driver-job-stops-${ride.id}'),
+                style: textTheme.labelSmall?.copyWith(
+                  color: DealGoColors.amber,
+                ),
+              ),
             const SizedBox(height: DealGoSpacing.s12),
             DriverMoneyRow(
               label: AppLocalizations.of(context).driverCustomerFare,

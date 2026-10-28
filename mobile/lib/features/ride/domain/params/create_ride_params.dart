@@ -8,7 +8,11 @@ class CreateRideParams {
     required this.dropoff,
     required this.offeredFareVnd,
     required this.vehicleClassCode,
+    this.stops = const [],
   });
+
+  /// Intermediate stops in visiting order (omitted from the body when empty).
+  final List<RidePoint> stops;
 
   final String accessToken;
   final String idempotencyKey;

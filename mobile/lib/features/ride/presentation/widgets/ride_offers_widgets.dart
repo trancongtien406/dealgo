@@ -122,6 +122,7 @@ class EmptyOffers extends StatelessWidget {
                     RideStopList(
                       pickup: ride.pickup.label,
                       dropoff: ride.dropoff.label,
+                      stops: [for (final s in ride.stops) s.point.label],
                     ),
                   ],
                 ),
@@ -356,6 +357,7 @@ class _QuoteState extends StatelessWidget {
                     RideStopList(
                       pickup: ride.pickup.label,
                       dropoff: ride.dropoff.label,
+                      stops: [for (final s in ride.stops) s.point.label],
                     ),
                   ],
                 ),
@@ -530,6 +532,7 @@ class OfferList extends StatelessWidget {
                     RideStopList(
                       pickup: ride.pickup.label,
                       dropoff: ride.dropoff.label,
+                      stops: [for (final s in ride.stops) s.point.label],
                     ),
                     const SizedBox(height: DealGoSpacing.s12),
                     RideMoneyLine(

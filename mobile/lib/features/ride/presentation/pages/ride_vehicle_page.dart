@@ -128,6 +128,7 @@ class _RideVehiclePageState extends State<RideVehiclePage> {
                         RideStopList(
                           pickup: widget.places.pickup.label,
                           dropoff: widget.places.dropoff.label,
+                          stops: [for (final s in widget.places.stops) s.label],
                         ),
                       ],
                     ),

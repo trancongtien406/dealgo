@@ -168,13 +168,33 @@ class RideSectionTitle extends StatelessWidget {
 }
 
 class RideStopList extends StatelessWidget {
-  const RideStopList({required this.pickup, required this.dropoff, super.key});
+  const RideStopList({
+    required this.pickup,
+    required this.dropoff,
+    this.stops = const [],
+    this.stopStates = const [],
+    super.key,
+  });
 
   final String pickup;
   final String dropoff;
 
+  /// Intermediate stop labels in visiting order (multi-stop rides).
+  final List<String> stops;
+
+  /// Optional per-stop progress (same length as [stops]) for live trips.
+  final List<RideStopState> stopStates;
+
   @override
   Widget build(BuildContext context) {
+    if (stops.isNotEmpty) {
+      return _MultiStopList(
+        pickup: pickup,
+        dropoff: dropoff,
+        stops: stops,
+        stopStates: stopStates,
+      );
+    }
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -217,6 +237,59 @@ class RideStopList extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Pickup → stops → drop-off, one dotted row each (multi-stop rides).
+class _MultiStopList extends StatelessWidget {
+  const _MultiStopList({
+    required this.pickup,
+    required this.dropoff,
+    required this.stops,
+    required this.stopStates,
+  });
+
+  final String pickup;
+  final String dropoff;
+  final List<String> stops;
+  final List<RideStopState> stopStates;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    String stateText(RideStopState state) => switch (state) {
+      RideStopState.pending => l10n.rideStopPending,
+      RideStopState.arrived => l10n.rideStopArrived,
+      RideStopState.departed => l10n.rideStopDeparted,
+    };
+    return Column(
+      key: const Key('ride-multi-stop-list'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        RideStopRow(
+          color: DealGoColors.brandGreen,
+          label: l10n.ridePickup,
+          value: pickup,
+        ),
+        for (final (i, label) in stops.indexed) ...[
+          const SizedBox(height: DealGoSpacing.s12),
+          RideStopRow(
+            key: Key('ride-stop-row-${i + 1}'),
+            color: DealGoColors.amber,
+            label: i < stopStates.length
+                ? '${l10n.rideStopNumbered(i + 1)} · ${stateText(stopStates[i])}'
+                : l10n.rideStopNumbered(i + 1),
+            value: label,
+          ),
+        ],
+        const SizedBox(height: DealGoSpacing.s12),
+        RideStopRow(
+          color: DealGoColors.danger,
+          label: l10n.rideDropoff,
+          value: dropoff,
+        ),
+      ],
     );
   }
 }

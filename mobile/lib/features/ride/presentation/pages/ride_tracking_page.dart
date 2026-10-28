@@ -404,6 +404,8 @@ class _TrackingLive extends StatelessWidget {
           child: RideStopList(
             pickup: current.pickup.label,
             dropoff: current.dropoff.label,
+            stops: [for (final s in current.stops) s.point.label],
+            stopStates: [for (final s in current.stops) s.state],
           ),
         ),
         TrackingSection(
@@ -423,7 +425,10 @@ class _TrackingLive extends StatelessWidget {
                   key: const Key('ride-cash-due'),
                   label: l10n.rideCashDueLabel,
                   amount: formatRideVnd(
-                    rideCashAfterVoucher(agreed, current.discountVnd),
+                    rideCashAfterVoucher(
+                      agreed + current.waitFeeVnd,
+                      current.discountVnd,
+                    ),
                   ),
                   emphasize: true,
                 ),
@@ -543,7 +548,10 @@ class _TrackingOffline extends StatelessWidget {
                         RideMoneyLine(
                           label: l10n.rideCashDueLabel,
                           amount: formatRideVnd(
-                            rideCashAfterVoucher(agreed, current.discountVnd),
+                            rideCashAfterVoucher(
+                              agreed + current.waitFeeVnd,
+                              current.discountVnd,
+                            ),
                           ),
                         ),
                     ],

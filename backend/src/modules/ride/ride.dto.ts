@@ -57,6 +57,17 @@ export class CreateRideDto {
   @Matches(/^[A-Za-z0-9_]+$/)
   vehicleClassCode!: string;
 
+  /**
+   * Multi-stop: intermediate stops in visiting order (admin flag + max per service, hard cap 5).
+   * Omitted / empty = single destination.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @ValidateNested({ each: true })
+  @Type(() => GeoPointDto)
+  stops?: GeoPointDto[];
+
   /** One-tap re-post of the customer's own EXPIRED request. */
   @IsOptional()
   @IsUUID()
@@ -73,6 +84,17 @@ export class QuoteRideDto {
   @ValidateNested()
   @Type(() => GeoPointDto)
   dropoff!: GeoPointDto;
+
+  /**
+   * Multi-stop: intermediate stops in visiting order (admin flag + max per service, hard cap 5).
+   * Omitted / empty = single destination.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @ValidateNested({ each: true })
+  @Type(() => GeoPointDto)
+  stops?: GeoPointDto[];
 }
 
 export class CreateOfferDto {
@@ -80,6 +102,43 @@ export class CreateOfferDto {
   @IsInt()
   @Min(1)
   amountVnd!: number;
+
+  /** Route version the driver saw; a stale one is rejected with RIDE_ROUTE_CHANGED. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  routeVersion?: number;
+}
+
+/** Customer replaces the stop list while NEGOTIATING (empty = back to single destination). */
+export class UpdateStopsDto {
+  @IsDefined()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @ValidateNested({ each: true })
+  @Type(() => GeoPointDto)
+  stops!: GeoPointDto[];
+
+  /** Optional new final destination. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => GeoPointDto)
+  dropoff?: GeoPointDto;
+
+  /** Optional new bid (must respect the re-quoted floor). Defaults to the current bid. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  offeredFareVnd?: number;
+
+  /** Optimistic check: the version the app edited (409 RIDE_ROUTE_CHANGED if stale). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  routeVersion?: number;
 }
 
 export class StartTripDto {
@@ -166,6 +225,24 @@ export class RideRouteQueryDto {
   @Min(-180)
   @Max(180)
   toLng!: number;
+
+  /** Multi-stop preview: up to 5 waypoints as `lat,lng|lat,lng` between from and to. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(220)
+  @Matches(/^-?\d{1,2}(\.\d+)?,-?\d{1,3}(\.\d+)?(\|-?\d{1,2}(\.\d+)?,-?\d{1,3}(\.\d+)?){0,4}$/, {
+    message: 'via must be up to 5 "lat,lng" pairs separated by |',
+  })
+  via?: string;
+}
+
+/** Parses RideRouteQueryDto.via (already shape-checked) into in-range points. */
+export function parseRouteVia(via: string | undefined): Array<{ lat: number; lng: number }> {
+  if (!via) return [];
+  return via.split('|').map((pair) => {
+    const [lat, lng] = pair.split(',').map(Number) as [number, number];
+    return { lat, lng };
+  }).filter((p) => Math.abs(p.lat) <= 90 && Math.abs(p.lng) <= 180);
 }
 
 /** Customer raises the bid (must be above the current one; class max still applies). */

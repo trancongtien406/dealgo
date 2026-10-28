@@ -20,6 +20,7 @@ import '../../../places/domain/place.dart';
 import '../../../places/presentation/current_place.dart';
 import '../../../places/presentation/place_picker_page.dart';
 import '../../domain/entities/ride_models.dart';
+import '../../domain/stops/ride_stops_client.dart';
 import '../cubit/ride_destination.dart';
 import '../cubit/ride_session.dart';
 import '../utils/ride_distance.dart';
@@ -41,6 +42,10 @@ class RideMapPage extends StatefulWidget {
 class _RideMapPageState extends State<RideMapPage> {
   PlaceOption? _pickup;
   PlaceOption? _dropoff;
+
+  /// Intermediate stops (multi-stop; admin-flagged, hidden when off).
+  final _stops = <PlaceOption>[];
+  var _multiStop = MultiStopSettings.disabled;
   var _locating = false;
   var _suggestions = const <PlaceOption>[];
   var _route = RouteGeometry.unavailable;
@@ -56,6 +61,7 @@ class _RideMapPageState extends State<RideMapPage> {
       }
       unawaited(_locatePickup());
       unawaited(_loadSuggestions());
+      unawaited(_loadMultiStop());
       // Destination-first: open picker immediately when nothing pre-filled.
       if (_dropoff == null) {
         unawaited(_pickDropoff(autoOpen: true));
@@ -83,6 +89,81 @@ class _RideMapPageState extends State<RideMapPage> {
       if (result is CurrentPlaceFound && _pickup == null) {
         _pickup = result.place;
       }
+    });
+    _tryAutoAdvance();
+  }
+
+  /// Admin multi-stop flags; any failure keeps the single-destination UI.
+  Future<void> _loadMultiStop() async {
+    final token = rideAccessToken(context);
+    RideStopsClient? client;
+    try {
+      client = context.read<RideStopsClient>();
+    } on ProviderNotFoundException {
+      client = null;
+    }
+    if (token == null || client == null) {
+      return;
+    }
+    MultiStopSettings settings;
+    try {
+      settings = await client.config(accessToken: token);
+    } catch (_) {
+      settings = MultiStopSettings.disabled;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _multiStop = settings;
+      final max = settings.maxStopsAnyService;
+      if (_stops.length > max) {
+        _stops.removeRange(max, _stops.length);
+      }
+    });
+  }
+
+  int get _maxStops => _multiStop.maxStopsAnyService;
+
+  Future<void> _addStop() async {
+    if (_stops.length >= _maxStops) {
+      return;
+    }
+    final pickup = _pickup;
+    final place = await pickPlace(
+      context,
+      PlacePickPurpose.dropoff,
+      near: pickup == null ? null : MapLatLng(lat: pickup.lat, lng: pickup.lng),
+    );
+    if (!mounted || place == null) {
+      return;
+    }
+    setState(() => _stops.add(place));
+    _tryAutoAdvance();
+  }
+
+  Future<void> _editStop(int index) async {
+    final place = await pickPlace(context, PlacePickPurpose.dropoff);
+    if (!mounted || place == null || index >= _stops.length) {
+      return;
+    }
+    setState(() => _stops[index] = place);
+    _tryAutoAdvance();
+  }
+
+  void _removeStop(int index) {
+    setState(() => _stops.removeAt(index));
+    _tryAutoAdvance();
+  }
+
+  /// Reorder: move stop [index] one place earlier.
+  void _moveStopUp(int index) {
+    if (index <= 0 || index >= _stops.length) {
+      return;
+    }
+    setState(() {
+      final stop = _stops.removeAt(index);
+      _stops.insert(index - 1, stop);
     });
     _tryAutoAdvance();
   }
@@ -162,6 +243,10 @@ class _RideMapPageState extends State<RideMapPage> {
       final pickup = _pickup;
       _pickup = _dropoff;
       _dropoff = pickup;
+      final reversed = _stops.reversed.toList();
+      _stops
+        ..clear()
+        ..addAll(reversed);
     });
     _tryAutoAdvance();
   }
@@ -179,6 +264,10 @@ class _RideMapPageState extends State<RideMapPage> {
         lng: dropoff.lng,
         label: dropoff.label,
       ),
+      stops: [
+        for (final s in _stops)
+          RidePoint(lat: s.lat, lng: s.lng, label: s.label),
+      ],
     );
     return places.canContinue ? places : null;
   }
@@ -216,10 +305,17 @@ class _RideMapPageState extends State<RideMapPage> {
     }
     final a = MapLatLng(lat: pickup.lat, lng: pickup.lng);
     final b = MapLatLng(lat: dropoff.lat, lng: dropoff.lng);
+    final via = [for (final s in _stops) MapLatLng(lat: s.lat, lng: s.lng)];
     // Straight-line estimate right away; replaced by the road km when ready.
+    var straightKm = 0.0;
+    var from = a;
+    for (final point in [...via, b]) {
+      straightKm += haversineKm(from, point);
+      from = point;
+    }
     setState(() {
       _route = RouteGeometry.unavailable;
-      _distance = RideDistance(km: haversineKm(a, b), road: false);
+      _distance = RideDistance(km: straightKm, road: false);
     });
     final token = rideAccessToken(context);
     MapRoutingRepository? routing;
@@ -233,7 +329,7 @@ class _RideMapPageState extends State<RideMapPage> {
     }
     RouteGeometry route;
     try {
-      route = await routing.route(accessToken: token, from: a, to: b);
+      route = await routing.route(accessToken: token, from: a, to: b, via: via);
     } catch (_) {
       route = RouteGeometry.unavailable;
     }
@@ -242,7 +338,9 @@ class _RideMapPageState extends State<RideMapPage> {
     }
     setState(() {
       _route = route;
-      _distance = RideDistance.from(route, a, b);
+      _distance = route.hasRoadPolyline || via.isEmpty
+          ? RideDistance.from(route, a, b)
+          : RideDistance(km: straightKm, road: false);
     });
   }
 
@@ -274,6 +372,7 @@ class _RideMapPageState extends State<RideMapPage> {
     setState(() {
       _pickup = null;
       _dropoff = null;
+      _stops.clear();
       _route = RouteGeometry.unavailable;
       _distance = null;
       _routeSeq++;
@@ -337,6 +436,8 @@ class _RideMapPageState extends State<RideMapPage> {
                       markers: [
                         if (pickup != null)
                           MapLatLng(lat: pickup.lat, lng: pickup.lng),
+                        for (final s in _stops)
+                          MapLatLng(lat: s.lat, lng: s.lng),
                         if (dropoff != null)
                           MapLatLng(lat: dropoff.lat, lng: dropoff.lng),
                       ],
@@ -407,6 +508,42 @@ class _RideMapPageState extends State<RideMapPage> {
                                   : l10n.ridePickupPlaceholder,
                               onTap: _pickPickup,
                             ),
+                            for (final (i, stop) in _stops.indexed) ...[
+                              const SizedBox(height: DealGoSpacing.s8),
+                              RideStopField(
+                                key: Key('ride-stop-field-${i + 1}'),
+                                icon: DealGoIcons.pin,
+                                tone: DealGoColors.amber,
+                                caption: l10n.rideStopNumbered(i + 1),
+                                value: stop.label,
+                                placeholder: l10n.rideAddStop,
+                                onTap: () => _editStop(i),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (i > 0)
+                                      IconButton(
+                                        key: Key('ride-stop-up-${i + 1}'),
+                                        tooltip: l10n.rideMoveStopUp,
+                                        onPressed: () => _moveStopUp(i),
+                                        icon: const Icon(
+                                          DealGoIcons.chevronUp,
+                                          color: DealGoColors.primary,
+                                        ),
+                                      ),
+                                    IconButton(
+                                      key: Key('ride-stop-remove-${i + 1}'),
+                                      tooltip: l10n.rideRemoveStop,
+                                      onPressed: () => _removeStop(i),
+                                      icon: const Icon(
+                                        DealGoIcons.close,
+                                        color: DealGoColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: DealGoSpacing.s8),
                             RideStopField(
                               key: const Key('ride-dropoff-label'),
@@ -427,6 +564,23 @@ class _RideMapPageState extends State<RideMapPage> {
                                 ),
                               ),
                             ),
+                            if (_maxStops > 0 &&
+                                dropoff != null &&
+                                _stops.length < _maxStops) ...[
+                              const SizedBox(height: DealGoSpacing.s4),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton.icon(
+                                  key: const Key('ride-add-stop'),
+                                  onPressed: _addStop,
+                                  icon: const Icon(DealGoIcons.add, size: 18),
+                                  label: Text(
+                                    '${l10n.rideAddStop} · '
+                                    '${l10n.rideStopsMax(_maxStops)}',
+                                  ),
+                                ),
+                              ),
+                            ],
                             if (_distance case final distance?
                                 when !_samePlace) ...[
                               const SizedBox(height: DealGoSpacing.s8),

@@ -16,6 +16,8 @@ import type {
   DriverCancelInput,
   NoShowInput,
   RideTimeoutPolicy,
+  StopEventInput,
+  UpdateStopsInput,
 } from './ride-ledger.js';
 import { RideLedger } from './ride-ledger.js';
 import type { DriverJobCounts } from '../../shared/driver-job-counts.js';
@@ -91,6 +93,11 @@ export interface RideRepository {
   raiseFare(input: RaiseFareInput): Promise<RideSnapshot>;
   /** Customer declines one driver's offer. */
   declineOffer(input: DeclineOfferInput): Promise<RideSnapshot>;
+  /** Customer edits stops while negotiating (live offers die, new round). */
+  updateStops(input: UpdateStopsInput): Promise<RideSnapshot>;
+  /** Assigned driver arrives at / leaves an intermediate stop (IN_TRIP, in order). */
+  arriveStop(input: StopEventInput): Promise<RideSnapshot>;
+  departStop(input: StopEventInput): Promise<RideSnapshot>;
   /** Driver withdraws their pending offer. */
   withdrawOffer(input: WithdrawOfferInput): Promise<RideSnapshot>;
   /** Assigned driver gives up before the trip; the ride returns to bidding. */
@@ -285,6 +292,18 @@ export class MemoryRideRepository implements RideRepository {
 
   declineOffer(input: DeclineOfferInput): Promise<RideSnapshot> {
     return this.run(() => finish(this.ledger.declineOffer(input)));
+  }
+
+  updateStops(input: UpdateStopsInput): Promise<RideSnapshot> {
+    return this.run(() => finish(this.ledger.updateStops(input)));
+  }
+
+  arriveStop(input: StopEventInput): Promise<RideSnapshot> {
+    return this.run(() => finish(this.ledger.arriveStop(input)));
+  }
+
+  departStop(input: StopEventInput): Promise<RideSnapshot> {
+    return this.run(() => finish(this.ledger.departStop(input)));
   }
 
   withdrawOffer(input: WithdrawOfferInput): Promise<RideSnapshot> {

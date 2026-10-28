@@ -23,11 +23,26 @@ export type NestRideOffer = {
   driverProfile?: OpsPerson | null;
 };
 
+export type NestRideStop = {
+  seq: number;
+  lat: number;
+  lng: number;
+  label: string;
+  arrivedAt: string | null;
+  departedAt: string | null;
+};
+
 export type NestRideView = {
   id: string;
   status: NestRideStatus;
   pickup: { lat: number; lng: number; label: string };
   dropoff: { lat: number; lng: number; label: string };
+  /** Multi-stop: intermediate stops in visiting order (older payloads omit it). */
+  stops?: NestRideStop[];
+  routeVersion?: number;
+  /** Per-stop fee in the reference and waiting fee billed at completion. */
+  stopFeeVnd?: number;
+  waitFeeVnd?: number;
   offeredFareVnd: number;
   referenceFareVnd: number;
   /** DG-DEC-VEH-001 catalog code (MOTORBIKE | CAR_4 | CAR_7, …). */

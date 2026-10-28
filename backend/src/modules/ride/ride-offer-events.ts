@@ -14,7 +14,9 @@ export type RideOfferChangeReason =
   | 'DECLINED'
   | 'WITHDRAWN'
   | 'DRIVER_CANCELLED'
-  | 'TIMEOUT';
+  | 'TIMEOUT'
+  // Customer edited the stops while negotiating: pending offers died, a new round starts.
+  | 'ROUTE_CHANGED';
 
 /** Reasons after which a NEGOTIATING ride should be (re)announced to nearby drivers. */
 export const RIDE_REQUEST_BROADCAST_REASONS: ReadonlySet<RideOfferChangeReason> = new Set([
@@ -23,6 +25,7 @@ export const RIDE_REQUEST_BROADCAST_REASONS: ReadonlySet<RideOfferChangeReason> 
   'REASSIGNED',
   'DRIVER_CANCELLED',
   'TIMEOUT',
+  'ROUTE_CHANGED',
 ]);
 
 /** Something changed in a ride's offer list (post-commit, in-process). */

@@ -44,6 +44,8 @@ import {
   type RideStatusName,
   type RideTimeoutPolicy,
   type SelectInput,
+  type StopEventInput,
+  type UpdateStopsInput,
   type WithdrawOfferInput,
 } from './ride-ledger.js';
 import type { OpsInterveneResult, OpsRidePage, RideRepository } from './ride.repository.js';
@@ -141,6 +143,8 @@ export class PrismaRideRepository implements RideRepository {
         referenceFareVnd: true,
         vehicleClassCode: true,
         expiresAt: true,
+        routeVersion: true,
+        stops: { orderBy: { seq: 'asc' }, select: { lat: true, lng: true, label: true } },
         _count: { select: { offers: true } },
       },
     });
@@ -155,6 +159,8 @@ export class PrismaRideRepository implements RideRepository {
       vehicleClassCode: ride.vehicleClassCode,
       expiresAt: ride.expiresAt,
       offerCount: ride._count.offers,
+      stops: ride.stops,
+      routeVersion: ride.routeVersion,
     }));
   }
 
@@ -359,6 +365,26 @@ export class PrismaRideRepository implements RideRepository {
     return this.mutate(input.rideId, (ledger) => ledger.withdrawOffer(input));
   }
 
+  updateStops(input: UpdateStopsInput): Promise<RideSnapshot> {
+    return this.mutate(input.rideId, (ledger) => ledger.updateStops(input));
+  }
+
+  arriveStop(input: StopEventInput): Promise<RideSnapshot> {
+    return this.driverLifecycle(
+      input,
+      (ledger) => ledger.arriveStop(input),
+      (tx, ride) => this.stopOutbox(tx as RideTx, ride.id, input.seq, 'ARRIVED'),
+    );
+  }
+
+  departStop(input: StopEventInput): Promise<RideSnapshot> {
+    return this.driverLifecycle(
+      input,
+      (ledger) => ledger.departStop(input),
+      (tx, ride) => this.stopOutbox(tx as RideTx, ride.id, input.seq, 'DEPARTED'),
+    );
+  }
+
   driverCancel(input: DriverCancelInput): Promise<RideSnapshot> {
     return this.mutate(input.rideId, (ledger) => ledger.driverCancel(input), {
       releaseVoucherAt: input.now,
@@ -510,7 +536,7 @@ export class PrismaRideRepository implements RideRepository {
       this.db.ride.count({ where }),
       this.db.ride.findMany({
         where,
-        include: { offers: true },
+        include: { offers: true, stops: { orderBy: { seq: 'asc' } } },
         orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: (page - 1) * limit,
         take: limit,
@@ -540,7 +566,7 @@ export class PrismaRideRepository implements RideRepository {
       this.db.ride.count({ where }),
       this.db.ride.findMany({
         where,
-        include: { offers: true },
+        include: { offers: true, stops: { orderBy: { seq: 'asc' } } },
         orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: (page - 1) * limit,
         take: limit,
@@ -647,7 +673,7 @@ export class PrismaRideRepository implements RideRepository {
           ...(window.since ? { gte: window.since } : {}),
         },
       },
-      include: { offers: true },
+      include: { offers: true, stops: { orderBy: { seq: 'asc' } } },
       orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
       take: window.limit,
     });
@@ -782,6 +808,26 @@ export class PrismaRideRepository implements RideRepository {
     return expired;
   }
 
+  /**
+   * Realtime hint for a stop event: an IN_TRIP snapshot with its own key (deduped on repeats)
+   * so the customer / driver apps re-GET the ride. `stopEvent` keeps the relay from re-sending
+   * the "trip started" push.
+   */
+  private async stopOutbox(
+    tx: Prisma.TransactionClient,
+    rideId: string,
+    seq: number,
+    event: 'ARRIVED' | 'DEPARTED',
+  ): Promise<void> {
+    await writeStatusOutbox(tx, {
+      aggregateType: 'Ride',
+      aggregateId: rideId,
+      status: 'IN_TRIP',
+      eventKeySuffix: `stop-${seq}-${event.toLowerCase()}`,
+      payload: { stopEvent: event, stopSeq: seq },
+    });
+  }
+
   private async driverLifecycle(
     input: DriverLifecycleInput,
     apply: (ledger: RideLedger) => Awaited<ReturnType<RideLedger['markEnRoute']>>,
@@ -900,14 +946,14 @@ export class PrismaRideRepository implements RideRepository {
         customerId,
         OR: [{ idempotencyKey }, { status: 'NEGOTIATING' }],
       },
-      include: { offers: true },
+      include: { offers: true, stops: { orderBy: { seq: 'asc' } } },
     });
     return this.ledgerFrom(rides, []);
   }
 
   private async hydrateRide(tx: RideTx, rideId: string): Promise<RideLedger | null> {
     await this.lockRides(tx, [rideId]);
-    const ride = await tx.ride.findUnique({ where: { id: rideId }, include: { offers: true } });
+    const ride = await tx.ride.findUnique({ where: { id: rideId }, include: { offers: true, stops: { orderBy: { seq: 'asc' } } } });
     if (!ride) {
       return null;
     }
@@ -940,13 +986,26 @@ export class PrismaRideRepository implements RideRepository {
     }
     const rides = await tx.ride.findMany({
       where: { id: { in: ids } },
-      include: { offers: true },
+      include: { offers: true, stops: { orderBy: { seq: 'asc' } } },
     });
     return this.ledgerFrom(rides, selection ? [selection] : []);
   }
 
   private ledgerFrom(
     rides: Array<{
+      stops?: Array<{
+        seq: number;
+        lat: number;
+        lng: number;
+        label: string;
+        arrivedAt: Date | null;
+        departedAt: Date | null;
+      }>;
+      routeVersion?: number;
+      stopFeeVnd?: number;
+      stopWaitFreeMinutes?: number;
+      stopWaitFeeVndPerMinute?: number;
+      waitFeeVnd?: number;
       id: string;
       customerId: string;
       pickupLat: number;
@@ -1030,6 +1089,12 @@ export class PrismaRideRepository implements RideRepository {
           priorFeesVnd: ride.priorFeesVnd ?? 0,
           fareRaiseCount: ride.fareRaiseCount ?? 0,
           repostOfRideId: ride.repostOfRideId ?? null,
+          stops: ride.stops ?? [],
+          routeVersion: ride.routeVersion ?? 0,
+          stopFeeVnd: ride.stopFeeVnd ?? 0,
+          stopWaitFreeMinutes: ride.stopWaitFreeMinutes ?? 0,
+          stopWaitFeeVndPerMinute: ride.stopWaitFeeVndPerMinute ?? 0,
+          waitFeeVnd: ride.waitFeeVnd ?? 0,
         }),
       ),
       offers: rides.flatMap((ride) =>
@@ -1158,6 +1223,25 @@ export class PrismaRideRepository implements RideRepository {
       });
     }
 
+    // Stop rows reference the ride, so they go after ride inserts. A changed stop list is
+    // rewritten whole (it is short and only edited under the ride row lock).
+    for (const entry of changes.stops) {
+      await tx.rideStop.deleteMany({ where: { rideId: entry.rideId } });
+      if (entry.stops.length > 0) {
+        await tx.rideStop.createMany({
+          data: entry.stops.map((stop) => ({
+            rideId: entry.rideId,
+            seq: stop.seq,
+            lat: stop.lat,
+            lng: stop.lng,
+            label: stop.label,
+            arrivedAt: stop.arrivedAt,
+            departedAt: stop.departedAt,
+          })),
+        });
+      }
+    }
+
     // Fees reference the ride, so they go after ride inserts.
     if (changes.fees.length > 0) {
       await tx.customerFeeCharge.createMany({
@@ -1216,8 +1300,18 @@ function rideData(row: {
   createdAt: Date;
   statusChangedAt: Date;
   repostOfRideId: string | null;
+  stops: unknown[];
+  routeVersion: number;
+  stopFeeVnd: number;
+  stopWaitFreeMinutes: number;
+  stopWaitFeeVndPerMinute: number;
 }) {
   return {
+    stopCount: row.stops.length,
+    routeVersion: row.routeVersion,
+    stopFeeVnd: row.stopFeeVnd,
+    stopWaitFreeMinutes: row.stopWaitFreeMinutes,
+    stopWaitFeeVndPerMinute: row.stopWaitFeeVndPerMinute,
     statusChangedAt: row.statusChangedAt,
     repostOfRideId: row.repostOfRideId,
     id: row.id,
@@ -1270,8 +1364,16 @@ function ridePatch(row: {
   cancelReasonCode: string | null;
   priorFeesVnd: number;
   fareRaiseCount: number;
+  stops: unknown[];
+  routeVersion: number;
+  stopFeeVnd: number;
+  waitFeeVnd: number;
 }) {
   return {
+    stopCount: row.stops.length,
+    routeVersion: row.routeVersion,
+    stopFeeVnd: row.stopFeeVnd,
+    waitFeeVnd: row.waitFeeVnd,
     assignedAt: row.assignedAt,
     fareRaiseCount: row.fareRaiseCount,
     statusChangedAt: row.statusChangedAt,

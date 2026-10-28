@@ -93,6 +93,15 @@ class DriverRideDetailPage extends StatelessWidget {
                     label: l10n.driverPickupLabel,
                     value: ride.pickup.label,
                   ),
+                  for (final (i, stop) in ride.stops.indexed) ...[
+                    const SizedBox(height: DealGoSpacing.s12),
+                    DriverStop(
+                      key: Key('driver-offer-stop-${i + 1}'),
+                      color: DealGoColors.amber,
+                      label: l10n.rideStopNumbered(i + 1),
+                      value: stop.label,
+                    ),
+                  ],
                   const SizedBox(height: DealGoSpacing.s12),
                   DriverStop(
                     color: DealGoColors.danger,
@@ -276,6 +285,8 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
           accessToken: token,
           rideId: widget.ride.id,
           amountVnd: amount,
+          // Multi-stop: the server rejects an offer made on an older route.
+          routeVersion: widget.ride.routeVersion,
         ),
       );
       if (!mounted) {

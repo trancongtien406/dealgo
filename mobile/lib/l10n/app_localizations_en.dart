@@ -6864,4 +6864,87 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get draftRestoredNote => 'Restored your unsent draft.';
+
+  @override
+  String rideStopNumbered(int n) {
+    return 'Stop $n';
+  }
+
+  @override
+  String get rideAddStop => 'Add stop';
+
+  @override
+  String get rideRemoveStop => 'Remove stop';
+
+  @override
+  String get rideMoveStopUp => 'Move stop up';
+
+  @override
+  String rideStopsMax(int n) {
+    return 'Up to $n stops';
+  }
+
+  @override
+  String rideStopFeeNote(String fee) {
+    return 'Each stop adds $fee';
+  }
+
+  @override
+  String get rideStopFeeLine => 'Stop fee';
+
+  @override
+  String get rideWaitFeeLine => 'Waiting at stops';
+
+  @override
+  String get rideStopPending => 'Not yet';
+
+  @override
+  String get rideStopArrived => 'Driver waiting';
+
+  @override
+  String get rideStopDeparted => 'Done';
+
+  @override
+  String rideStopsCount(int n) {
+    return '+$n stops';
+  }
+
+  @override
+  String get rideRouteChanged =>
+      'The customer changed the route. Review it and offer again.';
+
+  @override
+  String get rideStopsLocked =>
+      'Stops can only be changed before a driver is chosen.';
+
+  @override
+  String get rideStopsUnavailable =>
+      'Stops are not available for this service right now.';
+
+  @override
+  String driverStopArrive(int n) {
+    return 'Arrived at stop $n';
+  }
+
+  @override
+  String driverStopDepart(int n) {
+    return 'Leave stop $n';
+  }
+
+  @override
+  String get driverStopsTitle => 'Stops';
+
+  @override
+  String driverStopFreeWait(int m, String fee) {
+    return 'Free wait $m min, then $fee/min';
+  }
+
+  @override
+  String driverNavigateToStop(int n) {
+    return 'Navigate to stop $n';
+  }
+
+  @override
+  String get driverStopsPendingError =>
+      'Finish every stop before completing the trip.';
 }

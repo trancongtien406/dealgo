@@ -17,6 +17,7 @@ class DioMapRoutingRemoteDataSource implements MapRoutingRepository {
     required String accessToken,
     required MapLatLng from,
     required MapLatLng to,
+    List<MapLatLng> via = const [],
   }) async {
     try {
       final response = await dio.get<Object?>(
@@ -26,6 +27,8 @@ class DioMapRoutingRemoteDataSource implements MapRoutingRepository {
           'fromLng': from.lng,
           'toLat': to.lat,
           'toLng': to.lng,
+          if (via.isNotEmpty)
+            'via': [for (final p in via.take(5)) '${p.lat},${p.lng}'].join('|'),
         },
         options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       );
@@ -49,6 +52,7 @@ class FakeMapRoutingRemoteDataSource implements MapRoutingRepository {
     required String accessToken,
     required MapLatLng from,
     required MapLatLng to,
+    List<MapLatLng> via = const [],
   }) async {
     calls.add((from: from, to: to));
     return next;

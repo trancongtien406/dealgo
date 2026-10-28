@@ -3325,5 +3325,85 @@
   "draftResumeBody": "We saved your progress on this device. Continue, or start over?",
   "draftResumeContinue": "Continue",
   "draftResumeDiscard": "Start over",
-  "draftRestoredNote": "Restored your unsent draft."
+  "draftRestoredNote": "Restored your unsent draft.",
+  "rideStopNumbered": "Stop {n}",
+  "@rideStopNumbered": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "rideAddStop": "Add stop",
+  "rideRemoveStop": "Remove stop",
+  "rideMoveStopUp": "Move stop up",
+  "rideStopsMax": "Up to {n} stops",
+  "@rideStopsMax": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "rideStopFeeNote": "Each stop adds {fee}",
+  "@rideStopFeeNote": {
+    "placeholders": {
+      "fee": {
+        "type": "String"
+      }
+    }
+  },
+  "rideStopFeeLine": "Stop fee",
+  "rideWaitFeeLine": "Waiting at stops",
+  "rideStopPending": "Not yet",
+  "rideStopArrived": "Driver waiting",
+  "rideStopDeparted": "Done",
+  "rideStopsCount": "+{n} stops",
+  "@rideStopsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "rideRouteChanged": "The customer changed the route. Review it and offer again.",
+  "rideStopsLocked": "Stops can only be changed before a driver is chosen.",
+  "rideStopsUnavailable": "Stops are not available for this service right now.",
+  "driverStopArrive": "Arrived at stop {n}",
+  "@driverStopArrive": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "driverStopDepart": "Leave stop {n}",
+  "@driverStopDepart": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "driverStopsTitle": "Stops",
+  "driverStopFreeWait": "Free wait {m} min, then {fee}/min",
+  "@driverStopFreeWait": {
+    "placeholders": {
+      "m": {
+        "type": "int"
+      },
+      "fee": {
+        "type": "String"
+      }
+    }
+  },
+  "driverNavigateToStop": "Navigate to stop {n}",
+  "@driverNavigateToStop": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "driverStopsPendingError": "Finish every stop before completing the trip."
 }

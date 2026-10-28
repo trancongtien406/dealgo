@@ -137,6 +137,7 @@ class _FareChanged extends StatelessWidget {
                         RideStopList(
                           pickup: ride.pickup.label,
                           dropoff: ride.dropoff.label,
+                          stops: [for (final s in ride.stops) s.point.label],
                         ),
                       ],
                     ),
@@ -286,6 +287,7 @@ class _Confirmed extends StatelessWidget {
                         RideStopList(
                           pickup: ride.pickup.label,
                           dropoff: ride.dropoff.label,
+                          stops: [for (final s in ride.stops) s.point.label],
                         ),
                       ],
                     ),

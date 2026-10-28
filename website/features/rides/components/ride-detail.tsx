@@ -43,7 +43,7 @@ import {
   canOpsCancelRide,
   canOpsReassignRide,
 } from "@/features/rides/intervene";
-import { rideStatusLabel, rideStatusTone } from "@/features/rides/mappers";
+import { rideStatusLabel, rideStatusTone, rideStopStateLabel } from "@/features/rides/mappers";
 import { isForbiddenError } from "@/lib/api/errors";
 import { ChatReviewButton } from "@/features/chat-review/components/chat-review-button";
 
@@ -209,6 +209,10 @@ export function RideDetail({ code }: { code: string }) {
                   <FieldList
                     rows={[
                       { label: "Điểm đón", value: ride.pickup },
+                      ...ride.stops.map((stop) => ({
+                        label: `Điểm dừng ${stop.seq}`,
+                        value: `${stop.label} · ${rideStopStateLabel(stop)}`,
+                      })),
                       { label: "Điểm đến", value: ride.dropoff },
                       { label: "Hết hạn / ETA", value: ride.time },
                       { label: "Ghế / loại", value: ride.seats },
@@ -284,6 +288,9 @@ export function RideDetail({ code }: { code: string }) {
                             amount: -ride.discountVnd,
                           },
                         ]
+                      : []),
+                    ...(ride.waitFeeVnd > 0
+                      ? [{ label: "Phí chờ tại điểm dừng", amount: ride.waitFeeVnd }]
                       : []),
                   ]}
                   totalLabel="Tiền mặt khách trả tài xế"
@@ -381,6 +388,17 @@ export function RideDetail({ code }: { code: string }) {
                             ? "current"
                             : "upcoming",
                     },
+                    ...ride.stops.map((stop) => ({
+                      time: rideStopStateLabel(stop),
+                      title: `Điểm dừng ${stop.seq}`,
+                      detail: stop.label,
+                      tone:
+                        stop.state === "DEPARTED"
+                          ? ("done" as const)
+                          : stop.state === "ARRIVED"
+                            ? ("current" as const)
+                            : ("upcoming" as const),
+                    })),
                     {
                       time:
                         ride.status === "IN_TRIP" || ride.status === "COMPLETED"

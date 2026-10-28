@@ -7,5 +7,8 @@ abstract interface class MapRoutingRepository {
     required String accessToken,
     required MapLatLng from,
     required MapLatLng to,
+
+    /// Intermediate stops (multi-stop preview), in visiting order.
+    List<MapLatLng> via = const [],
   });
 }

@@ -95,6 +95,85 @@ class RidePoint {
   final String label;
 }
 
+/// Where an intermediate stop is in the trip (multi-stop rides).
+enum RideStopState { pending, arrived, departed }
+
+/// An intermediate stop between pickup and drop-off (server `stops[]`).
+class RideStop {
+  const RideStop({
+    required this.seq,
+    required this.point,
+    this.arrivedAt,
+    this.departedAt,
+  });
+
+  /// 1-based visiting order.
+  final int seq;
+  final RidePoint point;
+  final String? arrivedAt;
+  final String? departedAt;
+
+  RideStopState get state => departedAt != null
+      ? RideStopState.departed
+      : arrivedAt != null
+      ? RideStopState.arrived
+      : RideStopState.pending;
+}
+
+/// Admin multi-stop policy for one service (`GET /v1/rides/multi-stop-config`).
+class MultiStopPolicy {
+  const MultiStopPolicy({
+    required this.enabled,
+    required this.maxStops,
+    required this.stopFeeVnd,
+    required this.freeWaitMinutes,
+    required this.waitFeeVndPerMinute,
+  });
+
+  static const disabled = MultiStopPolicy(
+    enabled: false,
+    maxStops: 0,
+    stopFeeVnd: 0,
+    freeWaitMinutes: 0,
+    waitFeeVndPerMinute: 0,
+  );
+
+  final bool enabled;
+  final int maxStops;
+  final int stopFeeVnd;
+  final int freeWaitMinutes;
+  final int waitFeeVndPerMinute;
+
+  /// Whether the customer may add stops at all (flag on and room for one).
+  bool get offersStops => enabled && maxStops > 0;
+}
+
+/// BIKE / CAR policies; the booking sheet uses the most generous one.
+class MultiStopSettings {
+  const MultiStopSettings({required this.bike, required this.car});
+
+  static const disabled = MultiStopSettings(
+    bike: MultiStopPolicy.disabled,
+    car: MultiStopPolicy.disabled,
+  );
+
+  final MultiStopPolicy bike;
+  final MultiStopPolicy car;
+
+  /// Most stops any service accepts (0 ⇒ hide the "add stop" control).
+  int get maxStopsAnyService {
+    var max = 0;
+    for (final p in [bike, car]) {
+      if (p.offersStops && p.maxStops > max) max = p.maxStops;
+    }
+    return max;
+  }
+
+  /// Policy for a vehicle class code (MOTORBIKE ⇒ BIKE, anything else ⇒ CAR).
+  MultiStopPolicy forVehicleClass(String? code) =>
+      (code ?? '').toUpperCase().contains('BIKE') ? bike : car;
+}
+
 /// Pickup and drop-off chosen by the customer, with real coordinates.
 class RidePlaces {
   const RidePlaces({
@@ -102,10 +181,14 @@ class RidePlaces {
     required this.dropoff,
     this.quote,
     this.vehicleClassCode,
+    this.stops = const [],
   });
 
   final RidePoint pickup;
   final RidePoint dropoff;
+
+  /// Intermediate stops in visiting order (empty for a single-destination ride).
+  final List<RidePoint> stops;
 
   /// Server quote (`POST /v1/rides/quote`), once the route overview loaded it.
   final RideQuote? quote;
@@ -118,6 +201,7 @@ class RidePlaces {
     dropoff: dropoff,
     quote: quote,
     vehicleClassCode: vehicleClassCode,
+    stops: stops,
   );
 
   RidePlaces selectClass(RideQuote quote) => RidePlaces(
@@ -126,6 +210,7 @@ class RidePlaces {
     quote: quote,
     // DG-DEC-VEH-001: never invent MOTORBIKE when the customer has not chosen a class.
     vehicleClassCode: quote.vehicleClassCode ?? vehicleClassCode,
+    stops: stops,
   );
 
   String get pickupLabel => pickup.label;
@@ -136,6 +221,11 @@ class RidePlaces {
     final dropoff = dropoffLabel.trim();
     return pickup.isNotEmpty &&
         dropoff.isNotEmpty &&
+        stops.every(
+          (s) =>
+              s.label.trim().isNotEmpty &&
+              s.label.trim().length <= rideLabelMaxLength,
+        ) &&
         pickup.length <= rideLabelMaxLength &&
         dropoff.length <= rideLabelMaxLength;
   }
@@ -181,6 +271,11 @@ class RideView {
     this.route = RouteGeometry.unavailable,
     this.approachRoute,
     this.customerRating,
+    this.stops = const [],
+    this.routeVersion = 0,
+    this.currentStopSeq,
+    this.stopFeeVnd = 0,
+    this.waitFeeVnd = 0,
   });
 
   final String id;
@@ -218,6 +313,29 @@ class RideView {
   /// Shown to drivers only (null on customer reads).
   final CustomerRatingSummary? customerRating;
 
+  /// Intermediate stops in order (empty for a single-destination ride).
+  final List<RideStop> stops;
+
+  /// Bumped on every stop edit; a driver offer must carry the current value.
+  final int routeVersion;
+
+  /// First stop not yet departed while IN_TRIP (null when none remain).
+  final int? currentStopSeq;
+
+  /// Stop fees already folded into [referenceFareVnd] (shown as a line).
+  final int stopFeeVnd;
+
+  /// Waiting beyond the free minutes at stops, added at completion.
+  final int waitFeeVnd;
+
+  /// The stop the driver is heading to / waiting at, if any.
+  RideStop? get currentStop {
+    for (final stop in stops) {
+      if (stop.state != RideStopState.departed) return stop;
+    }
+    return null;
+  }
+
   /// Offers still in play (Declined/withdrawn ones stay in the snapshot).
   List<RideOffer> get liveOffers => [
     for (final offer in offers)
@@ -230,7 +348,7 @@ class RideView {
     if (agreed == null) {
       return null;
     }
-    final due = agreed - discountVnd;
+    final due = agreed + waitFeeVnd - discountVnd;
     return due < 0 ? 0 : due;
   }
 }
@@ -250,6 +368,8 @@ class OpenRide {
     this.route = RouteGeometry.unavailable,
     this.approachRoute,
     this.customerRating,
+    this.stops = const [],
+    this.routeVersion = 0,
   });
 
   final String id;
@@ -269,6 +389,12 @@ class OpenRide {
 
   /// The customer's rating from drivers, so a driver can decide.
   final CustomerRatingSummary? customerRating;
+
+  /// Intermediate stops the driver will make (multi-stop rides).
+  final List<RidePoint> stops;
+
+  /// Route version the driver's offer must echo (RIDE_ROUTE_CHANGED otherwise).
+  final int routeVersion;
 }
 
 class RideConfirmArgs {

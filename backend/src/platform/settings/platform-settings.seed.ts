@@ -86,6 +86,15 @@ export const PLATFORM_SETTING_SEED_DEFAULTS: Readonly<Partial<Record<PlatformSet
     NEW_JOB_CUSTOM_SOUND_ENABLED: 'true',
     // DEC-PROD-007: in-app voice calls between customer and assigned driver.
     VOICE_CALLS_ENABLED: 'true',
+    // Multi-stop rides (DRAFT, flags OFF until legal/ops approve; Grab-like defaults).
+    RIDE_MULTI_STOP_BIKE_ENABLED: 'false',
+    RIDE_MULTI_STOP_CAR_ENABLED: 'false',
+    RIDE_MAX_STOPS_BIKE: '1',
+    RIDE_MAX_STOPS_CAR: '2',
+    RIDE_STOP_FEE_BIKE_VND: '5000',
+    RIDE_STOP_FEE_CAR_VND: '10000',
+    RIDE_STOP_FREE_WAIT_MINUTES: '5',
+    RIDE_STOP_WAIT_FEE_VND_PER_MINUTE: '1000',
     RIDE_REQUEST_PUSH_MAX_DRIVERS: '30',
     FOOD_FAIL_MIN_WAIT_MINUTES: '10',
     FOOD_MERCHANT_COMMISSION_PERCENT: '20',

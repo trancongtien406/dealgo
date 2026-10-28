@@ -1,6 +1,7 @@
 import 'dart:developer' as developer;
 import 'dart:async';
 
+import '../features/ride/domain/stops/ride_stops_client.dart';
 import '../features/places/data/place_history_cache.dart';
 import '../features/onboarding/data/datasources/partner_requirements_client.dart';
 
@@ -73,6 +74,7 @@ class DealGoApp extends StatefulWidget {
     this.foodClient,
     this.merchantOrdersClient,
     this.rideClient,
+    this.rideStopsClient,
     this.presenceClient,
     this.realtime,
     this.chatClient,
@@ -110,6 +112,9 @@ class DealGoApp extends StatefulWidget {
   final FoodClient? foodClient;
   final MerchantOrdersClient? merchantOrdersClient;
   final RideClient? rideClient;
+
+  /// Multi-stop commands override (tests).
+  final RideStopsClient? rideStopsClient;
 
   /// Test seam for driver presence and service toggles.
   final PresenceClient? presenceClient;
@@ -173,6 +178,7 @@ class _DealGoAppState extends State<DealGoApp> {
       foodClient: widget.foodClient,
       merchantOrdersClient: widget.merchantOrdersClient,
       rideClient: widget.rideClient,
+      rideStopsClient: widget.rideStopsClient,
       presenceClient: widget.presenceClient,
       realtime: widget.realtime,
       chatClient: widget.chatClient,

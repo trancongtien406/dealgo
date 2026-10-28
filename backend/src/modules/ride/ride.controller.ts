@@ -6,8 +6,10 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseIntPipe,
   ParseUUIDPipe,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -26,6 +28,8 @@ import {
   RideRouteQueryDto,
   SelectOfferDto,
   StartTripDto,
+  UpdateStopsDto,
+  parseRouteVia,
 } from './ride.dto.js';
 import { rideError } from './ride.error.js';
 import { RideService } from './ride.service.js';
@@ -59,6 +63,12 @@ export class RideController {
   @ApiOperation({ summary: 'Customer paginated ride history (actor-scoped)' })
   listMine(@CurrentActor() actor: RequestActor, @Query() query: RidePageQueryDto) {
     return this.rides.listForCustomer(actor, query.page, query.limit);
+  }
+
+  @Get('multi-stop-config')
+  @ApiOperation({ summary: 'Admin multi-stop rules per service (flag, max stops, stop fee, wait fee)' })
+  multiStopConfig() {
+    return this.rides.multiStopConfig();
   }
 
   @Get('vehicle-classes')
@@ -95,6 +105,7 @@ export class RideController {
       actor,
       { lat: query.fromLat, lng: query.fromLng },
       { lat: query.toLat, lng: query.toLng },
+      parseRouteVia(query.via),
     );
   }
 
@@ -187,6 +198,41 @@ export class RideController {
   })
   cancel(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
     return this.rides.cancel(actor, id);
+  }
+
+  @Put(':id/stops')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Customer replaces stops while NEGOTIATING (re-quotes, pending offers lost, new round)',
+  })
+  updateStops(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateStopsDto,
+  ) {
+    return this.rides.updateStops(actor, id, dto);
+  }
+
+  @Post(':id/stops/:seq/arrive')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Assigned driver arrives at an intermediate stop (IN_TRIP, in order)' })
+  arriveStop(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('seq', ParseIntPipe) seq: number,
+  ) {
+    return this.rides.arriveStop(actor, id, seq);
+  }
+
+  @Post(':id/stops/:seq/depart')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Assigned driver leaves an intermediate stop (wait fee counts until here)' })
+  departStop(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('seq', ParseIntPipe) seq: number,
+  ) {
+    return this.rides.departStop(actor, id, seq);
   }
 
   @Post(':id/fare')

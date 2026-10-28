@@ -73,6 +73,10 @@ class _RideRouteOverviewPageState extends State<RideRouteOverviewPage> {
           lng: places.dropoff.lng,
           label: places.dropoff.label,
         ),
+        stops: [
+          for (final s in places.stops)
+            (lat: s.lat, lng: s.lng, label: s.label),
+        ],
       );
       if (mounted) {
         setState(() => _quote = quote);
@@ -200,6 +204,7 @@ class _RideRouteOverviewPageState extends State<RideRouteOverviewPage> {
                             child: RideStopList(
                               pickup: places.pickup.label,
                               dropoff: places.dropoff.label,
+                              stops: [for (final s in places.stops) s.label],
                             ),
                           ),
                         ],

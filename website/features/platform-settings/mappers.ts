@@ -81,6 +81,38 @@ const LABELS: Record<string, { label: string; hint: string }> = {
     label: "Cho phép gọi thoại trong app",
     hint: "DEC-PROD-007 — bật: khách và tài xế đang trong chuyến/đơn gọi nhau qua app (chỉ âm thanh, không ghi âm); tắt: ẩn nút gọi",
   },
+  RIDE_MULTI_STOP_BIKE_ENABLED: {
+    label: "Cho phép đặt xe máy nhiều điểm dừng",
+    hint: "DEC-PROD-MULTISTOP — tắt: app ẩn nút \"Thêm điểm dừng\" và chuyến xe máy chỉ có 1 điểm đến (chuyến đang chạy không bị ảnh hưởng)",
+  },
+  RIDE_MULTI_STOP_CAR_ENABLED: {
+    label: "Cho phép đặt ô tô nhiều điểm dừng",
+    hint: "DEC-PROD-MULTISTOP — tắt: app ẩn nút \"Thêm điểm dừng\" và chuyến ô tô chỉ có 1 điểm đến",
+  },
+  RIDE_MAX_STOPS_BIKE: {
+    label: "Số điểm dừng tối đa — xe máy",
+    hint: "Mặc định 1 — không tính điểm đón và điểm đến cuối (0–5)",
+  },
+  RIDE_MAX_STOPS_CAR: {
+    label: "Số điểm dừng tối đa — ô tô",
+    hint: "Mặc định 2 — không tính điểm đón và điểm đến cuối (0–5)",
+  },
+  RIDE_STOP_FEE_BIKE_VND: {
+    label: "Phí mỗi điểm dừng — xe máy (VND)",
+    hint: "Mặc định 5.000 — cộng vào giá gợi ý; khách vẫn trả giá (0–200.000)",
+  },
+  RIDE_STOP_FEE_CAR_VND: {
+    label: "Phí mỗi điểm dừng — ô tô (VND)",
+    hint: "Mặc định 10.000 — cộng vào giá gợi ý; khách vẫn trả giá (0–500.000)",
+  },
+  RIDE_STOP_FREE_WAIT_MINUTES: {
+    label: "Thời gian chờ miễn phí tại mỗi điểm dừng (phút)",
+    hint: "Mặc định 5 — tính từ lúc tài xế bấm \"Đã đến\" đến \"Rời điểm dừng\" (0–60)",
+  },
+  RIDE_STOP_WAIT_FEE_VND_PER_MINUTE: {
+    label: "Phí chờ tại điểm dừng (VND / phút)",
+    hint: "Mặc định 1.000 — mỗi phút trọn quá thời gian miễn phí, cộng vào tiền mặt khi hoàn tất; 0 = không thu (0–50.000)",
+  },
   RIDE_REQUEST_PUSH_ENABLED: {
     label: "Gửi push chuyến mới cho tài xế khi app ở nền/tắt",
     hint: "bật — FCM qua outbox, không gửi lại cho tài xế đang nhận socket",
@@ -338,6 +370,12 @@ const INTEGER_RANGES: Record<string, [number, number, string]> = {
   FOOD_MERCHANT_COMMISSION_PERCENT: [0, 50, "Giá trị phải là số nguyên từ 0 đến 50."],
   FOOD_ORDER_CHANGE_RESPONSE_MINUTES: [1, 30, "Giá trị phải là số nguyên từ 1 đến 30."],
   RIDE_REPOST_RAISE_HINT_PERCENT: [0, 50, "Giá trị phải là số nguyên từ 0 đến 50."],
+  RIDE_MAX_STOPS_BIKE: [0, 5, "Giá trị phải là số nguyên từ 0 đến 5."],
+  RIDE_MAX_STOPS_CAR: [0, 5, "Giá trị phải là số nguyên từ 0 đến 5."],
+  RIDE_STOP_FEE_BIKE_VND: [0, 200000, "Giá trị phải là số nguyên từ 0 đến 200000."],
+  RIDE_STOP_FEE_CAR_VND: [0, 500000, "Giá trị phải là số nguyên từ 0 đến 500000."],
+  RIDE_STOP_FREE_WAIT_MINUTES: [0, 60, "Giá trị phải là số nguyên từ 0 đến 60 phút."],
+  RIDE_STOP_WAIT_FEE_VND_PER_MINUTE: [0, 50000, "Giá trị phải là số nguyên từ 0 đến 50000."],
   MERCHANT_SETTLEMENT_CYCLE_DAYS: [1, 31, "Chu kỳ đối soát phải là số nguyên từ 1 đến 31 ngày."],
 };
 
@@ -352,6 +390,8 @@ export const BOOLEAN_SETTING_KEYS: ReadonlySet<string> = new Set([
   "RIDE_REQUEST_PUSH_ENABLED",
   "NEW_JOB_CUSTOM_SOUND_ENABLED",
   "VOICE_CALLS_ENABLED",
+  "RIDE_MULTI_STOP_BIKE_ENABLED",
+  "RIDE_MULTI_STOP_CAR_ENABLED",
 ]);
 
 export const UPLOAD_SNIFFABLE_TYPES = [

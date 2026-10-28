@@ -2,7 +2,7 @@ import { cancelActorLabel } from "@/lib/cancel-actor";
 import { rideCancelReasonLabel } from "@/lib/ride-cancel-reason";
 import type { StatusTone } from "@/lib/admin-format";
 import type { NestRideStatus, NestRideView } from "@/features/rides/nest-types";
-import type { GeoPoint, RideListItem, RideStatus } from "@/features/rides/types";
+import type { GeoPoint, RideListItem, RideStatus, RideStopItem } from "@/features/rides/types";
 import type { OpsPerson } from "@/lib/api/ops-people";
 import { formatOpsClock } from "@/lib/ops-time";
 
@@ -53,6 +53,8 @@ export function mapNestRideToListItem(ride: NestRideView): RideListItem {
     pickupArea: areaHint(pickupLabel),
     dropoff: dropoffLabel,
     dropoffArea: areaHint(dropoffLabel),
+    stops: mapRideStops(ride),
+    waitFeeVnd: ride.waitFeeVnd ?? 0,
     seats: rideVehicleClassLabel(ride.vehicleClassCode),
     vehicleClassCode: ride.vehicleClassCode ?? null,
     price: ride.agreedFareVnd ?? ride.offeredFareVnd,
@@ -68,6 +70,27 @@ export function mapNestRideToListItem(ride: NestRideView): RideListItem {
     pickupPoint: geoPoint(ride.pickup),
     dropoffPoint: geoPoint(ride.dropoff),
   };
+}
+
+/** Multi-stop rows for the detail timeline; older payloads have no `stops`. */
+export function mapRideStops(ride: Pick<NestRideView, "stops">): RideStopItem[] {
+  return [...(ride.stops ?? [])]
+    .sort((a, b) => a.seq - b.seq)
+    .map((stop) => ({
+      seq: stop.seq,
+      label: stop.label.trim() || "—",
+      point: geoPoint(stop),
+      state: stop.departedAt ? "DEPARTED" : stop.arrivedAt ? "ARRIVED" : "PENDING",
+      arrivedAt: stop.arrivedAt ? formatOpsClock(stop.arrivedAt) : null,
+      departedAt: stop.departedAt ? formatOpsClock(stop.departedAt) : null,
+    }));
+}
+
+/** Vietnamese status line for one stop. */
+export function rideStopStateLabel(stop: RideStopItem): string {
+  if (stop.state === "DEPARTED") return `Đã rời ${stop.departedAt ?? ""}`.trim();
+  if (stop.state === "ARRIVED") return `Đã đến ${stop.arrivedAt ?? ""}`.trim();
+  return "Chưa đến";
 }
 
 /** Real name, else masked phone, else a short id tag; "—" when nothing is known. */

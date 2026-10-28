@@ -256,6 +256,16 @@ abstract final class ApiPaths {
   static String mePlaceHistoryItem(String id) => '/v1/me/place-history/$id';
   static const ridesQuote = '/v1/rides/quote';
 
+  /// Multi-stop policy per service (admin feature flags).
+  static const rideMultiStopConfig = '/v1/rides/multi-stop-config';
+
+  static String rideStops(String rideId) =>
+      '/v1/rides/${Uri.encodeComponent(rideId)}/stops';
+
+  /// `arrive` | `depart` at stop [seq] (1-based).
+  static String rideStopAction(String rideId, int seq, String action) =>
+      '/v1/rides/${Uri.encodeComponent(rideId)}/stops/$seq/$action';
+
   /// Nest road geometry (ROUTING_PROVIDER) for live remaining path / previews.
   static const ridesRoute = '/v1/rides/route';
 

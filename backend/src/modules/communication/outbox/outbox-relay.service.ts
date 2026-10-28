@@ -193,6 +193,10 @@ export class OutboxRelayService {
       }
       return;
     }
+    // Multi-stop arrive/depart: snapshot hint only, never a second "trip started" push.
+    if (typeof (row.payload as { stopEvent?: unknown } | null)?.stopEvent === 'string') {
+      return;
+    }
     const status = statusFromPayload(row.payload);
     if (!status || !isNotablePush(row.aggregateType, status)) {
       return;

@@ -500,7 +500,11 @@ class _RideOffersPageState extends State<_RideOffersView> {
   void _changeFare(RideView ride) {
     context.push(
       RideRoutes.fare,
-      extra: RidePlaces(pickup: ride.pickup, dropoff: ride.dropoff),
+      extra: RidePlaces(
+        pickup: ride.pickup,
+        dropoff: ride.dropoff,
+        stops: [for (final s in ride.stops) s.point],
+      ),
     );
   }
 

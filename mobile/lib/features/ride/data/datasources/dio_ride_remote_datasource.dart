@@ -33,7 +33,10 @@ class DioRideRemoteDataSource implements RideRemoteDataSource {
     return _send(
       () => dio.post<Object?>(
         ApiPaths.rideOffers(request.rideId),
-        data: SubmitRideOfferBody(amountVnd: request.amountVnd).toJson(),
+        data: SubmitRideOfferBody(
+          amountVnd: request.amountVnd,
+          routeVersion: request.routeVersion,
+        ).toJson(),
         options: _bearer(request.accessToken),
       ),
     );
@@ -49,6 +52,7 @@ class DioRideRemoteDataSource implements RideRemoteDataSource {
           dropoff: RidePointModel.fromEntity(request.dropoff),
           offeredFareVnd: request.offeredFareVnd,
           vehicleClassCode: request.vehicleClassCode,
+          stops: [for (final s in request.stops) RidePointModel.fromEntity(s)],
         ).toJson(),
         options: _auth(request.accessToken, request.idempotencyKey),
       ),

@@ -154,6 +154,7 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
                           extra: RidePlaces(
                             pickup: ride.pickup,
                             dropoff: ride.dropoff,
+                            stops: [for (final s in ride.stops) s.point],
                             vehicleClassCode: ride.vehicleClassCode.isEmpty
                                 ? null
                                 : ride.vehicleClassCode,
@@ -237,7 +238,9 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
           RideNote(message: l10n.rideReceiptNoFare)
         else
           Text(
-            formatRideVnd(rideCashAfterVoucher(agreed, ride.discountVnd)),
+            formatRideVnd(
+              rideCashAfterVoucher(agreed + ride.waitFeeVnd, ride.discountVnd),
+            ),
             key: const Key('ride-receipt-fare'),
             textAlign: TextAlign.center,
             style: textTheme.headlineSmall?.copyWith(
@@ -277,6 +280,8 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
               RideStopList(
                 pickup: ride.pickup.label,
                 dropoff: ride.dropoff.label,
+                stops: [for (final s in ride.stops) s.point.label],
+                stopStates: [for (final s in ride.stops) s.state],
               ),
               const SizedBox(height: DealGoSpacing.s12),
               if (finishedAt != null)
@@ -311,6 +316,12 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
                   label: l10n.rideAgreedFare,
                   amount: formatRideVnd(agreed),
                 ),
+                if (ride.waitFeeVnd > 0)
+                  RideMoneyLine(
+                    key: const Key('ride-receipt-wait-fee'),
+                    label: l10n.rideWaitFeeLine,
+                    amount: formatRideVnd(ride.waitFeeVnd),
+                  ),
                 if (ride.discountVnd > 0)
                   RideMoneyLine(
                     label: l10n.rideVoucherLine(ride.voucherCode ?? ''),
@@ -320,7 +331,10 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
                   key: const Key('ride-receipt-total'),
                   label: l10n.checkoutTotalSection,
                   amount: formatRideVnd(
-                    rideCashAfterVoucher(agreed, ride.discountVnd),
+                    rideCashAfterVoucher(
+                      agreed + ride.waitFeeVnd,
+                      ride.discountVnd,
+                    ),
                   ),
                   emphasize: true,
                 ),

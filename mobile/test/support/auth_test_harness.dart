@@ -1,3 +1,4 @@
+import 'package:dealgo/features/ride/domain/stops/ride_stops_client.dart';
 import 'package:dealgo/features/onboarding/data/datasources/partner_requirements_client.dart';
 import 'package:dealgo/features/identity/domain/passkey_platform.dart';
 import 'package:dealgo/features/account_deletion/domain/account_deletion.dart';
@@ -56,6 +57,7 @@ Future<MemoryTokenStore> pumpDealGo(
   FoodClient? foodClient,
   MerchantOrdersClient? merchantOrdersClient,
   RideClient? rideClient,
+  RideStopsClient? rideStopsClient,
   PresenceClient? presenceClient,
   SnapshotRealtime? realtime,
   ChatClient? chatClient,
@@ -89,6 +91,7 @@ Future<MemoryTokenStore> pumpDealGo(
       foodClient: foodClient ?? FakeFoodClient(),
       merchantOrdersClient: merchantOrdersClient,
       rideClient: rideClient ?? FakeRideClient(),
+      rideStopsClient: rideStopsClient,
       presenceClient: presenceClient,
       realtime: realtime,
       chatClient: chatClient,
@@ -130,6 +133,7 @@ Future<MemoryTokenStore> pumpSignedIn(
   FoodClient? foodClient,
   MerchantOrdersClient? merchantOrdersClient,
   RideClient? rideClient,
+  RideStopsClient? rideStopsClient,
   PresenceClient? presenceClient,
   SnapshotRealtime? realtime,
   ChatClient? chatClient,
@@ -172,6 +176,7 @@ Future<MemoryTokenStore> pumpSignedIn(
       foodClient: foodClient ?? FakeFoodClient(),
       merchantOrdersClient: merchantOrdersClient,
       rideClient: rideClient ?? FakeRideClient(),
+      rideStopsClient: rideStopsClient,
       presenceClient: presenceClient,
       realtime: realtime,
       chatClient: chatClient,
