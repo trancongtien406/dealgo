@@ -940,6 +940,13 @@ export class MemoryFoodRepository implements FoodRepository {
   private readonly stores: StoredStore[] = [];
   private readonly items: StoredItem[] = [];
   private readonly seededAt = new Date();
+  private lastItemCreatedAt = this.seededAt.getTime();
+
+  /** Strictly increasing so "newest dish" never ties with seeded items in the same ms. */
+  private nextItemCreatedAt(): Date {
+    this.lastItemCreatedAt = Math.max(Date.now(), this.lastItemCreatedAt + 1);
+    return new Date(this.lastItemCreatedAt);
+  }
   private readonly orders: StoredOrder[] = [];
 
   async listIdsForDriverInStatuses(
@@ -1713,7 +1720,7 @@ export class MemoryFoodRepository implements FoodRepository {
       originalPriceVnd: input.originalPriceVnd ?? null,
       available,
       moderationStatus: available ? 'APPROVED' : 'PENDING',
-      createdAt: new Date(),
+      createdAt: this.nextItemCreatedAt(),
       description: input.description ?? null,
       prepMinutes: input.prepMinutes ?? null,
       imageUrl: input.imageUrl ?? null,
