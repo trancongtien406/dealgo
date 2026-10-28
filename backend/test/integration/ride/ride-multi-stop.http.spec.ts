@@ -259,6 +259,10 @@ describe('ride multi-stop http', () => {
     const listed = open.body.data.find((r: { id: string }) => r.id === rideId);
     expect(listed.stops).toHaveLength(1);
     expect(listed.routeVersion).toBe(0);
+    // The realtime/push request payload carries the stops too (was a TypeError → no fan-out).
+    const audience = await app.get(RideService).requestAudience(rideId);
+    expect(audience?.ride.stops).toHaveLength(1);
+    expect(audience?.ride.routeVersion).toBe(0);
 
     await offer(d.token, rideId, 60_000).expect(200);
     const edited = await http()

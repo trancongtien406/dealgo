@@ -1301,6 +1301,8 @@ export class RideService {
           vehicleClassCode: ride.vehicleClassCode,
           expiresAt: ride.expiresAt,
           offerCount: ride.offers.filter((o) => o.status === 'PENDING').length,
+          stops: ride.stops,
+          routeVersion: ride.routeVersion,
         } as OpenRideListing,
         await this.imageUrlForClass(ride.vehicleClassCode),
         ratings.get(ride.customerId) ?? EMPTY_CUSTOMER_RATING,
@@ -1821,7 +1823,7 @@ function toOpenView(
     offerCount: ride.offerCount,
     customerRating,
     pickupDistanceKm,
-    stops: ride.stops.map((stop) => ({ lat: stop.lat, lng: stop.lng, label: stop.label })),
+    stops: (ride.stops ?? []).map((stop) => ({ lat: stop.lat, lng: stop.lng, label: stop.label })),
     routeVersion: ride.routeVersion,
   };
 }
