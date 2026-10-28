@@ -6909,4 +6909,31 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get driverStopsPendingError =>
       'Hoàn tất các điểm dừng trước khi kết thúc chuyến.';
+
+  @override
+  String get rideEditStops => 'Sửa điểm dừng';
+
+  @override
+  String get rideEditStopsSave => 'Cập nhật lộ trình';
+
+  @override
+  String get rideEditStopsConfirmTitle => 'Đổi điểm dừng?';
+
+  @override
+  String get rideEditStopsConfirmBody =>
+      'Đổi lộ trình sẽ xoá các đề nghị giá hiện tại của tài xế và tìm lại từ đầu.';
+
+  @override
+  String get rideEditStopsConfirmAction => 'Đổi lộ trình';
+
+  @override
+  String get rideEditStopsDone => 'Đã cập nhật lộ trình. Đang chờ đề nghị mới.';
+
+  @override
+  String get rideStopsNone => 'Chưa có điểm dừng';
+
+  @override
+  String mapPinStop(int n) {
+    return 'Dừng $n';
+  }
 }

@@ -274,7 +274,8 @@ class _PlaceholderMapViewState extends State<PlaceholderMapView>
                   ),
                   if (markers.length > 1)
                     stop(
-                      project?.call(markers[1]),
+                      // Multi-stop: the drop-off is the last marker.
+                      project?.call(markers.last),
                       const Alignment(0.35, 0.35),
                       DealGoMapPin(
                         kind: mapPinKindFor(

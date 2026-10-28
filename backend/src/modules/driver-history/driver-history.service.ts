@@ -139,7 +139,10 @@ export function vnStartOfDay(at: Date): Date {
 
 function fromRide(ride: RideSnapshot): DriverHistoryItem {
   const outcome: DriverJobOutcome = ride.status === 'COMPLETED' ? 'COMPLETED' : 'CANCELLED';
-  const fareVnd = ride.agreedFareVnd ?? 0;
+  // Multi-stop: the stop wait fee is collected in cash on top of the fare (the stop fee is
+  // already inside the agreed fare), matching the earnings snapshot taken at completion.
+  const fareVnd =
+    (ride.agreedFareVnd ?? 0) + (outcome === 'COMPLETED' ? (ride.waitFeeVnd ?? 0) : 0);
   return {
     kind: 'RIDE',
     id: ride.id,

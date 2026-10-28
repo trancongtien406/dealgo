@@ -12913,6 +12913,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Finish every stop before completing the trip.'**
   String get driverStopsPendingError;
+
+  /// No description provided for @rideEditStops.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit stops'**
+  String get rideEditStops;
+
+  /// No description provided for @rideEditStopsSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Update route'**
+  String get rideEditStopsSave;
+
+  /// No description provided for @rideEditStopsConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change stops?'**
+  String get rideEditStopsConfirmTitle;
+
+  /// No description provided for @rideEditStopsConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Changing the route clears current driver offers and restarts the search.'**
+  String get rideEditStopsConfirmBody;
+
+  /// No description provided for @rideEditStopsConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Change route'**
+  String get rideEditStopsConfirmAction;
+
+  /// No description provided for @rideEditStopsDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Route updated. Waiting for new offers.'**
+  String get rideEditStopsDone;
+
+  /// No description provided for @rideStopsNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No stops yet'**
+  String get rideStopsNone;
+
+  /// No description provided for @mapPinStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop {n}'**
+  String mapPinStop(int n);
 }
 
 class _AppLocalizationsDelegate

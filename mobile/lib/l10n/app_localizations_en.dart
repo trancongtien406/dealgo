@@ -6947,4 +6947,31 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get driverStopsPendingError =>
       'Finish every stop before completing the trip.';
+
+  @override
+  String get rideEditStops => 'Edit stops';
+
+  @override
+  String get rideEditStopsSave => 'Update route';
+
+  @override
+  String get rideEditStopsConfirmTitle => 'Change stops?';
+
+  @override
+  String get rideEditStopsConfirmBody =>
+      'Changing the route clears current driver offers and restarts the search.';
+
+  @override
+  String get rideEditStopsConfirmAction => 'Change route';
+
+  @override
+  String get rideEditStopsDone => 'Route updated. Waiting for new offers.';
+
+  @override
+  String get rideStopsNone => 'No stops yet';
+
+  @override
+  String mapPinStop(int n) {
+    return 'Stop $n';
+  }
 }

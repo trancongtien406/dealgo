@@ -71,6 +71,7 @@ class EmptyOffers extends StatelessWidget {
     required this.onChangeFare,
     required this.onCancel,
     this.onRaiseFare,
+    this.onEditStops,
     super.key,
   });
 
@@ -85,6 +86,9 @@ class EmptyOffers extends StatelessWidget {
 
   /// Raise the fare in place (null hides the button).
   final VoidCallback? onRaiseFare;
+
+  /// Customer edits the stops (multi-stop flag on); null hides the button.
+  final VoidCallback? onEditStops;
 
   @override
   Widget build(BuildContext context) {
@@ -158,6 +162,12 @@ class EmptyOffers extends StatelessWidget {
                 const SizedBox(height: DealGoSpacing.s12),
                 RideNote(message: message!),
               ],
+              if (onEditStops != null)
+                TextButton(
+                  key: const Key('ride-edit-stops'),
+                  onPressed: busy ? null : onEditStops,
+                  child: Text(AppLocalizations.of(context).rideEditStops),
+                ),
               if (onRaiseFare != null)
                 TextButton(
                   key: const Key('ride-raise-fare'),
@@ -468,6 +478,7 @@ class OfferList extends StatelessWidget {
     required this.onConfirm,
     required this.onCancel,
     this.onRaiseFare,
+    this.onEditStops,
     this.onDeclineSelected,
     this.onVoucherQuote,
     this.voucherCode,
@@ -489,6 +500,9 @@ class OfferList extends StatelessWidget {
 
   /// Raise the fare while drivers are still bidding.
   final VoidCallback? onRaiseFare;
+
+  /// Customer edits the stops (multi-stop flag on); null hides the button.
+  final VoidCallback? onEditStops;
 
   /// Turn the selected price down (the driver may re-offer).
   final VoidCallback? onDeclineSelected;
@@ -643,6 +657,12 @@ class OfferList extends StatelessWidget {
                 const SizedBox(height: DealGoSpacing.s12),
                 RideNote(message: message!),
               ],
+              if (onEditStops != null)
+                TextButton(
+                  key: const Key('ride-edit-stops'),
+                  onPressed: busy ? null : onEditStops,
+                  child: Text(l10n.rideEditStops),
+                ),
               if (onRaiseFare != null || onDeclineSelected != null)
                 Wrap(
                   alignment: WrapAlignment.center,

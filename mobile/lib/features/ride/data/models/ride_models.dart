@@ -41,11 +41,11 @@ class RidePointModel {
 List<RideStop> parseRideStops(Object? raw) {
   if (raw is! List) return const [];
   final stops = <RideStop>[];
-  for (final item in raw) {
+  for (final (index, item) in raw.indexed) {
     final map = asJsonMap(item);
     if (map == null) continue;
-    final seq = _asInt(map['seq']);
-    if (seq == null) continue;
+    // The open-ride list sends stops in order without `seq`: use position.
+    final seq = _asInt(map['seq']) ?? index + 1;
     try {
       stops.add(
         RideStop(

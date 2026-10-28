@@ -3405,5 +3405,20 @@
       }
     }
   },
-  "driverStopsPendingError": "Finish every stop before completing the trip."
+  "driverStopsPendingError": "Finish every stop before completing the trip.",
+  "rideEditStops": "Edit stops",
+  "rideEditStopsSave": "Update route",
+  "rideEditStopsConfirmTitle": "Change stops?",
+  "rideEditStopsConfirmBody": "Changing the route clears current driver offers and restarts the search.",
+  "rideEditStopsConfirmAction": "Change route",
+  "rideEditStopsDone": "Route updated. Waiting for new offers.",
+  "rideStopsNone": "No stops yet",
+  "mapPinStop": "Stop {n}",
+  "@mapPinStop": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  }
 }

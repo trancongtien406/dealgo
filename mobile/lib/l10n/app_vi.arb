@@ -2261,5 +2261,13 @@
   "driverStopsTitle": "Các điểm dừng",
   "driverStopFreeWait": "Chờ miễn phí {m} phút, sau đó {fee}/phút",
   "driverNavigateToStop": "Chỉ đường tới điểm dừng {n}",
-  "driverStopsPendingError": "Hoàn tất các điểm dừng trước khi kết thúc chuyến."
+  "driverStopsPendingError": "Hoàn tất các điểm dừng trước khi kết thúc chuyến.",
+  "rideEditStops": "Sửa điểm dừng",
+  "rideEditStopsSave": "Cập nhật lộ trình",
+  "rideEditStopsConfirmTitle": "Đổi điểm dừng?",
+  "rideEditStopsConfirmBody": "Đổi lộ trình sẽ xoá các đề nghị giá hiện tại của tài xế và tìm lại từ đầu.",
+  "rideEditStopsConfirmAction": "Đổi lộ trình",
+  "rideEditStopsDone": "Đã cập nhật lộ trình. Đang chờ đề nghị mới.",
+  "rideStopsNone": "Chưa có điểm dừng",
+  "mapPinStop": "Dừng {n}"
 }
