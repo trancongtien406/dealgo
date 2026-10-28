@@ -397,18 +397,6 @@ class _RideFarePageState extends State<_RideFareView> {
               minChildSize: 0.32,
               maxChildSize: 0.92,
               snapSizes: const [0.32, 0.56, 0.78],
-              builder: (context, scrollController) {
-                return Column(
-                  children: [
-                    Expanded(
-                      child: ListView(
-                        controller: scrollController,
-                        padding: const EdgeInsets.fromLTRB(
-                          DealGoDimensions.pageGutter,
-                          DealGoSpacing.s12,
-                          DealGoDimensions.pageGutter,
-                          DealGoSpacing.s8,
-                        ),
                         children: [
                           const RideSheetHandle(),
                           const SizedBox(height: DealGoSpacing.s8),
@@ -479,71 +467,21 @@ class _RideFarePageState extends State<_RideFareView> {
                               ),
                             ),
                             const SizedBox(height: DealGoSpacing.s12),
-                            _FareStepper(
-                              amountLabel: amount == null
-                                  ? '—'
-                                  : formatRideVnd(amount),
+                            // C10: one control — the amount itself is editable
+                            // between −/+, with the presets underneath.
+                            _FareControl(
+                              controller: _fare,
+                              presets: quote.presetsVnd,
+                              selectedPreset: amount,
+                              hintText: l10n.rideEnterAmount,
+                              enabled: !_busy,
                               onMinus: () => _nudgeFare(-_fareStepVnd),
                               onPlus: () => _nudgeFare(_fareStepVnd),
-                              enabled: !_busy,
-                            ),
-                            const SizedBox(height: DealGoSpacing.s8),
-                            TextField(
-                              key: const Key('ride-fare-field'),
-                              controller: _fare,
-                              keyboardType: TextInputType.number,
-                              textAlign: TextAlign.center,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
-                              style: textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                              decoration: InputDecoration(
-                                hintText: l10n.rideEnterAmount,
-                                filled: true,
-                                fillColor: DealGoColors.canvas,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(
-                                    DealGoRadius.input,
-                                  ),
-                                  borderSide: const BorderSide(
-                                    color: DealGoColors.border,
-                                  ),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(
-                                    DealGoRadius.input,
-                                  ),
-                                  borderSide: const BorderSide(
-                                    color: DealGoColors.border,
-                                  ),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: DealGoSpacing.s12,
-                                  vertical: DealGoSpacing.s12,
-                                ),
-                              ),
-                              onChanged: (_) => setState(() => _message = null),
-                            ),
-                            const SizedBox(height: DealGoSpacing.s12),
-                            Row(
-                              children: [
-                                for (final preset in quote.presetsVnd) ...[
-                                  Expanded(
-                                    child: _FarePreset(
-                                      amount: preset,
-                                      selected: amount == preset,
-                                      onTap: () {
-                                        _fare.text = '$preset';
-                                        setState(() => _message = null);
-                                      },
-                                    ),
-                                  ),
-                                  if (preset != quote.presetsVnd.last)
-                                    const SizedBox(width: DealGoSpacing.s8),
-                                ],
-                              ],
+                              onPreset: (preset) {
+                                _fare.text = '$preset';
+                                setState(() => _message = null);
+                              },
+                              onChanged: () => setState(() => _message = null),
                             ),
                           ],
                           if (_offline) ...[
@@ -596,54 +534,104 @@ class _RideFarePageState extends State<_RideFareView> {
   }
 }
 
-class _FareStepper extends StatelessWidget {
-  const _FareStepper({
-    required this.amountLabel,
+class _FareControl extends StatelessWidget {
+  const _FareControl({
+    required this.controller,
+    required this.presets,
+    required this.selectedPreset,
+    required this.hintText,
+    required this.enabled,
     required this.onMinus,
     required this.onPlus,
-    required this.enabled,
+    required this.onPreset,
+    required this.onChanged,
   });
 
-  final String amountLabel;
+  final TextEditingController controller;
+  final List<int> presets;
+  final int? selectedPreset;
+  final String hintText;
+  final bool enabled;
   final VoidCallback onMinus;
   final VoidCallback onPlus;
-  final bool enabled;
+  final ValueChanged<int> onPreset;
+  final VoidCallback onChanged;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final amountStyle = textTheme.headlineMedium?.copyWith(
+      color: DealGoColors.primary,
+      fontWeight: FontWeight.w800,
+    );
     return DecoratedBox(
+      key: const Key('ride-fare-control'),
       decoration: BoxDecoration(
         color: DealGoColors.subtlePurple,
         borderRadius: BorderRadius.circular(DealGoRadius.card),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: DealGoSpacing.s8,
-          vertical: DealGoSpacing.s12,
+        padding: const EdgeInsets.fromLTRB(
+          DealGoSpacing.s8,
+          DealGoSpacing.s12,
+          DealGoSpacing.s8,
+          DealGoSpacing.s12,
         ),
-        child: Row(
+        child: Column(
           children: [
-            _StepButton(
-              key: const Key('ride-fare-minus'),
-              icon: DealGoIcons.remove,
-              onTap: enabled ? onMinus : null,
-            ),
-            Expanded(
-              child: Text(
-                amountLabel,
-                textAlign: TextAlign.center,
-                style: textTheme.headlineMedium?.copyWith(
-                  color: DealGoColors.primary,
-                  fontWeight: FontWeight.w800,
+            Row(
+              children: [
+                _StepButton(
+                  key: const Key('ride-fare-minus'),
+                  icon: DealGoIcons.remove,
+                  onTap: enabled ? onMinus : null,
                 ),
+                Expanded(
+                  child: TextField(
+                    key: const Key('ride-fare-field'),
+                    controller: controller,
+                    enabled: enabled,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    style: amountStyle,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      border: InputBorder.none,
+                      hintText: hintText,
+                      hintStyle: textTheme.titleSmall?.copyWith(
+                        color: DealGoColors.textSecondary,
+                      ),
+                      suffixText: 'đ',
+                      suffixStyle: amountStyle,
+                    ),
+                    onChanged: (_) => onChanged(),
+                  ),
+                ),
+                _StepButton(
+                  key: const Key('ride-fare-plus'),
+                  icon: DealGoIcons.add,
+                  onTap: enabled ? onPlus : null,
+                ),
+              ],
+            ),
+            if (presets.isNotEmpty) ...[
+              const SizedBox(height: DealGoSpacing.s12),
+              Row(
+                children: [
+                  for (var i = 0; i < presets.length; i++) ...[
+                    if (i > 0) const SizedBox(width: DealGoSpacing.s8),
+                    Expanded(
+                      child: _FarePreset(
+                        amount: presets[i],
+                        selected: selectedPreset == presets[i],
+                        onTap: enabled ? () => onPreset(presets[i]) : null,
+                      ),
+                    ),
+                  ],
+                ],
               ),
-            ),
-            _StepButton(
-              key: const Key('ride-fare-plus'),
-              icon: DealGoIcons.add,
-              onTap: enabled ? onPlus : null,
-            ),
+            ],
           ],
         ),
       ),
@@ -809,7 +797,7 @@ class _FarePreset extends StatelessWidget {
 
   final int amount;
   final bool selected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
