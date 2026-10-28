@@ -313,6 +313,38 @@ void main() {
     expect(find.byKey(const Key('driver-active-complete')), findsOneWidget);
   });
 
+  testWidgets('pickup OTP screen lists every stop between pickup and drop-off', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(600, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await pumpSignedIn(
+      tester,
+      profile: _driver,
+      rideClient: FakeRideClient()..onGet = (_) => _inTrip(),
+      foodClient: FakeFoodClient(),
+    );
+    GoRouter.of(tester.element(find.byType(Navigator).first)).go(
+      DriverRoutes.passengerOtp('ride-ms'),
+      extra: const OpenRide(
+        id: 'ride-ms',
+        status: 'DRIVER_ARRIVED',
+        pickup: _pickup,
+        dropoff: _dropoff,
+        offeredFareVnd: 60000,
+        referenceFareVnd: 60000,
+        expiresAt: '2030-01-01T00:00:00.000Z',
+        offerCount: 1,
+        stops: [_stop1, _stop2],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('driver-otp-stop-1')), findsOneWidget);
+    expect(find.byKey(const Key('driver-otp-stop-2')), findsOneWidget);
+    expect(find.text('Chợ Hàn'), findsOneWidget);
+    expect(find.text('Cầu Rồng'), findsOneWidget);
+  });
+
   testWidgets('single-destination ride has no stop panel or stop buttons', (
     tester,
   ) async {
