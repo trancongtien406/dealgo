@@ -573,7 +573,17 @@ describe('ride negotiation http', () => {
     expect(opsList.body.data.page).toBe(1);
     expect(opsList.body.data.limit).toBe(10);
     expect(opsList.body.data.total).toBeGreaterThanOrEqual(1);
-    expect(opsList.body.data.items.some((ride: { id: string }) => ride.id === rideId)).toBe(true);
+    // Other tests' rides share the frozen clock, so this one is not always on page 1: walk the pages.
+    let listed = false;
+    const pages = Math.ceil(opsList.body.data.total / 10);
+    for (let page = 1; page <= pages && !listed; page += 1) {
+      const res = await request(app.getHttpServer())
+        .get(`/v1/ops/rides?page=${page}&limit=10`)
+        .set('Authorization', `Bearer ${ops.body.data.accessToken}`)
+        .expect(200);
+      listed = res.body.data.items.some((ride: { id: string }) => ride.id === rideId);
+    }
+    expect(listed).toBe(true);
 
     const filteredByStatus = await request(app.getHttpServer())
       .get('/v1/ops/rides?page=1&limit=10&status=NEGOTIATING')
@@ -1210,6 +1220,9 @@ describe('ride negotiation in production', () => {
   let app: INestApplication | undefined;
   let sms: MockSmsSender;
   let identity: MemoryIdentityRepository;
+  // ConfigModule copies the validated production env (ROUTING_PROVIDER=mapbox, tokens…) into
+  // process.env; restore it so the other describe in this file still sees ROUTING_PROVIDER unset.
+  const envBefore = { ...process.env };
 
   beforeAll(async () => {
     sms = new MockSmsSender('test');
@@ -1287,6 +1300,10 @@ describe('ride negotiation in production', () => {
 
   afterAll(async () => {
     await app?.close();
+    for (const key of Object.keys(process.env)) {
+      if (!(key in envBefore)) delete process.env[key];
+    }
+    Object.assign(process.env, envBefore);
   });
 
   async function phoneLogin(phone: string): Promise<string> {
