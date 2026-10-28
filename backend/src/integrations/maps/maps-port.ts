@@ -33,7 +33,11 @@ export type PlaceSuggestion = {
 export interface MapsPort {
   geocode(query: string): Promise<GeocodeResult>;
   /** Up to `limit` matches for a free-text query; [] when nothing matches. */
-  searchPlaces(query: string, limit: number, near?: GeoPoint): Promise<PlaceSuggestion[]>;
+  searchPlaces(
+    query: string,
+    limit: number,
+    near?: GeoPoint,
+  ): Promise<PlaceSuggestion[]>;
   /** Nearest address for a GPS fix; null when the provider has nothing there. */
   reverseGeocode(point: GeoPoint): Promise<PlaceSuggestion | null>;
   routeDistanceKm(origin: GeoPoint, destination: GeoPoint): Promise<number>;
@@ -62,7 +66,11 @@ export class KeyedMapsPort implements MapsPort {
     return (await this.port()).geocode(query);
   }
 
-  async searchPlaces(query: string, limit: number, near?: GeoPoint): Promise<PlaceSuggestion[]> {
+  async searchPlaces(
+    query: string,
+    limit: number,
+    near?: GeoPoint,
+  ): Promise<PlaceSuggestion[]> {
     return (await this.port()).searchPlaces(query, limit, near);
   }
 
@@ -70,7 +78,10 @@ export class KeyedMapsPort implements MapsPort {
     return (await this.port()).reverseGeocode(point);
   }
 
-  async routeDistanceKm(origin: GeoPoint, destination: GeoPoint): Promise<number> {
+  async routeDistanceKm(
+    origin: GeoPoint,
+    destination: GeoPoint,
+  ): Promise<number> {
     return (await this.port()).routeDistanceKm(origin, destination);
   }
 
@@ -150,7 +161,10 @@ export class MockMapsPort implements MapsPort {
     };
   }
 
-  async routeDistanceKm(origin: GeoPoint, destination: GeoPoint): Promise<number> {
+  async routeDistanceKm(
+    origin: GeoPoint,
+    destination: GeoPoint,
+  ): Promise<number> {
     return haversineKm(origin, destination);
   }
 }
@@ -175,7 +189,10 @@ export class UnavailableMapsPort implements MapsPort {
     throw new UnavailableMapsError();
   }
 
-  async searchPlaces(_query: string, _limit: number): Promise<PlaceSuggestion[]> {
+  async searchPlaces(
+    _query: string,
+    _limit: number,
+  ): Promise<PlaceSuggestion[]> {
     throw new UnavailableMapsError();
   }
 
@@ -183,7 +200,10 @@ export class UnavailableMapsPort implements MapsPort {
     throw new UnavailableMapsError();
   }
 
-  async routeDistanceKm(_origin: GeoPoint, _destination: GeoPoint): Promise<number> {
+  async routeDistanceKm(
+    _origin: GeoPoint,
+    _destination: GeoPoint,
+  ): Promise<number> {
     throw new UnavailableMapsError();
   }
 }
@@ -234,16 +254,24 @@ export class GoongMapsPort implements MapsPort {
     return toSuggestions(await this.fetchJson(url), 1, 'goong')[0] ?? null;
   }
 
-  async routeDistanceKm(origin: GeoPoint, destination: GeoPoint): Promise<number> {
+  async routeDistanceKm(
+    origin: GeoPoint,
+    destination: GeoPoint,
+  ): Promise<number> {
     const url = new URL('https://rsapi.goong.io/DistanceMatrix');
     url.searchParams.set('origins', `${origin.lat},${origin.lng}`);
-    url.searchParams.set('destinations', `${destination.lat},${destination.lng}`);
+    url.searchParams.set(
+      'destinations',
+      `${destination.lat},${destination.lng}`,
+    );
     url.searchParams.set('vehicle', 'bike');
     url.searchParams.set('api_key', this.apiKey);
     const body = await this.fetchJson(url);
     const meters = body?.rows?.[0]?.elements?.[0]?.distance?.value;
     if (typeof meters !== 'number' || !Number.isFinite(meters) || meters < 0) {
-      throw new UnavailableMapsError('Goong distance matrix returned no distance');
+      throw new UnavailableMapsError(
+        'Goong distance matrix returned no distance',
+      );
     }
     return meters / 1000;
   }
@@ -263,7 +291,9 @@ export class GoongMapsPort implements MapsPort {
       if (error instanceof UnavailableMapsError) {
         throw error;
       }
-      this.logger.warn(`Goong request failed: ${error instanceof Error ? error.message : 'unknown'}`);
+      this.logger.warn(
+        `Goong request failed: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
       throw new UnavailableMapsError('Goong request failed');
     }
   }
@@ -294,7 +324,11 @@ export class MapboxMapsPort implements MapsPort {
     };
   }
 
-  async searchPlaces(query: string, limit: number, near?: GeoPoint): Promise<PlaceSuggestion[]> {
+  async searchPlaces(
+    query: string,
+    limit: number,
+    near?: GeoPoint,
+  ): Promise<PlaceSuggestion[]> {
     return this.forward(query, limit, near);
   }
 
@@ -311,9 +345,14 @@ export class MapboxMapsPort implements MapsPort {
     return mapboxFeaturesToSuggestions(body, 1)[0] ?? null;
   }
 
-  async routeDistanceKm(origin: GeoPoint, destination: GeoPoint): Promise<number> {
+  async routeDistanceKm(
+    origin: GeoPoint,
+    destination: GeoPoint,
+  ): Promise<number> {
     const pair = `${origin.lng},${origin.lat};${destination.lng},${destination.lat}`;
-    const url = new URL(`https://api.mapbox.com/directions/v5/mapbox/driving/${pair}`);
+    const url = new URL(
+      `https://api.mapbox.com/directions/v5/mapbox/driving/${pair}`,
+    );
     url.searchParams.set('access_token', this.accessToken);
     url.searchParams.set('overview', 'false');
     const body = await this.fetchJson(url);
@@ -324,7 +363,11 @@ export class MapboxMapsPort implements MapsPort {
     return meters / 1000;
   }
 
-  private async forward(query: string, limit: number, near?: GeoPoint): Promise<PlaceSuggestion[]> {
+  private async forward(
+    query: string,
+    limit: number,
+    near?: GeoPoint,
+  ): Promise<PlaceSuggestion[]> {
     const trimmed = query.trim();
     if (trimmed.length < 2) {
       return [];
@@ -390,22 +433,127 @@ export function cleanMapboxVnLabel(label: string): string {
 
 /**
  * Areas Mapbox's VN data sometimes returns without diacritics even with
- * language=vi (QA C6: "Hai Chau"). Whole comma-separated segments only.
+ * language=vi (QA C6: "Hai Chau"). Đà Nẵng, TP.HCM and Hà Nội districts + city names;
+ * whole comma-separated segments only. Keep in sync with mobile place.dart.
  */
 const VN_UNACCENTED_AREAS: Record<string, string> = {
-  'hai chau': 'Hải Châu',
-  'son tra': 'Sơn Trà',
-  'thanh khe': 'Thanh Khê',
-  'ngu hanh son': 'Ngũ Hành Sơn',
-  'lien chieu': 'Liên Chiểu',
+  'ba dinh': 'Ba Đình',
+  'bac tu liem': 'Bắc Từ Liêm',
+  'binh chanh': 'Bình Chánh',
+  'binh tan': 'Bình Tân',
+  'binh thanh': 'Bình Thạnh',
   'cam le': 'Cẩm Lệ',
-  'hoa vang': 'Hòa Vang',
+  'can gio': 'Cần Giờ',
+  'cau giay': 'Cầu Giấy',
+  'cu chi': 'Củ Chi',
   'da nang': 'Đà Nẵng',
-  'danang': 'Đà Nẵng',
   'da nang city': 'Đà Nẵng',
+  danang: 'Đà Nẵng',
+  'district 1': 'Quận 1',
+  'district 10': 'Quận 10',
+  'district 11': 'Quận 11',
+  'district 12': 'Quận 12',
+  'district 2': 'Quận 2',
+  'district 3': 'Quận 3',
+  'district 4': 'Quận 4',
+  'district 5': 'Quận 5',
+  'district 6': 'Quận 6',
+  'district 7': 'Quận 7',
+  'district 8': 'Quận 8',
+  'district 9': 'Quận 9',
+  'dong anh': 'Đông Anh',
+  'dong da': 'Đống Đa',
+  'gia lam': 'Gia Lâm',
+  'go vap': 'Gò Vấp',
+  'ha dong': 'Hà Đông',
+  'ha noi': 'Hà Nội',
+  'hai ba trung': 'Hai Bà Trưng',
+  'hai chau': 'Hải Châu',
+  hanoi: 'Hà Nội',
+  'ho chi minh': 'Hồ Chí Minh',
+  'ho chi minh city': 'Thành phố Hồ Chí Minh',
+  'hoa vang': 'Hòa Vang',
+  'hoan kiem': 'Hoàn Kiếm',
+  'hoang mai': 'Hoàng Mai',
+  'hoc mon': 'Hóc Môn',
+  'huyen binh chanh': 'Huyện Bình Chánh',
+  'huyen can gio': 'Huyện Cần Giờ',
+  'huyen cu chi': 'Huyện Củ Chi',
+  'huyen dong anh': 'Huyện Đông Anh',
+  'huyen gia lam': 'Huyện Gia Lâm',
+  'huyen hoa vang': 'Huyện Hòa Vang',
+  'huyen hoc mon': 'Huyện Hóc Môn',
+  'huyen me linh': 'Huyện Mê Linh',
+  'huyen nha be': 'Huyện Nhà Bè',
+  'huyen soc son': 'Huyện Sóc Sơn',
+  'huyen thanh tri': 'Huyện Thanh Trì',
+  'lien chieu': 'Liên Chiểu',
+  'long bien': 'Long Biên',
+  'me linh': 'Mê Linh',
+  'nam tu liem': 'Nam Từ Liêm',
+  'ngu hanh son': 'Ngũ Hành Sơn',
+  'nha be': 'Nhà Bè',
+  'phu nhuan': 'Phú Nhuận',
+  'quan 1': 'Quận 1',
+  'quan 10': 'Quận 10',
+  'quan 11': 'Quận 11',
+  'quan 12': 'Quận 12',
+  'quan 2': 'Quận 2',
+  'quan 3': 'Quận 3',
+  'quan 4': 'Quận 4',
+  'quan 5': 'Quận 5',
+  'quan 6': 'Quận 6',
+  'quan 7': 'Quận 7',
+  'quan 8': 'Quận 8',
+  'quan 9': 'Quận 9',
+  'quan ba dinh': 'Quận Ba Đình',
+  'quan bac tu liem': 'Quận Bắc Từ Liêm',
+  'quan binh tan': 'Quận Bình Tân',
+  'quan binh thanh': 'Quận Bình Thạnh',
+  'quan cam le': 'Quận Cẩm Lệ',
+  'quan cau giay': 'Quận Cầu Giấy',
+  'quan dong da': 'Quận Đống Đa',
+  'quan go vap': 'Quận Gò Vấp',
+  'quan ha dong': 'Quận Hà Đông',
+  'quan hai ba trung': 'Quận Hai Bà Trưng',
+  'quan hai chau': 'Quận Hải Châu',
+  'quan hoan kiem': 'Quận Hoàn Kiếm',
+  'quan hoang mai': 'Quận Hoàng Mai',
+  'quan lien chieu': 'Quận Liên Chiểu',
+  'quan long bien': 'Quận Long Biên',
+  'quan nam tu liem': 'Quận Nam Từ Liêm',
+  'quan ngu hanh son': 'Quận Ngũ Hành Sơn',
+  'quan phu nhuan': 'Quận Phú Nhuận',
+  'quan son tra': 'Quận Sơn Trà',
+  'quan tan binh': 'Quận Tân Bình',
+  'quan tan phu': 'Quận Tân Phú',
+  'quan tay ho': 'Quận Tây Hồ',
+  'quan thanh khe': 'Quận Thanh Khê',
+  'quan thanh xuan': 'Quận Thanh Xuân',
+  'sai gon': 'Sài Gòn',
+  saigon: 'Sài Gòn',
+  'soc son': 'Sóc Sơn',
+  'son tay': 'Sơn Tây',
+  'son tra': 'Sơn Trà',
+  'tan binh': 'Tân Bình',
+  'tan phu': 'Tân Phú',
+  'tay ho': 'Tây Hồ',
+  'thanh khe': 'Thanh Khê',
+  'thanh pho ha noi': 'Thành phố Hà Nội',
+  'thanh pho ho chi minh': 'Thành phố Hồ Chí Minh',
+  'thanh pho thu duc': 'Thành phố Thủ Đức',
+  'thanh tri': 'Thanh Trì',
+  'thanh xuan': 'Thanh Xuân',
+  'thi xa son tay': 'Thị xã Sơn Tây',
+  'thu duc': 'Thủ Đức',
+  'tp ho chi minh': 'TP. Hồ Chí Minh',
+  'tp. ho chi minh': 'TP. Hồ Chí Minh',
 };
 
-function mapboxFeaturesToSuggestions(body: MapboxJson, limit: number): PlaceSuggestion[] {
+function mapboxFeaturesToSuggestions(
+  body: MapboxJson,
+  limit: number,
+): PlaceSuggestion[] {
   const out: PlaceSuggestion[] = [];
   for (const feature of body?.features ?? []) {
     const center = feature.center;
@@ -423,7 +571,10 @@ function mapboxFeaturesToSuggestions(body: MapboxJson, limit: number): PlaceSugg
     if (!name) {
       continue;
     }
-    const number = feature.place_type?.[0] === 'address' ? feature.address?.trim() : undefined;
+    const number =
+      feature.place_type?.[0] === 'address'
+        ? feature.address?.trim()
+        : undefined;
     out.push({
       lat,
       lng,
@@ -448,7 +599,11 @@ function toSuggestions(
   for (const result of body?.results ?? []) {
     const location = result.geometry?.location;
     const address = result.formatted_address;
-    if (typeof location?.lat !== 'number' || typeof location?.lng !== 'number' || !address) {
+    if (
+      typeof location?.lat !== 'number' ||
+      typeof location?.lng !== 'number' ||
+      !address
+    ) {
       continue;
     }
     const name = result.name?.trim() || address.split(',')[0].trim();
@@ -460,7 +615,10 @@ function toSuggestions(
   return out;
 }
 
-function mapboxKind(feature: { place_type?: string[]; address?: string }): PlaceKind {
+function mapboxKind(feature: {
+  place_type?: string[];
+  address?: string;
+}): PlaceKind {
   const type = feature.place_type?.[0];
   if (type === 'address') {
     return feature.address ? 'address' : 'street';

@@ -19,6 +19,25 @@ void main() {
       );
     });
 
+    test('restores TP.HCM and Hà Nội district accents', () {
+      expect(
+        cleanPlaceText('12 Nguyễn Huệ, Quan 1, Ho Chi Minh City, 700000'),
+        '12 Nguyễn Huệ, Quận 1, Thành phố Hồ Chí Minh',
+      );
+      expect(
+        cleanPlaceText('Phan Xích Long, Phu Nhuan, Thu Duc'),
+        'Phan Xích Long, Phú Nhuận, Thủ Đức',
+      );
+      expect(
+        cleanPlaceText('Tràng Tiền, Hoan Kiem, Ha Noi 100000'),
+        'Tràng Tiền, Hoàn Kiếm, Hà Nội',
+      );
+      expect(
+        cleanPlaceText('Xuân Thủy, Quan Cau Giay, Hanoi'),
+        'Xuân Thủy, Quận Cầu Giấy, Hà Nội',
+      );
+    });
+
     test('removes a segment repeated back to back, keeps house number', () {
       expect(
         cleanPlaceText(

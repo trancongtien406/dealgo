@@ -5,17 +5,35 @@ describe('Mapbox VN geocoding', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it('strips the Malay "Jalan" prefix Mapbox puts on some VN streets', () => {
-    expect(cleanMapboxVnLabel('Jalan Nguyen Hue, Bến Nghé, Thành phố Hồ Chí Minh')).toBe(
-      'Nguyen Hue, Bến Nghé, Thành phố Hồ Chí Minh',
+    expect(
+      cleanMapboxVnLabel('Jalan Nguyen Hue, Bến Nghé, Thành phố Hồ Chí Minh'),
+    ).toBe('Nguyen Hue, Bến Nghé, Thành phố Hồ Chí Minh');
+    expect(cleanMapboxVnLabel('Nguyễn Huệ, Bến Nghé')).toBe(
+      'Nguyễn Huệ, Bến Nghé',
     );
-    expect(cleanMapboxVnLabel('Nguyễn Huệ, Bến Nghé')).toBe('Nguyễn Huệ, Bến Nghé');
   });
 
   it('drops postal codes and the country, and restores VN diacritics on known areas', () => {
     expect(
-      cleanMapboxVnLabel('3 Nguyễn Văn Linh, Hai Chau, Đà Nẵng 550000, Việt Nam'),
+      cleanMapboxVnLabel(
+        '3 Nguyễn Văn Linh, Hai Chau, Đà Nẵng 550000, Việt Nam',
+      ),
     ).toBe('3 Nguyễn Văn Linh, Hải Châu, Đà Nẵng');
-    expect(cleanMapboxVnLabel('Trưng Nữ Vương, 550000, Da Nang')).toBe('Trưng Nữ Vương, Đà Nẵng');
+    expect(cleanMapboxVnLabel('Trưng Nữ Vương, 550000, Da Nang')).toBe(
+      'Trưng Nữ Vương, Đà Nẵng',
+    );
+    expect(
+      cleanMapboxVnLabel('12 Nguyễn Huệ, Quan 1, Ho Chi Minh City, 700000'),
+    ).toBe('12 Nguyễn Huệ, Quận 1, Thành phố Hồ Chí Minh');
+    expect(cleanMapboxVnLabel('Phan Xích Long, Phu Nhuan, Thu Duc')).toBe(
+      'Phan Xích Long, Phú Nhuận, Thủ Đức',
+    );
+    expect(cleanMapboxVnLabel('Tràng Tiền, Hoan Kiem, Ha Noi 100000')).toBe(
+      'Tràng Tiền, Hoàn Kiếm, Hà Nội',
+    );
+    expect(cleanMapboxVnLabel('Xuân Thủy, Quan Cau Giay, Hanoi')).toBe(
+      'Xuân Thủy, Quận Cầu Giấy, Hà Nội',
+    );
   });
 
   it('forward search sends language=vi, country=vn and proximity=caller location', async () => {
@@ -24,12 +42,21 @@ describe('Mapbox VN geocoding', () => {
       calls.push(new URL(url));
       return new Response(
         JSON.stringify({
-          features: [{ text: 'Jalan Nguyen Hue', place_name: 'Jalan Nguyen Hue, Bến Nghé', center: [106.703, 10.774] }],
+          features: [
+            {
+              text: 'Jalan Nguyen Hue',
+              place_name: 'Jalan Nguyen Hue, Bến Nghé',
+              center: [106.703, 10.774],
+            },
+          ],
         }),
       );
     });
     const port = new MapboxMapsPort('pk.test');
-    const out = await port.searchPlaces('Nguyen Hue', 3, { lat: 10.7745, lng: 106.703 });
+    const out = await port.searchPlaces('Nguyen Hue', 3, {
+      lat: 10.7745,
+      lng: 106.703,
+    });
     const p = calls[0]!.searchParams;
     expect(p.get('language')).toBe('vi');
     expect(p.get('country')).toBe('vn');
@@ -42,7 +69,9 @@ describe('Mapbox VN geocoding', () => {
   });
   it('drops a leading postal code and restores accents (QA smoke)', () => {
     expect(
-      cleanMapboxVnLabel('Đường Nguyễn Văn Linh, Bình Hiên, 50200 Hai Chau, Đà Nẵng, Việt Nam'),
+      cleanMapboxVnLabel(
+        'Đường Nguyễn Văn Linh, Bình Hiên, 50200 Hai Chau, Đà Nẵng, Việt Nam',
+      ),
     ).toBe('Đường Nguyễn Văn Linh, Bình Hiên, Hải Châu, Đà Nẵng');
   });
 });
