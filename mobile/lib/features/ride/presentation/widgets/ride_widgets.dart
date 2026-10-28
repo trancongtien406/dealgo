@@ -767,3 +767,20 @@ String rideOfferKindLabel(AppLocalizations l10n, RideOfferKind kind) {
     RideOfferKind.counter => l10n.rideOfferKindCounter,
   };
 }
+
+/// Tallest a ride sheet may grow: its top edge stays under the status bar +
+/// floating back button (44 pt + gaps), never higher than 86%.
+double rideSheetMaxSize(MediaQueryData media) {
+  final height = media.size.height;
+  if (height <= 0) return 0.86;
+  final reserved =
+      media.padding.top + DealGoSpacing.s8 + 44 + DealGoSpacing.s12;
+  return ((height - reserved) / height).clamp(0.7, 0.86).toDouble();
+}
+
+/// Snap points kept strictly below [maxSize], so a capped sheet never snaps
+/// past its own max (DraggableScrollableSheet asserts snaps < max).
+List<double> rideSheetSnapSizes(List<double> wanted, double maxSize) => [
+  for (final size in wanted)
+    if (size < maxSize - 0.01) size,
+];

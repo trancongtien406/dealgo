@@ -361,8 +361,13 @@ class _MatchingWait extends StatelessWidget {
         RideDraggableSheet(
           initialChildSize: 0.46,
           minChildSize: 0.28,
-          maxChildSize: 0.88,
-          snapSizes: const [0.28, 0.46, 0.72],
+          // Max + snaps together keep the sheet under the back button.
+          maxChildSize: rideSheetMaxSize(MediaQuery.of(context)),
+          snapSizes: rideSheetSnapSizes(const [
+            0.28,
+            0.46,
+            0.72,
+          ], rideSheetMaxSize(MediaQuery.of(context))),
           builder: (context, scrollController) {
             return Column(
               children: [

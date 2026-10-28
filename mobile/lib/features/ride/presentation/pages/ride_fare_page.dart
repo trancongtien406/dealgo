@@ -395,8 +395,25 @@ class _RideFarePageState extends State<_RideFareView> {
             RideDraggableSheet(
               initialChildSize: 0.56,
               minChildSize: 0.32,
-              maxChildSize: 0.92,
-              snapSizes: const [0.32, 0.56, 0.78],
+              // Max + snaps together keep the sheet under the back button.
+              maxChildSize: rideSheetMaxSize(MediaQuery.of(context)),
+              snapSizes: rideSheetSnapSizes(const [
+                0.32,
+                0.56,
+                0.78,
+              ], rideSheetMaxSize(MediaQuery.of(context))),
+              builder: (context, scrollController) {
+                return Column(
+                  children: [
+                    Expanded(
+                      child: ListView(
+                        controller: scrollController,
+                        padding: const EdgeInsets.fromLTRB(
+                          DealGoDimensions.pageGutter,
+                          DealGoSpacing.s12,
+                          DealGoDimensions.pageGutter,
+                          DealGoSpacing.s8,
+                        ),
                         children: [
                           const RideSheetHandle(),
                           const SizedBox(height: DealGoSpacing.s8),

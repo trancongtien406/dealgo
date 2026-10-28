@@ -4,6 +4,7 @@ import 'package:dealgo/features/food/domain/usecases/list_food_stores.dart';
 import 'package:dealgo/features/food/presentation/cubit/food_cart_cubit.dart';
 import 'package:dealgo/features/food/presentation/cubit/food_discovery_cubit.dart';
 import 'package:dealgo/features/ride/presentation/pages/ride_map_page.dart';
+import 'package:dealgo/features/ride/presentation/widgets/ride_widgets.dart';
 import 'package:dealgo/features/ride/presentation/utils/ride_distance.dart';
 import 'package:dealgo/l10n/app_localizations_vi.dart';
 import 'package:dealgo/core/maps/map_markers.dart';
@@ -112,6 +113,18 @@ void main() {
     // Sheet top edge (px from the top) clears status bar + 44pt back button.
     expect(874 * (1 - max), greaterThanOrEqualTo(62 + 44));
     expect(max, lessThanOrEqualTo(0.86));
+  });
+
+  test('ride price sheet: snaps stay below the capped max on small phones', () {
+    const se = MediaQueryData(
+      size: Size(375, 667),
+      padding: EdgeInsets.only(top: 20),
+    );
+    final max = rideSheetMaxSize(se);
+    expect(667 * (1 - max), greaterThanOrEqualTo(20 + 44));
+    final snaps = rideSheetSnapSizes(const [0.32, 0.56, 0.78], max);
+    expect(snaps, everyElement(lessThan(max)));
+    expect(snaps, containsAll(<double>[0.32, 0.56]));
   });
 
   test('C7: destination-only map labels the stop "Đến", not "Đón"', () {
