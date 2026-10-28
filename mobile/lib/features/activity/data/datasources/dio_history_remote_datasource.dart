@@ -67,8 +67,10 @@ List<HistoryItem> decodeHistoryList(Object? body, {required HistoryKind kind}) {
       continue;
     }
     final status = (map['status'] as String?) ?? '';
+    final agreed = _asInt(map['agreedFareVnd']);
+    // Multi-stop rides: the receipt total includes the stop wait fee.
     final amount =
-        _asInt(map['agreedFareVnd']) ??
+        (agreed == null ? null : agreed + (_asInt(map['waitFeeVnd']) ?? 0)) ??
         _asInt(map['totalVnd']) ??
         _asInt(map['amountVnd']);
     final title = switch (kind) {
