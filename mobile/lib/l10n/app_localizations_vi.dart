@@ -394,6 +394,12 @@ class AppLocalizationsVi extends AppLocalizations {
   String get rideCancelReasonAddress => 'Sai điểm đón/đến';
 
   @override
+  String get rideCancelBookAgain => 'Đặt chuyến khác';
+
+  @override
+  String get rideCancelReasonOptional => 'Lý do hủy (không bắt buộc)';
+
+  @override
   String get rideCancelReasonDriver => 'Vấn đề với tài xế';
 
   @override
@@ -3042,7 +3048,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get merchantOrderRefLabel => 'Mã đơn';
 
   @override
-  String get merchantLineCountLabel => 'Số loại món';
+  String get merchantLineCountLabel => 'Số món';
 
   @override
   String get merchantHandoffCodLabel => 'Tiền món (COD)';
@@ -4773,6 +4779,9 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get merchantItemCreateFailed => 'Không thêm được món.';
+
+  @override
+  String get foodStageAwaitingStore => 'Chờ quán xác nhận';
 
   @override
   String get foodStagePreparing => 'Đang chuẩn bị món';

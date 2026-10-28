@@ -11,6 +11,7 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/ride_models.dart';
 import '../../domain/usecases/cancel_ride.dart';
+import '../../domain/params/get_ride_params.dart';
 import '../../domain/usecases/get_ride.dart';
 import '../../domain/usecases/select_ride_offer.dart';
 import '../cubit/ride_offers_cubit.dart';
@@ -54,12 +55,43 @@ class _RideCancelViewState extends State<_RideCancelView> {
   String? _message;
   var _done = false;
 
+  /// QA C9: while still searching (no driver yet) the reason is optional and
+  /// "Vấn đề với tài xế" makes no sense. Unknown until the ride is read.
+  bool _hasDriver = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _readRide());
+  }
+
+  Future<void> _readRide() async {
+    try {
+      final token = rideAccessToken(context);
+      if (token == null) return;
+      final ride = await context.read<GetRide>()(
+        GetRideParams(accessToken: token, rideId: widget.rideId),
+      );
+      if (!mounted) return;
+      setState(
+        () => _hasDriver =
+            ride.assignedDriverId != null &&
+            ride.status != RideStatus.negotiating,
+      );
+    } catch (_) {
+      // Keep the strict picker; the cancel call itself reports errors.
+    }
+  }
+
+  bool get _reasonRequired => _hasDriver;
+
   List<_CancelReason> _reasons(AppLocalizations l10n) {
     return [
       _CancelReason(id: 'wait_too_long', label: l10n.rideCancelReasonWait),
       _CancelReason(id: 'changed_plans', label: l10n.rideCancelReasonPlans),
       _CancelReason(id: 'wrong_address', label: l10n.rideCancelReasonAddress),
-      _CancelReason(id: 'driver_issue', label: l10n.rideCancelReasonDriver),
+      if (_hasDriver)
+        _CancelReason(id: 'driver_issue', label: l10n.rideCancelReasonDriver),
       _CancelReason(id: 'other', label: l10n.rideCancelReasonOther),
     ];
   }
@@ -78,7 +110,7 @@ class _RideCancelViewState extends State<_RideCancelView> {
   }
 
   Future<void> _confirm() async {
-    if (_busy || _reasonId == null) {
+    if (_busy || (_reasonRequired && _reasonId == null)) {
       return;
     }
     final token = rideAccessToken(context);
@@ -143,7 +175,12 @@ class _RideCancelViewState extends State<_RideCancelView> {
                   DealGoSpacing.s16,
                 ),
                 children: [
-                  Text(l10n.rideCancelPickReason, style: textTheme.titleMedium),
+                  Text(
+                    _reasonRequired
+                        ? l10n.rideCancelPickReason
+                        : l10n.rideCancelReasonOptional,
+                    style: textTheme.titleMedium,
+                  ),
                   const SizedBox(height: DealGoSpacing.s12),
                   for (final reason in reasons) ...[
                     _ReasonTile(
@@ -176,8 +213,9 @@ class _RideCancelViewState extends State<_RideCancelView> {
               child: _done
                   ? DealGoPrimaryButton(
                       key: const Key('ride-cancel-done'),
-                      label: l10n.actionBack,
-                      onPressed: () => context.go('/customer'),
+                      // QA C9: not a dead end — go straight back to booking.
+                      label: l10n.rideCancelBookAgain,
+                      onPressed: () => context.go('/customer/book'),
                     )
                   : Row(
                       children: [
@@ -195,7 +233,7 @@ class _RideCancelViewState extends State<_RideCancelView> {
                             key: const Key('ride-cancel-confirm'),
                             label: l10n.rideCancelConfirm,
                             isLoading: _busy,
-                            enabled: _reasonId != null,
+                            enabled: !_reasonRequired || _reasonId != null,
                             onPressed: _confirm,
                           ),
                         ),

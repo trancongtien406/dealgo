@@ -526,6 +526,8 @@ export type QueueOrderSummary = {
   totalVnd: number;
   dropoff: { lat: number; lng: number; label: string };
   lineCount: number;
+  /** QA M3: dishes by quantity (2× Phở = 2), what the merchant list shows. */
+  itemCount: number;
   createdAt: Date;
   /** Internal: resolved to masked display names by FoodService, never returned. */
   customerId: string;
@@ -1409,6 +1411,7 @@ export class MemoryFoodRepository implements FoodRepository {
         totalVnd: order.totalVnd,
         dropoff: { ...order.dropoff },
         lineCount: order.lines.length,
+        itemCount: order.lines.reduce((sum, line) => sum + line.quantity, 0),
         createdAt: new Date(order.createdAt),
         customerId: order.customerId,
         assignedDriverId: order.assignedDriverId,

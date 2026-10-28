@@ -373,7 +373,9 @@ class _RideMapPageState extends State<RideMapPage> {
               RideDraggableSheet(
                 initialChildSize: 0.42,
                 minChildSize: 0.26,
-                maxChildSize: 0.86,
+                // QA C8: stop the expanded sheet below the floating back
+                // button so it never sits on the "Điểm đón" label.
+                maxChildSize: rideSheetMaxSize(MediaQuery.of(context)),
                 snapSizes: const [0.26, 0.42, 0.68],
                 builder: (context, scrollController) {
                   return Column(
@@ -586,4 +588,14 @@ String rideDistanceText(AppLocalizations l10n, RideDistance distance) {
   if (!distance.road) return '~$text';
   final minutes = distance.minutes;
   return minutes == null ? text : '$text · ${l10n.rideEtaMinutes(minutes)}';
+}
+
+/// Tallest the booking sheet may grow: its top edge stays under the status
+/// bar + floating back button (44 pt + gaps), never higher than 86%.
+double rideSheetMaxSize(MediaQueryData media) {
+  final height = media.size.height;
+  if (height <= 0) return 0.86;
+  final reserved =
+      media.padding.top + DealGoSpacing.s8 + 44 + DealGoSpacing.s12;
+  return ((height - reserved) / height).clamp(0.7, 0.86).toDouble();
 }

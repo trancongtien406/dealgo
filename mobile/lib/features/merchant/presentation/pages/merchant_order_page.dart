@@ -244,17 +244,9 @@ class _Detail extends StatelessWidget {
                 const SizedBox(height: DealGoSpacing.s8),
                 Row(
                   children: [
-                    Expanded(
-                      child: Text(
-                        AppLocalizations.of(context)
-                            .orderRef(shortRef(order.id)),
-                        style: textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
+                    // QA M5: the badge is the single order ref on this card.
                     HandoverRefBadge(orderId: order.id, dense: true),
-                    const SizedBox(width: DealGoSpacing.s8),
+                    const Spacer(),
                     if (placedAt != null)
                       MerchantChip(
                         label: l10n.merchantOrderPlacedAt(

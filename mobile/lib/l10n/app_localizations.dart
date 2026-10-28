@@ -848,6 +848,18 @@ abstract class AppLocalizations {
   /// **'Wrong pickup / drop-off'**
   String get rideCancelReasonAddress;
 
+  /// No description provided for @rideCancelBookAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Book another ride'**
+  String get rideCancelBookAgain;
+
+  /// No description provided for @rideCancelReasonOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason (optional)'**
+  String get rideCancelReasonOptional;
+
   /// No description provided for @rideCancelReasonDriver.
   ///
   /// In en, this message translates to:
@@ -5873,7 +5885,7 @@ abstract class AppLocalizations {
   /// No description provided for @merchantLineCountLabel.
   ///
   /// In en, this message translates to:
-  /// **'Item types'**
+  /// **'Items'**
   String get merchantLineCountLabel;
 
   /// No description provided for @merchantHandoffCodLabel.
@@ -9055,6 +9067,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t add the item.'**
   String get merchantItemCreateFailed;
+
+  /// No description provided for @foodStageAwaitingStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the store to confirm'**
+  String get foodStageAwaitingStore;
 
   /// No description provided for @foodStagePreparing.
   ///

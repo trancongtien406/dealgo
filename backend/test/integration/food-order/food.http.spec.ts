@@ -453,6 +453,7 @@ describe('food order http', () => {
       totalVnd: created.body.data.totalVnd,
       dropoff,
       lineCount: (created.body.data.lines as unknown[]).length,
+      itemCount: expect.any(Number),
       createdAt: expect.any(String),
       customerName: maskPersonName(
         (await repository.findUserById(customer.userId))?.displayName,

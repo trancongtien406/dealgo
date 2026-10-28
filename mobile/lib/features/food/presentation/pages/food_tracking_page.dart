@@ -641,6 +641,8 @@ String foodTrackingTitle(
   FoodTrackingStage stage, {
   String? status,
 }) {
+  // QA C11: a PLACED order is still waiting for the store, not cooking.
+  if (status == 'PLACED') return l10n.foodStageAwaitingStore;
   if (stage == FoodTrackingStage.onTheWay) {
     switch (status) {
       case 'READY':
@@ -733,6 +735,8 @@ class _FoodOnTheWayMap extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final chipLabel = tracking
         ? l10n.foodTrackingMapChip
+        : order.status == 'PLACED'
+        ? l10n.foodStageAwaitingStore
         : l10n.foodTrackingMapWaitingDriver;
     return Stack(
       fit: StackFit.expand,

@@ -79,4 +79,28 @@ void main() {
     expect(find.byKey(const Key('ride-cancel-confirm')), findsOneWidget);
     expect(find.byKey(const Key('ride-cancel-keep')), findsOneWidget);
   });
+
+  testWidgets(
+    'QA C9: while searching the reason is optional and has no driver option',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(400, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final rides = FakeRideClient()
+        ..onGet = ((_) => _ride(RideStatus.negotiating))
+        ..onCancel = ((_) => _ride(RideStatus.cancelled));
+      await pumpSignedIn(tester, profile: _customer, rideClient: rides);
+      final context = tester.element(find.byType(Scaffold).first);
+      GoRouter.of(context).push(RideRoutes.cancel('ride-1'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('ride-cancel-reason-driver_issue')),
+        findsNothing,
+      );
+      expect(find.text('Lý do hủy (không bắt buộc)'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('ride-cancel-confirm')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('ride-cancel-done')), findsOneWidget);
+      expect(find.text('Đặt chuyến khác'), findsOneWidget);
+    },
+  );
 }

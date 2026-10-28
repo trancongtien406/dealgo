@@ -393,6 +393,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rideCancelReasonAddress => 'Wrong pickup / drop-off';
 
   @override
+  String get rideCancelBookAgain => 'Book another ride';
+
+  @override
+  String get rideCancelReasonOptional => 'Reason (optional)';
+
+  @override
   String get rideCancelReasonDriver => 'Issue with the driver';
 
   @override
@@ -3064,7 +3070,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get merchantOrderRefLabel => 'Order code';
 
   @override
-  String get merchantLineCountLabel => 'Item types';
+  String get merchantLineCountLabel => 'Items';
 
   @override
   String get merchantHandoffCodLabel => 'Food value (COD)';
@@ -4803,6 +4809,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get merchantItemCreateFailed => 'Couldn\'t add the item.';
+
+  @override
+  String get foodStageAwaitingStore => 'Waiting for the store to confirm';
 
   @override
   String get foodStagePreparing => 'Preparing your food';

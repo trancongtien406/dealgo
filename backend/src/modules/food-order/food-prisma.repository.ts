@@ -1867,6 +1867,7 @@ export class PrismaFoodRepository implements FoodRepository {
         customerId: true,
         assignedDriverId: true,
         _count: { select: { lines: true } },
+        lines: { select: { quantity: true } },
       },
     });
     return orders.flatMap((order) => {
@@ -1887,6 +1888,7 @@ export class PrismaFoodRepository implements FoodRepository {
             label: order.dropoffLabel,
           },
           lineCount: order._count.lines,
+          itemCount: order.lines.reduce((sum, line) => sum + line.quantity, 0),
           createdAt: order.createdAt,
           customerId: order.customerId,
           assignedDriverId: order.assignedDriverId,
