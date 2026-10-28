@@ -363,7 +363,7 @@ void main() {
       };
     await _pumpCustomer(tester, food: food);
     await _push(tester, FoodRoutes.store('store-bun-bo'));
-    expect(find.text('~45 phút'), findsWidgets);
+    expect(find.text('Khoảng 45 phút'), findsWidgets);
   });
 
   testWidgets('food on the way map shows store pickup and dropoff', (

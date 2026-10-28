@@ -848,6 +848,18 @@ abstract class AppLocalizations {
   /// **'Wrong pickup / drop-off'**
   String get rideCancelReasonAddress;
 
+  /// No description provided for @rideCancelBookAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Book another ride'**
+  String get rideCancelBookAgain;
+
+  /// No description provided for @rideCancelReasonOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason (optional)'**
+  String get rideCancelReasonOptional;
+
   /// No description provided for @rideCancelReasonDriver.
   ///
   /// In en, this message translates to:
@@ -4562,6 +4574,12 @@ abstract class AppLocalizations {
   /// **'Pickup and destination are the same.'**
   String get rideSamePlaces;
 
+  /// No description provided for @rideEtaMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String rideEtaMinutes(int minutes);
+
   /// No description provided for @rideDistanceKm.
   ///
   /// In en, this message translates to:
@@ -5786,6 +5804,12 @@ abstract class AppLocalizations {
   /// **'Ready'**
   String get merchantMarkReady;
 
+  /// No description provided for @merchantHandoffAwaitDriver.
+  ///
+  /// In en, this message translates to:
+  /// **'The driver has not confirmed pickup yet. Give them the handover code to finish.'**
+  String get merchantHandoffAwaitDriver;
+
   /// No description provided for @merchantMarkHandedOver.
   ///
   /// In en, this message translates to:
@@ -5861,7 +5885,7 @@ abstract class AppLocalizations {
   /// No description provided for @merchantLineCountLabel.
   ///
   /// In en, this message translates to:
-  /// **'Item types'**
+  /// **'Items'**
   String get merchantLineCountLabel;
 
   /// No description provided for @merchantHandoffCodLabel.
@@ -9043,6 +9067,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t add the item.'**
   String get merchantItemCreateFailed;
+
+  /// No description provided for @foodStageAwaitingStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the store to confirm'**
+  String get foodStageAwaitingStore;
 
   /// No description provided for @foodStagePreparing.
   ///

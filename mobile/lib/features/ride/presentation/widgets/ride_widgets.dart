@@ -340,8 +340,8 @@ class RideStopField extends StatelessWidget {
                       Text(caption, style: textTheme.labelSmall),
                       Text(
                         chosen ?? placeholder,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        // Full address wraps; never cut the house number off.
+                        softWrap: true,
                         style: textTheme.bodyMedium?.copyWith(
                           fontWeight: chosen == null
                               ? FontWeight.w400

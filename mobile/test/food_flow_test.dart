@@ -7,6 +7,7 @@ import 'package:dealgo/features/food/domain/entities/food_models.dart';
 import 'package:dealgo/features/food/presentation/cubit/food_cart_cubit.dart';
 import 'package:dealgo/core/network/api_exception.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dealgo/features/food/presentation/utils/food_routes.dart';
@@ -242,6 +243,62 @@ void main() {
     expect(find.text('61.000đ'), findsOneWidget);
     expect(find.text('Bạn đang ngoại tuyến'), findsNothing);
   });
+
+  testWidgets('checkout: the sticky order bar never covers the last section', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await _openCheckout(tester, _catalogClient());
+    final list = tester.widget<ListView>(
+      find.byKey(const Key('food-checkout-scroll')),
+    );
+    final bottomPad = (list.padding! as EdgeInsets).bottom;
+    final ctaTop = tester
+        .getRect(find.byKey(const Key('food-place-order')))
+        .top;
+    // Reserved space under the last card covers the whole sticky bar.
+    expect(bottomPad, greaterThanOrEqualTo(800 - ctaTop));
+  });
+
+  testWidgets(
+    'QA C1/C2: after ordering the cart is empty and back never returns to checkout',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(400, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final food = _catalogClient()
+        ..placedOrder = const PlacedFoodOrder(
+          id: 'order-1',
+          status: 'PLACED',
+          subtotalVnd: 60000,
+          deliveryFareVnd: 25000,
+          totalVnd: 85000,
+          lines: [
+            FoodOrderLine(
+              itemId: _bunId,
+              name: 'Bún bò đặc biệt',
+              unitPriceVnd: 60000,
+              quantity: 1,
+            ),
+          ],
+        );
+      await _openCheckout(tester, food);
+      await tester.tap(find.byKey(const Key('food-place-order')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('food-order-success-title')), findsOneWidget);
+      final ctx = tester.element(
+        find.byKey(const Key('food-order-success-title')),
+      );
+      expect(ctx.read<FoodCartCubit>().state.lines, isEmpty);
+
+      await tester.tap(find.byKey(const Key('food-track-order')));
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('food-place-order')), findsNothing);
+      expect(find.byKey(const Key('food-checkout-empty')), findsNothing);
+    },
+  );
 
   testWidgets('empty checkout shows clear empty state and back-to-menu CTA', (
     tester,

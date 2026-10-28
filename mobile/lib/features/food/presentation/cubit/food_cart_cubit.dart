@@ -567,6 +567,24 @@ class FoodCartCubit extends Cubit<FoodCartState> {
     if (!_placed.isClosed) _placed.add(null);
   }
 
+  /// QA C1 — the order was accepted: empty the cart so it cannot be placed
+  /// twice. The drop-off is kept for the next order; a fresh key is minted.
+  void clearAfterOrder() {
+    final prev = state;
+    emit(
+      FoodCartState(
+        storeId: null,
+        storeName: null,
+        lines: const [],
+        deliveryFareVnd: null,
+        dropoffLabel: prev.dropoffLabel,
+        dropoffLat: prev.dropoffLat,
+        dropoffLng: prev.dropoffLng,
+        idempotencyKey: createFoodIdempotencyKey(),
+      ),
+    );
+  }
+
   final _placed = StreamController<void>.broadcast(sync: true);
 
   /// T85 — fires when an order from this cart was accepted (key rotated).

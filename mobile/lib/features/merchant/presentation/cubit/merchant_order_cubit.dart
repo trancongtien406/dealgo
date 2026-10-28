@@ -209,6 +209,8 @@ class MerchantOrderCubit extends Cubit<MerchantOrderViewState> {
           clearHandoverCode: detail.handoverCode == null,
           pendingChange: detail.pendingChange,
           clearPendingChange: detail.pendingChange?.pending != true,
+          handoffDone:
+              latest.handoffDone || handedOverStatuses.contains(detail.status),
         ),
       );
       _syncAutoRefresh();
@@ -249,8 +251,29 @@ class MerchantOrderCubit extends Cubit<MerchantOrderViewState> {
     await loadLines(accessToken);
   }
 
-  void markHandoffDone() {
-    emit(_ready.copyWith(handoffDone: true));
+  /// Food has left the store once the driver confirmed pickup (DEC-PROD-036:
+  /// ASSIGNED → PICKED_UP is the driver's call, with the handover code).
+  static const handedOverStatuses = {'PICKED_UP', 'DELIVERING', 'DELIVERED'};
+
+  /// QA M1 — "Đã bàn giao hàng" is never a local-only flag: re-read the order
+  /// from the server and only mark it handed over when the driver's pickup is
+  /// recorded; otherwise explain that the driver confirms with the code.
+  Future<void> confirmHandoff(String? accessToken) async {
+    final token = accessToken?.trim() ?? '';
+    if (token.isEmpty || _ready.busy) return;
+    emit(_ready.copyWith(busy: true, clearMessage: true));
+    await loadLines(token);
+    if (isClosed) return;
+    final done = handedOverStatuses.contains(_ready.order.status);
+    emit(
+      _ready.copyWith(
+        busy: false,
+        handoffDone: done,
+        message: done
+            ? null
+            : UiMessage((l10n) => l10n.merchantHandoffAwaitDriver),
+      ),
+    );
   }
 
   Future<void> reload(String? accessToken) async {

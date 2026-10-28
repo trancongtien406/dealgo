@@ -111,10 +111,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byType(DriverActiveRidePage), findsNothing);
-    expect(
-      find.textContaining('Chuyến đã chuyển'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Chuyến đã chuyển'), findsOneWidget);
     expect(
       find.textContaining('Bạn chưa bắt đầu đi đón khách đúng hạn.'),
       findsOneWidget,

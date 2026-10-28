@@ -61,7 +61,10 @@ export class GoogleMapsPort implements MapsPort {
     url.searchParams.set('address', query);
     url.searchParams.set('region', 'vn');
     url.searchParams.set('language', 'vi');
-    const first = (await this.geocodeResults(url))[0];
+    // Google may list a plus code or the bare street ("route") first; prefer
+    // the street address so the label keeps its house number ("3 Nguyễn Văn Linh").
+    const results = await this.geocodeResults(url);
+    const first = results.find((r) => r.kind === 'address') ?? results[0];
     if (!first) {
       throw new UnavailableMapsError('Google geocode returned no result');
     }
@@ -130,7 +133,10 @@ export class GoogleMapsPort implements MapsPort {
     url.searchParams.set('latlng', `${point.lat},${point.lng}`);
     url.searchParams.set('language', 'vi');
     url.searchParams.set('region', 'vn');
-    const first = (await this.geocodeResults(url))[0];
+    // Google may list a plus code or the bare street ("route") first; prefer
+    // the street address so the label keeps its house number ("3 Nguyễn Văn Linh").
+    const results = await this.geocodeResults(url);
+    const first = results.find((r) => r.kind === 'address') ?? results[0];
     return first
       ? { lat: point.lat, lng: point.lng, name: first.name, address: first.address, provider: 'google', kind: first.kind }
       : null;

@@ -22,6 +22,7 @@ import '../widgets/merchant_widgets.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/format/short_ref.dart';
 import '../../../../core/design_system/components/dealgo_nav_insets.dart';
+import '../../../../core/design_system/components/dealgo_refresh.dart';
 
 class MerchantHomePage extends StatefulWidget {
   const MerchantHomePage({super.key});
@@ -36,14 +37,24 @@ class _MerchantHomePageState extends State<MerchantHomePage> {
     catalog: context.read<GetMerchantCatalog>(),
   );
 
+  // QA M2 — back in the foreground: refetch silently (sockets may have been
+  // suspended while the app was in the background).
+  late final AppLifecycleListener _lifecycle = AppLifecycleListener(
+    onResume: () {
+      if (mounted) unawaited(context.read<MerchantQueueCubit>().refresh());
+    },
+  );
+
   @override
   void initState() {
     super.initState();
+    _lifecycle;
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     _stats.close();
     super.dispose();
   }
@@ -130,249 +141,258 @@ class _Dashboard extends StatelessWidget {
     return MerchantPageFrame(
       title: l10n.merchantHomeTitle,
       showBack: false,
-      body: ListView(
-        padding: dealGoScrollPadding(context, merchantPagePadding),
-        children: [
-          if (store != null && !store.hasLocation) ...[
-            DealGoBanner(
-              key: const Key('merchant-home-pin-missing'),
-              tone: DealGoBannerTone.warning,
-              message: l10n.merchantLocationUnset,
-              actionLabel: l10n.merchantLocationPinNow,
-              onAction: () async {
-                await context.push(MerchantRoutes.location);
-                onRefresh();
-              },
+      body: DealGoRefresh(
+        key: const Key('merchant-home-refresh'),
+        onRefresh: () async {
+          onRefresh();
+          await context.read<MerchantQueueCubit>().refresh();
+        },
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: dealGoScrollPadding(context, merchantPagePadding),
+          children: [
+            if (store != null && !store.hasLocation) ...[
+              DealGoBanner(
+                key: const Key('merchant-home-pin-missing'),
+                tone: DealGoBannerTone.warning,
+                message: l10n.merchantLocationUnset,
+                actionLabel: l10n.merchantLocationPinNow,
+                onAction: () async {
+                  await context.push(MerchantRoutes.location);
+                  onRefresh();
+                },
+              ),
+              const SizedBox(height: DealGoSpacing.s12),
+            ],
+            MerchantPanel(
+              child: Row(
+                children: [
+                  FoodThumb(
+                    key: const Key('merchant-home-logo'),
+                    size: 56,
+                    imageUrl: store?.logoUrl,
+                    placeholderAsset: store == null
+                        ? foodStoreCoverImage
+                        : foodDishFallbackImage(store.category),
+                  ),
+                  const SizedBox(width: DealGoSpacing.s12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          store?.name ?? l10n.merchantHomeShopFallback,
+                          style: textTheme.titleMedium,
+                        ),
+                        if (store?.addressLabel case final address?)
+                          Text(address, style: textTheme.bodySmall),
+                        if (storeRatingText(context, ready?.rating)
+                            case final rating?)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              top: DealGoSpacing.s4,
+                            ),
+                            child: Row(
+                              key: const Key('merchant-home-rating'),
+                              children: [
+                                const Icon(
+                                  DealGoIcons.starFilled,
+                                  size: 16,
+                                  color: DealGoColors.amber,
+                                ),
+                                const SizedBox(width: DealGoSpacing.s4),
+                                Flexible(
+                                  child: Text(
+                                    rating,
+                                    style: textTheme.labelMedium?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (store != null)
+                    MerchantChip(
+                      key: const Key('merchant-home-mode-chip'),
+                      label: switch (store.serviceMode) {
+                        StoreServiceMode.open => l10n.merchantHomeOpenChip,
+                        StoreServiceMode.busy => l10n.merchantHomeBusyChip,
+                        StoreServiceMode.paused => l10n.merchantHomePausedChip,
+                      },
+                      tone: switch (store.serviceMode) {
+                        StoreServiceMode.open => MerchantChipTone.green,
+                        StoreServiceMode.busy => MerchantChipTone.warning,
+                        StoreServiceMode.paused => MerchantChipTone.neutral,
+                      },
+                    ),
+                ],
+              ),
             ),
             const SizedBox(height: DealGoSpacing.s12),
-          ],
-          MerchantPanel(
-            child: Row(
+            Row(
               children: [
-                FoodThumb(
-                  key: const Key('merchant-home-logo'),
-                  size: 56,
-                  imageUrl: store?.logoUrl,
-                  placeholderAsset: store == null
-                      ? foodStoreCoverImage
-                      : foodDishFallbackImage(store.category),
+                Expanded(
+                  child: _StatTile(
+                    icon: DealGoIcons.notificationsActive,
+                    tint: DealGoColors.amber,
+                    label: l10n.merchantHomeToConfirm,
+                    value: merchantCountLabel(totals.placed),
+                  ),
                 ),
                 const SizedBox(width: DealGoSpacing.s12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        store?.name ?? l10n.merchantHomeShopFallback,
-                        style: textTheme.titleMedium,
-                      ),
-                      if (store?.addressLabel case final address?)
-                        Text(address, style: textTheme.bodySmall),
-                      if (storeRatingText(context, ready?.rating)
-                          case final rating?)
-                        Padding(
-                          padding: const EdgeInsets.only(top: DealGoSpacing.s4),
-                          child: Row(
-                            key: const Key('merchant-home-rating'),
-                            children: [
-                              const Icon(
-                                DealGoIcons.starFilled,
-                                size: 16,
-                                color: DealGoColors.amber,
-                              ),
-                              const SizedBox(width: DealGoSpacing.s4),
-                              Flexible(
-                                child: Text(
-                                  rating,
-                                  style: textTheme.labelMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
+                  child: _StatTile(
+                    icon: DealGoIcons.timer,
+                    tint: DealGoColors.primary,
+                    label: l10n.merchantHomePreparing,
+                    value: merchantCountLabel(totals.preparing),
                   ),
                 ),
-                if (store != null)
-                  MerchantChip(
-                    key: const Key('merchant-home-mode-chip'),
-                    label: switch (store.serviceMode) {
-                      StoreServiceMode.open => l10n.merchantHomeOpenChip,
-                      StoreServiceMode.busy => l10n.merchantHomeBusyChip,
-                      StoreServiceMode.paused => l10n.merchantHomePausedChip,
-                    },
-                    tone: switch (store.serviceMode) {
-                      StoreServiceMode.open => MerchantChipTone.green,
-                      StoreServiceMode.busy => MerchantChipTone.warning,
-                      StoreServiceMode.paused => MerchantChipTone.neutral,
-                    },
-                  ),
               ],
             ),
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          Row(
-            children: [
-              Expanded(
-                child: _StatTile(
-                  icon: DealGoIcons.notificationsActive,
-                  tint: DealGoColors.amber,
-                  label: l10n.merchantHomeToConfirm,
-                  value: merchantCountLabel(totals.placed),
-                ),
-              ),
-              const SizedBox(width: DealGoSpacing.s12),
-              Expanded(
-                child: _StatTile(
-                  icon: DealGoIcons.timer,
-                  tint: DealGoColors.primary,
-                  label: l10n.merchantHomePreparing,
-                  value: merchantCountLabel(totals.preparing),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          Row(
-            children: [
-              Expanded(
-                child: _StatTile(
-                  icon: DealGoIcons.check,
-                  tint: DealGoColors.brandGreen,
-                  label: l10n.merchantHomeCompletedToday,
-                  value: today == null
-                      ? '—'
-                      : merchantCountLabel(today.deliveredCount),
-                ),
-              ),
-              const SizedBox(width: DealGoSpacing.s12),
-              Expanded(
-                child: _StatTile(
-                  icon: DealGoIcons.wallet,
-                  tint: DealGoColors.primaryDeep,
-                  label: l10n.merchantHomeFoodToday,
-                  value: today == null ? '—' : formatVnd(today.salesVnd),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          MerchantPanel(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(height: DealGoSpacing.s12),
+            Row(
               children: [
-                Text(l10n.merchantQueueToHandle, style: textTheme.titleMedium),
-                const SizedBox(height: DealGoSpacing.s12),
-                if (orders.isEmpty)
+                Expanded(
+                  child: _StatTile(
+                    icon: DealGoIcons.check,
+                    tint: DealGoColors.brandGreen,
+                    label: l10n.merchantHomeCompletedToday,
+                    value: today == null
+                        ? '—'
+                        : merchantCountLabel(today.deliveredCount),
+                  ),
+                ),
+                const SizedBox(width: DealGoSpacing.s12),
+                Expanded(
+                  child: _StatTile(
+                    icon: DealGoIcons.wallet,
+                    tint: DealGoColors.primaryDeep,
+                    label: l10n.merchantHomeFoodToday,
+                    value: today == null ? '—' : formatVnd(today.salesVnd),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: DealGoSpacing.s12),
+            MerchantPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    l10n.merchantHomeNoOrders,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: DealGoColors.textSecondary,
-                    ),
-                  )
-                else
-                  for (final order in orders.take(3)) ...[
-                    _HomeOrderRow(order: order),
-                    if (order != orders.take(3).last)
-                      const SizedBox(height: DealGoSpacing.s12),
-                  ],
-              ],
+                    l10n.merchantQueueToHandle,
+                    style: textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: DealGoSpacing.s12),
+                  if (orders.isEmpty)
+                    Text(
+                      l10n.merchantHomeNoOrders,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: DealGoColors.textSecondary,
+                      ),
+                    )
+                  else
+                    for (final order in orders.take(3)) ...[
+                      _HomeOrderRow(order: order),
+                      if (order != orders.take(3).last)
+                        const SizedBox(height: DealGoSpacing.s12),
+                    ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          MerchantPanel(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  AppLocalizations.of(context).merchantHomeFinanceTitle,
-                  style: textTheme.titleMedium,
-                ),
-                const SizedBox(height: DealGoSpacing.s8),
-                MerchantMoneyRow(
-                  label: l10n.merchantHomeSalesToday,
-                  value: today == null ? '—' : formatVnd(today.salesVnd),
-                  emphasize: true,
-                ),
-                MerchantMoneyRow(
-                  label: l10n.merchantHomeCancelledToday,
-                  value: today == null
-                      ? '—'
-                      : merchantCountLabel(today.cancelledCount),
-                ),
-                MerchantMoneyRow(
-                  label: l10n.merchantHomeOpenOrders,
-                  value: merchantCountLabel(orders.length),
-                ),
-              ],
+            const SizedBox(height: DealGoSpacing.s12),
+            MerchantPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    AppLocalizations.of(context).merchantHomeFinanceTitle,
+                    style: textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: DealGoSpacing.s8),
+                  // QA M5: today's food sales already sit in the stat tile above.
+                  MerchantMoneyRow(
+                    label: l10n.merchantHomeCancelledToday,
+                    value: today == null
+                        ? '—'
+                        : merchantCountLabel(today.cancelledCount),
+                  ),
+                  MerchantMoneyRow(
+                    label: l10n.merchantHomeOpenOrders,
+                    value: merchantCountLabel(orders.length),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: DealGoSpacing.s16),
-          Text(
-            AppLocalizations.of(context).merchantSettingsShellTitle,
-            style: textTheme.titleMedium,
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          MerchantPanel(
-            child: Column(
-              children: [
-                _SettingsLink(
-                  key: const Key('merchant-open-offers'),
-                  icon: DealGoIcons.voucher,
-                  label: AppLocalizations.of(context).merchantOffersTitle,
-                  onTap: () => context.push(MerchantRoutes.offers),
-                ),
-                const SizedBox(height: DealGoSpacing.s8),
-                _SettingsLink(
-                  key: const Key('merchant-open-reviews'),
-                  icon: DealGoIcons.star,
-                  label: AppLocalizations.of(context).merchantReviewsTitle,
-                  onTap: () => context.push(MerchantRoutes.reviews),
-                ),
-                const SizedBox(height: DealGoSpacing.s8),
-                _SettingsLink(
-                  key: const Key('merchant-open-accept'),
-                  icon: DealGoIcons.filter,
-                  label: AppLocalizations.of(context).merchantAcceptTitle,
-                  onTap: () => context.push(MerchantRoutes.acceptSettings),
-                ),
-                const SizedBox(height: DealGoSpacing.s8),
-                _SettingsLink(
-                  key: const Key('merchant-open-hours'),
-                  icon: DealGoIcons.clock,
-                  label: AppLocalizations.of(context).merchantHoursTitle,
-                  onTap: () => context.push(MerchantRoutes.hours),
-                ),
-                const SizedBox(height: DealGoSpacing.s8),
-                _SettingsLink(
-                  key: const Key('merchant-open-busy'),
-                  icon: DealGoIcons.pause,
-                  label: AppLocalizations.of(context).merchantBusyTitle,
-                  onTap: () async {
-                    await context.push(MerchantRoutes.busy);
-                    onRefresh();
-                  },
-                ),
-                const SizedBox(height: DealGoSpacing.s8),
-                _SettingsLink(
-                  key: const Key('merchant-open-location'),
-                  icon: DealGoIcons.pin,
-                  label: AppLocalizations.of(context).merchantLocationTitle,
-                  onTap: () => context.push(MerchantRoutes.location),
-                ),
-                const SizedBox(height: DealGoSpacing.s8),
-                _SettingsLink(
-                  key: const Key('merchant-open-history-home'),
-                  icon: DealGoIcons.history,
-                  label: AppLocalizations.of(context).merchantProductsHistory,
-                  onTap: () => context.push(MerchantRoutes.history),
-                ),
-              ],
+            const SizedBox(height: DealGoSpacing.s16),
+            Text(
+              AppLocalizations.of(context).merchantSettingsShellTitle,
+              style: textTheme.titleMedium,
             ),
-          ),
-        ],
+            const SizedBox(height: DealGoSpacing.s12),
+            MerchantPanel(
+              child: Column(
+                children: [
+                  _SettingsLink(
+                    key: const Key('merchant-open-offers'),
+                    icon: DealGoIcons.voucher,
+                    label: AppLocalizations.of(context).merchantOffersTitle,
+                    onTap: () => context.push(MerchantRoutes.offers),
+                  ),
+                  const SizedBox(height: DealGoSpacing.s8),
+                  _SettingsLink(
+                    key: const Key('merchant-open-reviews'),
+                    icon: DealGoIcons.star,
+                    label: AppLocalizations.of(context).merchantReviewsTitle,
+                    onTap: () => context.push(MerchantRoutes.reviews),
+                  ),
+                  const SizedBox(height: DealGoSpacing.s8),
+                  _SettingsLink(
+                    key: const Key('merchant-open-accept'),
+                    icon: DealGoIcons.filter,
+                    label: AppLocalizations.of(context).merchantAcceptTitle,
+                    onTap: () => context.push(MerchantRoutes.acceptSettings),
+                  ),
+                  const SizedBox(height: DealGoSpacing.s8),
+                  _SettingsLink(
+                    key: const Key('merchant-open-hours'),
+                    icon: DealGoIcons.clock,
+                    label: AppLocalizations.of(context).merchantHoursTitle,
+                    onTap: () => context.push(MerchantRoutes.hours),
+                  ),
+                  const SizedBox(height: DealGoSpacing.s8),
+                  _SettingsLink(
+                    key: const Key('merchant-open-busy'),
+                    icon: DealGoIcons.pause,
+                    label: AppLocalizations.of(context).merchantBusyTitle,
+                    onTap: () async {
+                      await context.push(MerchantRoutes.busy);
+                      onRefresh();
+                    },
+                  ),
+                  const SizedBox(height: DealGoSpacing.s8),
+                  _SettingsLink(
+                    key: const Key('merchant-open-location'),
+                    icon: DealGoIcons.pin,
+                    label: AppLocalizations.of(context).merchantLocationTitle,
+                    onTap: () => context.push(MerchantRoutes.location),
+                  ),
+                  const SizedBox(height: DealGoSpacing.s8),
+                  _SettingsLink(
+                    key: const Key('merchant-open-history-home'),
+                    icon: DealGoIcons.history,
+                    label: AppLocalizations.of(context).merchantProductsHistory,
+                    onTap: () => context.push(MerchantRoutes.history),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

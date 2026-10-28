@@ -16,6 +16,7 @@ import '../widgets/merchant_widgets.dart';
 import '../../../../core/format/short_ref.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../core/design_system/components/dealgo_nav_insets.dart';
+import '../../../../core/design_system/components/dealgo_refresh.dart';
 
 class MerchantOrdersPage extends StatefulWidget {
   const MerchantOrdersPage({super.key});
@@ -25,10 +26,25 @@ class MerchantOrdersPage extends StatefulWidget {
 }
 
 class _MerchantOrdersPageState extends State<MerchantOrdersPage> {
+  // QA M2 — back in the foreground: refetch silently (sockets may have been
+  // suspended while the app was in the background).
+  late final AppLifecycleListener _lifecycle = AppLifecycleListener(
+    onResume: () {
+      if (mounted) unawaited(context.read<MerchantQueueCubit>().refresh());
+    },
+  );
+
   @override
   void initState() {
     super.initState();
+    _lifecycle;
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
   }
 
   void _load() {
@@ -89,64 +105,76 @@ class _QueueList extends StatelessWidget {
     return MerchantPageFrame(
       title: l10n.merchantQueueTitle,
       showBack: false,
-      footer: MerchantPrimaryBar(
-        buttonKey: Key('merchant-open-${focus.id}'),
-        label: l10n.merchantQueueViewOrder(shortRef(focus.id)),
-        onPressed: () => _open(context, focus),
-      ),
-      body: ListView(
-        padding: dealGoScrollPadding(context, merchantPagePadding),
-        children: [
-          MerchantPanel(
-            elevated: true,
-            child: Row(
-              children: [
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: DealGoColors.subtlePurple,
-                    borderRadius: BorderRadius.circular(DealGoRadius.input),
-                  ),
-                  child: const SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: Icon(DealGoIcons.store, color: DealGoColors.primary),
-                  ),
-                ),
-                const SizedBox(width: DealGoSpacing.s12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l10n.merchantQueueYourShop,
-                        style: textTheme.titleMedium,
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  merchantCountLabel(placed),
-                  style: textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
+      // QA M5: the focus card already carries "Xác nhận đơn"/"Báo sẵn sàng";
+      // a second "Xem đơn" CTA in the footer only duplicated it.
+      footer: merchantQuickActionFor(focus) != null
+          ? null
+          : MerchantPrimaryBar(
+              buttonKey: Key('merchant-open-${focus.id}'),
+              label: l10n.merchantQueueViewOrder(shortRef(focus.id)),
+              onPressed: () => _open(context, focus),
             ),
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          Text(l10n.merchantQueueToHandle, style: textTheme.titleMedium),
-          const SizedBox(height: DealGoSpacing.s8),
-          _card(context, focus),
-          if (others.isNotEmpty) ...[
-            const SizedBox(height: DealGoSpacing.s16),
-            Text(l10n.merchantQueueOthers, style: textTheme.titleMedium),
+      body: DealGoRefresh(
+        key: const Key('merchant-orders-refresh'),
+        onRefresh: () => context.read<MerchantQueueCubit>().refresh(),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: dealGoScrollPadding(context, merchantPagePadding),
+          children: [
+            MerchantPanel(
+              elevated: true,
+              child: Row(
+                children: [
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: DealGoColors.subtlePurple,
+                      borderRadius: BorderRadius.circular(DealGoRadius.input),
+                    ),
+                    child: const SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: Icon(
+                        DealGoIcons.store,
+                        color: DealGoColors.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: DealGoSpacing.s12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.merchantQueueYourShop,
+                          style: textTheme.titleMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    merchantCountLabel(placed),
+                    style: textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: DealGoSpacing.s12),
+            Text(l10n.merchantQueueToHandle, style: textTheme.titleMedium),
             const SizedBox(height: DealGoSpacing.s8),
-            for (final order in others) ...[
-              _card(context, order),
+            _card(context, focus),
+            if (others.isNotEmpty) ...[
+              const SizedBox(height: DealGoSpacing.s16),
+              Text(l10n.merchantQueueOthers, style: textTheme.titleMedium),
               const SizedBox(height: DealGoSpacing.s8),
+              for (final order in others) ...[
+                _card(context, order),
+                const SizedBox(height: DealGoSpacing.s8),
+              ],
             ],
           ],
-        ],
+        ),
       ),
     );
   }

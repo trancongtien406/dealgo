@@ -136,7 +136,7 @@ class _MerchantOrderView extends StatelessWidget {
           note: note,
         ),
         onReady: () => cubit.markReady(merchantAccessToken(context)),
-        onHandoff: cubit.markHandoffDone,
+        onHandoff: () => cubit.confirmHandoff(merchantAccessToken(context)),
       ),
     );
   }
@@ -215,7 +215,8 @@ class _Detail extends StatelessWidget {
       footer = MerchantPrimaryBar(
         label: l10n.merchantMarkHandedOver,
         buttonKey: const Key('merchant-handoff'),
-        enabled: !busy,
+        // QA M1 — nothing to hand over until a driver has claimed the order.
+        enabled: !busy && order.status == 'ASSIGNED',
         loading: busy,
         onPressed: onHandoff,
       );
@@ -243,17 +244,9 @@ class _Detail extends StatelessWidget {
                 const SizedBox(height: DealGoSpacing.s8),
                 Row(
                   children: [
-                    Expanded(
-                      child: Text(
-                        AppLocalizations.of(context)
-                            .orderRef(shortRef(order.id)),
-                        style: textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
+                    // QA M5: the badge is the single order ref on this card.
                     HandoverRefBadge(orderId: order.id, dense: true),
-                    const SizedBox(width: DealGoSpacing.s8),
+                    const Spacer(),
                     if (placedAt != null)
                       MerchantChip(
                         label: l10n.merchantOrderPlacedAt(

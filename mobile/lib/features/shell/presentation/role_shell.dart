@@ -53,8 +53,8 @@ class _RoleShellState extends State<RoleShell> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final customerBar = _customerBookBar;
-    // Full-screen booking — hide shell chrome while on “Đặt”.
-    final hideBar = customerBar && navigationShell.currentIndex == 2;
+    // The app-wide bar stays on every tab, “Đặt xe” included; deeper ride
+    // screens (fare, offers, tracking) are pushed above the shell instead.
     return Scaffold(
       backgroundColor: DealGoColors.canvas,
       // The floating bar draws over the body; content scrolls behind it.
@@ -62,40 +62,36 @@ class _RoleShellState extends State<RoleShell> {
       body: FloatingNavBody(
         // Measured above the Scaffold: it strips the system inset and the
         // keyboard from the body's MediaQuery.
-        coveredBottom: hideBar
-            ? null
-            : MediaQuery.viewInsetsOf(context).bottom > 0
+        coveredBottom: MediaQuery.viewInsetsOf(context).bottom > 0
             ? 0
             : dealGoNavBarMetricsOf(context).totalHeight,
         child: navigationShell,
       ),
       // Five fixed-width tabs: cap text scaling so labels stay legible
       // instead of overflowing at accessibility sizes.
-      bottomNavigationBar: hideBar
-          ? null
-          : MediaQuery.withClampedTextScaling(
-              maxScaleFactor: kTabBarMaxTextScale,
-              child: customerBar
-                  ? CustomerTabBar(navigationShell: navigationShell, tabs: tabs)
-                  : ListenableBuilder(
-                      listenable: InboxUnread.instance,
-                      builder: (context, _) => DealGoTabBar(
-                        selectedIndex: navigationShell.currentIndex,
-                        onDestinationSelected: navigationShell.goBranch,
-                        destinations: [
-                          for (final tab in tabs)
-                            DealGoTabDestination(
-                              label: tab.localizedLabel(l10n),
-                              icon: tab.icon,
-                              selectedIcon: tab.selectedIcon,
-                              badgeCount: _carriesInboxBadge(tab)
-                                  ? InboxUnread.instance.count
-                                  : 0,
-                            ),
-                        ],
+      bottomNavigationBar: MediaQuery.withClampedTextScaling(
+        maxScaleFactor: kTabBarMaxTextScale,
+        child: customerBar
+            ? CustomerTabBar(navigationShell: navigationShell, tabs: tabs)
+            : ListenableBuilder(
+                listenable: InboxUnread.instance,
+                builder: (context, _) => DealGoTabBar(
+                  selectedIndex: navigationShell.currentIndex,
+                  onDestinationSelected: navigationShell.goBranch,
+                  destinations: [
+                    for (final tab in tabs)
+                      DealGoTabDestination(
+                        label: tab.localizedLabel(l10n),
+                        icon: tab.icon,
+                        selectedIcon: tab.selectedIcon,
+                        badgeCount: _carriesInboxBadge(tab)
+                            ? InboxUnread.instance.count
+                            : 0,
                       ),
-                    ),
-            ),
+                  ],
+                ),
+              ),
+      ),
     );
   }
 }

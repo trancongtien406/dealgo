@@ -73,7 +73,15 @@ class MerchantQueueCubit extends Cubit<MerchantQueueState> {
     this.markMerchantOrderReady,
     this.resolveStoreId,
     this.onNewOrders,
+    this.pollInterval = const Duration(seconds: 20),
   }) : super(const MerchantQueueLoading());
+
+  /// QA M2 fallback: a silent REST refetch on this cadence while a token
+  /// source is bound, so a missed socket hint (store room joined after the
+  /// order, socket down, worker restart) never leaves a new order invisible.
+  /// `Duration.zero` disables it (tests).
+  final Duration pollInterval;
+  Timer? _poll;
 
   final ListMerchantOrderQueue _listMerchantOrderQueue;
   final AcceptMerchantOrder? acceptMerchantOrder;
@@ -91,10 +99,22 @@ class MerchantQueueCubit extends Cubit<MerchantQueueState> {
   var _generation = 0;
   DateTime? _syncedAt;
   SnapshotBinding? _storeBinding;
+  String? _boundStoreId;
   String? Function()? _tokenSource;
 
   void setTokenSource(String? Function() tokenSource) {
     _tokenSource = tokenSource;
+    if (_poll == null && pollInterval > Duration.zero && !isClosed) {
+      _poll = Timer.periodic(pollInterval, (_) => unawaited(refresh()));
+    }
+  }
+
+  /// Silent refetch (foreground resume, poll, socket hint): keeps the list on
+  /// screen instead of flashing the loading view.
+  Future<void> refresh() async {
+    final source = _tokenSource;
+    if (source == null || isClosed) return;
+    await load(source(), silent: true);
   }
 
   /// Subscribe to store:{id} for new/status events; REST reload on each hint.
@@ -108,19 +128,28 @@ class MerchantQueueCubit extends Cubit<MerchantQueueState> {
     if (rt == null || token.isEmpty || storeId.isEmpty) {
       return;
     }
+    // Home + list both bind the same store: re-joining would unsubscribe the
+    // live room mid-flight, so keep the existing binding.
+    if (_storeBinding != null && _boundStoreId == storeId) return;
     await _storeBinding?.stop();
+    _boundStoreId = storeId;
     final binding = SnapshotBinding(
       realtime: rt,
       room: StoreSnapshotRoom(storeId),
       onInvalidate: () {
-        unawaited(load(tokenSource()));
+        unawaited(load(tokenSource(), silent: true));
       },
     );
     _storeBinding = binding;
     await binding.start(accessToken: token);
+    // Close the gap between the first GET and the join: an order placed in
+    // between produced its snapshot before we were in the room.
+    if (!isClosed && identical(_storeBinding, binding)) {
+      unawaited(load(tokenSource(), silent: true));
+    }
   }
 
-  Future<void> load(String? accessToken) async {
+  Future<void> load(String? accessToken, {bool silent = false}) async {
     final generation = ++_generation;
     final saved = _ordersOf(state);
     final token = accessToken?.trim() ?? '';
@@ -134,7 +163,9 @@ class MerchantQueueCubit extends Cubit<MerchantQueueState> {
       );
       return;
     }
-    emit(const MerchantQueueLoading());
+    if (!silent || state is! MerchantQueueReady) {
+      emit(const MerchantQueueLoading());
+    }
     try {
       final queue = await _listMerchantOrderQueue(token);
       if (isClosed || generation != _generation) {
@@ -164,6 +195,8 @@ class MerchantQueueCubit extends Cubit<MerchantQueueState> {
         emit(const MerchantQueueIneligible());
         return;
       }
+      // A background refetch never replaces a good list with an error.
+      if (silent && state is MerchantQueueReady) return;
       emit(
         MerchantQueueFailed(saved: saved, syncedAt: _syncedAt, cause: error),
       );
@@ -171,6 +204,8 @@ class MerchantQueueCubit extends Cubit<MerchantQueueState> {
       if (isClosed || generation != _generation) {
         return;
       }
+      // A background refetch never replaces a good list with an error.
+      if (silent && state is MerchantQueueReady) return;
       emit(
         MerchantQueueFailed(saved: saved, syncedAt: _syncedAt, cause: error),
       );
@@ -254,6 +289,8 @@ class MerchantQueueCubit extends Cubit<MerchantQueueState> {
 
   @override
   Future<void> close() async {
+    _poll?.cancel();
+    _poll = null;
     await _storeBinding?.stop();
     _storeBinding = null;
     return super.close();

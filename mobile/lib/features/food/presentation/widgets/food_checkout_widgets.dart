@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/motion/dealgo_sheet.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 import '../../../../core/design_system/components/dealgo_bottom_bar.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
@@ -252,11 +253,17 @@ class _Receipt extends StatelessWidget {
       fallback: AppLocalizations.of(context).checkoutRecipient,
     );
     return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        DealGoDimensions.pageGutter,
-        DealGoSpacing.s8,
-        DealGoDimensions.pageGutter,
-        DealGoSpacing.s24,
+      key: const Key('food-checkout-scroll'),
+      // The sticky CTA (Scaffold extendBody) sits over the list; its height
+      // arrives as MediaQuery padding, so the last card scrolls clear of it.
+      padding: dealGoScrollPadding(
+        context,
+        const EdgeInsets.fromLTRB(
+          DealGoDimensions.pageGutter,
+          DealGoSpacing.s8,
+          DealGoDimensions.pageGutter,
+          DealGoSpacing.s24,
+        ),
       ),
       children: [
         if (notice != null) ...[
@@ -434,7 +441,10 @@ class _SubmittingBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final preview = attempt.previewTotalVnd;
     return ListView(
-      padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
+      padding: dealGoScrollPadding(
+        context,
+        const EdgeInsets.all(DealGoDimensions.pageGutter),
+      ),
       children: [
         const SizedBox(height: DealGoSpacing.s24),
         const Center(
@@ -511,7 +521,10 @@ class _OfflineBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
+      padding: dealGoScrollPadding(
+        context,
+        const EdgeInsets.all(DealGoDimensions.pageGutter),
+      ),
       children: [
         const SizedBox(height: DealGoSpacing.s24),
         const Center(
@@ -578,7 +591,10 @@ class _RepricedBody extends StatelessWidget {
     final serverDelivery = order?.deliveryFareVnd;
     final serverTotal = phase.nextTotalVnd;
     return ListView(
-      padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
+      padding: dealGoScrollPadding(
+        context,
+        const EdgeInsets.all(DealGoDimensions.pageGutter),
+      ),
       children: [
         const SizedBox(height: DealGoSpacing.s24),
         const Center(

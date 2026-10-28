@@ -125,6 +125,8 @@
   "rideCancelReasonWait": "Waiting too long",
   "rideCancelReasonPlans": "Plans changed",
   "rideCancelReasonAddress": "Wrong pickup / drop-off",
+  "rideCancelBookAgain": "Book another ride",
+  "rideCancelReasonOptional": "Reason (optional)",
   "rideCancelReasonDriver": "Issue with the driver",
   "rideCancelReasonOther": "Other",
   "rideCancelConfirm": "Confirm cancel",
@@ -941,6 +943,14 @@
   "rideSuggestionsTitle": "Suggested for you",
   "rideOpenPendingOffers": "View pending offers",
   "rideSamePlaces": "Pickup and destination are the same.",
+  "rideEtaMinutes": "{minutes} min",
+  "@rideEtaMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "rideDistanceKm": "{km} km",
   "@rideDistanceKm": {
     "placeholders": {
@@ -1314,6 +1324,7 @@
   "merchantOrderTitlePreparing": "Preparing",
   "merchantOrderTitleReady": "Hand over to driver",
   "merchantMarkReady": "Ready",
+  "merchantHandoffAwaitDriver": "The driver has not confirmed pickup yet. Give them the handover code to finish.",
   "merchantMarkHandedOver": "Handed over",
   "merchantOrderHeadNew": "Waiting for confirmation",
   "merchantOrderHeadPreparing": "Order accepted",
@@ -1326,7 +1337,7 @@
   "merchantDriverWaiting": "Waiting for a DealGo driver to claim the order.",
   "merchantHandoffTitle": "Handover check",
   "merchantOrderRefLabel": "Order code",
-  "merchantLineCountLabel": "Item types",
+  "merchantLineCountLabel": "Items",
   "merchantHandoffCodLabel": "Food value (COD)",
   "merchantHandoffNote": "Match the order code with the driver.",
   "merchantHandoffDoneNote": "Waiting for driver.",
@@ -2188,6 +2199,7 @@
   "merchantItemInvalid": "Item name and price aren't valid.",
   "merchantItemUpdateFailed": "Couldn't update the item.",
   "merchantItemCreateFailed": "Couldn't add the item.",
+  "foodStageAwaitingStore": "Waiting for the store to confirm",
   "foodStagePreparing": "Preparing your food",
   "foodStageOnTheWay": "On the way",
   "foodStageCancelled": "Order cancelled",

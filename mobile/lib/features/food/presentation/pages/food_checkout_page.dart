@@ -135,7 +135,10 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
     PlacedFoodOrder order,
     CheckoutHeldAttempt attempt,
   ) async {
-    await context.push(
+    // QA C1/C2 — the order exists: drop the cart and replace the checkout
+    // stack, so Back from success/tracking never lands on a stale checkout.
+    final cart = context.read<FoodCartCubit>();
+    context.go(
       FoodRoutes.orderSuccess,
       extra: FoodOrderSuccessArgs(
         order: order,
@@ -143,6 +146,7 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
         storeAddress: null,
       ),
     );
+    cart.clearAfterOrder();
   }
 
   Future<void> _acceptReprice(CheckoutRepriced phase) async {
@@ -156,7 +160,9 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
       if (attempt != null) {
         await _openSuccess(order, attempt);
       } else {
-        await context.push(FoodRoutes.order(order.id));
+        final cart = context.read<FoodCartCubit>();
+        context.go(FoodRoutes.order(order.id));
+        cart.clearAfterOrder();
       }
       return;
     }

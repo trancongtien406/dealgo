@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import '../../../../core/network/api_envelope.dart';
 import '../../../../core/network/api_exception.dart';
@@ -209,14 +210,18 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
     String accessToken, {
     double? lat,
     double? lng,
+    String? search,
   }) {
     final hasGeo = lat != null && lng != null;
     return _send(
       () => dio.get<Object?>(
         ApiPaths.foodStores,
-        queryParameters: hasGeo
-            ? {'lat': lat, 'lng': lng, 'sort_by': 'distance'}
-            : null,
+        queryParameters: {
+          if (hasGeo) ...{'lat': lat, 'lng': lng, 'sort_by': 'distance'},
+          // QA C3 — name search runs on the server, not on the loaded page.
+          if (search != null && search.trim().isNotEmpty)
+            'search': search.trim(),
+        },
         options: _auth(accessToken),
       ),
       decodeFoodStoreList,
@@ -769,6 +774,9 @@ List<MerchantQueueOrder> decodeMerchantQueue(Object? body) {
   return List.unmodifiable(orders);
 }
 
+@visibleForTesting
+MerchantQueueOrder? decodeMerchantQueueOrder(Object? raw) => _queueOrder(raw);
+
 MerchantQueueOrder? _queueOrder(Object? raw) {
   final map = asJsonMap(raw);
   if (map == null) {
@@ -806,7 +814,9 @@ MerchantQueueOrder? _queueOrder(Object? raw) {
     subtotalVnd: subtotalVnd,
     totalVnd: totalVnd,
     dropoff: dropoff,
-    lineCount: lineCount,
+    // QA M3: the merchant list shows dishes by quantity (itemCount); older
+    // APIs only send the line count.
+    lineCount: _asInt(map['itemCount']) ?? lineCount,
     createdAt: createdAt,
     customerName: _nonEmpty(map['customerName']),
     driverName: _nonEmpty(map['driverName']),

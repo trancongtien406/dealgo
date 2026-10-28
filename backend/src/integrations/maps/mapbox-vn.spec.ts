@@ -11,6 +11,13 @@ describe('Mapbox VN geocoding', () => {
     expect(cleanMapboxVnLabel('Nguyễn Huệ, Bến Nghé')).toBe('Nguyễn Huệ, Bến Nghé');
   });
 
+  it('drops postal codes and the country, and restores VN diacritics on known areas', () => {
+    expect(
+      cleanMapboxVnLabel('3 Nguyễn Văn Linh, Hai Chau, Đà Nẵng 550000, Việt Nam'),
+    ).toBe('3 Nguyễn Văn Linh, Hải Châu, Đà Nẵng');
+    expect(cleanMapboxVnLabel('Trưng Nữ Vương, 550000, Da Nang')).toBe('Trưng Nữ Vương, Đà Nẵng');
+  });
+
   it('forward search sends language=vi, country=vn and proximity=caller location', async () => {
     const calls: URL[] = [];
     vi.stubGlobal('fetch', async (url: URL) => {
@@ -32,5 +39,10 @@ describe('Mapbox VN geocoding', () => {
     expect(calls[1]!.searchParams.get('proximity')).toBe('ip');
     await port.reverseGeocode({ lat: 10.77, lng: 106.7 });
     expect(calls[2]!.searchParams.get('country')).toBe('vn');
+  });
+  it('drops a leading postal code and restores accents (QA smoke)', () => {
+    expect(
+      cleanMapboxVnLabel('Đường Nguyễn Văn Linh, Bình Hiên, 50200 Hai Chau, Đà Nẵng, Việt Nam'),
+    ).toBe('Đường Nguyễn Văn Linh, Bình Hiên, Hải Châu, Đà Nẵng');
   });
 });

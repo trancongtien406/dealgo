@@ -526,19 +526,13 @@ class _MapPinPickerPageState extends State<MapPinPickerPage> {
                             ),
                             title: Text(
                               place.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
                             subtitle: place.address.isEmpty
                                 ? null
-                                : Text(
-                                    place.address,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                                : Text(place.address),
                             onTap: () => _chooseResult(place),
                           ),
                       ],
@@ -603,8 +597,6 @@ class _MapPinPickerPageState extends State<MapPinPickerPage> {
                             children: [
                               Text(
                                 named?.name ?? l10n.mapPickerPinned,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                                 style: textTheme.titleSmall,
                               ),
                               const SizedBox(height: 2),
@@ -612,8 +604,6 @@ class _MapPinPickerPageState extends State<MapPinPickerPage> {
                                 named?.address.isNotEmpty == true
                                     ? named!.address
                                     : _coords(_center),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
                                 style: textTheme.bodySmall,
                               ),
                             ],

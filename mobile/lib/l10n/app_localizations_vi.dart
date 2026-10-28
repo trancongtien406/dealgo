@@ -394,6 +394,12 @@ class AppLocalizationsVi extends AppLocalizations {
   String get rideCancelReasonAddress => 'Sai điểm đón/đến';
 
   @override
+  String get rideCancelBookAgain => 'Đặt chuyến khác';
+
+  @override
+  String get rideCancelReasonOptional => 'Lý do hủy (không bắt buộc)';
+
+  @override
   String get rideCancelReasonDriver => 'Vấn đề với tài xế';
 
   @override
@@ -2330,6 +2336,11 @@ class AppLocalizationsVi extends AppLocalizations {
   String get rideSamePlaces => 'Điểm đón và điểm đến đang trùng nhau.';
 
   @override
+  String rideEtaMinutes(int minutes) {
+    return '$minutes phút';
+  }
+
+  @override
   String rideDistanceKm(String km) {
     return '$km km';
   }
@@ -2842,7 +2853,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String foodStorePrepChip(int minutes) {
-    return '~$minutes phút';
+    return 'Khoảng $minutes phút';
   }
 
   @override
@@ -2997,6 +3008,10 @@ class AppLocalizationsVi extends AppLocalizations {
   String get merchantMarkReady => 'Đã chuẩn bị xong';
 
   @override
+  String get merchantHandoffAwaitDriver =>
+      'Tài xế chưa xác nhận lấy hàng. Đưa mã bàn giao cho tài xế để hoàn tất.';
+
+  @override
   String get merchantMarkHandedOver => 'Đã bàn giao hàng';
 
   @override
@@ -3033,7 +3048,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get merchantOrderRefLabel => 'Mã đơn';
 
   @override
-  String get merchantLineCountLabel => 'Số loại món';
+  String get merchantLineCountLabel => 'Số món';
 
   @override
   String get merchantHandoffCodLabel => 'Tiền món (COD)';
@@ -4764,6 +4779,9 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get merchantItemCreateFailed => 'Không thêm được món.';
+
+  @override
+  String get foodStageAwaitingStore => 'Chờ quán xác nhận';
 
   @override
   String get foodStagePreparing => 'Đang chuẩn bị món';

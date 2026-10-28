@@ -6,6 +6,7 @@ abstract interface class FoodRepository {
     String accessToken, {
     double? lat,
     double? lng,
+    String? search,
   });
 
   Future<FoodStoreDetail> getStore(String accessToken, String storeId);
