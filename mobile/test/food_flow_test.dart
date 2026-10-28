@@ -244,6 +244,23 @@ void main() {
     expect(find.text('Bạn đang ngoại tuyến'), findsNothing);
   });
 
+  testWidgets('checkout: the sticky order bar never covers the last section', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await _openCheckout(tester, _catalogClient());
+    final list = tester.widget<ListView>(
+      find.byKey(const Key('food-checkout-scroll')),
+    );
+    final bottomPad = (list.padding! as EdgeInsets).bottom;
+    final ctaTop = tester
+        .getRect(find.byKey(const Key('food-place-order')))
+        .top;
+    // Reserved space under the last card covers the whole sticky bar.
+    expect(bottomPad, greaterThanOrEqualTo(800 - ctaTop));
+  });
+
   testWidgets(
     'QA C1/C2: after ordering the cart is empty and back never returns to checkout',
     (tester) async {
