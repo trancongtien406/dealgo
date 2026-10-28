@@ -29,6 +29,8 @@ import '../widgets/driver_contact_actions.dart';
 import '../widgets/job_customer_name.dart';
 import '../widgets/driver_navigate_buttons.dart';
 import '../widgets/driver_widgets.dart';
+import '../widgets/driver_payment_collection.dart';
+import '../../../payment/data/driver_collection_api.dart';
 import '../../../../core/maps/map_lat_lng.dart';
 import '../../../../core/maps/map_port.dart';
 import '../../../live_location/domain/driver_location.dart';
@@ -56,8 +58,12 @@ class DriverActiveRidePage extends StatefulWidget {
     required this.rideId,
     this.ride,
     this.initialPhase = DriverRidePhase.navigatePickup,
+    this.collectionLoader,
     super.key,
   });
+
+  /// Test seam for GET /v1/rides/:id/collection.
+  final DriverCollectionLoader? collectionLoader;
 
   final String rideId;
   final OpenRide? ride;
@@ -95,6 +101,9 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
     }
     return null;
   }
+
+  /// Server split of the fare: paid online vs cash to collect.
+  DriverCollection? _collection;
 
   /// True once the backend has the ride in DRIVER_EN_ROUTE or later.
   late bool _enRoute =
@@ -721,6 +730,15 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
             ),
           ),
           const SizedBox(height: DealGoSpacing.s12),
+          DriverPaymentCollection(
+            key: ValueKey('driver-collection-${_phase.name}'),
+            entityType: 'RIDE',
+            entityId: widget.rideId,
+            accessToken: driverAccessToken(context),
+            loader: widget.collectionLoader,
+            onLoaded: (c) => setState(() => _collection = c),
+          ),
+          if (_collection != null) const SizedBox(height: DealGoSpacing.s12),
           DriverNote(
             tone: DriverNoteTone.green,
             message: switch (_phase) {
@@ -760,11 +778,17 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
                   DriverMoneyRow(
                     key: const Key('driver-cash-to-collect'),
                     label: l10n.driverCollect,
-                    value: l10n.driverCashToCollect(
-                      formatRideVnd(
-                        rideCashAfterVoucher(ride.offeredFareVnd, _discountVnd),
-                      ),
-                    ),
+                    value: _collection?.fullyPaidOnline == true
+                        ? l10n.driverPaidOnline
+                        : l10n.driverCashToCollect(
+                            formatRideVnd(
+                              _collection?.cashToCollectVnd ??
+                                  rideCashAfterVoucher(
+                                    ride.offeredFareVnd,
+                                    _discountVnd,
+                                  ),
+                            ),
+                          ),
                   ),
                 ],
               ),

@@ -9,6 +9,7 @@ class PlaceFoodOrderBody {
     required this.dropoffLabel,
     required this.deliveryFareVnd,
     this.voucherCode,
+    this.paymentMethod,
   });
 
   factory PlaceFoodOrderBody.fromParams(PlaceFoodOrderParams request) {
@@ -27,6 +28,7 @@ class PlaceFoodOrderBody {
       dropoffLabel: request.dropoff.label,
       deliveryFareVnd: request.deliveryFareVnd,
       voucherCode: request.voucherCode,
+      paymentMethod: request.paymentMethod,
     );
   }
 
@@ -37,6 +39,7 @@ class PlaceFoodOrderBody {
   final String dropoffLabel;
   final int deliveryFareVnd;
   final String? voucherCode;
+  final String? paymentMethod;
 
   Map<String, Object?> toJson() {
     return {
@@ -45,6 +48,7 @@ class PlaceFoodOrderBody {
       'dropoff': {'lat': dropoffLat, 'lng': dropoffLng, 'label': dropoffLabel},
       'deliveryFareVnd': deliveryFareVnd,
       if (voucherCode != null) 'voucherCode': voucherCode,
+      if (paymentMethod != null) 'paymentMethod': paymentMethod,
     };
   }
 }

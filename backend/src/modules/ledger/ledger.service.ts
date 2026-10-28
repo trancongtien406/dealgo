@@ -46,6 +46,18 @@ export class LedgerService {
     }
   }
 
+  /** Idempotent standalone post (e.g. PSP capture / refund journals). */
+  async postEvent(
+    event: PostableLedgerEvent,
+    input: { entityType: LedgerEntityTypeName; entityId: string; amountVnd: number },
+  ): Promise<LedgerJournalView> {
+    try {
+      return await this.ledger.postEvent(event, input);
+    } catch (error) {
+      throw this.asHttp(error);
+    }
+  }
+
   /** Posts inside the job's completion transaction; a failure rolls the completion back. */
   async postWithin(
     tx: TxHandle,

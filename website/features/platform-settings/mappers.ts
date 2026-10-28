@@ -17,10 +17,6 @@ const LABELS: Record<string, { label: string; hint: string }> = {
     label: "Bản đồ — lộ trình & quãng đường (mapbox | google)",
     hint: "DEC-PROD-045 — nên đổi ở Cài đặt › Bản đồ",
   },
-  PAYMENT_METHODS_ENABLED: {
-    label: "Kênh thanh toán bật (JSON)",
-    hint: 'OPEN-002 — ví dụ ["COD","SANDBOX"]; không chứa secret PSP',
-  },
   RIDE_MIN_FARE_VND: {
     label: "Giá Ride tối thiểu (VND) — chỉ để tạo hạng xe lần đầu",
     hint: "không phải giá đang áp dụng. Giá sàn/trần/km thật sửa ở Cấu hình › Loại xe (từng hạng)",

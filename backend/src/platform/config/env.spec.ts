@@ -157,7 +157,7 @@ describe('loadEnv', () => {
     expect(env.RIDE_REFERENCE_VND_PER_KM).toBe(8_000);
     expect(env.DRIVER_SEARCH_RADIUS_KM).toBe(5);
     expect(env.MAX_CONCURRENT_JOBS_PER_DRIVER).toBe(1);
-    expect(env.PAYMENT_METHODS_ENABLED).toBe('["COD","SANDBOX"]');
+    expect((env as Record<string, unknown>).PAYMENT_METHODS_ENABLED).toBeUndefined();
     expect(env.DISPATCH_FALLBACK_LIMIT).toBe(20);
     expect(env.OTP_THROTTLE_LIMIT).toBe(10);
   });

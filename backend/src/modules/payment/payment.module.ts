@@ -4,12 +4,27 @@ import { resolvePersistenceRepository, PrismaModule, PrismaService } from '../..
 import type { AppEnv } from '../../platform/config/index.js';
 import { IdentityModule } from '../identity/index.js';
 import { SupportModule } from '../support/index.js';
+import { LedgerModule } from '../ledger/ledger.module.js';
+import { PlatformSettingsModule } from '../../platform/settings/platform-settings.module.js';
+import {
+  MemoryCheckoutRepository,
+  PAYMENT_ADAPTERS,
+  PAYMENT_GATEWAY_OPTIONS,
+  PaymentGatewayService,
+  PaymentMethodRegistryService,
+  PrismaCheckoutRepository,
+  paymentAdaptersFromConfig,
+  type CheckoutRepository,
+  type PaymentGatewayOptions,
+} from './checkout/index.js';
+import { PaymentCallbacksController, PaymentMethodsController } from './checkout/payment-checkout.controller.js';
+import { OpsPaymentsController } from './checkout/ops-payments.controller.js';
 import { MomoPaymentPort } from '../../integrations/payment-gateways/index.js';
 import { CashOnlyPaymentPort } from '../../integrations/payment-gateways/cash-only-payment.port.js';
 import { isCashOnlyPaymentProvider } from '../../platform/config/env.js';
 
 import { UnavailablePaymentPort, type PaymentPort } from './payment-port.js';
-import { PAYMENT_PORT, PAYMENT_REPOSITORY } from './payment.constants.js';
+import { CHECKOUT_REPOSITORY, PAYMENT_PORT, PAYMENT_REPOSITORY } from './payment.constants.js';
 import { PaymentWebhookController } from './payment-webhook.controller.js';
 import { OpsRefundsController } from './ops-refunds.controller.js';
 import { OpsTransactionsController } from './ops-transactions.controller.js';
@@ -38,9 +53,43 @@ function hasMomoKeys(config: ConfigService<AppEnv, true>): boolean {
 }
 
 @Module({
-  imports: [PrismaModule, IdentityModule, SupportModule],
-  controllers: [PaymentWebhookController, OpsRefundsController, OpsTransactionsController],
+  imports: [PrismaModule, IdentityModule, SupportModule, LedgerModule, PlatformSettingsModule],
+  controllers: [
+    PaymentWebhookController,
+    OpsRefundsController,
+    OpsTransactionsController,
+    PaymentMethodsController,
+    PaymentCallbacksController,
+    OpsPaymentsController,
+  ],
   providers: [
+    PaymentMethodRegistryService,
+    PaymentGatewayService,
+    {
+      provide: PAYMENT_ADAPTERS,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<AppEnv, true>) => paymentAdaptersFromConfig(config),
+    },
+    {
+      provide: PAYMENT_GATEWAY_OPTIONS,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<AppEnv, true>): PaymentGatewayOptions => ({
+        publicBaseUrl: config.get('PAYMENT_PUBLIC_BASE_URL', { infer: true }) ?? null,
+        appReturnUrl: config.get('PAYMENT_APP_RETURN_URL', { infer: true }) ?? null,
+      }),
+    },
+    {
+      provide: CHECKOUT_REPOSITORY,
+      inject: [PrismaService, ConfigService],
+      useFactory: (prisma: PrismaService, config: ConfigService<AppEnv, true>): CheckoutRepository =>
+        resolvePersistenceRepository<NonNullable<ReturnType<PrismaService['db']>>, CheckoutRepository>({
+          nodeEnv: config.get('NODE_ENV', { infer: true }),
+          databaseUrl: config.get('DATABASE_URL', { infer: true }),
+          client: prisma.db(),
+          createMemory: () => new MemoryCheckoutRepository(),
+          createPrisma: (client) => new PrismaCheckoutRepository(client),
+        }),
+    },
     OpsRefundsService,
     OpsTransactionsService,
     {
@@ -116,6 +165,13 @@ function hasMomoKeys(config: ConfigService<AppEnv, true>): boolean {
       },
     },
   ],
-  exports: [PAYMENT_PORT, PAYMENT_REPOSITORY, OpsRefundsService, OpsTransactionsService],
+  exports: [
+    PAYMENT_PORT,
+    PAYMENT_REPOSITORY,
+    OpsRefundsService,
+    OpsTransactionsService,
+    PaymentMethodRegistryService,
+    PaymentGatewayService,
+  ],
 })
 export class PaymentModule {}

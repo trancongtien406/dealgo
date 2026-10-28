@@ -3,13 +3,17 @@ export const LEDGER_REPOSITORY = Symbol('LEDGER_REPOSITORY');
 export const LEDGER_CASH_IN_TRANSIT_CODE = 'sandbox.cod.cash_in_transit';
 export const LEDGER_COD_OBLIGATION_CODE = 'sandbox.cod.obligation';
 
-export type LedgerEntityTypeName = 'RIDE' | 'FOOD_ORDER' | 'DISPUTE';
+export type LedgerEntityTypeName = 'RIDE' | 'FOOD_ORDER' | 'DISPUTE' | 'PAYMENT_REFUND';
 export type LedgerJournalEventName =
   | 'COD_OBLIGATION_POSTED'
   | 'SANDBOX_REFUND_RECORDED'
   | 'PROMOTION_DISCOUNT_FUNDED'
   | 'DRIVER_PLATFORM_FEE_ACCRUED'
-  | 'MERCHANT_COMMISSION_ACCRUED';
+  | 'MERCHANT_COMMISSION_ACCRUED'
+  | 'PSP_PAYMENT_CAPTURED'
+  | 'PSP_REFUND_RECORDED'
+  | 'PSP_PREPAID_APPLIED'
+  | 'PSP_REFUND_AFTER_SETTLEMENT';
 
 /** DealGo-funded voucher discounts (proposed decision, see decisions-and-assumptions). */
 export const LEDGER_PROMO_EXPENSE_CODE = 'sandbox.promo.discount_expense';
@@ -24,6 +28,14 @@ export const LEDGER_FEE_REVENUE_CODE = 'sandbox.fee.platform_revenue';
 /** Commission a merchant owes DealGo on delivered food orders. */
 export const LEDGER_COMMISSION_MERCHANT_RECEIVABLE_CODE = 'sandbox.commission.merchant_receivable';
 export const LEDGER_COMMISSION_REVENUE_CODE = 'sandbox.commission.revenue';
+
+/** Online payments: money held by the PSP for DealGo vs prepaid by the customer. */
+export const LEDGER_PSP_CLEARING_CODE = 'psp.clearing_receivable';
+export const LEDGER_PSP_CUSTOMER_PREPAID_CODE = 'psp.customer_prepaid';
+/** Online-paid job completed: DealGo owes the driver the prepaid amount (driver balance credit). */
+export const LEDGER_PSP_PAYOUT_PAYABLE_CODE = 'psp.job_payout_payable';
+/** Refunds DealGo absorbs after the driver was already credited. */
+export const LEDGER_PSP_REFUND_EXPENSE_CODE = 'psp.refund_expense';
 
 export const LEDGER_REFUND_PAYABLE_CODE = 'sandbox.refund.payable';
 export const LEDGER_REFUND_CLEARING_CODE = 'sandbox.refund.clearing';

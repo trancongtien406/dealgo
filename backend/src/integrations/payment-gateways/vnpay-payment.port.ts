@@ -104,8 +104,10 @@ export function verifyVnpaySecureHash(
   return timingSafeEqualHex(expected, secureHash);
 }
 
-function formatVnpDate(date: Date): string {
+/** VNPay expects yyyyMMddHHmmss in GMT+7 (Asia/Ho_Chi_Minh), not UTC. */
+export function formatVnpDate(date: Date): string {
   const pad = (n: number) => n.toString().padStart(2, '0');
+  date = new Date(date.getTime() + 7 * 60 * 60 * 1000);
   return (
     `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}` +
     `${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}`

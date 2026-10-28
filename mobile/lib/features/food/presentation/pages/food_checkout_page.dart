@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/api_error_l10n.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../payment/domain/payment_models.dart';
+import '../../../payment/presentation/payment_method_sheet.dart';
+import '../../../payment/presentation/payment_status_page.dart';
 import '../../domain/entities/food_models.dart';
 import '../../domain/usecases/get_food_store.dart';
 import '../../domain/usecases/place_food_order.dart';
@@ -42,6 +45,7 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
   CheckoutPhase _phase = const CheckoutEditing();
   CheckoutHeldAttempt? _attempt;
   var _busy = false;
+  PaymentMethodOption _payment = PaymentMethodOption.cash;
 
   Future<void> _submit({bool retry = false}) async {
     if (_busy) {
@@ -60,7 +64,11 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
     if (held == null && !snapshot.canCheckout) {
       return;
     }
-    final attempt = held ?? CheckoutHeldAttempt.fromCart(snapshot, token);
+    final attempt = held ?? CheckoutHeldAttempt.fromCart(
+          snapshot,
+          token,
+          paymentMethod: _payment.code,
+        );
     _attempt = attempt;
     setState(() {
       _busy = true;
@@ -138,6 +146,18 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
     // QA C1/C2 — the order exists: drop the cart and replace the checkout
     // stack, so Back from success/tracking never lands on a stale checkout.
     final cart = context.read<FoodCartCubit>();
+    final method = attempt.request.paymentMethod;
+    if (method != null && method != cashMethodCode) {
+      context.go(
+        PaymentRoutes.location(
+          entityType: 'FOOD_ORDER',
+          entityId: order.id,
+          startMethod: method,
+        ),
+      );
+      cart.clearAfterOrder();
+      return;
+    }
     context.go(
       FoodRoutes.orderSuccess,
       extra: FoodOrderSuccessArgs(
@@ -189,7 +209,11 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
       setState(() => _phase = CheckoutRejected(sessionExpiredMessage(context)));
       return;
     }
-    _attempt = CheckoutHeldAttempt.fromCart(next, token);
+    _attempt = CheckoutHeldAttempt.fromCart(
+      next,
+      token,
+      paymentMethod: _payment.code,
+    );
     await _submit(retry: true);
   }
 
@@ -222,6 +246,20 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
                 onBack: submitting ? () {} : null,
               ),
               Expanded(child: CheckoutBody(phase: phase)),
+              if (phase is CheckoutEditing)
+                Container(
+                  color: DealGoColors.card,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: DealGoDimensions.pageGutter,
+                    vertical: DealGoSpacing.s8,
+                  ),
+                  child: PaymentMethodTile(
+                    service: 'FOOD',
+                    selected: _payment.code,
+                    enabled: !_busy,
+                    onChanged: (m) => setState(() => _payment = m),
+                  ),
+                ),
             ],
           ),
         ),

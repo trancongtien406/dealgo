@@ -8,6 +8,10 @@ import {
   LEDGER_PROMO_DRIVER_PAYABLE_CODE,
   LEDGER_PROMO_EXPENSE_CODE,
   LEDGER_PROMO_MERCHANT_PAYABLE_CODE,
+  LEDGER_PSP_CLEARING_CODE,
+  LEDGER_PSP_CUSTOMER_PREPAID_CODE,
+  LEDGER_PSP_PAYOUT_PAYABLE_CODE,
+  LEDGER_PSP_REFUND_EXPENSE_CODE,
   type LedgerEntityTypeName,
   type LedgerEntryDirectionName,
 } from './ledger.constants.js';
@@ -86,12 +90,60 @@ export function buildMerchantCommissionLines(amountVnd: number): CodJournalLine[
   ];
 }
 
+/** Verified online capture: PSP owes DealGo (asset) against the customer's prepayment (liability). */
+export function buildPspCaptureLines(amountVnd: number): CodJournalLine[] {
+  if (!Number.isSafeInteger(amountVnd) || amountVnd <= 0) {
+    throw new LedgerRuleError('LEDGER_AMOUNT_INVALID');
+  }
+  return [
+    { accountCode: LEDGER_PSP_CLEARING_CODE, direction: 'DEBIT', amountVnd },
+    { accountCode: LEDGER_PSP_CUSTOMER_PREPAID_CODE, direction: 'CREDIT', amountVnd },
+  ];
+}
+
+/** PSP-accepted refund: reverses the capture for the refunded amount. */
+export function buildPspRefundLines(amountVnd: number): CodJournalLine[] {
+  if (!Number.isSafeInteger(amountVnd) || amountVnd <= 0) {
+    throw new LedgerRuleError('LEDGER_AMOUNT_INVALID');
+  }
+  return [
+    { accountCode: LEDGER_PSP_CUSTOMER_PREPAID_CODE, direction: 'DEBIT', amountVnd },
+    { accountCode: LEDGER_PSP_CLEARING_CODE, direction: 'CREDIT', amountVnd },
+  ];
+}
+
+/** Online-paid job completed: the customer prepayment is now owed to the driver. */
+export function buildPspPrepaidAppliedLines(amountVnd: number): CodJournalLine[] {
+  if (!Number.isSafeInteger(amountVnd) || amountVnd <= 0) {
+    throw new LedgerRuleError('LEDGER_AMOUNT_INVALID');
+  }
+  return [
+    { accountCode: LEDGER_PSP_CUSTOMER_PREPAID_CODE, direction: 'DEBIT', amountVnd },
+    { accountCode: LEDGER_PSP_PAYOUT_PAYABLE_CODE, direction: 'CREDIT', amountVnd },
+  ];
+}
+
+/** Refund after settlement: DealGo expense against PSP clearing (driver payout unchanged). */
+export function buildPspRefundAfterSettlementLines(amountVnd: number): CodJournalLine[] {
+  if (!Number.isSafeInteger(amountVnd) || amountVnd <= 0) {
+    throw new LedgerRuleError('LEDGER_AMOUNT_INVALID');
+  }
+  return [
+    { accountCode: LEDGER_PSP_REFUND_EXPENSE_CODE, direction: 'DEBIT', amountVnd },
+    { accountCode: LEDGER_PSP_CLEARING_CODE, direction: 'CREDIT', amountVnd },
+  ];
+}
+
 /** Ledger events that can be posted for a completed job, with their line builders. */
 export type PostableLedgerEvent =
   | 'COD_OBLIGATION_POSTED'
   | 'PROMOTION_DISCOUNT_FUNDED'
   | 'DRIVER_PLATFORM_FEE_ACCRUED'
-  | 'MERCHANT_COMMISSION_ACCRUED';
+  | 'MERCHANT_COMMISSION_ACCRUED'
+  | 'PSP_PAYMENT_CAPTURED'
+  | 'PSP_REFUND_RECORDED'
+  | 'PSP_PREPAID_APPLIED'
+  | 'PSP_REFUND_AFTER_SETTLEMENT';
 
 export type LedgerLineBuilder = (
   amountVnd: number,
@@ -103,6 +155,10 @@ export const LEDGER_LINE_BUILDERS: Readonly<Record<PostableLedgerEvent, LedgerLi
   PROMOTION_DISCOUNT_FUNDED: buildPromotionDiscountLines,
   DRIVER_PLATFORM_FEE_ACCRUED: buildDriverPlatformFeeLines,
   MERCHANT_COMMISSION_ACCRUED: buildMerchantCommissionLines,
+  PSP_PAYMENT_CAPTURED: buildPspCaptureLines,
+  PSP_REFUND_RECORDED: buildPspRefundLines,
+  PSP_PREPAID_APPLIED: buildPspPrepaidAppliedLines,
+  PSP_REFUND_AFTER_SETTLEMENT: buildPspRefundAfterSettlementLines,
 };
 
 export function assertBalancedLines(lines: CodJournalLine[]): void {

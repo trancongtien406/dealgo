@@ -1,4 +1,5 @@
 import {
+  Ip,
   Body,
   Controller,
   Get,
@@ -13,6 +14,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { StartPaymentDto } from '../payment/checkout/payment-checkout.dto.js';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DriverLocationQueryDto } from '../dispatch/driver-location-query.dto.js';
 import { CurrentActor, CustomerSessionGuard, type RequestActor } from '../identity/access-auth.guard.js';
@@ -113,6 +115,30 @@ export class RideController {
   @ApiOperation({ summary: 'Get a ride by id' })
   get(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
     return this.rides.get(actor, id);
+  }
+
+  @Get(':id/collection')
+  @ApiOperation({ summary: 'Assigned driver: payment method, paid online vs cash to collect for this ride' })
+  collection(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.rides.driverCollection(actor, id);
+  }
+
+  @Get(':id/payment')
+  @ApiOperation({ summary: 'Payment method + status for this ride (CASH/PENDING/PAID/FAILED/…)' })
+  paymentStatus(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.rides.paymentStatus(actor, id);
+  }
+
+  @Post(':id/payment')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Choose a payment method; online methods return paymentUrl/deeplink' })
+  startPayment(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: StartPaymentDto,
+    @Ip() ip: string,
+  ) {
+    return this.rides.startPayment(actor, id, dto.methodCode, ip);
   }
 
   @Get(':id/driver-location')

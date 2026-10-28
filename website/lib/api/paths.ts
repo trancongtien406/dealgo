@@ -84,6 +84,11 @@ export const apiPaths = {
   opsRideVehicleClassImage: (code: string) =>
     `/api/ops/ride-vehicle-classes/${encodeURIComponent(code)}/image`,
   opsMapsProviders: () => "/api/ops/maps-providers",
+  opsPaymentMethods: () => "/api/ops/payment-methods",
+  opsPaymentIntents: () => "/api/ops/payment-intents",
+  opsPaymentIntent: (id: string) => `/api/ops/payment-intents/${encodeURIComponent(id)}`,
+  opsPaymentIntentRefund: (id: string) => `/api/ops/payment-intents/${encodeURIComponent(id)}/refund`,
+  opsPaymentIntentsReconcile: () => "/api/ops/payment-intents/reconcile",
   opsEmailSettings: () => "/api/ops/integrations/email",
   opsEmailTest: () => "/api/ops/integrations/email/test",
   opsMapKeys: () => "/api/ops/integrations/maps",

@@ -11,7 +11,8 @@ export type PlatformSettingKey =
   | 'FOOD_DELIVERY_VND_PER_KM'
   | 'CONTACT_WINDOW_MINUTES'
   | 'MAX_CONCURRENT_JOBS_PER_DRIVER'
-  | 'PAYMENT_METHODS_ENABLED'
+  | 'PAYMENT_METHOD_REGISTRY'
+  | 'PAYMENT_WALLET_ENABLED'
   | 'RATING_WINDOW_DAYS'
   | 'RIDE_COMMISSION_BIKE_PERCENT'
   | 'RIDE_COMMISSION_CAR_PERCENT'
@@ -189,9 +190,20 @@ export const PLATFORM_SETTING_SPECS: readonly PlatformSettingSpec[] = [
     max: 20,
   },
   {
-    key: 'PAYMENT_METHODS_ENABLED',
+    // Multi-method registry: per-method BIKE/CAR/FOOD flags, display order and the reason shown
+    // when hidden/unsupported. CASH can never be disabled (cash-only fallback, DEC-PROD-050).
+    key: 'PAYMENT_METHOD_REGISTRY',
     valueType: 'json',
     openIds: ['OPEN-002'],
+    seeded: true,
+  },
+  {
+    // Ví DealGo: off until the e-money licence question is settled.
+    key: 'PAYMENT_WALLET_ENABLED',
+    valueType: 'json',
+    openIds: ['OPEN-002'],
+    boolean: true,
+    seeded: true,
   },
   {
     key: 'RATING_WINDOW_DAYS',

@@ -66,7 +66,6 @@ export const CASH_FLOW_GROUPS: ReadonlyArray<{
     keys: [
       "FOOD_MIN_DELIVERY_VND",
       "FOOD_MAX_DELIVERY_VND",
-      "PAYMENT_METHODS_ENABLED",
     ],
   },
 ];

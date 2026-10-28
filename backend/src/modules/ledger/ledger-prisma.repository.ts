@@ -53,6 +53,13 @@ export class PrismaLedgerRepository implements LedgerRepository {
     );
   }
 
+  async postEvent(
+    event: PostableLedgerEvent,
+    input: PostCodObligationInput,
+  ): Promise<LedgerJournalView> {
+    return this.post(input, event, LEDGER_LINE_BUILDERS[event](input.amountVnd, input.entityType));
+  }
+
   async postWithin(
     tx: TxHandle,
     event: PostableLedgerEvent,

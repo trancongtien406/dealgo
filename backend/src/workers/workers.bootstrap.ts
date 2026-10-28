@@ -13,6 +13,7 @@ import { OrphanUploadCleanupService } from './orphan-upload-cleanup.service.js';
 import { RideExpiryService } from './ride-expiry.service.js';
 import { ChatRetentionService } from './chat-retention.service.js';
 import { WorkerHeartbeatService } from './worker-heartbeat.service.js';
+import { PaymentGatewayService } from '../modules/payment/checkout/payment-gateway.service.js';
 
 const RIDE_EXPIRY_JOB = 'ride-expiry';
 const OUTBOX_RELAY_JOB = 'outbox-relay';
@@ -21,6 +22,7 @@ const ACCOUNT_PURGE_JOB = 'account-purge';
 const QUEUE_NAME = 'dealgo-workers';
 const HEARTBEAT_JOB = 'worker-heartbeat';
 const CHAT_RETENTION_JOB = 'chat-retention';
+const PAYMENT_RECONCILE_JOB = 'payment-reconcile';
 
 /**
  * Starts BullMQ repeatable jobs when REDIS_URL is reachable.
@@ -43,6 +45,7 @@ export class WorkersBootstrap implements OnModuleInit, OnModuleDestroy {
     private readonly accountDeletion: AccountDeletionService,
     private readonly heartbeat: WorkerHeartbeatService,
     private readonly chatRetention: ChatRetentionService,
+    private readonly payments: PaymentGatewayService,
   ) {}
 
   /** Jobs added after the original four (DEC-PROD-053/056): name → interval + handler. */
@@ -57,6 +60,11 @@ export class WorkersBootstrap implements OnModuleInit, OnModuleDestroy {
         name: CHAT_RETENTION_JOB,
         every: this.config.get('CHAT_RETENTION_PURGE_INTERVAL_MS', { infer: true }),
         run: () => this.chatRetention.runOnce(),
+      },
+      {
+        name: PAYMENT_RECONCILE_JOB,
+        every: this.config.get('PAYMENT_RECONCILE_INTERVAL_MS', { infer: true }),
+        run: () => this.payments.reconcilePending(),
       },
     ];
   }

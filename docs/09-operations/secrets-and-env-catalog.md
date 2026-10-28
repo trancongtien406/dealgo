@@ -27,7 +27,7 @@ Tài liệu này liệt kê mọi biến môi trường mà backend, Admin web v
 
 Các tham số nghiệp vụ (giá cước, điều phối, hoa hồng, phí huỷ, cửa sổ liên lạc, số ngày giữ chat…) là **cài đặt Admin** lưu trong bảng `PlatformSetting`, sửa ở Admin › Cài đặt › Tham số. Khi một khoá chưa có trong DB, server lấy giá trị env cùng tên (nếu có) làm giá trị khởi tạo rồi lưu vào DB; từ đó DB là nguồn duy nhất. Danh sách đầy đủ: [Bản đồ cài đặt Admin](../10-ai-execution/open-admin-settings-map.md).
 
-Các khoá có cả env lẫn cài đặt Admin: `RIDE_OFFER_TTL_SECONDS`, `RIDE_MIN_FARE_VND`, `RIDE_MAX_FARE_VND`, `RIDE_REFERENCE_VND_PER_KM`, `FOOD_MIN_DELIVERY_VND`, `FOOD_MAX_DELIVERY_VND`, `FOOD_DELIVERY_VND_PER_KM`, `DRIVER_SEARCH_RADIUS_KM`, `MAX_CONCURRENT_JOBS_PER_DRIVER`, `PAYMENT_METHODS_ENABLED`, `CONTACT_WINDOW_MINUTES`. Với các khoá này env chỉ là giá trị khởi tạo.
+Các khoá có cả env lẫn cài đặt Admin: `RIDE_OFFER_TTL_SECONDS`, `RIDE_MIN_FARE_VND`, `RIDE_MAX_FARE_VND`, `RIDE_REFERENCE_VND_PER_KM`, `FOOD_MIN_DELIVERY_VND`, `FOOD_MAX_DELIVERY_VND`, `FOOD_DELIVERY_VND_PER_KM`, `DRIVER_SEARCH_RADIUS_KM`, `MAX_CONCURRENT_JOBS_PER_DRIVER`, `CONTACT_WINDOW_MINUTES`. Với các khoá này env chỉ là giá trị khởi tạo.
 
 ## Backend (`backend/.env`)
 
@@ -219,3 +219,23 @@ Khác:
 - [ ] Tài khoản review: mật khẩu + mã ở `/opt/dealgo/env/app-review.txt` (600, chỉ trên VPS và máy chủ dự án); `APP_REVIEW_PASSWORD` chỉ là biến lúc chạy `npm run seed:app-review` để đặt/đổi mật khẩu, không phải env của API
 - [ ] `/.well-known/apple-app-site-association` và `assetlinks.json` trả 200 trên domain thật
 - [ ] `android/key.properties` và keystore được backup ngoài git
+
+## Multi-method payment checkout
+
+Every method is toggled per service (BIKE/CAR/FOOD) in Ops → Payment methods
+(`PATCH /v1/ops/payment-methods`, permission `settings.write`, audited). A method is only
+offered to customers when it is enabled **and** its adapter is real **and** all its env keys
+below are set. CASH is always on, so the platform keeps working if every PSP is hidden.
+
+| Key | Secret | Used by |
+| --- | --- | --- |
+| `PAYMENT_PUBLIC_BASE_URL` | no | Public API base for IPN/return URLs (required for any online method) |
+| `PAYMENT_APP_RETURN_URL` | no | App deeplink after payment, e.g. `dealgo://payment-return` |
+| `MOMO_PARTNER_CODE`, `MOMO_ACCESS_KEY`, `MOMO_SECRET_KEY`, `MOMO_ENDPOINT` | secret key | MoMo (real adapter) |
+| `ZALOPAY_APP_ID`, `ZALOPAY_KEY1`, `ZALOPAY_KEY2`, `ZALOPAY_ENDPOINT` | key1/key2 | ZaloPay (real adapter) |
+| `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`, `VNPAY_URL`, `VNPAY_API_URL` | hash secret | VNPay QR + ATM/VNBANK (real adapter; API URL for refunds) |
+| `SHOPEEPAY_*` | secret key | ShopeePay (stub — not selectable yet) |
+| `CARD_GATEWAY_MERCHANT_ID`, `CARD_GATEWAY_SECRET` | secret | International card (stub) |
+| `APPLE_PAY_MERCHANT_ID` | no | Apple Pay (stub) |
+
+The DealGo wallet additionally requires the `PAYMENT_WALLET_ENABLED` platform setting (default `false`).

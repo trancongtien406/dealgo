@@ -37,6 +37,8 @@ export const PLATFORM_SETTING_SEED_DEFAULTS: Readonly<Partial<Record<PlatformSet
     RIDE_PICKUP_CODE_MAX_ATTEMPTS: '5',
     // DEC-PROD-036: delivery proof on by default; merchant↔driver handover code opt-in.
     FOOD_DELIVERY_CODE_REQUIRED: 'true',
+    PAYMENT_METHOD_REGISTRY: '{"methods":{}}',
+    PAYMENT_WALLET_ENABLED: 'false',
     FOOD_DELIVERY_CODE_MAX_ATTEMPTS: '5',
     FOOD_HANDOVER_CODE_REQUIRED: 'false',
     // DEC-PROD-048 (DRAFT): KYC/KYB documents required by default (fail closed).

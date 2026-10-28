@@ -6936,4 +6936,105 @@ class AppLocalizationsVi extends AppLocalizations {
   String mapPinStop(int n) {
     return 'Dừng $n';
   }
+
+  @override
+  String get paymentGroupWallet => 'Ví điện tử';
+
+  @override
+  String get paymentGroupCard => 'Thẻ tín dụng/ghi nợ';
+
+  @override
+  String get paymentGroupRecommended => 'Phương thức đề xuất';
+
+  @override
+  String get paymentGroupAddMore => 'Thêm phương thức';
+
+  @override
+  String get paymentCashLabel => 'Tiền mặt';
+
+  @override
+  String get paymentCashSubtitle => 'Trả trực tiếp cho tài xế';
+
+  @override
+  String get paymentStatusCash => 'Thanh toán tiền mặt';
+
+  @override
+  String get paymentStatusNotStarted => 'Chưa thanh toán';
+
+  @override
+  String get paymentStatusPending => 'Đang chờ xác nhận thanh toán';
+
+  @override
+  String get paymentStatusPaid => 'Thanh toán thành công';
+
+  @override
+  String get paymentStatusFailed => 'Thanh toán thất bại';
+
+  @override
+  String get paymentStatusExpired => 'Phiên thanh toán đã hết hạn';
+
+  @override
+  String get paymentStatusRefundPending => 'Đang hoàn tiền';
+
+  @override
+  String get paymentStatusRefunded => 'Đã hoàn tiền';
+
+  @override
+  String get paymentSheetTitle => 'Phương thức thanh toán';
+
+  @override
+  String get paymentClose => 'Đóng';
+
+  @override
+  String get paymentUnavailable => 'Không khả dụng';
+
+  @override
+  String get paymentChange => 'Đổi';
+
+  @override
+  String get paymentSessionExpired => 'Phiên đăng nhập đã hết hạn.';
+
+  @override
+  String get paymentStartFailed =>
+      'Không khởi tạo được thanh toán. Bạn có thể thử lại hoặc trả tiền mặt.';
+
+  @override
+  String get paymentStatusLoadFailed => 'Không tải được trạng thái thanh toán.';
+
+  @override
+  String get paymentHeader => 'Thanh toán';
+
+  @override
+  String get paymentPreparing => 'Đang chuẩn bị thanh toán…';
+
+  @override
+  String get paymentPendingHint =>
+      'Hoàn tất thanh toán trong ứng dụng ví/ngân hàng rồi quay lại DealGo. Trạng thái tự cập nhật.';
+
+  @override
+  String get paymentReopen => 'Mở lại trang thanh toán';
+
+  @override
+  String get paymentRetry => 'Thử lại';
+
+  @override
+  String get paymentSwitchToCash => 'Chuyển sang tiền mặt';
+
+  @override
+  String get paymentContinue => 'Tiếp tục';
+
+  @override
+  String get driverPaymentMethod => 'Phương thức thanh toán';
+
+  @override
+  String get driverPaidOnline => 'Đã thanh toán online';
+
+  @override
+  String driverPaidOnlineAmount(String amount) {
+    return 'Đã thanh toán online $amount';
+  }
+
+  @override
+  String get driverOnlinePaymentPending =>
+      'Khách đang thanh toán online, chưa xác nhận';
 }

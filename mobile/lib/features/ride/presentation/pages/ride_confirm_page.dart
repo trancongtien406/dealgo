@@ -13,6 +13,9 @@ import '../widgets/ride_widgets.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
+import '../../../payment/domain/payment_models.dart';
+import '../../../payment/presentation/payment_method_sheet.dart';
+import '../../../payment/presentation/payment_status_page.dart';
 
 class RideConfirmPage extends StatefulWidget {
   const RideConfirmPage({required this.args, super.key});
@@ -374,37 +377,7 @@ class _Confirmed extends StatelessWidget {
                           AppLocalizations.of(context).ridePaymentMethod,
                         ),
                         const SizedBox(height: DealGoSpacing.s8),
-                        Row(
-                          children: [
-                            const Icon(
-                              DealGoIcons.cash,
-                              color: DealGoColors.brandGreen,
-                            ),
-                            const SizedBox(width: DealGoSpacing.s8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    AppLocalizations.of(context)
-                                        .paymentHistoryCash,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  Text(
-                                    AppLocalizations.of(context).rideCashNote,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            RideStatusChip(
-                              label: AppLocalizations.of(context)
-                                  .commonSelected,
-                              tone: RideChipTone.green,
-                            ),
-                          ],
-                        ),
+                        RidePaymentSection(ride: ride),
                       ],
                     ),
                   ),
@@ -430,6 +403,55 @@ class _Confirmed extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Payment choice on the confirmed ride. CASH needs nothing more; an online
+/// method is started server-side (amount = cash due) and tracked on
+/// [PaymentStatusPage].
+class RidePaymentSection extends StatefulWidget {
+  const RidePaymentSection({required this.ride, super.key});
+
+  final RideView ride;
+
+  @override
+  State<RidePaymentSection> createState() => _RidePaymentSectionState();
+}
+
+class _RidePaymentSectionState extends State<RidePaymentSection> {
+  PaymentMethodOption _method = PaymentMethodOption.cash;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PaymentMethodTile(
+          service: paymentServiceForVehicleClass(widget.ride.vehicleClassCode),
+          selected: _method.code,
+          onChanged: (m) => setState(() => _method = m),
+        ),
+        if (_method.isCash)
+          Padding(
+            padding: const EdgeInsets.only(top: DealGoSpacing.s4),
+            child: Text(AppLocalizations.of(context).rideCashNote),
+          )
+        else ...[
+          const SizedBox(height: DealGoSpacing.s12),
+          DealGoPrimaryButton(
+            key: const Key('ride-pay-online'),
+            label: 'Thanh toán qua ${_method.label}',
+            onPressed: () => context.push(
+              PaymentRoutes.location(
+                entityType: 'RIDE',
+                entityId: widget.ride.id,
+                startMethod: _method.code,
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

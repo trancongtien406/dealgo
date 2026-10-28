@@ -42,7 +42,7 @@ Tài liệu mô tả hiện trạng của `backend/`. Code là nguồn chuẩn; 
 |---|---|
 | Biểu phí, hoa hồng (`OPEN-003`) | Là cài đặt Admin với giá trị mặc định DRAFT; chờ chủ dự án duyệt số |
 | Cổng thanh toán (`OPEN-002`) | Ra mắt chỉ tiền mặt; không tuyên bố đã thu tiền thật |
-| `PAYMENT_METHODS_ENABLED` | Có trong env nhưng không được kiểm khi đặt chuyến/đơn |
+| `PAYMENT_METHODS_ENABLED` | Đã gỡ — thay bằng `PAYMENT_METHOD_REGISTRY` (được kiểm khi đặt chuyến/đơn) |
 | Lưu giữ liên lạc (`OPEN-021`) | `CONTACT_WINDOW_MINUTES` mặc định 120, là TEST_ONLY |
 | Migration trùng tiền tố | Ba thư mục `20261014160000_*`; không đổi tên vì đã áp dụng |
 

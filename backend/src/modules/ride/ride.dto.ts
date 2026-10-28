@@ -1,3 +1,4 @@
+import { PAYMENT_METHOD_CODES } from '../../platform/settings/payment-method-registry.js';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -72,6 +73,11 @@ export class CreateRideDto {
   @IsOptional()
   @IsUUID()
   repostOfRideId?: string;
+
+  /** Registry payment method code (default CASH); must be enabled for BIKE/CAR. */
+  @IsOptional()
+  @IsIn(PAYMENT_METHOD_CODES as unknown as string[])
+  paymentMethod?: (typeof PAYMENT_METHOD_CODES)[number];
 }
 
 export class QuoteRideDto {

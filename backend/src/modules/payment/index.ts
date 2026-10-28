@@ -8,3 +8,4 @@ export * from './ops-refunds.controller.js';
 export * from './ops-refunds.service.js';
 export * from './ops-transactions.controller.js';
 export * from './ops-transactions.service.js';
+export * from './checkout/index.js';

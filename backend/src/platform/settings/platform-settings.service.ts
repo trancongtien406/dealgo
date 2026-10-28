@@ -1,6 +1,6 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { isCashOnlyPaymentProvider, type AppEnv } from '../config/env.js';
+import type { AppEnv } from '../config/env.js';
 import { MapKeysService } from '../integration-settings/map-keys.service.js';
 import {
   MAPS_PROVIDER_CHOICES,
@@ -17,6 +17,10 @@ import {
   PLATFORM_SETTINGS_REPOSITORY,
 } from './platform-settings.constants.js';
 import { settingsError } from './platform-settings.error.js';
+import {
+  normalizePaymentMethodRegistry,
+  validatePaymentMethodRegistry,
+} from './payment-method-registry.js';
 import { PLATFORM_SETTING_SEED_DEFAULTS } from './platform-settings.seed.js';
 import type {
   PlatformSettingRecord,
@@ -336,13 +340,8 @@ export class PlatformSettingsService {
         return String(this.config.get('CONTACT_WINDOW_MINUTES', { infer: true }));
       case 'MAX_CONCURRENT_JOBS_PER_DRIVER':
         return String(this.config.get('MAX_CONCURRENT_JOBS_PER_DRIVER', { infer: true }));
-      case 'PAYMENT_METHODS_ENABLED':
-        // DEC-PROD-050: a cash-only launch never advertises online methods by default.
-        if (isCashOnlyPaymentProvider(this.config.get('PAYMENT_PROVIDER', { infer: true }))) {
-          return '["COD"]';
-        }
-        return this.config.get('PAYMENT_METHODS_ENABLED', { infer: true });
-
+      case 'PAYMENT_METHOD_REGISTRY':
+      case 'PAYMENT_WALLET_ENABLED':
       case 'RATING_WINDOW_DAYS':
       case 'RIDE_COMMISSION_BIKE_PERCENT':
       case 'RIDE_COMMISSION_CAR_PERCENT':
@@ -470,14 +469,12 @@ export class PlatformSettingsService {
       if (spec.boolean && typeof parsed !== 'boolean') {
         throw settingsError(400, 'PLATFORM_SETTING_INVALID', `${key} must be true or false`);
       }
-      if (key === 'PAYMENT_METHODS_ENABLED') {
-        if (!Array.isArray(parsed) || !parsed.every((x) => typeof x === 'string' && x.length > 0)) {
-          throw settingsError(
-            400,
-            'PLATFORM_SETTING_INVALID',
-            'PAYMENT_METHODS_ENABLED must be a JSON array of non-empty strings',
-          );
+      if (key === 'PAYMENT_METHOD_REGISTRY') {
+        const problem = validatePaymentMethodRegistry(parsed);
+        if (problem) {
+          throw settingsError(400, 'PLATFORM_SETTING_INVALID', problem);
         }
+        return JSON.stringify(normalizePaymentMethodRegistry(parsed));
       }
       if (key === 'UPLOAD_ALLOWED_TYPES') {
         const allowed = UPLOAD_SNIFFABLE_TYPES as readonly string[];

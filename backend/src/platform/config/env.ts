@@ -178,6 +178,8 @@ const envSchema = z.object({
   OPS_ALERT_WEBHOOK_URL: optionalString,
   /** DEC-PROD-056: how often the worker purges chat messages older than the admin retention setting. */
   CHAT_RETENTION_PURGE_INTERVAL_MS: positiveInt(3_600_000),
+  /** Active PSP status reconciliation for online payments stuck pending (missed IPN). */
+  PAYMENT_RECONCILE_INTERVAL_MS: positiveInt(120_000),
   SMTP_URL: optionalString,
   SMTP_HOST: optionalString,
   SMTP_PORT: optionalPositiveInt,
@@ -213,6 +215,25 @@ const envSchema = z.object({
   MOMO_ACCESS_KEY: optionalString,
   MOMO_SECRET_KEY: optionalString,
   MOMO_ENDPOINT: optionalString,
+  // Multi-method gateway (sandbox placeholders only; real keys live in the secret store).
+  // Public HTTPS base the PSPs call back (IPN) and redirect to, e.g. https://api.dealgo.vn
+  PAYMENT_PUBLIC_BASE_URL: optionalString,
+  // App deeplink the return page bounces to, e.g. dealgo://payment-return
+  PAYMENT_APP_RETURN_URL: optionalString,
+  // VNPay merchant API (refund/querydr), sandbox: https://sandbox.vnpayment.vn/merchant_webapi/api/transaction
+  VNPAY_API_URL: optionalString,
+  ZALOPAY_APP_ID: optionalString,
+  ZALOPAY_KEY1: optionalString,
+  ZALOPAY_KEY2: optionalString,
+  // sandbox: https://sb-openapi.zalopay.vn
+  ZALOPAY_ENDPOINT: optionalString,
+  SHOPEEPAY_CLIENT_ID: optionalString,
+  SHOPEEPAY_SECRET_KEY: optionalString,
+  SHOPEEPAY_MERCHANT_EXT_ID: optionalString,
+  SHOPEEPAY_ENDPOINT: optionalString,
+  CARD_GATEWAY_MERCHANT_ID: optionalString,
+  CARD_GATEWAY_SECRET: optionalString,
+  APPLE_PAY_MERCHANT_ID: optionalString,
   VOICE_PROVIDER: optionalString,
   LIVEKIT_URL: optionalString,
   LIVEKIT_API_KEY: optionalString,
@@ -254,24 +275,7 @@ const envSchema = z.object({
   ),
   // Maximum concurrent active jobs per driver — enforced on food claim + ride select.
   MAX_CONCURRENT_JOBS_PER_DRIVER: positiveInt(1),
-  // OPEN-002 channel flags (not PSP secrets). JSON array string.
-  PAYMENT_METHODS_ENABLED: z.preprocess(
-    (value) =>
-      value === undefined || value === null || value === '' ? undefined : value,
-    z
-      .string()
-      .default('["COD","SANDBOX"]')
-      .refine((raw) => {
-        try {
-          const parsed: unknown = JSON.parse(raw);
-          return (
-            Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')
-          );
-        } catch {
-          return false;
-        }
-      }, 'PAYMENT_METHODS_ENABLED must be a JSON array of strings'),
-  ),
+  // PAYMENT_METHODS_ENABLED was retired: methods are managed by PAYMENT_METHOD_REGISTRY (Admin › Thanh toán).
   // Cap when driver omits lat/lng so open/ready lists stay bounded.
   DISPATCH_FALLBACK_LIMIT: positiveInt(20),
   // DEC-PROD-031 rev 2026-10-24 adaptive GPS (DRAFT defaults; Fleet Engine range 5–60 s).

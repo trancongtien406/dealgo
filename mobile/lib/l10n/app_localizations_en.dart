@@ -6974,4 +6974,105 @@ class AppLocalizationsEn extends AppLocalizations {
   String mapPinStop(int n) {
     return 'Stop $n';
   }
+
+  @override
+  String get paymentGroupWallet => 'E-wallets';
+
+  @override
+  String get paymentGroupCard => 'Credit/debit cards';
+
+  @override
+  String get paymentGroupRecommended => 'Recommended';
+
+  @override
+  String get paymentGroupAddMore => 'More methods';
+
+  @override
+  String get paymentCashLabel => 'Cash';
+
+  @override
+  String get paymentCashSubtitle => 'Pay the driver directly';
+
+  @override
+  String get paymentStatusCash => 'Cash payment';
+
+  @override
+  String get paymentStatusNotStarted => 'Not paid yet';
+
+  @override
+  String get paymentStatusPending => 'Waiting for payment confirmation';
+
+  @override
+  String get paymentStatusPaid => 'Payment successful';
+
+  @override
+  String get paymentStatusFailed => 'Payment failed';
+
+  @override
+  String get paymentStatusExpired => 'Payment session expired';
+
+  @override
+  String get paymentStatusRefundPending => 'Refund in progress';
+
+  @override
+  String get paymentStatusRefunded => 'Refunded';
+
+  @override
+  String get paymentSheetTitle => 'Payment method';
+
+  @override
+  String get paymentClose => 'Close';
+
+  @override
+  String get paymentUnavailable => 'Unavailable';
+
+  @override
+  String get paymentChange => 'Change';
+
+  @override
+  String get paymentSessionExpired => 'Your session has expired.';
+
+  @override
+  String get paymentStartFailed =>
+      'Couldn\'t start the payment. Try again or pay in cash.';
+
+  @override
+  String get paymentStatusLoadFailed => 'Couldn\'t load the payment status.';
+
+  @override
+  String get paymentHeader => 'Payment';
+
+  @override
+  String get paymentPreparing => 'Preparing payment…';
+
+  @override
+  String get paymentPendingHint =>
+      'Finish paying in your wallet/bank app, then come back to DealGo. The status updates automatically.';
+
+  @override
+  String get paymentReopen => 'Reopen payment page';
+
+  @override
+  String get paymentRetry => 'Try again';
+
+  @override
+  String get paymentSwitchToCash => 'Switch to cash';
+
+  @override
+  String get paymentContinue => 'Continue';
+
+  @override
+  String get driverPaymentMethod => 'Payment method';
+
+  @override
+  String get driverPaidOnline => 'Paid online';
+
+  @override
+  String driverPaidOnlineAmount(String amount) {
+    return 'Paid online $amount';
+  }
+
+  @override
+  String get driverOnlinePaymentPending =>
+      'Customer\'s online payment not confirmed yet';
 }

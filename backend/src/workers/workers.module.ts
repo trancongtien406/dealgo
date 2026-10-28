@@ -4,6 +4,7 @@ import { Module } from '@nestjs/common';
 import { AccountDeletionModule } from '../modules/account-deletion/index.js';
 import { OutboxModule } from '../modules/communication/outbox/index.js';
 import { RideModule } from '../modules/ride/index.js';
+import { PaymentModule } from '../modules/payment/index.js';
 import { FoodModule } from '../modules/food-order/food.module.js';
 import { PrismaModule } from '../platform/database/prisma.module.js';
 import { PlatformSettingsModule } from '../platform/settings/platform-settings.module.js';
@@ -18,7 +19,7 @@ import { PrismaWorkerHeartbeatStore, WORKER_HEARTBEAT_STORE } from '../platform/
 import { OpsAlertService } from '../platform/observability/ops-alert.js';
 
 @Module({
-  imports: [AccountDeletionModule, RealtimeModule, RideModule, FoodModule, OutboxModule, PrismaModule, PlatformSettingsModule, StorageModule],
+  imports: [AccountDeletionModule, RealtimeModule, RideModule, PaymentModule, FoodModule, OutboxModule, PrismaModule, PlatformSettingsModule, StorageModule],
   providers: [
     RideExpiryService,
     OrphanUploadCleanupService,
