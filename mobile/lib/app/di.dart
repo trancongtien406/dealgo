@@ -27,6 +27,8 @@ import '../features/driver/data/datasources/driver_active_job_client.dart';
 import '../features/ride/data/datasources/customer_active_trip_client.dart';
 import '../features/ride/data/datasources/ride_negotiation_clients.dart';
 import '../features/ride/domain/negotiation/ride_negotiation_client.dart';
+import '../features/ride/data/datasources/ride_stops_client_impl.dart';
+import '../features/ride/domain/stops/ride_stops_client.dart';
 import '../core/notifications/notification_router.dart';
 import '../core/permissions/app_permission_service.dart';
 import '../core/push/fake_push.dart';
@@ -265,6 +267,7 @@ class DealGoDependencies {
   SnapshotRealtime get realtime => _locator<SnapshotRealtime>();
   RideNegotiationClient get rideNegotiation =>
       _locator<RideNegotiationClient>();
+  RideStopsClient get rideStops => _locator<RideStopsClient>();
   AnalyticsPort get analytics => _locator<AnalyticsPort>();
   NotificationRouter get notificationRouter => _locator<NotificationRouter>();
   AuthCubit get authCubit => _locator<AuthCubit>();
@@ -285,6 +288,7 @@ class DealGoDependencies {
     PasskeyPlatform? passkeyPlatform,
     FoodClient? foodClient,
     RideClient? rideClient,
+    RideStopsClient? rideStopsClient,
     DriverJobsClient? driverJobsClient,
     MerchantOrdersClient? merchantOrdersClient,
     PartnerApplicationsClient? partnerApplicationsClient,
@@ -327,6 +331,7 @@ class DealGoDependencies {
       authMethodsCache: authMethodsCache,
       foodClient: foodClient,
       rideClient: rideClient,
+      rideStopsClient: rideStopsClient,
       driverJobsClient: driverJobsClient,
       merchantOrdersClient: merchantOrdersClient,
       partnerApplicationsClient: partnerApplicationsClient,
@@ -371,6 +376,7 @@ class DealGoDependencies {
       authMethodsCache: authMethodsCache,
       foodClient: foodClient,
       rideClient: rideClient,
+      rideStopsClient: rideStopsClient,
       driverJobsClient: driverJobsClient,
       merchantOrdersClient: merchantOrdersClient,
       partnerApplicationsClient: partnerApplicationsClient,
@@ -445,6 +451,7 @@ class DealGoDependencies {
     PasskeyPlatform? passkeyPlatform,
     FoodClient? foodClient,
     RideClient? rideClient,
+    RideStopsClient? rideStopsClient,
     DriverJobsClient? driverJobsClient,
     MerchantOrdersClient? merchantOrdersClient,
     PartnerApplicationsClient? partnerApplicationsClient,
@@ -684,6 +691,11 @@ class DealGoDependencies {
     final RideNegotiationClient rideNegotiation = useOverrides || useMockData
         ? FakeRideNegotiationClient()
         : DioRideNegotiationClient(dio: dio);
+    final RideStopsClient rideStops =
+        rideStopsClient ??
+        (useOverrides || useMockData
+            ? FakeRideStopsClient()
+            : DioRideStopsClient(dio: dio));
     final inboxRepository = InboxRepositoryImpl(
       inboxRemote ??
           (useOverrides
@@ -792,6 +804,7 @@ class DealGoDependencies {
     put<AccountDeletionRepository>(accountDeletionRepository);
     put<AccountSettingsRepository>(accountSettingsRepository);
     put<RideNegotiationClient>(rideNegotiation);
+    put<RideStopsClient>(rideStops);
     put<HelpFaqRepository>(helpFaqRepository);
     put<RideShareRepository>(rideShareRepository);
     put<ListInboxNotifications>(ListInboxNotifications(inboxRepository));
@@ -1166,6 +1179,7 @@ class DealGoDependencies {
         RepositoryProvider<ExternalNavigator>.value(value: externalNavigator),
         RepositoryProvider<SnapshotRealtime>.value(value: realtime),
         RepositoryProvider<RideNegotiationClient>.value(value: rideNegotiation),
+        RepositoryProvider<RideStopsClient>.value(value: rideStops),
         RepositoryProvider<AnalyticsPort>.value(value: analytics),
         RepositoryProvider<NotificationRouter>.value(value: notificationRouter),
         RepositoryProvider<ConnectivityService>.value(value: connectivity),

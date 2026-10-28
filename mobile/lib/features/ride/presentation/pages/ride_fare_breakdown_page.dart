@@ -173,6 +173,7 @@ class RideFareBreakdownPage extends StatelessWidget {
                         RideStopList(
                           pickup: draft.places.pickup.label,
                           dropoff: draft.places.dropoff.label,
+                          stops: [for (final s in draft.places.stops) s.label],
                         ),
                       ],
                     ),

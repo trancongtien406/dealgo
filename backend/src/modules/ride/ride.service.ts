@@ -74,8 +74,18 @@ import type {
   RaiseFareDto,
   RateCustomerDto,
   SelectOfferDto,
+  UpdateStopsDto,
 } from './ride.dto.js';
 import { RideRuleError, rideError } from './ride.error.js';
+import {
+  loadMultiStopConfig,
+  multiStopService,
+  referenceWithStopsVnd,
+  stopPolicy,
+  stopsRuleError,
+  waypoints,
+  type MultiStopConfig,
+} from './ride-multi-stop.js';
 import type { OpsInterveneResult, RideRepository } from './ride.repository.js';
 
 export type RideOfferView = {
@@ -105,6 +115,19 @@ export type OpenRideView = {
   customerRating: CustomerRatingSummary;
   /** Straight-line km from the driver's dispatch origin to pickup. */
   pickupDistanceKm: number | null;
+  /** Intermediate stops between pickup and dropoff (empty = single destination). */
+  stops: Array<{ lat: number; lng: number; label: string }>;
+  /** Offers must quote this version; a stop edit bumps it. */
+  routeVersion: number;
+};
+
+export type RideStopView = {
+  seq: number;
+  lat: number;
+  lng: number;
+  label: string;
+  arrivedAt: string | null;
+  departedAt: string | null;
 };
 
 export type RideView = {
@@ -120,6 +143,16 @@ export type RideView = {
     | 'EXPIRED';
   pickup: { lat: number; lng: number; label: string };
   dropoff: { lat: number; lng: number; label: string };
+  /** Intermediate stops in visiting order (empty = single destination). */
+  stops: RideStopView[];
+  /** Bumped on each stop edit; offers carry it (RIDE_ROUTE_CHANGED on mismatch). */
+  routeVersion: number;
+  /** Next stop the driver has not left yet while IN_TRIP (null = heading to dropoff). */
+  currentStopSeq: number | null;
+  /** Per-stop fee included in the reference fare (snapshot at booking). */
+  stopFeeVnd: number;
+  /** Stop waiting charge over the free minutes, added at completion. */
+  waitFeeVnd: number;
   offeredFareVnd: number;
   referenceFareVnd: number;
   vehicleClassCode: string;
@@ -198,6 +231,11 @@ export interface RideQuoteOptionView {
    * ceil(reference × RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE / 100)). The slider starts here.
    */
   minBidVnd: number;
+  /** Multi-stop service for this class (BIKE / CAR). */
+  multiStopService: 'BIKE' | 'CAR';
+  /** false when the quoted stops are not allowed for this class (flag off / too many). */
+  available: boolean;
+  unavailableReason: 'RIDE_STOPS_DISABLED' | 'RIDE_TOO_MANY_STOPS' | null;
 }
 
 export interface RideQuoteView {
@@ -212,6 +250,10 @@ export interface RideQuoteView {
   options: RideQuoteOptionView[];
   /** Road geometry for the overview map (same provider as Admin). */
   route: RouteGeometryView;
+  /** Stops quoted (0 = single destination). */
+  stopCount: number;
+  /** Admin multi-stop rules per service, so the app shows / hides "Thêm điểm dừng". */
+  multiStop: { BIKE: MultiStopConfig; CAR: MultiStopConfig };
 }
 
 
@@ -271,12 +313,19 @@ export class RideService {
     const vehicle = await this.requireEnabledClass(dto.vehicleClassCode);
     const offeredFareVnd = toFareStep(dto.offeredFareVnd);
     await this.assertFare(offeredFareVnd, vehicle.minFareVnd, vehicle.maxFareVnd);
-    await this.assertInServiceZone(dto.pickup, dto.dropoff);
+    const stops = dto.stops ?? [];
+    const multiStop = await loadMultiStopConfig(this.settings, multiStopService(vehicle.code));
+    this.assertStopsAllowed(stops.length, multiStop);
+    await this.assertInServiceZone(dto.pickup, dto.dropoff, stops);
     const now = this.clock.now();
     await this.assertCancelCooldown(actor.userId, now);
     const repostOfRideId = await this.repostSource(actor.userId, dto.repostOfRideId, now);
-    const distanceKm = await resolveRouteDistanceKm(this.maps, dto.pickup, dto.dropoff);
-    const quoted = this.vehicleClasses.quote(distanceKm, vehicle);
+    const distanceKm = await this.routeDistanceKm(dto.pickup, stops, dto.dropoff);
+    const distanceQuote = this.vehicleClasses.quote(distanceKm, vehicle);
+    const quoted = {
+      ...distanceQuote,
+      referenceFareVnd: referenceWithStopsVnd(distanceQuote.referenceFareVnd, stops.length, multiStop.stopFeeVnd, vehicle),
+    };
     // The customer's bid may not undercut the server reference by more than
     // RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE (inDrive shows a "recommended" floor the same way).
     await this.assertBidFloor(offeredFareVnd, quoted.referenceFareVnd);
@@ -287,6 +336,7 @@ export class RideService {
         idempotencyKey,
         pickup: dto.pickup,
         dropoff: dto.dropoff,
+        ...(stops.length > 0 ? { stops, stopPolicy: stopPolicy(multiStop) } : {}),
         offeredFareVnd,
         referenceFareVnd: quoted.referenceFareVnd,
         vehicleClassCode: vehicle.code,
@@ -351,20 +401,36 @@ export class RideService {
   /** Preview of what create() would store, so the app never guesses prices. */
   async quote(
     actor: RequestActor,
-    dto: { pickup: { lat: number; lng: number }; dropoff: { lat: number; lng: number } },
+    dto: {
+      pickup: { lat: number; lng: number };
+      dropoff: { lat: number; lng: number };
+      stops?: Array<{ lat: number; lng: number }>;
+    },
   ): Promise<RideQuoteView> {
     await this.requireActiveCustomer(actor.userId);
     const enabled = await this.vehicleClasses.listEnabled();
     if (enabled.length === 0) {
       throw rideError(400, 'RIDE_VEHICLE_CLASS_UNKNOWN', 'No vehicle class is available');
     }
-    await this.assertInServiceZone(dto.pickup, dto.dropoff);
-    const distanceKm = await resolveRouteDistanceKm(this.maps, dto.pickup, dto.dropoff);
+    const stops = dto.stops ?? [];
+    await this.assertInServiceZone(dto.pickup, dto.dropoff, stops);
+    const multiStop = await this.multiStopConfig();
+    const distanceKm = await this.routeDistanceKm(dto.pickup, stops, dto.dropoff);
     const floorPercent = await this.settings.getNumber('RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE');
     const options = enabled.map((vehicle) => {
-      const quoted = this.vehicleClasses.quote(distanceKm, vehicle);
+      const service = multiStopService(vehicle.code);
+      const config = multiStop[service];
+      const unavailableReason = stopsRuleError(stops.length, config) as RideQuoteOptionView['unavailableReason'];
+      const distanceQuote = this.vehicleClasses.quote(distanceKm, vehicle);
+      const quoted = {
+        ...distanceQuote,
+        referenceFareVnd: referenceWithStopsVnd(distanceQuote.referenceFareVnd, stops.length, config.stopFeeVnd, vehicle),
+      };
       const floor = rideBidFloorVnd(quoted.referenceFareVnd, floorPercent);
       return {
+        multiStopService: service,
+        available: unavailableReason === null,
+        unavailableReason,
         minBidVnd: clampToFareSteps(floor, vehicle.minFareVnd, vehicle.maxFareVnd),
         code: vehicle.code,
         name: vehicle.name,
@@ -380,8 +446,12 @@ export class RideService {
       };
     });
     // Top-level summary uses catalog sortOrder — do not prefer MOTORBIKE (DG-DEC-VEH-001).
-    const primary = options[0]!;
-    const route = await this.lookupRoute(dto.pickup, dto.dropoff);
+    if (stops.length > 0 && !options.some((option) => option.available)) {
+      const reason = options.find((option) => option.unavailableReason)?.unavailableReason ?? 'RIDE_STOPS_DISABLED';
+      throw this.asHttp(new RideRuleError(reason));
+    }
+    const primary = options.find((option) => option.available) ?? options[0]!;
+    const route = await this.lookupRoute(dto.pickup, dto.dropoff, stops);
     return {
       distanceKm: Math.round(distanceKm * 10) / 10,
       referenceFareVnd: primary.referenceFareVnd,
@@ -391,7 +461,107 @@ export class RideService {
       pendingFeesVnd: await this.rides.pendingFeeTotal(actor.userId),
       options,
       route,
+      stopCount: stops.length,
+      multiStop,
     };
+  }
+
+  /** Admin multi-stop rules for both services (GET /v1/rides/multi-stop-config). */
+  async multiStopConfig(): Promise<{ BIKE: MultiStopConfig; CAR: MultiStopConfig }> {
+    const [BIKE, CAR] = await Promise.all([
+      loadMultiStopConfig(this.settings, 'BIKE'),
+      loadMultiStopConfig(this.settings, 'CAR'),
+    ]);
+    return { BIKE, CAR };
+  }
+
+  /**
+   * Customer adds / removes / reorders stops while NEGOTIATING. The route and reference are
+   * re-quoted, pending offers die (LOST) and the round restarts; after selection the route is
+   * locked (RIDE_STOPS_LOCKED). Removing every stop is always allowed even with the flag off.
+   */
+  async updateStops(actor: RequestActor, rideId: string, dto: UpdateStopsDto): Promise<RideView> {
+    await this.requireActiveCustomer(actor.userId);
+    const now = this.clock.now();
+    const existing = await this.unwrapNullable(() => this.rides.findById(rideId, now));
+    if (!existing || existing.customerId !== actor.userId) {
+      throw rideError(404, 'RIDE_NOT_FOUND', 'Ride not found');
+    }
+    if (existing.status !== 'NEGOTIATING') {
+      throw this.asHttp(new RideRuleError('RIDE_STOPS_LOCKED'));
+    }
+    const stops = dto.stops;
+    const dropoff = dto.dropoff ?? existing.dropoff;
+    const multiStop = await loadMultiStopConfig(this.settings, multiStopService(existing.vehicleClassCode));
+    this.assertStopsAllowed(stops.length, multiStop);
+    await this.assertInServiceZone(existing.pickup, dropoff, stops);
+    const bounds = await this.vehicleClasses.findAny(existing.vehicleClassCode);
+    if (!bounds) {
+      throw rideError(400, 'RIDE_VEHICLE_CLASS_UNKNOWN', 'Vehicle class is not available');
+    }
+    const distanceKm = await this.routeDistanceKm(existing.pickup, stops, dropoff);
+    const referenceFareVnd = referenceWithStopsVnd(
+      this.vehicleClasses.quote(distanceKm, bounds).referenceFareVnd,
+      stops.length,
+      multiStop.stopFeeVnd,
+      bounds,
+    );
+    const offeredFareVnd = toFareStep(dto.offeredFareVnd ?? existing.offeredFareVnd);
+    await this.assertFare(offeredFareVnd, bounds.minFareVnd, bounds.maxFareVnd);
+    await this.assertBidFloor(offeredFareVnd, referenceFareVnd);
+    const windowExpiresAt = await this.requestWindowEnd(now);
+    const updated = await this.unwrap(() =>
+      this.rides.updateStops({
+        rideId,
+        customerId: actor.userId,
+        stops,
+        dropoff,
+        referenceFareVnd,
+        offeredFareVnd,
+        stopFeeVnd: multiStop.stopFeeVnd,
+        ...(dto.routeVersion !== undefined ? { expectedRouteVersion: dto.routeVersion } : {}),
+        windowExpiresAt,
+        now,
+      }),
+    );
+    this.notifyOffers(rideId, 'ROUTE_CHANGED');
+    return updated;
+  }
+
+  /** Assigned driver reached stop `seq` (IN_TRIP, stops in order; repeats are no-ops). */
+  async arriveStop(actor: RequestActor, rideId: string, seq: number): Promise<RideView> {
+    await this.requireActiveDriver(actor.userId);
+    return this.unwrap(() =>
+      this.rides.arriveStop({ rideId, driverId: actor.userId, seq, now: this.clock.now() }),
+    );
+  }
+
+  /** Assigned driver leaves stop `seq`; waiting beyond the free minutes is billed at completion. */
+  async departStop(actor: RequestActor, rideId: string, seq: number): Promise<RideView> {
+    await this.requireActiveDriver(actor.userId);
+    return this.unwrap(() =>
+      this.rides.departStop({ rideId, driverId: actor.userId, seq, now: this.clock.now() }),
+    );
+  }
+
+  private assertStopsAllowed(stopCount: number, config: MultiStopConfig): void {
+    const code = stopsRuleError(stopCount, config);
+    if (code) {
+      throw this.asHttp(new RideRuleError(code));
+    }
+  }
+
+  /** Road km over every leg pickup → stops → dropoff. */
+  private async routeDistanceKm(
+    pickup: { lat: number; lng: number },
+    stops: ReadonlyArray<{ lat: number; lng: number }>,
+    dropoff: { lat: number; lng: number },
+  ): Promise<number> {
+    const points = waypoints(pickup, [...stops], dropoff);
+    const legs = await Promise.all(
+      points.slice(1).map((to, index) => resolveRouteDistanceKm(this.maps, points[index]!, to)),
+    );
+    return legs.reduce((sum, km) => sum + km, 0);
   }
 
   async listVehicleClasses(): Promise<{
@@ -551,11 +721,20 @@ export class RideService {
   async routeLegsForDriver(
     rideId: string,
     driverId: string,
-  ): Promise<{ phase: RoutePhase; pickup: { lat: number; lng: number }; dropoff: { lat: number; lng: number } } | null> {
+  ): Promise<{
+    phase: RoutePhase;
+    pickup: { lat: number; lng: number };
+    dropoff: { lat: number; lng: number };
+    via?: Array<{ lat: number; lng: number }>;
+  } | null> {
     const ride = await this.unwrapNullable(() => this.rides.findById(rideId, this.clock.now()));
     if (!ride || ride.assignedDriverId !== driverId) return null;
     const phase = routePhaseForRide(ride.status);
-    return phase ? { phase, pickup: ride.pickup, dropoff: ride.dropoff } : null;
+    if (!phase) return null;
+    const via = (ride.stops ?? [])
+      .filter((stop) => !stop.departedAt)
+      .map((stop) => ({ lat: stop.lat, lng: stop.lng }));
+    return { phase, pickup: ride.pickup, dropoff: ride.dropoff, ...(via.length > 0 ? { via } : {}) };
   }
 
   /**
@@ -727,6 +906,7 @@ export class RideService {
         amountVnd,
         expiresAt,
         now,
+        ...(dto.routeVersion !== undefined ? { routeVersion: dto.routeVersion } : {}),
         ...(maxLiveOffers > 0 ? { maxLiveOffers } : {}),
         ...(maxEdits !== undefined && maxEdits >= 0 ? { maxEdits } : {}),
       }),
@@ -1045,7 +1225,7 @@ export class RideService {
     );
     this.notifyOffers(rideId, 'CANCELLED');
     const base = toOpsView(result.ride, await this.imageUrlForClass(result.ride.vehicleClassCode));
-    return { ...base, route: await this.lookupRoute(result.ride.pickup, result.ride.dropoff) };
+    return { ...base, route: await this.lookupRoute(result.ride.pickup, result.ride.dropoff, result.ride.stops) };
   }
 
   /** Clear assignment back to NEGOTIATING when still pre-trip. */
@@ -1057,7 +1237,7 @@ export class RideService {
     );
     this.notifyOffers(rideId, 'REASSIGNED');
     const base = toOpsView(result.ride, await this.imageUrlForClass(result.ride.vehicleClassCode));
-    return { ...base, route: await this.lookupRoute(result.ride.pickup, result.ride.dropoff) };
+    return { ...base, route: await this.lookupRoute(result.ride.pickup, result.ride.dropoff, result.ride.stops) };
   }
 
   /** Worker entry: expire NEGOTIATING rides past expiresAt (idempotent). */
@@ -1141,7 +1321,7 @@ export class RideService {
             entityType: 'RIDE',
             entityId: done.id,
             driverId: actor.userId,
-            fareVnd: done.agreedFareVnd,
+            fareVnd: done.agreedFareVnd + (done.waitFeeVnd ?? 0),
             completedAt,
             feeBps: isBikeClass(done.vehicleClassCode) ? bikeFeeBps : carFeeBps,
           });
@@ -1206,7 +1386,7 @@ export class RideService {
       throw rideError(404, 'RIDE_NOT_FOUND', 'Ride not found');
     }
     const base = toOpsView(ride, await this.imageUrlForClass(ride.vehicleClassCode));
-    return { ...base, route: await this.lookupRoute(ride.pickup, ride.dropoff) };
+    return { ...base, route: await this.lookupRoute(ride.pickup, ride.dropoff, ride.stops) };
   }
 
   async getLedgerJournal(actor: RequestActor, rideId: string) {
@@ -1363,11 +1543,12 @@ export class RideService {
   private async assertInServiceZone(
     pickup: { lat: number; lng: number },
     dropoff: { lat: number; lng: number },
+    stops: ReadonlyArray<{ lat: number; lng: number }> = [],
   ): Promise<void> {
     if (!(await this.settings.getBoolean('SERVICE_ZONE_ENFORCED'))) {
       return;
     }
-    if (!activeRegionCodeAt(pickup.lat, pickup.lng) || !activeRegionCodeAt(dropoff.lat, dropoff.lng)) {
+    if ([pickup, ...stops, dropoff].some((point) => !activeRegionCodeAt(point.lat, point.lng))) {
       throw rideError(
         422,
         'RIDE_OUTSIDE_SERVICE_ZONE',
@@ -1440,19 +1621,24 @@ export class RideService {
     actor: RequestActor,
     from: { lat: number; lng: number },
     to: { lat: number; lng: number },
+    via: ReadonlyArray<{ lat: number; lng: number }> = [],
   ): Promise<RouteGeometryView> {
     // Any signed-in customer/driver session may preview a route (throttled at controller).
     if (!actor.userId) {
       throw rideError(401, 'UNAUTHORIZED', 'Unauthorized');
     }
-    return this.lookupRoute(from, to);
+    return this.lookupRoute(from, to, via);
   }
 
   private async lookupRoute(
     from: { lat: number; lng: number },
     to: { lat: number; lng: number },
+    stops: ReadonlyArray<{ lat: number; lng: number }> = [],
   ): Promise<RouteGeometryView> {
     try {
+      if (stops.length > 0) {
+        return toRouteGeometryView(await this.routing.routeVia(waypoints(from, [...stops], to)));
+      }
       return toRouteGeometryView(await this.routing.route(from, to));
     } catch {
       return { ...UNAVAILABLE_ROUTE_GEOMETRY, provider: this.routing.provider() };
@@ -1463,8 +1649,9 @@ export class RideService {
     view: RideView,
     from: { lat: number; lng: number },
     to: { lat: number; lng: number },
+    stops: ReadonlyArray<{ lat: number; lng: number }> = view.stops,
   ): Promise<RideView> {
-    return { ...view, route: await this.lookupRoute(from, to) };
+    return { ...view, route: await this.lookupRoute(from, to, stops) };
   }
 
   private async unwrapIntervene(work: () => Promise<OpsInterveneResult>): Promise<OpsInterveneResult> {
@@ -1521,6 +1708,8 @@ function toOpenView(
     offerCount: ride.offerCount,
     customerRating,
     pickupDistanceKm,
+    stops: ride.stops.map((stop) => ({ lat: stop.lat, lng: stop.lng, label: stop.label })),
+    routeVersion: ride.routeVersion,
   };
 }
 
@@ -1530,6 +1719,19 @@ function toView(ride: RideSnapshot, imageUrl: string | null): RideView {
     status: ride.status,
     pickup: ride.pickup,
     dropoff: ride.dropoff,
+    stops: (ride.stops ?? []).map((stop) => ({
+      seq: stop.seq,
+      lat: stop.lat,
+      lng: stop.lng,
+      label: stop.label,
+      arrivedAt: stop.arrivedAt ? stop.arrivedAt.toISOString() : null,
+      departedAt: stop.departedAt ? stop.departedAt.toISOString() : null,
+    })),
+    routeVersion: ride.routeVersion ?? 0,
+    currentStopSeq:
+      ride.status === 'IN_TRIP' ? ((ride.stops ?? []).find((stop) => !stop.departedAt)?.seq ?? null) : null,
+    stopFeeVnd: ride.stopFeeVnd ?? 0,
+    waitFeeVnd: ride.waitFeeVnd ?? 0,
     offeredFareVnd: ride.offeredFareVnd,
     referenceFareVnd: ride.referenceFareVnd,
     vehicleClassCode: ride.vehicleClassCode,
@@ -1578,10 +1780,12 @@ export function onlyOwnOffers<T extends { offers: RideOfferView[] }>(view: T, dr
  * DEC-PROD-024: cash the customer hands the driver (never negative). Plus earlier unpaid
  * cancel / no-show fees collected at this completion (priorFeesVnd).
  */
-function cashDue(
-  ride: Pick<RideSnapshot, 'agreedFareVnd' | 'discountVnd'> & { priorFeesVnd?: number },
+export function cashDue(
+  ride: Pick<RideSnapshot, 'agreedFareVnd' | 'discountVnd'> & { priorFeesVnd?: number; waitFeeVnd?: number },
 ): number {
-  return Math.max(0, (ride.agreedFareVnd ?? 0) - ride.discountVnd) + (ride.priorFeesVnd ?? 0);
+  return (
+    Math.max(0, (ride.agreedFareVnd ?? 0) - ride.discountVnd) + (ride.priorFeesVnd ?? 0) + (ride.waitFeeVnd ?? 0)
+  );
 }
 
 /** A bid, counter or raise goes up to the fare step; non-integers are left for assertFare to reject. */

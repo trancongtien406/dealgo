@@ -10,6 +10,8 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/network/request_failure.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../ride/domain/entities/ride_models.dart';
+import '../../../ride/domain/stops/ride_stops_client.dart';
+import '../../../ride/presentation/widgets/ride_widgets.dart' show RideStopList;
 import '../../../ride/presentation/utils/ride_vehicle_label.dart';
 import '../../../ride/presentation/widgets/ride_negotiation_ui.dart';
 import '../../../../core/design_system/components/dealgo_dialog.dart';
@@ -79,6 +81,20 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
 
   /// DEC-PROD-024: customer voucher on this ride; the driver collects fare minus this.
   var _discountVnd = 0;
+
+  /// Multi-stop progress from the server (arrive/depart per stop).
+  late List<RideStop> _stops = [
+    for (final (i, p) in (widget.ride?.stops ?? const <RidePoint>[]).indexed)
+      RideStop(seq: i + 1, point: p),
+  ];
+
+  /// First stop not yet departed (null when none, or a single-stop ride).
+  RideStop? get _currentStop {
+    for (final stop in _stops) {
+      if (stop.state != RideStopState.departed) return stop;
+    }
+    return null;
+  }
 
   /// True once the backend has the ride in DRIVER_EN_ROUTE or later.
   late bool _enRoute =
@@ -173,6 +189,7 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
       setState(() {
         _loaded = openRideFromView(view);
         _discountVnd = view.discountVnd;
+        _stops = view.stops;
         _enRoute =
             view.status != RideStatus.assigned &&
             view.status != RideStatus.negotiating;
@@ -212,6 +229,38 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
       } else if (next == DriverRidePhase.complete) {
         context.pushReplacement(DriverRoutes.completed(widget.rideId));
       }
+    }
+  }
+
+  /// Arrive at / leave the current stop (server enforces order and IN_TRIP).
+  Future<void> _stopAction(RideStop stop) async {
+    RideStopsClient? client;
+    try {
+      client = context.read<RideStopsClient>();
+    } on ProviderNotFoundException {
+      client = null;
+    }
+    if (client == null) {
+      return;
+    }
+    final arrive = stop.state == RideStopState.pending;
+    RideView? updated;
+    final ok = await runDriverAction((token) async {
+      updated = arrive
+          ? await client!.arriveStop(
+              accessToken: token,
+              rideId: widget.rideId,
+              seq: stop.seq,
+            )
+          : await client!.departStop(
+              accessToken: token,
+              rideId: widget.rideId,
+              seq: stop.seq,
+            );
+    });
+    final view = updated;
+    if (ok && mounted && view != null) {
+      setState(() => _stops = view.stops);
     }
   }
 
@@ -358,6 +407,21 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
         onPrimary: () =>
             context.push(DriverRoutes.passengerOtp(widget.rideId), extra: ride),
       ),
+      DriverRidePhase.onTrip when _currentStop != null => DriverFooter(
+        secondaryLabel: l10n.driverActiveReportIssue,
+        primaryLabel: _currentStop!.state == RideStopState.pending
+            ? l10n.driverStopArrive(_currentStop!.seq)
+            : l10n.driverStopDepart(_currentStop!.seq),
+        primaryKey: Key(
+          _currentStop!.state == RideStopState.pending
+              ? 'driver-stop-arrive-${_currentStop!.seq}'
+              : 'driver-stop-depart-${_currentStop!.seq}',
+        ),
+        primaryLoading: actionBusy,
+        primaryEnabled: !actionBusy,
+        onSecondary: () => context.push(DriverRoutes.failed(widget.rideId)),
+        onPrimary: () => _stopAction(_currentStop!),
+      ),
       DriverRidePhase.onTrip => DriverFooter(
         secondaryLabel: l10n.driverActiveReportIssue,
         primaryLabel: l10n.driverActiveCompleteCta,
@@ -421,7 +485,9 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
                       children: [
                         Text(
                           _phase == DriverRidePhase.onTrip
-                              ? l10n.driverFollowRoute
+                              ? (_currentStop == null
+                                    ? l10n.driverFollowRoute
+                                    : l10n.rideStopNumbered(_currentStop!.seq))
                               : l10n.driverHeadToPickup,
                           style: textTheme.labelMedium?.copyWith(
                             color: DealGoColors.textSecondary,
@@ -429,7 +495,8 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
                         ),
                         Text(
                           _phase == DriverRidePhase.onTrip
-                              ? ride.dropoff.label
+                              ? (_currentStop?.point.label ??
+                                    ride.dropoff.label)
                               : ride.pickup.label,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -457,8 +524,14 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
                   lat: ride.dropoff.lat,
                   lng: ride.dropoff.lng,
                 );
+                final nextStop = _currentStop;
                 final target = _phase == DriverRidePhase.onTrip
-                    ? dropoff
+                    ? (nextStop == null
+                          ? dropoff
+                          : MapLatLng(
+                              lat: nextStop.point.lat,
+                              lng: nextStop.point.lng,
+                            ))
                     : pickup;
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -487,7 +560,15 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
                                   28,
                                 ),
                                 center: target,
-                                markers: [pickup, dropoff],
+                                markers: [
+                                  pickup,
+                                  for (final s in _stops)
+                                    MapLatLng(
+                                      lat: s.point.lat,
+                                      lng: s.point.lng,
+                                    ),
+                                  dropoff,
+                                ],
                                 route: route,
                                 pulseRoute: true,
                               ),
@@ -499,12 +580,35 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
                       lat: target.lat,
                       lng: target.lng,
                       destinationLabel: _phase == DriverRidePhase.onTrip
-                          ? AppLocalizations.of(context).driverNavToDropoff
+                          ? (nextStop == null
+                                ? AppLocalizations.of(context)
+                                      .driverNavToDropoff
+                                : AppLocalizations.of(context)
+                                      .driverNavigateToStop(nextStop.seq))
                           : AppLocalizations.of(context).driverNavToPickup,
                     ),
                   ],
                 );
               },
+            ),
+            const SizedBox(height: DealGoSpacing.s12),
+          ],
+          if (_stops.isNotEmpty) ...[
+            DriverPanel(
+              key: const Key('driver-active-stops'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.driverStopsTitle, style: textTheme.titleMedium),
+                  const SizedBox(height: DealGoSpacing.s8),
+                  RideStopList(
+                    pickup: ride.pickup.label,
+                    dropoff: ride.dropoff.label,
+                    stops: [for (final s in _stops) s.point.label],
+                    stopStates: [for (final s in _stops) s.state],
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: DealGoSpacing.s12),
           ],
@@ -697,4 +801,6 @@ OpenRide openRideFromView(RideView view) => OpenRide(
   route: view.route,
   approachRoute: view.approachRoute,
   customerRating: view.customerRating,
+  stops: [for (final s in view.stops) s.point],
+  routeVersion: view.routeVersion,
 );

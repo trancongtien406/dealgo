@@ -28,11 +28,16 @@ class DioPricingRemoteDataSource implements PricingRepository {
     required String accessToken,
     required PricePoint pickup,
     required PricePoint dropoff,
+    List<PricePoint> stops = const [],
   }) async {
     try {
       final response = await dio.post<Object?>(
         ApiPaths.ridesQuote,
-        data: {'pickup': _point(pickup), 'dropoff': _point(dropoff)},
+        data: {
+          'pickup': _point(pickup),
+          'dropoff': _point(dropoff),
+          if (stops.isNotEmpty) 'stops': [for (final s in stops) _point(s)],
+        },
         options: _auth(accessToken),
       );
       return decodeRideQuote(requireSuccessData(response.data));
@@ -154,6 +159,9 @@ List<RideQuote> _decodeOptions(
         durationMin: _int(data['durationMin']) ?? 0,
         imageUrl: _text(data['imageUrl']),
         route: route,
+        // Multi-stop: a class whose service has stops off / too few allowed.
+        available: data['available'] != false,
+        unavailableReason: _text(data['unavailableReason']),
       ),
     );
   }
@@ -229,6 +237,9 @@ class FakePricingRemoteDataSource implements PricingRepository {
   /// Throws on the next call (error-state tests).
   Object? failNext;
 
+  /// Stops sent with the last [quoteRide] call (multi-stop assertions).
+  List<PricePoint> lastStops = const [];
+
   void _maybeFail() {
     final error = failNext;
     if (error != null) {
@@ -242,8 +253,10 @@ class FakePricingRemoteDataSource implements PricingRepository {
     required String accessToken,
     required PricePoint pickup,
     required PricePoint dropoff,
+    List<PricePoint> stops = const [],
   }) async {
     _maybeFail();
+    lastStops = stops;
     final km = _haversineKm(pickup, dropoff);
     final distanceKm = (km * 10).round() / 10;
     final reference =

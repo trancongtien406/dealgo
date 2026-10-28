@@ -37,6 +37,63 @@ class RidePointModel {
   RidePoint toEntity() => RidePoint(lat: lat, lng: lng, label: label);
 }
 
+/// Parses `stops[]`; malformed rows are skipped, order follows `seq`.
+List<RideStop> parseRideStops(Object? raw) {
+  if (raw is! List) return const [];
+  final stops = <RideStop>[];
+  for (final (index, item) in raw.indexed) {
+    final map = asJsonMap(item);
+    if (map == null) continue;
+    // The open-ride list sends stops in order without `seq`: use position.
+    final seq = _asInt(map['seq']) ?? index + 1;
+    try {
+      stops.add(
+        RideStop(
+          seq: seq,
+          point: RidePointModel.fromJson(map).toEntity(),
+          arrivedAt: _nullableString(map['arrivedAt']),
+          departedAt: _nullableString(map['departedAt']),
+        ),
+      );
+    } on ApiException {
+      continue;
+    }
+  }
+  stops.sort((a, b) => a.seq.compareTo(b.seq));
+  return List.unmodifiable(stops);
+}
+
+Map<String, Object?> rideStopToJson(RideStop stop) => {
+  'seq': stop.seq,
+  'lat': stop.point.lat,
+  'lng': stop.point.lng,
+  'label': stop.point.label,
+  'arrivedAt': stop.arrivedAt,
+  'departedAt': stop.departedAt,
+};
+
+MultiStopPolicy _policy(Object? raw) {
+  final map = asJsonMap(raw);
+  if (map == null) return MultiStopPolicy.disabled;
+  return MultiStopPolicy(
+    enabled: map['enabled'] == true,
+    maxStops: _asInt(map['maxStops']) ?? 0,
+    stopFeeVnd: _asInt(map['stopFeeVnd']) ?? 0,
+    freeWaitMinutes: _asInt(map['freeWaitMinutes']) ?? 0,
+    waitFeeVndPerMinute: _asInt(map['waitFeeVndPerMinute']) ?? 0,
+  );
+}
+
+/// `{BIKE: {...}, CAR: {...}}` → settings; anything malformed reads as off.
+MultiStopSettings parseMultiStopSettings(Object? raw) {
+  final map = asJsonMap(raw);
+  if (map == null) return MultiStopSettings.disabled;
+  return MultiStopSettings(
+    bike: _policy(map['BIKE']),
+    car: _policy(map['CAR']),
+  );
+}
+
 class RideOfferModel {
   const RideOfferModel({
     required this.id,
@@ -142,6 +199,11 @@ class RideViewModel {
     this.route = RouteGeometry.unavailable,
     this.approachRoute,
     this.customerRating,
+    this.stops = const [],
+    this.routeVersion = 0,
+    this.currentStopSeq,
+    this.stopFeeVnd = 0,
+    this.waitFeeVnd = 0,
   });
 
   final String id;
@@ -164,6 +226,11 @@ class RideViewModel {
   final RouteGeometry route;
   final RouteGeometry? approachRoute;
   final CustomerRatingSummary? customerRating;
+  final List<RideStop> stops;
+  final int routeVersion;
+  final int? currentStopSeq;
+  final int stopFeeVnd;
+  final int waitFeeVnd;
 
   factory RideViewModel.fromJson(Map<String, Object?> json) {
     final id = json['id'];
@@ -223,6 +290,11 @@ class RideViewModel {
       route: RouteGeometry.tryParse(json['route']) ?? RouteGeometry.unavailable,
       approachRoute: RouteGeometry.tryParse(json['approachRoute']),
       customerRating: parseCustomerRatingSummary(json['customerRating']),
+      stops: parseRideStops(json['stops']),
+      routeVersion: _nullableInt(json['routeVersion']) ?? 0,
+      currentStopSeq: _nullableInt(json['currentStopSeq']),
+      stopFeeVnd: _nullableInt(json['stopFeeVnd']) ?? 0,
+      waitFeeVnd: _nullableInt(json['waitFeeVnd']) ?? 0,
     );
   }
 
@@ -250,6 +322,11 @@ class RideViewModel {
       route: ride.route,
       approachRoute: ride.approachRoute,
       customerRating: ride.customerRating,
+      stops: ride.stops,
+      routeVersion: ride.routeVersion,
+      currentStopSeq: ride.currentStopSeq,
+      stopFeeVnd: ride.stopFeeVnd,
+      waitFeeVnd: ride.waitFeeVnd,
     );
   }
 
@@ -276,6 +353,11 @@ class RideViewModel {
       'voucherCode': voucherCode,
       'vehicleClassCode': vehicleClassCode,
       if (imageUrl != null) 'imageUrl': imageUrl,
+      'stops': [for (final stop in stops) rideStopToJson(stop)],
+      'routeVersion': routeVersion,
+      'currentStopSeq': currentStopSeq,
+      'stopFeeVnd': stopFeeVnd,
+      'waitFeeVnd': waitFeeVnd,
       'route': {
         'available': route.available,
         'provider': route.provider,
@@ -310,6 +392,11 @@ class RideViewModel {
       route: route,
       approachRoute: approachRoute,
       customerRating: customerRating,
+      stops: stops,
+      routeVersion: routeVersion,
+      currentStopSeq: currentStopSeq,
+      stopFeeVnd: stopFeeVnd < 0 ? 0 : stopFeeVnd,
+      waitFeeVnd: waitFeeVnd < 0 ? 0 : waitFeeVnd,
     );
   }
 }
@@ -327,6 +414,8 @@ class OpenRideModel {
     required this.vehicleClassCode,
     this.imageUrl,
     this.customerRating,
+    this.stops = const [],
+    this.routeVersion = 0,
   });
 
   final String id;
@@ -340,6 +429,8 @@ class OpenRideModel {
   final String vehicleClassCode;
   final String? imageUrl;
   final CustomerRatingSummary? customerRating;
+  final List<RidePoint> stops;
+  final int routeVersion;
 
   factory OpenRideModel.fromJson(Map<String, Object?> json) {
     final id = json['id'];
@@ -379,6 +470,8 @@ class OpenRideModel {
       vehicleClassCode: _nullableString(json['vehicleClassCode']) ?? '',
       imageUrl: _nullableString(json['imageUrl']),
       customerRating: parseCustomerRatingSummary(json['customerRating']),
+      stops: [for (final stop in parseRideStops(json['stops'])) stop.point],
+      routeVersion: _nullableInt(json['routeVersion']) ?? 0,
     );
   }
 
@@ -395,6 +488,8 @@ class OpenRideModel {
       vehicleClassCode: ride.vehicleClassCode,
       imageUrl: ride.imageUrl,
       customerRating: ride.customerRating,
+      stops: ride.stops,
+      routeVersion: ride.routeVersion,
     );
   }
 
@@ -434,6 +529,11 @@ class OpenRideModel {
       'offerCount': offerCount,
       'vehicleClassCode': vehicleClassCode,
       if (imageUrl != null) 'imageUrl': imageUrl,
+      'stops': [
+        for (final (i, stop) in stops.indexed)
+          {'seq': i + 1, 'lat': stop.lat, 'lng': stop.lng, 'label': stop.label},
+      ],
+      'routeVersion': routeVersion,
     };
   }
 
@@ -450,6 +550,8 @@ class OpenRideModel {
       vehicleClassCode: vehicleClassCode,
       imageUrl: imageUrl,
       customerRating: customerRating,
+      stops: stops,
+      routeVersion: routeVersion,
     );
   }
 }
@@ -460,21 +562,44 @@ class CreateRideBody {
     required this.dropoff,
     required this.offeredFareVnd,
     required this.vehicleClassCode,
+    this.stops = const [],
   });
 
   final RidePointModel pickup;
   final RidePointModel dropoff;
   final int offeredFareVnd;
   final String vehicleClassCode;
+  final List<RidePointModel> stops;
 
   Map<String, Object?> toJson() {
     return {
       'pickup': pickup.toJson(),
       'dropoff': dropoff.toJson(),
+      // Omitted when empty so single-destination bodies stay byte-identical.
+      if (stops.isNotEmpty) 'stops': [for (final s in stops) s.toJson()],
       'offeredFareVnd': offeredFareVnd,
       'vehicleClassCode': vehicleClassCode,
     };
   }
+}
+
+/// `PUT /v1/rides/:id/stops` — full replacement of the stop list.
+class UpdateRideStopsBody {
+  const UpdateRideStopsBody({
+    required this.stops,
+    this.offeredFareVnd,
+    this.routeVersion,
+  });
+
+  final List<RidePointModel> stops;
+  final int? offeredFareVnd;
+  final int? routeVersion;
+
+  Map<String, Object?> toJson() => {
+    'stops': [for (final s in stops) s.toJson()],
+    if (offeredFareVnd != null) 'offeredFareVnd': offeredFareVnd,
+    if (routeVersion != null) 'routeVersion': routeVersion,
+  };
 }
 
 class SelectRideOfferBody {
@@ -491,11 +616,15 @@ class SelectRideOfferBody {
 }
 
 class SubmitRideOfferBody {
-  const SubmitRideOfferBody({required this.amountVnd});
+  const SubmitRideOfferBody({required this.amountVnd, this.routeVersion});
 
   final int amountVnd;
+  final int? routeVersion;
 
-  Map<String, Object?> toJson() => {'amountVnd': amountVnd};
+  Map<String, Object?> toJson() => {
+    'amountVnd': amountVnd,
+    if (routeVersion != null) 'routeVersion': routeVersion,
+  };
 }
 
 String? _string(Object? value) {

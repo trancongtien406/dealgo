@@ -428,6 +428,8 @@ describe('ride negotiation http', () => {
       offerCount: 0,
       customerRating: { average: null, count: 0 },
       pickupDistanceKm: expect.any(Number),
+      stops: [],
+      routeVersion: 0,
     });
     expect(JSON.stringify(listed.body.data)).not.toContain('"phone"');
     expect(JSON.stringify(listed.body.data)).not.toContain(customer.userId);

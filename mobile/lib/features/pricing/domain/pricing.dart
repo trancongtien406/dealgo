@@ -20,6 +20,8 @@ class RideQuote {
     this.imageUrl,
     this.options = const [],
     this.route = RouteGeometry.unavailable,
+    this.available = true,
+    this.unavailableReason,
   });
 
   final double distanceKm;
@@ -40,6 +42,11 @@ class RideQuote {
 
   /// Nest road geometry for the overview map.
   final RouteGeometry route;
+
+  /// False when this class cannot carry the requested stops (admin flag off
+  /// or too many stops); [unavailableReason] is the server error code.
+  final bool available;
+  final String? unavailableReason;
 
   bool allows(int amountVnd) =>
       amountVnd >= minFareVnd && amountVnd <= maxFareVnd;
@@ -83,6 +90,7 @@ abstract interface class PricingRepository {
     required String accessToken,
     required PricePoint pickup,
     required PricePoint dropoff,
+    List<PricePoint> stops = const [],
   });
 
   Future<List<RideVehicleClassOption>> listVehicleClasses({

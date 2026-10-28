@@ -18,6 +18,10 @@ export type RideListItem = {
   pickupArea: string;
   dropoff: string;
   dropoffArea: string;
+  /** Multi-stop: intermediate stops in order (empty = single destination). */
+  stops: RideStopItem[];
+  /** Stop waiting fee included in the cash (0 when none). */
+  waitFeeVnd: number;
   seats: string;
   /** Nest catalog code when present (DG-DEC-VEH-001). */
   vehicleClassCode: string | null;
@@ -38,6 +42,16 @@ export type RideListItem = {
 };
 
 export type GeoPoint = { lat: number; lng: number };
+
+export type RideStopItem = {
+  seq: number;
+  label: string;
+  point: GeoPoint | null;
+  /** "Chưa đến" | "Đã đến HH:mm" | "Đã rời HH:mm". */
+  state: "PENDING" | "ARRIVED" | "DEPARTED";
+  arrivedAt: string | null;
+  departedAt: string | null;
+};
 
 export type RideListFilters = {
   status: RideStatus | "ALL";

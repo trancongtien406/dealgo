@@ -16,6 +16,8 @@ export type RouteOption = {
   distanceM: number;
   durationSec: number;
   summary: string;
+  /** Per-leg distance/duration between consecutive waypoints (multi-stop). */
+  legs?: Array<{ distanceM: number; durationSec: number }>;
 };
 
 export type RouteLookup = {
@@ -83,7 +85,27 @@ export class RoutingService {
     if (provider === 'none') {
       return { provider, available: false, routes: [] };
     }
-    return this.cached(provider, from, to, () => this.query(provider, from, to));
+    return this.cached(provider, from, to, () => this.query(provider, [from, to], true));
+  }
+
+  /**
+   * Road route through every waypoint in order (multi-stop rides). Two points = route().
+   * Google Routes is not used for waypoints; Mapbox/OSRM (server key) take up to 25 coordinates.
+   */
+  async routeVia(points: readonly RoutePoint[]): Promise<RouteLookup> {
+    if (points.length < 2) {
+      return { provider: this.provider(), available: false, routes: [] };
+    }
+    if (points.length === 2) {
+      return this.route(points[0]!, points[1]!);
+    }
+    const provider = this.provider();
+    if (provider === 'none' || points.length > 25) {
+      return { provider, available: false, routes: [] };
+    }
+    return this.cachedKey(provider, `${provider};via;${points.map(pointKey).join(';')}`, () =>
+      this.query(provider, points, false),
+    );
   }
 
   private async cached(
@@ -92,7 +114,14 @@ export class RoutingService {
     to: RoutePoint,
     load: () => Promise<RouteOption[]>,
   ): Promise<RouteLookup> {
-    const key = `${provider};${from.lat.toFixed(5)},${from.lng.toFixed(5)};${to.lat.toFixed(5)},${to.lng.toFixed(5)}`;
+    return this.cachedKey(provider, `${provider};${pointKey(from)};${pointKey(to)}`, load);
+  }
+
+  private async cachedKey(
+    provider: Exclude<RoutingProviderName, 'none'>,
+    key: string,
+    load: () => Promise<RouteOption[]>,
+  ): Promise<RouteLookup> {
     const hit = this.cache.get(key);
     if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
       return hit.value;
@@ -116,15 +145,15 @@ export class RoutingService {
 
   private async query(
     provider: 'osrm' | 'mapbox',
-    from: RoutePoint,
-    to: RoutePoint,
+    points: readonly RoutePoint[],
+    alternatives: boolean,
   ): Promise<RouteOption[]> {
-    const pair = `${from.lng},${from.lat};${to.lng},${to.lat}`;
+    const pair = points.map((point) => `${point.lng},${point.lat}`).join(';');
     const mapboxToken = provider === 'mapbox' ? await this.mapboxToken() : '';
     const url =
       provider === 'osrm'
-        ? `${this.osrmBase()}/route/v1/driving/${pair}?overview=full&geometries=geojson&alternatives=true`
-        : `https://api.mapbox.com/directions/v5/mapbox/driving/${pair}?geometries=geojson&overview=full&alternatives=true&access_token=${encodeURIComponent(mapboxToken)}`;
+        ? `${this.osrmBase()}/route/v1/driving/${pair}?overview=full&geometries=geojson&alternatives=${alternatives}`
+        : `https://api.mapbox.com/directions/v5/mapbox/driving/${pair}?geometries=geojson&overview=full&alternatives=${alternatives}&access_token=${encodeURIComponent(mapboxToken)}`;
     const timeout = this.config.get('ROUTING_TIMEOUT_MS', { infer: true }) ?? 4000;
     const res = await this.fetcher(url, { signal: AbortSignal.timeout(timeout) });
     if (!res.ok) {
@@ -161,7 +190,7 @@ export function parseDirections(body: unknown): RouteOption[] {
       geometry?: { coordinates?: unknown };
       distance?: unknown;
       duration?: unknown;
-      legs?: { summary?: unknown }[];
+      legs?: { summary?: unknown; distance?: unknown; duration?: unknown }[];
     };
     const coordinates = r?.geometry?.coordinates;
     if (!Array.isArray(coordinates) || coordinates.length < 2) continue;
@@ -184,8 +213,20 @@ export function parseDirections(body: unknown): RouteOption[] {
       distanceM: typeof r.distance === 'number' ? Math.round(r.distance) : 0,
       durationSec: typeof r.duration === 'number' ? Math.round(r.duration) : 0,
       summary: typeof summary === 'string' ? summary.slice(0, 200) : '',
+      ...(Array.isArray(r.legs) && r.legs.length > 1
+        ? {
+            legs: r.legs.map((leg) => ({
+              distanceM: typeof leg?.distance === 'number' ? Math.round(leg.distance) : 0,
+              durationSec: typeof leg?.duration === 'number' ? Math.round(leg.duration) : 0,
+            })),
+          }
+        : {}),
     });
     if (out.length >= MAX_ROUTES) break;
   }
   return out;
+}
+
+function pointKey(point: RoutePoint): string {
+  return `${point.lat.toFixed(5)},${point.lng.toFixed(5)}`;
 }

@@ -390,10 +390,12 @@ class _TileMapViewState extends State<TileMapView>
                 alignment: DealGoMapPin.markerAlignment(_pinSize),
                 child: DealGoMapPin(
                   size: _pinSize,
+                  number: i,
                   kind: mapPinKindFor(
                     i,
                     firstMarkerIsPickup: widget.firstMarkerIsPickup,
                     style: widget.stopStyle,
+                    count: points.length,
                   ),
                 ),
               ),

@@ -36,6 +36,23 @@ export type GeoPoint = {
   label: string;
 };
 
+/** Intermediate stop (multi-stop rides), visited in `seq` order between pickup and dropoff. */
+export type RideStopSnapshot = {
+  seq: number;
+  lat: number;
+  lng: number;
+  label: string;
+  arrivedAt: Date | null;
+  departedAt: Date | null;
+};
+
+/** Stop fee + wait policy snapshot taken at booking (admin edits never touch live rides). */
+export type RideStopPolicy = {
+  feeVnd: number;
+  freeWaitMinutes: number;
+  waitFeeVndPerMinute: number;
+};
+
 export type RideOfferSnapshot = {
   id: string;
   driverId: string;
@@ -115,6 +132,16 @@ export type RideSnapshot = {
   /** EXPIRED ride this request re-posts. */
   repostOfRideId: string | null;
   offers: RideOfferSnapshot[];
+  /** Intermediate stops in visiting order (empty = single destination). */
+  stops: RideStopSnapshot[];
+  /** Bumped on every stop edit; offers made on an older version are rejected. */
+  routeVersion: number;
+  /** Per-stop fee snapshot (already part of referenceFareVnd). */
+  stopFeeVnd: number;
+  stopWaitFreeMinutes: number;
+  stopWaitFeeVndPerMinute: number;
+  /** Wait fee charged at completion (cash to the driver). */
+  waitFeeVnd: number;
   /** Transient: fee charges collected by this completion (cash hand-over adjustments). */
   collectedFees?: Array<{ id: string; amountVnd: number; beneficiaryDriverId: string | null }>;
 };
@@ -155,6 +182,32 @@ export type CreateRideInput = {
   now: Date;
   /** EXPIRED ride of the same customer being re-posted. */
   repostOfRideId?: string | null;
+  /** Intermediate stops (multi-stop rides; validated by the service). */
+  stops?: GeoPoint[];
+  stopPolicy?: RideStopPolicy;
+};
+
+/** Customer edits stops while negotiating: pending offers die and a new round starts. */
+export type UpdateStopsInput = {
+  rideId: string;
+  customerId: string;
+  stops: GeoPoint[];
+  dropoff: GeoPoint;
+  referenceFareVnd: number;
+  offeredFareVnd: number;
+  stopFeeVnd: number;
+  /** Version the customer edited from (optimistic check; undefined = skip). */
+  expectedRouteVersion?: number;
+  windowExpiresAt: Date;
+  now: Date;
+};
+
+/** Assigned driver arrives at / leaves stop `seq` (IN_TRIP, in order, idempotent). */
+export type StopEventInput = {
+  rideId: string;
+  driverId: string;
+  seq: number;
+  now: Date;
 };
 
 export type OfferInput = {
@@ -171,6 +224,8 @@ export type OfferInput = {
   maxLiveOffers?: number;
   /** Max price changes per driver within the current round (undefined = unlimited). */
   maxEdits?: number;
+  /** Route version the driver saw; a stale one is rejected (RIDE_ROUTE_CHANGED). */
+  routeVersion?: number;
 };
 
 /** Late-cancel / no-show fee policy resolved from settings by the service. */
@@ -292,6 +347,8 @@ export type OpenRideListing = {
   vehicleClassCode: string;
   expiresAt: Date;
   offerCount: number;
+  stops: GeoPoint[];
+  routeVersion: number;
 };
 
 type RideRow = {
@@ -326,7 +383,15 @@ type RideRow = {
   priorFeesVnd: number;
   fareRaiseCount: number;
   repostOfRideId: string | null;
+  stops: StopRow[];
+  routeVersion: number;
+  stopFeeVnd: number;
+  stopWaitFreeMinutes: number;
+  stopWaitFeeVndPerMinute: number;
+  waitFeeVnd: number;
 };
+
+type StopRow = RideStopSnapshot;
 
 type OfferRow = {
   id: string;
@@ -379,6 +444,8 @@ export class RideLedger {
   private newUnassignments: RideUnassignment[] = [];
   private newFees: CustomerFeeRecord[] = [];
   private readonly dirtyFeeIds = new Set<string>();
+  /** Rides whose stop rows must be re-written. */
+  private readonly dirtyStopRideIds = new Set<string>();
 
   static hydrate(input: {
     rides: RideRow[];
@@ -451,8 +518,24 @@ export class RideLedger {
       priorFeesVnd: 0,
       fareRaiseCount: 0,
       repostOfRideId: input.repostOfRideId ?? null,
+      stops: (input.stops ?? []).map((stop, index) => ({
+        seq: index + 1,
+        lat: stop.lat,
+        lng: stop.lng,
+        label: stop.label,
+        arrivedAt: null,
+        departedAt: null,
+      })),
+      routeVersion: 0,
+      stopFeeVnd: input.stops?.length ? (input.stopPolicy?.feeVnd ?? 0) : 0,
+      stopWaitFreeMinutes: input.stops?.length ? (input.stopPolicy?.freeWaitMinutes ?? 0) : 0,
+      stopWaitFeeVndPerMinute: input.stops?.length ? (input.stopPolicy?.waitFeeVndPerMinute ?? 0) : 0,
+      waitFeeVnd: 0,
     };
     this.rides.set(ride.id, ride);
+    if (ride.stops.length > 0) {
+      this.dirtyStopRideIds.add(ride.id);
+    }
     this.newRideIds.add(ride.id);
     this.dirtyRideIds.add(ride.id);
     return { ride: this.snapshot(ride) };
@@ -497,6 +580,8 @@ export class RideLedger {
         vehicleClassCode: ride.vehicleClassCode,
         expiresAt: new Date(ride.expiresAt),
         offerCount: this.countOffers(ride.id),
+        stops: ride.stops.map((stop) => ({ lat: stop.lat, lng: stop.lng, label: stop.label })),
+        routeVersion: ride.routeVersion,
       }));
     if (limit !== undefined && Number.isSafeInteger(limit) && limit > 0) {
       return rows.slice(0, limit);
@@ -517,6 +602,9 @@ export class RideLedger {
       return { error: 'RIDE_OFFER_UNAVAILABLE' };
     }
 
+    if (input.routeVersion !== undefined && input.routeVersion !== ride.routeVersion) {
+      return { error: 'RIDE_ROUTE_CHANGED' };
+    }
     // A driver accepts the bid or asks for more, never less.
     if (input.amountVnd < ride.offeredFareVnd) {
       return { error: 'RIDE_COUNTER_OUT_OF_RANGE' };
@@ -795,6 +883,108 @@ export class RideLedger {
       }
     }
     return { ride: this.snapshot(ride) };
+  }
+
+  /**
+   * Customer edits the stop list while NEGOTIATING. Every live offer is LOST (it priced the old
+   * route), edit budgets reset and the request window restarts — a new round, like a raise.
+   * Locked once a driver is chosen.
+   */
+  updateStops(input: UpdateStopsInput): LedgerOutcome {
+    const ride = this.rides.get(input.rideId);
+    if (!ride || ride.customerId !== input.customerId) {
+      return { error: 'RIDE_NOT_FOUND' };
+    }
+    this.expireIfDue(ride, input.now);
+    if (ride.status !== 'NEGOTIATING') {
+      return { error: 'RIDE_STOPS_LOCKED' };
+    }
+    if (input.expectedRouteVersion !== undefined && input.expectedRouteVersion !== ride.routeVersion) {
+      return { error: 'RIDE_ROUTE_CHANGED' };
+    }
+    ride.stops = input.stops.map((stop, index) => ({
+      seq: index + 1,
+      lat: stop.lat,
+      lng: stop.lng,
+      label: stop.label,
+      arrivedAt: null,
+      departedAt: null,
+    }));
+    ride.dropoffLat = input.dropoff.lat;
+    ride.dropoffLng = input.dropoff.lng;
+    ride.dropoffLabel = input.dropoff.label;
+    ride.referenceFareVnd = input.referenceFareVnd;
+    ride.offeredFareVnd = input.offeredFareVnd;
+    ride.stopFeeVnd = ride.stops.length > 0 ? input.stopFeeVnd : 0;
+    ride.routeVersion += 1;
+    if (input.windowExpiresAt.getTime() > ride.expiresAt.getTime()) {
+      ride.expiresAt = input.windowExpiresAt;
+    }
+    ride.updatedAt = input.now;
+    this.dirtyRideIds.add(ride.id);
+    this.dirtyStopRideIds.add(ride.id);
+    for (const offer of this.offers.values()) {
+      if (offer.rideId !== ride.id || offer.status === 'DECLINED') continue;
+      let dirty = false;
+      if (offer.status === 'PENDING') {
+        offer.status = 'LOST';
+        dirty = true;
+      }
+      if (offer.editCount !== 0) {
+        offer.editCount = 0;
+        dirty = true;
+      }
+      if (dirty) this.dirtyOfferIds.add(offer.id);
+    }
+    return { ride: this.snapshot(ride) };
+  }
+
+  /** Driver reached stop `seq` (the first one not yet left). Repeating it is a no-op. */
+  arriveStop(input: StopEventInput): LedgerOutcome {
+    const found = this.tripStop(input);
+    if ('error' in found) return { error: found.error };
+    const { ride, stop, next } = found;
+    if (stop.arrivedAt) {
+      return { ride: this.snapshot(ride) };
+    }
+    if (next !== stop) {
+      return { error: 'RIDE_STOP_OUT_OF_ORDER' };
+    }
+    stop.arrivedAt = input.now;
+    ride.updatedAt = input.now;
+    this.dirtyRideIds.add(ride.id);
+    this.dirtyStopRideIds.add(ride.id);
+    return { ride: this.snapshot(ride) };
+  }
+
+  /** Driver leaves stop `seq` after arriving. Repeating it is a no-op. */
+  departStop(input: StopEventInput): LedgerOutcome {
+    const found = this.tripStop(input);
+    if ('error' in found) return { error: found.error };
+    const { ride, stop } = found;
+    if (stop.departedAt) {
+      return { ride: this.snapshot(ride) };
+    }
+    if (!stop.arrivedAt) {
+      return { error: 'RIDE_STOP_OUT_OF_ORDER' };
+    }
+    stop.departedAt = input.now;
+    ride.updatedAt = input.now;
+    this.dirtyRideIds.add(ride.id);
+    this.dirtyStopRideIds.add(ride.id);
+    return { ride: this.snapshot(ride) };
+  }
+
+  private tripStop(
+    input: StopEventInput,
+  ): { error: RideRuleCode } | { ride: RideRow; stop: StopRow; next: StopRow | undefined } {
+    const ride = this.rides.get(input.rideId);
+    if (!ride) return { error: 'RIDE_NOT_FOUND' };
+    if (ride.assignedDriverId !== input.driverId) return { error: 'RIDE_NOT_ASSIGNED_DRIVER' };
+    if (ride.status !== 'IN_TRIP') return { error: 'RIDE_STATUS_CONFLICT' };
+    const stop = ride.stops.find((candidate) => candidate.seq === input.seq);
+    if (!stop) return { error: 'RIDE_NOT_FOUND' };
+    return { ride, stop, next: ride.stops.find((candidate) => !candidate.departedAt) };
   }
 
   /** Customer declines one offer; that driver cannot bid on this ride again. */
@@ -1157,6 +1347,10 @@ export class RideLedger {
     if (ride.agreedFareVnd === null) {
       return { error: 'RIDE_STATUS_CONFLICT' };
     }
+    if (ride.stops.some((stop) => !stop.departedAt)) {
+      return { error: 'RIDE_STOPS_PENDING' };
+    }
+    ride.waitFeeVnd = stopWaitFeeVnd(ride.stops, ride.stopWaitFreeMinutes, ride.stopWaitFeeVndPerMinute);
     ride.status = 'COMPLETED';
     ride.updatedAt = input.now;
     ride.statusChangedAt = input.now;
@@ -1242,6 +1436,7 @@ export class RideLedger {
     cancellations: DriverCancellationRecord[];
     unassignments: RideUnassignment[];
     fees: CustomerFeeRecord[];
+    stops: Array<{ rideId: string; stops: RideStopSnapshot[] }>;
   } {
     const rides: RideChange[] = [];
     for (const id of this.dirtyRideIds) {
@@ -1273,6 +1468,9 @@ export class RideLedger {
       cancellations: [...this.newCancellations],
       unassignments: [...this.newUnassignments],
       fees: [...this.newFees],
+      stops: [...this.dirtyStopRideIds]
+        .map((rideId) => ({ rideId, stops: this.rides.get(rideId)?.stops ?? [] }))
+        .filter((entry) => this.rides.has(entry.rideId)),
     };
   }
 
@@ -1366,6 +1564,16 @@ export class RideLedger {
       priorFeesVnd: ride.priorFeesVnd,
       fareRaiseCount: ride.fareRaiseCount,
       repostOfRideId: ride.repostOfRideId,
+      stops: ride.stops.map((stop) => ({
+        ...stop,
+        arrivedAt: stop.arrivedAt ? new Date(stop.arrivedAt) : null,
+        departedAt: stop.departedAt ? new Date(stop.departedAt) : null,
+      })),
+      routeVersion: ride.routeVersion,
+      stopFeeVnd: ride.stopFeeVnd,
+      stopWaitFreeMinutes: ride.stopWaitFreeMinutes,
+      stopWaitFeeVndPerMinute: ride.stopWaitFeeVndPerMinute,
+      waitFeeVnd: ride.waitFeeVnd,
       offers: offers.map((offer) => ({
         id: offer.id,
         driverId: offer.driverId,
@@ -1410,9 +1618,28 @@ export function rideRowFromRecord(input: {
   priorFeesVnd?: number;
   fareRaiseCount?: number;
   repostOfRideId?: string | null;
+  stops?: RideStopSnapshot[];
+  routeVersion?: number;
+  stopFeeVnd?: number;
+  stopWaitFreeMinutes?: number;
+  stopWaitFeeVndPerMinute?: number;
+  waitFeeVnd?: number;
 }): RideRow {
   return {
     ...input,
+    stops: [...(input.stops ?? [])].sort((a, b) => a.seq - b.seq).map((stop) => ({
+      seq: stop.seq,
+      lat: stop.lat,
+      lng: stop.lng,
+      label: stop.label,
+      arrivedAt: stop.arrivedAt ?? null,
+      departedAt: stop.departedAt ?? null,
+    })),
+    routeVersion: input.routeVersion ?? 0,
+    stopFeeVnd: input.stopFeeVnd ?? 0,
+    stopWaitFreeMinutes: input.stopWaitFreeMinutes ?? 0,
+    stopWaitFeeVndPerMinute: input.stopWaitFeeVndPerMinute ?? 0,
+    waitFeeVnd: input.waitFeeVnd ?? 0,
     fareRaiseCount: input.fareRaiseCount ?? 0,
     repostOfRideId: input.repostOfRideId ?? null,
     assignedAt: input.assignedAt ?? null,
@@ -1431,3 +1658,22 @@ export function rideRowFromRecord(input: {
 }
 
 export type { OfferRow, RideRow, SelectionRow };
+
+/**
+ * Wait fee for a multi-stop ride: per stop, whole minutes between arrival and departure beyond
+ * the free minutes, times the per-minute fee. 0 for single-destination rides.
+ */
+export function stopWaitFeeVnd(
+  stops: ReadonlyArray<Pick<RideStopSnapshot, 'arrivedAt' | 'departedAt'>>,
+  freeMinutes: number,
+  feePerMinuteVnd: number,
+): number {
+  if (feePerMinuteVnd <= 0) return 0;
+  let total = 0;
+  for (const stop of stops) {
+    if (!stop.arrivedAt || !stop.departedAt) continue;
+    const waited = Math.floor((stop.departedAt.getTime() - stop.arrivedAt.getTime()) / 60_000);
+    total += Math.max(0, waited - Math.max(0, freeMinutes)) * feePerMinuteVnd;
+  }
+  return total;
+}

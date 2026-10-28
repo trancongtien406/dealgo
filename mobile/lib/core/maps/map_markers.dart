@@ -8,7 +8,8 @@ import 'map_lat_lng.dart';
 
 /// Stop role on DealGo maps: ride pickup (person, "Đón"), ride dropoff
 /// (flag, "Đến"), food store (shop, "Quán") and food customer (home, "Giao").
-enum DealGoMapPinKind { pickup, dropoff, store, home }
+/// [stop] is a numbered intermediate ride stop (multi-stop rides).
+enum DealGoMapPinKind { pickup, dropoff, store, home, stop }
 
 /// Which stop glyphs a map uses: ride (person → flag) or food (store → home).
 enum MapStopStyle { ride, food }
@@ -18,8 +19,17 @@ DealGoMapPinKind mapPinKindFor(
   int index, {
   required bool firstMarkerIsPickup,
   MapStopStyle style = MapStopStyle.ride,
+  int? count,
 }) {
   final first = index == 0 && firstMarkerIsPickup;
+  // Multi-stop ride: pickup → stops → drop-off; the middle markers are stops.
+  if (style == MapStopStyle.ride &&
+      firstMarkerIsPickup &&
+      count != null &&
+      index > 0 &&
+      index < count - 1) {
+    return DealGoMapPinKind.stop;
+  }
   return switch (style) {
     MapStopStyle.ride =>
       first ? DealGoMapPinKind.pickup : DealGoMapPinKind.dropoff,
@@ -90,10 +100,14 @@ class DealGoMapPin extends StatelessWidget {
     required this.kind,
     this.size = 44,
     this.showLabel = true,
+    this.number,
     super.key,
   });
 
   final DealGoMapPinKind kind;
+
+  /// Stop number drawn in the head of a [DealGoMapPinKind.stop] pin.
+  final int? number;
 
   /// Pin height; the box adds the label chip above it.
   final double size;
@@ -121,6 +135,7 @@ class DealGoMapPin extends StatelessWidget {
     DealGoMapPinKind.dropoff => DealGoColors.danger,
     DealGoMapPinKind.store => DealGoColors.amber,
     DealGoMapPinKind.home => DealGoColors.primary,
+    DealGoMapPinKind.stop => DealGoColors.amber,
   };
 
   static IconData glyphOf(DealGoMapPinKind kind) => switch (kind) {
@@ -128,6 +143,7 @@ class DealGoMapPin extends StatelessWidget {
     DealGoMapPinKind.dropoff => Icons.flag_rounded,
     DealGoMapPinKind.store => Icons.storefront_rounded,
     DealGoMapPinKind.home => Icons.home_rounded,
+    DealGoMapPinKind.stop => Icons.circle,
   };
 
   String _label(BuildContext context) {
@@ -137,6 +153,8 @@ class DealGoMapPin extends StatelessWidget {
       DealGoMapPinKind.dropoff => l10n?.mapPinDropoff ?? 'Đến',
       DealGoMapPinKind.store => l10n?.mapPinStore ?? 'Quán',
       DealGoMapPinKind.home => l10n?.mapPinHome ?? 'Giao',
+      DealGoMapPinKind.stop =>
+        l10n?.mapPinStop(number ?? 1) ?? 'Dừng ${number ?? 1}',
     };
   }
 
@@ -164,11 +182,23 @@ class DealGoMapPin extends StatelessWidget {
             width: headR * 2,
             height: headR * 2,
             child: Center(
-              child: Icon(
-                glyphOf(kind),
-                size: headR * 1.15,
-                color: Colors.white,
-              ),
+              child: kind == DealGoMapPinKind.stop
+                  ? Text(
+                      '${number ?? 1}',
+                      key: Key('map-pin-stop-${number ?? 1}'),
+                      textScaler: TextScaler.noScaling,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: headR * 1.05,
+                        fontWeight: FontWeight.w800,
+                        height: 1,
+                      ),
+                    )
+                  : Icon(
+                      glyphOf(kind),
+                      size: headR * 1.15,
+                      color: Colors.white,
+                    ),
             ),
           ),
         ],

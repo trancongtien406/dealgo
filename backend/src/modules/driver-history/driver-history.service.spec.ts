@@ -42,10 +42,10 @@ function order(id: string, at: string, status = 'DELIVERED', fare = 15_000) {
   };
 }
 
-function setup(options: { driver?: boolean } = {}) {
+function setup(options: { driver?: boolean; waitFeeVnd?: number } = {}) {
   const rides = [
     ride('r1', '2026-10-19T02:00:00.000Z'),
-    ride('r2', '2026-10-18T16:30:00.000Z', 'COMPLETED', 40_000), // 23:30 VN on 18/10
+    { ...ride('r2', '2026-10-18T16:30:00.000Z', 'COMPLETED', 40_000), waitFeeVnd: options.waitFeeVnd ?? 0 }, // 23:30 VN on 18/10
     ride('r3', '2026-10-17T17:30:00.000Z', 'CANCELLED'), // 00:30 VN on 18/10
   ];
   const orders = [
@@ -122,6 +122,14 @@ describe('DriverHistoryService', () => {
     expect(food.items[2]).toMatchObject({ outcome: 'FAILED', earningsVnd: 0, storeName: 'Bún bò Cô Ba' });
     const rides = await service.list('drv', { kind: 'RIDE' });
     expect(rides.items.at(-1)).toMatchObject({ outcome: 'CANCELLED', earningsVnd: 0 });
+  });
+
+  it('adds the multi-stop wait fee to a completed ride fare', async () => {
+    const { service } = setup({ waitFeeVnd: 3_000 });
+    const page = await service.list('drv', { kind: 'RIDE' });
+    const r2 = page.items.find((item) => item.id === 'r2');
+    expect(r2?.fareVnd).toBe(43_000);
+    expect(r2?.earningsVnd).toBe(43_000);
   });
 
   it('rejects a bad cursor and non-drivers', async () => {

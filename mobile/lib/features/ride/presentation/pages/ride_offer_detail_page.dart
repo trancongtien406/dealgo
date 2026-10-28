@@ -231,6 +231,9 @@ class _RideOfferDetailViewState extends State<_RideOfferDetailView> {
                                 RideStopList(
                                   pickup: ride.pickup.label,
                                   dropoff: ride.dropoff.label,
+                                  stops: [
+                                    for (final s in ride.stops) s.point.label,
+                                  ],
                                 ),
                               ],
                             ),

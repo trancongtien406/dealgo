@@ -17,7 +17,13 @@ import type { RouteUpdatedEventPayload } from './realtime.constants.js';
 import { SnapshotFanoutService } from './snapshot-fanout.service.js';
 
 type Aggregate = 'Ride' | 'FoodOrder';
-type Legs = { phase: RoutePhase; pickup: { lat: number; lng: number }; dropoff: { lat: number; lng: number } };
+type Point = { lat: number; lng: number };
+/** `via` = multi-stop TRIP stops not yet departed, in order (route goes through them). */
+type Legs = { phase: RoutePhase; pickup: Point; dropoff: Point; via?: Point[] };
+
+function viaKeyOf(via: readonly Point[] | undefined): string {
+  return (via ?? []).map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join('|');
+}
 
 /**
  * Server-side phase route (r25: no in-app navigation). ONE Directions leg per phase:
@@ -68,7 +74,8 @@ export class PhaseRouteService {
       const prev = this.cache.get(aggregate, id, now);
       const here = { lat: fix.lat, lng: fix.lng };
       let reason: RouteUpdatedEventPayload['reason'] | null = null;
-      if (!prev || prev.phase !== leg.phase) {
+      const viaKey = leg.phase === 'TRIP' ? viaKeyOf(leg.via) : '';
+      if (!prev || prev.phase !== leg.phase || (prev.viaKey ?? '') !== viaKey) {
         reason = 'INITIAL';
       } else {
         const { minIntervalMs, offRouteM } = await this.thresholds();
@@ -80,8 +87,11 @@ export class PhaseRouteService {
       // TRIP starts as the pickup→dropoff overview; a deviation re-route starts from the driver.
       const from = leg.phase === 'APPROACH' || reason !== 'INITIAL' ? here : leg.pickup;
       const to = leg.phase === 'APPROACH' ? leg.pickup : leg.dropoff;
-      const route = await this.lookup(from, to);
-      this.cache.set(aggregate, id, { phase: leg.phase, route, at: now });
+      const via = leg.phase === 'TRIP' ? (leg.via ?? []) : [];
+      // After the first stop is left, the INITIAL overview starts from the driver too.
+      const start = viaKey !== '' && prev && prev.phase === leg.phase ? here : from;
+      const route = await this.lookup(start, to, via);
+      this.cache.set(aggregate, id, { phase: leg.phase, route, at: now, ...(viaKey ? { viaKey } : {}) });
       this.fanout.emitRouteUpdated({
         aggregateType: aggregate,
         aggregateId: id,
@@ -109,8 +119,11 @@ export class PhaseRouteService {
     return { minIntervalMs, offRouteM };
   }
 
-  private async lookup(from: { lat: number; lng: number }, to: { lat: number; lng: number }): Promise<RouteGeometryView> {
+  private async lookup(from: Point, to: Point, via: readonly Point[] = []): Promise<RouteGeometryView> {
     try {
+      if (via.length > 0) {
+        return toRouteGeometryView(await this.routing.routeVia([from, ...via, to]));
+      }
       return toRouteGeometryView(await this.routing.route(from, to));
     } catch {
       return { available: false, provider: this.routing.provider(), coords: [], distanceM: null, durationSec: null };

@@ -76,7 +76,15 @@ export type PlatformSettingKey =
   | 'VOICE_CALLS_ENABLED'
   | 'MAPS_SEARCH_PROVIDER'
   | 'MAPS_REVERSE_PROVIDER'
-  | 'MAPS_ROUTE_PROVIDER';
+  | 'MAPS_ROUTE_PROVIDER'
+  | 'RIDE_MULTI_STOP_BIKE_ENABLED'
+  | 'RIDE_MULTI_STOP_CAR_ENABLED'
+  | 'RIDE_MAX_STOPS_BIKE'
+  | 'RIDE_MAX_STOPS_CAR'
+  | 'RIDE_STOP_FEE_BIKE_VND'
+  | 'RIDE_STOP_FEE_CAR_VND'
+  | 'RIDE_STOP_FREE_WAIT_MINUTES'
+  | 'RIDE_STOP_WAIT_FEE_VND_PER_MINUTE';
 
 /** Highest value an admin may set for UPLOAD_MAX_FILE_KB. */
 export const UPLOAD_MAX_FILE_KB_CEILING = 5120;
@@ -753,6 +761,70 @@ export const PLATFORM_SETTING_SPECS: readonly PlatformSettingSpec[] = [
     key: 'MAPS_ROUTE_PROVIDER',
     valueType: 'string',
     openIds: ['DEC-PROD-045'],
+    seeded: true,
+  },
+  {
+    // Multi-stop rides on/off for this service (off = single destination only).
+    key: 'RIDE_MULTI_STOP_BIKE_ENABLED',
+    valueType: 'json',
+    openIds: ['DEC-PROD-MULTISTOP'],
+    boolean: true,
+    seeded: true,
+  },
+  {
+    // Multi-stop rides on/off for this service (off = single destination only).
+    key: 'RIDE_MULTI_STOP_CAR_ENABLED',
+    valueType: 'json',
+    openIds: ['DEC-PROD-MULTISTOP'],
+    boolean: true,
+    seeded: true,
+  },
+  {
+    key: 'RIDE_MAX_STOPS_BIKE',
+    valueType: 'number',
+    openIds: ['DEC-PROD-MULTISTOP'],
+    min: 0,
+    max: 5,
+    seeded: true,
+  },
+  {
+    key: 'RIDE_MAX_STOPS_CAR',
+    valueType: 'number',
+    openIds: ['DEC-PROD-MULTISTOP'],
+    min: 0,
+    max: 5,
+    seeded: true,
+  },
+  {
+    key: 'RIDE_STOP_FEE_BIKE_VND',
+    valueType: 'number',
+    openIds: ['DEC-PROD-MULTISTOP'],
+    min: 0,
+    max: 200000,
+    seeded: true,
+  },
+  {
+    key: 'RIDE_STOP_FEE_CAR_VND',
+    valueType: 'number',
+    openIds: ['DEC-PROD-MULTISTOP'],
+    min: 0,
+    max: 500000,
+    seeded: true,
+  },
+  {
+    key: 'RIDE_STOP_FREE_WAIT_MINUTES',
+    valueType: 'number',
+    openIds: ['DEC-PROD-MULTISTOP'],
+    min: 0,
+    max: 60,
+    seeded: true,
+  },
+  {
+    key: 'RIDE_STOP_WAIT_FEE_VND_PER_MINUTE',
+    valueType: 'number',
+    openIds: ['DEC-PROD-MULTISTOP'],
+    min: 0,
+    max: 50000,
     seeded: true,
   },
 ] as const;

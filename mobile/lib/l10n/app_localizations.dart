@@ -12787,6 +12787,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Restored your unsent draft.'**
   String get draftRestoredNote;
+
+  /// No description provided for @rideStopNumbered.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop {n}'**
+  String rideStopNumbered(int n);
+
+  /// No description provided for @rideAddStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Add stop'**
+  String get rideAddStop;
+
+  /// No description provided for @rideRemoveStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove stop'**
+  String get rideRemoveStop;
+
+  /// No description provided for @rideMoveStopUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Move stop up'**
+  String get rideMoveStopUp;
+
+  /// No description provided for @rideStopsMax.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to {n} stops'**
+  String rideStopsMax(int n);
+
+  /// No description provided for @rideStopFeeNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Each stop adds {fee}'**
+  String rideStopFeeNote(String fee);
+
+  /// No description provided for @rideStopFeeLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop fee'**
+  String get rideStopFeeLine;
+
+  /// No description provided for @rideWaitFeeLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting at stops'**
+  String get rideWaitFeeLine;
+
+  /// No description provided for @rideStopPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Not yet'**
+  String get rideStopPending;
+
+  /// No description provided for @rideStopArrived.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver waiting'**
+  String get rideStopArrived;
+
+  /// No description provided for @rideStopDeparted.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get rideStopDeparted;
+
+  /// No description provided for @rideStopsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'+{n} stops'**
+  String rideStopsCount(int n);
+
+  /// No description provided for @rideRouteChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The customer changed the route. Review it and offer again.'**
+  String get rideRouteChanged;
+
+  /// No description provided for @rideStopsLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Stops can only be changed before a driver is chosen.'**
+  String get rideStopsLocked;
+
+  /// No description provided for @rideStopsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Stops are not available for this service right now.'**
+  String get rideStopsUnavailable;
+
+  /// No description provided for @driverStopArrive.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrived at stop {n}'**
+  String driverStopArrive(int n);
+
+  /// No description provided for @driverStopDepart.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave stop {n}'**
+  String driverStopDepart(int n);
+
+  /// No description provided for @driverStopsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stops'**
+  String get driverStopsTitle;
+
+  /// No description provided for @driverStopFreeWait.
+  ///
+  /// In en, this message translates to:
+  /// **'Free wait {m} min, then {fee}/min'**
+  String driverStopFreeWait(int m, String fee);
+
+  /// No description provided for @driverNavigateToStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Navigate to stop {n}'**
+  String driverNavigateToStop(int n);
+
+  /// No description provided for @driverStopsPendingError.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish every stop before completing the trip.'**
+  String get driverStopsPendingError;
+
+  /// No description provided for @rideEditStops.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit stops'**
+  String get rideEditStops;
+
+  /// No description provided for @rideEditStopsSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Update route'**
+  String get rideEditStopsSave;
+
+  /// No description provided for @rideEditStopsConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change stops?'**
+  String get rideEditStopsConfirmTitle;
+
+  /// No description provided for @rideEditStopsConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Changing the route clears current driver offers and restarts the search.'**
+  String get rideEditStopsConfirmBody;
+
+  /// No description provided for @rideEditStopsConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Change route'**
+  String get rideEditStopsConfirmAction;
+
+  /// No description provided for @rideEditStopsDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Route updated. Waiting for new offers.'**
+  String get rideEditStopsDone;
+
+  /// No description provided for @rideStopsNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No stops yet'**
+  String get rideStopsNone;
+
+  /// No description provided for @mapPinStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop {n}'**
+  String mapPinStop(int n);
 }
 
 class _AppLocalizationsDelegate

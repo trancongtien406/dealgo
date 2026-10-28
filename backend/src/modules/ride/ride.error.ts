@@ -49,6 +49,13 @@ export const RIDE_RULES = {
     status: 409,
     message: 'Go online and share your current location to see nearby requests',
   },
+  // Multi-stop rides.
+  RIDE_STOPS_DISABLED: { status: 400, message: 'Multi-stop rides are not available for this service' },
+  RIDE_TOO_MANY_STOPS: { status: 400, message: 'Too many stops for this service' },
+  RIDE_STOPS_LOCKED: { status: 409, message: 'Stops can only be changed before a driver is chosen' },
+  RIDE_ROUTE_CHANGED: { status: 409, message: 'The customer changed the route; review it and offer again' },
+  RIDE_STOP_OUT_OF_ORDER: { status: 409, message: 'Stops must be visited in order' },
+  RIDE_STOPS_PENDING: { status: 409, message: 'Finish every stop before completing the ride' },
   DRIVER_DEBT_LIMIT_REACHED: {
     status: 403,
     message: 'Settle your outstanding platform fees to keep receiving jobs',

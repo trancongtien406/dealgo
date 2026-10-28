@@ -25,6 +25,9 @@ import '../utils/ride_routes.dart';
 import '../cubit/ride_session.dart';
 import '../widgets/ride_widgets.dart';
 import '../widgets/ride_negotiation_ui.dart';
+import '../widgets/ride_edit_stops_sheet.dart';
+import '../../domain/stops/ride_stops_client.dart';
+import '../../../../core/maps/map_lat_lng.dart';
 import '../../../../core/l10n/api_error_text.dart';
 import '../../../promotion/domain/entities/voucher_quote.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
@@ -70,6 +73,7 @@ class _RideOffersView extends StatefulWidget {
 
 class _RideOffersPageState extends State<_RideOffersView> {
   RideView? _ride;
+  MultiStopSettings _multiStop = MultiStopSettings.disabled;
   String? _selectedOfferId;
   OfferBlock? _block;
   var _loading = true;
@@ -101,6 +105,7 @@ class _RideOffersPageState extends State<_RideOffersView> {
       await _load();
       _watch();
     });
+    unawaited(Future<void>.microtask(_loadMultiStop));
   }
 
   var _watching = false;
@@ -411,6 +416,108 @@ class _RideOffersPageState extends State<_RideOffersView> {
     }
   }
 
+  RideStopsClient? get _stopsClient {
+    try {
+      return context.read<RideStopsClient>();
+    } on ProviderNotFoundException {
+      return null;
+    }
+  }
+
+  /// Admin multi-stop flags; failure keeps the edit button hidden.
+  Future<void> _loadMultiStop() async {
+    final client = _stopsClient;
+    final token = rideAccessToken(context);
+    if (client == null || token == null) {
+      return;
+    }
+    try {
+      final settings = await client.config(accessToken: token);
+      if (mounted) {
+        setState(() => _multiStop = settings);
+      }
+    } catch (_) {
+      // Keep disabled.
+    }
+  }
+
+  bool _canEditStops(RideView ride) =>
+      ride.status == RideStatus.negotiating &&
+      (_maxStopsFor(ride) > 0 || ride.stops.isNotEmpty);
+
+  int _maxStopsFor(RideView ride) =>
+      _multiStop.forVehicleClass(ride.vehicleClassCode).maxStops;
+
+  /// Customer replaces the stops while NEGOTIATING. Pending offers are dropped
+  /// by the server, so we ask first when any exist.
+  Future<void> _editStops(RideView ride) async {
+    final client = _stopsClient;
+    final token = rideAccessToken(context);
+    if (_busy || client == null || token == null) {
+      return;
+    }
+    final max = _maxStopsFor(ride);
+    final next = await showRideEditStopsSheet(
+      context: context,
+      current: [for (final s in ride.stops) s.point],
+      maxStops: max < ride.stops.length ? ride.stops.length : max,
+      pick: (ctx) => defaultRideStopPicker(
+        ctx,
+        near: MapLatLng(lat: ride.pickup.lat, lng: ride.pickup.lng),
+      ),
+    );
+    if (next == null || !mounted) {
+      return;
+    }
+    final l10n = AppLocalizations.of(context);
+    final hasOffers = ride.offers.any(
+      (o) => o.status == RideOfferStatus.pending,
+    );
+    if (hasOffers) {
+      final ok = await showDealGoConfirmDialog(
+        context: context,
+        title: l10n.rideEditStopsConfirmTitle,
+        body: l10n.rideEditStopsConfirmBody,
+        confirmLabel: l10n.rideEditStopsConfirmAction,
+        cancelLabel: l10n.rideOfferConfirmCancel,
+        confirmKey: const Key('ride-edit-stops-confirm'),
+      );
+      if (!ok || !mounted) {
+        return;
+      }
+    }
+    setState(() {
+      _busy = true;
+      _message = null;
+    });
+    try {
+      final updated = await client.updateStops(
+        accessToken: token,
+        rideId: ride.id,
+        stops: next,
+        routeVersion: ride.routeVersion,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _busy = false;
+        _ride = updated;
+        _selectedOfferId = null;
+      });
+      showNegotiationSnack(context, l10n.rideEditStopsDone);
+      await _load(silent: true);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _busy = false;
+        _message = negotiationErrorText(context, error);
+      });
+    }
+  }
+
   /// Raise the fare in place; drivers see it over the socket.
   Future<void> _raiseFare(RideView ride) async {
     final client = maybeRideNegotiation(context);
@@ -500,7 +607,11 @@ class _RideOffersPageState extends State<_RideOffersView> {
   void _changeFare(RideView ride) {
     context.push(
       RideRoutes.fare,
-      extra: RidePlaces(pickup: ride.pickup, dropoff: ride.dropoff),
+      extra: RidePlaces(
+        pickup: ride.pickup,
+        dropoff: ride.dropoff,
+        stops: [for (final s in ride.stops) s.point],
+      ),
     );
   }
 
@@ -611,6 +722,7 @@ class _RideOffersPageState extends State<_RideOffersView> {
         onChangeFare: () => _changeFare(ride),
         onCancel: _cancel,
         onRaiseFare: negotiation == null ? null : () => _raiseFare(ride),
+        onEditStops: _canEditStops(ride) ? () => _editStops(ride) : null,
       );
     }
     return OfferList(
@@ -625,6 +737,7 @@ class _RideOffersPageState extends State<_RideOffersView> {
       onConfirm: _select,
       onCancel: _cancel,
       onRaiseFare: negotiation == null ? null : () => _raiseFare(ride),
+      onEditStops: _canEditStops(ride) ? () => _editStops(ride) : null,
       onDeclineSelected: negotiation == null
           ? null
           : () => _declineSelected(ride),

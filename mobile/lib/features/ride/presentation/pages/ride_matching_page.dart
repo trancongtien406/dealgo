@@ -208,7 +208,11 @@ class _RideMatchingPageState extends State<_RideMatchingView> {
   void _editTrip(RideView ride) {
     context.push(
       RideRoutes.fare,
-      extra: RidePlaces(pickup: ride.pickup, dropoff: ride.dropoff),
+      extra: RidePlaces(
+        pickup: ride.pickup,
+        dropoff: ride.dropoff,
+        stops: [for (final s in ride.stops) s.point],
+      ),
     );
   }
 
@@ -411,6 +415,9 @@ class _MatchingWait extends StatelessWidget {
                             RideStopList(
                               pickup: ride.pickup.label,
                               dropoff: ride.dropoff.label,
+                              stops: [
+                                for (final s in ride.stops) s.point.label,
+                              ],
                             ),
                             const SizedBox(height: DealGoSpacing.s12),
                             Row(
@@ -634,6 +641,7 @@ class _MatchingTimeout extends StatelessWidget {
                     RideStopList(
                       pickup: ride.pickup.label,
                       dropoff: ride.dropoff.label,
+                      stops: [for (final s in ride.stops) s.point.label],
                     ),
                   ],
                 ),

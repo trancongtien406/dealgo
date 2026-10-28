@@ -12,6 +12,8 @@ export type RouteGeometryView = {
   coords: [number, number][];
   distanceM: number | null;
   durationSec: number | null;
+  /** Per-leg km/time between consecutive points (multi-stop); absent for single routes. */
+  legs?: Array<{ distanceM: number; durationSec: number }>;
 };
 
 export function toRouteGeometryView(lookup: RouteLookup): RouteGeometryView {
@@ -31,6 +33,7 @@ export function toRouteGeometryView(lookup: RouteLookup): RouteGeometryView {
     coords: best.coords,
     distanceM: best.distanceM,
     durationSec: best.durationSec,
+    ...(best.legs && best.legs.length > 1 ? { legs: best.legs } : {}),
   };
 }
 
