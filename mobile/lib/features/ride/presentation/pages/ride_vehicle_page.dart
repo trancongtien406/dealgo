@@ -15,6 +15,7 @@ import '../utils/ride_routes.dart';
 import '../utils/ride_vehicle_label.dart';
 import '../widgets/ride_widgets.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
+import '../../../../core/design_system/components/dealgo_network_image.dart';
 
 /// C004 — customer picks a vehicle class. Each class has its own reference fare
 /// and bid window; the customer still proposes the amount on the next screens.
@@ -168,10 +169,6 @@ class _RideVehiclePageState extends State<RideVehiclePage> {
                         onTap: () => setState(() => _index = i),
                       ),
                     ],
-                  if (quote != null) ...[
-                    const SizedBox(height: DealGoSpacing.s12),
-                    RideInfoBanner(message: l10n.rideFareReferenceExplain),
-                  ],
                 ],
               ),
             ),
@@ -274,10 +271,10 @@ class _VehicleTile extends StatelessWidget {
                       width: 48,
                       height: 48,
                       child: imageUrl != null
-                          ? Image.network(
+                          ? DealGoNetworkImage(
                               imageUrl!,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => _artwork(),
+                              fallback: _artwork(),
                             )
                           : _artwork(),
                     ),

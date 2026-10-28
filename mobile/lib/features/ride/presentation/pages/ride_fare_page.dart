@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/design_system/components/dealgo_info_tip.dart';
 import '../../../../core/network/api_error_l10n.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
@@ -13,6 +12,7 @@ import '../../../../core/design_system/components/dealgo_banner.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../core/config/api_base_url.dart';
+import '../../../../core/maps/map_controls.dart';
 import '../../../../core/maps/map_lat_lng.dart';
 import '../../../../core/maps/map_port.dart';
 import '../../../../core/maps/route_geometry.dart';
@@ -30,6 +30,7 @@ import '../widgets/ride_widgets.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/l10n/api_error_text.dart';
 import '../../../../core/storage/customer_booking_prefs.dart';
+import '../../../../core/design_system/components/dealgo_network_image.dart';
 
 /// inDrive-like: map-first sheet with vehicle cards + large bid fare + Find driver.
 class RideFarePage extends StatelessWidget {
@@ -347,7 +348,7 @@ class _RideFarePageState extends State<_RideFareView> {
       MapLatLng(lat: _places.dropoff.lat, lng: _places.dropoff.lng),
     ]);
     final media = MediaQuery.of(context);
-    // Keep A/B + polyline in the visible band above the sheet (system back only).
+    // Keep A/B + polyline in the visible band above the sheet.
     final fitPadding = EdgeInsets.fromLTRB(
       40,
       // Status bar + the full stop pin (chip above the tip) + margin.
@@ -363,7 +364,7 @@ class _RideFarePageState extends State<_RideFareView> {
         body: Stack(
           children: [
             Positioned.fill(
-              child: context.read<MapPort>().buildMap(
+              child: context.watch<MapPort>().buildMap(
                 center: MapLatLng(
                   lat: _places.pickup.lat,
                   lng: _places.pickup.lng,
@@ -409,9 +410,6 @@ class _RideFarePageState extends State<_RideFareView> {
                                 style: textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.w800,
                                 ),
-                              ),
-                              DealGoInfoTip(
-                                message: l10n.rideSuggestedFareHint,
                               ),
                             ],
                           ),
@@ -513,11 +511,6 @@ class _RideFarePageState extends State<_RideFareView> {
                               ),
                               onChanged: (_) => setState(() => _message = null),
                             ),
-                            Center(
-                              child: DealGoInfoTip(
-                                message: l10n.rideFareAdjustHint,
-                              ),
-                            ),
                             const SizedBox(height: DealGoSpacing.s12),
                             Row(
                               children: [
@@ -574,6 +567,12 @@ class _RideFarePageState extends State<_RideFareView> {
                   ],
                 );
               },
+            ),
+            // Floating back over the sheet, as on the driver search; inert
+            // (still shown) while a request is being sent, like PopScope.
+            MapBackOverlay(
+              buttonKey: const Key('ride-fare-back'),
+              enabled: !_busy,
             ),
           ],
         ),
@@ -683,104 +682,101 @@ class _ClassTile extends StatelessWidget {
         ? l10n.rideVehicleBikeSubtitle
         : l10n.rideVehicleSeats(option.seats!);
     final photo = resolveMediaUrl(option.imageUrl);
-    return Material(
-      color: selected ? DealGoColors.subtlePurple : DealGoColors.card,
-      borderRadius: BorderRadius.circular(DealGoRadius.input),
-      child: InkWell(
-        key: Key(
-          code == 'MOTORBIKE'
-              ? 'ride-vehicle-bike'
-              : 'ride-vehicle-${code ?? 'unknown'}',
-        ),
+    // The border marks the choice; screen readers get it from `selected`.
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: selected ? DealGoColors.subtlePurple : DealGoColors.card,
         borderRadius: BorderRadius.circular(DealGoRadius.input),
-        onTap: onTap,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(DealGoRadius.input),
-            border: Border.all(
-              color: selected ? DealGoColors.primary : DealGoColors.border,
-              width: selected ? 1.8 : 1,
-            ),
+        child: InkWell(
+          key: Key(
+            code == 'MOTORBIKE'
+                ? 'ride-vehicle-bike'
+                : 'ride-vehicle-${code ?? 'unknown'}',
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: DealGoSpacing.s12,
-              vertical: DealGoSpacing.s12,
+          borderRadius: BorderRadius.circular(DealGoRadius.input),
+          onTap: onTap,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(DealGoRadius.input),
+              border: Border.all(
+                color: selected ? DealGoColors.primary : DealGoColors.border,
+                width: selected ? 1.8 : 1,
+              ),
             ),
-            child: Row(
-              children: [
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: DealGoColors.greenSurface,
-                    borderRadius: BorderRadius.circular(DealGoRadius.input),
-                  ),
-                  child: SizedBox(
-                    width: 44,
-                    height: 44,
-                    child: photo == null
-                        ? Icon(
-                            rideVehicleClassIcon(code),
-                            color: DealGoColors.brandGreen,
-                            size: 22,
-                          )
-                        : ClipRRect(
-                            borderRadius: BorderRadius.circular(
-                              DealGoRadius.input,
-                            ),
-                            child: Image.network(
-                              photo,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => Icon(
-                                rideVehicleClassIcon(code),
-                                color: DealGoColors.brandGreen,
-                                size: 22,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: DealGoSpacing.s12,
+                vertical: DealGoSpacing.s12,
+              ),
+              child: Row(
+                children: [
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: DealGoColors.greenSurface,
+                      borderRadius: BorderRadius.circular(DealGoRadius.input),
+                    ),
+                    child: SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: photo == null
+                          ? Icon(
+                              rideVehicleClassIcon(code),
+                              color: DealGoColors.brandGreen,
+                              size: 22,
+                            )
+                          : ClipRRect(
+                              borderRadius: BorderRadius.circular(
+                                DealGoRadius.input,
+                              ),
+                              child: DealGoNetworkImage(
+                                photo,
+                                fit: BoxFit.cover,
+                                fallback: Icon(
+                                  rideVehicleClassIcon(code),
+                                  color: DealGoColors.brandGreen,
+                                  size: 22,
+                                ),
                               ),
                             ),
-                          ),
+                    ),
                   ),
-                ),
-                const SizedBox(width: DealGoSpacing.s12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(width: DealGoSpacing.s12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(subtitle, style: textTheme.bodySmall),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        title,
+                        l10n.rideSuggestedFareShort,
+                        style: textTheme.labelSmall?.copyWith(
+                          color: DealGoColors.textSecondary,
+                        ),
+                      ),
+                      Text(
+                        formatRideVnd(option.referenceFareVnd),
                         style: textTheme.titleSmall?.copyWith(
+                          color: DealGoColors.primary,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      Text(subtitle, style: textTheme.bodySmall),
                     ],
                   ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      l10n.rideSuggestedFareShort,
-                      style: textTheme.labelSmall?.copyWith(
-                        color: DealGoColors.textSecondary,
-                      ),
-                    ),
-                    Text(
-                      formatRideVnd(option.referenceFareVnd),
-                      style: textTheme.titleSmall?.copyWith(
-                        color: DealGoColors.primary,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-                if (selected) ...[
-                  const SizedBox(width: DealGoSpacing.s8),
-                  const Icon(
-                    DealGoIcons.check,
-                    size: 18,
-                    color: DealGoColors.primary,
-                  ),
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -802,44 +798,41 @@ class _FarePreset extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: selected ? DealGoColors.card : DealGoColors.canvas,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(999),
-        side: BorderSide(
-          color: selected ? DealGoColors.primary : DealGoColors.border,
-          width: selected ? 1.4 : 1,
+    // The border marks the choice; screen readers get it from `selected`.
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: selected ? DealGoColors.card : DealGoColors.canvas,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(999),
+          side: BorderSide(
+            color: selected ? DealGoColors.primary : DealGoColors.border,
+            width: selected ? 1.4 : 1,
+          ),
         ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: DealGoSpacing.s8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Flexible(
-                child: Text(
-                  formatRideVnd(amount),
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: selected
-                        ? DealGoColors.primary
-                        : DealGoColors.textSecondary,
-                    fontWeight: FontWeight.w700,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: DealGoSpacing.s8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: Text(
+                    formatRideVnd(amount),
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: selected
+                          ? DealGoColors.primary
+                          : DealGoColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-              if (selected) ...[
-                const SizedBox(width: 2),
-                const Icon(
-                  DealGoIcons.check,
-                  size: 14,
-                  color: DealGoColors.primary,
-                ),
               ],
-            ],
+            ),
           ),
         ),
       ),

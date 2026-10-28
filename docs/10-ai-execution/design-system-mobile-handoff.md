@@ -129,9 +129,16 @@ touch: min 48h target
 **Insets / content clearance**
 
 - `DealGoNavBarMetrics` = overhang + bar + bottom gap. Bottom gap: iOS `max(inset − 10, 8)` (pill sits in the home-indicator zone), Android `inset + 6` (above gesture/3-button nav), no inset → 10.
-- `RoleShell` uses `extendBody: true` (the raised circle overlaps content) and wraps the branch in `FloatingNavBody`: the body ends at the pill top (`contentClearance`) and pages receive zero bottom padding. With the keyboard open no clearance is added.
+- `RoleShell` (customer, driver, merchant) uses `extendBody: true`: page content scrolls behind the floating bar. It measures the covered height above the `Scaffold` (`DealGoNavBarMetrics.totalHeight`, including the home-indicator inset) and `FloatingNavBody` hands it to pages as `MediaQuery.padding.bottom`. With the keyboard open it is 0; when the bar is hidden the real inset passes through.
+- Scrollable tab pages pad their end with `dealGoScrollPadding(context, base)` (`dealgo_nav_insets.dart`), so the last item stops just above the bar on every device (tested on 320×568, 375×667 and 390×844 with a 34 pt inset). `DriverPageFrame`/`MerchantPageFrame` lift a fixed footer above the bar and end the list at the footer.
+- Narrow phones (320 pt): single-line labels in fixed-width slots (tab bar, `DealGoSegmentedControl`, ride ref) use `FittedBox(scaleDown)`, never ellipsis; label + chip rows use `Wrap`; content text that must stay whole (store meta, customer name, promo titles) gets more lines. Only addresses may end in "…". Audit: `flutter test test/screenshots --dart-define=SCREENSHOTS=true --dart-define=SHOT_DIR=<dir> --dart-define=SHOT_SIZE=320x568` writes `truncated.tsv` with every cut text.
 
-**Tests:** `test/dealgo_tab_bar_test.dart` (selection, notch position, reduced motion, semantics, badge, labels, body clearance), `test/bottom_nav_insets_test.dart` (metrics per platform/inset), `test/large_text_chrome_test.dart` (five tabs at accessibility XL). PNG previews: `flutter test test/nav_bar_preview_test.dart --dart-define=NAV_PREVIEW_DIR=<dir>`.
+**Keyboard**
+
+- `MaterialApp.builder` wraps the app in `KeyboardDismissOnTapOutside` (`lib/core/ui/keyboard_dismiss.dart`): a tap (not a drag) outside the focused field closes the keyboard after the tapped button has fired; map pans, sheet drags and selection handles keep focus. Chat/support composers mark the send button with `TextFieldTapRegion` so sending keeps the keyboard open.
+- `DealGoScrollBehavior` makes every scroll view close the keyboard on drag; pages do not set `keyboardDismissBehavior` themselves.
+
+**Tests:** `test/dealgo_tab_bar_test.dart` (selection, notch position, reduced motion, semantics, badge, labels, covered height), `test/shell_last_item_visible_test.dart` (last item above the bar for the three roles, with and without a footer, three screen sizes), `test/keyboard_dismiss_test.dart`, `test/bottom_nav_insets_test.dart` (metrics per platform/inset), `test/large_text_chrome_test.dart` (five tabs at accessibility XL). PNG previews: `flutter test test/nav_bar_preview_test.dart --dart-define=NAV_PREVIEW_DIR=<dir>`.
 
 ---
 

@@ -123,14 +123,6 @@ class _RolePickerPageState extends State<RolePickerPage> {
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: DealGoSpacing.s8),
-                      Text(
-                        l10n.rolePickerSubtitle,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: DealGoColors.textSecondary,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
                       const SizedBox(height: DealGoSpacing.s24),
                       for (final mode in modes) ...[
                         _RoleCard(
@@ -202,7 +194,6 @@ class _RolePickerPageState extends State<RolePickerPage> {
     showDealGoDialog<void>(
       context: context,
       title: l10n.authHelp,
-      body: l10n.rolePickerHelpBody,
       primaryLabel: l10n.actionGotIt,
     );
   }
@@ -226,15 +217,6 @@ class _RolePickerPageState extends State<RolePickerPage> {
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
                   color: DealGoColors.text,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                AppLocalizations.of(context).rolePickerInfoBody,
-                style: const TextStyle(
-                  fontSize: 14,
-                  height: 1.45,
-                  color: DealGoColors.textSecondary,
                 ),
               ),
               const SizedBox(height: 20),

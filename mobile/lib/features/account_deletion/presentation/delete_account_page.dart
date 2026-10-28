@@ -16,6 +16,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../food/domain/entities/food_money.dart';
 import '../../identity/domain/auth_redirect.dart';
 import '../../identity/domain/entities/auth_state.dart';
+import '../../identity/domain/passkey_platform.dart';
 import '../../identity/presentation/cubit/auth_cubit.dart';
 import '../domain/account_deletion.dart';
 
@@ -43,7 +44,8 @@ String deletionBlockerText(
 
 enum _Phase { loading, loadError, form, verify, done }
 
-/// S027 — request → re-auth (SMS OTP or password) → soft-delete; purge after the grace period.
+/// S027 — request → re-auth (native passkey prompt, SMS OTP or password) → soft-delete;
+/// purge after the grace period.
 class DeleteAccountPage extends StatefulWidget {
   const DeleteAccountPage({super.key});
 
@@ -119,11 +121,12 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
       _busy = true;
       _error = null;
     });
+    AccountDeletionChallenge? started;
     try {
-      final challenge = await _repo.start(accessToken: token);
+      started = await _repo.start(accessToken: token);
       if (!mounted) return;
       setState(() {
-        _challenge = challenge;
+        _challenge = started;
         _secret.clear();
         _mustRestart = false;
         _phase = _Phase.verify;
@@ -134,19 +137,30 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+    // Passkey: open the native prompt straight away; the verify step only offers a retry.
+    if (mounted && started?.method == AccountDeletionMethod.passkey) {
+      await _confirm();
+    }
   }
 
   Future<void> _confirm() async {
     final token = _token;
     final challenge = _challenge;
     final secret = _secret.text.trim();
-    if (token == null || challenge == null || secret.isEmpty || _busy) return;
+    final passkey = challenge?.method == AccountDeletionMethod.passkey;
+    if (token == null || challenge == null || _busy) return;
+    if (!passkey && secret.isEmpty) return;
+    final repo = _repo;
+    final platform = passkey ? context.read<PasskeyPlatform>() : null;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      final scheduled = await _repo.confirm(
+      final assertion = await platform?.authenticate(
+        challenge.passkeyOptions ?? const {},
+      );
+      final scheduled = await repo.confirm(
         accessToken: token,
         requestId: challenge.requestId,
         code: challenge.method == AccountDeletionMethod.phoneOtp
@@ -155,12 +169,24 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
         password: challenge.method == AccountDeletionMethod.password
             ? _secret.text
             : null,
+        passkey: assertion,
       );
       if (!mounted) return;
       setState(() {
         _scheduled = scheduled;
         _phase = _Phase.done;
       });
+    } on PasskeyPlatformException catch (error) {
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
+      // Cancelling the system prompt is a choice, not an error: stay quiet.
+      setState(
+        () => _error = switch (error.kind) {
+          PasskeyFailureKind.cancelled => null,
+          PasskeyFailureKind.unsupported => l10n.securityPasskeyUnsupported,
+          _ => l10n.deleteAccountWrongPasskey,
+        },
+      );
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() => _applyError(error));
@@ -182,6 +208,8 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
         _error = l10n.deleteAccountWrongCode;
       case 'AUTH_PASSWORD_INVALID':
         _error = l10n.deleteAccountWrongPassword;
+      case 'AUTH_PASSKEY_INVALID':
+        _error = l10n.deleteAccountWrongPasskey;
       case 'AUTH_CODE_LOCKED':
         _error = l10n.deleteAccountLocked;
         _mustRestart = true;
@@ -254,8 +282,6 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: DealGoSpacing.s8),
-              Text(l10n.deleteAccountSubtitle, style: textTheme.bodyMedium),
               const SizedBox(height: DealGoSpacing.s16),
               _WarningBox(
                 title: l10n.deleteAccountWarnTitle,
@@ -320,8 +346,6 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                 textCapitalization: TextCapitalization.characters,
                 onChanged: (_) => setState(() {}),
               ),
-              const SizedBox(height: DealGoSpacing.s8),
-              Text(l10n.deleteAccountTypeHelper, style: textTheme.bodySmall),
               if (overview.method == null) ...[
                 const SizedBox(height: DealGoSpacing.s12),
                 _ErrorText(l10n.deleteAccountReauthUnavailable),
@@ -353,6 +377,9 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
     final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
     final challenge = _challenge!;
+    if (challenge.method == AccountDeletionMethod.passkey) {
+      return _buildPasskeyVerify(context);
+    }
     final otp = challenge.method == AccountDeletionMethod.phoneOtp;
     return Column(
       children: [
@@ -417,6 +444,50 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                   label: l10n.deleteAccountConfirm,
                   busy: _busy,
                   onPressed: _secret.text.trim().isEmpty ? null : _confirm,
+                ),
+          secondary: DealGoSecondaryButton(
+            label: l10n.deleteAccountKeep,
+            onPressed: () => context.pop(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// No text field: the system prompt does the work, the page only offers a retry.
+  Widget _buildPasskeyVerify(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Column(
+      children: [
+        Expanded(
+          child: ListView(
+            key: const ValueKey('delete-account-verify'),
+            padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
+            children: [
+              Text(
+                l10n.deleteAccountVerifyTitle,
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: DealGoSpacing.s12),
+                _ErrorText(_error!),
+              ],
+            ],
+          ),
+        ),
+        _Footer(
+          primary: _mustRestart
+              ? _DangerButton(
+                  key: const ValueKey('delete-restart'),
+                  label: l10n.deleteAccountRestart,
+                  busy: _busy,
+                  onPressed: _start,
+                )
+              : _DangerButton(
+                  key: const ValueKey('delete-passkey'),
+                  label: l10n.deleteAccountPasskeyVerify,
+                  busy: _busy,
+                  onPressed: _confirm,
                 ),
           secondary: DealGoSecondaryButton(
             label: l10n.deleteAccountKeep,
@@ -704,12 +775,11 @@ class _Footer extends StatelessWidget {
         DealGoDimensions.pageGutter,
         DealGoSpacing.s16,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Row(
         children: [
-          primary,
-          const SizedBox(height: DealGoSpacing.s12),
-          secondary,
+          Expanded(child: secondary),
+          const SizedBox(width: DealGoSpacing.s12),
+          Expanded(child: primary),
         ],
       ),
     );
@@ -752,7 +822,12 @@ class _DangerButton extends StatelessWidget {
                   color: Colors.white,
                 ),
               )
-            : Text(label),
+            : Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
       ),
     );
   }

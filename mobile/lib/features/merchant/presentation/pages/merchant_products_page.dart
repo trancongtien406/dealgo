@@ -14,7 +14,8 @@ import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_models.dart';
-import '../../../food/domain/entities/food_money.dart';
+import '../../../food/presentation/widgets/food_badges.dart';
+import '../../../food/presentation/widgets/food_category_tile.dart';
 import '../../domain/usecases/create_merchant_catalog_item.dart';
 import '../../domain/usecases/get_merchant_catalog.dart';
 import '../../domain/usecases/set_merchant_item_availability.dart';
@@ -22,6 +23,8 @@ import '../cubit/merchant_catalog_cubit.dart';
 import '../utils/merchant_routes.dart';
 import '../widgets/merchant_widgets.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
+import '../../../../core/design_system/components/dealgo_network_image.dart';
 
 class MerchantProductsPage extends StatelessWidget {
   const MerchantProductsPage({super.key});
@@ -263,7 +266,7 @@ class _CatalogBodyState extends State<_CatalogBody> {
     final textTheme = widget.textTheme;
     final filtered = _filtered;
     return ListView(
-      padding: merchantPagePadding,
+      padding: dealGoScrollPadding(context, merchantPagePadding),
       children: [
         DealGoCard(
           child: Row(
@@ -394,15 +397,15 @@ class _ProductRow extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: imageUrl != null && imageUrl.isNotEmpty
-                ? Image.network(
+                ? DealGoNetworkImage(
                     imageUrl,
                     width: 56,
                     height: 56,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stack) => fallback,
+                    fallback: fallback,
                   )
                 : Image.asset(
-                    'assets/images/food_bun_bo_special.png',
+                    foodPlaceholderImage,
                     width: 56,
                     height: 56,
                     fit: BoxFit.cover,
@@ -415,12 +418,11 @@ class _ProductRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(item.name, style: textTheme.titleMedium),
-                Text(
-                  formatVnd(item.priceVnd),
-                  style: textTheme.titleSmall?.copyWith(
-                    color: DealGoColors.primary,
-                    fontWeight: FontWeight.w800,
-                  ),
+                FoodPriceText(
+                  key: Key('merchant-product-price-${item.id}'),
+                  priceVnd: item.priceVnd,
+                  originalPriceVnd: item.originalPriceVnd,
+                  size: 14,
                 ),
                 if (item.soldCount > 0)
                   Text(

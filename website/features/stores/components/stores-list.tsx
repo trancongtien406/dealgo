@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { OpsIcon } from "@/components/ui/ops-icons";
@@ -64,6 +65,10 @@ export function StoresList() {
   const { data, isPending, isError, error, refetch } = useStoresQuery();
   const { options: regionOptions } = useLiveRegionFilterOptions();
   const { options: categoryOptions } = useLiveCatalogCategoryOptions();
+  const categoryLabel = useMemo(() => {
+    const names = new Map(categoryOptions.map((o) => [o.value, o.label]));
+    return (code: string) => names.get(code) ?? code;
+  }, [categoryOptions]);
   const stores = data?.items ?? [];
   const total = data?.total ?? 0;
   const forbidden = isError && isForbiddenError(error);
@@ -121,7 +126,7 @@ export function StoresList() {
             rows={stores.map((row) => [
               row.code,
               row.name,
-              row.category,
+              categoryLabel(row.category),
               row.area,
               row.sale ? storeSaleStatusLabel(row.sale) : "—",
               row.kyb ? storeKybStatusLabel(row.kyb) : "—",
@@ -372,7 +377,7 @@ export function StoresList() {
                           </div>
                         </div>
                       </AdminTableCell>
-                      <AdminTableCell>{store.category}</AdminTableCell>
+                      <AdminTableCell>{categoryLabel(store.category)}</AdminTableCell>
                       <AdminTableCell>{store.owner}</AdminTableCell>
                       <AdminTableCell>
                         {store.locationMissing ? (

@@ -5,6 +5,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:dealgo/core/design_system/components/dealgo_nav_insets.dart';
 import 'package:dealgo/core/design_system/components/dealgo_tab_bar.dart';
 import 'package:dealgo/core/design_system/theme/dealgo_theme.dart';
 import 'package:dealgo/core/design_system/tokens/dealgo_tokens.dart';
@@ -33,8 +34,8 @@ Future<void> _loadFonts() async {
   await lucide.load();
 }
 
-Widget _fakeContent() => ListView(
-  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+Widget _fakeContent(BuildContext context) => ListView(
+  padding: dealGoScrollPadding(context, const EdgeInsets.all(16)),
   children: [
     for (var i = 0; i < 8; i++)
       Container(
@@ -72,7 +73,13 @@ Future<void> _shot(
             return Scaffold(
               backgroundColor: DealGoColors.canvas,
               extendBody: true,
-              body: FloatingNavBody(child: SafeArea(child: _fakeContent())),
+              body: FloatingNavBody(
+                coveredBottom: dealGoNavBarMetricsOf(context).totalHeight,
+                child: SafeArea(
+                  bottom: false,
+                  child: Builder(builder: _fakeContent),
+                ),
+              ),
               bottomNavigationBar: DealGoTabBar(
                 selectedIndex: selected,
                 onDestinationSelected: (_) {},

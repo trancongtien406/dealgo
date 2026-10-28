@@ -366,12 +366,7 @@ void main() {
 
     expect(food.acceptCalls, ['order-placed-1']);
     expect(find.text('Đơn đã được xử lý'), findsOneWidget);
-    expect(
-      find.text(
-        'Đơn đã thay đổi trạng thái (khách hủy, nhân viên khác hoặc hệ thống đã xử lý).',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('Đơn đã đổi trạng thái.'), findsOneWidget);
     expect(find.text('PREPARING'), findsNothing);
     expect(find.text('Đang chuẩn bị'), findsNothing);
     expect(find.textContaining('thành công'), findsNothing);
@@ -391,7 +386,7 @@ void main() {
     await _openOrders(tester, food);
 
     expect(food.queueCalls, isNotEmpty);
-    expect(find.text('Cửa hàng chưa được phép nhận đơn'), findsWidgets);
+    expect(find.text('Chưa thể nhận đơn'), findsWidgets);
     expect(find.text('Chưa có đơn mới'), findsNothing);
     expect(find.text('Không được hiện như hàng đợi trống'), findsNothing);
     expect(find.text('PLACED'), findsNothing);
@@ -410,12 +405,6 @@ void main() {
 
       expect(food.acceptCalls, ['order-placed-1']);
       expect(find.text('Không tải được đơn hàng'), findsOneWidget);
-      expect(
-        find.text(
-          'Lỗi kết nối không có nghĩa là không có đơn. Hãy thử lại để xem đơn mới.',
-        ),
-        findsOneWidget,
-      );
       expect(find.text('PREPARING'), findsNothing);
       expect(find.text('Đang chuẩn bị'), findsNothing);
       expect(find.textContaining('thành công'), findsNothing);
@@ -549,7 +538,7 @@ void main() {
     );
 
     final open = find.byKey(const Key('merchant-open-busy'));
-    await tester.scrollUntilVisible(open, 200);
+    await _revealAboveNav(tester, open);
     await tester.tap(open);
     await tester.pumpAndSettle();
     expect(find.text('Tình trạng cửa hàng'), findsOneWidget);
@@ -652,6 +641,34 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(row);
       await tester.pumpAndSettle();
+      // Cover first: picked, shown, removed.
+      expect(
+        find.byKey(const Key('merchant-profile-cover-empty')),
+        findsOneWidget,
+      );
+      await tester.ensureVisible(
+        find.byKey(const Key('merchant-profile-cover-pick')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('merchant-profile-cover-pick')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('merchant-profile-cover')), findsOneWidget);
+      await tester.ensureVisible(
+        find.byKey(const Key('merchant-profile-cover-remove')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('merchant-profile-cover-remove')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('merchant-profile-cover-empty')),
+        findsOneWidget,
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('merchant-profile-logo-empty')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('merchant-profile-logo-empty')),
         findsOneWidget,
@@ -670,12 +687,35 @@ void main() {
       await tester.tap(find.byKey(const Key('merchant-profile-save')));
       await tester.pumpAndSettle();
       expect(food.storeProfileCalls, ['Bún Bò Cô Ba']);
-      expect(find.text('Đã lưu tên quán.'), findsOneWidget);
+      // The notice sits at the top of the form.
+      await tester.scrollUntilVisible(
+        find.text('Đã lưu hồ sơ quán.'),
+        -200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Đã lưu hồ sơ quán.'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('merchant-profile-logo-pick')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('merchant-profile-logo-pick')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('merchant-profile-logo')), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Đã cập nhật logo.'),
+        -200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('Đã cập nhật logo.'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('merchant-profile-logo-remove')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('merchant-profile-logo-remove')));
       await tester.pumpAndSettle();
@@ -687,6 +727,21 @@ void main() {
         find.byKey(const Key('merchant-profile-logo-remove')),
         findsNothing,
       );
+
+      // Category comes from the Admin-managed list; only the change is sent.
+      final tea = find.byKey(const Key('food-category-pick-tea'));
+      await tester.scrollUntilVisible(
+        tea,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.ensureVisible(tea);
+      await tester.pumpAndSettle();
+      await tester.tap(tea);
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('merchant-profile-save')));
+      await tester.pumpAndSettle();
+      expect(food.storeProfileCalls, ['Bún Bò Cô Ba', 'category:tea']);
     },
   );
 
@@ -798,7 +853,7 @@ void main() {
       initialLocation: '/merchant',
     );
     final link = find.byKey(const Key('merchant-open-hours'));
-    await tester.scrollUntilVisible(link, 200);
+    await _revealAboveNav(tester, link);
     await tester.tap(link);
     await tester.pumpAndSettle();
     expect(find.text('Lịch hoạt động'), findsOneWidget);
@@ -898,6 +953,8 @@ void main() {
     );
     final link = find.byKey(const Key('merchant-open-accept'));
     await tester.scrollUntilVisible(link, 200);
+    await tester.ensureVisible(link);
+    await tester.pumpAndSettle();
     await tester.tap(link);
     await tester.pumpAndSettle();
     expect(find.text('Thiết lập nhận đơn'), findsOneWidget);
@@ -961,7 +1018,7 @@ void main() {
       initialLocation: '/merchant',
     );
     final open = find.byKey(const Key('merchant-open-busy'));
-    await tester.scrollUntilVisible(open, 200);
+    await _revealAboveNav(tester, open);
     await Scrollable.ensureVisible(tester.element(open), alignment: 0.5);
     await tester.pumpAndSettle();
     await tester.tap(open);
@@ -977,10 +1034,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(extra);
     await tester.pumpAndSettle();
-    expect(
-      find.text('Khách sẽ thấy thời gian chuẩn bị khoảng 45 phút.'),
-      findsOneWidget,
-    );
+    expect(find.text('Chuẩn bị ~45 phút.'), findsOneWidget);
     await tester.tap(find.byKey(const Key('merchant-busy-save')));
     await tester.pumpAndSettle();
     expect(food.storeStatusCalls.single.$1, StoreServiceMode.busy);
@@ -1127,4 +1181,12 @@ MerchantQueueOrder _placedOrder({String dropoff = '456 Trần Hưng Đạo'}) {
     lineCount: 3,
     createdAt: '2026-10-14T02:20:00.000Z',
   );
+}
+
+/// Tab pages scroll behind the floating nav bar: bring [target] to the middle
+/// so the tap lands on it, not on the bar.
+Future<void> _revealAboveNav(WidgetTester tester, Finder target) async {
+  await tester.scrollUntilVisible(target, 200);
+  await Scrollable.ensureVisible(tester.element(target), alignment: 0.5);
+  await tester.pumpAndSettle();
 }

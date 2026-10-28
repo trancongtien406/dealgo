@@ -16,7 +16,7 @@ MapPort createMapPort() {
     if (!_warned) {
       _warned = true;
       debugPrint(
-        'maps: PLACEHOLDER map (no MAPS_API_KEY / MAP_TILE_URL dart-define, '
+        'maps: PLACEHOLDER map (no Mapbox token / MAP_TILE_URL dart-define, '
         'or USE_MOCK_DATA) - routes are not drawn on real roads',
       );
     }
@@ -25,8 +25,33 @@ MapPort createMapPort() {
   return TileMapPort(
     urlTemplate: resolveTileUrlTemplate(
       effectiveMapTileUrl,
-      apiKey: mapsApiKey,
+      apiKey: effectiveMapsApiKey,
     )!,
     attribution: effectiveMapAttribution,
   );
+}
+
+/// The map adapter for the current [adminMapboxToken]: a new port when the
+/// token changes (placeholder ↔ live tiles), the same instance otherwise so
+/// maps are not rebuilt for nothing. A fixed port (tests, overrides) is
+/// always returned as is.
+class MapPortSource {
+  MapPortSource([this._fixed]);
+
+  final MapPort? _fixed;
+  MapPort? _port;
+  String? _token;
+
+  MapPort get current {
+    final fixed = _fixed;
+    if (fixed != null) {
+      return fixed;
+    }
+    final token = adminMapboxToken;
+    if (_port == null || _token != token) {
+      _token = token;
+      _port = createMapPort();
+    }
+    return _port!;
+  }
 }

@@ -1,6 +1,7 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { isCashOnlyPaymentProvider, type AppEnv } from '../config/env.js';
+import { MapKeysService } from '../integration-settings/map-keys.service.js';
 import {
   MAPS_PROVIDER_CHOICES,
   MAPS_PROVIDER_SETTING_KEYS,
@@ -128,6 +129,7 @@ export class PlatformSettingsService {
   constructor(
     @Inject(PLATFORM_SETTINGS_REPOSITORY) private readonly repo: PlatformSettingsRepository,
     private readonly config: ConfigService<AppEnv, true>,
+    @Optional() private readonly mapKeys?: MapKeysService,
   ) {}
 
   async list(query?: {
@@ -186,6 +188,9 @@ export class PlatformSettingsService {
     const key = keyRaw;
     const spec = specForKey(key);
     const normalized = this.validateAndNormalize(key, value);
+    if ((MAPS_PROVIDER_SETTING_KEYS as readonly string[]).includes(key) && normalized === 'google') {
+      await this.assertGoogleKey();
+    }
     await this.ensureSeeded();
     await this.assertCrossKeyInvariants(key, normalized);
     const previous = await this.repo.findByKey(key);
@@ -409,14 +414,17 @@ export class PlatformSettingsService {
     if (!(MAPS_PROVIDER_CHOICES as readonly string[]).includes(choice)) {
       throw settingsError(400, 'PLATFORM_SETTING_INVALID', `${key} must be mapbox or google`);
     }
-    if (choice === 'google' && !this.config.get('GOOGLE_MAPS_API_KEY', { infer: true })?.trim()) {
-      throw settingsError(
-        400,
-        'MAPS_PROVIDER_NOT_CONFIGURED',
-        'Google Maps chưa có GOOGLE_MAPS_API_KEY trên server',
-      );
-    }
     return choice;
+  }
+
+  /** Google is selectable only with a key (Admin › Cài đặt › Bản đồ, else GOOGLE_MAPS_API_KEY). */
+  private async assertGoogleKey(): Promise<void> {
+    const key = this.mapKeys
+      ? (await this.mapKeys.effective()).googleMapsApiKey
+      : (this.config.get('GOOGLE_MAPS_API_KEY', { infer: true }) ?? '').trim();
+    if (!key) {
+      throw settingsError(400, 'MAPS_PROVIDER_NOT_CONFIGURED', 'Google Maps chưa có API key');
+    }
   }
 
   private validateAndNormalize(key: PlatformSettingKey, raw: string): string {

@@ -44,7 +44,7 @@ export function mapMapsProviders(raw: NestMapsProviders): MapsProvidersView {
   };
 }
 
-/** Google can only be picked when the server has GOOGLE_MAPS_API_KEY. */
+/** Google can only be picked when a Google key is set (Admin or env). */
 export function canChooseProvider(
   view: Pick<MapsProvidersView, "googleConfigured">,
   value: MapsProviderChoice,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/network/api_exception.dart';
 import '../../../identity/domain/entities/auth_state.dart';
@@ -34,8 +35,14 @@ class RideSafetyPage extends StatefulWidget {
 }
 
 class _RideSafetyPageState extends State<RideSafetyPage> {
-  var _shareCopied = false;
+  /// What happened to the link last: shown as a chip beside the title.
+  _ShareOutcome? _shareOutcome;
   var _sharing = false;
+
+  /// One link per visit: sharing again reuses it instead of using up the
+  /// server's active-link limit.
+  RideShareLink? _link;
+  final _shareButtonKey = GlobalKey();
   List<EmergencyContact> _contacts = const [];
 
   @override
@@ -101,30 +108,26 @@ class _RideSafetyPageState extends State<RideSafetyPage> {
     context.go(RideRoutes.tracking(widget.rideId));
   }
 
-  Future<void> _shareTrip() async {
+  Future<RideShareLink?> _ensureLink() async {
+    final cached = _link;
+    if (cached != null &&
+        cached.expiresAt.isAfter(
+          DateTime.now().add(const Duration(minutes: 1)),
+        )) {
+      return cached;
+    }
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final auth = context.read<AuthCubit>().state;
-    if (_sharing || auth is! AuthSignedIn) return;
-    setState(() => _sharing = true);
+    if (auth is! AuthSignedIn) return null;
     try {
       final link = await context.read<RideShareRepository>().create(
         accessToken: auth.tokens.accessToken,
         rideId: widget.rideId,
       );
-      await Clipboard.setData(ClipboardData(text: link.url));
-      if (!mounted) return;
-      setState(() {
-        _sharing = false;
-        _shareCopied = true;
-      });
-      messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.rideSafetyShareCopied)),
-      );
+      _link = link;
+      return link;
     } on ApiException catch (error) {
-      if (!mounted) return;
-      setState(() => _sharing = false);
       messenger.hideCurrentSnackBar();
       messenger.showSnackBar(
         SnackBar(
@@ -135,7 +138,69 @@ class _RideSafetyPageState extends State<RideSafetyPage> {
           }),
         ),
       );
+      return null;
     }
+  }
+
+  /// Opens the system share sheet (Zalo, Messenger, SMS…). Where no sheet is
+  /// available the link is copied instead.
+  Future<void> _shareTrip() async {
+    if (_sharing) return;
+    final l10n = AppLocalizations.of(context);
+    setState(() => _sharing = true);
+    final link = await _ensureLink();
+    if (!mounted) return;
+    if (link == null) {
+      setState(() => _sharing = false);
+      return;
+    }
+    final box =
+        _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;
+    ShareResultStatus status;
+    try {
+      final result = await SharePlus.instance.share(
+        ShareParams(
+          text: l10n.rideShareMessage(link.url),
+          subject: l10n.rideShareSubject,
+          // iPad anchors the popover to the button.
+          sharePositionOrigin: box == null
+              ? null
+              : box.localToGlobal(Offset.zero) & box.size,
+        ),
+      );
+      status = result.status;
+    } on PlatformException {
+      status = ShareResultStatus.unavailable;
+    } on MissingPluginException {
+      status = ShareResultStatus.unavailable;
+    }
+    if (!mounted) return;
+    if (status == ShareResultStatus.unavailable) {
+      await _copy(link);
+      if (!mounted) return;
+    } else if (status == ShareResultStatus.success) {
+      _shareOutcome = _ShareOutcome.shared;
+    }
+    setState(() => _sharing = false);
+  }
+
+  Future<void> _copyLink() async {
+    if (_sharing) return;
+    setState(() => _sharing = true);
+    final link = await _ensureLink();
+    if (link != null && mounted) {
+      await _copy(link);
+    }
+    if (mounted) setState(() => _sharing = false);
+  }
+
+  Future<void> _copy(RideShareLink link) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final copied = AppLocalizations.of(context).rideSafetyShareCopied;
+    await Clipboard.setData(ClipboardData(text: link.url));
+    _shareOutcome = _ShareOutcome.copied;
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(content: Text(copied)));
   }
 
   @override
@@ -176,9 +241,12 @@ class _RideSafetyPageState extends State<RideSafetyPage> {
                                 style: textTheme.titleMedium,
                               ),
                             ),
-                            if (_shareCopied)
+                            if (_shareOutcome != null)
                               DealGoChip(
-                                label: l10n.rideShareCopiedChip,
+                                key: const Key('ride-safety-share-outcome'),
+                                label: _shareOutcome == _ShareOutcome.shared
+                                    ? l10n.rideShareSentChip
+                                    : l10n.rideShareCopiedChip,
                                 tone: DealGoChipTone.success,
                               ),
                           ],
@@ -189,11 +257,21 @@ class _RideSafetyPageState extends State<RideSafetyPage> {
                           style: textTheme.bodySmall,
                         ),
                         const SizedBox(height: DealGoSpacing.s12),
-                        DealGoPrimaryButton(
-                          key: const Key('ride-safety-share'),
-                          label: l10n.rideSafetyShareCta,
-                          onPressed: _shareTrip,
-                          isLoading: _sharing,
+                        KeyedSubtree(
+                          key: _shareButtonKey,
+                          child: DealGoPrimaryButton(
+                            key: const Key('ride-safety-share'),
+                            label: l10n.rideSafetyShareCta,
+                            onPressed: _shareTrip,
+                            isLoading: _sharing,
+                          ),
+                        ),
+                        Align(
+                          child: TextButton(
+                            key: const Key('ride-safety-copy'),
+                            onPressed: _sharing ? null : _copyLink,
+                            child: Text(l10n.rideSafetyCopyLink),
+                          ),
                         ),
                       ],
                     ),
@@ -274,3 +352,5 @@ class _RideSafetyPageState extends State<RideSafetyPage> {
     );
   }
 }
+
+enum _ShareOutcome { shared, copied }

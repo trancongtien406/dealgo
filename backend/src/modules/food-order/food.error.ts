@@ -14,6 +14,10 @@ export const FOOD_RULES = {
     status: 409,
     message: 'The store is at its active-order limit; try again shortly',
   },
+  FOOD_MIN_ORDER_NOT_MET: {
+    status: 409,
+    message: 'The food subtotal is below the store minimum order',
+  },
   FOOD_ITEM_NOT_FOUND: { status: 404, message: 'Catalog item not found' },
   FOOD_ITEM_UNAVAILABLE: { status: 409, message: 'An item is unavailable' },
   FOOD_OPTION_INVALID: {

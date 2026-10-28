@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/design_system/components/dealgo_info_tip.dart';
 import '../../../../core/design_system/components/dealgo_banner.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
@@ -139,7 +138,7 @@ class _RideRouteOverviewPageState extends State<RideRouteOverviewPage> {
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            context.read<MapPort>().buildMap(
+                            context.watch<MapPort>().buildMap(
                               center: MapLatLng(
                                 lat: places.pickup.lat,
                                 lng: places.pickup.lng,
@@ -227,11 +226,6 @@ class _RideRouteOverviewPageState extends State<RideRouteOverviewPage> {
                       l10n.rideRouteOverviewTitle,
                       style: textTheme.titleLarge,
                     ),
-                    Text(
-                      l10n.rideRouteOverviewSubtitle,
-                      style: textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: DealGoSpacing.s12),
                     if (_failed)
                       DealGoBanner(
                         key: const Key('ride-quote-error'),
@@ -265,11 +259,6 @@ class _RideRouteOverviewPageState extends State<RideRouteOverviewPage> {
                     if (quote == null && !_failed) ...[
                       const SizedBox(height: DealGoSpacing.s12),
                       Text(l10n.rideQuoteLoading, style: textTheme.bodySmall),
-                    ] else if (!_failed) ...[
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: DealGoInfoTip(message: l10n.rideRoutePriceHint),
-                      ),
                     ],
                     const SizedBox(height: DealGoSpacing.s16),
                     DealGoPrimaryButton(

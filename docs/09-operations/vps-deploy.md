@@ -149,6 +149,26 @@ ssh root@103.116.38.245 '
 `NEXT_PUBLIC_*` values are baked at build time from `/opt/dealgo/.env`; rebuild `dealgo-web` after
 changing them.
 
+### Sentry release per deploy
+
+Projects: `dealgo-backend` (API + worker, `env/backend.env`), `dealgo-web` (`.env` build args +
+`env/website.env`), `flutter` (mobile). Before building, set the same tag in both places so events and
+source maps line up:
+
+```bash
+REL=$(date +%Y.%m.%d-%H%M)
+sed -i -E "s/^SENTRY_RELEASE=.*/SENTRY_RELEASE=$REL/" env/backend.env
+sed -i -E "s/^NEXT_PUBLIC_SENTRY_RELEASE=.*/NEXT_PUBLIC_SENTRY_RELEASE=$REL/" .env
+```
+
+`gen-secrets.sh` writes both keys (placeholder `initial`), the DSNs from `env/thirdparty.env`
+(`SENTRY_BACKEND_DSN`, `SENTRY_WEB_DSN`), `production` and traces `0.1`.
+
+`build-secrets/sentry-auth-token` (600, never in `./secrets`, which the API mounts) holds the org
+token (`SENTRY_AUTH_TOKEN` in `env/thirdparty.env`); the `dealgo-web` build reads it as Docker secret
+`sentry_auth_token`, uploads source maps to `dealgo-web`, then deletes the maps. An empty file builds
+without uploading.
+
 ## Place search: self-hosted Photon (OSM)
 
 Mapbox alone misses many Vietnamese streets, so the API also queries a private Photon

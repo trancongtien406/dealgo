@@ -19,6 +19,7 @@ import {
   RatingSubjectParamsDto,
   StoreIdParamsDto,
   StoreRatingQueryDto,
+  StoreReviewsQueryDto,
   SubmitRatingDto,
 } from './rating.dto.js';
 import { RatingService } from './rating.service.js';
@@ -49,8 +50,8 @@ export class RatingController {
   @ApiOperation({
     summary: 'Store rating summary and newest reviews (no rater identity; hidden below RATING_STORE_MIN_COUNT)',
   })
-  storeReviews(@Param() params: StoreIdParamsDto) {
-    return this.ratings.storeReviews(params.storeId);
+  storeReviews(@Param() params: StoreIdParamsDto, @Query() query: StoreReviewsQueryDto) {
+    return this.ratings.storeReviews(params.storeId, query);
   }
 
   @Get(':subjectType/:subjectId')

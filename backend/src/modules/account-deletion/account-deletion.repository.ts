@@ -6,7 +6,7 @@ export const ACCOUNT_DELETION_REPOSITORY = Symbol('ACCOUNT_DELETION_REPOSITORY')
 /** Shown instead of the name once the purge worker has anonymized the account. */
 export const DELETED_USER_DISPLAY_NAME = 'Người dùng đã xoá';
 
-export type AccountDeletionMethodName = 'PHONE_OTP' | 'PASSWORD';
+export type AccountDeletionMethodName = 'PHONE_OTP' | 'PASSWORD' | 'PASSKEY';
 export type AccountDeletionStatusName = 'PENDING' | 'SCHEDULED' | 'CANCELLED' | 'PURGED';
 
 /**

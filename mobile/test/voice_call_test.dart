@@ -17,6 +17,7 @@ import 'package:dealgo/features/voice/domain/usecases/start_voice_call.dart';
 import 'package:dealgo/features/voice/presentation/cubit/voice_call_cubit.dart';
 import 'package:dealgo/features/voice/presentation/widgets/voice_call_host.dart';
 import 'package:dealgo/l10n/app_localizations.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -183,26 +184,36 @@ void main() {
     await h.dispose();
   });
 
-  test('unanswered incoming call ends as missed', () async {
-    final h = _Harness();
-    final call = h.voice.ring();
-    h.push(
-      VoiceCall(
-        id: call.id,
-        kind: call.kind,
-        aggregateId: call.aggregateId,
-        status: VoiceCallStatus.ringing,
-        callerUserId: call.callerUserId,
-        calleeUserId: 'me',
-        callerIsCustomer: false,
-        ringUntil: DateTime.now().subtract(const Duration(seconds: 1)),
-      ),
-    );
-    await _settle();
-    await _settle();
-    expect(h.cubit.state.phase, VoiceCallPhase.ended);
-    expect(h.cubit.state.notice, VoiceCallNotice.missed);
-    await h.dispose();
+  test('unanswered incoming call ends as missed', () {
+    // Fake clock: the ring timer and the 5 ms ended-hold only advance when the
+    // test says so, so the "ended" state can't reset to idle under CPU load.
+    fakeAsync((async) {
+      final h = _Harness();
+      final call = h.voice.ring();
+      h.push(
+        VoiceCall(
+          id: call.id,
+          kind: call.kind,
+          aggregateId: call.aggregateId,
+          status: VoiceCallStatus.ringing,
+          callerUserId: call.callerUserId,
+          calleeUserId: 'me',
+          callerIsCustomer: false,
+          ringUntil: DateTime.now().subtract(const Duration(seconds: 1)),
+        ),
+      );
+      async.flushMicrotasks();
+      expect(h.cubit.state.phase, VoiceCallPhase.incoming);
+      async
+        ..elapse(Duration.zero)
+        ..flushMicrotasks();
+      expect(h.cubit.state.phase, VoiceCallPhase.ended);
+      expect(h.cubit.state.notice, VoiceCallNotice.missed);
+      async.elapse(const Duration(milliseconds: 5));
+      expect(h.cubit.state.phase, VoiceCallPhase.idle);
+      unawaited(h.dispose());
+      async.flushMicrotasks();
+    });
   });
 
   test('a second incoming call while busy is declined automatically', () async {

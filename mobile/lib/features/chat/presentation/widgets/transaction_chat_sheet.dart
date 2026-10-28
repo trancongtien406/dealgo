@@ -927,79 +927,82 @@ class _Composer extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
-    return Container(
-      color: DealGoColors.card,
-      padding: EdgeInsets.fromLTRB(
-        DealGoSpacing.s12,
-        DealGoSpacing.s8,
-        DealGoSpacing.s12,
-        DealGoSpacing.s8 + bottomInset,
-      ),
+    // Send counts as part of the field: tapping it keeps the keyboard up.
+    return TextFieldTapRegion(
       child: Container(
-        constraints: const BoxConstraints(minHeight: 44),
-        padding: const EdgeInsets.only(left: DealGoSpacing.s16, right: 4),
-        decoration: BoxDecoration(
-          color: DealGoColors.canvas,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: DealGoColors.border),
+        color: DealGoColors.card,
+        padding: EdgeInsets.fromLTRB(
+          DealGoSpacing.s12,
+          DealGoSpacing.s8,
+          DealGoSpacing.s12,
+          DealGoSpacing.s8 + bottomInset,
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: TextField(
-                  key: const Key('chat-input'),
-                  controller: controller,
-                  focusNode: focus,
-                  minLines: 1,
-                  maxLines: 4,
-                  maxLength: 2000,
-                  textCapitalization: TextCapitalization.sentences,
-                  keyboardType: TextInputType.multiline,
-                  style: textTheme.bodyMedium,
-                  decoration: InputDecoration(
-                    hintText: l10n.chatInputHint,
-                    hintStyle: textTheme.bodyMedium?.copyWith(
-                      color: DealGoColors.textTertiary,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 44),
+          padding: const EdgeInsets.only(left: DealGoSpacing.s16, right: 4),
+          decoration: BoxDecoration(
+            color: DealGoColors.canvas,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: DealGoColors.border),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: TextField(
+                    key: const Key('chat-input'),
+                    controller: controller,
+                    focusNode: focus,
+                    minLines: 1,
+                    maxLines: 4,
+                    maxLength: 2000,
+                    textCapitalization: TextCapitalization.sentences,
+                    keyboardType: TextInputType.multiline,
+                    style: textTheme.bodyMedium,
+                    decoration: InputDecoration(
+                      hintText: l10n.chatInputHint,
+                      hintStyle: textTheme.bodyMedium?.copyWith(
+                        color: DealGoColors.textTertiary,
+                      ),
+                      counterText: '',
+                      isDense: true,
+                      filled: false,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
                     ),
-                    counterText: '',
-                    isDense: true,
-                    filled: false,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
                   ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 3),
-              child: Material(
-                color: canSend ? DealGoColors.primary : DealGoColors.border,
-                shape: const CircleBorder(),
-                child: InkWell(
-                  key: const Key('chat-send'),
-                  customBorder: const CircleBorder(),
-                  onTap: canSend ? onSend : null,
-                  child: Tooltip(
-                    message: l10n.chatSendAction,
-                    child: const SizedBox(
-                      width: 36,
-                      height: 36,
-                      child: Icon(
-                        DealGoIcons.send,
-                        size: 18,
-                        color: Colors.white,
+              Padding(
+                padding: const EdgeInsets.only(bottom: 3),
+                child: Material(
+                  color: canSend ? DealGoColors.primary : DealGoColors.border,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    key: const Key('chat-send'),
+                    customBorder: const CircleBorder(),
+                    onTap: canSend ? onSend : null,
+                    child: Tooltip(
+                      message: l10n.chatSendAction,
+                      child: const SizedBox(
+                        width: 36,
+                        height: 36,
+                        child: Icon(
+                          DealGoIcons.send,
+                          size: 18,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

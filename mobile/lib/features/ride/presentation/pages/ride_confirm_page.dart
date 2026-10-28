@@ -167,10 +167,6 @@ class _FareChanged extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(height: DealGoSpacing.s12),
-                  RideNote(
-                    message: AppLocalizations.of(context).rideFareChangedNote,
-                  ),
                 ],
               ),
             ),
@@ -409,10 +405,6 @@ class _Confirmed extends StatelessWidget {
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: DealGoSpacing.s12),
-                  RideNote(
-                    message: AppLocalizations.of(context).rideConfirmPriceNote,
                   ),
                 ],
               ),

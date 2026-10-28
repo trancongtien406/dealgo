@@ -126,6 +126,12 @@ services:
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
         NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN:-}
         NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${NEXT_PUBLIC_SENTRY_ENVIRONMENT:-}
+        NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: ${NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE:-0}
+        NEXT_PUBLIC_SENTRY_RELEASE: ${NEXT_PUBLIC_SENTRY_RELEASE:-}
+      # Source-map upload token (empty file = no upload). Kept outside ./secrets,
+      # which the API containers mount.
+      secrets: [sentry_auth_token]
     image: dealgo-web:latest
     container_name: dealgo-web
     env_file: ./env/website.env
@@ -192,3 +198,7 @@ services:
     profiles: ["photon-import"]
     mem_limit: 1536m
     cpus: 2
+
+secrets:
+  sentry_auth_token:
+    file: ./build-secrets/sentry-auth-token

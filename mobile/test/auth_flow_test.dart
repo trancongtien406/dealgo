@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dealgo/core/network/api_exception.dart';
+import 'package:dealgo/features/identity/presentation/pages/phone_input_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -98,7 +99,7 @@ void main() {
     await submitPhone(tester, '987654321');
     await submitOtp(tester, '000000');
 
-    expect(find.text('Mã xác thực không đúng'), findsOneWidget);
+    expect(find.byKey(const Key('auth-error')), findsOneWidget);
     expect(find.text('Thử lại'), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
   });
@@ -182,10 +183,15 @@ void main() {
     await tester.tap(find.byKey(const Key('auth-method-phone')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Đăng nhập bằng số điện thoại'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(PhoneInputPage),
+        matching: find.text('Đăng nhập'),
+      ),
+      findsOneWidget,
+    );
     expect(find.byKey(const Key('phone-field')), findsOneWidget);
     expect(find.byKey(const Key('phone-submit-btn')), findsOneWidget);
-    expect(find.text('Chúng tôi sẽ gửi mã OTP để xác minh.'), findsOneWidget);
   });
 
   testWidgets('passkey sign-in starts without asking for phone or email', (

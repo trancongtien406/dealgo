@@ -234,7 +234,7 @@ describe('PromotionService', () => {
       await campaign('OVER', { endDate: '2026-10-10T00:00:00.000Z' });
       const now = new Date('2026-10-19T03:00:00.000Z');
 
-      const food = await service.listAvailableForCustomer('cust-1', 'FOOD', now);
+      const food = await service.listAvailableForCustomer('cust-1', 'FOOD', undefined, now);
       expect(food.map((v) => v.code)).toEqual(['FOODNOW']);
       expect(food[0]).toEqual({
         code: 'FOODNOW',
@@ -247,9 +247,10 @@ describe('PromotionService', () => {
         minOrderVnd: 50000,
         endsAt: '2026-11-01T00:00:00.000Z',
         usesLeft: 1,
+        storeId: null,
       });
       expect(Object.keys(food[0])).not.toContain('totalBudget');
-      const all = await service.listAvailableForCustomer('cust-1', undefined, now);
+      const all = await service.listAvailableForCustomer('cust-1', undefined, undefined, now);
       expect(all.map((v) => v.code).sort()).toEqual(['FOODNOW', 'RIDEONLY']);
     });
 
@@ -258,13 +259,13 @@ describe('PromotionService', () => {
       service = new PromotionService(repo);
       await campaign('USED', { endDate: '2026-10-20T00:00:00.000Z' });
       await campaign('TWICE', { userLimit: 3 });
-      const used = await service.listAvailableForCustomer('cust-1', 'FOOD', new Date('2026-10-19T03:00:00.000Z'));
+      const used = await service.listAvailableForCustomer('cust-1', 'FOOD', undefined, new Date('2026-10-19T03:00:00.000Z'));
       expect(used.map((v) => v.code)).toEqual(['USED', 'TWICE']);
       const usedId = (await repo.findByCode('USED'))?.id;
       vi.spyOn(repo, 'countUserRedemptions').mockImplementation(async (id: string) =>
         id === usedId ? 1 : 0,
       );
-      const left = await service.listAvailableForCustomer('cust-1', 'FOOD', new Date('2026-10-19T03:00:00.000Z'));
+      const left = await service.listAvailableForCustomer('cust-1', 'FOOD', undefined, new Date('2026-10-19T03:00:00.000Z'));
       expect(left).toEqual([expect.objectContaining({ code: 'TWICE', usesLeft: 3 })]);
     });
   });

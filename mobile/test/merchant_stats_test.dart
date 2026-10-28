@@ -256,6 +256,8 @@ class _Ratings implements RatingRepository {
   Future<StoreReviews> storeReviews({
     required String accessToken,
     required String storeId,
+    int page = 1,
+    int? stars,
   }) async {
     return StoreReviews(
       summary: StoreRating(storeId: storeId, count: 12, average: 4.6),

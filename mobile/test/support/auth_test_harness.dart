@@ -21,6 +21,7 @@ import 'fake_location.dart';
 import 'package:dealgo/features/live_location/domain/driver_location.dart';
 import 'package:dealgo/features/pricing/domain/pricing.dart';
 import 'package:dealgo/features/places/domain/place.dart';
+import 'package:dealgo/features/merchant/domain/merchant_offers.dart';
 import 'package:dealgo/features/rating/domain/service_rating.dart';
 import 'package:dealgo/features/inbox/data/datasources/inbox_remote_datasource.dart';
 import 'package:dealgo/features/chat/data/datasources/chat_remote_datasource.dart';
@@ -61,6 +62,7 @@ Future<MemoryTokenStore> pumpDealGo(
   InboxRemoteDataSource? inboxRemote,
   AddressBookRepository? addressBook,
   RatingRepository? ratings,
+  MerchantOfferRepository? merchantOffers,
   DriverHistoryRepository? driverHistory,
   SupportRepository? support,
   AccountDeletionRepository? accountDeletion,
@@ -93,6 +95,7 @@ Future<MemoryTokenStore> pumpDealGo(
       inboxRemote: inboxRemote,
       addressBook: addressBook,
       ratings: ratings,
+      merchantOffers: merchantOffers,
       driverHistory: driverHistory,
       support: support,
       accountDeletion: accountDeletion,
@@ -133,6 +136,7 @@ Future<MemoryTokenStore> pumpSignedIn(
   InboxRemoteDataSource? inboxRemote,
   AddressBookRepository? addressBook,
   RatingRepository? ratings,
+  MerchantOfferRepository? merchantOffers,
   DriverHistoryRepository? driverHistory,
   SupportRepository? support,
   AccountDeletionRepository? accountDeletion,
@@ -174,6 +178,7 @@ Future<MemoryTokenStore> pumpSignedIn(
       inboxRemote: inboxRemote,
       addressBook: addressBook,
       ratings: ratings,
+      merchantOffers: merchantOffers,
       driverHistory: driverHistory,
       support: support,
       accountDeletion: accountDeletion,
@@ -226,9 +231,12 @@ Future<void> submitOtp(WidgetTester tester, String code) async {
       await tester.pump();
     }
   }
+  // A full code auto-submits; tap "Xác nhận" only if the entry pane is still up.
   final confirm = find.text('Xác nhận');
-  await tester.ensureVisible(confirm);
-  await tester.tap(confirm);
+  if (confirm.evaluate().isNotEmpty) {
+    await tester.ensureVisible(confirm);
+    await tester.tap(confirm, warnIfMissed: false);
+  }
   await tester.pumpAndSettle();
 }
 

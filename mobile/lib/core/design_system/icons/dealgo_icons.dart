@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show Icons;
 import 'package:flutter/widgets.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -121,6 +122,9 @@ abstract final class DealGoIcons {
   static const IconData southWest = LucideIcons.arrowDownLeft;
   static const IconData square = LucideIcons.square;
   static const IconData star = LucideIcons.star;
+
+  /// Solid star for rating displays (Lucide has outline only).
+  static const IconData starFilled = Icons.star_rounded;
   static const IconData stars = LucideIcons.sparkles;
   static const IconData store = LucideIcons.store;
   static const IconData success = LucideIcons.circleCheck;

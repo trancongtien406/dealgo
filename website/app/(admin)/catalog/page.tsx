@@ -1,5 +1,5 @@
-import { CatalogBoard } from "@/features/catalog/components/catalog-board";
+import { FoodCategoriesBoard } from "@/features/food-categories/components/food-categories-board";
 
 export default function CatalogPage() {
-  return <CatalogBoard />;
+  return <FoodCategoriesBoard />;
 }

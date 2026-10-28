@@ -1,5 +1,6 @@
 import '../../../core/auth/post_auth_gate.dart';
 import 'entities/app_role.dart';
+import 'entities/auth_method_policy.dart';
 import 'entities/auth_state.dart';
 
 abstract final class AuthRoutes {
@@ -15,13 +16,26 @@ abstract final class AuthRoutes {
   static const permissions = '/onboarding/permissions';
 }
 
+/// Answers whether a sign-in method (an [AuthMethodPolicy] name) is switched on.
+typedef AuthMethodAvailable = bool Function(String method);
+
+/// [methodAvailable] keeps pages of switched-off sign-in methods unreachable,
+/// deep links included: they land on the login picker instead. Without it
+/// every method counts as on.
 String? authRedirect(
   AuthState auth,
   Uri uri, {
   PostAuthGate? postAuth,
   bool? profileSetupCompleted,
+  AuthMethodAvailable? methodAvailable,
 }) {
   final path = uri.path;
+  final method = _methodOf(uri);
+  if (method != null &&
+      auth is! AuthSignedIn &&
+      !(methodAvailable?.call(method) ?? true)) {
+    return AuthRoutes.login;
+  }
   switch (auth) {
     case AuthRestoring():
       if (path == AuthRoutes.splash ||
@@ -43,12 +57,38 @@ String? authRedirect(
     case AuthSignedIn(:final profile):
       final profileDone =
           profileSetupCompleted ?? postAuth?.profileSetupCompleted ?? false;
-      return _signedInRedirect(
+      final next = _signedInRedirect(
         path,
         profile.activeAppRoles,
         profileDone: profileDone,
       );
+      // The password belongs to email sign-in: hidden with it.
+      if (next == null &&
+          path.endsWith(_changePasswordSuffix) &&
+          !(methodAvailable?.call(AuthMethodPolicy.email) ?? true)) {
+        return '${path.substring(0, path.length - _changePasswordSuffix.length)}/security';
+      }
+      return next;
   }
+}
+
+const _changePasswordSuffix = '/change-password';
+
+/// Sign-in method a signed-out page belongs to, or null for shared pages.
+String? _methodOf(Uri uri) {
+  switch (uri.path) {
+    case AuthRoutes.phoneLogin:
+      return AuthMethodPolicy.phoneSms;
+    case AuthRoutes.emailLogin:
+    case AuthRoutes.forgotPassword:
+      return AuthMethodPolicy.email;
+    case AuthRoutes.otp:
+      final email = uri.queryParameters['email'];
+      return email != null && email.isNotEmpty
+          ? AuthMethodPolicy.email
+          : AuthMethodPolicy.phoneSms;
+  }
+  return null;
 }
 
 String? _signedOutRedirect(String path, Uri uri) {

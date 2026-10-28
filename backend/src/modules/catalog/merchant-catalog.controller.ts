@@ -15,6 +15,10 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
+  FoodCategoryService,
+  foodCategoryError,
+} from '../food-category/index.js';
+import {
   CurrentActor,
   CustomerSessionGuard,
   type RequestActor,
@@ -49,19 +53,42 @@ export class MerchantCatalogController {
     private readonly food: FoodService,
     private readonly itemImages: MenuItemImageService,
     private readonly logos: StoreLogoService,
+    private readonly categories: FoodCategoryService,
   ) {}
 
   @Get('catalog')
   @ApiOperation({
-    summary: 'Get the authenticated merchant store catalog (creates an empty store if none)',
+    summary:
+      'Get the authenticated merchant store catalog (creates an empty store if none)',
   })
   getCatalog(@CurrentActor() actor: RequestActor) {
     return this.catalog.getMerchantCatalog(actor);
   }
 
   @Patch('store/profile')
-  @ApiOperation({ summary: 'M030 rename the merchant-owned store (2–120 chars)' })
-  updateStoreProfile(@CurrentActor() actor: RequestActor, @Body() dto: UpdateStoreProfileDto) {
+  @ApiOperation({
+    summary:
+      'M030 rename the merchant-owned store (2–120 chars), set its category (active FoodCategory code, null clears) its minimum food subtotal (minOrderVnd 0–10,000,000, 0 = none) and/or its description (≤500 chars, empty or null clears)',
+  })
+  async updateStoreProfile(
+    @CurrentActor() actor: RequestActor,
+    @Body() dto: UpdateStoreProfileDto,
+  ) {
+    if (
+      dto.name === undefined &&
+      dto.category === undefined &&
+      dto.minOrderVnd === undefined &&
+      dto.description === undefined
+    ) {
+      throw foodCategoryError(
+        400,
+        'VALIDATION_ERROR',
+        'name, category, minOrderVnd or description is required',
+      );
+    }
+    if (dto.category) {
+      await this.categories.requireAssignable(dto.category);
+    }
     return this.food.updateStoreProfile(actor, dto);
   }
 
@@ -71,7 +98,10 @@ export class MerchantCatalogController {
     summary:
       'M030 upload the store logo (JPEG/PNG/WebP, base64 or data URL, max UPLOAD_MAX_FILE_KB). Returns the store with logoUrl under /v1/public/store-logos.',
   })
-  uploadStoreLogo(@CurrentActor() actor: RequestActor, @Body() dto: UploadAvatarDto) {
+  uploadStoreLogo(
+    @CurrentActor() actor: RequestActor,
+    @Body() dto: UploadAvatarDto,
+  ) {
     return this.logos.upload(actor, {
       contentBase64: dto.contentBase64,
       dataUrl: dto.dataUrl,
@@ -81,25 +111,70 @@ export class MerchantCatalogController {
 
   @Delete('store/logo')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'M030 remove the store logo and discard the stored object' })
+  @ApiOperation({
+    summary: 'M030 remove the store logo and discard the stored object',
+  })
   clearStoreLogo(@CurrentActor() actor: RequestActor) {
     return this.logos.clear(actor);
   }
 
+  @Post('store/cover')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Upload the store cover photo (JPEG/PNG/WebP, base64 or data URL, max UPLOAD_MAX_FILE_KB). Returns the store with coverUrl under /v1/public/store-covers.',
+  })
+  uploadStoreCover(
+    @CurrentActor() actor: RequestActor,
+    @Body() dto: UploadAvatarDto,
+  ) {
+    return this.logos.upload(
+      actor,
+      {
+        contentBase64: dto.contentBase64,
+        dataUrl: dto.dataUrl,
+        contentType: dto.contentType,
+      },
+      'cover',
+    );
+  }
+
+  @Delete('store/cover')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Remove the store cover photo and discard the stored object',
+  })
+  clearStoreCover(@CurrentActor() actor: RequestActor) {
+    return this.logos.clear(actor, 'cover');
+  }
+
   @Patch('store/location')
-  @ApiOperation({ summary: 'Set optional lat/lng for the merchant-owned store' })
-  updateStoreLocation(@CurrentActor() actor: RequestActor, @Body() dto: UpdateStoreLocationDto) {
+  @ApiOperation({
+    summary: 'Set optional lat/lng for the merchant-owned store',
+  })
+  updateStoreLocation(
+    @CurrentActor() actor: RequestActor,
+    @Body() dto: UpdateStoreLocationDto,
+  ) {
     return this.food.updateStoreLocation(actor, dto);
   }
 
   @Put('store/hours')
-  @ApiOperation({ summary: 'Replace the merchant store weekly hours, closed days and cut-off' })
-  updateStoreHours(@CurrentActor() actor: RequestActor, @Body() dto: UpdateStoreHoursDto) {
+  @ApiOperation({
+    summary: 'Replace the merchant store weekly hours, closed days and cut-off',
+  })
+  updateStoreHours(
+    @CurrentActor() actor: RequestActor,
+    @Body() dto: UpdateStoreHoursDto,
+  ) {
     return this.food.updateStoreHours(actor, dto);
   }
 
   @Put('store/accept-settings')
-  @ApiOperation({ summary: 'Set M022 order acceptance: manual/auto, active-order cap, prep minutes' })
+  @ApiOperation({
+    summary:
+      'Set M022 order acceptance: manual/auto, active-order cap, prep minutes',
+  })
   updateStoreAcceptSettings(
     @CurrentActor() actor: RequestActor,
     @Body() dto: UpdateStoreAcceptSettingsDto,
@@ -109,7 +184,8 @@ export class MerchantCatalogController {
 
   @Patch('store/status')
   @ApiOperation({
-    summary: 'Set the merchant store intake mode (OPEN / BUSY / PAUSED, optional auto-resume)',
+    summary:
+      'Set the merchant store intake mode (OPEN / BUSY / PAUSED, optional auto-resume)',
   })
   updateStoreServiceMode(
     @CurrentActor() actor: RequestActor,
@@ -127,7 +203,10 @@ export class MerchantCatalogController {
   @Post('menu-categories')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'M025 create a menu category' })
-  createMenuCategory(@CurrentActor() actor: RequestActor, @Body() dto: UpsertMenuCategoryDto) {
+  createMenuCategory(
+    @CurrentActor() actor: RequestActor,
+    @Body() dto: UpsertMenuCategoryDto,
+  ) {
     return this.food.createMenuCategory(actor, dto);
   }
 
@@ -143,7 +222,9 @@ export class MerchantCatalogController {
 
   @Delete('menu-categories/:categoryId')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'M025 delete a menu category (items become uncategorized)' })
+  @ApiOperation({
+    summary: 'M025 delete a menu category (items become uncategorized)',
+  })
   deleteMenuCategory(
     @CurrentActor() actor: RequestActor,
     @Param('categoryId', ParseUUIDPipe) categoryId: string,
@@ -161,11 +242,15 @@ export class MerchantCatalogController {
   }
 
   @Get('orders/history')
-  @ApiOperation({ summary: 'M020 finished order history with filters (DEC-PROD-039)' })
-  orderHistory(@CurrentActor() actor: RequestActor, @Query() query: MerchantHistoryQueryDto) {
+  @ApiOperation({
+    summary: 'M020 finished order history with filters (DEC-PROD-039)',
+  })
+  orderHistory(
+    @CurrentActor() actor: RequestActor,
+    @Query() query: MerchantHistoryQueryDto,
+  ) {
     return this.food.merchantHistory(actor, query);
   }
-
 
   @Post('items/:itemId/image')
   @HttpCode(HttpStatus.OK)
@@ -187,7 +272,9 @@ export class MerchantCatalogController {
 
   @Delete('items/:itemId/image')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'M027 clear menu item photo and discard the stored object' })
+  @ApiOperation({
+    summary: 'M027 clear menu item photo and discard the stored object',
+  })
   clearItemImage(
     @CurrentActor() actor: RequestActor,
     @Param('itemId', ParseUUIDPipe) itemId: string,
@@ -197,13 +284,21 @@ export class MerchantCatalogController {
 
   @Post('items')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Create a catalog item on the merchant-owned store' })
-  createItem(@CurrentActor() actor: RequestActor, @Body() dto: CreateFoodItemDto) {
+  @ApiOperation({
+    summary: 'Create a catalog item on the merchant-owned store',
+  })
+  createItem(
+    @CurrentActor() actor: RequestActor,
+    @Body() dto: CreateFoodItemDto,
+  ) {
     return this.catalog.createItem(actor, dto);
   }
 
   @Patch('items/:itemId')
-  @ApiOperation({ summary: 'M027 update an owned catalog item (name/price/description/category/prep/image/availability)' })
+  @ApiOperation({
+    summary:
+      'M027 update an owned catalog item (name/price/originalPriceVnd/description/category/prep/image/availability); originalPriceVnd is shown struck through only while above the price, null clears',
+  })
   updateItem(
     @CurrentActor() actor: RequestActor,
     @Param('itemId', ParseUUIDPipe) itemId: string,

@@ -8,6 +8,7 @@ import '../../../food/domain/entities/food_models.dart';
 import '../widgets/merchant_widgets.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/format/short_ref.dart';
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 
 class MerchantQueueLoadingView extends StatelessWidget {
   const MerchantQueueLoadingView({required this.title, super.key});
@@ -49,7 +50,7 @@ class MerchantIneligibleView extends StatelessWidget {
         onPressed: onRetry,
       ),
       body: ListView(
-        padding: merchantPagePadding,
+        padding: dealGoScrollPadding(context, merchantPagePadding),
         children: [
           MerchantHero(
             icon: DealGoIcons.alert,
@@ -58,8 +59,6 @@ class MerchantIneligibleView extends StatelessWidget {
             title: l10n.merchantIneligibleTitle,
             message: l10n.merchantIneligibleMessage,
           ),
-          const SizedBox(height: DealGoSpacing.s16),
-          MerchantNote(message: l10n.merchantIneligibleNote),
         ],
       ),
     );
@@ -83,7 +82,7 @@ class MerchantQueueEmptyView extends StatelessWidget {
         onPressed: onCheck,
       ),
       body: ListView(
-        padding: merchantPagePadding,
+        padding: dealGoScrollPadding(context, merchantPagePadding),
         children: [
           MerchantHero(
             icon: DealGoIcons.square,
@@ -145,7 +144,7 @@ class _MerchantQueueErrorViewState extends State<MerchantQueueErrorView> {
         onPrimary: widget.onRetry,
       ),
       body: ListView(
-        padding: merchantPagePadding,
+        padding: dealGoScrollPadding(context, merchantPagePadding),
         children: [
           MerchantHero(
             icon: DealGoIcons.alert,
@@ -173,8 +172,6 @@ class _MerchantQueueErrorViewState extends State<MerchantQueueErrorView> {
               ],
             ),
           ),
-          const SizedBox(height: DealGoSpacing.s12),
-          MerchantNote(message: l10n.merchantLoadFailedNote),
           if (_showSaved) ...[
             const SizedBox(height: DealGoSpacing.s16),
             if (widget.saved.isEmpty)

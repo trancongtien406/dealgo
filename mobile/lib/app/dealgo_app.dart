@@ -10,11 +10,13 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../core/observability/crash_reporting.dart';
 import '../core/auth/post_auth_gate.dart';
 import '../core/auth/token_store.dart';
 import '../core/deeplink/deep_link_gate.dart';
 import '../core/launch/launch_splash.dart';
 import '../core/deeplink/deep_link_router_hook.dart';
+import '../features/identity/presentation/auth_methods_store.dart';
 import '../features/identity/domain/entities/app_role.dart';
 import '../core/push/push_port.dart';
 import '../core/push/new_job_alert.dart';
@@ -38,6 +40,7 @@ import '../features/pricing/domain/pricing.dart';
 import '../core/navigation/external_navigator.dart';
 import '../features/places/domain/place.dart';
 import '../features/ride/presentation/cubit/ride_destination.dart';
+import '../features/merchant/domain/merchant_offers.dart';
 import '../features/rating/domain/service_rating.dart';
 import '../features/chat/data/datasources/chat_remote_datasource.dart';
 import '../features/food/data/datasources/food_remote_datasource.dart';
@@ -58,11 +61,13 @@ import '../core/realtime/snapshot_realtime.dart';
 import '../features/driver/presentation/utils/driver_routes.dart';
 import '../features/driver/presentation/utils/ride_unassigned_copy.dart';
 import '../features/voice/presentation/widgets/voice_call_host.dart';
+import '../core/ui/keyboard_dismiss.dart';
 
 class DealGoApp extends StatefulWidget {
   const DealGoApp({
     super.key,
     this.identityClient,
+    this.authMethodsCache,
     this.tokenStore,
     this.passkeyPlatform,
     this.foodClient,
@@ -74,6 +79,7 @@ class DealGoApp extends StatefulWidget {
     this.inboxRemote,
     this.addressBook,
     this.ratings,
+    this.merchantOffers,
     this.driverHistory,
     this.support,
     this.accountDeletion,
@@ -95,6 +101,9 @@ class DealGoApp extends StatefulWidget {
 
   final IdentityClient? identityClient;
 
+  /// Device cache of enabled sign-in methods (tests seed a returning user).
+  final AuthMethodsCache? authMethodsCache;
+
   /// Overrides the WebAuthn adapter (tests simulate unsupported devices).
   final PasskeyPlatform? passkeyPlatform;
   final TokenStore? tokenStore;
@@ -111,6 +120,7 @@ class DealGoApp extends StatefulWidget {
   final InboxRemoteDataSource? inboxRemote;
   final AddressBookRepository? addressBook;
   final RatingRepository? ratings;
+  final MerchantOfferRepository? merchantOffers;
   final DriverHistoryRepository? driverHistory;
   final SupportRepository? support;
   final AccountDeletionRepository? accountDeletion;
@@ -157,6 +167,7 @@ class _DealGoAppState extends State<DealGoApp> {
     super.initState();
     _deps = DealGoDependencies.create(
       identityClient: widget.identityClient,
+      authMethodsCache: widget.authMethodsCache,
       tokenStore: widget.tokenStore,
       passkeyPlatform: widget.passkeyPlatform,
       foodClient: widget.foodClient,
@@ -168,6 +179,7 @@ class _DealGoAppState extends State<DealGoApp> {
       inboxRemote: widget.inboxRemote,
       addressBook: widget.addressBook,
       ratings: widget.ratings,
+      merchantOffers: widget.merchantOffers,
       driverHistory: widget.driverHistory,
       support: widget.support,
       accountDeletion: widget.accountDeletion,
@@ -200,16 +212,18 @@ class _DealGoAppState extends State<DealGoApp> {
       await _deps.push.unregister(accessToken: token);
     };
     _authRefresh = AuthRefreshListenable(_deps.authCubit);
-    _refresh = Listenable.merge([_authRefresh, _postAuth]);
+    _refresh = Listenable.merge([_authRefresh, _postAuth, _deps.authMethods]);
     _router = createAppRouter(
       auth: _deps.authCubit,
       refreshListenable: _refresh,
       postAuth: _postAuth,
       initialLocation: widget.initialLocation ?? AuthRoutes.splash,
       deepLinks: DeepLinkGate(notifications: _deps.notificationRouter),
+      methodAvailable: _deps.authMethods.isEnabled,
     );
     _deepLinks = DeepLinkRouterHook()..attach(_router);
     _router.routerDelegate.addListener(_maybeReleaseLaunch);
+    _router.routerDelegate.addListener(_recordNavigation);
     _refresh.addListener(_maybeReleaseLaunch);
     _registerSmokeNavigateHook();
     _deps.notificationRouter
@@ -225,6 +239,7 @@ class _DealGoAppState extends State<DealGoApp> {
     }).ignore();
     _deps.push.listenForeground(_showForegroundPush).ignore();
     _unassignedSub = _deps.realtime.rideUnassigned.listen(_onRideUnassigned);
+    NewJobAlert.instance.inCall = () => _deps.voiceCallCubit.state.busy;
     unawaited(NewJobAlert.instance.restore());
     _refresh.addListener(_flushPendingPushTap);
     _deps.snapshotSessionBinder.start();
@@ -261,16 +276,32 @@ class _DealGoAppState extends State<DealGoApp> {
         unawaited(_deps.voiceCallCubit.refreshConfig());
         _maybePromptRuntimePermissions();
         unawaited(_deps.analytics.setUserId(state.profile.id));
+        setCrashReportingUser(state.profile.id);
       } else {
         if (state is AuthSignedOut) {
           unawaited(_deps.voiceCallCubit.signOut());
         }
         unawaited(_deps.analytics.setUserId(null));
+        setCrashReportingUser(null);
       }
     });
     unawaited(_postAuth.load());
+    // Sign-in options resolve behind the native splash, so the picker never
+    // draws options that vanish a moment later.
+    unawaited(_deps.authMethods.load());
+    unawaited(_deps.foodCategories.load());
     unawaited(_deps.authCubit.restore());
     unawaited(_deps.connectivity.start());
+  }
+
+  String _lastPath = '';
+
+  /// Crash-report breadcrumb for each route change (ids redacted).
+  void _recordNavigation() {
+    final path = _router.routerDelegate.currentConfiguration.uri.path;
+    if (path == _lastPath) return;
+    recordNavigation(_lastPath, path);
+    _lastPath = path;
   }
 
   /// Lets Flutter paint its first frame (dropping the native launch screen)
@@ -281,6 +312,7 @@ class _DealGoAppState extends State<DealGoApp> {
       auth: _deps.authCubit.state,
       postAuthLoaded: _postAuth.isLoaded,
       location: _router.routerDelegate.currentConfiguration.uri.path,
+      authMethodsLoading: _deps.authMethods.status == AuthMethodsStatus.loading,
     );
     if (ready) LaunchSplash.release();
   }
@@ -521,6 +553,7 @@ class _DealGoAppState extends State<DealGoApp> {
     _refresh.removeListener(_flushPendingPushTap);
     _refresh.removeListener(_maybeReleaseLaunch);
     _router.routerDelegate.removeListener(_maybeReleaseLaunch);
+    _router.routerDelegate.removeListener(_recordNavigation);
     _postAuth.removeListener(_maybePromptRuntimePermissions);
     _postAuth.removeListener(_maybeResumeDriverJob);
     _driverResume.reset();
@@ -557,8 +590,10 @@ class _DealGoAppState extends State<DealGoApp> {
           ],
           routerConfig: _router,
           scaffoldMessengerKey: _messengerKey,
-          builder: (context, child) =>
-              VoiceCallHost(child: child ?? const SizedBox.shrink()),
+          scrollBehavior: const DealGoScrollBehavior(),
+          builder: (context, child) => KeyboardDismissOnTapOutside(
+            child: VoiceCallHost(child: child ?? const SizedBox.shrink()),
+          ),
         ),
       ),
     );

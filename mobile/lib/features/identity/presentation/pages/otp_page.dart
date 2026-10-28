@@ -190,22 +190,9 @@ class _OtpPageState extends State<OtpPage> {
     });
   }
 
-  void _pushDigit(String digit) {
-    final busy = isPhoneAuthBusy(context.read<PhoneAuthCubit>().state);
-    if (busy || _code.text.length >= otpCodeLength) {
-      return;
-    }
-    _code.text = '${_code.text}$digit';
-    setState(() {});
-  }
-
-  void _backspace() {
-    final busy = isPhoneAuthBusy(context.read<PhoneAuthCubit>().state);
-    if (busy || _code.text.isEmpty) {
-      return;
-    }
-    _code.text = _code.text.substring(0, _code.text.length - 1);
-    setState(() {});
+  /// Back from the cooldown notice: keep whatever was already typed.
+  void _continueEntry() {
+    setState(() => _pane = _OtpPane.entry);
   }
 
   @override
@@ -269,8 +256,8 @@ class _OtpPageState extends State<OtpPage> {
                     remaining: _remaining,
                     onBack: _changePhone,
                     onChanged: () => setState(() {}),
-                    onDigit: _pushDigit,
-                    onBackspace: _backspace,
+                    // Autofilled / pasted / fully typed codes submit themselves.
+                    onCompleted: _confirm,
                     onResend: _resend,
                     onConfirm: _confirm,
                   ),
@@ -288,7 +275,7 @@ class _OtpPageState extends State<OtpPage> {
                     remaining: _remaining,
                     onBack: _changePhone,
                     onLeave: _changePhone,
-                    onContinue: _retryEntry,
+                    onContinue: _continueEntry,
                   ),
                 },
               ),

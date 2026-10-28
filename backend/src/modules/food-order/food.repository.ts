@@ -1,8 +1,14 @@
-import { type OpsDateWindow, inDateWindow } from '../operations/ops-date-window.js';
+import {
+  type OpsDateWindow,
+  inDateWindow,
+} from '../operations/ops-date-window.js';
 import { cancellationCountsAgainstDriver } from '../../shared/cancel-actor.js';
 import type { CancelActorName } from '../../shared/cancel-actor.js';
 import type { DriverJobCounts } from '../../shared/driver-job-counts.js';
-import type { CompletionHook, TxHandle } from '../../shared/tx/completion-hook.js';
+import type {
+  CompletionHook,
+  TxHandle,
+} from '../../shared/tx/completion-hook.js';
 import { randomUUID } from 'node:crypto';
 import { pageOffset } from '../../shared/pagination/pagination.js';
 import {
@@ -40,7 +46,12 @@ import {
   prepMinutesFor,
   type StoreAcceptSettings,
 } from './store-accept.js';
-import { OPEN_FOOD_STATUSES, type FoodOrderStatusName, type FoodCancelReasonCode, type FoodSystemCancelReason } from './food.constants.js';
+import {
+  OPEN_FOOD_STATUSES,
+  type FoodOrderStatusName,
+  type FoodCancelReasonCode,
+  type FoodSystemCancelReason,
+} from './food.constants.js';
 import {
   VoucherRejectedError,
   type VoucherRedeemer,
@@ -78,6 +89,12 @@ export type StoreListItem = {
   serviceRegionCode?: string | null;
   /** M030 logo path (DEC-PROD-045); null = none uploaded. */
   logoUrl?: string | null;
+  /** Merchant cover photo path; null = none (clients fall back to a dish photo). */
+  coverUrl?: string | null;
+  /** Merchant "about the store" text; null = none. */
+  description?: string | null;
+  /** Smallest food subtotal the store accepts; 0 = none. */
+  minOrderVnd?: number;
 };
 
 export type StoreBrowseItem = StoreListItem &
@@ -87,6 +104,11 @@ export type StoreBrowseItem = StoreListItem &
     serviceMode: StoreServiceMode;
     /** Cover thumb: first available menu item imageUrl (DEC-PROD-041). */
     imageUrl: string | null;
+    /** Default prep + BUSY extra right now. */
+    estimatedPrepMinutes: number;
+    /** Raw average of visible store ratings (null = none); the service applies RATING_STORE_MIN_COUNT. */
+    ratingAverage: number | null;
+    ratingCount: number;
   };
 
 export type StoreBrowsePage = {
@@ -102,13 +124,17 @@ export type ListFoodStoresQuery = {
   lat?: number;
   lng?: number;
   radiusKm: number;
-  sortBy: 'name' | 'createdAt' | 'distance';
+  sortBy: 'name' | 'createdAt' | 'distance' | 'rating';
+  /** Ratings below this count do not rank in sortBy=rating. */
+  minRatingCount?: number;
 };
 
 export type StoreItemView = {
   id: string;
   name: string;
   priceVnd: number;
+  /** List price shown struck through; null unless it is above priceVnd. */
+  originalPriceVnd: number | null;
   available: boolean;
   /** M027 (DEC-PROD-039). */
   description: string | null;
@@ -121,7 +147,55 @@ export type StoreItemView = {
   menuCategoryId: string | null;
   /** Option groups in display order (DEC-PROD-033); [] when the dish has none. */
   optionGroups: FoodOptionGroupView[];
+  /** When the dish was added (ISO); the app marks recent ones as new. */
+  addedAt: string | null;
 };
+
+/** A dish surfaced on browse cards: the store's best sellers and its newest dish. */
+export type StoreFeaturedItem = {
+  id: string;
+  name: string;
+  priceVnd: number;
+  originalPriceVnd: number | null;
+  imageUrl: string | null;
+  soldCount: number;
+  addedAt: string;
+};
+
+/** Best sellers (sold > 0) first, then the newest dish when it is not already listed. */
+export const STORE_FEATURED_BEST_SELLERS = 2;
+
+export function pickFeaturedItems(
+  items: StoreFeaturedItem[],
+): StoreFeaturedItem[] {
+  const best = items
+    .filter((item) => item.soldCount > 0)
+    .sort(
+      (a, b) =>
+        b.soldCount - a.soldCount ||
+        b.addedAt.localeCompare(a.addedAt) ||
+        a.id.localeCompare(b.id),
+    )
+    .slice(0, STORE_FEATURED_BEST_SELLERS);
+  const newest = [...items].sort(
+    (a, b) => b.addedAt.localeCompare(a.addedAt) || a.id.localeCompare(b.id),
+  )[0];
+  return newest && !best.some((item) => item.id === newest.id)
+    ? [...best, newest]
+    : best;
+}
+
+/** originalPriceVnd only counts while it is above the selling price. */
+export function shownOriginalPrice(
+  priceVnd: number,
+  originalPriceVnd: number | null | undefined,
+): number | null {
+  return originalPriceVnd != null && originalPriceVnd > priceVnd
+    ? originalPriceVnd
+    : null;
+}
+
+export type StoreMenuSection = { id: string; name: string };
 
 export type MenuCategoryView = {
   id: string;
@@ -205,96 +279,20 @@ export type OpsCatalogModerationPage = {
   limit: number;
 };
 
-export type OpsCatalogCategoryItem = {
-  code: string;
-  name: string;
-  slug: string;
-  storeCount: number;
-  itemCount: number;
-  status: 'ACTIVE';
-};
-
-export type OpsCatalogCategoryPage = {
-  items: OpsCatalogCategoryItem[];
-  total: number;
-  page: number;
-  limit: number;
-};
-
+/** Moderation rows show this when the store has no category yet. */
 export const UNCATEGORIZED_STORE_CATEGORY_NAME = 'Khác';
-
-export function slugifyStoreCategory(name: string): string {
-  const slug = name
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  return slug.length > 0 ? slug : 'khac';
-}
-
-export function normalizeStoreCategoryName(category: string | null | undefined): string {
-  const trimmed = category?.trim();
-  return trimmed && trimmed.length > 0 ? trimmed : UNCATEGORIZED_STORE_CATEGORY_NAME;
-}
-
-export function aggregateStoreCategories(
-  stores: Array<{ category: string | null; itemCount: number }>,
-): OpsCatalogCategoryItem[] {
-  const byCode = new Map<string, OpsCatalogCategoryItem>();
-  for (const store of stores) {
-    const name = normalizeStoreCategoryName(store.category);
-    const slug = slugifyStoreCategory(name);
-    const existing = byCode.get(slug);
-    if (existing) {
-      existing.storeCount += 1;
-      existing.itemCount += store.itemCount;
-      continue;
-    }
-    byCode.set(slug, {
-      code: slug,
-      name,
-      slug,
-      storeCount: 1,
-      itemCount: store.itemCount,
-      status: 'ACTIVE',
-    });
-  }
-  return [...byCode.values()].sort((a, b) => a.name.localeCompare(b.name, 'vi'));
-}
-
-export function filterStoreCategories(
-  categories: OpsCatalogCategoryItem[],
-  query: { page?: number; limit?: number; q?: string },
-): OpsCatalogCategoryPage {
-  const page = Math.max(1, query.page ?? 1);
-  const limit = Math.max(1, Math.min(50, query.limit ?? 20));
-  let filtered = categories;
-  if (query.q?.trim()) {
-    const q = query.q.trim().toLowerCase();
-    filtered = categories.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.code.toLowerCase().includes(q) ||
-        c.slug.toLowerCase().includes(q),
-    );
-  }
-  const total = filtered.length;
-  const start = (page - 1) * limit;
-  return {
-    items: filtered.slice(start, start + limit),
-    total,
-    page,
-    limit,
-  };
-}
 
 /** M030 (DEC-PROD-045): undefined fields keep their current value. */
 export type UpdateStoreProfileInput = {
   ownerId: string;
   name?: string;
   logoUrl?: string | null;
+  coverUrl?: string | null;
+  /** Trimmed text; null clears it. */
+  description?: string | null;
+  /** DEC-PROD-067: FoodCategory.code, already validated as active; null clears it. */
+  category?: string | null;
+  minOrderVnd?: number;
 };
 
 export type UpdateStoreLocationInput = {
@@ -356,7 +354,8 @@ export type FoodOrderChangeLine = {
   toQuantity: number;
 };
 
-export type FoodOrderChangeStatusName = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
+export type FoodOrderChangeStatusName =
+  'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
 
 export type FoodOrderChangeView = {
   id: string;
@@ -383,7 +382,10 @@ export type ProposeFoodOrderChangeInput = {
   expiresAt: Date;
 };
 
-export type FoodOrderChangeResult = { order: FoodOrderView; change: FoodOrderChangeView };
+export type FoodOrderChangeResult = {
+  order: FoodOrderView;
+  change: FoodOrderChangeView;
+};
 
 /** Failure input resolved by the service. */
 export type FoodFailInput = {
@@ -394,12 +396,18 @@ export type FoodFailInput = {
   now: Date;
 };
 
-export type FoodCancelReason = { code: FoodCancelReasonCode; note: string | null };
+export type FoodCancelReason = {
+  code: FoodCancelReasonCode;
+  note: string | null;
+};
 
 /** A PREPARING order may be claimed `leadMinutes` before its estimated ready time. */
 export type FoodEarlyClaim = { leadMinutes: number; now: Date };
 
-export type FoodTimeoutPolicy = { merchantAcceptMinutes: number; unclaimedReadyMinutes: number };
+export type FoodTimeoutPolicy = {
+  merchantAcceptMinutes: number;
+  unclaimedReadyMinutes: number;
+};
 export type FoodTimedOut = { orderId: string; reason: FoodSystemCancelReason };
 
 /** Driver history window: finished jobs, newest first. */
@@ -409,7 +417,11 @@ export type FoodDriverHistoryWindow = {
   limit: number;
 };
 
-export const DRIVER_HISTORY_FOOD_STATUSES = ['DELIVERED', 'FAILED', 'CANCELLED'] as const;
+export const DRIVER_HISTORY_FOOD_STATUSES = [
+  'DELIVERED',
+  'FAILED',
+  'CANCELLED',
+] as const;
 
 export type CatalogItemInput = {
   name: string;
@@ -420,6 +432,7 @@ export type CreateCatalogItemInput = {
   ownerId: string;
   name: string;
   priceVnd: number;
+  originalPriceVnd?: number | null;
   available?: boolean;
   description?: string | null;
   prepMinutes?: number | null;
@@ -433,6 +446,7 @@ export type UpdateCatalogItemInput = {
   itemId: string;
   name?: string;
   priceVnd?: number;
+  originalPriceVnd?: number | null;
   available?: boolean;
   description?: string | null;
   prepMinutes?: number | null;
@@ -520,7 +534,11 @@ export type QueueOrderSummary = {
 
 /** Raw rows for merchant stats; FoodService buckets them by Vietnam day. */
 export type MerchantStatsRows = {
-  finished: Array<{ status: 'DELIVERED' | 'CANCELLED' | 'FAILED'; subtotalVnd: number; finishedAt: Date }>;
+  finished: Array<{
+    status: 'DELIVERED' | 'CANCELLED' | 'FAILED';
+    subtotalVnd: number;
+    finishedAt: Date;
+  }>;
   openCount: number;
   topItems: Array<{ name: string; quantity: number }>;
 };
@@ -555,14 +573,25 @@ export type MerchantSettlementView = {
   createdAt: Date;
 };
 
-export type RecordMerchantSettlementInput = Omit<MerchantSettlementView, 'id' | 'createdAt'> & {
+export type RecordMerchantSettlementInput = Omit<
+  MerchantSettlementView,
+  'id' | 'createdAt'
+> & {
   reason: string;
 };
 
 /** Sandbox demo store pin (Hải Châu, Đà Nẵng). */
-export const FIXTURE_STORE_PIN = { lat: 16.0544, lng: 108.2022, label: 'Hải Châu, Đà Nẵng' } as const;
+export const FIXTURE_STORE_PIN = {
+  lat: 16.0544,
+  lng: 108.2022,
+  label: 'Hải Châu, Đà Nẵng',
+} as const;
 
-export type PlaceFoodLineInput = { itemId: string; quantity: number; optionIds?: string[] };
+export type PlaceFoodLineInput = {
+  itemId: string;
+  quantity: number;
+  optionIds?: string[];
+};
 
 export type PlaceFoodInput = {
   customerId: string;
@@ -602,13 +631,6 @@ export interface FoodRepository {
     status?: string;
     window?: OpsDateWindow;
   }): Promise<OpsCatalogModerationPage>;
-  listStoreCategories(query: {
-    page?: number;
-    limit?: number;
-    q?: string;
-  }): Promise<OpsCatalogCategoryPage>;
-  findStoreCategoryByCode(code: string): Promise<OpsCatalogCategoryItem | null>;
-  renameStoreCategory(code: string, name: string): Promise<OpsCatalogCategoryItem>;
   findStore(storeId: string): Promise<StoreDetail | null>;
   findStoreForOps(storeId: string): Promise<OpsStoreDetail | null>;
   findStoreByOwner(ownerId: string): Promise<StoreDetail | null>;
@@ -616,10 +638,21 @@ export interface FoodRepository {
   updateStoreLocation(input: UpdateStoreLocationInput): Promise<StoreDetail>;
   updateStoreProfile(input: UpdateStoreProfileInput): Promise<StoreDetail>;
   findStoreLogoUrl(storeId: string): Promise<string | null>;
-  updateStoreServiceMode(input: UpdateStoreServiceModeInput): Promise<StoreDetail>;
+  findStoreCoverUrl(storeId: string): Promise<string | null>;
+  updateStoreServiceMode(
+    input: UpdateStoreServiceModeInput,
+  ): Promise<StoreDetail>;
   updateStoreSchedule(input: UpdateStoreScheduleInput): Promise<StoreDetail>;
-  updateStoreAcceptSettings(input: UpdateStoreAcceptSettingsInput): Promise<StoreDetail>;
+  updateStoreAcceptSettings(
+    input: UpdateStoreAcceptSettingsInput,
+  ): Promise<StoreDetail>;
   listMenuCategories(ownerId: string): Promise<MenuCategoryView[]>;
+  /** Customer menu sections of a store, in merchant order (empty sections omitted). */
+  listStoreMenuSections(storeId: string): Promise<StoreMenuSection[]>;
+  /** Approved, available dishes for browse cards, picked per store with pickFeaturedItems. */
+  listFeaturedItems(
+    storeIds: string[],
+  ): Promise<Map<string, StoreFeaturedItem[]>>;
   createMenuCategory(input: {
     ownerId: string;
     name: string;
@@ -631,8 +664,14 @@ export interface FoodRepository {
     name?: string;
     description?: string | null;
   }): Promise<MenuCategoryView>;
-  deleteMenuCategory(ownerId: string, categoryId: string): Promise<{ deleted: true }>;
-  reorderMenuCategories(ownerId: string, orderedIds: string[]): Promise<MenuCategoryView[]>;
+  deleteMenuCategory(
+    ownerId: string,
+    categoryId: string,
+  ): Promise<{ deleted: true }>;
+  reorderMenuCategories(
+    ownerId: string,
+    orderedIds: string[],
+  ): Promise<MenuCategoryView[]>;
   listMerchantHistory(filter: MerchantHistoryFilter): Promise<{
     items: MerchantHistoryRow[];
     page: number;
@@ -652,7 +691,11 @@ export interface FoodRepository {
   setCatalogModeration(
     itemId: string,
     decision: 'APPROVED' | 'REJECTED',
-  ): Promise<{ id: string; available: boolean; moderationStatus: string } | null>;
+  ): Promise<{
+    id: string;
+    available: boolean;
+    moderationStatus: string;
+  } | null>;
   place(input: PlaceFoodInput): Promise<FoodOrderView>;
   findOrder(orderId: string): Promise<FoodOrderView | null>;
   /**
@@ -667,12 +710,25 @@ export interface FoodRepository {
   ): Promise<ReadyOrderSummary[]>;
   listQueue(ownerId: string): Promise<QueueOrderSummary[]>;
   /** Owner-scoped finished orders since `since` (by last status change), open count, top items. */
-  merchantStats(ownerId: string, since: Date, topLimit: number): Promise<MerchantStatsRows>;
+  merchantStats(
+    ownerId: string,
+    since: Date,
+    topLimit: number,
+  ): Promise<MerchantStatsRows>;
   /** DELIVERED orders of a store finished in [from, to). */
-  deliveredForStatement(storeId: string, from: Date, to: Date): Promise<MerchantStatementRow[]>;
-  listMerchantSettlements(storeId: string, limit: number): Promise<MerchantSettlementView[]>;
+  deliveredForStatement(
+    storeId: string,
+    from: Date,
+    to: Date,
+  ): Promise<MerchantStatementRow[]>;
+  listMerchantSettlements(
+    storeId: string,
+    limit: number,
+  ): Promise<MerchantSettlementView[]>;
   /** Rejects overlapping periods (FOOD_SETTLEMENT_OVERLAP); writes the Ops audit row. */
-  recordMerchantSettlement(input: RecordMerchantSettlementInput): Promise<MerchantSettlementView>;
+  recordMerchantSettlement(
+    input: RecordMerchantSettlementInput,
+  ): Promise<MerchantSettlementView>;
   listOrdersPage(
     page: number,
     limit: number,
@@ -692,13 +748,24 @@ export interface FoodRepository {
     limit: number,
   ): Promise<OpsFoodOrderPage>;
   /** DELIVERED/FAILED/CANCELLED orders still assigned to the driver, newest updatedAt first. */
-  listFinishedForDriver(driverId: string, window: FoodDriverHistoryWindow): Promise<FoodOrderView[]>;
+  listFinishedForDriver(
+    driverId: string,
+    window: FoodDriverHistoryWindow,
+  ): Promise<FoodOrderView[]>;
   /** Order ids assigned to the driver in one of [statuses] (live location fan-out). */
-  listIdsForDriverInStatuses?(driverId: string, statuses: readonly string[]): Promise<string[]>;
+  listIdsForDriverInStatuses?(
+    driverId: string,
+    statuses: readonly string[],
+  ): Promise<string[]>;
   /** Customer's order ids in one of [statuses], newest first (relaunch resume, DEC-PROD-057). */
-  listIdsForCustomerInStatuses?(customerId: string, statuses: readonly string[]): Promise<string[]>;
+  listIdsForCustomerInStatuses?(
+    customerId: string,
+    statuses: readonly string[],
+  ): Promise<string[]>;
   /** Lifetime DELIVERED / terminal order counts per assigned driver (Admin stats). */
-  countFinishedForDrivers(driverIds: readonly string[]): Promise<Map<string, DriverJobCounts>>;
+  countFinishedForDrivers(
+    driverIds: readonly string[],
+  ): Promise<Map<string, DriverJobCounts>>;
   accept(orderId: string, ownerId: string): Promise<FoodOrderView>;
   markReady(orderId: string, ownerId: string): Promise<FoodOrderView>;
   claim(
@@ -708,9 +775,17 @@ export interface FoodRepository {
     early?: FoodEarlyClaim,
   ): Promise<FoodOrderView>;
   /** Assigned driver hands the order back before pickup (counts as a driver cancel). */
-  release(orderId: string, driverId: string, reasonCode: string): Promise<FoodOrderView>;
+  release(
+    orderId: string,
+    driverId: string,
+    reasonCode: string,
+  ): Promise<FoodOrderView>;
   /** Worker: PLACED never accepted → MERCHANT_TIMEOUT; READY never claimed → NO_DRIVER. */
-  timeoutDue(now: Date, policy: FoodTimeoutPolicy, limit?: number): Promise<FoodTimedOut[]>;
+  timeoutDue(
+    now: Date,
+    policy: FoodTimeoutPolicy,
+    limit?: number,
+  ): Promise<FoodTimedOut[]>;
   /** Snapshots pickedUpAt + merchantCashVnd (cash paid to the store). */
   pickup(
     orderId: string,
@@ -741,7 +816,9 @@ export interface FoodRepository {
    * Merchant edits a PLACED/PREPARING order (lower quantities / remove lines).
    * One PENDING change per order (FOOD_CHANGE_PENDING); ready is blocked until it is answered.
    */
-  proposeChange(input: ProposeFoodOrderChangeInput): Promise<FoodOrderChangeResult>;
+  proposeChange(
+    input: ProposeFoodOrderChangeInput,
+  ): Promise<FoodOrderChangeResult>;
   /** Latest change of the order (any status), or null. */
   latestChange(orderId: string): Promise<FoodOrderChangeView | null>;
   /** Customer answers the PENDING change: accept applies it, reject cancels the order (no fee). */
@@ -755,7 +832,11 @@ export interface FoodRepository {
   /** Worker: PENDING changes past expiresAt → EXPIRED and the order CANCELLED (SYSTEM). */
   expireChanges(now: Date, limit?: number): Promise<string[]>;
   /** Store owner declines a PLACED order (→ CANCELLED, voucher released). */
-  reject(orderId: string, ownerId: string, reason: FoodCancelReason): Promise<FoodOrderView>;
+  reject(
+    orderId: string,
+    ownerId: string,
+    reason: FoodCancelReason,
+  ): Promise<FoodOrderView>;
   opsCancel(
     orderId: string,
     actorUserId: string,
@@ -779,13 +860,24 @@ type StoredStore = StoreListItem & {
   accept?: StoreAcceptSettings;
 };
 
-function memoryAccept(store: StoredStore): Pick<StoreDetail, 'acceptSettings' | 'estimatedPrepMinutes'> {
+function memoryAccept(
+  store: StoredStore,
+): Pick<StoreDetail, 'acceptSettings' | 'estimatedPrepMinutes'> {
   const acceptSettings = store.accept ?? acceptSettingsFromRow({});
-  const mode = effectiveServiceMode(store.serviceMode, store.serviceModeUntil).serviceMode;
-  return { acceptSettings: { ...acceptSettings }, estimatedPrepMinutes: prepMinutesFor(acceptSettings, mode) };
+  const mode = effectiveServiceMode(
+    store.serviceMode,
+    store.serviceModeUntil,
+  ).serviceMode;
+  return {
+    acceptSettings: { ...acceptSettings },
+    estimatedPrepMinutes: prepMinutesFor(acceptSettings, mode),
+  };
 }
 
-function memoryAvailability(store: StoredStore, now = new Date()): StoreAvailability {
+function memoryAvailability(
+  store: StoredStore,
+  now = new Date(),
+): StoreAvailability {
   return storeAvailability(
     store.serviceMode,
     store.serviceModeUntil,
@@ -793,7 +885,8 @@ function memoryAvailability(store: StoredStore, now = new Date()): StoreAvailabi
     now,
   );
 }
-type StoredItem = StoreItemView & {
+type StoredItem = Omit<StoreItemView, 'addedAt' | 'originalPriceVnd'> & {
+  originalPriceVnd?: number | null;
   storeId: string;
   moderationStatus: CatalogModerationStatus;
   createdAt?: Date;
@@ -809,14 +902,20 @@ type StoredOrder = FoodOrderView & {
 
 /** Earliest instant a PREPARING order may be claimed; null = not early-claimable. */
 export function earlyClaimOpensAt(
-  order: { prepMinutes: number | null; createdAt: Date; acceptedAt?: Date | null },
+  order: {
+    prepMinutes: number | null;
+    createdAt: Date;
+    acceptedAt?: Date | null;
+  },
   leadMinutes: number,
 ): Date | null {
   if (order.prepMinutes === null || order.prepMinutes === undefined) {
     return null;
   }
   const start = (order.acceptedAt ?? order.createdAt).getTime();
-  return new Date(start + (order.prepMinutes - Math.max(0, leadMinutes)) * 60_000);
+  return new Date(
+    start + (order.prepMinutes - Math.max(0, leadMinutes)) * 60_000,
+  );
 }
 
 export type MemoryDriverJobCancellation = {
@@ -841,15 +940,28 @@ export class MemoryFoodRepository implements FoodRepository {
   private readonly seededAt = new Date();
   private readonly orders: StoredOrder[] = [];
 
-  async listIdsForDriverInStatuses(driverId: string, statuses: readonly string[]): Promise<string[]> {
+  async listIdsForDriverInStatuses(
+    driverId: string,
+    statuses: readonly string[],
+  ): Promise<string[]> {
     return this.orders
-      .filter((order) => order.assignedDriverId === driverId && statuses.includes(order.status))
+      .filter(
+        (order) =>
+          order.assignedDriverId === driverId &&
+          statuses.includes(order.status),
+      )
       .map((order) => order.id);
   }
 
-  async listIdsForCustomerInStatuses(customerId: string, statuses: readonly string[]): Promise<string[]> {
+  async listIdsForCustomerInStatuses(
+    customerId: string,
+    statuses: readonly string[],
+  ): Promise<string[]> {
     return this.orders
-      .filter((order) => order.customerId === customerId && statuses.includes(order.status))
+      .filter(
+        (order) =>
+          order.customerId === customerId && statuses.includes(order.status),
+      )
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .map((order) => order.id);
   }
@@ -858,7 +970,10 @@ export class MemoryFoodRepository implements FoodRepository {
     return this.stores.length > 0;
   }
 
-  async createFixtureStore(ownerId: string, items: CatalogItemInput[]): Promise<void> {
+  async createFixtureStore(
+    ownerId: string,
+    items: CatalogItemInput[],
+  ): Promise<void> {
     if (this.stores.length > 0) {
       return;
     }
@@ -899,16 +1014,26 @@ export class MemoryFoodRepository implements FoodRepository {
     const origin = hasGeo ? { lat: query.lat!, lng: query.lng! } : null;
 
     // Stores without coordinates are not orderable, so browse hides them.
-    let filtered = this.stores.filter((store) => store.lat != null && store.lng != null).map((store) => {
-      const distanceKm =
-        origin && store.lat !== null && store.lng !== null
-          ? haversineKm(origin, { lat: store.lat, lng: store.lng })
-          : null;
-      return { store, distanceKm };
-    });
+    let filtered = this.stores
+      .filter((store) => store.lat != null && store.lng != null)
+      .map((store) => {
+        const distanceKm =
+          origin && store.lat !== null && store.lng !== null
+            ? haversineKm(origin, { lat: store.lat, lng: store.lng })
+            : null;
+        return { store, distanceKm };
+      });
 
     if (search) {
-      filtered = filtered.filter((entry) => entry.store.name.toLowerCase().includes(search));
+      filtered = filtered.filter(
+        (entry) =>
+          entry.store.name.toLowerCase().includes(search) ||
+          this.items.some(
+            (item) =>
+              item.storeId === entry.store.id &&
+              item.name.toLowerCase().includes(search),
+          ),
+      );
     }
     if (category) {
       filtered = filtered.filter(
@@ -917,18 +1042,25 @@ export class MemoryFoodRepository implements FoodRepository {
     }
     if (origin) {
       filtered = filtered.filter(
-        (entry) => entry.distanceKm !== null && entry.distanceKm <= query.radiusKm,
+        (entry) =>
+          entry.distanceKm !== null && entry.distanceKm <= query.radiusKm,
       );
     }
 
     const sortBy =
       query.sortBy === 'distance' && !origin ? 'createdAt' : query.sortBy;
     const now = new Date();
-    const open = new Map(filtered.map((entry) => [entry.store.id, memoryAvailability(entry.store, now)]));
+    const open = new Map(
+      filtered.map((entry) => [
+        entry.store.id,
+        memoryAvailability(entry.store, now),
+      ]),
+    );
     filtered.sort((left, right) => {
       // DEC-PROD-027: open stores first; paused/closed stay listed with a label.
       const openRank =
-        Number(open.get(right.store.id)!.openNow) - Number(open.get(left.store.id)!.openNow);
+        Number(open.get(right.store.id)!.openNow) -
+        Number(open.get(left.store.id)!.openNow);
       if (openRank !== 0) {
         return openRank;
       }
@@ -942,7 +1074,8 @@ export class MemoryFoodRepository implements FoodRepository {
         const leftDistance = left.distanceKm ?? Number.POSITIVE_INFINITY;
         const rightDistance = right.distanceKm ?? Number.POSITIVE_INFINITY;
         return (
-          leftDistance - rightDistance || left.store.id.localeCompare(right.store.id)
+          leftDistance - rightDistance ||
+          left.store.id.localeCompare(right.store.id)
         );
       }
       return (
@@ -952,15 +1085,21 @@ export class MemoryFoodRepository implements FoodRepository {
     });
 
     const total = filtered.length;
-    const start = (pageOffset(query.page, query.limit));
+    const start = pageOffset(query.page, query.limit);
     const items = filtered.slice(start, start + query.limit).map((entry) => ({
       ...toStoreListItem(entry.store),
       ...open.get(entry.store.id)!,
-      serviceMode: effectiveServiceMode(entry.store.serviceMode, entry.store.serviceModeUntil)
-        .serviceMode,
+      serviceMode: effectiveServiceMode(
+        entry.store.serviceMode,
+        entry.store.serviceModeUntil,
+      ).serviceMode,
       createdAt: entry.store.createdAt,
       distanceKm: entry.distanceKm,
-      imageUrl: coverImageForStore(this.items, entry.store.id),
+      imageUrl:
+        entry.store.coverUrl ?? coverImageForStore(this.items, entry.store.id),
+      estimatedPrepMinutes: memoryAccept(entry.store).estimatedPrepMinutes,
+      ratingAverage: null,
+      ratingCount: 0,
     }));
     return { items, total };
   }
@@ -983,7 +1122,8 @@ export class MemoryFoodRepository implements FoodRepository {
     if (filter?.q && filter.q.trim()) {
       const q = filter.q.trim().toLowerCase();
       filtered = filtered.filter(
-        (s) => s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q),
+        (s) =>
+          s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q),
       );
     }
     const regionCode = normalizeRegionFilter(filter?.region);
@@ -994,23 +1134,24 @@ export class MemoryFoodRepository implements FoodRepository {
       filtered = filtered.filter((s) => s.name.toLowerCase().includes(label));
     }
     if (filter?.category && filter.category !== 'ALL') {
-      const c = filter.category.toLowerCase();
-      filtered = filtered.filter((s) =>
-        (s.category ?? '').toLowerCase().includes(c),
-      );
+      const c = filter.category;
+      filtered = filtered.filter((s) => s.category === c);
     }
     if (filter?.location === 'MISSING') {
       filtered = filtered.filter((s) => s.lat == null || s.lng == null);
     }
     const sorted = filtered.sort(
       (left, right) =>
-        right.createdAt.getTime() - left.createdAt.getTime() || left.id.localeCompare(right.id),
+        right.createdAt.getTime() - left.createdAt.getTime() ||
+        left.id.localeCompare(right.id),
     );
     const total = sorted.length;
     const start = (page - 1) * limit;
     return {
       total,
-      items: sorted.slice(start, start + limit).map((store) => this.toOpsStoreSummary(store)),
+      items: sorted
+        .slice(start, start + limit)
+        .map((store) => this.toOpsStoreSummary(store)),
     };
   }
 
@@ -1030,7 +1171,7 @@ export class MemoryFoodRepository implements FoodRepository {
         id: item.id,
         code: `SP-${item.id.slice(0, 5).toUpperCase()}`,
         name: item.name,
-        category: normalizeStoreCategoryName(st?.category),
+        category: st?.category ?? UNCATEGORIZED_STORE_CATEGORY_NAME,
         store: st ? st.name : 'Cửa hàng DealGo',
         price: item.priceVnd,
         submittedAt: (item.createdAt ?? this.seededAt).toISOString(),
@@ -1040,41 +1181,6 @@ export class MemoryFoodRepository implements FoodRepository {
       });
     }
     return filterCatalogModerationItems(combined, query);
-  }
-
-  async listStoreCategories(query: {
-    page?: number;
-    limit?: number;
-    q?: string;
-  }): Promise<OpsCatalogCategoryPage> {
-    return filterStoreCategories(this.aggregateCategories(), query);
-  }
-
-  async findStoreCategoryByCode(code: string): Promise<OpsCatalogCategoryItem | null> {
-    const normalized = code.trim().toLowerCase();
-    return this.aggregateCategories().find((c) => c.code === normalized) ?? null;
-  }
-
-  async renameStoreCategory(code: string, name: string): Promise<OpsCatalogCategoryItem> {
-    const current = await this.findStoreCategoryByCode(code);
-    if (!current) throw new FoodRuleError('FOOD_CATEGORY_NOT_FOUND');
-    for (const store of this.stores) {
-      if (slugifyStoreCategory(normalizeStoreCategoryName(store.category)) === current.code) {
-        store.category = name;
-      }
-    }
-    const next = await this.findStoreCategoryByCode(slugifyStoreCategory(name));
-    if (!next) throw new FoodRuleError('FOOD_CATEGORY_NOT_FOUND');
-    return next;
-  }
-
-  private aggregateCategories(): OpsCatalogCategoryItem[] {
-    return aggregateStoreCategories(
-      this.stores.map((store) => ({
-        category: store.category,
-        itemCount: this.items.filter((item) => item.storeId === store.id).length,
-      })),
-    );
   }
 
   async findStore(storeId: string): Promise<StoreDetail | null> {
@@ -1089,7 +1195,9 @@ export class MemoryFoodRepository implements FoodRepository {
       schedule: scheduleView(store.schedule ?? ALWAYS_OPEN),
       ...memoryAccept(store),
       addressLabel: store.addressLabel ?? null,
-      items: this.items.filter((item) => item.storeId === storeId).map(memoryItemView),
+      items: this.items
+        .filter((item) => item.storeId === storeId)
+        .map(memoryItemView),
     };
   }
 
@@ -1100,7 +1208,7 @@ export class MemoryFoodRepository implements FoodRepository {
     }
     const items = this.items
       .filter((item) => item.storeId === storeId)
-      .map(({ storeId: _storeId, ...item }) => item);
+      .map(memoryItemView);
     return {
       ...this.toOpsStoreSummary(store),
       items,
@@ -1109,12 +1217,19 @@ export class MemoryFoodRepository implements FoodRepository {
 
   async place(input: PlaceFoodInput): Promise<FoodOrderView> {
     const existing = this.orders.find(
-      (order) => order.customerId === input.customerId && order.idempotencyKey === input.idempotencyKey,
+      (order) =>
+        order.customerId === input.customerId &&
+        order.idempotencyKey === input.idempotencyKey,
     );
     if (existing) {
       return copyOrder(existing);
     }
-    if (this.orders.some((order) => order.customerId === input.customerId && OPEN.has(order.status))) {
+    if (
+      this.orders.some(
+        (order) =>
+          order.customerId === input.customerId && OPEN.has(order.status),
+      )
+    ) {
       throw new FoodRuleError('FOOD_ORDER_ALREADY_OPEN');
     }
     const store = this.stores.find((entry) => entry.id === input.storeId);
@@ -1137,14 +1252,23 @@ export class MemoryFoodRepository implements FoodRepository {
       throw new FoodRuleError('FOOD_STORE_AT_CAPACITY');
     }
     const lines = this.snapshotLines(input.storeId, input.items);
-    const subtotalVnd = lines.reduce((sum, line) => sum + line.unitPriceVnd * line.quantity, 0);
+    const subtotalVnd = lines.reduce(
+      (sum, line) => sum + line.unitPriceVnd * line.quantity,
+      0,
+    );
+    if (subtotalVnd < (store.minOrderVnd ?? 0)) {
+      throw new FoodRuleError('FOOD_MIN_ORDER_NOT_MET');
+    }
     const orderId = randomUUID();
     let discountVnd = 0;
     let voucherCode: string | null = null;
     let voucherSponsor: VoucherSponsor | null = null;
     if (input.voucherCode) {
       if (!this.vouchers) {
-        throw new VoucherRejectedError('VOUCHER_NOT_FOUND', 'Vouchers are not configured');
+        throw new VoucherRejectedError(
+          'VOUCHER_NOT_FOUND',
+          'Vouchers are not configured',
+        );
       }
       const redeemed = await this.vouchers.redeem({
         code: input.voucherCode,
@@ -1152,6 +1276,7 @@ export class MemoryFoodRepository implements FoodRepository {
         serviceType: 'FOOD',
         orderAmount: subtotalVnd,
         deliveryFee: input.deliveryFareVnd,
+        storeId: store.id,
         entityType: 'FOOD_ORDER',
         entityId: orderId,
       });
@@ -1167,7 +1292,11 @@ export class MemoryFoodRepository implements FoodRepository {
       storeName: store.name,
       pickup:
         store.lat != null && store.lng != null
-          ? { lat: store.lat, lng: store.lng, label: store.addressLabel ?? null }
+          ? {
+              lat: store.lat,
+              lng: store.lng,
+              label: store.addressLabel ?? null,
+            }
           : null,
       serviceRegionCode: store.serviceRegionCode ?? null,
       ownerId: store.ownerId,
@@ -1207,14 +1336,17 @@ export class MemoryFoodRepository implements FoodRepository {
     early?: FoodEarlyClaim,
   ): Promise<ReadyOrderSummary[]> {
     const earlyOpen = (order: StoredOrder): boolean => {
-      const opensAt = early ? earlyClaimOpensAt(order, early.leadMinutes) : null;
+      const opensAt = early
+        ? earlyClaimOpensAt(order, early.leadMinutes)
+        : null;
       return !!early && !!opensAt && opensAt.getTime() <= early.now.getTime();
     };
     let rows = this.orders
       .filter(
         (order) =>
           order.assignedDriverId === null &&
-          (order.status === 'READY' || (order.status === 'PREPARING' && earlyOpen(order))),
+          (order.status === 'READY' ||
+            (order.status === 'PREPARING' && earlyOpen(order))),
       )
       .sort(byCreatedAt)
       .map((order) => {
@@ -1222,12 +1354,19 @@ export class MemoryFoodRepository implements FoodRepository {
         const pickup = order.pickup
           ? { ...order.pickup }
           : store?.lat != null && store?.lng != null
-            ? { lat: store.lat, lng: store.lng, label: store.addressLabel ?? null }
+            ? {
+                lat: store.lat,
+                lng: store.lng,
+                label: store.addressLabel ?? null,
+              }
             : null;
         return {
           id: order.id,
           storeId: order.storeId,
-          status: order.status === 'PREPARING' ? ('PREPARING' as const) : ('READY' as const),
+          status:
+            order.status === 'PREPARING'
+              ? ('PREPARING' as const)
+              : ('READY' as const),
           estimatedReadyAt: order.estimatedReadyAt,
           storeName: store?.name ?? order.storeName ?? '',
           storeAddress: store?.addressLabel ?? null,
@@ -1242,7 +1381,9 @@ export class MemoryFoodRepository implements FoodRepository {
       });
     if (near) {
       const origin = { lat: near.lat, lng: near.lng };
-      rows = rows.filter((row) => haversineKm(origin, row.store ?? row.dropoff) <= near.radiusKm);
+      rows = rows.filter(
+        (row) => haversineKm(origin, row.store ?? row.dropoff) <= near.radiusKm,
+      );
     }
     if (limit !== undefined && Number.isSafeInteger(limit) && limit > 0) {
       return rows.slice(0, limit);
@@ -1253,7 +1394,9 @@ export class MemoryFoodRepository implements FoodRepository {
   async listQueue(ownerId: string): Promise<QueueOrderSummary[]> {
     return this.orders
       .filter(
-        (order): order is StoredOrder & { status: QueueOrderSummary['status'] } =>
+        (
+          order,
+        ): order is StoredOrder & { status: QueueOrderSummary['status'] } =>
           order.ownerId === ownerId && OPEN.has(order.status),
       )
       .sort(byCreatedAt)
@@ -1272,12 +1415,24 @@ export class MemoryFoodRepository implements FoodRepository {
       }));
   }
 
-  async merchantStats(ownerId: string, since: Date, topLimit: number): Promise<MerchantStatsRows> {
+  async merchantStats(
+    ownerId: string,
+    since: Date,
+    topLimit: number,
+  ): Promise<MerchantStatsRows> {
     const owned = this.orders.filter((order) => order.ownerId === ownerId);
     const finished = owned.flatMap((order) =>
-      (order.status === 'DELIVERED' || order.status === 'CANCELLED' || order.status === 'FAILED') &&
+      (order.status === 'DELIVERED' ||
+        order.status === 'CANCELLED' ||
+        order.status === 'FAILED') &&
       order.updatedAt >= since
-        ? [{ status: order.status, subtotalVnd: order.subtotalVnd, finishedAt: new Date(order.updatedAt) }]
+        ? [
+            {
+              status: order.status,
+              subtotalVnd: order.subtotalVnd,
+              finishedAt: new Date(order.updatedAt),
+            },
+          ]
         : [],
     );
     const quantities = new Map<string, number>();
@@ -1286,7 +1441,10 @@ export class MemoryFoodRepository implements FoodRepository {
         continue;
       }
       for (const line of order.lines) {
-        quantities.set(line.name, (quantities.get(line.name) ?? 0) + line.quantity);
+        quantities.set(
+          line.name,
+          (quantities.get(line.name) ?? 0) + line.quantity,
+        );
       }
     }
     return {
@@ -1301,7 +1459,11 @@ export class MemoryFoodRepository implements FoodRepository {
 
   readonly merchantSettlements: MerchantSettlementView[] = [];
 
-  async deliveredForStatement(storeId: string, from: Date, to: Date): Promise<MerchantStatementRow[]> {
+  async deliveredForStatement(
+    storeId: string,
+    from: Date,
+    to: Date,
+  ): Promise<MerchantStatementRow[]> {
     return this.orders
       .filter(
         (order) =>
@@ -1321,7 +1483,10 @@ export class MemoryFoodRepository implements FoodRepository {
       }));
   }
 
-  async listMerchantSettlements(storeId: string, limit: number): Promise<MerchantSettlementView[]> {
+  async listMerchantSettlements(
+    storeId: string,
+    limit: number,
+  ): Promise<MerchantSettlementView[]> {
     return this.merchantSettlements
       .filter((row) => row.storeId === storeId)
       .sort((a, b) => b.periodEnd.localeCompare(a.periodEnd))
@@ -1329,7 +1494,9 @@ export class MemoryFoodRepository implements FoodRepository {
       .map((row) => ({ ...row }));
   }
 
-  async recordMerchantSettlement(input: RecordMerchantSettlementInput): Promise<MerchantSettlementView> {
+  async recordMerchantSettlement(
+    input: RecordMerchantSettlementInput,
+  ): Promise<MerchantSettlementView> {
     const overlaps = this.merchantSettlements.some(
       (row) =>
         row.storeId === input.storeId &&
@@ -1343,7 +1510,11 @@ export class MemoryFoodRepository implements FoodRepository {
       throw new FoodRuleError('FOOD_SETTLEMENT_OVERLAP');
     }
     const { reason: _reason, ...rest } = input;
-    const row: MerchantSettlementView = { ...rest, id: randomUUID(), createdAt: new Date() };
+    const row: MerchantSettlementView = {
+      ...rest,
+      id: randomUUID(),
+      createdAt: new Date(),
+    };
     this.merchantSettlements.push(row);
     return { ...row };
   }
@@ -1383,12 +1554,22 @@ export class MemoryFoodRepository implements FoodRepository {
       openNow: true,
       closedReason: null,
       schedule: scheduleView(ALWAYS_OPEN),
-      ...memoryAccept({ id: storeId, name, ownerId, lat: null, lng: null, category: null, createdAt: new Date() }),
+      ...memoryAccept({
+        id: storeId,
+        name,
+        ownerId,
+        lat: null,
+        lng: null,
+        category: null,
+        createdAt: new Date(),
+      }),
       items: [],
     };
   }
 
-  async updateStoreSchedule(input: UpdateStoreScheduleInput): Promise<StoreDetail> {
+  async updateStoreSchedule(
+    input: UpdateStoreScheduleInput,
+  ): Promise<StoreDetail> {
     const store = this.stores.find((entry) => entry.ownerId === input.ownerId);
     if (!store) {
       throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
@@ -1401,7 +1582,9 @@ export class MemoryFoodRepository implements FoodRepository {
     return detail;
   }
 
-  async updateStoreAcceptSettings(input: UpdateStoreAcceptSettingsInput): Promise<StoreDetail> {
+  async updateStoreAcceptSettings(
+    input: UpdateStoreAcceptSettingsInput,
+  ): Promise<StoreDetail> {
     const store = this.stores.find((entry) => entry.ownerId === input.ownerId);
     if (!store) {
       throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
@@ -1412,7 +1595,10 @@ export class MemoryFoodRepository implements FoodRepository {
       maxActiveOrders: input.maxActiveOrders,
       defaultPrepMinutes: input.defaultPrepMinutes,
     };
-    store.schedule = { ...(store.schedule ?? ALWAYS_OPEN), lastOrderMinutes: input.lastOrderMinutes };
+    store.schedule = {
+      ...(store.schedule ?? ALWAYS_OPEN),
+      lastOrderMinutes: input.lastOrderMinutes,
+    };
     const detail = await this.findStore(store.id);
     if (!detail) {
       throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
@@ -1420,7 +1606,9 @@ export class MemoryFoodRepository implements FoodRepository {
     return detail;
   }
 
-  async updateStoreServiceMode(input: UpdateStoreServiceModeInput): Promise<StoreDetail> {
+  async updateStoreServiceMode(
+    input: UpdateStoreServiceModeInput,
+  ): Promise<StoreDetail> {
     const store = this.stores.find((entry) => entry.ownerId === input.ownerId);
     if (!store) {
       throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
@@ -1428,7 +1616,10 @@ export class MemoryFoodRepository implements FoodRepository {
     store.serviceMode = input.mode;
     store.serviceModeUntil = input.until;
     if (input.busyExtraMinutes !== undefined) {
-      store.accept = { ...(store.accept ?? acceptSettingsFromRow({})), busyExtraMinutes: input.busyExtraMinutes };
+      store.accept = {
+        ...(store.accept ?? acceptSettingsFromRow({})),
+        busyExtraMinutes: input.busyExtraMinutes,
+      };
     }
     const detail = await this.findStore(store.id);
     if (!detail) {
@@ -1437,13 +1628,19 @@ export class MemoryFoodRepository implements FoodRepository {
     return detail;
   }
 
-  async updateStoreProfile(input: UpdateStoreProfileInput): Promise<StoreDetail> {
+  async updateStoreProfile(
+    input: UpdateStoreProfileInput,
+  ): Promise<StoreDetail> {
     const store = this.stores.find((entry) => entry.ownerId === input.ownerId);
     if (!store) {
       throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
     }
     if (input.name !== undefined) store.name = input.name;
     if (input.logoUrl !== undefined) store.logoUrl = input.logoUrl;
+    if (input.coverUrl !== undefined) store.coverUrl = input.coverUrl;
+    if (input.description !== undefined) store.description = input.description;
+    if (input.category !== undefined) store.category = input.category;
+    if (input.minOrderVnd !== undefined) store.minOrderVnd = input.minOrderVnd;
     const detail = await this.findStore(store.id);
     if (!detail) {
       throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
@@ -1455,7 +1652,13 @@ export class MemoryFoodRepository implements FoodRepository {
     return this.stores.find((entry) => entry.id === storeId)?.logoUrl ?? null;
   }
 
-  async updateStoreLocation(input: UpdateStoreLocationInput): Promise<StoreDetail> {
+  async findStoreCoverUrl(storeId: string): Promise<string | null> {
+    return this.stores.find((entry) => entry.id === storeId)?.coverUrl ?? null;
+  }
+
+  async updateStoreLocation(
+    input: UpdateStoreLocationInput,
+  ): Promise<StoreDetail> {
     const store = this.stores.find((entry) => entry.ownerId === input.ownerId);
     if (!store) {
       throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
@@ -1473,7 +1676,11 @@ export class MemoryFoodRepository implements FoodRepository {
   }
 
   /** Test helper: create a store with initial items for a non-fixture merchant. */
-  async createStore(ownerId: string, name: string, items: CatalogItemInput[]): Promise<StoreDetail> {
+  async createStore(
+    ownerId: string,
+    name: string,
+    items: CatalogItemInput[],
+  ): Promise<StoreDetail> {
     const store = await this.ensureOwnedStore(ownerId, name);
     for (const item of items) {
       await this.createItem({
@@ -1500,6 +1707,7 @@ export class MemoryFoodRepository implements FoodRepository {
       storeId: store.id,
       name: input.name,
       priceVnd: input.priceVnd,
+      originalPriceVnd: input.originalPriceVnd ?? null,
       available,
       moderationStatus: available ? 'APPROVED' : 'PENDING',
       createdAt: new Date(),
@@ -1519,6 +1727,12 @@ export class MemoryFoodRepository implements FoodRepository {
     const item = this.requireOwnedItem(input.ownerId, input.itemId);
     if (input.name !== undefined) item.name = input.name;
     if (input.priceVnd !== undefined) item.priceVnd = input.priceVnd;
+    if (input.originalPriceVnd !== undefined)
+      item.originalPriceVnd = input.originalPriceVnd;
+    item.originalPriceVnd = shownOriginalPrice(
+      item.priceVnd,
+      item.originalPriceVnd,
+    );
     if (input.available !== undefined) item.available = input.available;
     if (input.description !== undefined) item.description = input.description;
     if (input.prepMinutes !== undefined) item.prepMinutes = input.prepMinutes;
@@ -1529,7 +1743,8 @@ export class MemoryFoodRepository implements FoodRepository {
     } else if (input.imageUrl !== undefined) {
       item.imageUrls = input.imageUrl ? [input.imageUrl] : [];
     }
-    if (input.menuCategoryId !== undefined) item.menuCategoryId = input.menuCategoryId;
+    if (input.menuCategoryId !== undefined)
+      item.menuCategoryId = input.menuCategoryId;
     return memoryItemView(item);
   }
 
@@ -1551,6 +1766,48 @@ export class MemoryFoodRepository implements FoodRepository {
     const store = this.stores.find((e) => e.ownerId === ownerId);
     if (!store) return [];
     return [...(this.menuCategories.get(store.id) ?? [])];
+  }
+
+  async listFeaturedItems(
+    storeIds: string[],
+  ): Promise<Map<string, StoreFeaturedItem[]>> {
+    const byStore = new Map<string, StoreFeaturedItem[]>();
+    for (const storeId of new Set(storeIds)) {
+      const rows = this.items
+        .filter(
+          (item) =>
+            item.storeId === storeId &&
+            item.available &&
+            item.moderationStatus === 'APPROVED',
+        )
+        .map((item) => ({
+          id: item.id,
+          name: item.name,
+          priceVnd: item.priceVnd,
+          originalPriceVnd: shownOriginalPrice(
+            item.priceVnd,
+            item.originalPriceVnd,
+          ),
+          imageUrl: item.imageUrl ?? null,
+          soldCount: item.soldCount ?? 0,
+          addedAt: (item.createdAt ?? this.seededAt).toISOString(),
+        }));
+      const picked = pickFeaturedItems(rows);
+      if (picked.length > 0) byStore.set(storeId, picked);
+    }
+    return byStore;
+  }
+
+  async listStoreMenuSections(storeId: string): Promise<StoreMenuSection[]> {
+    const used = new Set(
+      this.items
+        .filter((e) => e.storeId === storeId)
+        .map((e) => e.menuCategoryId ?? null),
+    );
+    return (this.menuCategories.get(storeId) ?? [])
+      .filter((row) => used.has(row.id))
+      .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name))
+      .map((row) => ({ id: row.id, name: row.name }));
   }
 
   async createMenuCategory(input: {
@@ -1585,16 +1842,21 @@ export class MemoryFoodRepository implements FoodRepository {
     const row = list.find((c) => c.id === input.categoryId);
     if (!row) throw new FoodRuleError('FOOD_CATEGORY_NOT_FOUND');
     if (input.name !== undefined) row.name = input.name.trim();
-    if (input.description !== undefined) row.description = input.description?.trim() || null;
+    if (input.description !== undefined)
+      row.description = input.description?.trim() || null;
     return { ...row };
   }
 
-  async deleteMenuCategory(ownerId: string, categoryId: string): Promise<{ deleted: true }> {
+  async deleteMenuCategory(
+    ownerId: string,
+    categoryId: string,
+  ): Promise<{ deleted: true }> {
     const store = this.stores.find((e) => e.ownerId === ownerId);
     if (!store) throw new FoodRuleError('FOOD_CATEGORY_NOT_FOUND');
     const list = this.menuCategories.get(store.id) ?? [];
     const next = list.filter((c) => c.id !== categoryId);
-    if (next.length === list.length) throw new FoodRuleError('FOOD_CATEGORY_NOT_FOUND');
+    if (next.length === list.length)
+      throw new FoodRuleError('FOOD_CATEGORY_NOT_FOUND');
     this.menuCategories.set(store.id, next);
     for (const item of this.items) {
       if (item.menuCategoryId === categoryId) item.menuCategoryId = null;
@@ -1602,11 +1864,17 @@ export class MemoryFoodRepository implements FoodRepository {
     return { deleted: true };
   }
 
-  async reorderMenuCategories(ownerId: string, orderedIds: string[]): Promise<MenuCategoryView[]> {
+  async reorderMenuCategories(
+    ownerId: string,
+    orderedIds: string[],
+  ): Promise<MenuCategoryView[]> {
     const store = this.stores.find((e) => e.ownerId === ownerId);
     if (!store) throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
     const list = this.menuCategories.get(store.id) ?? [];
-    if (orderedIds.length !== list.length || orderedIds.some((id) => !list.some((c) => c.id === id))) {
+    if (
+      orderedIds.length !== list.length ||
+      orderedIds.some((id) => !list.some((c) => c.id === id))
+    ) {
       throw new FoodRuleError('FOOD_CATEGORY_REORDER_INVALID');
     }
     const byId = new Map(list.map((c) => [c.id, c]));
@@ -1643,10 +1911,14 @@ export class MemoryFoodRepository implements FoodRepository {
       rows = rows.filter((o) => o.id.toLowerCase().includes(q));
     }
     rows = [...rows].sort(
-      (a, b) => (b.updatedAt?.getTime?.() ?? 0) - (a.updatedAt?.getTime?.() ?? 0),
+      (a, b) =>
+        (b.updatedAt?.getTime?.() ?? 0) - (a.updatedAt?.getTime?.() ?? 0),
     );
     const delivered = rows.filter((o) => o.status === 'DELIVERED');
-    const pageRows = rows.slice((filter.page - 1) * filter.limit, filter.page * filter.limit);
+    const pageRows = rows.slice(
+      (filter.page - 1) * filter.limit,
+      filter.page * filter.limit,
+    );
     return {
       items: pageRows.map((o) => ({
         id: o.id,
@@ -1666,13 +1938,21 @@ export class MemoryFoodRepository implements FoodRepository {
     };
   }
 
-  async replaceItemOptions(input: ReplaceItemOptionsInput): Promise<StoreItemView> {
+  async replaceItemOptions(
+    input: ReplaceItemOptionsInput,
+  ): Promise<StoreItemView> {
     const item = this.requireOwnedItem(input.ownerId, input.itemId);
-    item.optionGroups = normalizeOptionGroups(input.groups, item.optionGroups, randomUUID);
+    item.optionGroups = normalizeOptionGroups(
+      input.groups,
+      item.optionGroups,
+      randomUUID,
+    );
     return memoryItemView(item);
   }
 
-  async setItemAvailability(input: SetItemAvailabilityInput): Promise<StoreItemView> {
+  async setItemAvailability(
+    input: SetItemAvailabilityInput,
+  ): Promise<StoreItemView> {
     const item = this.requireOwnedItem(input.ownerId, input.itemId);
     item.available = input.available;
     if (input.available && item.moderationStatus === 'REJECTED') {
@@ -1684,7 +1964,11 @@ export class MemoryFoodRepository implements FoodRepository {
   async setCatalogModeration(
     itemId: string,
     decision: 'APPROVED' | 'REJECTED',
-  ): Promise<{ id: string; available: boolean; moderationStatus: string } | null> {
+  ): Promise<{
+    id: string;
+    available: boolean;
+    moderationStatus: string;
+  } | null> {
     const item = this.items.find((entry) => entry.id === itemId);
     if (!item) {
       return null;
@@ -1726,8 +2010,13 @@ export class MemoryFoodRepository implements FoodRepository {
     if (filter?.store && filter.store !== 'ALL') {
       const store = filter.store.toLowerCase();
       sorted = sorted.filter((o) => {
-        const storeName = this.stores.find((s) => s.id === o.storeId)?.name?.toLowerCase();
-        return o.storeId.toLowerCase().includes(store) || (storeName && storeName.includes(store));
+        const storeName = this.stores
+          .find((s) => s.id === o.storeId)
+          ?.name?.toLowerCase();
+        return (
+          o.storeId.toLowerCase().includes(store) ||
+          (storeName && storeName.includes(store))
+        );
       });
     }
     if (filter?.zone && filter.zone !== 'ALL') {
@@ -1812,12 +2101,15 @@ export class MemoryFoodRepository implements FoodRepository {
         (order) =>
           order.assignedDriverId === driverId &&
           statuses.includes(order.status) &&
-          (!window.before || order.updatedAt.getTime() <= window.before.getTime()) &&
-          (!window.since || order.updatedAt.getTime() >= window.since.getTime()),
+          (!window.before ||
+            order.updatedAt.getTime() <= window.before.getTime()) &&
+          (!window.since ||
+            order.updatedAt.getTime() >= window.since.getTime()),
       )
       .sort(
         (left, right) =>
-          right.updatedAt.getTime() - left.updatedAt.getTime() || right.id.localeCompare(left.id),
+          right.updatedAt.getTime() - left.updatedAt.getTime() ||
+          right.id.localeCompare(left.id),
       )
       .slice(0, window.limit)
       .map(copyOrder);
@@ -1834,7 +2126,11 @@ export class MemoryFoodRepository implements FoodRepository {
     return copyOrder(order);
   }
 
-  async reject(orderId: string, ownerId: string, reason: FoodCancelReason): Promise<FoodOrderView> {
+  async reject(
+    orderId: string,
+    ownerId: string,
+    reason: FoodCancelReason,
+  ): Promise<FoodOrderView> {
     const order = this.requireOwned(orderId, ownerId);
     if (order.status !== 'PLACED') {
       throw new FoodRuleError('FOOD_STATUS_CONFLICT');
@@ -1842,7 +2138,10 @@ export class MemoryFoodRepository implements FoodRepository {
     order.status = 'CANCELLED';
     order.cancelReason = { ...reason };
     order.cancelledBy = 'MERCHANT';
-    await this.vouchers?.release({ entityType: 'FOOD_ORDER', entityId: order.id });
+    await this.vouchers?.release({
+      entityType: 'FOOD_ORDER',
+      entityId: order.id,
+    });
     touchOrder(order);
     return copyOrder(order);
   }
@@ -1852,7 +2151,11 @@ export class MemoryFoodRepository implements FoodRepository {
     if (order.status !== 'PREPARING') {
       throw new FoodRuleError('FOOD_STATUS_CONFLICT');
     }
-    if (this.changes.some((change) => change.orderId === orderId && change.status === 'PENDING')) {
+    if (
+      this.changes.some(
+        (change) => change.orderId === orderId && change.status === 'PENDING',
+      )
+    ) {
       throw new FoodRuleError('FOOD_CHANGE_PENDING');
     }
     // A driver claimed early → straight to ASSIGNED; otherwise open for claims.
@@ -1885,7 +2188,9 @@ export class MemoryFoodRepository implements FoodRepository {
       throw new FoodRuleError('FOOD_STATUS_CONFLICT');
     }
     if (isEarly) {
-      const opensAt = early ? earlyClaimOpensAt(order, early.leadMinutes) : null;
+      const opensAt = early
+        ? earlyClaimOpensAt(order, early.leadMinutes)
+        : null;
       if (!early || !opensAt || opensAt.getTime() > early.now.getTime()) {
         throw new FoodRuleError('FOOD_NOT_YET_CLAIMABLE');
       }
@@ -1893,7 +2198,9 @@ export class MemoryFoodRepository implements FoodRepository {
     const active = this.orders.filter(
       (entry) =>
         entry.assignedDriverId === driverId &&
-        (entry.status === 'PREPARING' || entry.status === 'ASSIGNED' || entry.status === 'PICKED_UP'),
+        (entry.status === 'PREPARING' ||
+          entry.status === 'ASSIGNED' ||
+          entry.status === 'PICKED_UP'),
     ).length;
     if (active >= maxConcurrentJobs) {
       throw new FoodRuleError('DRIVER_AT_CAPACITY');
@@ -1906,7 +2213,11 @@ export class MemoryFoodRepository implements FoodRepository {
     return copyOrder(order);
   }
 
-  async release(orderId: string, driverId: string, reasonCode: string): Promise<FoodOrderView> {
+  async release(
+    orderId: string,
+    driverId: string,
+    reasonCode: string,
+  ): Promise<FoodOrderView> {
     const order = this.requireAssignedDriver(orderId, driverId);
     if (order.status !== 'ASSIGNED' && order.status !== 'PREPARING') {
       throw new FoodRuleError('FOOD_STATUS_CONFLICT');
@@ -1914,19 +2225,32 @@ export class MemoryFoodRepository implements FoodRepository {
     const fromStatus = order.status;
     order.status = order.status === 'ASSIGNED' ? 'READY' : 'PREPARING';
     order.assignedDriverId = null;
-    this.driverCancellations.push({ orderId, driverId, reasonCode, fromStatus, createdAt: new Date() });
+    this.driverCancellations.push({
+      orderId,
+      driverId,
+      reasonCode,
+      fromStatus,
+      createdAt: new Date(),
+    });
     touchOrder(order);
     return copyOrder(order);
   }
 
-  async timeoutDue(now: Date, policy: FoodTimeoutPolicy, limit = 100): Promise<FoodTimedOut[]> {
+  async timeoutDue(
+    now: Date,
+    policy: FoodTimeoutPolicy,
+    limit = 100,
+  ): Promise<FoodTimedOut[]> {
     const out: FoodTimedOut[] = [];
     const placedCutoff = now.getTime() - policy.merchantAcceptMinutes * 60_000;
     const readyCutoff = now.getTime() - policy.unclaimedReadyMinutes * 60_000;
     for (const order of [...this.orders].sort(byCreatedAt)) {
       if (out.length >= limit) break;
       let reason: FoodSystemCancelReason | null = null;
-      if (order.status === 'PLACED' && order.createdAt.getTime() <= placedCutoff) {
+      if (
+        order.status === 'PLACED' &&
+        order.createdAt.getTime() <= placedCutoff
+      ) {
         reason = 'MERCHANT_TIMEOUT';
       } else if (
         order.status === 'READY' &&
@@ -1939,7 +2263,10 @@ export class MemoryFoodRepository implements FoodRepository {
       order.status = 'CANCELLED';
       order.cancelledBy = 'SYSTEM';
       order.cancelReason = { code: reason, note: null };
-      await this.vouchers?.release({ entityType: 'FOOD_ORDER', entityId: order.id });
+      await this.vouchers?.release({
+        entityType: 'FOOD_ORDER',
+        entityId: order.id,
+      });
       order.updatedAt = now;
       out.push({ orderId: order.id, reason });
     }
@@ -1957,7 +2284,12 @@ export class MemoryFoodRepository implements FoodRepository {
     }
     order.pickedUpAt = snapshot?.at ?? new Date();
     order.merchantCashVnd = snapshot?.merchantCashVnd ?? null;
-    return this.assignedDriverTransition(orderId, driverId, 'ASSIGNED', 'PICKED_UP');
+    return this.assignedDriverTransition(
+      orderId,
+      driverId,
+      'ASSIGNED',
+      'PICKED_UP',
+    );
   }
 
   async snapshotCommissionWithin(
@@ -2010,19 +2342,28 @@ export class MemoryFoodRepository implements FoodRepository {
     order.status = 'FAILED';
     order.failReason = { code: input.reasonCode, note: input.note };
     // Confirmed (DEC-PROD-012): a failed delivery gives the voucher use back.
-    await this.vouchers?.release({ entityType: 'FOOD_ORDER', entityId: order.id });
+    await this.vouchers?.release({
+      entityType: 'FOOD_ORDER',
+      entityId: order.id,
+    });
     touchOrder(order);
     return copyOrder(order);
   }
 
   readonly changes: FoodOrderChangeView[] = [];
 
-  async proposeChange(input: ProposeFoodOrderChangeInput): Promise<FoodOrderChangeResult> {
+  async proposeChange(
+    input: ProposeFoodOrderChangeInput,
+  ): Promise<FoodOrderChangeResult> {
     const order = this.requireOwned(input.orderId, input.ownerId);
     if (!FOOD_CHANGE_EDITABLE_STATUSES.includes(order.status)) {
       throw new FoodRuleError('FOOD_STATUS_CONFLICT');
     }
-    if (this.changes.some((change) => change.orderId === order.id && change.status === 'PENDING')) {
+    if (
+      this.changes.some(
+        (change) => change.orderId === order.id && change.status === 'PENDING',
+      )
+    ) {
       throw new FoodRuleError('FOOD_CHANGE_PENDING');
     }
     const plan = planFoodOrderChange(order, input.lines);
@@ -2055,15 +2396,22 @@ export class MemoryFoodRepository implements FoodRepository {
     accept: boolean,
     now: Date,
   ): Promise<FoodOrderChangeResult> {
-    const order = this.orders.find((entry) => entry.id === orderId && entry.customerId === customerId);
+    const order = this.orders.find(
+      (entry) => entry.id === orderId && entry.customerId === customerId,
+    );
     if (!order) {
       throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
     }
-    const change = this.changes.find((entry) => entry.id === changeId && entry.orderId === orderId);
+    const change = this.changes.find(
+      (entry) => entry.id === changeId && entry.orderId === orderId,
+    );
     if (!change) {
       throw new FoodRuleError('FOOD_CHANGE_NOT_FOUND');
     }
-    if (change.status !== 'PENDING' || !FOOD_CHANGE_EDITABLE_STATUSES.includes(order.status)) {
+    if (
+      change.status !== 'PENDING' ||
+      !FOOD_CHANGE_EDITABLE_STATUSES.includes(order.status)
+    ) {
       throw new FoodRuleError('FOOD_STATUS_CONFLICT');
     }
     if (change.expiresAt.getTime() <= now.getTime()) {
@@ -2081,7 +2429,10 @@ export class MemoryFoodRepository implements FoodRepository {
       order.status = 'CANCELLED';
       order.cancelledBy = 'CUSTOMER';
       order.cancelReason = { code: 'CHANGE_REJECTED', note: null };
-      await this.vouchers?.release({ entityType: 'FOOD_ORDER', entityId: order.id });
+      await this.vouchers?.release({
+        entityType: 'FOOD_ORDER',
+        entityId: order.id,
+      });
     }
     touchOrder(order);
     return { order: copyOrder(order), change: copyChange(change) };
@@ -2091,15 +2442,23 @@ export class MemoryFoodRepository implements FoodRepository {
     const out: string[] = [];
     for (const change of this.changes) {
       if (out.length >= limit) break;
-      if (change.status !== 'PENDING' || change.expiresAt.getTime() > now.getTime()) continue;
+      if (
+        change.status !== 'PENDING' ||
+        change.expiresAt.getTime() > now.getTime()
+      )
+        continue;
       change.status = 'EXPIRED';
       change.respondedAt = now;
       const order = this.orders.find((entry) => entry.id === change.orderId);
-      if (!order || !FOOD_CHANGE_EDITABLE_STATUSES.includes(order.status)) continue;
+      if (!order || !FOOD_CHANGE_EDITABLE_STATUSES.includes(order.status))
+        continue;
       order.status = 'CANCELLED';
       order.cancelledBy = 'SYSTEM';
       order.cancelReason = { code: 'CHANGE_EXPIRED', note: null };
-      await this.vouchers?.release({ entityType: 'FOOD_ORDER', entityId: order.id });
+      await this.vouchers?.release({
+        entityType: 'FOOD_ORDER',
+        entityId: order.id,
+      });
       order.updatedAt = now;
       out.push(order.id);
     }
@@ -2107,7 +2466,9 @@ export class MemoryFoodRepository implements FoodRepository {
   }
 
   async cancel(orderId: string, customerId: string): Promise<FoodOrderView> {
-    const order = this.orders.find((entry) => entry.id === orderId && entry.customerId === customerId);
+    const order = this.orders.find(
+      (entry) => entry.id === orderId && entry.customerId === customerId,
+    );
     if (!order) {
       throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
     }
@@ -2116,7 +2477,10 @@ export class MemoryFoodRepository implements FoodRepository {
     }
     order.status = 'CANCELLED';
     order.cancelledBy = 'CUSTOMER';
-    await this.vouchers?.release({ entityType: 'FOOD_ORDER', entityId: order.id });
+    await this.vouchers?.release({
+      entityType: 'FOOD_ORDER',
+      entityId: order.id,
+    });
     touchOrder(order);
     return copyOrder(order);
   }
@@ -2139,9 +2503,15 @@ export class MemoryFoodRepository implements FoodRepository {
     }
     order.status = 'CANCELLED';
     order.cancelledBy = 'OPS';
-    await this.vouchers?.release({ entityType: 'FOOD_ORDER', entityId: order.id });
+    await this.vouchers?.release({
+      entityType: 'FOOD_ORDER',
+      entityId: order.id,
+    });
     touchOrder(order);
-    return { order: copyOrder(order), auditId: `memory-audit-${order.id}-cancel` };
+    return {
+      order: copyOrder(order),
+      auditId: `memory-audit-${order.id}-cancel`,
+    };
   }
 
   async opsReassign(
@@ -2159,7 +2529,10 @@ export class MemoryFoodRepository implements FoodRepository {
     order.status = 'READY';
     order.assignedDriverId = null;
     touchOrder(order);
-    return { order: copyOrder(order), auditId: `memory-audit-${order.id}-reassign` };
+    return {
+      order: copyOrder(order),
+      auditId: `memory-audit-${order.id}-reassign`,
+    };
   }
 
   private assignedDriverTransition(
@@ -2177,7 +2550,10 @@ export class MemoryFoodRepository implements FoodRepository {
     return copyOrder(order);
   }
 
-  private requireAssignedDriver(orderId: string, driverId: string): StoredOrder {
+  private requireAssignedDriver(
+    orderId: string,
+    driverId: string,
+  ): StoredOrder {
     const order = this.orders.find((entry) => entry.id === orderId);
     if (!order) {
       throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
@@ -2219,7 +2595,10 @@ export class MemoryFoodRepository implements FoodRepository {
     return item;
   }
 
-  private snapshotLines(storeId: string, requested: PlaceFoodLineInput[]): FoodLineView[] {
+  private snapshotLines(
+    storeId: string,
+    requested: PlaceFoodLineInput[],
+  ): FoodLineView[] {
     return snapshotFoodLines(
       this.items.filter((entry) => entry.storeId === storeId),
       requested,
@@ -2228,7 +2607,11 @@ export class MemoryFoodRepository implements FoodRepository {
 }
 
 function coverImageForStore(
-  items: Array<{ storeId: string; available: boolean; imageUrl: string | null }>,
+  items: Array<{
+    storeId: string;
+    available: boolean;
+    imageUrl: string | null;
+  }>,
   storeId: string,
 ): string | null {
   for (const item of items) {
@@ -2253,18 +2636,30 @@ function toStoreListItem(store: StoredStore): StoreListItem {
     lng: store.lng,
     category: store.category,
     logoUrl: store.logoUrl ?? null,
+    coverUrl: store.coverUrl ?? null,
+    description: store.description ?? null,
+    minOrderVnd: store.minOrderVnd ?? 0,
   };
 }
 
-function byCreatedAt(left: { createdAt: Date; id: string }, right: { createdAt: Date; id: string }): number {
-  return left.createdAt.getTime() - right.createdAt.getTime() || left.id.localeCompare(right.id);
+function byCreatedAt(
+  left: { createdAt: Date; id: string },
+  right: { createdAt: Date; id: string },
+): number {
+  return (
+    left.createdAt.getTime() - right.createdAt.getTime() ||
+    left.id.localeCompare(right.id)
+  );
 }
 
 function byCreatedAtDesc(
   left: { createdAt: Date; id: string },
   right: { createdAt: Date; id: string },
 ): number {
-  return right.createdAt.getTime() - left.createdAt.getTime() || left.id.localeCompare(right.id);
+  return (
+    right.createdAt.getTime() - left.createdAt.getTime() ||
+    left.id.localeCompare(right.id)
+  );
 }
 
 function memoryItemView(item: StoredItem): StoreItemView {
@@ -2272,7 +2667,9 @@ function memoryItemView(item: StoredItem): StoreItemView {
     id: item.id,
     name: item.name,
     priceVnd: item.priceVnd,
+    originalPriceVnd: shownOriginalPrice(item.priceVnd, item.originalPriceVnd),
     available: item.available,
+    addedAt: item.createdAt ? item.createdAt.toISOString() : null,
     description: item.description ?? null,
     prepMinutes: item.prepMinutes ?? null,
     imageUrl: item.imageUrl ?? null,
@@ -2314,7 +2711,10 @@ export function snapshotFoodLines(
     if (!item || !item.available) {
       throw new FoodRuleError('FOOD_ITEM_UNAVAILABLE');
     }
-    const priced = priceOptionSelection(item.optionGroups, line.optionIds ?? []);
+    const priced = priceOptionSelection(
+      item.optionGroups,
+      line.optionIds ?? [],
+    );
     return {
       id: randomUUID(),
       itemId: item.id,
@@ -2362,7 +2762,9 @@ function copyOrder(order: StoredOrder): FoodOrderView {
       options: line.options.map((option) => ({ ...option })),
     })),
     prepMinutes: order.prepMinutes ?? null,
-    estimatedReadyAt: order.estimatedReadyAt ? new Date(order.estimatedReadyAt) : null,
+    estimatedReadyAt: order.estimatedReadyAt
+      ? new Date(order.estimatedReadyAt)
+      : null,
     pickedUpAt: order.pickedUpAt ? new Date(order.pickedUpAt) : null,
     failReason: order.failReason ? { ...order.failReason } : null,
     merchantCashVnd: order.merchantCashVnd ?? null,
@@ -2372,7 +2774,10 @@ function copyOrder(order: StoredOrder): FoodOrderView {
 }
 
 /** Statuses in which the kitchen can still edit an order. */
-export const FOOD_CHANGE_EDITABLE_STATUSES: readonly FoodOrderStatusName[] = ['PLACED', 'PREPARING'];
+export const FOOD_CHANGE_EDITABLE_STATUSES: readonly FoodOrderStatusName[] = [
+  'PLACED',
+  'PREPARING',
+];
 
 /**
  * Validates a merchant edit and prices it. Only lower quantities / removals
@@ -2380,9 +2785,19 @@ export const FOOD_CHANGE_EDITABLE_STATUSES: readonly FoodOrderStatusName[] = ['P
  * merchant should reject the order. The voucher discount is capped at the new subtotal.
  */
 export function planFoodOrderChange(
-  order: Pick<FoodOrderView, 'lines' | 'subtotalVnd' | 'discountVnd' | 'deliveryFareVnd'>,
+  order: Pick<
+    FoodOrderView,
+    'lines' | 'subtotalVnd' | 'discountVnd' | 'deliveryFareVnd'
+  >,
   requested: { lineId: string; toQuantity: number }[],
-): Pick<FoodOrderChangeView, 'lines' | 'oldSubtotalVnd' | 'newSubtotalVnd' | 'newDiscountVnd' | 'newTotalVnd'> {
+): Pick<
+  FoodOrderChangeView,
+  | 'lines'
+  | 'oldSubtotalVnd'
+  | 'newSubtotalVnd'
+  | 'newDiscountVnd'
+  | 'newTotalVnd'
+> {
   if (requested.length === 0) {
     throw new FoodRuleError('FOOD_CHANGE_INVALID');
   }
@@ -2422,12 +2837,18 @@ export function planFoodOrderChange(
     oldSubtotalVnd: order.subtotalVnd,
     newSubtotalVnd,
     newDiscountVnd,
-    newTotalVnd: Math.max(0, newSubtotalVnd + order.deliveryFareVnd - newDiscountVnd),
+    newTotalVnd: Math.max(
+      0,
+      newSubtotalVnd + order.deliveryFareVnd - newDiscountVnd,
+    ),
   };
 }
 
 /** Applies accepted change lines to order lines (drops 0-quantity lines). */
-export function applyFoodOrderChangeLines(lines: FoodLineView[], change: FoodOrderChangeLine[]): FoodLineView[] {
+export function applyFoodOrderChangeLines(
+  lines: FoodLineView[],
+  change: FoodOrderChangeLine[],
+): FoodLineView[] {
   return lines
     .map((line) => {
       const edit = change.find((entry) => entry.lineId === line.id);
@@ -2437,11 +2858,21 @@ export function applyFoodOrderChangeLines(lines: FoodLineView[], change: FoodOrd
 }
 
 /** "customer unreachable" only after the minimum wait since pickup. */
-export function assertFailWaitOver(pickedUpAt: Date | null, input: FoodFailInput): void {
-  if (input.reasonCode !== 'CUSTOMER_UNREACHABLE' || input.minWaitMinutes <= 0 || !pickedUpAt) {
+export function assertFailWaitOver(
+  pickedUpAt: Date | null,
+  input: FoodFailInput,
+): void {
+  if (
+    input.reasonCode !== 'CUSTOMER_UNREACHABLE' ||
+    input.minWaitMinutes <= 0 ||
+    !pickedUpAt
+  ) {
     return;
   }
-  if (input.now.getTime() - pickedUpAt.getTime() < input.minWaitMinutes * 60_000) {
+  if (
+    input.now.getTime() - pickedUpAt.getTime() <
+    input.minWaitMinutes * 60_000
+  ) {
     throw new FoodRuleError('FOOD_FAIL_TOO_EARLY');
   }
 }
@@ -2584,7 +3015,9 @@ export function filterCatalogModerationItems(
   const page = Math.max(1, query.page ?? 1);
   const limit = Math.max(1, Math.min(50, query.limit ?? 10));
 
-  let filtered = items.filter((i) => inDateWindow(new Date(i.submittedAt), query.window));
+  let filtered = items.filter((i) =>
+    inDateWindow(new Date(i.submittedAt), query.window),
+  );
   if (query.status && query.status !== 'ALL') {
     filtered = filtered.filter((i) => i.status === query.status);
   }

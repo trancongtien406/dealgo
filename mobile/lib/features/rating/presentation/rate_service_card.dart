@@ -8,6 +8,7 @@ import '../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../core/drafts/text_draft.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../identity/domain/entities/auth_state.dart';
@@ -26,12 +27,23 @@ class RateServiceCard extends StatefulWidget {
     required this.type,
     required this.subjectId,
     this.hasDriver = true,
+    this.autoPrompt = false,
     super.key,
   });
 
   final RatingSubjectType type;
   final String subjectId;
   final bool hasDriver;
+
+  /// Opens the rating sheet by itself once per subject per app session
+  /// (right after a delivery), while it can still be rated.
+  final bool autoPrompt;
+
+  /// Subjects already auto-prompted in this session.
+  static final Set<String> _prompted = {};
+
+  @visibleForTesting
+  static void resetAutoPrompts() => _prompted.clear();
 
   @override
   State<RateServiceCard> createState() => _RateServiceCardState();
@@ -59,6 +71,13 @@ class _RateServiceCardState extends State<RateServiceCard> {
       );
       if (mounted) {
         setState(() => _status = status);
+        final key = '${widget.type.wire}:${widget.subjectId}';
+        if (widget.autoPrompt &&
+            status.canRate &&
+            status.rating == null &&
+            RateServiceCard._prompted.add(key)) {
+          await _rate();
+        }
       }
     } catch (_) {
       // Rating is optional: hide the card when the lookup fails.
@@ -174,7 +193,7 @@ class RatingSheet extends StatefulWidget {
   State<RatingSheet> createState() => _RatingSheetState();
 }
 
-class _RatingSheetState extends State<RatingSheet> {
+class _RatingSheetState extends State<RatingSheet> with TextDraftMixin {
   final _comment = TextEditingController();
   final _tags = <RatingTag>{};
   int? _driverStars;
@@ -187,6 +206,40 @@ class _RatingSheetState extends State<RatingSheet> {
   bool get _complete =>
       (!widget.hasDriver || _driverStars != null) &&
       (!_isFood || _storeStars != null);
+
+  @override
+  void initState() {
+    super.initState();
+    // Stars/tags/comment survive closing the app mid-review (rating window
+    // is short, so the draft expires after 2 days).
+    bindTextDraft(
+      'rating.${widget.type.name}.${widget.subjectId}',
+      {'comment': _comment},
+      maxAge: const Duration(days: 2),
+      extras: () => {
+        'driverStars': _driverStars,
+        'storeStars': _storeStars,
+        'tags': [for (final t in _tags) t.name],
+      },
+      restoreExtras: (saved) {
+        final driver = saved['driverStars'];
+        final store = saved['storeStars'];
+        final tags = saved['tags'];
+        final picked = <RatingTag>{
+          if (tags is List)
+            for (final t in RatingTag.values)
+              if (tags.contains(t.name)) t,
+        };
+        if (driver is! int && store is! int && picked.isEmpty) return false;
+        setState(() {
+          if (driver is int) _driverStars = driver;
+          if (store is int) _storeStars = store;
+          _tags.addAll(picked);
+        });
+        return true;
+      },
+    );
+  }
 
   @override
   void dispose() {
@@ -216,6 +269,7 @@ class _RatingSheetState extends State<RatingSheet> {
           comment: _comment.text,
         ),
       );
+      clearTextDraft();
       if (mounted) {
         Navigator.of(context).pop(rating);
       }
@@ -224,6 +278,9 @@ class _RatingSheetState extends State<RatingSheet> {
         return;
       }
       final code = error is ApiException ? error.errorCode : '';
+      if (code == 'RATING_ALREADY_SUBMITTED') {
+        clearTextDraft();
+      }
       setState(() {
         _saving = false;
         _error = switch (code) {
@@ -268,14 +325,20 @@ class _RatingSheetState extends State<RatingSheet> {
                 key: const Key('rate-driver-stars'),
                 label: l10n.rateDriverLabel,
                 value: _driverStars,
-                onChanged: (value) => setState(() => _driverStars = value),
+                onChanged: (value) {
+                  setState(() => _driverStars = value);
+                  markTextDraftDirty();
+                },
               ),
             if (_isFood)
               _StarRow(
                 key: const Key('rate-store-stars'),
                 label: l10n.rateStoreLabel,
                 value: _storeStars,
-                onChanged: (value) => setState(() => _storeStars = value),
+                onChanged: (value) {
+                  setState(() => _storeStars = value);
+                  markTextDraftDirty();
+                },
               ),
             const SizedBox(height: DealGoSpacing.s12),
             Text(l10n.rateTagsLabel, style: textTheme.labelLarge),
@@ -289,11 +352,14 @@ class _RatingSheetState extends State<RatingSheet> {
                     key: Key('rate-tag-${tag.wire}'),
                     label: ratingTagLabel(l10n, tag),
                     selected: _tags.contains(tag),
-                    onTap: () => setState(() {
-                      if (!_tags.remove(tag)) {
-                        _tags.add(tag);
-                      }
-                    }),
+                    onTap: () {
+                      setState(() {
+                        if (!_tags.remove(tag)) {
+                          _tags.add(tag);
+                        }
+                      });
+                      markTextDraftDirty();
+                    },
                   ),
               ],
             ),

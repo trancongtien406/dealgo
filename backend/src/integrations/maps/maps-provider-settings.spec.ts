@@ -23,7 +23,7 @@ function googleStub(overrides: Partial<MapsPort> = {}): GoogleMapsPort {
 describe('MapsProviderSettings', () => {
   it('is mapbox for every capability without a Google key, whatever the admin stored', async () => {
     const sel = new MapsProviderSettings(settings({ MAPS_SEARCH_PROVIDER: 'google' }), null);
-    expect(sel.googleConfigured()).toBe(false);
+    expect(await sel.googleConfigured()).toBe(false);
     expect(await sel.chosen('search')).toBe('google');
     expect(await sel.effective('search')).toBe('mapbox');
   });

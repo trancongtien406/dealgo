@@ -4,10 +4,13 @@ import 'package:go_router/go_router.dart';
 
 import '../utils/partner_status_listener.dart';
 import '../../../../core/design_system/components/dealgo_card.dart';
+import '../../../../core/drafts/draft_resume_prompt.dart';
 import '../../../../core/design_system/components/dealgo_segmented_control.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../food/presentation/food_categories_store.dart';
+import '../../../food/presentation/widgets/food_category_tile.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../places/domain/place.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
@@ -204,11 +207,47 @@ class _MerchantKybIntroPageState extends State<MerchantKybIntroPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _loadMerchantKyb(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _open());
+  }
+
+  Future<void> _open() async {
+    if (!mounted) {
+      return;
+    }
+    try {
+      await _loadMerchantKyb(context);
+    } catch (_) {}
+    if (!mounted) {
+      return;
+    }
+    // App killed mid-registration: offer the saved draft once on reopen.
+    if (await context.read<MerchantKybCubit>().loadDraft() && mounted) {
+      await _offerDraft();
+    }
+  }
+
+  /// True when a saved draft was offered (the caller should not start fresh).
+  Future<bool> _offerDraft() async {
+    final cubit = context.read<MerchantKybCubit>();
+    if (cubit.pendingDraft == null) {
+      return false;
+    }
+    final resume = await askResumeDraft(context);
+    if (!mounted || resume == null) {
+      return true;
+    }
+    if (resume) {
+      cubit.restoreDraft();
+      showDraftRestoredNote(context);
+    } else {
+      await cubit.discardDraft();
+      if (!mounted) {
+        return true;
       }
-    });
+      cubit.startDraft();
+    }
+    context.push(MerchantKybRoutes.steps);
+    return true;
   }
 
   @override
@@ -221,7 +260,10 @@ class _MerchantKybIntroPageState extends State<MerchantKybIntroPage> {
       onBack: () => _leaveMerchantKyb(context),
       footer: OnboardingContinueBar(
         label: l10n.kybStartCta,
-        onPressed: () {
+        onPressed: () async {
+          if (await _offerDraft() || !context.mounted) {
+            return;
+          }
           context.read<MerchantKybCubit>().startDraft();
           context.push(MerchantKybRoutes.steps);
         },
@@ -258,14 +300,6 @@ class _MerchantKybIntroPageState extends State<MerchantKybIntroPage> {
           ),
           const SizedBox(height: DealGoSpacing.s12),
           Text(l10n.kybIntroHeadline, style: textTheme.titleLarge),
-          const SizedBox(height: DealGoSpacing.s8),
-          Text(
-            l10n.kybIntroBody,
-            style: textTheme.bodyMedium?.copyWith(
-              color: DealGoColors.textSecondary,
-              height: 1.4,
-            ),
-          ),
           const SizedBox(height: DealGoSpacing.s20),
           DealGoCard(
             child: Column(
@@ -553,7 +587,6 @@ class _MerchantKybStatusPageState extends State<MerchantKybStatusPage>
                 const SizedBox(height: DealGoSpacing.s12),
                 PartnerTimelineRow(
                   title: l10n.kybTimelineActivate,
-                  subtitle: l10n.kybTimelineActivateBody,
                   done: isActive,
                 ),
                 const SizedBox(height: DealGoSpacing.s16),
@@ -780,8 +813,6 @@ class _BusinessTypeStep extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: DealGoSpacing.s16),
-        OnboardingInfoBanner(message: l10n.kybTypeNote),
       ],
     );
   }
@@ -820,6 +851,23 @@ class _ShopInfoStep extends StatelessWidget {
           label: l10n.kybShopType,
           value: merchantBusinessTypeLabel(l10n, state.businessType),
           required: true,
+        ),
+        const SizedBox(height: DealGoSpacing.s16),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            l10n.kybShopCategory,
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+        ),
+        const SizedBox(height: DealGoSpacing.s8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FoodCategoryPicker(
+            key: const Key('kyb-shop-category'),
+            selected: state.shopCategory,
+            onChanged: cubit.setShopCategory,
+          ),
         ),
       ],
     );
@@ -896,11 +944,6 @@ class _RepStep extends StatelessWidget {
           fieldKey: const Key('kyb-representative'),
           onChanged: cubit.setRepresentativeName,
         ),
-        const SizedBox(height: DealGoSpacing.s12),
-        OnboardingInfoBanner(
-          message: l10n.kybRepNote,
-          tone: OnboardingBannerTone.neutral,
-        ),
         const SizedBox(height: DealGoSpacing.s20),
         PartnerBankFields(
           bankName: state.bankName,
@@ -964,8 +1007,11 @@ class _MerchantReviewStep extends StatelessWidget {
               const SizedBox(height: DealGoSpacing.s12),
               PartnerReviewRow(
                 title: l10n.kybReviewShop,
-                subtitle:
-                    '${state.shopName} · ${merchantBusinessTypeLabel(l10n, state.businessType)}',
+                subtitle: [
+                  state.shopName,
+                  merchantBusinessTypeLabel(l10n, state.businessType),
+                  ?foodCategoryLabel(context, state.shopCategory),
+                ].join(' · '),
                 ok: state.canContinueShopInfo,
               ),
               if (state.documentsRequired) ...[

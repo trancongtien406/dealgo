@@ -122,6 +122,8 @@ class FoodRepositoryImpl implements FoodRepository {
     int? prepMinutes,
     String? imageUrl,
     String? menuCategoryId,
+    int? originalPriceVnd,
+    bool clearOriginalPrice = false,
   }) {
     return _remote.updateMerchantItem(
       accessToken: accessToken,
@@ -133,6 +135,8 @@ class FoodRepositoryImpl implements FoodRepository {
       prepMinutes: prepMinutes,
       imageUrl: imageUrl,
       menuCategoryId: menuCategoryId,
+      originalPriceVnd: originalPriceVnd,
+      clearOriginalPrice: clearOriginalPrice,
     );
   }
 

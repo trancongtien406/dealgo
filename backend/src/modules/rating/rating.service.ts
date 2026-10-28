@@ -3,11 +3,15 @@ import { FoodService } from '../food-order/food.service.js';
 import { PlatformSettingsService } from '../../platform/settings/platform-settings.service.js';
 import { RideService } from '../ride/ride.service.js';
 import { RATING_REPOSITORY, type RatingSubjectType } from './rating.constants.js';
-import type { SubmitRatingDto } from './rating.dto.js';
+import type { RequestActor } from '../identity/access-auth.guard.js';
+import type { OpsReviewsQueryDto, SubmitRatingDto } from './rating.dto.js';
 import {
   RatingAlreadySubmittedError,
+  type ModeratedReviewRow,
   type RatingRepository,
   type ServiceRating,
+  type StarDistribution,
+  type StoreReviewRow,
 } from './rating.repository.js';
 
 export type PublicRating = Omit<ServiceRating, 'raterId' | 'createdAt'> & { createdAt: string };
@@ -25,15 +29,38 @@ export type StoreRatingSummary = {
   /** Null until the store has RATING_STORE_MIN_COUNT ratings, so one rater's stars stay private. */
   average: number | null;
   count: number;
+  /** Count per star (index 0 = 1 star); null while the average is hidden. */
+  distribution: StarDistribution | null;
+};
+
+export type PublicStoreReview = {
+  id: string;
+  stars: number;
+  tags: string[];
+  comment: string | null;
+  merchantReply: string | null;
+  repliedAt: string | null;
+  createdAt: string;
 };
 
 export type StoreReviews = {
   summary: StoreRatingSummary;
   /** Empty until the store reaches RATING_STORE_MIN_COUNT ratings. */
-  items: { stars: number; tags: string[]; comment: string | null; createdAt: string }[];
+  items: PublicStoreReview[];
+  page: number;
+  hasMore: boolean;
+};
+
+export type ModeratedReview = PublicStoreReview & {
+  storeId: string;
+  storeName: string | null;
+  hidden: boolean;
+  hiddenAt: string | null;
+  hiddenReason: string | null;
 };
 
 const STORE_REVIEW_LIMIT = 20;
+const MERCHANT_REVIEW_LIMIT = 20;
 
 const DAY_MS = 86_400_000;
 
@@ -66,30 +93,112 @@ export class RatingService {
     return unique.map((storeId) => {
       const row = byStore.get(storeId);
       const count = row?.count ?? 0;
+      const shown = row && count >= minCount;
       return {
         storeId,
         count,
-        average:
-          row && count >= minCount ? Math.round((row.sum / count) * 10) / 10 : null,
+        average: shown ? Math.round((row.sum / count) * 10) / 10 : null,
+        distribution: shown ? row.distribution : null,
       };
     });
   }
 
-  async storeReviews(storeId: string): Promise<StoreReviews> {
+  async storeReviews(
+    storeId: string,
+    query: { page?: number; stars?: number } = {},
+  ): Promise<StoreReviews> {
+    const page = Math.max(1, query.page ?? 1);
     const [summary] = await this.storeSummaries([storeId]);
     if (summary.average === null) {
-      return { summary, items: [] };
+      return { summary, items: [], page, hasMore: false };
     }
-    const rows = await this.ratings.recentStoreReviews(storeId, STORE_REVIEW_LIMIT);
+    const rows = await this.ratings.recentStoreReviews(
+      storeId,
+      STORE_REVIEW_LIMIT + 1,
+      (page - 1) * STORE_REVIEW_LIMIT,
+      query.stars,
+    );
     return {
       summary,
-      items: rows.map((row) => ({
-        stars: row.storeStars,
-        tags: row.tags,
-        comment: row.comment,
-        createdAt: row.createdAt.toISOString(),
-      })),
+      items: rows.slice(0, STORE_REVIEW_LIMIT).map(publicReview),
+      page,
+      hasMore: rows.length > STORE_REVIEW_LIMIT,
     };
+  }
+
+  /** The merchant sees every review of its store, including hidden ones and below the min count. */
+  async merchantReviews(
+    actor: RequestActor,
+    page = 1,
+  ): Promise<{ summary: StoreRatingSummary; items: ModeratedReview[]; total: number; page: number }> {
+    const storeId = await this.food.merchantStoreId(actor);
+    const [[summary], result] = await Promise.all([
+      this.storeSummaries([storeId]),
+      this.ratings.listModerated({ storeId }, page, MERCHANT_REVIEW_LIMIT),
+    ]);
+    return {
+      summary,
+      items: result.items.map((row) => moderatedReview(row, null)),
+      total: result.total,
+      page,
+    };
+  }
+
+  async replyAsMerchant(
+    actor: RequestActor,
+    ratingId: string,
+    text: string | undefined,
+  ): Promise<ModeratedReview> {
+    const storeId = await this.food.merchantStoreId(actor);
+    const trimmed = text?.trim() ? text.trim() : null;
+    const row = await this.ratings.reply(storeId, ratingId, trimmed, new Date());
+    if (!row) {
+      fail(404, 'RATING_NOT_FOUND', 'Review not found');
+    }
+    return moderatedReview(row, null);
+  }
+
+  async opsReviews(
+    query: OpsReviewsQueryDto,
+  ): Promise<{ items: ModeratedReview[]; total: number; page: number; limit: number }> {
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(50, Math.max(1, query.limit ?? 20));
+    const result = await this.ratings.listModerated(
+      {
+        storeId: query.storeId,
+        hidden: query.visibility === undefined ? undefined : query.visibility === 'HIDDEN',
+        maxStars: query.maxStars,
+        q: query.q,
+      },
+      page,
+      limit,
+    );
+    const names = await this.food.storeNames(result.items.map((row) => row.storeId));
+    return {
+      items: result.items.map((row) => moderatedReview(row, names.get(row.storeId) ?? null)),
+      total: result.total,
+      page,
+      limit,
+    };
+  }
+
+  async setHidden(
+    actorUserId: string,
+    ratingId: string,
+    hidden: boolean,
+    reason: string,
+  ): Promise<ModeratedReview> {
+    const row = await this.ratings.setHidden(
+      ratingId,
+      hidden,
+      { actorUserId, reason: reason.trim() },
+      new Date(),
+    );
+    if (!row) {
+      fail(404, 'RATING_NOT_FOUND', 'Review not found');
+    }
+    const names = await this.food.storeNames([row.storeId]);
+    return moderatedReview(row, names.get(row.storeId) ?? null);
   }
 
   async submit(userId: string, dto: SubmitRatingDto): Promise<PublicRating> {
@@ -168,6 +277,29 @@ export class RatingService {
     }
     return subject;
   }
+}
+
+function publicReview(row: StoreReviewRow): PublicStoreReview {
+  return {
+    id: row.id,
+    stars: row.storeStars,
+    tags: row.tags,
+    comment: row.comment,
+    merchantReply: row.merchantReply,
+    repliedAt: row.repliedAt ? row.repliedAt.toISOString() : null,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+function moderatedReview(row: ModeratedReviewRow, storeName: string | null): ModeratedReview {
+  return {
+    ...publicReview(row),
+    storeId: row.storeId,
+    storeName,
+    hidden: row.hiddenAt !== null,
+    hiddenAt: row.hiddenAt ? row.hiddenAt.toISOString() : null,
+    hiddenReason: row.hiddenReason,
+  };
 }
 
 function publish(rating: ServiceRating): PublicRating {

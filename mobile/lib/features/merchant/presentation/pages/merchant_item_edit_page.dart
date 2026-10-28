@@ -4,8 +4,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/drafts/text_draft.dart';
 import '../../../../core/l10n/api_error_text.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/network/request_failure.dart';
@@ -23,6 +25,8 @@ import '../../domain/entities/merchant_menu_models.dart';
 import '../../domain/repositories/merchant_orders_repository.dart';
 import '../utils/merchant_routes.dart';
 import '../widgets/merchant_widgets.dart';
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
+import '../../../../core/design_system/components/dealgo_network_image.dart';
 
 /// M027 — edit name/price/description/prep/category/availability (DEC-PROD-039).
 class MerchantItemEditPage extends StatefulWidget {
@@ -35,9 +39,12 @@ class MerchantItemEditPage extends StatefulWidget {
   State<MerchantItemEditPage> createState() => _MerchantItemEditPageState();
 }
 
-class _MerchantItemEditPageState extends State<MerchantItemEditPage> {
+class _MerchantItemEditPageState extends State<MerchantItemEditPage>
+    with TextDraftMixin {
   final _name = TextEditingController();
   final _price = TextEditingController();
+  final _originalPrice = TextEditingController();
+  int? _loadedOriginalPrice;
   final _description = TextEditingController();
   final _prep = TextEditingController();
   var _available = true;
@@ -64,6 +71,7 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage> {
   void dispose() {
     _name.dispose();
     _price.dispose();
+    _originalPrice.dispose();
     _description.dispose();
     _prep.dispose();
     super.dispose();
@@ -101,6 +109,8 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage> {
       }
       _name.text = item.name;
       _price.text = '${item.priceVnd}';
+      _loadedOriginalPrice = item.originalPriceVnd;
+      _originalPrice.text = item.originalPriceVnd?.toString() ?? '';
       _description.text = item.description ?? '';
       _prep.text = item.prepMinutes?.toString() ?? '';
       _available = item.available;
@@ -118,6 +128,14 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage> {
         _formReady = true;
         _loadFailure = null;
         _missing = false;
+      });
+      // Unsaved edits of this item survive an app kill (text fields only).
+      bindTextDraft('merchant.item.${widget.itemId}', {
+        'name': _name,
+        'price': _price,
+        'originalPrice': _originalPrice,
+        'description': _description,
+        'prep': _prep,
       });
     } catch (e) {
       if (!mounted) return;
@@ -223,6 +241,16 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage> {
       setState(() => _error = AppLocalizations.of(context).merchantItemInvalid);
       return;
     }
+    final originalText = _originalPrice.text.trim();
+    final original = originalText.isEmpty ? null : int.tryParse(originalText);
+    if (originalText.isNotEmpty && (original == null || original <= price)) {
+      setState(
+        () =>
+            _error = AppLocalizations.of(context)
+                .merchantItemOriginalPriceInvalid,
+      );
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
@@ -239,7 +267,10 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage> {
             : _description.text.trim(),
         prepMinutes: prep,
         menuCategoryId: _categoryId,
+        originalPriceVnd: original,
+        clearOriginalPrice: original == null && _loadedOriginalPrice != null,
       );
+      clearTextDraft();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocalizations.of(context).merchantItemSaved)),
@@ -285,7 +316,7 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage> {
                         : l10n.merchantItemUpdateFailed,
                   ))
           : SingleChildScrollView(
-              padding: merchantPagePadding,
+              padding: dealGoScrollPadding(context, merchantPagePadding),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -313,11 +344,6 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage> {
                   const SizedBox(height: DealGoSpacing.s12),
                   Text(l10n.merchantItemPhoto, style: textTheme.titleSmall),
                   const SizedBox(height: DealGoSpacing.s8),
-                  Text(
-                    l10n.merchantEditGalleryHint,
-                    style: textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: DealGoSpacing.s8),
                   SizedBox(
                     height: 88,
                     child: ListView(
@@ -334,17 +360,16 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage> {
                               child: SizedBox(
                                 width: 88,
                                 height: 88,
-                                child: Image.network(
+                                child: DealGoNetworkImage(
                                   resolveMediaUrl(url) ?? url,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      const ColoredBox(
-                                        color: DealGoColors.subtlePurple,
-                                        child: Icon(
-                                          DealGoIcons.restaurant,
-                                          color: DealGoColors.primary,
-                                        ),
-                                      ),
+                                  fallback: const ColoredBox(
+                                    color: DealGoColors.subtlePurple,
+                                    child: Icon(
+                                      DealGoIcons.restaurant,
+                                      color: DealGoColors.primary,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -410,6 +435,14 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage> {
                   ),
                   const SizedBox(height: DealGoSpacing.s12),
                   DealGoTextField(
+                    label: l10n.merchantItemOriginalPrice,
+                    fieldKey: const Key('merchant-edit-original-price'),
+                    controller: _originalPrice,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  ),
+                  const SizedBox(height: DealGoSpacing.s12),
+                  DealGoTextField(
                     label: l10n.merchantItemDescription,
                     fieldKey: const Key('merchant-edit-description'),
                     controller: _description,
@@ -450,19 +483,28 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage> {
                   if (_error != null)
                     Text(_error!, style: TextStyle(color: DealGoColors.danger)),
                   const SizedBox(height: DealGoSpacing.s16),
-                  DealGoPrimaryButton(
-                    key: const Key('merchant-edit-save'),
-                    label: l10n.actionSave,
-                    isLoading: _busy,
-                    onPressed: () => _save(continueToVariants: false),
-                  ),
-                  const SizedBox(height: DealGoSpacing.s8),
-                  OutlinedButton(
-                    key: const Key('merchant-edit-continue-variants'),
-                    onPressed: _busy
-                        ? null
-                        : () => _save(continueToVariants: true),
-                    child: Text(l10n.merchantItemContinue),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DealGoSecondaryButton(
+                          key: const Key('merchant-edit-continue-variants'),
+                          label: l10n.merchantItemContinue,
+                          compact: true,
+                          enabled: !_busy,
+                          onPressed: () => _save(continueToVariants: true),
+                        ),
+                      ),
+                      const SizedBox(width: DealGoSpacing.s8),
+                      Expanded(
+                        child: DealGoPrimaryButton(
+                          key: const Key('merchant-edit-save'),
+                          label: l10n.actionSave,
+                          compact: true,
+                          isLoading: _busy,
+                          onPressed: () => _save(continueToVariants: false),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

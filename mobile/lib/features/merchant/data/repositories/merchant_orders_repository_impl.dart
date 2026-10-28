@@ -60,23 +60,36 @@ class MerchantOrdersRepositoryImpl implements MerchantOrdersRepository {
   @override
   Future<FoodStoreDetail> updateStoreProfile({
     required String accessToken,
-    required String name,
-  }) => _remote.updateStoreProfile(accessToken: accessToken, name: name);
+    String? name,
+    String? category,
+    int? minOrderVnd,
+    String? description,
+  }) => _remote.updateStoreProfile(
+    accessToken: accessToken,
+    name: name,
+    category: category,
+    minOrderVnd: minOrderVnd,
+    description: description,
+  );
 
   @override
   Future<FoodStoreDetail> uploadStoreLogo({
     required String accessToken,
     required String contentBase64,
     String? contentType,
+    bool cover = false,
   }) => _remote.uploadStoreLogo(
     accessToken: accessToken,
     contentBase64: contentBase64,
     contentType: contentType,
+    cover: cover,
   );
 
   @override
-  Future<FoodStoreDetail> clearStoreLogo({required String accessToken}) =>
-      _remote.clearStoreLogo(accessToken: accessToken);
+  Future<FoodStoreDetail> clearStoreLogo({
+    required String accessToken,
+    bool cover = false,
+  }) => _remote.clearStoreLogo(accessToken: accessToken, cover: cover);
 
   @override
   Future<FoodStoreDetail> updateStoreLocation({
@@ -158,6 +171,8 @@ class MerchantOrdersRepositoryImpl implements MerchantOrdersRepository {
     int? prepMinutes,
     String? imageUrl,
     String? menuCategoryId,
+    int? originalPriceVnd,
+    bool clearOriginalPrice = false,
   }) {
     return _remote.updateCatalogItem(
       accessToken: accessToken,
@@ -169,6 +184,8 @@ class MerchantOrdersRepositoryImpl implements MerchantOrdersRepository {
       prepMinutes: prepMinutes,
       imageUrl: imageUrl,
       menuCategoryId: menuCategoryId,
+      originalPriceVnd: originalPriceVnd,
+      clearOriginalPrice: clearOriginalPrice,
     );
   }
 

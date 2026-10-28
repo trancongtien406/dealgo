@@ -24,8 +24,9 @@ import '../widgets/ride_widgets.dart';
 
 const _suggestionLimit = 5;
 
-/// Fast ride entry (inDrive-like): GPS pickup in background, destination first,
-/// then map + sheet for confirm before class/fare.
+/// Fast ride entry (inDrive-like): GPS fills the pickup in the background and
+/// the destination picker opens first; the sheet lists pickup on top and the
+/// destination below, then map + sheet confirm before class/fare.
 class RideMapPage extends StatefulWidget {
   const RideMapPage({super.key});
 
@@ -204,8 +205,22 @@ class _RideMapPageState extends State<RideMapPage> {
     if (context.canPop()) {
       context.pop();
     } else {
+      // Leaving the booking tab abandons this draft.
+      _resetDraft();
       context.go('/customer');
     }
+  }
+
+  /// The tab stays alive in the shell, so a used or abandoned A/B would
+  /// otherwise greet the next booking. Pickup is located again from GPS;
+  /// recent places stay suggestions only.
+  void _resetDraft() {
+    setState(() {
+      _pickup = null;
+      _dropoff = null;
+    });
+    unawaited(_locatePickup());
+    unawaited(_loadSuggestions());
   }
 
   @override
@@ -221,17 +236,28 @@ class _RideMapPageState extends State<RideMapPage> {
         ? MapLatLng(lat: dropoff.lat, lng: dropoff.lng)
         : danangViewportCenter;
 
-    return BlocListener<RideDestinationCubit, PlaceOption?>(
-      listenWhen: (_, next) => next != null,
-      listener: (context, _) {
-        final place = context.read<RideDestinationCubit>().take();
-        if (place != null) {
-          setState(() {
-            _dropoff = place;
-          });
-          _tryAutoAdvance();
-        }
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<RideDestinationCubit, PlaceOption?>(
+          listenWhen: (_, next) => next != null,
+          listener: (context, _) {
+            final place = context.read<RideDestinationCubit>().take();
+            if (place != null) {
+              setState(() {
+                _dropoff = place;
+              });
+              _tryAutoAdvance();
+            }
+          },
+        ),
+        // A ride was created from this draft: it is used up. Cancelling or
+        // finishing that ride then starts from an empty tab, while a ride
+        // still waiting for offers stays one tap away ("ride-open-pending").
+        BlocListener<RideSessionCubit, String?>(
+          listenWhen: (previous, next) => next != null && next != previous,
+          listener: (context, _) => _resetDraft(),
+        ),
+      ],
       child: PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) {
@@ -247,7 +273,7 @@ class _RideMapPageState extends State<RideMapPage> {
                 child: Builder(
                   builder: (context) {
                     final media = MediaQuery.of(context);
-                    return context.read<MapPort>().buildMap(
+                    return context.watch<MapPort>().buildMap(
                       center: center,
                       markers: [
                         if (pickup != null)
@@ -271,19 +297,15 @@ class _RideMapPageState extends State<RideMapPage> {
               ),
               // Tab root with the bar hidden: map stays full-bleed, floating
               // back on the left, map controls on the right.
-              Positioned(
-                left: DealGoDimensions.pageGutter,
-                top: MediaQuery.paddingOf(context).top + DealGoSpacing.s8,
-                child: MapBackButton(
-                  key: const Key('ride-map-back'),
-                  onPressed: _back,
-                ),
+              MapBackOverlay(
+                buttonKey: const Key('ride-map-back'),
+                onPressed: _back,
               ),
               Positioned(
                 right: DealGoDimensions.pageGutter,
                 top: MediaQuery.paddingOf(context).top + DealGoSpacing.s8,
                 child: MapSideControls(
-                  stylesAvailable: mapStylesAvailable(context.read<MapPort>()),
+                  stylesAvailable: mapStylesAvailable(context.watch<MapPort>()),
                   locateKey: const Key('ride-map-recenter'),
                   onLocate: _locating ? null : _locatePickup,
                 ),
@@ -310,17 +332,8 @@ class _RideMapPageState extends State<RideMapPage> {
                             const SizedBox(height: DealGoSpacing.s12),
                             Text(l10n.rideWhereTo, style: textTheme.titleLarge),
                             const SizedBox(height: DealGoSpacing.s12),
-                            // Destination first — primary action.
-                            RideStopField(
-                              key: const Key('ride-dropoff-label'),
-                              icon: DealGoIcons.search,
-                              tone: DealGoColors.primary,
-                              caption: l10n.rideDropoff,
-                              value: dropoff?.label,
-                              placeholder: l10n.rideDropoffPlaceholder,
-                              onTap: () => _pickDropoff(),
-                            ),
-                            const SizedBox(height: DealGoSpacing.s8),
+                            // Pickup on top, destination below — same order as
+                            // RideStopList on every later ride screen.
                             RideStopField(
                               key: const Key('ride-pickup-label'),
                               icon: DealGoIcons.myLocation,
@@ -331,6 +344,16 @@ class _RideMapPageState extends State<RideMapPage> {
                                   ? l10n.placeLocating
                                   : l10n.ridePickupPlaceholder,
                               onTap: _pickPickup,
+                            ),
+                            const SizedBox(height: DealGoSpacing.s8),
+                            RideStopField(
+                              key: const Key('ride-dropoff-label'),
+                              icon: DealGoIcons.pin,
+                              tone: DealGoColors.danger,
+                              caption: l10n.rideDropoff,
+                              value: dropoff?.label,
+                              placeholder: l10n.rideDropoffPlaceholder,
+                              onTap: () => _pickDropoff(),
                               trailing: IconButton(
                                 tooltip: l10n.rideRouteSwapTooltip,
                                 onPressed: pickup == null && dropoff == null
@@ -431,16 +454,6 @@ class _RideMapPageState extends State<RideMapPage> {
                                   ),
                                 ),
                             ],
-                            if (pendingRideId != null) ...[
-                              const SizedBox(height: DealGoSpacing.s12),
-                              DealGoSecondaryButton(
-                                label: l10n.rideOpenPendingOffers,
-                                compact: true,
-                                onPressed: () => context.push(
-                                  RideRoutes.offers(pendingRideId),
-                                ),
-                              ),
-                            ],
                           ],
                         ),
                       ),
@@ -452,14 +465,35 @@ class _RideMapPageState extends State<RideMapPage> {
                           DealGoSpacing.s12 +
                               MediaQuery.viewPaddingOf(context).bottom,
                         ),
-                        child: DealGoPrimaryButton(
-                          key: const Key('ride-open-route-overview'),
-                          label: l10n.rideRouteContinueBooking,
-                          trailingIcon: DealGoIcons.arrowRight,
-                          compact: true,
-                          enabled: _places != null && !_samePlace,
-                          isLoading: _locating && _dropoff != null,
-                          onPressed: _continue,
+                        child: Row(
+                          children: [
+                            if (pendingRideId != null) ...[
+                              Expanded(
+                                child: DealGoSecondaryButton(
+                                  key: const Key('ride-open-pending'),
+                                  label: l10n.rideOpenPendingOffers,
+                                  compact: true,
+                                  onPressed: () => context.push(
+                                    RideRoutes.offers(pendingRideId),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: DealGoSpacing.s8),
+                            ],
+                            Expanded(
+                              child: DealGoPrimaryButton(
+                                key: const Key('ride-open-route-overview'),
+                                label: l10n.rideRouteContinueBooking,
+                                trailingIcon: pendingRideId == null
+                                    ? DealGoIcons.arrowRight
+                                    : null,
+                                compact: true,
+                                enabled: _places != null && !_samePlace,
+                                isLoading: _locating && _dropoff != null,
+                                onPressed: _continue,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],

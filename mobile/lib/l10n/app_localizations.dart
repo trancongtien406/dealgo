@@ -335,7 +335,7 @@ abstract class AppLocalizations {
   /// No description provided for @otpHeading.
   ///
   /// In en, this message translates to:
-  /// **'Verify phone number'**
+  /// **'Verify phone'**
   String get otpHeading;
 
   /// No description provided for @otpSending.
@@ -347,25 +347,25 @@ abstract class AppLocalizations {
   /// No description provided for @otpInvalidTitle.
   ///
   /// In en, this message translates to:
-  /// **'Incorrect verification code'**
+  /// **'Wrong code'**
   String get otpInvalidTitle;
 
   /// No description provided for @otpExpiredTitle.
   ///
   /// In en, this message translates to:
-  /// **'Verification code expired'**
+  /// **'Code expired'**
   String get otpExpiredTitle;
 
   /// No description provided for @otpLockedBody.
   ///
   /// In en, this message translates to:
-  /// **'Too many incorrect attempts. Request a new code later.'**
+  /// **'Too many attempts. Try later.'**
   String get otpLockedBody;
 
   /// No description provided for @otpInvalidBody.
   ///
   /// In en, this message translates to:
-  /// **'The 6-digit code does not match or was already used. Check and try again.'**
+  /// **'Code is wrong or used.'**
   String get otpInvalidBody;
 
   /// No description provided for @otpInvalidShort.
@@ -383,7 +383,7 @@ abstract class AppLocalizations {
   /// No description provided for @otpCannotResendBody.
   ///
   /// In en, this message translates to:
-  /// **'Wait until the cooldown ends before requesting another OTP.'**
+  /// **'Wait to resend.'**
   String get otpCannotResendBody;
 
   /// No description provided for @otpResendLabel.
@@ -401,7 +401,7 @@ abstract class AppLocalizations {
   /// No description provided for @otpServerGateHint.
   ///
   /// In en, this message translates to:
-  /// **'You can request a new code once the timer ends.'**
+  /// **'Wait to get a new code.'**
   String get otpServerGateHint;
 
   /// No description provided for @otpPrivacyNote.
@@ -493,12 +493,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Da Nang'**
   String get homeCitySample;
-
-  /// No description provided for @chatTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Messages'**
-  String get chatTitle;
 
   /// No description provided for @chatEmpty.
   ///
@@ -689,7 +683,7 @@ abstract class AppLocalizations {
   /// No description provided for @rideOfferDetailTitle.
   ///
   /// In en, this message translates to:
-  /// **'Offer & driver details'**
+  /// **'Offer details'**
   String get rideOfferDetailTitle;
 
   /// No description provided for @rideOfferAmountLabel.
@@ -710,16 +704,10 @@ abstract class AppLocalizations {
   /// **'Trip'**
   String get rideTripInfoTitle;
 
-  /// No description provided for @rideOfferDetailHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Confirming this offer creates the trip. Unselected offers may expire.'**
-  String get rideOfferDetailHint;
-
   /// No description provided for @rideSelectOfferCta.
   ///
   /// In en, this message translates to:
-  /// **'Continue with this offer'**
+  /// **'Choose offer'**
   String get rideSelectOfferCta;
 
   /// No description provided for @ridePickupCodeTitle.
@@ -743,7 +731,7 @@ abstract class AppLocalizations {
   /// No description provided for @ridePickupCodeBody.
   ///
   /// In en, this message translates to:
-  /// **'Share this code only when the vehicle and plate match.'**
+  /// **'Share only if car and plate match.'**
   String get ridePickupCodeBody;
 
   /// No description provided for @ridePickupCodeSafetyTitle.
@@ -755,7 +743,7 @@ abstract class AppLocalizations {
   /// No description provided for @ridePickupCodeSafetyBody.
   ///
   /// In en, this message translates to:
-  /// **'Do not send the code in chat before the driver arrives.'**
+  /// **'Don\'t send the code in chat.'**
   String get ridePickupCodeSafetyBody;
 
   /// No description provided for @rideSafetyTitle.
@@ -773,7 +761,7 @@ abstract class AppLocalizations {
   /// No description provided for @rideSafetyBannerBody.
   ///
   /// In en, this message translates to:
-  /// **'Share your trip and save emergency contacts. In an emergency, call 113/115 directly from your phone.'**
+  /// **'Share your trip; call 113/115 if needed.'**
   String get rideSafetyBannerBody;
 
   /// No description provided for @rideSafetyShareTitle.
@@ -785,13 +773,13 @@ abstract class AppLocalizations {
   /// No description provided for @rideSafetyShareBody.
   ///
   /// In en, this message translates to:
-  /// **'Send a trip-tracking link to family. It only shows the trip status, the driver\'s masked name and plate, and expires after 12 hours or 30 minutes after the trip ends.'**
+  /// **'Send a trip link to someone.'**
   String get rideSafetyShareBody;
 
   /// No description provided for @rideSafetyShareCta.
   ///
   /// In en, this message translates to:
-  /// **'Copy trip link'**
+  /// **'Share trip link'**
   String get rideSafetyShareCta;
 
   /// No description provided for @rideSafetyShareCopied.
@@ -809,7 +797,7 @@ abstract class AppLocalizations {
   /// No description provided for @rideSafetyContactsBody.
   ///
   /// In en, this message translates to:
-  /// **'Emergency contacts are saved on this device.'**
+  /// **'Saved on this device.'**
   String get rideSafetyContactsBody;
 
   /// No description provided for @rideSafetyAddContact.
@@ -827,7 +815,7 @@ abstract class AppLocalizations {
   /// No description provided for @rideSafetyEmergencyBody.
   ///
   /// In en, this message translates to:
-  /// **'Use your phone dialer for local emergency numbers. No in-app SOS is claimed here.'**
+  /// **'Call emergency from your phone.'**
   String get rideSafetyEmergencyBody;
 
   /// No description provided for @rideCancelTitle.
@@ -841,12 +829,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Why are you cancelling?'**
   String get rideCancelPickReason;
-
-  /// No description provided for @rideCancelPolicyHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Cancellation fees, if any, follow DealGo policy.'**
-  String get rideCancelPolicyHint;
 
   /// No description provided for @rideCancelReasonWait.
   ///
@@ -923,7 +905,7 @@ abstract class AppLocalizations {
   /// No description provided for @foodCancelPolicyHint.
   ///
   /// In en, this message translates to:
-  /// **'You can cancel only before the shop accepts the order. Refunds, if any, follow DealGo policy.'**
+  /// **'Cancel only before the store accepts.'**
   String get foodCancelPolicyHint;
 
   /// No description provided for @foodCancelReasonWrong.
@@ -977,7 +959,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverJobFailedBody.
   ///
   /// In en, this message translates to:
-  /// **'Tell us why this job couldn\'t be completed.'**
+  /// **'Pick a reason.'**
   String get driverJobFailedBody;
 
   /// No description provided for @driverJobFailedPick.
@@ -1015,12 +997,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Submit outcome'**
   String get driverJobFailedSubmit;
-
-  /// No description provided for @driverJobFailedPolicyHint.
-  ///
-  /// In en, this message translates to:
-  /// **'DealGo will review and settle according to driver policy.'**
-  String get driverJobFailedPolicyHint;
 
   /// No description provided for @driverJobFailedSoftFail.
   ///
@@ -1064,12 +1040,6 @@ abstract class AppLocalizations {
   /// **'Accepted fare'**
   String get driverCompletedFareLabel;
 
-  /// No description provided for @driverCompletedEarningsHint.
-  ///
-  /// In en, this message translates to:
-  /// **'The platform fee is fixed when the job completes.'**
-  String get driverCompletedEarningsHint;
-
   /// No description provided for @driverJobsHistorySection.
   ///
   /// In en, this message translates to:
@@ -1085,26 +1055,14 @@ abstract class AppLocalizations {
   /// No description provided for @driverServicesHeadline.
   ///
   /// In en, this message translates to:
-  /// **'Choose services to receive work'**
+  /// **'Services'**
   String get driverServicesHeadline;
-
-  /// No description provided for @driverServicesBody.
-  ///
-  /// In en, this message translates to:
-  /// **'You can enable each approved work type separately.'**
-  String get driverServicesBody;
 
   /// No description provided for @driverServicesOnlineTitle.
   ///
   /// In en, this message translates to:
   /// **'Online'**
   String get driverServicesOnlineTitle;
-
-  /// No description provided for @driverServicesOnlineBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Ready to receive new requests'**
-  String get driverServicesOnlineBody;
 
   /// No description provided for @driverServicesApprovedSection.
   ///
@@ -1115,26 +1073,14 @@ abstract class AppLocalizations {
   /// No description provided for @driverServicesRideTitle.
   ///
   /// In en, this message translates to:
-  /// **'Passenger rides (bike & car)'**
+  /// **'Rides'**
   String get driverServicesRideTitle;
-
-  /// No description provided for @driverServicesRideBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Nearby trips · Flexible pricing'**
-  String get driverServicesRideBody;
 
   /// No description provided for @driverServicesFoodTitle.
   ///
   /// In en, this message translates to:
   /// **'Food delivery'**
   String get driverServicesFoodTitle;
-
-  /// No description provided for @driverServicesFoodBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Pick up from Shop and deliver to customer'**
-  String get driverServicesFoodBody;
 
   /// No description provided for @driverServicesApprovedChip.
   ///
@@ -1148,23 +1094,11 @@ abstract class AppLocalizations {
   /// **'Active vehicle'**
   String get driverServicesVehicleSection;
 
-  /// No description provided for @driverServicesVehicleInUse.
-  ///
-  /// In en, this message translates to:
-  /// **'In use'**
-  String get driverServicesVehicleInUse;
-
   /// No description provided for @driverServicesAreaSection.
   ///
   /// In en, this message translates to:
   /// **'Request area'**
   String get driverServicesAreaSection;
-
-  /// No description provided for @driverServicesAreaEdit.
-  ///
-  /// In en, this message translates to:
-  /// **'Edit'**
-  String get driverServicesAreaEdit;
 
   /// No description provided for @driverServicesAreaFromGps.
   ///
@@ -1177,12 +1111,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save configuration'**
   String get driverServicesSave;
-
-  /// No description provided for @driverServicesPolicyHint.
-  ///
-  /// In en, this message translates to:
-  /// **'The system only sends jobs that match valid documents, driver status, and vehicle.'**
-  String get driverServicesPolicyHint;
 
   /// No description provided for @driverServicesCount.
   ///
@@ -1205,7 +1133,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverOtpBody.
   ///
   /// In en, this message translates to:
-  /// **'Enter the 4-digit code from the passenger to start the trip.'**
+  /// **'Enter the rider\'s 4-digit code.'**
   String get driverOtpBody;
 
   /// No description provided for @driverOtpVerifyTitle.
@@ -1231,18 +1159,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'OTP does not match. Check again with the passenger.'**
   String get driverOtpWrong;
-
-  /// No description provided for @driverOtpGuide.
-  ///
-  /// In en, this message translates to:
-  /// **'Only start the trip after verifying the passenger and confirmation code.'**
-  String get driverOtpGuide;
-
-  /// No description provided for @driverOtpPrivacy.
-  ///
-  /// In en, this message translates to:
-  /// **'Do not share the pickup OTP in chat or with unrelated people.'**
-  String get driverOtpPrivacy;
 
   /// No description provided for @driverOtpConfirm.
   ///
@@ -1295,13 +1211,13 @@ abstract class AppLocalizations {
   /// No description provided for @driverActiveWaitingBody.
   ///
   /// In en, this message translates to:
-  /// **'Wait for the passenger. Verify OTP before starting the trip.'**
+  /// **'Wait, then enter OTP to start.'**
   String get driverActiveWaitingBody;
 
   /// No description provided for @driverActiveOnTripBody.
   ///
   /// In en, this message translates to:
-  /// **'Follow the route to the destination and drive safely.'**
+  /// **'Drive safely.'**
   String get driverActiveOnTripBody;
 
   /// No description provided for @driverActiveCompleteCta.
@@ -1313,7 +1229,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverActiveCompleteBody.
   ///
   /// In en, this message translates to:
-  /// **'Collect the fare agreed with the customer.'**
+  /// **'Collect the agreed fare.'**
   String get driverActiveCompleteBody;
 
   /// No description provided for @driverActiveReportIssue.
@@ -1349,14 +1265,8 @@ abstract class AppLocalizations {
   /// No description provided for @driverFoodPhaseCompleteTitle.
   ///
   /// In en, this message translates to:
-  /// **'Delivery confirmed'**
+  /// **'Delivered'**
   String get driverFoodPhaseCompleteTitle;
-
-  /// No description provided for @driverFoodArrivedStore.
-  ///
-  /// In en, this message translates to:
-  /// **'Arrived at store'**
-  String get driverFoodArrivedStore;
 
   /// No description provided for @driverFoodConfirmPickup.
   ///
@@ -1379,25 +1289,25 @@ abstract class AppLocalizations {
   /// No description provided for @driverFoodWaitBody.
   ///
   /// In en, this message translates to:
-  /// **'Wait until the Shop finishes. Do not mark pickup before bags are ready.'**
+  /// **'Wait for the order.'**
   String get driverFoodWaitBody;
 
   /// No description provided for @driverFoodPickupBody.
   ///
   /// In en, this message translates to:
-  /// **'Match bag count and handoff code with the Shop before leaving.'**
+  /// **'Check bags and handover code.'**
   String get driverFoodPickupBody;
 
   /// No description provided for @driverFoodDeliverBody.
   ///
   /// In en, this message translates to:
-  /// **'Hand the order to the customer and collect COD for the order total.'**
+  /// **'Deliver and collect COD.'**
   String get driverFoodDeliverBody;
 
   /// No description provided for @driverFoodCompleteBody.
   ///
   /// In en, this message translates to:
-  /// **'COD is collected on behalf of the shop and settled with DealGo.'**
+  /// **'COD will be settled.'**
   String get driverFoodCompleteBody;
 
   /// No description provided for @driverFoodIncomePending.
@@ -1439,7 +1349,7 @@ abstract class AppLocalizations {
   /// No description provided for @merchantRejectConfirmBody.
   ///
   /// In en, this message translates to:
-  /// **'Are you sure you want to reject this order?'**
+  /// **'Reject this order?'**
   String get merchantRejectConfirmBody;
 
   /// No description provided for @merchantRejectConfirmCta.
@@ -1465,30 +1375,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Today’s finances'**
   String get merchantHomeFinanceTitle;
-
-  /// No description provided for @merchantHomeGrossFood.
-  ///
-  /// In en, this message translates to:
-  /// **'Food revenue (gross)'**
-  String get merchantHomeGrossFood;
-
-  /// No description provided for @merchantHomePendingSettle.
-  ///
-  /// In en, this message translates to:
-  /// **'Pending settlement'**
-  String get merchantHomePendingSettle;
-
-  /// No description provided for @merchantHomeAvailable.
-  ///
-  /// In en, this message translates to:
-  /// **'Available balance'**
-  String get merchantHomeAvailable;
-
-  /// No description provided for @merchantHomeFinanceHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Sales are the food subtotal of orders delivered today (Vietnam time). Withdrawable balance comes from settlement and isn\'t shown in the app yet.'**
-  String get merchantHomeFinanceHint;
 
   /// No description provided for @merchantHomeCompletedToday.
   ///
@@ -1532,23 +1418,11 @@ abstract class AppLocalizations {
   /// **'Discount'**
   String get merchantOrderDiscount;
 
-  /// No description provided for @merchantOrderCodNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Shop does not keep the full COD: delivery fee belongs to driver/platform; COD is not collected at accept.'**
-  String get merchantOrderCodNote;
-
   /// No description provided for @merchantSettingsShellTitle.
   ///
   /// In en, this message translates to:
   /// **'Shop settings'**
   String get merchantSettingsShellTitle;
-
-  /// No description provided for @merchantSettingsMockHint.
-  ///
-  /// In en, this message translates to:
-  /// **'These settings are saved on this device only for now.'**
-  String get merchantSettingsMockHint;
 
   /// No description provided for @merchantAcceptTitle.
   ///
@@ -1577,19 +1451,19 @@ abstract class AppLocalizations {
   /// No description provided for @merchantAcceptManualHint.
   ///
   /// In en, this message translates to:
-  /// **'The shop reviews and accepts each order.'**
+  /// **'Accept each order.'**
   String get merchantAcceptManualHint;
 
   /// No description provided for @merchantAcceptAutoHint.
   ///
   /// In en, this message translates to:
-  /// **'Orders are accepted only while open and under capacity.'**
+  /// **'Auto-accept while open.'**
   String get merchantAcceptAutoHint;
 
   /// No description provided for @merchantHoursTitle.
   ///
   /// In en, this message translates to:
-  /// **'Hours & days off'**
+  /// **'Opening hours'**
   String get merchantHoursTitle;
 
   /// No description provided for @merchantHoursOpen.
@@ -1607,7 +1481,7 @@ abstract class AppLocalizations {
   /// No description provided for @merchantBusyTitle.
   ///
   /// In en, this message translates to:
-  /// **'Busy & pause mode'**
+  /// **'Busy / Paused'**
   String get merchantBusyTitle;
 
   /// No description provided for @merchantBusyModeLabel.
@@ -1643,19 +1517,19 @@ abstract class AppLocalizations {
   /// No description provided for @merchantBusyBusyHint.
   ///
   /// In en, this message translates to:
-  /// **'Still taking orders; customers see the kitchen is busy.'**
+  /// **'Still open, slower prep.'**
   String get merchantBusyBusyHint;
 
   /// No description provided for @merchantBusyPausedHint.
   ///
   /// In en, this message translates to:
-  /// **'No new orders; existing orders continue.'**
+  /// **'No new orders.'**
   String get merchantBusyPausedHint;
 
   /// No description provided for @merchantVariantsTitle.
   ///
   /// In en, this message translates to:
-  /// **'Size, variants & toppings'**
+  /// **'Options'**
   String get merchantVariantsTitle;
 
   /// No description provided for @merchantVariantsCta.
@@ -1718,12 +1592,6 @@ abstract class AppLocalizations {
   /// **'Check your route'**
   String get rideRouteOverviewTitle;
 
-  /// No description provided for @rideRouteOverviewSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Estimated path before booking'**
-  String get rideRouteOverviewSubtitle;
-
   /// No description provided for @rideRouteSwapTooltip.
   ///
   /// In en, this message translates to:
@@ -1741,18 +1609,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Ref. price'**
   String get rideRouteRefPrice;
-
-  /// No description provided for @rideRoutePriceHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Suggested fares depend on vehicle class; you propose your offer next.'**
-  String get rideRoutePriceHint;
-
-  /// No description provided for @rideRouteContinueVehicle.
-  ///
-  /// In en, this message translates to:
-  /// **'Continue to vehicles'**
-  String get rideRouteContinueVehicle;
 
   /// No description provided for @rideRouteContinueBooking.
   ///
@@ -1783,12 +1639,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Trip information'**
   String get rideFareTripInfoTitle;
-
-  /// No description provided for @rideFareBreakdownNote.
-  ///
-  /// In en, this message translates to:
-  /// **'The fare is locked to the quote you confirm. Later surcharges need notice and your consent.'**
-  String get rideFareBreakdownNote;
 
   /// No description provided for @rideFareProposeCta.
   ///
@@ -1831,12 +1681,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Search suggestions'**
   String get foodSearchSuggestions;
-
-  /// No description provided for @foodSearchSuggestionsHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Results matching your keyword'**
-  String get foodSearchSuggestionsHint;
 
   /// No description provided for @foodSearchEmpty.
   ///
@@ -2021,7 +1865,7 @@ abstract class AppLocalizations {
   /// No description provided for @foodInvoiceCodNote.
   ///
   /// In en, this message translates to:
-  /// **'You paid {amount} in cash to the driver on delivery.'**
+  /// **'Paid {amount} in cash.'**
   String foodInvoiceCodNote(String amount);
 
   /// No description provided for @foodInvoiceRateCta.
@@ -2051,7 +1895,7 @@ abstract class AppLocalizations {
   /// No description provided for @checkoutEmptyBody.
   ///
   /// In en, this message translates to:
-  /// **'Add items before checking out.'**
+  /// **'No items yet.'**
   String get checkoutEmptyBody;
 
   /// No description provided for @checkoutBackToMenu.
@@ -2059,12 +1903,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Back to menu'**
   String get checkoutBackToMenu;
-
-  /// No description provided for @foodTrackingStatusTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Live status'**
-  String get foodTrackingStatusTitle;
 
   /// No description provided for @foodTrackingMapChip.
   ///
@@ -2081,20 +1919,8 @@ abstract class AppLocalizations {
   /// No description provided for @foodTrackingMapEmptyHint.
   ///
   /// In en, this message translates to:
-  /// **'Dropoff is ready. Store coordinates are not on the map yet.'**
+  /// **'Store not on the map yet.'**
   String get foodTrackingMapEmptyHint;
-
-  /// No description provided for @foodTrackingDriverTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Driver delivering'**
-  String get foodTrackingDriverTitle;
-
-  /// No description provided for @foodTrackingPayOnDelivery.
-  ///
-  /// In en, this message translates to:
-  /// **'Pay on delivery'**
-  String get foodTrackingPayOnDelivery;
 
   /// No description provided for @foodTrackingCodDue.
   ///
@@ -2105,7 +1931,7 @@ abstract class AppLocalizations {
   /// No description provided for @foodTrackingCodHint.
   ///
   /// In en, this message translates to:
-  /// **'Not collected until delivery succeeds.'**
+  /// **'Pay on delivery.'**
   String get foodTrackingCodHint;
 
   /// No description provided for @paymentHistoryTitle.
@@ -2126,12 +1952,6 @@ abstract class AppLocalizations {
   /// **'Recent transactions'**
   String get paymentHistoryRecent;
 
-  /// No description provided for @paymentHistoryNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Each row is a completed ride or delivered food order, paid in cash on delivery.'**
-  String get paymentHistoryNote;
-
   /// No description provided for @stateErrorTitle.
   ///
   /// In en, this message translates to:
@@ -2141,7 +1961,7 @@ abstract class AppLocalizations {
   /// No description provided for @stateErrorBody.
   ///
   /// In en, this message translates to:
-  /// **'We couldn\'t load this right now. Please try again.'**
+  /// **'Couldn\'t load. Try again.'**
   String get stateErrorBody;
 
   /// No description provided for @fieldShowPassword.
@@ -2207,26 +2027,20 @@ abstract class AppLocalizations {
   /// No description provided for @authMethodsEmptyTitle.
   ///
   /// In en, this message translates to:
-  /// **'No sign-in method is available right now.'**
+  /// **'No sign-in methods'**
   String get authMethodsEmptyTitle;
 
   /// No description provided for @authMethodsEmptyBody.
   ///
   /// In en, this message translates to:
-  /// **'Please try again later or contact Help.'**
+  /// **'Try again later.'**
   String get authMethodsEmptyBody;
 
   /// No description provided for @authPhoneTitle.
   ///
   /// In en, this message translates to:
-  /// **'Sign in with phone number'**
+  /// **'Sign in'**
   String get authPhoneTitle;
-
-  /// No description provided for @authPhoneOtpNote.
-  ///
-  /// In en, this message translates to:
-  /// **'We\'ll send an OTP to verify it.'**
-  String get authPhoneOtpNote;
 
   /// No description provided for @authPhoneRequired.
   ///
@@ -2381,7 +2195,7 @@ abstract class AppLocalizations {
   /// No description provided for @otpShieldNote.
   ///
   /// In en, this message translates to:
-  /// **'The OTP keeps your account safe.'**
+  /// **'OTP protects your account.'**
   String get otpShieldNote;
 
   /// No description provided for @otpConfirm.
@@ -2390,29 +2204,11 @@ abstract class AppLocalizations {
   /// **'Confirm'**
   String get otpConfirm;
 
-  /// No description provided for @passkeyErrMissing.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter a phone number or email'**
-  String get passkeyErrMissing;
-
-  /// No description provided for @passkeyErrBoth.
-  ///
-  /// In en, this message translates to:
-  /// **'Use only one: phone or email'**
-  String get passkeyErrBoth;
-
   /// No description provided for @passkeyTitle.
   ///
   /// In en, this message translates to:
   /// **'Sign in with Passkey'**
   String get passkeyTitle;
-
-  /// No description provided for @passkeyBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter the phone number or email linked to your passkey.'**
-  String get passkeyBody;
 
   /// No description provided for @passkeyOr.
   ///
@@ -2429,13 +2225,13 @@ abstract class AppLocalizations {
   /// No description provided for @passkeySignIn.
   ///
   /// In en, this message translates to:
-  /// **'Sign in with Passkey'**
+  /// **'Sign in'**
   String get passkeySignIn;
 
   /// No description provided for @passkeySignUp.
   ///
   /// In en, this message translates to:
-  /// **'Create account with Passkey'**
+  /// **'Create account'**
   String get passkeySignUp;
 
   /// No description provided for @splashTagline.
@@ -2459,32 +2255,8 @@ abstract class AppLocalizations {
   /// No description provided for @serviceRideBlurb.
   ///
   /// In en, this message translates to:
-  /// **'Bike · Car · Bid your fare'**
+  /// **'Bike, car'**
   String get serviceRideBlurb;
-
-  /// No description provided for @homeServiceBikeTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Motorbike'**
-  String get homeServiceBikeTitle;
-
-  /// No description provided for @homeServiceBikeBlurb.
-  ///
-  /// In en, this message translates to:
-  /// **'Quick · 1 passenger'**
-  String get homeServiceBikeBlurb;
-
-  /// No description provided for @homeServiceCarTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Car'**
-  String get homeServiceCarTitle;
-
-  /// No description provided for @homeServiceCarBlurb.
-  ///
-  /// In en, this message translates to:
-  /// **'4 & 7 seats'**
-  String get homeServiceCarBlurb;
 
   /// No description provided for @serviceFoodTitle.
   ///
@@ -2531,7 +2303,7 @@ abstract class AppLocalizations {
   /// No description provided for @onbSlide2Body.
   ///
   /// In en, this message translates to:
-  /// **'Local drivers pick you up, live trip tracking, transparent fares and the freedom to negotiate.'**
+  /// **'Local drivers, clear fares, your price.'**
   String get onbSlide2Body;
 
   /// No description provided for @onbSlide2Pill1Title.
@@ -2573,7 +2345,7 @@ abstract class AppLocalizations {
   /// No description provided for @onbSlide3Body.
   ///
   /// In en, this message translates to:
-  /// **'Thousands of authentic Da Nang eateries ready to serve. Order easily, delivered in about 20 minutes.'**
+  /// **'Da Nang favourites, delivered.'**
   String get onbSlide3Body;
 
   /// No description provided for @onbSlide3Pill1Title.
@@ -2618,18 +2390,6 @@ abstract class AppLocalizations {
   /// **'Complete your profile'**
   String get profileSetupTitle;
 
-  /// No description provided for @profileSetupHeadline.
-  ///
-  /// In en, this message translates to:
-  /// **'Just one more step!'**
-  String get profileSetupHeadline;
-
-  /// No description provided for @profileSetupLead.
-  ///
-  /// In en, this message translates to:
-  /// **'Complete your details to get the most out of '**
-  String get profileSetupLead;
-
   /// No description provided for @profileAvatarOptional.
   ///
   /// In en, this message translates to:
@@ -2672,12 +2432,6 @@ abstract class AppLocalizations {
   /// **'Other'**
   String get profileGenderOther;
 
-  /// No description provided for @profilePersonalizeNote.
-  ///
-  /// In en, this message translates to:
-  /// **'This helps personalise your experience on '**
-  String get profilePersonalizeNote;
-
   /// No description provided for @profileDone.
   ///
   /// In en, this message translates to:
@@ -2690,90 +2444,6 @@ abstract class AppLocalizations {
   /// **'Add later'**
   String get profileLater;
 
-  /// No description provided for @permTitlePrefix.
-  ///
-  /// In en, this message translates to:
-  /// **'Allow '**
-  String get permTitlePrefix;
-
-  /// No description provided for @permTitleAccent.
-  ///
-  /// In en, this message translates to:
-  /// **'access'**
-  String get permTitleAccent;
-
-  /// No description provided for @permSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Turn on the permissions DealGo needs to work smoothly.'**
-  String get permSubtitle;
-
-  /// No description provided for @permLocation.
-  ///
-  /// In en, this message translates to:
-  /// **'Location'**
-  String get permLocation;
-
-  /// No description provided for @permLocationBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Find rides, food and shops near you'**
-  String get permLocationBody;
-
-  /// No description provided for @permNotifications.
-  ///
-  /// In en, this message translates to:
-  /// **'Notifications'**
-  String get permNotifications;
-
-  /// No description provided for @permNotificationsBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Get trip, order and deal updates'**
-  String get permNotificationsBody;
-
-  /// No description provided for @permMic.
-  ///
-  /// In en, this message translates to:
-  /// **'Microphone / Calls'**
-  String get permMic;
-
-  /// No description provided for @permMicBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Contact your driver or shop when needed'**
-  String get permMicBody;
-
-  /// No description provided for @permAllowAll.
-  ///
-  /// In en, this message translates to:
-  /// **'Allow all'**
-  String get permAllowAll;
-
-  /// No description provided for @permLater.
-  ///
-  /// In en, this message translates to:
-  /// **'Set up later'**
-  String get permLater;
-
-  /// No description provided for @permFootnote.
-  ///
-  /// In en, this message translates to:
-  /// **'You can change these anytime in the app Settings.'**
-  String get permFootnote;
-
-  /// No description provided for @permGranted.
-  ///
-  /// In en, this message translates to:
-  /// **'On'**
-  String get permGranted;
-
-  /// No description provided for @permAllow.
-  ///
-  /// In en, this message translates to:
-  /// **'Allow'**
-  String get permAllow;
-
   /// No description provided for @rolePickerPrefix.
   ///
   /// In en, this message translates to:
@@ -2785,12 +2455,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'?'**
   String get rolePickerSuffix;
-
-  /// No description provided for @rolePickerSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'You can switch roles anytime.'**
-  String get rolePickerSubtitle;
 
   /// No description provided for @rolePickerPartnerSection.
   ///
@@ -2837,7 +2501,7 @@ abstract class AppLocalizations {
   /// No description provided for @roleMerchantBody.
   ///
   /// In en, this message translates to:
-  /// **'Manage menus, take orders, track revenue'**
+  /// **'Menu, orders, revenue'**
   String get roleMerchantBody;
 
   /// No description provided for @roleDriver.
@@ -2849,7 +2513,7 @@ abstract class AppLocalizations {
   /// No description provided for @roleDriverBody.
   ///
   /// In en, this message translates to:
-  /// **'Take rides, deliver food, earn more'**
+  /// **'Rides and deliveries'**
   String get roleDriverBody;
 
   /// No description provided for @rolePartnerDriver.
@@ -2888,18 +2552,6 @@ abstract class AppLocalizations {
   /// **'Step {step} of {total}'**
   String onbStep(int step, int total);
 
-  /// No description provided for @rolePickerHelpBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Pick a role to get started. You can switch later in Account.'**
-  String get rolePickerHelpBody;
-
-  /// No description provided for @rolePickerInfoBody.
-  ///
-  /// In en, this message translates to:
-  /// **'DealGo serves Customers, Shops and Drivers on one account. Switching roles only changes the interface — active orders and trips stay as they are.'**
-  String get rolePickerInfoBody;
-
   /// No description provided for @driverActionFailed.
   ///
   /// In en, this message translates to:
@@ -2923,12 +2575,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Collect'**
   String get driverCollect;
-
-  /// No description provided for @driverCollectBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Using the customer\'s chosen payment method'**
-  String get driverCollectBody;
 
   /// No description provided for @driverPhasePickup.
   ///
@@ -2963,7 +2609,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverCodNote.
   ///
   /// In en, this message translates to:
-  /// **'The {amount} COD is collected on behalf of the shop, not personal income.'**
+  /// **'COD {amount} is collected for the store.'**
   String driverCodNote(String amount);
 
   /// No description provided for @actionSkip.
@@ -2987,7 +2633,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverFoodRequestTitle.
   ///
   /// In en, this message translates to:
-  /// **'Delivery request'**
+  /// **'Delivery'**
   String get driverFoodRequestTitle;
 
   /// No description provided for @driverJobInfo.
@@ -3071,7 +2717,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverFoodNavigateBody.
   ///
   /// In en, this message translates to:
-  /// **'Go to the store and confirm when you arrive.'**
+  /// **'Go to the store, then confirm.'**
   String get driverFoodNavigateBody;
 
   /// No description provided for @driverFoodPhaseWait.
@@ -3119,7 +2765,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverJobTakenBody.
   ///
   /// In en, this message translates to:
-  /// **'This request went to another driver or its hold time expired.'**
+  /// **'Another driver took this.'**
   String get driverJobTakenBody;
 
   /// No description provided for @driverJobUnavailable.
@@ -3145,12 +2791,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Food delivery'**
   String get driverServiceFood;
-
-  /// No description provided for @driverJobTakenHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Refresh the list to see other requests.'**
-  String get driverJobTakenHint;
 
   /// No description provided for @driverOtpMatched.
   ///
@@ -3191,7 +2831,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverRideNavigateNote.
   ///
   /// In en, this message translates to:
-  /// **'Open your phone\'s maps app to navigate; DealGo keeps the customer updated.'**
+  /// **'Head to pickup.'**
   String get driverRideNavigateNote;
 
   /// No description provided for @driverCallCustomer.
@@ -3326,23 +2966,11 @@ abstract class AppLocalizations {
   /// **'Couldn\'t check the code. Please try again.'**
   String get voucherErrFailed;
 
-  /// No description provided for @voucherPreviewNote.
-  ///
-  /// In en, this message translates to:
-  /// **'The discount is confirmed again when you place the order and taken off the amount due.'**
-  String get voucherPreviewNote;
-
   /// No description provided for @driverOfflineNote.
   ///
   /// In en, this message translates to:
-  /// **'You\'re offline. Go online to start receiving jobs.'**
+  /// **'You\'re offline.'**
   String get driverOfflineNote;
-
-  /// No description provided for @driverNoShiftHistory.
-  ///
-  /// In en, this message translates to:
-  /// **'No shift history yet.'**
-  String get driverNoShiftHistory;
 
   /// No description provided for @vouchersEmptyTitle.
   ///
@@ -3353,7 +2981,7 @@ abstract class AppLocalizations {
   /// No description provided for @vouchersEmptyBody.
   ///
   /// In en, this message translates to:
-  /// **'No offers for you right now. New DealGo campaigns will show up here.'**
+  /// **'No vouchers yet.'**
   String get vouchersEmptyBody;
 
   /// No description provided for @accountTitle.
@@ -3569,7 +3197,7 @@ abstract class AppLocalizations {
   /// No description provided for @activityEmptyBody.
   ///
   /// In en, this message translates to:
-  /// **'Your trips and orders will show up here.'**
+  /// **'No activity yet.'**
   String get activityEmptyBody;
 
   /// No description provided for @activityRecent.
@@ -3581,7 +3209,7 @@ abstract class AppLocalizations {
   /// No description provided for @activityOfflineBody.
   ///
   /// In en, this message translates to:
-  /// **'Your activity history may be out of date.'**
+  /// **'May be out of date.'**
   String get activityOfflineBody;
 
   /// No description provided for @statusExpired.
@@ -3611,7 +3239,7 @@ abstract class AppLocalizations {
   /// No description provided for @emptyStoresNearbyBody.
   ///
   /// In en, this message translates to:
-  /// **'DealGo is expanding its service area. Please check back soon.'**
+  /// **'Check back later.'**
   String get emptyStoresNearbyBody;
 
   /// No description provided for @notificationsEmptyTitle.
@@ -3623,14 +3251,8 @@ abstract class AppLocalizations {
   /// No description provided for @notificationsEmptyBody.
   ///
   /// In en, this message translates to:
-  /// **'Updates about your trips, orders and deals will show up here.'**
+  /// **'No notifications yet.'**
   String get notificationsEmptyBody;
-
-  /// No description provided for @helpAnswersNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Can\'t find an answer? Send a support request and DealGo will reply right in the app.'**
-  String get helpAnswersNote;
 
   /// No description provided for @helpNoResults.
   ///
@@ -3653,7 +3275,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverJobsOfflineBody.
   ///
   /// In en, this message translates to:
-  /// **'Go online to see requests near you.'**
+  /// **'Go online to see requests.'**
   String get driverJobsOfflineBody;
 
   /// No description provided for @checkoutVoucherRejected.
@@ -3803,13 +3425,13 @@ abstract class AppLocalizations {
   /// No description provided for @checkoutPlacedNote.
   ///
   /// In en, this message translates to:
-  /// **'Your order is in. You pay in cash on delivery.'**
+  /// **'Pay cash on delivery.'**
   String get checkoutPlacedNote;
 
   /// No description provided for @checkoutPayLaterNote.
   ///
   /// In en, this message translates to:
-  /// **'Payment is collected on delivery, not at this step.'**
+  /// **'Pay cash on delivery.'**
   String get checkoutPayLaterNote;
 
   /// No description provided for @checkoutProcessingTitle.
@@ -3821,7 +3443,7 @@ abstract class AppLocalizations {
   /// No description provided for @checkoutProcessingBody.
   ///
   /// In en, this message translates to:
-  /// **'Your order was sent and is waiting for confirmation. Please don\'t place it again.'**
+  /// **'Confirming — don\'t reorder.'**
   String get checkoutProcessingBody;
 
   /// No description provided for @checkoutPendingRequest.
@@ -3842,12 +3464,6 @@ abstract class AppLocalizations {
   /// **'Expected amount'**
   String get checkoutExpectedAmount;
 
-  /// No description provided for @checkoutLockedNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Ordering is paused for a moment so the order isn\'t placed twice.'**
-  String get checkoutLockedNote;
-
   /// No description provided for @checkoutOfflineTitle.
   ///
   /// In en, this message translates to:
@@ -3857,7 +3473,7 @@ abstract class AppLocalizations {
   /// No description provided for @checkoutOfflineBody.
   ///
   /// In en, this message translates to:
-  /// **'We couldn\'t send the order yet. Your cart is kept on this device.'**
+  /// **'Couldn\'t send. Cart is kept.'**
   String get checkoutOfflineBody;
 
   /// No description provided for @checkoutUnsentCart.
@@ -3878,22 +3494,16 @@ abstract class AppLocalizations {
   /// **'Cash · Unpaid'**
   String get checkoutCodShort;
 
-  /// No description provided for @checkoutOfflineNote.
-  ///
-  /// In en, this message translates to:
-  /// **'No order is created until the server confirms it.'**
-  String get checkoutOfflineNote;
-
   /// No description provided for @checkoutRepricedTitle.
   ///
   /// In en, this message translates to:
-  /// **'Cart prices changed'**
+  /// **'Price changed'**
   String get checkoutRepricedTitle;
 
   /// No description provided for @checkoutRepricedBody.
   ///
   /// In en, this message translates to:
-  /// **'The store updated prices or the delivery fee. Please confirm the new total before ordering.'**
+  /// **'Please confirm the new total.'**
   String get checkoutRepricedBody;
 
   /// No description provided for @checkoutCompare.
@@ -3923,13 +3533,13 @@ abstract class AppLocalizations {
   /// No description provided for @checkoutRepricedDraftNote.
   ///
   /// In en, this message translates to:
-  /// **'Nothing is ordered until you accept the new prices.'**
+  /// **'Order is placed only after you accept.'**
   String get checkoutRepricedDraftNote;
 
   /// No description provided for @checkoutRepricedPlacedNote.
   ///
   /// In en, this message translates to:
-  /// **'Your order is in at the new price. You pay in cash on delivery.'**
+  /// **'Placed at new price. Pay cash on delivery.'**
   String get checkoutRepricedPlacedNote;
 
   /// No description provided for @checkoutAcceptTotal.
@@ -3947,7 +3557,7 @@ abstract class AppLocalizations {
   /// No description provided for @inboxRideAssignedTitle.
   ///
   /// In en, this message translates to:
-  /// **'A driver accepted your ride'**
+  /// **'Driver found'**
   String get inboxRideAssignedTitle;
 
   /// No description provided for @inboxRideAssignedBody.
@@ -3971,7 +3581,7 @@ abstract class AppLocalizations {
   /// No description provided for @inboxRideDriverArrivedTitle.
   ///
   /// In en, this message translates to:
-  /// **'Your driver has arrived'**
+  /// **'Driver arrived'**
   String get inboxRideDriverArrivedTitle;
 
   /// No description provided for @inboxRideDriverArrivedBody.
@@ -4019,19 +3629,19 @@ abstract class AppLocalizations {
   /// No description provided for @inboxRideExpiredTitle.
   ///
   /// In en, this message translates to:
-  /// **'Ride request expired'**
+  /// **'Request expired'**
   String get inboxRideExpiredTitle;
 
   /// No description provided for @inboxRideExpiredBody.
   ///
   /// In en, this message translates to:
-  /// **'No driver accepted in time. You can book again.'**
+  /// **'No driver accepted.'**
   String get inboxRideExpiredBody;
 
   /// No description provided for @inboxFoodPreparingTitle.
   ///
   /// In en, this message translates to:
-  /// **'The store is preparing your food'**
+  /// **'Preparing'**
   String get inboxFoodPreparingTitle;
 
   /// No description provided for @inboxFoodPreparingBody.
@@ -4079,7 +3689,7 @@ abstract class AppLocalizations {
   /// No description provided for @inboxFoodDeliveredTitle.
   ///
   /// In en, this message translates to:
-  /// **'Order delivered'**
+  /// **'Delivered'**
   String get inboxFoodDeliveredTitle;
 
   /// No description provided for @inboxFoodDeliveredBody.
@@ -4148,6 +3758,12 @@ abstract class AppLocalizations {
   /// **'Unread'**
   String get inboxUnread;
 
+  /// No description provided for @inboxUnreadCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} unread notifications'**
+  String inboxUnreadCount(int count);
+
   /// No description provided for @inboxLoading.
   ///
   /// In en, this message translates to:
@@ -4177,12 +3793,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Saved addresses'**
   String get addrBookTitle;
-
-  /// No description provided for @addrBookIntro.
-  ///
-  /// In en, this message translates to:
-  /// **'Pick these quickly when booking a ride or ordering food.'**
-  String get addrBookIntro;
 
   /// No description provided for @addrBookAdd.
   ///
@@ -4223,7 +3833,7 @@ abstract class AppLocalizations {
   /// No description provided for @addrBookEmptyBody.
   ///
   /// In en, this message translates to:
-  /// **'Save home, work or places you visit often to book faster.'**
+  /// **'Save places to book faster.'**
   String get addrBookEmptyBody;
 
   /// No description provided for @addrBookDefault.
@@ -4334,12 +3944,6 @@ abstract class AppLocalizations {
   /// **'Name'**
   String get addrBookLabel;
 
-  /// No description provided for @addrBookLabelHint.
-  ///
-  /// In en, this message translates to:
-  /// **'e.g. Mum\'s place, Gym'**
-  String get addrBookLabelHint;
-
   /// No description provided for @addrBookLabelRequired.
   ///
   /// In en, this message translates to:
@@ -4367,14 +3971,8 @@ abstract class AppLocalizations {
   /// No description provided for @addrBookNote.
   ///
   /// In en, this message translates to:
-  /// **'Note for the driver (optional)'**
+  /// **'Note for driver'**
   String get addrBookNote;
-
-  /// No description provided for @addrBookNoteHint.
-  ///
-  /// In en, this message translates to:
-  /// **'e.g. green gate, call on arrival'**
-  String get addrBookNoteHint;
 
   /// No description provided for @addrBookSave.
   ///
@@ -4409,7 +4007,7 @@ abstract class AppLocalizations {
   /// No description provided for @addrBookDeleteBody.
   ///
   /// In en, this message translates to:
-  /// **'\"{label}\" will be removed from your address book.'**
+  /// **'Delete \"{label}\"?'**
   String addrBookDeleteBody(String label);
 
   /// No description provided for @rateRidePrompt.
@@ -4475,7 +4073,7 @@ abstract class AppLocalizations {
   /// No description provided for @rateCommentLabel.
   ///
   /// In en, this message translates to:
-  /// **'Comments (optional)'**
+  /// **'Comment'**
   String get rateCommentLabel;
 
   /// No description provided for @rateCommentHint.
@@ -4604,12 +4202,6 @@ abstract class AppLocalizations {
   /// **'Earnings & history'**
   String get drvHistTitle;
 
-  /// No description provided for @drvHistSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Based on finished jobs'**
-  String get drvHistSubtitle;
-
   /// No description provided for @drvHistToday.
   ///
   /// In en, this message translates to:
@@ -4679,7 +4271,7 @@ abstract class AppLocalizations {
   /// No description provided for @drvHistEmptyBody.
   ///
   /// In en, this message translates to:
-  /// **'Go online to get rides and deliveries. Finished jobs show up here.'**
+  /// **'No jobs yet.'**
   String get drvHistEmptyBody;
 
   /// No description provided for @drvHistLoadMore.
@@ -4741,12 +4333,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Gross fares {gross} · DealGo commission −{fee}'**
   String drvHistGrossLine(String gross, String fee);
-
-  /// No description provided for @drvHistNetNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Net after fees · excludes COD collected'**
-  String get drvHistNetNote;
 
   /// No description provided for @drvHistItemFee.
   ///
@@ -4844,12 +4430,6 @@ abstract class AppLocalizations {
   /// **'Manage'**
   String get placeSavedManage;
 
-  /// No description provided for @placeRecentTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Recent trips'**
-  String get placeRecentTitle;
-
   /// No description provided for @placeResultsTitle.
   ///
   /// In en, this message translates to:
@@ -4859,13 +4439,13 @@ abstract class AppLocalizations {
   /// No description provided for @placeSearchEmptyTitle.
   ///
   /// In en, this message translates to:
-  /// **'No places found'**
+  /// **'No results'**
   String get placeSearchEmptyTitle;
 
   /// No description provided for @placeSearchEmptyBody.
   ///
   /// In en, this message translates to:
-  /// **'Try another street, district or landmark.'**
+  /// **'Try another search.'**
   String get placeSearchEmptyBody;
 
   /// No description provided for @placeSearchUnavailable.
@@ -4913,7 +4493,7 @@ abstract class AppLocalizations {
   /// No description provided for @placeHistoryClearBody.
   ///
   /// In en, this message translates to:
-  /// **'Places you picked will be removed on all your devices.'**
+  /// **'Clear place history?'**
   String get placeHistoryClearBody;
 
   /// No description provided for @placeHistoryClearConfirm.
@@ -4939,24 +4519,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Book a ride'**
   String get rideBookTitle;
-
-  /// No description provided for @rideBookSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Explore the city with DealGo'**
-  String get rideBookSubtitle;
-
-  /// No description provided for @rideModeNow.
-  ///
-  /// In en, this message translates to:
-  /// **'Ride now'**
-  String get rideModeNow;
-
-  /// No description provided for @rideModeSchedule.
-  ///
-  /// In en, this message translates to:
-  /// **'Schedule'**
-  String get rideModeSchedule;
 
   /// No description provided for @mapRecenter.
   ///
@@ -4994,12 +4556,6 @@ abstract class AppLocalizations {
   /// **'View pending offers'**
   String get rideOpenPendingOffers;
 
-  /// No description provided for @rideCheckRoute.
-  ///
-  /// In en, this message translates to:
-  /// **'Review route'**
-  String get rideCheckRoute;
-
   /// No description provided for @rideSamePlaces.
   ///
   /// In en, this message translates to:
@@ -5035,12 +4591,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter a valid amount.'**
   String get rideFareInvalid;
-
-  /// No description provided for @rideFareReferenceExplain.
-  ///
-  /// In en, this message translates to:
-  /// **'The reference fare uses the distance and DealGo\'s price table. You can propose another amount within the allowed range.'**
-  String get rideFareReferenceExplain;
 
   /// No description provided for @rideFareAllowedRange.
   ///
@@ -5113,12 +4663,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your route'**
   String get rideVehicleRouteTitle;
-
-  /// No description provided for @rideVehicleContinue.
-  ///
-  /// In en, this message translates to:
-  /// **'View fare details'**
-  String get rideVehicleContinue;
 
   /// No description provided for @rideVehicleContinueToOffer.
   ///
@@ -5240,12 +4784,6 @@ abstract class AppLocalizations {
   /// **'Your pickup code appears once a driver accepts the ride.'**
   String get ridePickupCodeUnavailable;
 
-  /// No description provided for @driverCardNoRating.
-  ///
-  /// In en, this message translates to:
-  /// **'No ratings yet'**
-  String get driverCardNoRating;
-
   /// No description provided for @driverCardRating.
   ///
   /// In en, this message translates to:
@@ -5264,18 +4802,6 @@ abstract class AppLocalizations {
   /// **'Agreed fare'**
   String get rideAgreedFare;
 
-  /// No description provided for @rideTripInfo.
-  ///
-  /// In en, this message translates to:
-  /// **'Trip details'**
-  String get rideTripInfo;
-
-  /// No description provided for @rideDriverAssignedTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Your driver accepted'**
-  String get rideDriverAssignedTitle;
-
   /// No description provided for @rideVehicleLabel.
   ///
   /// In en, this message translates to:
@@ -5288,12 +4814,6 @@ abstract class AppLocalizations {
   /// **'View receipt'**
   String get rideViewReceipt;
 
-  /// No description provided for @ridePickupCodeHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Only share the code once the plate matches'**
-  String get ridePickupCodeHint;
-
   /// No description provided for @rideOfflineTitle.
   ///
   /// In en, this message translates to:
@@ -5303,14 +4823,8 @@ abstract class AppLocalizations {
   /// No description provided for @rideOfflineBody.
   ///
   /// In en, this message translates to:
-  /// **'You are seeing the last loaded status, not a live one.'**
+  /// **'Showing last known data.'**
   String get rideOfflineBody;
-
-  /// No description provided for @rideOfflineNote.
-  ///
-  /// In en, this message translates to:
-  /// **'We never assume the driver has arrived when this refresh fails.'**
-  String get rideOfflineNote;
 
   /// No description provided for @rideTripSummary.
   ///
@@ -5396,12 +4910,6 @@ abstract class AppLocalizations {
   /// **'Track food order'**
   String get foodTrackingTitle;
 
-  /// No description provided for @foodTrackingDeliverTo.
-  ///
-  /// In en, this message translates to:
-  /// **'Deliver to'**
-  String get foodTrackingDeliverTo;
-
   /// No description provided for @paymentHistoryTotal.
   ///
   /// In en, this message translates to:
@@ -5431,12 +4939,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No payments yet. Completed rides and delivered orders appear here.'**
   String get paymentHistoryEmpty;
-
-  /// No description provided for @paymentHistoryLoadFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Could not load your payment history. Try again later.'**
-  String get paymentHistoryLoadFailed;
 
   /// No description provided for @paymentHistoryCount.
   ///
@@ -5474,12 +4976,6 @@ abstract class AppLocalizations {
   /// **'Help center'**
   String get helpTitle;
 
-  /// No description provided for @helpSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'How can we help you?'**
-  String get helpSubtitle;
-
   /// No description provided for @helpSearchHint.
   ///
   /// In en, this message translates to:
@@ -5498,23 +4994,11 @@ abstract class AppLocalizations {
   /// **'Rides'**
   String get helpTopicRide;
 
-  /// No description provided for @helpTopicRideSub.
-  ///
-  /// In en, this message translates to:
-  /// **'Booking & cancelling'**
-  String get helpTopicRideSub;
-
   /// No description provided for @helpTopicFood.
   ///
   /// In en, this message translates to:
   /// **'Food'**
   String get helpTopicFood;
-
-  /// No description provided for @helpTopicFoodSub.
-  ///
-  /// In en, this message translates to:
-  /// **'Orders & delivery'**
-  String get helpTopicFoodSub;
 
   /// No description provided for @helpTopicPayment.
   ///
@@ -5522,23 +5006,11 @@ abstract class AppLocalizations {
   /// **'Payments'**
   String get helpTopicPayment;
 
-  /// No description provided for @helpTopicPaymentSub.
-  ///
-  /// In en, this message translates to:
-  /// **'Cash & refunds'**
-  String get helpTopicPaymentSub;
-
   /// No description provided for @helpTopicAccount.
   ///
   /// In en, this message translates to:
   /// **'Account'**
   String get helpTopicAccount;
-
-  /// No description provided for @helpTopicAccountSub.
-  ///
-  /// In en, this message translates to:
-  /// **'Sign-in & security'**
-  String get helpTopicAccountSub;
 
   /// No description provided for @helpTopicSelected.
   ///
@@ -5567,7 +5039,7 @@ abstract class AppLocalizations {
   /// No description provided for @helpStillNeedBody.
   ///
   /// In en, this message translates to:
-  /// **'See the requests you sent and chat with the support team.'**
+  /// **'See your requests.'**
   String get helpStillNeedBody;
 
   /// No description provided for @helpMyTickets.
@@ -5594,12 +5066,6 @@ abstract class AppLocalizations {
   /// **'Your requests'**
   String get supportListHeading;
 
-  /// No description provided for @supportListSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Track progress and talk directly with the support team.'**
-  String get supportListSubtitle;
-
   /// No description provided for @supportListEmptyTitle.
   ///
   /// In en, this message translates to:
@@ -5609,7 +5075,7 @@ abstract class AppLocalizations {
   /// No description provided for @supportListEmptyBody.
   ///
   /// In en, this message translates to:
-  /// **'Need help with a ride, an order or a payment? Create a new request.'**
+  /// **'No requests yet.'**
   String get supportListEmptyBody;
 
   /// No description provided for @supportListLoadFailed.
@@ -5623,12 +5089,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New request'**
   String get supportNewTicket;
-
-  /// No description provided for @supportRetry.
-  ///
-  /// In en, this message translates to:
-  /// **'Try again'**
-  String get supportRetry;
 
   /// No description provided for @supportStatusOpen.
   ///
@@ -5732,12 +5192,6 @@ abstract class AppLocalizations {
   /// **'Need help?'**
   String get supportCreateHeading;
 
-  /// No description provided for @supportCreateSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Describe the issue so DealGo can help with the right transaction.'**
-  String get supportCreateSubtitle;
-
   /// No description provided for @supportFieldCategory.
   ///
   /// In en, this message translates to:
@@ -5759,7 +5213,7 @@ abstract class AppLocalizations {
   /// No description provided for @supportRelatedPickTitle.
   ///
   /// In en, this message translates to:
-  /// **'Pick a ride or order'**
+  /// **'Pick ride / order'**
   String get supportRelatedPickTitle;
 
   /// No description provided for @supportRelatedEmpty.
@@ -5774,28 +5228,16 @@ abstract class AppLocalizations {
   /// **'Subject'**
   String get supportFieldSubject;
 
-  /// No description provided for @supportSubjectHint.
-  ///
-  /// In en, this message translates to:
-  /// **'e.g. Question about my ride fare'**
-  String get supportSubjectHint;
-
   /// No description provided for @supportFieldDescription.
   ///
   /// In en, this message translates to:
   /// **'Details'**
   String get supportFieldDescription;
 
-  /// No description provided for @supportDescriptionHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Tell us what happened, when, and anything related...'**
-  String get supportDescriptionHint;
-
   /// No description provided for @supportPrivacyNote.
   ///
   /// In en, this message translates to:
-  /// **'This is only used to handle your request. Never send passwords, OTP codes or card data.'**
+  /// **'Never send passwords, OTPs or cards.'**
   String get supportPrivacyNote;
 
   /// No description provided for @supportSubmit.
@@ -5885,7 +5327,7 @@ abstract class AppLocalizations {
   /// No description provided for @supportProgressInProgressBody.
   ///
   /// In en, this message translates to:
-  /// **'The support team is looking into your request.'**
+  /// **'In progress.'**
   String get supportProgressInProgressBody;
 
   /// No description provided for @supportProgressResolved.
@@ -5912,12 +5354,6 @@ abstract class AppLocalizations {
   /// **'DealGo Support'**
   String get supportStaffName;
 
-  /// No description provided for @supportYou.
-  ///
-  /// In en, this message translates to:
-  /// **'You'**
-  String get supportYou;
-
   /// No description provided for @supportReplyHint.
   ///
   /// In en, this message translates to:
@@ -5933,13 +5369,13 @@ abstract class AppLocalizations {
   /// No description provided for @supportClosedNote.
   ///
   /// In en, this message translates to:
-  /// **'This request is closed. Create a new one if you need more help.'**
+  /// **'Request closed.'**
   String get supportClosedNote;
 
   /// No description provided for @supportResolvedNote.
   ///
   /// In en, this message translates to:
-  /// **'This request was resolved. Reply if the issue persists and it will reopen.'**
+  /// **'Resolved. Reply to reopen.'**
   String get supportResolvedNote;
 
   /// No description provided for @supportDetailLoadFailed.
@@ -5963,13 +5399,13 @@ abstract class AppLocalizations {
   /// No description provided for @inboxSupportReplyTitle.
   ///
   /// In en, this message translates to:
-  /// **'DealGo replied to your support request'**
+  /// **'Support replied'**
   String get inboxSupportReplyTitle;
 
   /// No description provided for @inboxSupportResolvedTitle.
   ///
   /// In en, this message translates to:
-  /// **'Your support request was resolved'**
+  /// **'Request resolved'**
   String get inboxSupportResolvedTitle;
 
   /// No description provided for @supportFilterAll.
@@ -6014,95 +5450,11 @@ abstract class AppLocalizations {
   /// **'DealGo Support'**
   String get helpBannerBadge;
 
-  /// No description provided for @helpBannerBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Help with every trip and every order.'**
-  String get helpBannerBody;
-
   /// No description provided for @foodGroupNear.
   ///
   /// In en, this message translates to:
   /// **'Near me'**
   String get foodGroupNear;
-
-  /// No description provided for @foodGroupVietnamese.
-  ///
-  /// In en, this message translates to:
-  /// **'Vietnamese'**
-  String get foodGroupVietnamese;
-
-  /// No description provided for @foodGroupTea.
-  ///
-  /// In en, this message translates to:
-  /// **'Milk tea'**
-  String get foodGroupTea;
-
-  /// No description provided for @foodGroupFastFood.
-  ///
-  /// In en, this message translates to:
-  /// **'Fast food'**
-  String get foodGroupFastFood;
-
-  /// No description provided for @foodGroupCafe.
-  ///
-  /// In en, this message translates to:
-  /// **'Coffee'**
-  String get foodGroupCafe;
-
-  /// No description provided for @storeCategoryPho.
-  ///
-  /// In en, this message translates to:
-  /// **'Pho'**
-  String get storeCategoryPho;
-
-  /// No description provided for @storeCategoryNoodles.
-  ///
-  /// In en, this message translates to:
-  /// **'Noodles'**
-  String get storeCategoryNoodles;
-
-  /// No description provided for @storeCategoryRice.
-  ///
-  /// In en, this message translates to:
-  /// **'Rice'**
-  String get storeCategoryRice;
-
-  /// No description provided for @storeCategoryBanhMi.
-  ///
-  /// In en, this message translates to:
-  /// **'Banh mi'**
-  String get storeCategoryBanhMi;
-
-  /// No description provided for @storeCategoryCafe.
-  ///
-  /// In en, this message translates to:
-  /// **'Coffee'**
-  String get storeCategoryCafe;
-
-  /// No description provided for @storeCategoryTea.
-  ///
-  /// In en, this message translates to:
-  /// **'Milk tea'**
-  String get storeCategoryTea;
-
-  /// No description provided for @storeCategoryFastFood.
-  ///
-  /// In en, this message translates to:
-  /// **'Fast food'**
-  String get storeCategoryFastFood;
-
-  /// No description provided for @storeCategorySnack.
-  ///
-  /// In en, this message translates to:
-  /// **'Snacks'**
-  String get storeCategorySnack;
-
-  /// No description provided for @storeCategoryMart.
-  ///
-  /// In en, this message translates to:
-  /// **'Grocery'**
-  String get storeCategoryMart;
 
   /// No description provided for @storeRatingNew.
   ///
@@ -6131,56 +5483,8 @@ abstract class AppLocalizations {
   /// No description provided for @foodDiscoverySearchHint.
   ///
   /// In en, this message translates to:
-  /// **'Search restaurants, dishes, drinks...'**
+  /// **'Search restaurants, dishes, drinks'**
   String get foodDiscoverySearchHint;
-
-  /// No description provided for @foodDiscoveryStoresTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Tasty spots near you'**
-  String get foodDiscoveryStoresTitle;
-
-  /// No description provided for @foodDiscoverySortedByDistance.
-  ///
-  /// In en, this message translates to:
-  /// **'Sorted by real distance'**
-  String get foodDiscoverySortedByDistance;
-
-  /// No description provided for @foodDiscoveryLocationOff.
-  ///
-  /// In en, this message translates to:
-  /// **'Turn on location to sort by distance'**
-  String get foodDiscoveryLocationOff;
-
-  /// No description provided for @foodDiscoveryTopRatedTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Popular this week'**
-  String get foodDiscoveryTopRatedTitle;
-
-  /// No description provided for @foodDiscoveryTopRatedSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Dishes people love'**
-  String get foodDiscoveryTopRatedSubtitle;
-
-  /// No description provided for @foodBannerKicker.
-  ///
-  /// In en, this message translates to:
-  /// **'TODAY\'S FOOD DEAL'**
-  String get foodBannerKicker;
-
-  /// No description provided for @foodBannerTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Good food every day,\ndelivered to you'**
-  String get foodBannerTitle;
-
-  /// No description provided for @foodBannerCta.
-  ///
-  /// In en, this message translates to:
-  /// **'Explore now →'**
-  String get foodBannerCta;
 
   /// No description provided for @foodStoreBestsellers.
   ///
@@ -6332,12 +5636,6 @@ abstract class AppLocalizations {
   /// **'Menu · {count} items'**
   String foodStoreMenuCount(int count);
 
-  /// No description provided for @foodCartSelected.
-  ///
-  /// In en, this message translates to:
-  /// **'{count} items selected'**
-  String foodCartSelected(int count);
-
   /// No description provided for @foodStoreReviewsHidden.
   ///
   /// In en, this message translates to:
@@ -6359,20 +5657,8 @@ abstract class AppLocalizations {
   /// No description provided for @homeVoucherTitle.
   ///
   /// In en, this message translates to:
-  /// **'Daily deals that save on every trip!'**
+  /// **'Today\'s deals'**
   String get homeVoucherTitle;
-
-  /// No description provided for @homeVoucherBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Browse running codes and add one at checkout — DealGo checks it before you order.'**
-  String get homeVoucherBody;
-
-  /// No description provided for @homeVoucherAction.
-  ///
-  /// In en, this message translates to:
-  /// **'Hunt deals'**
-  String get homeVoucherAction;
 
   /// No description provided for @homeRecentEmpty.
   ///
@@ -6389,7 +5675,7 @@ abstract class AppLocalizations {
   /// No description provided for @homeRecentTitle.
   ///
   /// In en, this message translates to:
-  /// **'Recent orders & rides'**
+  /// **'Recent'**
   String get homeRecentTitle;
 
   /// No description provided for @homeCatFood.
@@ -6397,42 +5683,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Food'**
   String get homeCatFood;
-
-  /// No description provided for @homeCatMart.
-  ///
-  /// In en, this message translates to:
-  /// **'Supermarket'**
-  String get homeCatMart;
-
-  /// No description provided for @homeCatConvenience.
-  ///
-  /// In en, this message translates to:
-  /// **'Convenience'**
-  String get homeCatConvenience;
-
-  /// No description provided for @homeCatPharmacy.
-  ///
-  /// In en, this message translates to:
-  /// **'Pharmacy'**
-  String get homeCatPharmacy;
-
-  /// No description provided for @homeCatFlowers.
-  ///
-  /// In en, this message translates to:
-  /// **'Flowers & gifts'**
-  String get homeCatFlowers;
-
-  /// No description provided for @homeCatElectronics.
-  ///
-  /// In en, this message translates to:
-  /// **'Electronics'**
-  String get homeCatElectronics;
-
-  /// No description provided for @homeCatFashion.
-  ///
-  /// In en, this message translates to:
-  /// **'Fashion'**
-  String get homeCatFashion;
 
   /// No description provided for @actionSave.
   ///
@@ -6485,7 +5735,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverCompletedNotFoundHint.
   ///
   /// In en, this message translates to:
-  /// **'History updates after a job ends. Try again in a few minutes.'**
+  /// **'Try again shortly.'**
   String get driverCompletedNotFoundHint;
 
   /// No description provided for @driverCompletedFeeLabel.
@@ -6581,7 +5831,7 @@ abstract class AppLocalizations {
   /// No description provided for @merchantReadyHint.
   ///
   /// In en, this message translates to:
-  /// **'Tap “Ready” only when every item is done and ready to hand over.'**
+  /// **'Tap when the order is complete.'**
   String get merchantReadyHint;
 
   /// No description provided for @merchantDriverTitle.
@@ -6623,13 +5873,13 @@ abstract class AppLocalizations {
   /// No description provided for @merchantHandoffNote.
   ///
   /// In en, this message translates to:
-  /// **'Match the order code with the driver. The order moves to “Picked up” when the driver confirms in their app.'**
+  /// **'Match the order code with the driver.'**
   String get merchantHandoffNote;
 
   /// No description provided for @merchantHandoffDoneNote.
   ///
   /// In en, this message translates to:
-  /// **'Noted on this device. The status changes when the driver confirms pickup.'**
+  /// **'Waiting for driver.'**
   String get merchantHandoffDoneNote;
 
   /// No description provided for @merchantFoodValueLabel.
@@ -6677,7 +5927,7 @@ abstract class AppLocalizations {
   /// No description provided for @merchantConflictBody.
   ///
   /// In en, this message translates to:
-  /// **'The order changed status (customer cancelled, another staff member or the system handled it).'**
+  /// **'Order status changed.'**
   String get merchantConflictBody;
 
   /// No description provided for @merchantConflictOrder.
@@ -6685,12 +5935,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Order'**
   String get merchantConflictOrder;
-
-  /// No description provided for @merchantConflictNote.
-  ///
-  /// In en, this message translates to:
-  /// **'The old action is not resent; the latest status comes from the server.'**
-  String get merchantConflictNote;
 
   /// No description provided for @orderRef.
   ///
@@ -6713,7 +5957,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverCompletedFoodFeePercentLabel.
   ///
   /// In en, this message translates to:
-  /// **'DealGo commission on delivery fee ({percent}%)'**
+  /// **'Delivery fee commission ({percent}%)'**
   String driverCompletedFoodFeePercentLabel(String percent);
 
   /// No description provided for @merchantOrderPlacedAt.
@@ -6803,7 +6047,7 @@ abstract class AppLocalizations {
   /// No description provided for @partnerDocHint.
   ///
   /// In en, this message translates to:
-  /// **'Sharp, all four corners visible, no glare. JPG/PNG up to 4 MB.'**
+  /// **'Sharp, all 4 corners. JPG/PNG ≤ 4 MB.'**
   String get partnerDocHint;
 
   /// No description provided for @partnerDocPickFailed.
@@ -6968,12 +6212,6 @@ abstract class AppLocalizations {
   /// **'DealGo did not list specific items. Please review the whole application.'**
   String get partnerNoIssues;
 
-  /// No description provided for @partnerResubmitNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Only retake the requested documents; the others stay on your application.'**
-  String get partnerResubmitNote;
-
   /// No description provided for @partnerTimelineSubmitted.
   ///
   /// In en, this message translates to:
@@ -7028,18 +6266,6 @@ abstract class AppLocalizations {
   /// **'Waiting'**
   String get partnerTimelineWaiting;
 
-  /// No description provided for @partnerSubmittedAt.
-  ///
-  /// In en, this message translates to:
-  /// **'Sent {time}'**
-  String partnerSubmittedAt(String time);
-
-  /// No description provided for @partnerLoading.
-  ///
-  /// In en, this message translates to:
-  /// **'Loading application…'**
-  String get partnerLoading;
-
   /// No description provided for @partnerErrorSession.
   ///
   /// In en, this message translates to:
@@ -7088,12 +6314,6 @@ abstract class AppLocalizations {
   /// **'Bank'**
   String get partnerBankName;
 
-  /// No description provided for @partnerBankNameHint.
-  ///
-  /// In en, this message translates to:
-  /// **'e.g. Vietcombank'**
-  String get partnerBankNameHint;
-
   /// No description provided for @partnerBankAccount.
   ///
   /// In en, this message translates to:
@@ -7109,13 +6329,13 @@ abstract class AppLocalizations {
   /// No description provided for @partnerBankHolderHint.
   ///
   /// In en, this message translates to:
-  /// **'Uppercase, as printed on the card'**
+  /// **'UPPERCASE, NO ACCENTS'**
   String get partnerBankHolderHint;
 
   /// No description provided for @partnerBankNote.
   ///
   /// In en, this message translates to:
-  /// **'The account holder must match your ID. DealGo does not charge when linking.'**
+  /// **'Holder name must match your ID.'**
   String get partnerBankNote;
 
   /// No description provided for @partnerReviewTitleDocs.
@@ -7136,18 +6356,6 @@ abstract class AppLocalizations {
   /// **'Missing'**
   String get partnerReviewMissing;
 
-  /// No description provided for @partnerBackHome.
-  ///
-  /// In en, this message translates to:
-  /// **'Back to home'**
-  String get partnerBackHome;
-
-  /// No description provided for @partnerViewApplication.
-  ///
-  /// In en, this message translates to:
-  /// **'Review application'**
-  String get partnerViewApplication;
-
   /// No description provided for @kycRoleBadge.
   ///
   /// In en, this message translates to:
@@ -7157,13 +6365,13 @@ abstract class AppLocalizations {
   /// No description provided for @kycFlowLabel.
   ///
   /// In en, this message translates to:
-  /// **'DRIVER PARTNER SIGN-UP'**
+  /// **'DRIVER SIGN-UP'**
   String get kycFlowLabel;
 
   /// No description provided for @kycIntroTitle.
   ///
   /// In en, this message translates to:
-  /// **'Driver partner sign-up'**
+  /// **'Driver sign-up'**
   String get kycIntroTitle;
 
   /// No description provided for @kycIntroSubtitle.
@@ -7181,14 +6389,8 @@ abstract class AppLocalizations {
   /// No description provided for @kycIntroHeadline.
   ///
   /// In en, this message translates to:
-  /// **'Become a DealGo driver partner'**
+  /// **'Drive with DealGo'**
   String get kycIntroHeadline;
-
-  /// No description provided for @kycIntroBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Go online for rides or food delivery once each service is approved.'**
-  String get kycIntroBody;
 
   /// No description provided for @kycIntroRideTitle.
   ///
@@ -7199,7 +6401,7 @@ abstract class AppLocalizations {
   /// No description provided for @kycIntroRideBody.
   ///
   /// In en, this message translates to:
-  /// **'Take trips and make offers'**
+  /// **'Rides, your price'**
   String get kycIntroRideBody;
 
   /// No description provided for @kycIntroFoodTitle.
@@ -7211,7 +6413,7 @@ abstract class AppLocalizations {
   /// No description provided for @kycIntroFoodBody.
   ///
   /// In en, this message translates to:
-  /// **'Pick up from shops and deliver'**
+  /// **'Pick up, deliver'**
   String get kycIntroFoodBody;
 
   /// No description provided for @kycIntroEarnTitle.
@@ -7223,7 +6425,7 @@ abstract class AppLocalizations {
   /// No description provided for @kycIntroEarnBody.
   ///
   /// In en, this message translates to:
-  /// **'Clear per-trip earnings and payouts'**
+  /// **'Clear earnings'**
   String get kycIntroEarnBody;
 
   /// No description provided for @kycIntroRequirements.
@@ -7355,32 +6557,20 @@ abstract class AppLocalizations {
   /// No description provided for @kycServiceRideBody.
   ///
   /// In en, this message translates to:
-  /// **'Take trips, agree fares and pick up riders'**
+  /// **'Carry riders, agree a fare'**
   String get kycServiceRideBody;
 
   /// No description provided for @kycServiceFoodBody.
   ///
   /// In en, this message translates to:
-  /// **'Collect orders from shops and deliver them'**
+  /// **'Pick up and deliver food'**
   String get kycServiceFoodBody;
-
-  /// No description provided for @kycServicesNote.
-  ///
-  /// In en, this message translates to:
-  /// **'You can switch each service on or off after approval.'**
-  String get kycServicesNote;
 
   /// No description provided for @kycFullName.
   ///
   /// In en, this message translates to:
   /// **'Full name'**
   String get kycFullName;
-
-  /// No description provided for @kycFullNameHint.
-  ///
-  /// In en, this message translates to:
-  /// **'As on your ID'**
-  String get kycFullNameHint;
 
   /// No description provided for @kycBirthDate.
   ///
@@ -7409,7 +6599,7 @@ abstract class AppLocalizations {
   /// No description provided for @kycPrivacyNote.
   ///
   /// In en, this message translates to:
-  /// **'Legal details are only used for partner review and protected under DealGo\'s data policy.'**
+  /// **'Used only for review; kept private.'**
   String get kycPrivacyNote;
 
   /// No description provided for @kycIdNumber.
@@ -7423,12 +6613,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'12 digits'**
   String get kycIdNumberHint;
-
-  /// No description provided for @kycConfirmNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Details that don\'t match your ID will be sent back for changes.'**
-  String get kycConfirmNote;
 
   /// No description provided for @kycLicenseClass.
   ///
@@ -7466,16 +6650,10 @@ abstract class AppLocalizations {
   /// **'Model'**
   String get kycVehicleModel;
 
-  /// No description provided for @kycVehicleNote.
-  ///
-  /// In en, this message translates to:
-  /// **'DealGo Ride accepts motorbikes and cars. Food delivery eligibility is separate.'**
-  String get kycVehicleNote;
-
   /// No description provided for @kycVehicleInsuranceNote.
   ///
   /// In en, this message translates to:
-  /// **'Car applications need a vehicle insurance photo when this checklist is on. This is an app checklist only — not a legal or regulatory determination.'**
+  /// **'Cars need an insurance photo.'**
   String get kycVehicleInsuranceNote;
 
   /// No description provided for @kycReviewProfile.
@@ -7505,7 +6683,7 @@ abstract class AppLocalizations {
   /// No description provided for @kycReviewNote.
   ///
   /// In en, this message translates to:
-  /// **'Sending creates a review; going online stays locked until DealGo approves.'**
+  /// **'You can work once approved.'**
   String get kycReviewNote;
 
   /// No description provided for @kycSubmitCta.
@@ -7547,25 +6725,25 @@ abstract class AppLocalizations {
   /// No description provided for @kycActiveTitle.
   ///
   /// In en, this message translates to:
-  /// **'Driver application approved'**
+  /// **'Activated'**
   String get kycActiveTitle;
 
   /// No description provided for @kycActiveBody.
   ///
   /// In en, this message translates to:
-  /// **'You can go online for the approved services.'**
+  /// **'You can go online.'**
   String get kycActiveBody;
 
   /// No description provided for @kycStatusPendingNote.
   ///
   /// In en, this message translates to:
-  /// **'The app updates once DealGo finishes the review. You can\'t go online until approved.'**
+  /// **'Awaiting review.'**
   String get kycStatusPendingNote;
 
   /// No description provided for @kycStatusActiveNote.
   ///
   /// In en, this message translates to:
-  /// **'Jobs are open for your approved application.'**
+  /// **'Approved.'**
   String get kycStatusActiveNote;
 
   /// No description provided for @kycTimelineActivate.
@@ -7573,12 +6751,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Start taking jobs'**
   String get kycTimelineActivate;
-
-  /// No description provided for @kycTimelineActivateBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Only once each service is approved'**
-  String get kycTimelineActivateBody;
 
   /// No description provided for @kycRejectedTitle.
   ///
@@ -7589,7 +6761,7 @@ abstract class AppLocalizations {
   /// No description provided for @kycRejectedBanner.
   ///
   /// In en, this message translates to:
-  /// **'Your application needs changes. Each item has a reason; unchanged documents don\'t need to be resent.'**
+  /// **'Fix the items below.'**
   String get kycRejectedBanner;
 
   /// No description provided for @kybRoleBadge.
@@ -7601,7 +6773,7 @@ abstract class AppLocalizations {
   /// No description provided for @kybFlowLabel.
   ///
   /// In en, this message translates to:
-  /// **'DEALGO PARTNER SIGN-UP'**
+  /// **'STORE SIGN-UP'**
   String get kybFlowLabel;
 
   /// No description provided for @kybStepFlowLabel.
@@ -7613,7 +6785,7 @@ abstract class AppLocalizations {
   /// No description provided for @kybIntroTitle.
   ///
   /// In en, this message translates to:
-  /// **'Become a Shop partner'**
+  /// **'Store sign-up'**
   String get kybIntroTitle;
 
   /// No description provided for @kybIntroSubtitle.
@@ -7625,14 +6797,8 @@ abstract class AppLocalizations {
   /// No description provided for @kybIntroHeadline.
   ///
   /// In en, this message translates to:
-  /// **'Start selling with DealGo'**
+  /// **'Sell with DealGo'**
   String get kybIntroHeadline;
-
-  /// No description provided for @kybIntroBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Sell food, groceries and goods in one app.'**
-  String get kybIntroBody;
 
   /// No description provided for @kybIntroHero.
   ///
@@ -7655,7 +6821,7 @@ abstract class AppLocalizations {
   /// No description provided for @kybBenefitReachBody.
   ///
   /// In en, this message translates to:
-  /// **'Show your shop and menu nearby'**
+  /// **'Shown by area'**
   String get kybBenefitReachBody;
 
   /// No description provided for @kybBenefitOrdersTitle.
@@ -7667,7 +6833,7 @@ abstract class AppLocalizations {
   /// No description provided for @kybBenefitOrdersBody.
   ///
   /// In en, this message translates to:
-  /// **'Track new and in-progress orders'**
+  /// **'Track orders'**
   String get kybBenefitOrdersBody;
 
   /// No description provided for @kybBenefitRevenueTitle.
@@ -7679,7 +6845,7 @@ abstract class AppLocalizations {
   /// No description provided for @kybBenefitRevenueBody.
   ///
   /// In en, this message translates to:
-  /// **'Sales stats and payouts'**
+  /// **'Stats & settlement'**
   String get kybBenefitRevenueBody;
 
   /// No description provided for @kybBenefitTrustTitle.
@@ -7691,7 +6857,7 @@ abstract class AppLocalizations {
   /// No description provided for @kybBenefitTrustBody.
   ///
   /// In en, this message translates to:
-  /// **'Applications are reviewed before selling'**
+  /// **'Verified stores'**
   String get kybBenefitTrustBody;
 
   /// No description provided for @kybIntroRequirements.
@@ -7781,7 +6947,7 @@ abstract class AppLocalizations {
   /// No description provided for @kybTypeRestaurantBody.
   ///
   /// In en, this message translates to:
-  /// **'Cooked food delivered to the door.'**
+  /// **'Cooked food'**
   String get kybTypeRestaurantBody;
 
   /// No description provided for @kybTypeCafe.
@@ -7793,7 +6959,7 @@ abstract class AppLocalizations {
   /// No description provided for @kybTypeCafeBody.
   ///
   /// In en, this message translates to:
-  /// **'Drinks, cakes and snacks.'**
+  /// **'Drinks, bakery'**
   String get kybTypeCafeBody;
 
   /// No description provided for @kybTypeGrocery.
@@ -7805,7 +6971,7 @@ abstract class AppLocalizations {
   /// No description provided for @kybTypeGroceryBody.
   ///
   /// In en, this message translates to:
-  /// **'Produce, meat, fish and household goods.'**
+  /// **'Groceries'**
   String get kybTypeGroceryBody;
 
   /// No description provided for @kybTypeConvenience.
@@ -7817,7 +6983,7 @@ abstract class AppLocalizations {
   /// No description provided for @kybTypeConvenienceBody.
   ///
   /// In en, this message translates to:
-  /// **'Everyday essentials.'**
+  /// **'Essentials'**
   String get kybTypeConvenienceBody;
 
   /// No description provided for @kybTypeOther.
@@ -7829,7 +6995,7 @@ abstract class AppLocalizations {
   /// No description provided for @kybTypeOtherBody.
   ///
   /// In en, this message translates to:
-  /// **'Pick categories when adding products.'**
+  /// **'Other'**
   String get kybTypeOtherBody;
 
   /// No description provided for @kybSubjectLabel.
@@ -7855,12 +7021,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Other'**
   String get kybSubjectOther;
-
-  /// No description provided for @kybTypeNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Categories and requirements can vary by type and area.'**
-  String get kybTypeNote;
 
   /// No description provided for @kybShopName.
   ///
@@ -7898,17 +7058,17 @@ abstract class AppLocalizations {
   /// **'Type'**
   String get kybShopType;
 
+  /// No description provided for @kybShopCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Store category (you can pick later)'**
+  String get kybShopCategory;
+
   /// No description provided for @kybRepName.
   ///
   /// In en, this message translates to:
   /// **'Representative\'s full name'**
   String get kybRepName;
-
-  /// No description provided for @kybRepNote.
-  ///
-  /// In en, this message translates to:
-  /// **'The representative is responsible for the details given to DealGo.'**
-  String get kybRepNote;
 
   /// No description provided for @kybReviewStatus.
   ///
@@ -7937,7 +7097,7 @@ abstract class AppLocalizations {
   /// No description provided for @kybReviewNote.
   ///
   /// In en, this message translates to:
-  /// **'Sending creates a review. Changing documents later needs a new update.'**
+  /// **'You can sell once approved.'**
   String get kybReviewNote;
 
   /// No description provided for @kybSubmitCta.
@@ -7955,7 +7115,7 @@ abstract class AppLocalizations {
   /// No description provided for @kybStatusTitle.
   ///
   /// In en, this message translates to:
-  /// **'Shop review status'**
+  /// **'Review status'**
   String get kybStatusTitle;
 
   /// No description provided for @kybTrackCta.
@@ -7973,25 +7133,25 @@ abstract class AppLocalizations {
   /// No description provided for @kybActiveTitle.
   ///
   /// In en, this message translates to:
-  /// **'Shop application approved'**
+  /// **'Activated'**
   String get kybActiveTitle;
 
   /// No description provided for @kybActiveBody.
   ///
   /// In en, this message translates to:
-  /// **'You can open your shop and take orders.'**
+  /// **'You can start selling.'**
   String get kybActiveBody;
 
   /// No description provided for @kybStatusPendingNote.
   ///
   /// In en, this message translates to:
-  /// **'There\'s no guaranteed review time. The app updates once DealGo decides.'**
+  /// **'Awaiting review.'**
   String get kybStatusPendingNote;
 
   /// No description provided for @kybStatusActiveNote.
   ///
   /// In en, this message translates to:
-  /// **'Selling is open for your approved application.'**
+  /// **'Approved.'**
   String get kybStatusActiveNote;
 
   /// No description provided for @kybTimelineActivate.
@@ -7999,12 +7159,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Start selling'**
   String get kybTimelineActivate;
-
-  /// No description provided for @kybTimelineActivateBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Only after approval'**
-  String get kybTimelineActivateBody;
 
   /// No description provided for @kybRejectedTitle.
   ///
@@ -8015,7 +7169,7 @@ abstract class AppLocalizations {
   /// No description provided for @kybRejectedBanner.
   ///
   /// In en, this message translates to:
-  /// **'Your application needs changes before review continues. The previous version is kept.'**
+  /// **'More info needed.'**
   String get kybRejectedBanner;
 
   /// No description provided for @merchantStatsTitle.
@@ -8114,12 +7268,6 @@ abstract class AppLocalizations {
   /// **'{count} portions'**
   String merchantStatsPortions(int count);
 
-  /// No description provided for @merchantStatsNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Sales are the food subtotal of delivered orders, in Vietnam time; delivery fees excluded.'**
-  String get merchantStatsNote;
-
   /// No description provided for @merchantStatementTitle.
   ///
   /// In en, this message translates to:
@@ -8171,7 +7319,7 @@ abstract class AppLocalizations {
   /// No description provided for @merchantStatementNote.
   ///
   /// In en, this message translates to:
-  /// **'Drivers pay the food amount to the store at pickup; the store pays the commission to DealGo. Contact support if the figures look wrong.'**
+  /// **'Store pays commission to DealGo.'**
   String get merchantStatementNote;
 
   /// No description provided for @merchantStatsFailed.
@@ -8179,12 +7327,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not load statistics. Pull to retry.'**
   String get merchantStatsFailed;
-
-  /// No description provided for @merchantStatsRetry.
-  ///
-  /// In en, this message translates to:
-  /// **'Retry'**
-  String get merchantStatsRetry;
 
   /// No description provided for @merchantOrderCustomerName.
   ///
@@ -8215,12 +7357,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your shop'**
   String get merchantQueueYourShop;
-
-  /// No description provided for @merchantQueueNewToConfirm.
-  ///
-  /// In en, this message translates to:
-  /// **'New orders to confirm'**
-  String get merchantQueueNewToConfirm;
 
   /// No description provided for @merchantQueueToHandle.
   ///
@@ -8369,7 +7505,7 @@ abstract class AppLocalizations {
   /// No description provided for @supportAttachTitle.
   ///
   /// In en, this message translates to:
-  /// **'Photos (optional)'**
+  /// **'Attachments'**
   String get supportAttachTitle;
 
   /// No description provided for @supportAttachCamera.
@@ -8411,7 +7547,7 @@ abstract class AppLocalizations {
   /// No description provided for @supportAttachPdfNote.
   ///
   /// In en, this message translates to:
-  /// **'The PDF is stored with the request; DealGo staff can open it in the admin console.'**
+  /// **'PDF attached.'**
   String get supportAttachPdfNote;
 
   /// No description provided for @supportAttachOpenFailed.
@@ -8444,17 +7580,41 @@ abstract class AppLocalizations {
   /// **'Could not load the FAQ.'**
   String get helpFaqLoadFailed;
 
-  /// No description provided for @helpFaqRetry.
+  /// No description provided for @helpSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Retry'**
-  String get helpFaqRetry;
+  /// **'Need help?'**
+  String get helpSubtitle;
 
   /// No description provided for @helpFaqEmpty.
   ///
   /// In en, this message translates to:
-  /// **'No FAQ yet. Send a support request and DealGo will reply in the app.'**
+  /// **'No FAQ yet.'**
   String get helpFaqEmpty;
+
+  /// No description provided for @rideShareMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow my DealGo trip live: {url}'**
+  String rideShareMessage(String url);
+
+  /// No description provided for @rideShareSubject.
+  ///
+  /// In en, this message translates to:
+  /// **'My DealGo trip'**
+  String get rideShareSubject;
+
+  /// No description provided for @rideShareSentChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared'**
+  String get rideShareSentChip;
+
+  /// No description provided for @rideSafetyCopyLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link'**
+  String get rideSafetyCopyLink;
 
   /// No description provided for @rideShareCopiedChip.
   ///
@@ -8531,7 +7691,7 @@ abstract class AppLocalizations {
   /// No description provided for @merchantRejectReasonTitle.
   ///
   /// In en, this message translates to:
-  /// **'Reason (shown to the customer)'**
+  /// **'Reject reason'**
   String get merchantRejectReasonTitle;
 
   /// No description provided for @merchantRejectNoteRequired.
@@ -8545,12 +7705,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Note for the customer (optional)'**
   String get merchantRejectNoteOptional;
-
-  /// No description provided for @merchantRejectNoteMissing.
-  ///
-  /// In en, this message translates to:
-  /// **'Add a note when choosing \"Other reason\".'**
-  String get merchantRejectNoteMissing;
 
   /// No description provided for @vouchersUse.
   ///
@@ -8567,7 +7721,7 @@ abstract class AppLocalizations {
   /// No description provided for @vouchersFootnote.
   ///
   /// In en, this message translates to:
-  /// **'Offers are managed by DealGo. The actual discount is calculated at checkout.'**
+  /// **'Discount applied at checkout.'**
   String get vouchersFootnote;
 
   /// No description provided for @voucherPercent.
@@ -8618,29 +7772,11 @@ abstract class AppLocalizations {
   /// **'Hunt deals'**
   String get homeVoucherSeeAll;
 
-  /// No description provided for @rideQuoteExpiredNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Get a new quote before confirming; an old quote can\'t be reused.'**
-  String get rideQuoteExpiredNote;
-
   /// No description provided for @rideQuoteExpiredBadge.
   ///
   /// In en, this message translates to:
   /// **'Expired'**
   String get rideQuoteExpiredBadge;
-
-  /// No description provided for @driverCounterNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Keep the customer\'s fare to accept, or enter another amount to counter. The fare is only final once the customer confirms.'**
-  String get driverCounterNote;
-
-  /// No description provided for @foodTrackingReconnectNote.
-  ///
-  /// In en, this message translates to:
-  /// **'When you\'re back online, the app loads the latest order status.'**
-  String get foodTrackingReconnectNote;
 
   /// No description provided for @foodCancelledBrowse.
   ///
@@ -8677,12 +7813,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Waiting for drivers to make offers...'**
   String get rideMatchingWaiting;
-
-  /// No description provided for @rideMatchingWaitingHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Matching offers will appear here so you can compare and pick your driver.'**
-  String get rideMatchingWaitingHint;
 
   /// No description provided for @rideStatusLabel.
   ///
@@ -8741,13 +7871,13 @@ abstract class AppLocalizations {
   /// No description provided for @rideNoOffersTitle.
   ///
   /// In en, this message translates to:
-  /// **'No driver offers yet'**
+  /// **'No offers yet'**
   String get rideNoOffersTitle;
 
   /// No description provided for @rideNoOffersMessage.
   ///
   /// In en, this message translates to:
-  /// **'There are no valid offers for this request in your area yet.'**
+  /// **'No driver offers yet.'**
   String get rideNoOffersMessage;
 
   /// No description provided for @rideProgress.
@@ -8755,24 +7885,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Progress'**
   String get rideProgress;
-
-  /// No description provided for @rideProgressSent.
-  ///
-  /// In en, this message translates to:
-  /// **'Request sent'**
-  String get rideProgressSent;
-
-  /// No description provided for @rideProgressReceiving.
-  ///
-  /// In en, this message translates to:
-  /// **'Receiving offers from drivers'**
-  String get rideProgressReceiving;
-
-  /// No description provided for @rideProgressChoose.
-  ///
-  /// In en, this message translates to:
-  /// **'Waiting for you to choose and confirm'**
-  String get rideProgressChoose;
 
   /// No description provided for @rideMatchingRefreshFailed.
   ///
@@ -8801,7 +7913,7 @@ abstract class AppLocalizations {
   /// No description provided for @rideTimeoutMessage.
   ///
   /// In en, this message translates to:
-  /// **'Matching time is over. No driver accepted the request.'**
+  /// **'Timed out, no driver.'**
   String get rideTimeoutMessage;
 
   /// No description provided for @rideCurrentRoute.
@@ -8822,12 +7934,6 @@ abstract class AppLocalizations {
   /// **'Offered fare'**
   String get rideOfferedFare;
 
-  /// No description provided for @rideTimeoutNote.
-  ///
-  /// In en, this message translates to:
-  /// **'The previous request has expired. Tap \"Find a driver again\" to send a new request.'**
-  String get rideTimeoutNote;
-
   /// No description provided for @rideEditRoute.
   ///
   /// In en, this message translates to:
@@ -8843,7 +7949,7 @@ abstract class AppLocalizations {
   /// No description provided for @rideAssignedNote.
   ///
   /// In en, this message translates to:
-  /// **'A driver accepted the trip. Open tracking to see the agreed fare.'**
+  /// **'Driver accepted.'**
   String get rideAssignedNote;
 
   /// No description provided for @rideTrack.
@@ -8851,12 +7957,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Track trip'**
   String get rideTrack;
-
-  /// No description provided for @rideCancelledNote.
-  ///
-  /// In en, this message translates to:
-  /// **'The request was cancelled. Your offer is no longer valid.'**
-  String get rideCancelledNote;
 
   /// No description provided for @rideConfirmTitle.
   ///
@@ -8879,13 +7979,13 @@ abstract class AppLocalizations {
   /// No description provided for @rideFareChangedTitle.
   ///
   /// In en, this message translates to:
-  /// **'The fare just changed'**
+  /// **'Fare changed'**
   String get rideFareChangedTitle;
 
   /// No description provided for @rideFareChangedMessage.
   ///
   /// In en, this message translates to:
-  /// **'Trip conditions changed, so the old offer is no longer valid. Review the agreed fare before you accept.'**
+  /// **'Old quote is invalid. Review the fare.'**
   String get rideFareChangedMessage;
 
   /// No description provided for @rideCompareFares.
@@ -8905,12 +8005,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Difference'**
   String get rideFareDifference;
-
-  /// No description provided for @rideFareChangedNote.
-  ///
-  /// In en, this message translates to:
-  /// **'DealGo never changes what you pay on its own. The fare that applies is the agreed fare above.'**
-  String get rideFareChangedNote;
 
   /// No description provided for @rideChosenRoute.
   ///
@@ -8951,14 +8045,8 @@ abstract class AppLocalizations {
   /// No description provided for @rideCashNote.
   ///
   /// In en, this message translates to:
-  /// **'Paid only when the trip is completed'**
+  /// **'Pay at the end'**
   String get rideCashNote;
-
-  /// No description provided for @rideConfirmPriceNote.
-  ///
-  /// In en, this message translates to:
-  /// **'If the fare changes, DealGo asks you to review and confirm again before it applies.'**
-  String get rideConfirmPriceNote;
 
   /// No description provided for @rideFarePendingExists.
   ///
@@ -8972,47 +8060,17 @@ abstract class AppLocalizations {
   /// **'Could not send your offer.'**
   String get rideFareSendFailed;
 
-  /// No description provided for @rideFareTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Your fare'**
-  String get rideFareTitle;
-
-  /// No description provided for @rideBookingInfo.
-  ///
-  /// In en, this message translates to:
-  /// **'Booking details'**
-  String get rideBookingInfo;
-
-  /// No description provided for @rideFareAsk.
-  ///
-  /// In en, this message translates to:
-  /// **'The fare you want to offer'**
-  String get rideFareAsk;
-
   /// No description provided for @rideYourOffer.
   ///
   /// In en, this message translates to:
   /// **'Your offer'**
   String get rideYourOffer;
 
-  /// No description provided for @rideSuggestedFare.
-  ///
-  /// In en, this message translates to:
-  /// **'Suggested fare {amount}'**
-  String rideSuggestedFare(String amount);
-
   /// No description provided for @rideSuggestedFareShort.
   ///
   /// In en, this message translates to:
   /// **'Suggested'**
   String get rideSuggestedFareShort;
-
-  /// No description provided for @rideSuggestedFareHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose a vehicle, then set the fare you want to offer.'**
-  String get rideSuggestedFareHint;
 
   /// No description provided for @ridePickVehicleClassFirst.
   ///
@@ -9025,18 +8083,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter amount'**
   String get rideEnterAmount;
-
-  /// No description provided for @rideFairNegotiation.
-  ///
-  /// In en, this message translates to:
-  /// **'Transparent negotiation'**
-  String get rideFairNegotiation;
-
-  /// No description provided for @rideFairNegotiationNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Drivers may offer a different fare. You only pay the amount of the offer you chose and confirmed.'**
-  String get rideFairNegotiationNote;
 
   /// No description provided for @rideFareOffline.
   ///
@@ -9116,12 +8162,6 @@ abstract class AppLocalizations {
   /// **'Trip code'**
   String get rideTripCode;
 
-  /// No description provided for @rideNoOffersHint.
-  ///
-  /// In en, this message translates to:
-  /// **'You can change your offered fare or try again later.'**
-  String get rideNoOffersHint;
-
   /// No description provided for @rideListRefreshFailed.
   ///
   /// In en, this message translates to:
@@ -9143,7 +8183,7 @@ abstract class AppLocalizations {
   /// No description provided for @rideQuoteExpiredMessage.
   ///
   /// In en, this message translates to:
-  /// **'The old offer can no longer be chosen because it expired.'**
+  /// **'Quote expired.'**
   String get rideQuoteExpiredMessage;
 
   /// No description provided for @rideOldFare.
@@ -9161,13 +8201,13 @@ abstract class AppLocalizations {
   /// No description provided for @rideOfferTakenTitle.
   ///
   /// In en, this message translates to:
-  /// **'The driver took another job'**
+  /// **'Driver unavailable'**
   String get rideOfferTakenTitle;
 
   /// No description provided for @rideOfferTakenMessage.
   ///
   /// In en, this message translates to:
-  /// **'The offer you picked was no longer available when you confirmed.'**
+  /// **'Offer no longer available.'**
   String get rideOfferTakenMessage;
 
   /// No description provided for @ridePreviousOffer.
@@ -9175,12 +8215,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Previous offer'**
   String get ridePreviousOffer;
-
-  /// No description provided for @rideOfferTakenNote.
-  ///
-  /// In en, this message translates to:
-  /// **'The list may be out of date. Refresh and pick another offer.'**
-  String get rideOfferTakenNote;
 
   /// No description provided for @rideRefreshList.
   ///
@@ -9212,12 +8246,6 @@ abstract class AppLocalizations {
   /// **'Lowest price'**
   String get rideLowestFirst;
 
-  /// No description provided for @rideOffersNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Only the offer you confirm becomes a trip. Offers you have not picked may expire.'**
-  String get rideOffersNote;
-
   /// No description provided for @rideSelectOffline.
   ///
   /// In en, this message translates to:
@@ -9248,12 +8276,6 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 matching offer} other{{count} matching offers}}'**
   String rideOffersCount(int count);
 
-  /// No description provided for @rideSendOffer.
-  ///
-  /// In en, this message translates to:
-  /// **'Find a driver · {amount}'**
-  String rideSendOffer(String amount);
-
   /// No description provided for @rideFindDriverCta.
   ///
   /// In en, this message translates to:
@@ -9271,18 +8293,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Recommended fare {amount}'**
   String rideRecommendedFareLabel(String amount);
-
-  /// No description provided for @rideFareAdjustHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Tap − / + or enter an amount. Drivers may accept or counter.'**
-  String get rideFareAdjustHint;
-
-  /// No description provided for @rideVehicleMotorbike.
-  ///
-  /// In en, this message translates to:
-  /// **'Motorbike'**
-  String get rideVehicleMotorbike;
 
   /// No description provided for @rideOfferKindAccept.
   ///
@@ -9326,16 +8336,10 @@ abstract class AppLocalizations {
   /// **'Offline'**
   String get driverServicesOfflineTitle;
 
-  /// No description provided for @driverServicesOfflineBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Switch on to start taking jobs'**
-  String get driverServicesOfflineBody;
-
   /// No description provided for @driverServicesNotRegistered.
   ///
   /// In en, this message translates to:
-  /// **'Not in your application'**
+  /// **'Not registered'**
   String get driverServicesNotRegistered;
 
   /// No description provided for @driverServicesNoneOn.
@@ -9395,7 +8399,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverOfflineHeroMessage.
   ///
   /// In en, this message translates to:
-  /// **'Go online to see ride requests and food deliveries near you.'**
+  /// **'Go online for rides and deliveries.'**
   String get driverOfflineHeroMessage;
 
   /// No description provided for @driverDutyStatus.
@@ -9443,7 +8447,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverIneligibleMessage.
   ///
   /// In en, this message translates to:
-  /// **'Your driver account is not approved yet or is suspended, so you cannot take rides or deliveries.'**
+  /// **'Account not approved or locked.'**
   String get driverIneligibleMessage;
 
   /// No description provided for @driverRightsByService.
@@ -9464,12 +8468,6 @@ abstract class AppLocalizations {
   /// **'Not available'**
   String get driverServiceBlocked;
 
-  /// No description provided for @driverIneligibleNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Open your driver application to see its review status and anything you need to add. If your account is suspended, contact support.'**
-  String get driverIneligibleNote;
-
   /// No description provided for @driverAllowedServices.
   ///
   /// In en, this message translates to:
@@ -9481,12 +8479,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Settings'**
   String get driverConfigure;
-
-  /// No description provided for @driverOnlinePolicyNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Fares and job access are checked by DealGo. Each driver handles one job at a time.'**
-  String get driverOnlinePolicyNote;
 
   /// No description provided for @driverOnlineBadge.
   ///
@@ -9509,7 +8501,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverRideDetailTitle.
   ///
   /// In en, this message translates to:
-  /// **'Ride request details'**
+  /// **'Ride request'**
   String get driverRideDetailTitle;
 
   /// No description provided for @driverCounterOffer.
@@ -9523,12 +8515,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Accept {price}'**
   String driverAcceptAtPrice(String price);
-
-  /// No description provided for @driverMakeOffer.
-  ///
-  /// In en, this message translates to:
-  /// **'Make an offer'**
-  String get driverMakeOffer;
 
   /// No description provided for @driverRideChip.
   ///
@@ -9563,7 +8549,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverOfferTitle.
   ///
   /// In en, this message translates to:
-  /// **'Negotiate the fare'**
+  /// **'Make an offer'**
   String get driverOfferTitle;
 
   /// No description provided for @driverSendOffer.
@@ -9623,7 +8609,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverWaitingForCustomerBody.
   ///
   /// In en, this message translates to:
-  /// **'This screen updates when the customer picks your offer.'**
+  /// **'Waiting for rider.'**
   String get driverWaitingForCustomerBody;
 
   /// No description provided for @driverReadyToNavigate.
@@ -9635,13 +8621,13 @@ abstract class AppLocalizations {
   /// No description provided for @driverReadyToNavigateBody.
   ///
   /// In en, this message translates to:
-  /// **'Open pickup navigation to start the trip.'**
+  /// **'Open pickup route.'**
   String get driverReadyToNavigateBody;
 
   /// No description provided for @driverOfferLostBody.
   ///
   /// In en, this message translates to:
-  /// **'The customer chose another driver or the ride was cancelled.'**
+  /// **'Rider chose another driver.'**
   String get driverOfferLostBody;
 
   /// No description provided for @driverOpenPickupNavigation.
@@ -9686,12 +8672,6 @@ abstract class AppLocalizations {
   /// **'Propose another fare'**
   String get driverOfferKindCounter;
 
-  /// No description provided for @driverOfferKindNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Sending the customer\'s fare accepts it; any other amount is a new proposal for the customer to consider.'**
-  String get driverOfferKindNote;
-
   /// No description provided for @driverOfferHintSame.
   ///
   /// In en, this message translates to:
@@ -9709,12 +8689,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'View job details'**
   String get driverOpenJobDetails;
-
-  /// No description provided for @driverLoadingRequests.
-  ///
-  /// In en, this message translates to:
-  /// **'Loading requests'**
-  String get driverLoadingRequests;
 
   /// No description provided for @driverNoOpenRequests.
   ///
@@ -9734,12 +8708,6 @@ abstract class AppLocalizations {
   /// **'Deliveries you can take'**
   String get driverFoodAvailable;
 
-  /// No description provided for @driverOneJobNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Each driver handles one job at a time.'**
-  String get driverOneJobNote;
-
   /// No description provided for @driverFoodJobSummary.
   ///
   /// In en, this message translates to:
@@ -9751,12 +8719,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delivery fee'**
   String get driverDeliveryFare;
-
-  /// No description provided for @driverDeliveryFareNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Earnings are settled after delivery. You can take the job only after the store confirms the order.'**
-  String get driverDeliveryFareNote;
 
   /// No description provided for @driverLoadRequestsFailed.
   ///
@@ -9986,29 +8948,17 @@ abstract class AppLocalizations {
   /// **'This promo code doesn\'t apply to this service.'**
   String get apiErrVoucherWrongService;
 
-  /// No description provided for @merchantLoadingOrders.
-  ///
-  /// In en, this message translates to:
-  /// **'Loading orders'**
-  String get merchantLoadingOrders;
-
   /// No description provided for @merchantIneligibleTitle.
   ///
   /// In en, this message translates to:
-  /// **'Your store can\'t take orders yet'**
+  /// **'Can\'t take orders'**
   String get merchantIneligibleTitle;
 
   /// No description provided for @merchantIneligibleMessage.
   ///
   /// In en, this message translates to:
-  /// **'Your store account isn\'t approved yet or is suspended, so it can\'t receive orders.'**
+  /// **'Store not approved or locked.'**
   String get merchantIneligibleMessage;
-
-  /// No description provided for @merchantIneligibleNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Check your store application under Account. If it\'s suspended, contact support.'**
-  String get merchantIneligibleNote;
 
   /// No description provided for @merchantReloadOrders.
   ///
@@ -10025,14 +8975,8 @@ abstract class AppLocalizations {
   /// No description provided for @merchantNoNewOrdersBody.
   ///
   /// In en, this message translates to:
-  /// **'New orders show up here as soon as customers place them.'**
+  /// **'New orders appear here.'**
   String get merchantNoNewOrdersBody;
-
-  /// No description provided for @merchantNoNewOrdersNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Turn on notifications so you don\'t miss new orders.'**
-  String get merchantNoNewOrdersNote;
 
   /// No description provided for @merchantViewSavedOrders.
   ///
@@ -10049,7 +8993,7 @@ abstract class AppLocalizations {
   /// No description provided for @merchantOrdersLoadFailedBody.
   ///
   /// In en, this message translates to:
-  /// **'The connection is unstable, so the order list may be out of date.'**
+  /// **'List may be outdated.'**
   String get merchantOrdersLoadFailedBody;
 
   /// No description provided for @merchantConnection.
@@ -10069,12 +9013,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Last synced'**
   String get merchantLastSynced;
-
-  /// No description provided for @merchantLoadFailedNote.
-  ///
-  /// In en, this message translates to:
-  /// **'A connection error doesn\'t mean there are no orders. Retry to see new ones.'**
-  String get merchantLoadFailedNote;
 
   /// No description provided for @merchantNoSavedOrders.
   ///
@@ -10187,7 +9125,7 @@ abstract class AppLocalizations {
   /// No description provided for @foodOrderPlacedSub.
   ///
   /// In en, this message translates to:
-  /// **'The store will confirm your order shortly'**
+  /// **'Waiting for store'**
   String get foodOrderPlacedSub;
 
   /// No description provided for @foodPayOnDelivery.
@@ -10220,12 +9158,6 @@ abstract class AppLocalizations {
   /// **'Not being prepared yet'**
   String get foodStepNotPreparing;
 
-  /// No description provided for @foodOrderPlacedNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Your order is in. You pay in cash on delivery; track it to see when the store confirms.'**
-  String get foodOrderPlacedNote;
-
   /// No description provided for @foodTrackOrder.
   ///
   /// In en, this message translates to:
@@ -10241,7 +9173,7 @@ abstract class AppLocalizations {
   /// No description provided for @foodReconnectingBody.
   ///
   /// In en, this message translates to:
-  /// **'Live updates are paused. Your order is still being handled.'**
+  /// **'Reconnecting…'**
   String get foodReconnectingBody;
 
   /// No description provided for @foodOrderInProgress.
@@ -10262,12 +9194,6 @@ abstract class AppLocalizations {
   /// **'Last known status'**
   String get foodLastKnownStatus;
 
-  /// No description provided for @actionClose.
-  ///
-  /// In en, this message translates to:
-  /// **'Close'**
-  String get actionClose;
-
   /// No description provided for @foodLineQtyPrice.
   ///
   /// In en, this message translates to:
@@ -10280,10 +9206,16 @@ abstract class AppLocalizations {
   /// **'Search places, stores, dishes...'**
   String get homeSearchHint;
 
+  /// No description provided for @homeServiceRideSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Ride now'**
+  String get homeServiceRideSub;
+
   /// No description provided for @homeServiceFoodSub.
   ///
   /// In en, this message translates to:
-  /// **'Thousands of stores,\ndelivered'**
+  /// **'Delivered to you'**
   String get homeServiceFoodSub;
 
   /// No description provided for @voiceOpenFailed.
@@ -10315,12 +9247,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Voucher'**
   String get rideVoucherTitle;
-
-  /// No description provided for @rideVoucherNote.
-  ///
-  /// In en, this message translates to:
-  /// **'The code is reserved when you pick a driver and returned if the trip is cancelled.'**
-  String get rideVoucherNote;
 
   /// No description provided for @rideVoucherLine.
   ///
@@ -10364,12 +9290,6 @@ abstract class AppLocalizations {
   /// **'Store status'**
   String get merchantBusyHeading;
 
-  /// No description provided for @merchantBusyIntro.
-  ///
-  /// In en, this message translates to:
-  /// **'Adjust order intake when the kitchen is overloaded or needs a break.'**
-  String get merchantBusyIntro;
-
   /// No description provided for @merchantBusyAccepting.
   ///
   /// In en, this message translates to:
@@ -10391,7 +9311,7 @@ abstract class AppLocalizations {
   /// No description provided for @merchantBusyNotAcceptingBody.
   ///
   /// In en, this message translates to:
-  /// **'Customers can\'t place new orders until you reopen.'**
+  /// **'Customers can\'t order.'**
   String get merchantBusyNotAcceptingBody;
 
   /// No description provided for @merchantBusyResumesAt.
@@ -10424,12 +9344,6 @@ abstract class AppLocalizations {
   /// **'Manual'**
   String get merchantBusyResumeManual;
 
-  /// No description provided for @merchantBusyPolicyNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Confirmed orders still need to be served or handled per policy; pausing does not cancel them.'**
-  String get merchantBusyPolicyNote;
-
   /// No description provided for @merchantBusySave.
   ///
   /// In en, this message translates to:
@@ -10457,7 +9371,7 @@ abstract class AppLocalizations {
   /// No description provided for @foodStoreBusyBanner.
   ///
   /// In en, this message translates to:
-  /// **'The kitchen is busy — prep may take longer.'**
+  /// **'Busy — slower prep.'**
   String get foodStoreBusyBanner;
 
   /// No description provided for @merchantHomeBusyChip.
@@ -10483,12 +9397,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Opening schedule'**
   String get merchantHoursHeading;
-
-  /// No description provided for @merchantHoursIntro.
-  ///
-  /// In en, this message translates to:
-  /// **'Set opening hours, days off and the last-order cut-off.'**
-  String get merchantHoursIntro;
 
   /// No description provided for @merchantHoursUnset.
   ///
@@ -10535,26 +9443,14 @@ abstract class AppLocalizations {
   /// No description provided for @merchantHoursCutoffTitle.
   ///
   /// In en, this message translates to:
-  /// **'Stop orders before closing'**
+  /// **'Last order before close'**
   String get merchantHoursCutoffTitle;
-
-  /// No description provided for @merchantHoursCutoffHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Don\'t accept orders too close to closing.'**
-  String get merchantHoursCutoffHint;
 
   /// No description provided for @merchantHoursCutoffNone.
   ///
   /// In en, this message translates to:
   /// **'None'**
   String get merchantHoursCutoffNone;
-
-  /// No description provided for @merchantHoursEnforcedNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Hours appear on your store page and are enforced when customers order. A closing time earlier than opening means the shift runs overnight into the next morning.'**
-  String get merchantHoursEnforcedNote;
 
   /// No description provided for @merchantHoursSave.
   ///
@@ -10643,7 +9539,7 @@ abstract class AppLocalizations {
   /// No description provided for @foodStoreClosedBanner.
   ///
   /// In en, this message translates to:
-  /// **'This store is outside its ordering hours.'**
+  /// **'Store is closed.'**
   String get foodStoreClosedBanner;
 
   /// No description provided for @foodStoreHoursToday.
@@ -10669,12 +9565,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Order intake setup'**
   String get merchantAcceptHeading;
-
-  /// No description provided for @merchantAcceptIntro.
-  ///
-  /// In en, this message translates to:
-  /// **'Control how the store takes in new orders.'**
-  String get merchantAcceptIntro;
 
   /// No description provided for @merchantAcceptStoreState.
   ///
@@ -10718,12 +9608,6 @@ abstract class AppLocalizations {
   /// **'Max orders in progress'**
   String get merchantAcceptMaxActive;
 
-  /// No description provided for @merchantAcceptMaxActiveHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Avoid taking more than the kitchen can handle'**
-  String get merchantAcceptMaxActiveHint;
-
   /// No description provided for @merchantAcceptOrdersCount.
   ///
   /// In en, this message translates to:
@@ -10742,29 +9626,11 @@ abstract class AppLocalizations {
   /// **'Default prep time'**
   String get merchantAcceptPrep;
 
-  /// No description provided for @merchantAcceptPrepHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Used to estimate when orders are ready'**
-  String get merchantAcceptPrepHint;
-
   /// No description provided for @merchantAcceptCutoff.
   ///
   /// In en, this message translates to:
   /// **'Orders near closing'**
   String get merchantAcceptCutoff;
-
-  /// No description provided for @merchantAcceptCutoffHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Stop taking orders before closing'**
-  String get merchantAcceptCutoffHint;
-
-  /// No description provided for @merchantAcceptPolicyNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Orders in progress are not cancelled when you change modes. Finish pending orders before you stop taking orders.'**
-  String get merchantAcceptPolicyNote;
 
   /// No description provided for @merchantAcceptSave.
   ///
@@ -10787,20 +9653,14 @@ abstract class AppLocalizations {
   /// No description provided for @merchantBusyExtraLabel.
   ///
   /// In en, this message translates to:
-  /// **'Extra prep time while busy'**
+  /// **'Extra prep time'**
   String get merchantBusyExtraLabel;
 
   /// No description provided for @merchantBusyExtraHint.
   ///
   /// In en, this message translates to:
-  /// **'Customers will see a prep time of about {minutes} min.'**
+  /// **'Prep ~{minutes} min.'**
   String merchantBusyExtraHint(int minutes);
-
-  /// No description provided for @foodStorePrepEstimate.
-  ///
-  /// In en, this message translates to:
-  /// **'Prep about {minutes} min'**
-  String foodStorePrepEstimate(int minutes);
 
   /// No description provided for @foodTrackingReadyBy.
   ///
@@ -10999,12 +9859,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Each group needs a unique name, at least one distinct choice, and min ≤ max ≤ number of choices.'**
   String get merchantOptionsInvalidGroup;
-
-  /// No description provided for @merchantOptionsServerHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Customers see the extra price; the server re-prices at checkout. Placed orders keep their original choices.'**
-  String get merchantOptionsServerHint;
 
   /// No description provided for @merchantOptionsItemMissing.
   ///
@@ -11219,7 +10073,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverRideUnassignedTitle.
   ///
   /// In en, this message translates to:
-  /// **'This ride was handed to another driver'**
+  /// **'Ride reassigned'**
   String get driverRideUnassignedTitle;
 
   /// No description provided for @driverRideUnassignedStartTimeout.
@@ -11255,7 +10109,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverFoodDeliveryCodeBody.
   ///
   /// In en, this message translates to:
-  /// **'Ask the customer for the 4-digit code in their DealGo app to complete the delivery.'**
+  /// **'Enter the customer\'s 4-digit code.'**
   String get driverFoodDeliveryCodeBody;
 
   /// No description provided for @driverFoodHandoverCodeTitle.
@@ -11267,7 +10121,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverFoodHandoverCodeBody.
   ///
   /// In en, this message translates to:
-  /// **'Enter the 4-digit code the store shows on its handover screen.'**
+  /// **'Enter the store\'s 4-digit code.'**
   String get driverFoodHandoverCodeBody;
 
   /// No description provided for @driverFoodCodeWrong.
@@ -11297,7 +10151,7 @@ abstract class AppLocalizations {
   /// No description provided for @foodDeliveryCodeHint.
   ///
   /// In en, this message translates to:
-  /// **'Give this code to the courier when you receive your order. Don\'t share it before then.'**
+  /// **'Tell the driver this code on delivery.'**
   String get foodDeliveryCodeHint;
 
   /// No description provided for @merchantHandoverCodeLabel.
@@ -11309,7 +10163,7 @@ abstract class AppLocalizations {
   /// No description provided for @merchantHandoverCodeHint.
   ///
   /// In en, this message translates to:
-  /// **'The driver enters this code when collecting the order. Only give it to the assigned driver.'**
+  /// **'Tell the driver this code at pickup.'**
   String get merchantHandoverCodeHint;
 
   /// No description provided for @accountDeleteRow.
@@ -11336,22 +10190,16 @@ abstract class AppLocalizations {
   /// **'Request account deletion'**
   String get deleteAccountTitle;
 
-  /// No description provided for @deleteAccountSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'This may cost you access to DealGo services.'**
-  String get deleteAccountSubtitle;
-
   /// No description provided for @deleteAccountWarnTitle.
   ///
   /// In en, this message translates to:
-  /// **'Please read carefully before continuing'**
+  /// **'Please note'**
   String get deleteAccountWarnTitle;
 
   /// No description provided for @deleteAccountWarnBody.
   ///
   /// In en, this message translates to:
-  /// **'A deleted account may not be recoverable once deletion completes.'**
+  /// **'This can\'t be undone.'**
   String get deleteAccountWarnBody;
 
   /// No description provided for @deleteAccountWhatHappens.
@@ -11420,22 +10268,16 @@ abstract class AppLocalizations {
   /// **'XÓA'**
   String get deleteAccountTypeHint;
 
-  /// No description provided for @deleteAccountTypeHelper.
-  ///
-  /// In en, this message translates to:
-  /// **'You will verify your identity before the request is sent.'**
-  String get deleteAccountTypeHelper;
-
   /// No description provided for @deleteAccountContinue.
   ///
   /// In en, this message translates to:
-  /// **'Continue deletion request'**
+  /// **'Continue'**
   String get deleteAccountContinue;
 
   /// No description provided for @deleteAccountKeep.
   ///
   /// In en, this message translates to:
-  /// **'Keep my account'**
+  /// **'Keep account'**
   String get deleteAccountKeep;
 
   /// No description provided for @deleteAccountVerifyTitle.
@@ -11447,7 +10289,7 @@ abstract class AppLocalizations {
   /// No description provided for @deleteAccountPasswordBody.
   ///
   /// In en, this message translates to:
-  /// **'Enter your account password to confirm deletion.'**
+  /// **'Enter your password to confirm.'**
   String get deleteAccountPasswordBody;
 
   /// No description provided for @deleteAccountPasswordLabel.
@@ -11465,7 +10307,7 @@ abstract class AppLocalizations {
   /// No description provided for @deleteAccountConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Confirm account deletion'**
+  /// **'Confirm deletion'**
   String get deleteAccountConfirm;
 
   /// No description provided for @deleteAccountRestart.
@@ -11477,7 +10319,7 @@ abstract class AppLocalizations {
   /// No description provided for @deleteAccountDoneTitle.
   ///
   /// In en, this message translates to:
-  /// **'Deletion request received'**
+  /// **'Deletion requested'**
   String get deleteAccountDoneTitle;
 
   /// No description provided for @deleteAccountDoneAction.
@@ -11495,7 +10337,7 @@ abstract class AppLocalizations {
   /// No description provided for @deleteAccountReauthUnavailable.
   ///
   /// In en, this message translates to:
-  /// **'This account has no verified phone or password to verify with. Please contact support.'**
+  /// **'This account can\'t be re-verified in the app yet. Please contact support.'**
   String get deleteAccountReauthUnavailable;
 
   /// No description provided for @deleteAccountWrongPassword.
@@ -11513,8 +10355,20 @@ abstract class AppLocalizations {
   /// No description provided for @deleteAccountLocked.
   ///
   /// In en, this message translates to:
-  /// **'Too many wrong attempts. Start again to get a new code.'**
+  /// **'Too many failed attempts. Start again.'**
   String get deleteAccountLocked;
+
+  /// Delete account: button that opens the native passkey prompt again
+  ///
+  /// In en, this message translates to:
+  /// **'Verify passkey'**
+  String get deleteAccountPasskeyVerify;
+
+  /// No description provided for @deleteAccountWrongPasskey.
+  ///
+  /// In en, this message translates to:
+  /// **'Passkey verification failed.'**
+  String get deleteAccountWrongPasskey;
 
   /// No description provided for @deleteAccountExpired.
   ///
@@ -11582,18 +10436,6 @@ abstract class AppLocalizations {
   /// **'{amount} of cash-job platform fees are not yet settled with DealGo.'**
   String deleteBlockerCod(String amount);
 
-  /// No description provided for @accountEditProfile.
-  ///
-  /// In en, this message translates to:
-  /// **'Edit profile'**
-  String get accountEditProfile;
-
-  /// No description provided for @accountEditProfileBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Update name, email and photo'**
-  String get accountEditProfileBody;
-
   /// No description provided for @accountNotifPrefs.
   ///
   /// In en, this message translates to:
@@ -11645,7 +10487,7 @@ abstract class AppLocalizations {
   /// No description provided for @editProfilePhoneLocked.
   ///
   /// In en, this message translates to:
-  /// **'Phone is protected. Verify to change.'**
+  /// **'Verified phone; it can\'t be changed here.'**
   String get editProfilePhoneLocked;
 
   /// No description provided for @editProfileEmail.
@@ -11684,12 +10526,6 @@ abstract class AppLocalizations {
   /// **'Other'**
   String get editProfileGenderOther;
 
-  /// No description provided for @editProfilePrivacy.
-  ///
-  /// In en, this message translates to:
-  /// **'Personal info is only used to improve your experience.'**
-  String get editProfilePrivacy;
-
   /// No description provided for @editProfileSave.
   ///
   /// In en, this message translates to:
@@ -11701,12 +10537,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Profile saved'**
   String get editProfileSaved;
-
-  /// No description provided for @editProfileHint.
-  ///
-  /// In en, this message translates to:
-  /// **'You can update this anytime'**
-  String get editProfileHint;
 
   /// No description provided for @notifPrefsHeader.
   ///
@@ -11720,23 +10550,11 @@ abstract class AppLocalizations {
   /// **'Your notifications'**
   String get notifPrefsTitle;
 
-  /// No description provided for @notifPrefsSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Choose which updates you want. You can change this anytime.'**
-  String get notifPrefsSubtitle;
-
   /// No description provided for @notifPrefsPushOn.
   ///
   /// In en, this message translates to:
   /// **'Push notifications are on'**
   String get notifPrefsPushOn;
-
-  /// No description provided for @notifPrefsPushHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Adjust in the app or device settings'**
-  String get notifPrefsPushHint;
 
   /// No description provided for @notifPrefsImportant.
   ///
@@ -11789,7 +10607,7 @@ abstract class AppLocalizations {
   /// No description provided for @notifPrefsNewJobSoundBody.
   ///
   /// In en, this message translates to:
-  /// **'Play the spoken \"DealGo, có cuốc mới\" alert for new rides, deliveries and store orders. Turn off to use the phone\'s default sound.'**
+  /// **'Say \"DealGo, new job\" on new jobs.'**
   String get notifPrefsNewJobSoundBody;
 
   /// No description provided for @notifPrefsOther.
@@ -11852,23 +10670,11 @@ abstract class AppLocalizations {
   /// **'Account safety'**
   String get securityTitle;
 
-  /// No description provided for @securitySubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Manage how you sign in and control personal data.'**
-  String get securitySubtitle;
-
   /// No description provided for @securityProtected.
   ///
   /// In en, this message translates to:
   /// **'Account is protected'**
   String get securityProtected;
-
-  /// No description provided for @securityProtectedBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Phone verified · enhance with Passkey'**
-  String get securityProtectedBody;
 
   /// No description provided for @securityLoginSection.
   ///
@@ -11900,35 +10706,17 @@ abstract class AppLocalizations {
   /// **'Passkey'**
   String get securityPasskey;
 
-  /// No description provided for @securityPasskeyBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Sign in with biometrics or a device key'**
-  String get securityPasskeyBody;
-
   /// No description provided for @securitySessions.
   ///
   /// In en, this message translates to:
   /// **'Devices and sessions'**
   String get securitySessions;
 
-  /// No description provided for @securitySessionsBody.
-  ///
-  /// In en, this message translates to:
-  /// **'View and sign out other devices'**
-  String get securitySessionsBody;
-
   /// No description provided for @securityChangePassword.
   ///
   /// In en, this message translates to:
   /// **'Change password'**
   String get securityChangePassword;
-
-  /// No description provided for @securityChangePasswordBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Update your email login password'**
-  String get securityChangePasswordBody;
 
   /// No description provided for @securityPrivacySection.
   ///
@@ -11942,23 +10730,11 @@ abstract class AppLocalizations {
   /// **'App permissions'**
   String get securityPermissions;
 
-  /// No description provided for @securityPermissionsBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Location, notifications, mic when needed'**
-  String get securityPermissionsBody;
-
   /// No description provided for @securityTerms.
   ///
   /// In en, this message translates to:
   /// **'Terms & personal data'**
   String get securityTerms;
-
-  /// No description provided for @securityTermsBody.
-  ///
-  /// In en, this message translates to:
-  /// **'View policies and your rights'**
-  String get securityTermsBody;
 
   /// No description provided for @securityAccountSection.
   ///
@@ -11971,12 +10747,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Request account deletion'**
   String get securityDelete;
-
-  /// No description provided for @securityDeleteBody.
-  ///
-  /// In en, this message translates to:
-  /// **'See consequences and steps'**
-  String get securityDeleteBody;
 
   /// No description provided for @changePasswordHeader.
   ///
@@ -12031,12 +10801,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Active sessions'**
   String get sessionsTitle;
-
-  /// No description provided for @sessionsSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'See where you are signed in and revoke sessions.'**
-  String get sessionsSubtitle;
 
   /// No description provided for @sessionsWarn.
   ///
@@ -12098,16 +10862,10 @@ abstract class AppLocalizations {
   /// **'Order history'**
   String get merchantHistoryHeadline;
 
-  /// No description provided for @merchantHistorySubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Look up sold, cancelled and settled orders'**
-  String get merchantHistorySubtitle;
-
   /// No description provided for @merchantHistorySearch.
   ///
   /// In en, this message translates to:
-  /// **'Search by order id or customer...'**
+  /// **'Search by order id or customer'**
   String get merchantHistorySearch;
 
   /// No description provided for @merchantHistoryAll.
@@ -12128,18 +10886,6 @@ abstract class AppLocalizations {
   /// **'Cancelled'**
   String get merchantHistoryCancelled;
 
-  /// No description provided for @merchantHistoryTabReconcile.
-  ///
-  /// In en, this message translates to:
-  /// **'Settlement'**
-  String get merchantHistoryTabReconcile;
-
-  /// No description provided for @merchantHistoryToday.
-  ///
-  /// In en, this message translates to:
-  /// **'Today'**
-  String get merchantHistoryToday;
-
   /// No description provided for @merchantHistoryRevenue.
   ///
   /// In en, this message translates to:
@@ -12152,12 +10898,6 @@ abstract class AppLocalizations {
   /// **'Orders'**
   String get merchantHistoryList;
 
-  /// No description provided for @merchantHistoryDetail.
-  ///
-  /// In en, this message translates to:
-  /// **'Details'**
-  String get merchantHistoryDetail;
-
   /// No description provided for @merchantHistoryEmpty.
   ///
   /// In en, this message translates to:
@@ -12167,7 +10907,7 @@ abstract class AppLocalizations {
   /// No description provided for @merchantCategoriesTitle.
   ///
   /// In en, this message translates to:
-  /// **'Menu categories'**
+  /// **'Categories'**
   String get merchantCategoriesTitle;
 
   /// No description provided for @merchantCategoriesHeadline.
@@ -12176,16 +10916,10 @@ abstract class AppLocalizations {
   /// **'Manage categories'**
   String get merchantCategoriesHeadline;
 
-  /// No description provided for @merchantCategoriesSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Arrange dishes so customers find them faster.'**
-  String get merchantCategoriesSubtitle;
-
   /// No description provided for @merchantCategoriesSearch.
   ///
   /// In en, this message translates to:
-  /// **'Search categories...'**
+  /// **'Search categories'**
   String get merchantCategoriesSearch;
 
   /// No description provided for @merchantCategoriesCount.
@@ -12200,23 +10934,11 @@ abstract class AppLocalizations {
   /// **'{count} items on sale'**
   String merchantCategoriesItemsOnSale(String count);
 
-  /// No description provided for @merchantCategoriesShowing.
-  ///
-  /// In en, this message translates to:
-  /// **'Visible categories'**
-  String get merchantCategoriesShowing;
-
   /// No description provided for @merchantCategoriesAdd.
   ///
   /// In en, this message translates to:
   /// **'Add category +'**
   String get merchantCategoriesAdd;
-
-  /// No description provided for @merchantCategoriesHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Category order affects the store page. Out-of-stock items stay in the category.'**
-  String get merchantCategoriesHint;
 
   /// No description provided for @merchantCategoriesEmpty.
   ///
@@ -12241,12 +10963,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add / edit item'**
   String get merchantItemEditTitle;
-
-  /// No description provided for @merchantItemStep.
-  ///
-  /// In en, this message translates to:
-  /// **'Step 1 / 2'**
-  String get merchantItemStep;
 
   /// No description provided for @merchantItemInfo.
   ///
@@ -12284,12 +11000,6 @@ abstract class AppLocalizations {
   /// **'Allow customers to order now'**
   String get merchantItemVisibleBody;
 
-  /// No description provided for @merchantItemSaveDraft.
-  ///
-  /// In en, this message translates to:
-  /// **'Save draft'**
-  String get merchantItemSaveDraft;
-
   /// No description provided for @merchantItemContinue.
   ///
   /// In en, this message translates to:
@@ -12326,12 +11036,6 @@ abstract class AppLocalizations {
   /// **'Item photo'**
   String get merchantItemPhoto;
 
-  /// No description provided for @merchantItemPhotoHint.
-  ///
-  /// In en, this message translates to:
-  /// **'JPEG, PNG or WebP — size/type limits from system settings'**
-  String get merchantItemPhotoHint;
-
   /// No description provided for @merchantItemPhotoPick.
   ///
   /// In en, this message translates to:
@@ -12356,12 +11060,6 @@ abstract class AppLocalizations {
   /// **'Could not upload the photo. Try again.'**
   String get merchantItemPhotoError;
 
-  /// No description provided for @merchantCategoriesReorderHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Hold and drag to change the order on the store page.'**
-  String get merchantCategoriesReorderHint;
-
   /// No description provided for @merchantCategoriesReordered.
   ///
   /// In en, this message translates to:
@@ -12377,7 +11075,7 @@ abstract class AppLocalizations {
   /// No description provided for @merchantProductsSearch.
   ///
   /// In en, this message translates to:
-  /// **'Search items...'**
+  /// **'Search items'**
   String get merchantProductsSearch;
 
   /// No description provided for @merchantProductsFilterAll.
@@ -12425,14 +11123,8 @@ abstract class AppLocalizations {
   /// No description provided for @merchantCategoriesSearchHint.
   ///
   /// In en, this message translates to:
-  /// **'Search categories...'**
+  /// **'Search categories'**
   String get merchantCategoriesSearchHint;
-
-  /// No description provided for @merchantEditGalleryHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Photo gallery (max from settings)'**
-  String get merchantEditGalleryHint;
 
   /// No description provided for @merchantEditStatusHidden.
   ///
@@ -12452,16 +11144,10 @@ abstract class AppLocalizations {
   /// **'Store location'**
   String get merchantLocationTitle;
 
-  /// No description provided for @merchantLocationIntro.
-  ///
-  /// In en, this message translates to:
-  /// **'Drivers use this point to pick up orders; the delivery fee is measured from here.'**
-  String get merchantLocationIntro;
-
   /// No description provided for @merchantLocationUnset.
   ///
   /// In en, this message translates to:
-  /// **'Your store is not pinned, so it is hidden and cannot take orders. Pin it so drivers find the pickup point.'**
+  /// **'No pin set — store is hidden.'**
   String get merchantLocationUnset;
 
   /// No description provided for @merchantLocationPinNow.
@@ -12479,7 +11165,7 @@ abstract class AppLocalizations {
   /// No description provided for @merchantLocationPickHint.
   ///
   /// In en, this message translates to:
-  /// **'Tap to search an address or use the map'**
+  /// **'Pick on map'**
   String get merchantLocationPickHint;
 
   /// No description provided for @merchantLocationPendingHint.
@@ -12527,7 +11213,7 @@ abstract class AppLocalizations {
   /// No description provided for @forgotPasswordIntro.
   ///
   /// In en, this message translates to:
-  /// **'Enter the email you sign in with. If it has a password account, DealGo emails a 6-digit code to reset it.'**
+  /// **'Enter your email to get a 6-digit code.'**
   String get forgotPasswordIntro;
 
   /// No description provided for @forgotPasswordSendCode.
@@ -12551,7 +11237,7 @@ abstract class AppLocalizations {
   /// No description provided for @forgotPasswordNewLabel.
   ///
   /// In en, this message translates to:
-  /// **'New password (at least 8 characters)'**
+  /// **'New password (8+ chars)'**
   String get forgotPasswordNewLabel;
 
   /// No description provided for @forgotPasswordConfirmLabel.
@@ -12617,7 +11303,7 @@ abstract class AppLocalizations {
   /// No description provided for @securityPasskeyUnsupported.
   ///
   /// In en, this message translates to:
-  /// **'This device or app version does not support passkeys yet. You can keep signing in with your phone number.'**
+  /// **'This device or app version does not support passkeys yet.'**
   String get securityPasskeyUnsupported;
 
   /// No description provided for @securityPasskeyExists.
@@ -12632,29 +11318,17 @@ abstract class AppLocalizations {
   /// **'Could not add the passkey. Please try again.'**
   String get securityPasskeyFailed;
 
-  /// No description provided for @securityPasskeyDisabled.
+  /// No description provided for @securityPasskeyNeedsVerifiedLogin.
   ///
   /// In en, this message translates to:
-  /// **'Passkey sign-in is turned off for now.'**
-  String get securityPasskeyDisabled;
-
-  /// No description provided for @securityPasskeyNeedsPhone.
-  ///
-  /// In en, this message translates to:
-  /// **'Verify your phone number or email before adding a passkey.'**
-  String get securityPasskeyNeedsPhone;
+  /// **'Verify your account before adding a passkey.'**
+  String get securityPasskeyNeedsVerifiedLogin;
 
   /// No description provided for @merchantProfileTitle.
   ///
   /// In en, this message translates to:
   /// **'Store profile'**
   String get merchantProfileTitle;
-
-  /// No description provided for @merchantProfileIntro.
-  ///
-  /// In en, this message translates to:
-  /// **'Name and logo customers see in the store list and on your store page.'**
-  String get merchantProfileIntro;
 
   /// No description provided for @merchantProfileName.
   ///
@@ -12668,16 +11342,22 @@ abstract class AppLocalizations {
   /// **'Store name must be 2 to 120 characters.'**
   String get merchantProfileNameInvalid;
 
+  /// No description provided for @merchantProfileCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Store category'**
+  String get merchantProfileCategory;
+
   /// No description provided for @merchantProfileSave.
   ///
   /// In en, this message translates to:
-  /// **'Save store name'**
+  /// **'Save changes'**
   String get merchantProfileSave;
 
   /// No description provided for @merchantProfileSaved.
   ///
   /// In en, this message translates to:
-  /// **'Store name saved.'**
+  /// **'Store profile saved.'**
   String get merchantProfileSaved;
 
   /// No description provided for @merchantProfileLogo.
@@ -12685,12 +11365,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Store logo'**
   String get merchantProfileLogo;
-
-  /// No description provided for @merchantProfileLogoHint.
-  ///
-  /// In en, this message translates to:
-  /// **'JPEG, PNG or WebP; a square image works best.'**
-  String get merchantProfileLogoHint;
 
   /// No description provided for @merchantProfileLogoAdd.
   ///
@@ -12725,7 +11399,7 @@ abstract class AppLocalizations {
   /// No description provided for @accountStoreProfileBody.
   ///
   /// In en, this message translates to:
-  /// **'Store name and logo'**
+  /// **'Store name, category and logo'**
   String get accountStoreProfileBody;
 
   /// No description provided for @foodReorderConfirmTitle.
@@ -12737,7 +11411,7 @@ abstract class AppLocalizations {
   /// No description provided for @foodReorderConfirmBody.
   ///
   /// In en, this message translates to:
-  /// **'Items from this order go into your cart at current prices. You can review before placing.'**
+  /// **'Add items at current prices?'**
   String get foodReorderConfirmBody;
 
   /// No description provided for @actionReorder.
@@ -12761,13 +11435,13 @@ abstract class AppLocalizations {
   /// No description provided for @kycQuickModeBanner.
   ///
   /// In en, this message translates to:
-  /// **'Quick sign-up: no documents needed. Admin will review and confirm your vehicle class.'**
+  /// **'Quick sign-up, no documents.'**
   String get kycQuickModeBanner;
 
   /// No description provided for @kybQuickModeBanner.
   ///
   /// In en, this message translates to:
-  /// **'Quick sign-up: no documents needed. Admin will review your store.'**
+  /// **'Quick sign-up, no documents.'**
   String get kybQuickModeBanner;
 
   /// No description provided for @handoverRefLabel.
@@ -12860,12 +11534,6 @@ abstract class AppLocalizations {
   /// **'Delivered'**
   String get trackStepDelivered;
 
-  /// No description provided for @trackDeliveryCodeLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Delivery code'**
-  String get trackDeliveryCodeLabel;
-
   /// No description provided for @trackItemsMore.
   ///
   /// In en, this message translates to:
@@ -12893,13 +11561,13 @@ abstract class AppLocalizations {
   /// No description provided for @accountSignOutConfirmTitle.
   ///
   /// In en, this message translates to:
-  /// **'Sign out of DealGo?'**
+  /// **'Sign out?'**
   String get accountSignOutConfirmTitle;
 
   /// No description provided for @accountSignOutConfirmBody.
   ///
   /// In en, this message translates to:
-  /// **'You will need your phone number and an OTP code to sign in again.'**
+  /// **'You\'ll need to sign in again.'**
   String get accountSignOutConfirmBody;
 
   /// No description provided for @accountSignOutCancel.
@@ -12917,7 +11585,7 @@ abstract class AppLocalizations {
   /// No description provided for @rideOfferConfirmBody.
   ///
   /// In en, this message translates to:
-  /// **'Fare {amount}. The driver will be assigned to your ride right away.'**
+  /// **'Fare {amount}.'**
   String rideOfferConfirmBody(String amount);
 
   /// No description provided for @rideOfferConfirmAction.
@@ -12947,7 +11615,7 @@ abstract class AppLocalizations {
   /// No description provided for @rideRaiseFareBody.
   ///
   /// In en, this message translates to:
-  /// **'Drivers see the new price right away. Current price: {amount}'**
+  /// **'Current fare: {amount}'**
   String rideRaiseFareBody(String amount);
 
   /// No description provided for @rideRaiseFareStep.
@@ -13019,7 +11687,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverCancelHint.
   ///
   /// In en, this message translates to:
-  /// **'Cancelling an accepted ride counts toward your cancellation rate.'**
+  /// **'Counts toward your cancel rate.'**
   String get driverCancelHint;
 
   /// No description provided for @driverCancelReasonCustomerUnreachable.
@@ -13073,7 +11741,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverNoShowBody.
   ///
   /// In en, this message translates to:
-  /// **'Use this only after waiting at the pickup point. The server checks the wait time and may charge the customer a no-show fee.'**
+  /// **'Use only after waiting at pickup.'**
   String get driverNoShowBody;
 
   /// No description provided for @driverNoShowDone.
@@ -13157,7 +11825,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverFoodReleaseHint.
   ///
   /// In en, this message translates to:
-  /// **'The order goes back to other drivers. Returning counts as a cancellation.'**
+  /// **'Releasing counts as a cancel.'**
   String get driverFoodReleaseHint;
 
   /// No description provided for @driverFoodReleaseStoreTooSlow.
@@ -13199,7 +11867,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverFailNoteLabel.
   ///
   /// In en, this message translates to:
-  /// **'What happened? (required)'**
+  /// **'Details (required)'**
   String get driverFailNoteLabel;
 
   /// No description provided for @driverFailNoteRequired.
@@ -13211,7 +11879,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverFailAbsentHint.
   ///
   /// In en, this message translates to:
-  /// **'Call and message the customer first. You can report \"customer unreachable\" only after waiting at the drop-off for a few minutes.'**
+  /// **'Call and text first, wait a few minutes.'**
   String get driverFailAbsentHint;
 
   /// No description provided for @driverFoodFailedDone.
@@ -13331,7 +11999,7 @@ abstract class AppLocalizations {
   /// No description provided for @foodChangeTitle.
   ///
   /// In en, this message translates to:
-  /// **'The store changed your order'**
+  /// **'Store changed order'**
   String get foodChangeTitle;
 
   /// No description provided for @foodChangeReasonOutOfStock.
@@ -13391,7 +12059,7 @@ abstract class AppLocalizations {
   /// No description provided for @foodChangeRejectConfirmBody.
   ///
   /// In en, this message translates to:
-  /// **'The order will be cancelled at no cost to you.'**
+  /// **'Order will be cancelled at no cost.'**
   String get foodChangeRejectConfirmBody;
 
   /// No description provided for @merchantEditOrder.
@@ -13403,7 +12071,7 @@ abstract class AppLocalizations {
   /// No description provided for @merchantEditOrderHint.
   ///
   /// In en, this message translates to:
-  /// **'Lower quantities or remove items. The customer must accept before you continue.'**
+  /// **'Customer must approve changes.'**
   String get merchantEditOrderHint;
 
   /// No description provided for @merchantEditOrderNote.
@@ -13525,6 +12193,570 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Banner {index} of {count}'**
   String homeBannerSlideLabel(int index, int count);
+
+  /// No description provided for @foodStoreFeeFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery from {fee}'**
+  String foodStoreFeeFrom(String fee);
+
+  /// No description provided for @foodOffersNearTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Deals near you'**
+  String get foodOffersNearTitle;
+
+  /// No description provided for @foodStoreOffersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Store deals'**
+  String get foodStoreOffersTitle;
+
+  /// No description provided for @foodStoreOfferUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Use'**
+  String get foodStoreOfferUse;
+
+  /// No description provided for @foodStoreOfferApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Code {code} added to this order'**
+  String foodStoreOfferApplied(String code);
+
+  /// No description provided for @foodStoreSearchMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Search this menu'**
+  String get foodStoreSearchMenu;
+
+  /// No description provided for @foodStoreSearchNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching dishes'**
+  String get foodStoreSearchNone;
+
+  /// No description provided for @foodStoreSectionOther.
+  ///
+  /// In en, this message translates to:
+  /// **'More dishes'**
+  String get foodStoreSectionOther;
+
+  /// No description provided for @foodStoreReviewsAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get foodStoreReviewsAll;
+
+  /// No description provided for @foodStoreReviewsMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Show more'**
+  String get foodStoreReviewsMore;
+
+  /// No description provided for @foodStoreMerchantReply.
+  ///
+  /// In en, this message translates to:
+  /// **'Store reply'**
+  String get foodStoreMerchantReply;
+
+  /// No description provided for @foodStoreReviewsFilterNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching reviews'**
+  String get foodStoreReviewsFilterNone;
+
+  /// No description provided for @foodItemSold.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} sold'**
+  String foodItemSold(int count);
+
+  /// No description provided for @merchantOffersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Store deals'**
+  String get merchantOffersTitle;
+
+  /// No description provided for @merchantOffersEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No deals yet'**
+  String get merchantOffersEmpty;
+
+  /// No description provided for @merchantOffersCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'New deal'**
+  String get merchantOffersCreate;
+
+  /// No description provided for @merchantOfferNewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New deal'**
+  String get merchantOfferNewTitle;
+
+  /// No description provided for @merchantOfferStatusActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Live'**
+  String get merchantOfferStatusActive;
+
+  /// No description provided for @merchantOfferStatusPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get merchantOfferStatusPaused;
+
+  /// No description provided for @merchantOfferStatusEnded.
+  ///
+  /// In en, this message translates to:
+  /// **'Ended'**
+  String get merchantOfferStatusEnded;
+
+  /// No description provided for @merchantOfferStatusUpcoming.
+  ///
+  /// In en, this message translates to:
+  /// **'Upcoming'**
+  String get merchantOfferStatusUpcoming;
+
+  /// No description provided for @merchantOfferPause.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get merchantOfferPause;
+
+  /// No description provided for @merchantOfferResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get merchantOfferResume;
+
+  /// No description provided for @merchantOfferEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get merchantOfferEnd;
+
+  /// No description provided for @merchantOfferEndConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'End {name}?'**
+  String merchantOfferEndConfirm(String name);
+
+  /// No description provided for @merchantOfferUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'Used {used}/{limit}'**
+  String merchantOfferUsage(int used, int limit);
+
+  /// No description provided for @merchantOfferLimitReached.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} deals already live'**
+  String merchantOfferLimitReached(int count);
+
+  /// No description provided for @merchantOfferFormName.
+  ///
+  /// In en, this message translates to:
+  /// **'Deal name'**
+  String get merchantOfferFormName;
+
+  /// No description provided for @merchantOfferFormCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get merchantOfferFormCode;
+
+  /// No description provided for @merchantOfferKindPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Percent off'**
+  String get merchantOfferKindPercent;
+
+  /// No description provided for @merchantOfferKindFixed.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount off'**
+  String get merchantOfferKindFixed;
+
+  /// No description provided for @merchantOfferFormPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Percent'**
+  String get merchantOfferFormPercent;
+
+  /// No description provided for @merchantOfferFormAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get merchantOfferFormAmount;
+
+  /// No description provided for @merchantOfferFormMax.
+  ///
+  /// In en, this message translates to:
+  /// **'Max discount'**
+  String get merchantOfferFormMax;
+
+  /// No description provided for @merchantOfferFormMinOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum order'**
+  String get merchantOfferFormMinOrder;
+
+  /// No description provided for @merchantOfferFormUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'Total uses'**
+  String get merchantOfferFormUsage;
+
+  /// No description provided for @merchantOfferFormPerUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses per customer'**
+  String get merchantOfferFormPerUser;
+
+  /// No description provided for @merchantOfferFormStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Starts'**
+  String get merchantOfferFormStart;
+
+  /// No description provided for @merchantOfferFormEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Ends'**
+  String get merchantOfferFormEnd;
+
+  /// No description provided for @merchantOfferFieldRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get merchantOfferFieldRequired;
+
+  /// No description provided for @merchantOfferFieldInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid'**
+  String get merchantOfferFieldInvalid;
+
+  /// No description provided for @merchantOfferMinBelowValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Must be at least the discount'**
+  String get merchantOfferMinBelowValue;
+
+  /// No description provided for @merchantOfferSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Create deal'**
+  String get merchantOfferSave;
+
+  /// No description provided for @merchantReviewsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer reviews'**
+  String get merchantReviewsTitle;
+
+  /// No description provided for @merchantReviewsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No reviews yet'**
+  String get merchantReviewsEmpty;
+
+  /// No description provided for @merchantReviewHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden'**
+  String get merchantReviewHidden;
+
+  /// No description provided for @merchantReviewReply.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply'**
+  String get merchantReviewReply;
+
+  /// No description provided for @merchantReviewEditReply.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit reply'**
+  String get merchantReviewEditReply;
+
+  /// No description provided for @merchantReviewReplySend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get merchantReviewReplySend;
+
+  /// No description provided for @merchantReviewReplyRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove reply'**
+  String get merchantReviewReplyRemove;
+
+  /// No description provided for @foodBadgeBestSeller.
+  ///
+  /// In en, this message translates to:
+  /// **'Best seller'**
+  String get foodBadgeBestSeller;
+
+  /// No description provided for @foodBadgeNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get foodBadgeNew;
+
+  /// No description provided for @foodStoreMinOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Min. order {amount}'**
+  String foodStoreMinOrder(String amount);
+
+  /// No description provided for @foodCollectionNear.
+  ///
+  /// In en, this message translates to:
+  /// **'Near you'**
+  String get foodCollectionNear;
+
+  /// No description provided for @foodCollectionTopRated.
+  ///
+  /// In en, this message translates to:
+  /// **'Top rated'**
+  String get foodCollectionTopRated;
+
+  /// No description provided for @foodCollectionDeals.
+  ///
+  /// In en, this message translates to:
+  /// **'On sale'**
+  String get foodCollectionDeals;
+
+  /// No description provided for @foodCollectionNewDishes.
+  ///
+  /// In en, this message translates to:
+  /// **'New dishes'**
+  String get foodCollectionNewDishes;
+
+  /// No description provided for @foodEtaArriveAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrives around {time}'**
+  String foodEtaArriveAt(String time);
+
+  /// No description provided for @foodCartBarShortfall.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} to go'**
+  String foodCartBarShortfall(String amount);
+
+  /// No description provided for @foodCartMinOrderMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Add {amount} more to reach the minimum order'**
+  String foodCartMinOrderMissing(String amount);
+
+  /// No description provided for @foodStoreInfoHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours'**
+  String get foodStoreInfoHours;
+
+  /// No description provided for @foodStoreInfoMinOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum order'**
+  String get foodStoreInfoMinOrder;
+
+  /// No description provided for @foodStoreInfoNoMinOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get foodStoreInfoNoMinOrder;
+
+  /// No description provided for @foodStoreInfoPrep.
+  ///
+  /// In en, this message translates to:
+  /// **'Prep time'**
+  String get foodStoreInfoPrep;
+
+  /// No description provided for @foodStoreTagsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers say'**
+  String get foodStoreTagsTitle;
+
+  /// No description provided for @foodStoreSoldTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}+ sold'**
+  String foodStoreSoldTotal(int count);
+
+  /// No description provided for @voucherSaveAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Save {amount}'**
+  String voucherSaveAmount(String amount);
+
+  /// No description provided for @voucherBestPick.
+  ///
+  /// In en, this message translates to:
+  /// **'Best'**
+  String get voucherBestPick;
+
+  /// No description provided for @voucherNeedMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Add {amount} more'**
+  String voucherNeedMore(String amount);
+
+  /// No description provided for @voucherPickerApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Use'**
+  String get voucherPickerApply;
+
+  /// No description provided for @checkoutErrMinOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'The order is below the store minimum'**
+  String get checkoutErrMinOrder;
+
+  /// No description provided for @merchantItemOriginalPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Original price'**
+  String get merchantItemOriginalPrice;
+
+  /// No description provided for @merchantItemOriginalPriceInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Original price must be above the price'**
+  String get merchantItemOriginalPriceInvalid;
+
+  /// No description provided for @merchantStoreMinOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum order'**
+  String get merchantStoreMinOrder;
+
+  /// No description provided for @merchantStoreMinOrderInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter 0 to 10,000,000'**
+  String get merchantStoreMinOrderInvalid;
+
+  /// Store card: delivery fee is 0
+  ///
+  /// In en, this message translates to:
+  /// **'Free delivery'**
+  String get foodStoreFeeFree;
+
+  /// No description provided for @merchantProfileCover.
+  ///
+  /// In en, this message translates to:
+  /// **'Cover photo'**
+  String get merchantProfileCover;
+
+  /// No description provided for @merchantProfileCoverAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add cover photo'**
+  String get merchantProfileCoverAdd;
+
+  /// No description provided for @merchantProfileCoverChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Change cover photo'**
+  String get merchantProfileCoverChange;
+
+  /// No description provided for @merchantProfileCoverRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove cover photo'**
+  String get merchantProfileCoverRemove;
+
+  /// No description provided for @merchantProfileCoverSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Cover photo updated.'**
+  String get merchantProfileCoverSaved;
+
+  /// No description provided for @merchantProfileCoverRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Cover photo removed.'**
+  String get merchantProfileCoverRemoved;
+
+  /// No description provided for @merchantProfileDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'About the store'**
+  String get merchantProfileDescription;
+
+  /// No description provided for @foodStoreAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get foodStoreAbout;
+
+  /// No description provided for @voucherCap.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to {amount}'**
+  String voucherCap(String amount);
+
+  /// No description provided for @voucherUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Used'**
+  String get voucherUsed;
+
+  /// No description provided for @otpPasteChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste code {code}'**
+  String otpPasteChip(String code);
+
+  /// No description provided for @otpNoCodeYet.
+  ///
+  /// In en, this message translates to:
+  /// **'Didn\'t get the code?'**
+  String get otpNoCodeYet;
+
+  /// No description provided for @otpEmailSpamHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t find the email? Check your Spam or Promotions folder.'**
+  String get otpEmailSpamHint;
+
+  /// No description provided for @draftResumeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue where you left off?'**
+  String get draftResumeTitle;
+
+  /// No description provided for @draftResumeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'We saved your progress on this device. Continue, or start over?'**
+  String get draftResumeBody;
+
+  /// No description provided for @draftResumeContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get draftResumeContinue;
+
+  /// No description provided for @draftResumeDiscard.
+  ///
+  /// In en, this message translates to:
+  /// **'Start over'**
+  String get draftResumeDiscard;
+
+  /// No description provided for @draftRestoredNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Restored your unsent draft.'**
+  String get draftRestoredNote;
 }
 
 class _AppLocalizationsDelegate

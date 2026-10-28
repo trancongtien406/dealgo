@@ -40,6 +40,8 @@ import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/maps/route_geometry.dart';
 import '../../../../core/maps/live_route.dart';
 import '../../../chat/presentation/widgets/open_chat_on_arrival.dart';
+import '../../../rating/domain/service_rating.dart';
+import '../../../rating/presentation/rate_service_card.dart';
 
 class FoodTrackingPage extends StatelessWidget {
   const FoodTrackingPage({required this.orderId, super.key});
@@ -421,6 +423,15 @@ class _FoodLive extends StatelessWidget {
             ],
           ),
         ),
+        if (current.stage == FoodTrackingStage.delivered)
+          TrackingSection(
+            child: RateServiceCard(
+              key: Key('food-rate-${current.id}'),
+              type: RatingSubjectType.foodOrder,
+              subjectId: current.id,
+              autoPrompt: true,
+            ),
+          ),
         TrackingSection(
           child: Row(
             children: [
@@ -606,11 +617,6 @@ class _FoodReconnect extends StatelessWidget {
                   ),
                 ),
               ],
-              const SizedBox(height: DealGoSpacing.s12),
-              FoodNote(
-                message: AppLocalizations.of(context).foodTrackingReconnectNote,
-                tone: FoodNoteTone.amber,
-              ),
             ],
           ),
         ),

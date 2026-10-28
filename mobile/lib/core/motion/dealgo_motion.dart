@@ -15,6 +15,17 @@ abstract final class DealGoMotion {
     return MediaQuery.disableAnimationsOf(context);
   }
 
+  /// Endless decorative loops (pulse rings): off for reduced motion, muted
+  /// tickers, and widget tests, where a loop would never let frames settle.
+  static bool ambientLoops(BuildContext context) {
+    final inWidgetTest = WidgetsBinding.instance.runtimeType
+        .toString()
+        .contains('TestWidgetsFlutterBinding');
+    return !prefersReducedMotion(context) &&
+        !inWidgetTest &&
+        TickerMode.valuesOf(context).enabled;
+  }
+
   static Duration durationFor(BuildContext context, Duration preferred) {
     return prefersReducedMotion(context) ? Duration.zero : preferred;
   }

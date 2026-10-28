@@ -1,5 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type {
+  AuthenticationResponseJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+} from '@simplewebauthn/server';
 import type { AppEnv } from '../../platform/config/env.js';
 import { PasswordHasher } from '../../platform/security/password-hasher.js';
 import {
@@ -12,12 +16,16 @@ import { PlatformSettingsService } from '../../platform/settings/platform-settin
 import { maskPhone } from '../../shared/privacy/pii-mask.js';
 import type { SmsSender } from '../../integrations/sms/sms-sender.js';
 import { authError } from '../identity/auth-error.js';
+import { AuthMethodPolicyService } from '../identity/auth-method-policy.service.js';
 import {
   IDENTITY_REPOSITORY,
   MAX_PHONE_ATTEMPTS,
+  PASSKEY_CHALLENGE_TTL_MS,
   PHONE_CHALLENGE_TTL_MS,
   SMS_SENDER,
 } from '../identity/identity.constants.js';
+import type { AuthMethodName } from '../identity/auth-method.constants.js';
+import { PasskeyService } from '../identity/passkey.service.js';
 import type { IdentityRepository, UserRecord } from '../identity/identity.repository.js';
 import {
   ACCOUNT_DELETION_REPOSITORY,
@@ -28,8 +36,18 @@ import {
 } from './account-deletion.repository.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** A password re-auth request stays usable as long as an OTP one. */
-const REQUEST_TTL_MS = PHONE_CHALLENGE_TTL_MS;
+/** A password re-auth request stays usable as long as an OTP one; a passkey one as a ceremony. */
+const REQUEST_TTL_MS: Record<AccountDeletionMethodName, number> = {
+  PHONE_OTP: PHONE_CHALLENGE_TTL_MS,
+  PASSWORD: PHONE_CHALLENGE_TTL_MS,
+  PASSKEY: PASSKEY_CHALLENGE_TTL_MS,
+};
+
+export type AccountDeletionProof = {
+  code?: string;
+  password?: string;
+  passkey?: AuthenticationResponseJSON;
+};
 
 export type AccountDeletionOverview = {
   status: AccountDeletionStatusName | 'NONE';
@@ -41,9 +59,10 @@ export type AccountDeletionOverview = {
 };
 
 /**
- * S027 account deletion (DEC-PROD-037): request → re-auth (SMS OTP to the verified phone, or
- * the account password) → soft-delete + revoke every session → purge worker anonymizes PII
- * after ACCOUNT_DELETION_GRACE_DAYS. Ops can restore during the grace period (audited).
+ * S027 account deletion (DEC-PROD-037): request → re-auth → soft-delete + revoke every session →
+ * purge worker anonymizes PII after ACCOUNT_DELETION_GRACE_DAYS. Ops can restore during the grace
+ * period (audited). Re-auth only uses a sign-in method that is enabled (DEC-PROD-052): one of the
+ * user's passkeys first, then an SMS code to the verified phone, then the account password.
  */
 @Injectable()
 export class AccountDeletionService {
@@ -56,6 +75,8 @@ export class AccountDeletionService {
     private readonly passwords: PasswordHasher,
     private readonly settings: PlatformSettingsService,
     private readonly config: ConfigService<AppEnv, true>,
+    private readonly authMethods: AuthMethodPolicyService,
+    private readonly passkeys: PasskeyService,
   ) {}
 
   async overview(userId: string): Promise<AccountDeletionOverview> {
@@ -81,6 +102,7 @@ export class AccountDeletionService {
     method: AccountDeletionMethodName;
     expiresAt: string;
     phoneMasked: string | null;
+    passkeyOptions: PublicKeyCredentialRequestOptionsJSON | null;
     graceDays: number;
   }> {
     const user = await this.requireUser(userId);
@@ -90,15 +112,19 @@ export class AccountDeletionService {
       throw authError(
         409,
         'ACCOUNT_DELETION_REAUTH_UNAVAILABLE',
-        'Add a verified phone or a password before deleting the account',
+        'This account cannot be re-verified in the app; contact support',
       );
     }
     const code = method === 'PHONE_OTP' ? randomOtpCode() : null;
-    const expiresAt = new Date(Date.now() + REQUEST_TTL_MS);
+    const passkeyOptions =
+      method === 'PASSKEY' ? await this.passkeys.reauthenticationOptions(userId) : null;
+    // The challenge is bound to this user and this deletion request; only its hash is stored.
+    const secret = code ?? passkeyOptions?.challenge ?? null;
+    const expiresAt = new Date(Date.now() + REQUEST_TTL_MS[method]);
     const request = await this.repository.createRequest({
       userId,
       method,
-      codeHash: code ? hashOneTimeSecret(code, this.pepper()) : null,
+      codeHash: secret ? hashOneTimeSecret(secret, this.pepper()) : null,
       expiresAt,
     });
     if (code && user.phone) {
@@ -109,6 +135,7 @@ export class AccountDeletionService {
       method,
       expiresAt: expiresAt.toISOString(),
       phoneMasked: method === 'PHONE_OTP' ? maskPhone(user.phone) : null,
+      passkeyOptions,
       graceDays: await this.graceDays(),
     };
   }
@@ -116,10 +143,16 @@ export class AccountDeletionService {
   async confirm(
     userId: string,
     requestId: string,
-    proof: { code?: string; password?: string },
+    proof: AccountDeletionProof,
   ): Promise<{ status: 'SCHEDULED'; purgeAfter: string; graceDays: number }> {
     const request = await this.repository.findRequest(requestId);
-    if (!request || request.userId !== userId || request.status !== 'PENDING') {
+    // A request whose method was switched off since it started is treated as gone.
+    if (
+      !request ||
+      request.userId !== userId ||
+      request.status !== 'PENDING' ||
+      !(await this.methodEnabled(request.method))
+    ) {
       throw authError(404, 'ACCOUNT_DELETION_NOT_FOUND', 'Deletion request not found');
     }
     if (request.attemptCount >= MAX_PHONE_ATTEMPTS) {
@@ -134,9 +167,7 @@ export class AccountDeletionService {
       if (updated.attemptCount >= MAX_PHONE_ATTEMPTS) {
         throw authError(429, 'AUTH_CODE_LOCKED', 'Too many wrong attempts; start again');
       }
-      throw request.method === 'PHONE_OTP'
-        ? authError(401, 'AUTH_CODE_INVALID', 'Verification code is invalid')
-        : authError(401, 'AUTH_PASSWORD_INVALID', 'Password is incorrect');
+      throw proofError(request.method);
     }
     const graceDays = await this.graceDays();
     const at = new Date();
@@ -245,13 +276,25 @@ export class AccountDeletionService {
     userId: string,
     method: AccountDeletionMethodName,
     codeHash: string | null,
-    proof: { code?: string; password?: string },
+    proof: AccountDeletionProof,
   ): Promise<boolean> {
     if (method === 'PHONE_OTP') {
       return (
         !!proof.code &&
         !!codeHash &&
         fixedEqual(hashOneTimeSecret(proof.code, this.pepper()), codeHash)
+      );
+    }
+    if (method === 'PASSKEY') {
+      const pepper = this.pepper();
+      return (
+        !!proof.passkey &&
+        !!codeHash &&
+        this.passkeys.verifyReauthentication(
+          userId,
+          (challenge) => fixedEqual(hashOneTimeSecret(challenge, pepper), codeHash),
+          proof.passkey,
+        )
       );
     }
     const credential = await this.identity.findCustomerCredential(userId);
@@ -262,12 +305,28 @@ export class AccountDeletionService {
     );
   }
 
+  /** Passkey first, then SMS, then password; never a method that is switched off. */
   private async methodFor(user: UserRecord): Promise<AccountDeletionMethodName | null> {
-    if (user.phone && user.phoneVerifiedAt) {
+    if (
+      (await this.methodEnabled('PASSKEY')) &&
+      (await this.identity.listPasskeys(user.id)).length > 0
+    ) {
+      return 'PASSKEY';
+    }
+    if ((await this.methodEnabled('PHONE_OTP')) && user.phone && user.phoneVerifiedAt) {
       return 'PHONE_OTP';
     }
-    const credential = await this.identity.findCustomerCredential(user.id);
-    return credential?.passwordHash ? 'PASSWORD' : null;
+    if (await this.methodEnabled('PASSWORD')) {
+      const credential = await this.identity.findCustomerCredential(user.id);
+      if (credential?.passwordHash) {
+        return 'PASSWORD';
+      }
+    }
+    return null;
+  }
+
+  private methodEnabled(method: AccountDeletionMethodName): Promise<boolean> {
+    return this.authMethods.isEnabled(SIGN_IN_METHOD[method]);
   }
 
   private async requireUser(userId: string): Promise<UserRecord> {
@@ -287,6 +346,24 @@ export class AccountDeletionService {
       JWT_ACCESS_SECRET: this.config.get('JWT_ACCESS_SECRET', { infer: true }),
       NODE_ENV: this.config.get('NODE_ENV', { infer: true }),
     });
+  }
+}
+
+/** The sign-in method each re-auth method belongs to (the password follows email sign-in). */
+const SIGN_IN_METHOD = {
+  PASSKEY: 'PASSKEY',
+  PHONE_OTP: 'PHONE_SMS',
+  PASSWORD: 'EMAIL_LOGIN_IDENTIFIER',
+} as const satisfies Record<AccountDeletionMethodName, AuthMethodName>;
+
+function proofError(method: AccountDeletionMethodName) {
+  switch (method) {
+    case 'PHONE_OTP':
+      return authError(401, 'AUTH_CODE_INVALID', 'Verification code is invalid');
+    case 'PASSWORD':
+      return authError(401, 'AUTH_PASSWORD_INVALID', 'Password is incorrect');
+    case 'PASSKEY':
+      return authError(401, 'AUTH_PASSKEY_INVALID', 'Passkey verification failed');
   }
 }
 

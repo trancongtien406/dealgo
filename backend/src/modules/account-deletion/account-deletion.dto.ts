@@ -3,6 +3,7 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   Matches,
@@ -11,6 +12,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import type { AuthenticationResponseJSON } from '@simplewebauthn/server';
 
 export class ConfirmAccountDeletionDto {
   @ApiPropertyOptional({ description: '6-digit SMS code when method = PHONE_OTP' })
@@ -24,6 +26,14 @@ export class ConfirmAccountDeletionDto {
   @IsString()
   @MaxLength(200)
   password?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'WebAuthn assertion (AuthenticationResponseJSON) over start.passkeyOptions when method = PASSKEY',
+  })
+  @IsOptional()
+  @IsObject()
+  passkey?: AuthenticationResponseJSON;
 }
 
 export class OpsReasonDto {

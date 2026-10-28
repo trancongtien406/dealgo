@@ -108,11 +108,19 @@ class RatingSubmission {
 /// Public rating of a store. [average] stays null until the backend has
 /// enough ratings (RATING_STORE_MIN_COUNT), so one customer's stars stay private.
 class StoreRating {
-  const StoreRating({required this.storeId, required this.count, this.average});
+  const StoreRating({
+    required this.storeId,
+    required this.count,
+    this.average,
+    this.distribution,
+  });
 
   final String storeId;
   final int count;
   final double? average;
+
+  /// Count per star (index 0 = 1 star); null while the average is hidden.
+  final List<int>? distribution;
 }
 
 class StoreReview {
@@ -120,28 +128,89 @@ class StoreReview {
     required this.stars,
     required this.tags,
     required this.createdAt,
+    this.id = '',
     this.comment,
+    this.merchantReply,
+    this.repliedAt,
+    this.hidden = false,
   });
 
+  final String id;
   final int stars;
   final List<RatingTag> tags;
   final String? comment;
   final DateTime createdAt;
+
+  /// The store's public answer; null = not answered.
+  final String? merchantReply;
+  final DateTime? repliedAt;
+
+  /// Hidden by DealGo moderation (merchant view only).
+  final bool hidden;
+
+  StoreReview withReply(String? reply, DateTime? at) => StoreReview(
+    id: id,
+    stars: stars,
+    tags: tags,
+    createdAt: createdAt,
+    comment: comment,
+    merchantReply: reply,
+    repliedAt: at,
+    hidden: hidden,
+  );
 }
 
 class StoreReviews {
-  const StoreReviews({required this.summary, required this.items});
+  const StoreReviews({
+    required this.summary,
+    required this.items,
+    this.page = 1,
+    this.hasMore = false,
+  });
 
   final StoreRating summary;
 
   /// Empty until the store has enough ratings to be shown.
   final List<StoreReview> items;
+  final int page;
+  final bool hasMore;
+}
+
+/// The merchant's own review inbox (includes hidden reviews, flagged).
+class MerchantReviews {
+  const MerchantReviews({
+    required this.summary,
+    required this.items,
+    required this.total,
+    required this.page,
+  });
+
+  final StoreRating summary;
+  final List<StoreReview> items;
+  final int total;
+  final int page;
+
+  bool get hasMore => page * 20 < total;
 }
 
 abstract interface class RatingRepository {
   Future<StoreReviews> storeReviews({
     required String accessToken,
     required String storeId,
+    int page = 1,
+    int? stars,
+  });
+
+  Future<MerchantReviews> merchantReviews({
+    required String accessToken,
+    int page = 1,
+  });
+
+  /// Empty [text] clears the reply.
+  Future<StoreReview> replyToReview({
+    required String accessToken,
+    required String reviewId,
+    required String text,
   });
 
   /// Summaries for up to 50 stores; unknown ids come back with count 0.

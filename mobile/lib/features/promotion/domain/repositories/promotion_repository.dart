@@ -14,5 +14,6 @@ abstract interface class PromotionRepository {
   Future<List<AvailableVoucher>> listAvailable({
     required String accessToken,
     VoucherService? service,
+    String? storeId,
   });
 }

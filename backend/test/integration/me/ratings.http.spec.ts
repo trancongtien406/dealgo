@@ -55,7 +55,7 @@ describe('ratings http', () => {
       .get(`/v1/ratings/stores?ids=${id},${id}`)
       .set('Authorization', `Bearer ${alice.token}`)
       .expect(200);
-    expect(ok.body.data).toEqual([{ storeId: id, count: 0, average: null }]);
+    expect(ok.body.data).toEqual([{ storeId: id, count: 0, average: null, distribution: null }]);
     await harness
       .http()
       .get('/v1/ratings/stores?ids=nope')
@@ -79,7 +79,12 @@ describe('ratings http', () => {
       .get(`/v1/ratings/stores/${id}/reviews`)
       .set('Authorization', `Bearer ${alice.token}`)
       .expect(200);
-    expect(res.body.data).toEqual({ summary: { storeId: id, count: 0, average: null }, items: [] });
+    expect(res.body.data).toEqual({
+      summary: { storeId: id, count: 0, average: null, distribution: null },
+      items: [],
+      page: 1,
+      hasMore: false,
+    });
     await harness
       .http()
       .get('/v1/ratings/stores/nope/reviews')

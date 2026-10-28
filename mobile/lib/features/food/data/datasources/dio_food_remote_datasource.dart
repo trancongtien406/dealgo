@@ -267,12 +267,20 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
   @override
   Future<FoodStoreDetail> updateStoreProfile({
     required String accessToken,
-    required String name,
+    String? name,
+    String? category,
+    int? minOrderVnd,
+    String? description,
   }) {
     return _send(
       () => dio.patch<Object?>(
         ApiPaths.foodMerchantStoreProfile,
-        data: {'name': name},
+        data: {
+          'name': ?name,
+          'category': ?category,
+          'minOrderVnd': ?minOrderVnd,
+          'description': ?description,
+        },
         options: _auth(accessToken),
       ),
       decodeFoodStoreDetail,
@@ -284,10 +292,13 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
     required String accessToken,
     required String contentBase64,
     String? contentType,
+    bool cover = false,
   }) {
     return _send(
       () => dio.post<Object?>(
-        ApiPaths.foodMerchantStoreLogo,
+        cover
+            ? ApiPaths.foodMerchantStoreCover
+            : ApiPaths.foodMerchantStoreLogo,
         data: {'contentBase64': contentBase64, 'contentType': ?contentType},
         options: _auth(accessToken),
       ),
@@ -296,10 +307,15 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
   }
 
   @override
-  Future<FoodStoreDetail> clearStoreLogo({required String accessToken}) {
+  Future<FoodStoreDetail> clearStoreLogo({
+    required String accessToken,
+    bool cover = false,
+  }) {
     return _send(
       () => dio.delete<Object?>(
-        ApiPaths.foodMerchantStoreLogo,
+        cover
+            ? ApiPaths.foodMerchantStoreCover
+            : ApiPaths.foodMerchantStoreLogo,
         options: _auth(accessToken),
       ),
       decodeFoodStoreDetail,
@@ -394,6 +410,8 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
     int? prepMinutes,
     String? imageUrl,
     String? menuCategoryId,
+    int? originalPriceVnd,
+    bool clearOriginalPrice = false,
   }) {
     return _send(
       () => dio.patch<Object?>(
@@ -406,6 +424,10 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
           'prepMinutes': ?prepMinutes,
           'imageUrl': ?imageUrl,
           'menuCategoryId': ?menuCategoryId,
+          if (clearOriginalPrice)
+            'originalPriceVnd': null
+          else
+            'originalPriceVnd': ?originalPriceVnd,
         },
         options: _auth(accessToken),
       ),
@@ -885,6 +907,7 @@ List<FoodStoreSummary> decodeFoodStoreList(Object? body) {
     if (id is String && id.isNotEmpty && name is String && name.isNotEmpty) {
       final category = map['category'];
       final distance = map['distanceKm'];
+      final rating = asJsonMap(map['rating']);
       stores.add(
         FoodStoreSummary(
           id: id,
@@ -895,11 +918,114 @@ List<FoodStoreSummary> decodeFoodStoreList(Object? body) {
           imageUrl: map['imageUrl'] is String
               ? map['imageUrl'] as String
               : null,
+          logoUrl:
+              map['logoUrl'] is String && (map['logoUrl'] as String).isNotEmpty
+              ? map['logoUrl'] as String
+              : null,
+          ratingAverage: _asDouble(rating?['average']),
+          ratingCount: rating == null ? null : (_asInt(rating['count']) ?? 0),
+          etaMinutes: _asInt(map['etaMinutes']),
+          deliveryFeeFromVnd: _asInt(map['deliveryFeeFromVnd']),
+          offers: decodeStoreOffers(map['offers']),
+          minOrderVnd: _asInt(map['minOrderVnd']) ?? 0,
+          featuredItems: _decodeFeaturedItems(map['featuredItems']),
         ),
       );
     }
   }
   return List.unmodifiable(stores);
+}
+
+DateTime? _asLocalTime(Object? raw) =>
+    raw is String ? DateTime.tryParse(raw)?.toLocal() : null;
+
+/// Strike-through price only while it is above the selling price.
+int? _shownOriginalPrice(int price, Object? raw) {
+  final original = _asInt(raw);
+  return original != null && original > price ? original : null;
+}
+
+List<FoodFeaturedItem> _decodeFeaturedItems(Object? raw) {
+  if (raw is! List) return const [];
+  final out = <FoodFeaturedItem>[];
+  for (final row in raw) {
+    final map = asJsonMap(row);
+    if (map == null) continue;
+    final id = map['id'];
+    final name = map['name'];
+    final price = _asInt(map['priceVnd']);
+    if (id is! String || id.isEmpty || name is! String || price == null) {
+      continue;
+    }
+    final image = map['imageUrl'];
+    out.add(
+      FoodFeaturedItem(
+        id: id,
+        name: name,
+        priceVnd: price,
+        originalPriceVnd: _shownOriginalPrice(price, map['originalPriceVnd']),
+        imageUrl: image is String && image.isNotEmpty ? image : null,
+        soldCount: _asInt(map['soldCount']) ?? 0,
+        addedAt: _asLocalTime(map['addedAt']),
+      ),
+    );
+  }
+  return List.unmodifiable(out);
+}
+
+/// Store offers on list cards and the store page; malformed rows are skipped.
+List<StoreOffer> decodeStoreOffers(Object? raw) {
+  if (raw is! List) return const [];
+  final out = <StoreOffer>[];
+  for (final row in raw) {
+    final map = asJsonMap(row);
+    if (map == null) continue;
+    final id = map['id'];
+    final code = map['code'];
+    final name = map['name'];
+    final value = _asInt(map['discountValue']);
+    final ends = map['endsAt'] is String
+        ? DateTime.tryParse(map['endsAt'] as String)
+        : null;
+    final kind = switch (map['discountType']) {
+      'FIXED_AMOUNT' => StoreOfferKind.fixedAmount,
+      'PERCENTAGE' => StoreOfferKind.percentage,
+      _ => null,
+    };
+    if (id is! String ||
+        code is! String ||
+        name is! String ||
+        value == null ||
+        value <= 0 ||
+        ends == null ||
+        kind == null) {
+      continue;
+    }
+    out.add(
+      StoreOffer(
+        id: id,
+        code: code,
+        name: name,
+        kind: kind,
+        discountValue: value,
+        maxDiscountVnd: _asInt(map['maxDiscountVnd']),
+        minOrderVnd: _asInt(map['minOrderVnd']) ?? 0,
+        endsAt: ends.toLocal(),
+        remainingUses: _asInt(map['remainingUses']),
+      ),
+    );
+  }
+  return List.unmodifiable(out);
+}
+
+List<FoodMenuSection> _decodeMenuSections(Object? raw) {
+  if (raw is! List) return const [];
+  return List.unmodifiable([
+    for (final row in raw)
+      if (asJsonMap(row) case final map?)
+        if (map['id'] is String && map['name'] is String)
+          FoodMenuSection(id: map['id'] as String, name: map['name'] as String),
+  ]);
 }
 
 FoodStoreDetail decodeFoodStoreDetail(Object? body) {
@@ -935,6 +1061,8 @@ FoodStoreDetail decodeFoodStoreDetail(Object? body) {
   final category = data['category'];
   final addressLabel = data['addressLabel'];
   final logoUrl = data['logoUrl'];
+  final coverUrl = data['coverUrl'];
+  final description = data['description'];
   final until = data['serviceModeUntil'];
   return FoodStoreDetail(
     id: id,
@@ -943,6 +1071,10 @@ FoodStoreDetail decodeFoodStoreDetail(Object? body) {
     category: category is String ? category : null,
     addressLabel: addressLabel is String ? addressLabel : null,
     logoUrl: logoUrl is String && logoUrl.isNotEmpty ? logoUrl : null,
+    coverUrl: coverUrl is String && coverUrl.isNotEmpty ? coverUrl : null,
+    description: description is String && description.trim().isNotEmpty
+        ? description.trim()
+        : null,
     lat: _asDouble(data['lat']),
     lng: _asDouble(data['lng']),
     serviceMode: StoreServiceMode.fromWire(data['serviceMode']),
@@ -951,6 +1083,9 @@ FoodStoreDetail decodeFoodStoreDetail(Object? body) {
     schedule: decodeStoreSchedule(data['schedule']),
     acceptSettings: decodeStoreAcceptSettings(data['acceptSettings']),
     estimatedPrepMinutes: _asInt(data['estimatedPrepMinutes']),
+    offers: decodeStoreOffers(data['offers']),
+    menuSections: _decodeMenuSections(data['menuSections']),
+    minOrderVnd: _asInt(data['minOrderVnd']) ?? 0,
   );
 }
 
@@ -1062,6 +1197,8 @@ FoodMenuItem? _menuItem(Object? raw) {
         ? map['menuCategoryId'] as String
         : null,
     optionGroups: decodeFoodOptionGroups(map['optionGroups']),
+    originalPriceVnd: _shownOriginalPrice(price, map['originalPriceVnd']),
+    addedAt: _asLocalTime(map['addedAt']),
   );
 }
 

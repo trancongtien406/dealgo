@@ -28,7 +28,14 @@ import { PAYMENT_PORT } from '../payment/payment.constants.js';
 import type { PaymentPort } from '../payment/payment-port.js';
 import { UnavailablePaymentError } from '../payment/payment-port.js';
 import { RideVehicleClassService } from '../ride-vehicle/ride-vehicle-class.service.js';
-import { isBikeClass, MOTORBIKE_CLASS_CODE } from '../ride-vehicle/ride-vehicle-class.js';
+import {
+  clampToFareSteps,
+  isBikeClass,
+  MOTORBIKE_CLASS_CODE,
+  rideBidFloorVnd,
+  roundDownToFareStep,
+  roundUpToFareStep,
+} from '../ride-vehicle/ride-vehicle-class.js';
 import {
   PhaseRouteCache,
   RoutingService,
@@ -262,7 +269,8 @@ export class RideService {
   async create(actor: RequestActor, idempotencyKey: string, dto: CreateRideDto): Promise<RideView> {
     await this.requireActiveCustomer(actor.userId);
     const vehicle = await this.requireEnabledClass(dto.vehicleClassCode);
-    await this.assertFare(dto.offeredFareVnd, vehicle.minFareVnd, vehicle.maxFareVnd);
+    const offeredFareVnd = toFareStep(dto.offeredFareVnd);
+    await this.assertFare(offeredFareVnd, vehicle.minFareVnd, vehicle.maxFareVnd);
     await this.assertInServiceZone(dto.pickup, dto.dropoff);
     const now = this.clock.now();
     await this.assertCancelCooldown(actor.userId, now);
@@ -271,7 +279,7 @@ export class RideService {
     const quoted = this.vehicleClasses.quote(distanceKm, vehicle);
     // The customer's bid may not undercut the server reference by more than
     // RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE (inDrive shows a "recommended" floor the same way).
-    await this.assertBidFloor(dto.offeredFareVnd, quoted.referenceFareVnd);
+    await this.assertBidFloor(offeredFareVnd, quoted.referenceFareVnd);
     const expiresAt = await this.requestWindowEnd(now);
     const created = await this.unwrap(() =>
       this.rides.create({
@@ -279,7 +287,7 @@ export class RideService {
         idempotencyKey,
         pickup: dto.pickup,
         dropoff: dto.dropoff,
-        offeredFareVnd: dto.offeredFareVnd,
+        offeredFareVnd,
         referenceFareVnd: quoted.referenceFareVnd,
         vehicleClassCode: vehicle.code,
         expiresAt,
@@ -355,10 +363,9 @@ export class RideService {
     const floorPercent = await this.settings.getNumber('RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE');
     const options = enabled.map((vehicle) => {
       const quoted = this.vehicleClasses.quote(distanceKm, vehicle);
-      const floor =
-        floorPercent > 0 ? Math.ceil((quoted.referenceFareVnd * floorPercent) / 100) : 0;
+      const floor = rideBidFloorVnd(quoted.referenceFareVnd, floorPercent);
       return {
-        minBidVnd: Math.min(vehicle.maxFareVnd, Math.max(vehicle.minFareVnd, floor)),
+        minBidVnd: clampToFareSteps(floor, vehicle.minFareVnd, vehicle.maxFareVnd),
         code: vehicle.code,
         name: vehicle.name,
         seats: vehicle.seats,
@@ -687,16 +694,23 @@ export class RideService {
         'This ride is for a different vehicle class',
       );
     }
+    // Taking the customer's own price stays exact; any other amount goes up to the fare step.
+    const amountVnd =
+      dto.amountVnd === existing.offeredFareVnd ? dto.amountVnd : toFareStep(dto.amountVnd);
     const bounds = await this.vehicleClasses.findAny(existing.vehicleClassCode);
     if (bounds) {
-      await this.assertFare(dto.amountVnd, bounds.minFareVnd, bounds.maxFareVnd);
+      await this.assertFare(amountVnd, bounds.minFareVnd, bounds.maxFareVnd);
     } else {
-      await this.assertFare(dto.amountVnd);
+      await this.assertFare(amountVnd);
     }
     // A counter can only go up from the customer's bid and at most
     // RIDE_COUNTER_MAX_PERCENT_OF_OFFER of it (the ledger enforces the lower bound too).
     const counterPercent = await this.settings.getNumber('RIDE_COUNTER_MAX_PERCENT_OF_OFFER');
-    if (counterPercent > 0 && dto.amountVnd > Math.floor((existing.offeredFareVnd * counterPercent) / 100)) {
+    const counterCapVnd = Math.max(
+      existing.offeredFareVnd,
+      roundDownToFareStep((existing.offeredFareVnd * counterPercent) / 100),
+    );
+    if (counterPercent > 0 && amountVnd > counterCapVnd) {
       throw rideError(
         400,
         'RIDE_COUNTER_OUT_OF_RANGE',
@@ -710,7 +724,7 @@ export class RideService {
       this.rides.offer({
         rideId,
         driverId: actor.userId,
-        amountVnd: dto.amountVnd,
+        amountVnd,
         expiresAt,
         now,
         ...(maxLiveOffers > 0 ? { maxLiveOffers } : {}),
@@ -792,18 +806,19 @@ export class RideService {
     if (!existing || existing.customerId !== actor.userId) {
       throw rideError(404, 'RIDE_NOT_FOUND', 'Ride not found');
     }
+    const amountVnd = toFareStep(dto.amountVnd);
     const bounds = await this.vehicleClasses.findAny(existing.vehicleClassCode);
-    await this.assertFare(dto.amountVnd, bounds?.minFareVnd, bounds?.maxFareVnd);
+    await this.assertFare(amountVnd, bounds?.minFareVnd, bounds?.maxFareVnd);
     // The raised price must still respect the floor (it only goes up, but the reference may
     // have been recomputed since create).
-    await this.assertBidFloor(dto.amountVnd, existing.referenceFareVnd);
+    await this.assertBidFloor(amountVnd, existing.referenceFareVnd);
     const windowExpiresAt = await this.requestWindowEnd(now);
     const maxRaises = await this.settings.getNumber('RIDE_MAX_FARE_RAISES_PER_RIDE');
     const raised = await this.unwrap(() =>
       this.rides.raiseFare({
         rideId,
         customerId: actor.userId,
-        amountVnd: dto.amountVnd,
+        amountVnd,
         now,
         windowExpiresAt,
         ...(maxRaises > 0 ? { maxRaises } : {}),
@@ -1334,11 +1349,8 @@ export class RideService {
 
   private async assertBidFloor(amountVnd: number, referenceFareVnd: number): Promise<void> {
     const percent = await this.settings.getNumber('RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE');
-    if (percent <= 0 || referenceFareVnd <= 0) {
-      return;
-    }
-    const floor = Math.ceil((referenceFareVnd * percent) / 100);
-    if (amountVnd < floor) {
+    const floor = rideBidFloorVnd(referenceFareVnd, percent);
+    if (floor > 0 && amountVnd < floor) {
       throw rideError(
         400,
         'RIDE_FARE_OUT_OF_RANGE',
@@ -1389,7 +1401,7 @@ export class RideService {
       const raised = view.offeredFareVnd * (1 + raisePercent / 100);
       return {
         ...view,
-        repostHint: { suggestedFareVnd: Math.ceil(raised / 1000) * 1000, raisePercent },
+        repostHint: { suggestedFareVnd: roundUpToFareStep(raised), raisePercent },
       };
     }
     if (view.status !== 'NEGOTIATING') {
@@ -1570,4 +1582,9 @@ function cashDue(
   ride: Pick<RideSnapshot, 'agreedFareVnd' | 'discountVnd'> & { priorFeesVnd?: number },
 ): number {
   return Math.max(0, (ride.agreedFareVnd ?? 0) - ride.discountVnd) + (ride.priorFeesVnd ?? 0);
+}
+
+/** A bid, counter or raise goes up to the fare step; non-integers are left for assertFare to reject. */
+function toFareStep(amountVnd: number): number {
+  return Number.isSafeInteger(amountVnd) ? roundUpToFareStep(amountVnd) : amountVnd;
 }

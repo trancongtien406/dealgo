@@ -11,7 +11,7 @@ import { ApiError } from "@/lib/api/errors";
 
 type InterveneKind = "cancel" | "reassign";
 
-type InterveneCopy = { title: string; confirm: string; hint: string };
+type InterveneCopy = { title: string; confirm: string; hint: string; success?: string };
 
 type OpsInterveneDialogProps = {
   open: boolean;
@@ -107,9 +107,14 @@ export function OpsInterveneDialog({
     setError(null);
     try {
       await onConfirm(trimmed);
-      toast.success(
-        kind === "cancel" ? "Đã hủy thành công." : "Đã gỡ gán thành công.",
-      );
+      const success = labels
+        ? labels.success
+        : kind === "cancel"
+          ? "Đã hủy thành công."
+          : "Đã gỡ gán thành công.";
+      if (success) {
+        toast.success(success);
+      }
       onClose();
     } catch (err) {
       const message = errorMessage(err);

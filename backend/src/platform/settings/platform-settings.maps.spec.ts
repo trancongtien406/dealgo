@@ -21,7 +21,7 @@ describe('MAPS_*_PROVIDER settings', () => {
     expect(support.some((v) => v.key === 'MAPS_ROUTE_PROVIDER')).toBe(true);
   });
 
-  it('accept only mapbox or google, and google only with GOOGLE_MAPS_API_KEY', async () => {
+  it('accept only mapbox or google, and google only with a Google key', async () => {
     const noKey = service({});
     await expect(noKey.patch('MAPS_SEARCH_PROVIDER', 'here', 'thử nhà cung cấp', ACTOR)).rejects.toMatchObject({
       errorCode: 'PLATFORM_SETTING_INVALID',

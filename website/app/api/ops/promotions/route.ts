@@ -63,6 +63,7 @@ export async function GET(request: Request) {
   const status = searchParams.get("status")?.trim() || undefined;
   const serviceType = searchParams.get("serviceType")?.trim() || searchParams.get("channel")?.trim() || undefined;
   const audience = searchParams.get("audience")?.trim() || undefined;
+  const scope = searchParams.get("scope")?.trim() || undefined;
 
   const result = await fetchOpsUpstream({
     path: "/v1/ops/promotions",
@@ -73,6 +74,7 @@ export async function GET(request: Request) {
       ...(status && status !== "ALL" ? { status } : {}),
       ...(serviceType && serviceType !== "ALL" ? { serviceType } : {}),
       ...(audience && audience !== "ALL" ? { audience } : {}),
+      ...(scope === "STORE" || scope === "PLATFORM" ? { scope } : {}),
     },
   });
 
@@ -102,6 +104,8 @@ export async function GET(request: Request) {
       endDate: string;
       sponsor: string;
       createdAt: string;
+      storeId?: string | null;
+      storeName?: string | null;
     }>;
     total?: number;
     page?: number;
@@ -141,7 +145,15 @@ export async function GET(request: Request) {
     startDate: raw.startDate,
     endDate: raw.endDate,
     status: raw.status,
-    owner: raw.sponsor === "PLATFORM" ? "Nền tảng DealGo" : raw.sponsor === "MERCHANT" ? "Đối tác quán ăn" : "Đồng tài trợ",
+    owner: raw.storeId
+      ? (raw.storeName ?? "Cửa hàng")
+      : raw.sponsor === "PLATFORM"
+        ? "Nền tảng DealGo"
+        : raw.sponsor === "MERCHANT"
+          ? "Đối tác quán ăn"
+          : "Đồng tài trợ",
+    storeId: raw.storeId ?? null,
+    storeName: raw.storeName ?? null,
     targetAudience: raw.targetAudience,
     createdAt: raw.createdAt,
   }));

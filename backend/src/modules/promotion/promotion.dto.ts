@@ -6,6 +6,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   Max,
   MaxLength,
@@ -59,6 +60,15 @@ export class OpsPromotionQueryDto {
   @Transform(upperCase)
   @IsIn(['ALL', 'CUSTOMER', 'DRIVER', 'MERCHANT'])
   audience?: PromotionAudience;
+
+  @IsOptional()
+  @Transform(upperCase)
+  @IsIn(['STORE', 'PLATFORM'])
+  scope?: 'STORE' | 'PLATFORM';
+
+  @IsOptional()
+  @IsUUID()
+  storeId?: string;
 }
 
 export class CreatePromotionBodyDto {
@@ -134,6 +144,11 @@ export class UpdatePromotionStatusDto {
   @IsNotEmpty()
   @IsIn(['ACTIVE', 'SCHEDULED', 'PAUSED', 'ENDED', 'CANCELLED'])
   status!: PromotionStatus;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
 }
 
 export class ValidateVoucherBodyDto {
@@ -170,4 +185,62 @@ export class AvailableVouchersQueryDto {
   @IsOptional()
   @IsIn(['RIDE', 'FOOD'])
   serviceType?: 'RIDE' | 'FOOD';
+
+  /** Adds this store's own offers to the DealGo vouchers. */
+  @IsOptional()
+  @IsUUID()
+  storeId?: string;
+}
+
+export class CreateStoreOfferDto {
+  @IsNotEmpty()
+  @IsString()
+  @MaxLength(80)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\s*[A-Za-z0-9_-]{3,20}\s*$/)
+  code?: string;
+
+  @IsIn(['FIXED_AMOUNT', 'PERCENTAGE'])
+  discountType!: 'FIXED_AMOUNT' | 'PERCENTAGE';
+
+  @IsInt()
+  @Min(1)
+  @Max(MAX_VND)
+  discountValue!: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1000)
+  @Max(MAX_VND)
+  maxDiscountAmount?: number;
+
+  @IsInt()
+  @Min(0)
+  @Max(MAX_VND)
+  minOrderAmount!: number;
+
+  @IsInt()
+  @Min(1)
+  @Max(100_000)
+  usageLimit!: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  userLimit?: number;
+
+  @IsISO8601()
+  startDate!: string;
+
+  @IsISO8601()
+  endDate!: string;
+}
+
+export class UpdateStoreOfferStatusDto {
+  @IsIn(['ACTIVE', 'PAUSED', 'ENDED'])
+  status!: 'ACTIVE' | 'PAUSED' | 'ENDED';
 }

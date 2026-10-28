@@ -124,26 +124,6 @@ class _PhoneInputPageState extends State<PhoneInputPage> {
                   }
                 },
               ),
-              const SizedBox(height: DealGoSpacing.s12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    DealGoIcons.lock,
-                    size: 16,
-                    color: DealGoColors.textSecondary,
-                  ),
-                  const SizedBox(width: DealGoSpacing.s8),
-                  Expanded(
-                    child: Text(
-                      l10n.authPhoneOtpNote,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: DealGoColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
               if (error != null) ...[
                 const SizedBox(height: DealGoSpacing.s8),
                 AuthErrorText(error: error),

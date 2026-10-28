@@ -735,7 +735,7 @@ export const PLATFORM_SETTING_SPECS: readonly PlatformSettingSpec[] = [
     seeded: true,
   },
   {
-    // mapbox | google — nguồn gợi ý địa chỉ khi gõ tìm (app + Admin). google cần GOOGLE_MAPS_API_KEY.
+    // mapbox | google — nguồn gợi ý địa chỉ khi gõ tìm (app + Admin). google cần Google Maps key (Admin › Cài đặt › Bản đồ hoặc GOOGLE_MAPS_API_KEY).
     key: 'MAPS_SEARCH_PROVIDER',
     valueType: 'string',
     openIds: ['DEC-PROD-045'],

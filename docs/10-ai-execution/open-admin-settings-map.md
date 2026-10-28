@@ -58,8 +58,8 @@ Cột "Tham chiếu" trỏ tới quyết định (`DEC-PROD-*`) hoặc vấn đ�
 | `RIDE_COMMISSION_CAR_PERCENT` | `0` | 0–100 | Hoa hồng DealGo trên giá chốt của chuyến ô tô; chốt % lúc hoàn thành. | OPEN-003, DEC-PROD-062 |
 | `FOOD_DRIVER_COMMISSION_PERCENT` | `0` | 0–100 | Hoa hồng DealGo trên phí giao (không tính tiền món); chốt % lúc giao xong. | OPEN-003, DEC-PROD-062 |
 | `VOUCHER_SHARED_PLATFORM_PERCENT` | `100` | 0–100 | Phần DealGo chịu với voucher đồng tài trợ (SHARED); phần còn lại trừ vào tiền của quán. | DEC-PROD-015 |
-| `RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE` | `80` | 0–100 | Giá khách đưa tối thiểu tính theo % giá tham khảo; 0 = chỉ dùng giá sàn của hạng xe. | DEC-PROD-059 |
-| `RIDE_COUNTER_MAX_PERCENT_OF_OFFER` | `150` | 100–300 | Giá tài xế trả lại tối đa tính theo % giá khách đưa. | DEC-PROD-059 |
+| `RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE` | `80` | 0–100 | Giá khách đưa tối thiểu tính theo % giá tham khảo, làm tròn lên 1.000đ; 0 = chỉ dùng giá sàn của hạng xe. | DEC-PROD-059 |
+| `RIDE_COUNTER_MAX_PERCENT_OF_OFFER` | `150` | 100–300 | Giá tài xế trả lại tối đa tính theo % giá khách đưa, làm tròn xuống 1.000đ. | DEC-PROD-059 |
 | `RIDE_FREE_CANCEL_MINUTES` | `5` | 0–30 | Khách huỷ miễn phí trong số phút này sau khi có tài xế (và trước khi tài xế tới). | DEC-PROD-060 |
 | `RIDE_CANCEL_FEE_BIKE_VND` | `3000` | 0–200000 | Phí huỷ muộn / không xuất hiện cho xe máy; cộng vào chuyến hoàn thành kế tiếp của khách, trả cho tài xế bị huỷ. | DEC-PROD-060 |
 | `RIDE_CANCEL_FEE_CAR_VND` | `10000` | 0–500000 | Phí huỷ muộn / không xuất hiện cho ô tô; cộng vào chuyến hoàn thành kế tiếp của khách, trả cho tài xế bị huỷ. | DEC-PROD-060 |

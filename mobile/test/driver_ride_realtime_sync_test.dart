@@ -112,7 +112,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(DriverActiveRidePage), findsNothing);
     expect(
-      find.textContaining('Chuyến đã chuyển cho tài xế khác'),
+      find.textContaining('Chuyến đã chuyển'),
       findsOneWidget,
     );
     expect(

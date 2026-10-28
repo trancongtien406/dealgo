@@ -72,12 +72,30 @@ export const apiPaths = {
   opsHomeBannerImage: (id: string) =>
     `/api/ops/home-banners/${encodeURIComponent(id)}/image`,
   opsHomeBannersReorder: () => "/api/ops/home-banners/reorder",
+  opsFoodCategories: () => "/api/ops/food-categories",
+  opsFoodCategory: (code: string) =>
+    `/api/ops/food-categories/${encodeURIComponent(code)}`,
+  opsFoodCategoryImage: (code: string) =>
+    `/api/ops/food-categories/${encodeURIComponent(code)}/image`,
+  opsFoodCategoriesReorder: () => "/api/ops/food-categories/reorder",
   opsRideVehicleClasses: () => "/api/ops/ride-vehicle-classes",
   opsRideVehicleClass: (code: string) =>
     `/api/ops/ride-vehicle-classes/${encodeURIComponent(code)}`,
   opsRideVehicleClassImage: (code: string) =>
     `/api/ops/ride-vehicle-classes/${encodeURIComponent(code)}/image`,
   opsMapsProviders: () => "/api/ops/maps-providers",
+  opsEmailSettings: () => "/api/ops/integrations/email",
+  opsEmailTest: () => "/api/ops/integrations/email/test",
+  opsMapKeys: () => "/api/ops/integrations/maps",
+  opsMapKeysTest: () => "/api/ops/integrations/maps/test",
+  opsSentrySettings: () => "/api/ops/integrations/sentry",
+  opsSentryTest: () => "/api/ops/integrations/sentry/test",
+  opsSystemErrors: () => "/api/ops/system-errors/issues",
+  opsSystemErrorsCount: () => "/api/ops/system-errors/issues/count",
+  opsSystemError: (id: string) => `/api/ops/system-errors/issues/${encodeURIComponent(id)}`,
+  opsSystemErrorStatus: (id: string) =>
+    `/api/ops/system-errors/issues/${encodeURIComponent(id)}/status`,
+  publicClientConfig: () => "/api/public/client-config",
   opsPlatformSettings: () => "/api/ops/platform-settings",
   opsPlatformSetting: (key: string) =>
     `/api/ops/platform-settings/${encodeURIComponent(key)}`,
@@ -112,6 +130,9 @@ export const apiPaths = {
   opsZonesRules: () => "/api/ops/zones/rules",
   opsRefunds: () => "/api/ops/refunds",
   opsPromotions: () => "/api/ops/promotions",
+  opsReviews: () => "/api/ops/reviews",
+  opsReviewVisibility: (id: string) =>
+    `/api/ops/reviews/${encodeURIComponent(id)}/visibility`,
   opsPromotion: (id: string) => `/api/ops/promotions/${encodeURIComponent(id)}`,
   opsPromotionStatus: (id: string) =>
     `/api/ops/promotions/${encodeURIComponent(id)}/status`,
@@ -130,9 +151,6 @@ export const apiPaths = {
     `/api/ops/notifications/${encodeURIComponent(code)}/cancel`,
   opsNotificationCmsItem: (id: string) =>
     `/api/ops/notifications/cms/${encodeURIComponent(id)}`,
-  opsCatalogCategories: () => "/api/ops/catalog/categories",
-  opsCatalogCategoryItem: (code: string) =>
-    `/api/ops/catalog/categories/${encodeURIComponent(code)}`,
 } as const;
 
 export type ApiPathKey = keyof typeof apiPaths;

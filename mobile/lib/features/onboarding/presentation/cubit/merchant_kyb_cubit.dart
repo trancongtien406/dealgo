@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/config/app_env.dart';
+import '../../../../core/drafts/draft_store.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../identity/domain/entities/app_role.dart';
 import '../../../identity/domain/entities/user_profile.dart';
@@ -11,6 +14,7 @@ import '../../domain/usecases/get_my_partner_application.dart';
 import '../../domain/usecases/submit_partner_application.dart';
 import '../document_image_source.dart';
 import 'partner_document_draft.dart';
+import 'partner_draft_support.dart';
 
 export 'partner_document_draft.dart' show PartnerSubmitError;
 
@@ -38,6 +42,7 @@ class MerchantKybState {
     required this.issues,
     required this.seeded,
     this.reason,
+    this.shopCategory,
     this.shopLat,
     this.shopLng,
     this.loading = false,
@@ -74,6 +79,10 @@ class MerchantKybState {
   final String registrationSubject;
   final String shopName;
   final String shopAddress;
+
+  /// Admin-managed food category code (`GET /v1/public/food-categories`);
+  /// optional, the merchant can set it later in Hồ sơ quán.
+  final String? shopCategory;
 
   /// The pickup pin, required by the backend for merchant KYB
   /// (GrabFood / ShopeeFood merchant sign-up also pins the store on a map).
@@ -138,6 +147,7 @@ class MerchantKybState {
     String? registrationSubject,
     String? shopName,
     String? shopAddress,
+    String? shopCategory,
     double? shopLat,
     double? shopLng,
     String? representativeName,
@@ -163,6 +173,7 @@ class MerchantKybState {
       registrationSubject: registrationSubject ?? this.registrationSubject,
       shopName: shopName ?? this.shopName,
       shopAddress: shopAddress ?? this.shopAddress,
+      shopCategory: shopCategory ?? this.shopCategory,
       shopLat: shopLat ?? this.shopLat,
       shopLng: shopLng ?? this.shopLng,
       representativeName: representativeName ?? this.representativeName,
@@ -186,6 +197,8 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
     this._getMyPartnerApplication,
     this._accessToken,
     this._loadDocumentsRequired,
+    this._draftStore,
+    this._draftOwner,
     bool? useMock,
   }) : _useMock = useMock ?? useMockData,
        super(MerchantKybState.initial());
@@ -201,6 +214,162 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
   })?
   _loadDocumentsRequired;
   final bool _useMock;
+
+  /// Unsent-draft persistence (app killed mid-flow); off without a store/user.
+  final DraftStore? _draftStore;
+  final String? Function()? _draftOwner;
+  DraftKeeper? _keeper;
+  var _editing = false;
+  PartnerDraftSnapshot? _pendingDraft;
+
+  /// Draft found by [loadDraft], until [restoreDraft] or [discardDraft].
+  PartnerDraftSnapshot? get pendingDraft => _pendingDraft;
+
+  DraftKeeper? _draftKeeper() {
+    final store = _draftStore;
+    final owner = _draftOwner?.call()?.trim() ?? '';
+    if (store == null || owner.isEmpty) {
+      return null;
+    }
+    final key = partnerDraftKey(role, owner);
+    final current = _keeper;
+    if (current != null && current.key == key) {
+      return current;
+    }
+    return _keeper = DraftKeeper(store: store, key: key);
+  }
+
+  /// Looks for an unsent draft from an earlier session (call after
+  /// [refresh]). True when one worth resuming exists: see [pendingDraft].
+  Future<bool> loadDraft() async {
+    final keeper = _draftKeeper();
+    if (keeper == null || _editing) {
+      return false;
+    }
+    if (state.status == PartnerApplicationStatus.pending ||
+        state.status == PartnerApplicationStatus.active) {
+      _pendingDraft = null;
+      await keeper.clear();
+      return false;
+    }
+    final data = await keeper.load();
+    if (data == null || isClosed) {
+      return false;
+    }
+    final stepIndex = MerchantKybStep.values.indexWhere(
+      (step) => step.name == data['step'],
+    );
+    final images = await loadDraftImages(
+      keeper.store,
+      keeper.key,
+      data['docs'],
+    );
+    if (stepIndex <= 0 && images.isEmpty) {
+      return false;
+    }
+    _pendingDraft = PartnerDraftSnapshot(
+      fields: data,
+      images: images,
+      savedAt: DateTime.tryParse('${data['savedAt']}'),
+    );
+    return true;
+  }
+
+  /// Puts the saved draft back, at the step the applicant left.
+  void restoreDraft() {
+    final draft = _pendingDraft;
+    if (draft == null) {
+      return;
+    }
+    _pendingDraft = null;
+    final d = draft.fields;
+    var documents = state.documents;
+    for (final entry in draft.images.entries) {
+      documents = documents.attach(entry.key, entry.value);
+    }
+    final saved = MerchantKybStep.values
+        .where((step) => step.name == d['step'])
+        .firstOrNull;
+    final step = saved != null && state.steps.contains(saved)
+        ? saved
+        : MerchantKybStep.businessType;
+    final type = draftString(d, 'businessType');
+    final subject = draftString(d, 'registrationSubject');
+    _editing = true;
+    emit(
+      state.copyWith(
+        status: PartnerApplicationStatus.draft,
+        step: step,
+        businessType: MerchantBusinessType.values.contains(type) ? type : null,
+        registrationSubject:
+            MerchantRegistrationSubject.values.contains(subject)
+            ? subject
+            : null,
+        shopName: draftString(d, 'shopName'),
+        shopAddress: draftString(d, 'shopAddress'),
+        shopCategory: draftString(d, 'shopCategory'),
+        shopLat: _coordinate(d['shopLat']),
+        shopLng: _coordinate(d['shopLng']),
+        representativeName: draftString(d, 'representativeName'),
+        bankName: draftString(d, 'bankName'),
+        bankAccountNumber: draftString(d, 'bankAccountNumber'),
+        bankAccountHolder: draftString(d, 'bankAccountHolder'),
+        documents: documents,
+        clearSubmitError: true,
+      ),
+    );
+  }
+
+  /// "Làm lại từ đầu": drops the saved draft (fields and photos).
+  Future<void> discardDraft() async {
+    _pendingDraft = null;
+    _editing = false;
+    await _draftKeeper()?.clear();
+  }
+
+  void _finishDraft() {
+    _pendingDraft = null;
+    _editing = false;
+    unawaited(_draftKeeper()?.clear());
+  }
+
+  Map<String, Object?> _metadataOf(MerchantKybState state) => {
+    'businessType': state.businessType,
+    'registrationSubject': state.registrationSubject,
+    'shopName': state.shopName.trim(),
+    'shopAddress': state.shopAddress.trim(),
+    'shopCategory': ?state.shopCategory,
+    'shopLat': ?state.shopLat,
+    'shopLng': ?state.shopLng,
+    'representativeName': state.representativeName.trim(),
+    'bankName': state.bankName.trim(),
+    'bankAccountNumber': state.bankAccountNumber,
+    'bankAccountHolder': state.bankAccountHolder.trim(),
+  };
+
+  @override
+  void onChange(Change<MerchantKybState> change) {
+    super.onChange(change);
+    final next = change.nextState;
+    if (!_editing || next.status != PartnerApplicationStatus.draft) {
+      return;
+    }
+    _draftKeeper()?.schedule({
+      ..._metadataOf(next),
+      // Untrimmed so a restored field reads exactly as typed.
+      'shopName': next.shopName,
+      'shopAddress': next.shopAddress,
+      'representativeName': next.representativeName,
+      'step': next.step.name,
+      'docs': draftDocumentTypes(next.documents),
+    });
+  }
+
+  @override
+  Future<void> close() async {
+    await _keeper?.flush();
+    return super.close();
+  }
 
   /// DEC-PROD-048: reads the admin KYB switch; keeps documents required on error.
   Future<void> loadRequirements() async {
@@ -269,6 +438,7 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
           : (metadataText(m, key) ?? current);
       final type = metadataText(m, 'businessType');
       final subject = metadataText(m, 'registrationSubject');
+      final category = metadataText(m, 'shopCategory');
       emit(
         state.copyWith(
           status: partnerStatusFromServer(view.status),
@@ -286,6 +456,7 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
               : null,
           shopName: keep(state.shopName, 'shopName'),
           shopAddress: keep(state.shopAddress, 'shopAddress'),
+          shopCategory: state.shopCategory ?? category,
           shopLat: state.shopLat ?? _coordinate(m['shopLat']),
           shopLng: state.shopLng ?? _coordinate(m['shopLng']),
           representativeName: metadataText(m, 'representativeName'),
@@ -304,6 +475,8 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
   void setShopName(String value) => emit(state.copyWith(shopName: value));
 
   void setShopAddress(String value) => emit(state.copyWith(shopAddress: value));
+
+  void setShopCategory(String code) => emit(state.copyWith(shopCategory: code));
 
   /// Pins the store; fills an empty address with the picked place label.
   void setShopPin({
@@ -334,13 +507,22 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
 
   void attachDocument(String kind, PickedDocumentImage image) {
     emit(state.copyWith(documents: state.documents.attach(kind, image)));
+    final keeper = _editing ? _draftKeeper() : null;
+    if (keeper != null) {
+      unawaited(keeper.store.writeBlob(keeper.key, kind, image.bytes));
+    }
   }
 
   void removeDocument(String kind) {
     emit(state.copyWith(documents: state.documents.detach(kind)));
+    final keeper = _editing ? _draftKeeper() : null;
+    if (keeper != null) {
+      unawaited(keeper.store.deleteBlob(keeper.key, kind));
+    }
   }
 
   void startDraft() {
+    _editing = true;
     emit(
       state.copyWith(
         status: PartnerApplicationStatus.draft,
@@ -383,6 +565,7 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
   void beginResubmit([String? section]) {
     final sections = [for (final issue in state.issues) issue.section];
     final target = section ?? (sections.isEmpty ? null : sections.first);
+    _editing = true;
     emit(
       state.copyWith(
         status: PartnerApplicationStatus.draft,
@@ -412,6 +595,7 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
     }
     final submit = _submitPartnerApplication;
     if (_useMock || submit == null) {
+      _finishDraft();
       emit(
         state.copyWith(
           status: PartnerApplicationStatus.pending,
@@ -437,18 +621,7 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
         SubmitPartnerApplicationRequest(
           accessToken: token,
           role: role,
-          metadata: {
-            'businessType': state.businessType,
-            'registrationSubject': state.registrationSubject,
-            'shopName': state.shopName.trim(),
-            'shopAddress': state.shopAddress.trim(),
-            'shopLat': ?state.shopLat,
-            'shopLng': ?state.shopLng,
-            'representativeName': state.representativeName.trim(),
-            'bankName': state.bankName.trim(),
-            'bankAccountNumber': state.bankAccountNumber,
-            'bankAccountHolder': state.bankAccountHolder.trim(),
-          },
+          metadata: _metadataOf(state),
           documents: state.documentsRequired
               ? state.documents.uploads(PartnerDocumentKind.merchantAll)
               : const [],
@@ -457,6 +630,7 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
       if (isClosed) {
         return;
       }
+      _finishDraft();
       emit(
         state.copyWith(
           status: partnerStatusFromServer(view.status),
@@ -469,6 +643,20 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
       );
     } on ApiException catch (error) {
       if (isClosed) {
+        return;
+      }
+      if (error.errorCode == partnerAlreadySubmitted) {
+        // An earlier tap (or a retry after a dropped response) already
+        // landed: show the application under review, not an error.
+        _finishDraft();
+        emit(
+          state.copyWith(
+            status: PartnerApplicationStatus.pending,
+            submitting: false,
+            clearSubmitError: true,
+          ),
+        );
+        await refresh();
         return;
       }
       emit(state.copyWith(submitting: false, submitError: error.errorCode));

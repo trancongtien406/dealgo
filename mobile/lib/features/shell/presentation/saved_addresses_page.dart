@@ -192,11 +192,6 @@ class _SavedAddressesView extends StatelessWidget {
                 compact: true,
               )
             else ...[
-              Text(
-                l10n.addrBookIntro,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: DealGoSpacing.s12),
               for (final address in items) ...[
                 _AddressCard(
                   address: address,

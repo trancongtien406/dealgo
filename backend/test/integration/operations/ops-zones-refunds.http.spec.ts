@@ -154,7 +154,7 @@ describe('ops zones / refunds / catalog categories http', () => {
     await request(app.getHttpServer()).get('/v1/ops/zones').expect(401);
     await request(app.getHttpServer()).get('/v1/ops/zones/rules').expect(401);
     await request(app.getHttpServer()).get('/v1/ops/refunds').expect(401);
-    await request(app.getHttpServer()).get('/v1/ops/catalog/categories').expect(401);
+    await request(app.getHttpServer()).get('/v1/ops/food-categories').expect(401);
   });
 
   it('lists zones and pricing rules', async () => {
@@ -283,40 +283,40 @@ describe('ops zones / refunds / catalog categories http', () => {
     );
   });
 
-  it('lists catalog categories aggregated from stores', async () => {
-    await foods.createFixtureStore('owner-cat', [
-      { name: 'Bún bò', priceVnd: 55_000 },
-      { name: 'Trà tắc', priceVnd: 20_000 },
-    ]);
-
+  it('manages store categories and serves the active ones publicly (DEC-PROD-067)', async () => {
     const listed = await request(app.getHttpServer())
-      .get('/v1/ops/catalog/categories?page=1&limit=20')
+      .get('/v1/ops/food-categories')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
-
-    expect(listed.body.data.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          code: 'pho',
-          name: 'pho',
-          slug: 'pho',
-          storeCount: 1,
-          itemCount: 2,
-          status: 'ACTIVE',
-        }),
-      ]),
+    expect(listed.body.data.items.map((c: { code: string }) => c.code)).toEqual(
+      expect.arrayContaining(['pho', 'noodles', 'mart']),
     );
 
-    const detail = await request(app.getHttpServer())
-      .get('/v1/ops/catalog/categories/pho')
+    const created = await request(app.getHttpServer())
+      .post('/v1/ops/food-categories')
       .set('Authorization', `Bearer ${token}`)
-      .expect(200);
-
-    expect(detail.body.data.code).toBe('pho');
+      .send({ nameVi: 'Bún bò Huế', nameEn: 'Hue beef noodles', icon: 'soup', tone: 'red' })
+      .expect(201);
+    expect(created.body.data).toEqual(
+      expect.objectContaining({ code: 'bun_bo_hue', active: true, storeCount: 0 }),
+    );
 
     await request(app.getHttpServer())
-      .get('/v1/ops/catalog/categories/missing-cat')
+      .patch('/v1/ops/food-categories/bun_bo_hue')
       .set('Authorization', `Bearer ${token}`)
+      .send({ active: false })
+      .expect(200);
+
+    const pub = await request(app.getHttpServer()).get('/v1/public/food-categories').expect(200);
+    expect(pub.headers['cache-control']).toContain('max-age=300');
+    const codes = pub.body.data.items.map((c: { code: string }) => c.code);
+    expect(codes[0]).toBe('pho');
+    expect(codes).not.toContain('bun_bo_hue');
+
+    await request(app.getHttpServer())
+      .patch('/v1/ops/food-categories/missing')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ active: false })
       .expect(404);
   });
 });

@@ -70,6 +70,45 @@ class StoreSchedule {
   }
 }
 
+/// A live merchant-funded offer that applies only at its store.
+enum StoreOfferKind { fixedAmount, percentage }
+
+class StoreOffer {
+  const StoreOffer({
+    required this.id,
+    required this.code,
+    required this.name,
+    required this.kind,
+    required this.discountValue,
+    required this.endsAt,
+    this.maxDiscountVnd,
+    this.minOrderVnd = 0,
+    this.remainingUses,
+  });
+
+  final String id;
+  final String code;
+  final String name;
+  final StoreOfferKind kind;
+
+  /// VND for [StoreOfferKind.fixedAmount], percent for [StoreOfferKind.percentage].
+  final int discountValue;
+  final int? maxDiscountVnd;
+  final int minOrderVnd;
+  final DateTime endsAt;
+
+  /// Redemptions left before the offer is used up; null = not reported.
+  final int? remainingUses;
+}
+
+/// Named menu section (merchant menu category) shown on the store page.
+class FoodMenuSection {
+  const FoodMenuSection({required this.id, required this.name});
+
+  final String id;
+  final String name;
+}
+
 class FoodStoreSummary {
   const FoodStoreSummary({
     required this.id,
@@ -78,7 +117,39 @@ class FoodStoreSummary {
     this.distanceKm,
     this.closedReason,
     this.imageUrl,
+    this.logoUrl,
+    this.ratingAverage,
+    this.ratingCount,
+    this.etaMinutes,
+    this.deliveryFeeFromVnd,
+    this.offers = const [],
+    this.minOrderVnd = 0,
+    this.featuredItems = const [],
   });
+
+  /// Smallest food subtotal the store accepts; 0 = no minimum.
+  final int minOrderVnd;
+
+  /// Up to 3 dishes for discovery rows: best sellers first, then the newest.
+  final List<FoodFeaturedItem> featuredItems;
+
+  /// Store logo; the card prefers the cover [imageUrl].
+  final String? logoUrl;
+
+  /// Null until the store has enough visible ratings to publish an average.
+  final double? ratingAverage;
+
+  /// Visible ratings; null when the list did not include rating data.
+  final int? ratingCount;
+
+  /// Prep + ride estimate; only when the app sent a GPS fix.
+  final int? etaMinutes;
+
+  /// Straight-line delivery fee estimate ("từ" price).
+  final int? deliveryFeeFromVnd;
+
+  /// Up to 3 live store offers, best first.
+  final List<StoreOffer> offers;
 
   final String id;
   final String name;
@@ -96,6 +167,41 @@ class FoodStoreSummary {
   final String? imageUrl;
 }
 
+/// How long a dish counts as "Mới" after the merchant adds it.
+const foodNewItemWindow = Duration(days: 14);
+
+/// True while [addedAt] is inside [foodNewItemWindow].
+bool foodItemIsNew(DateTime? addedAt, {DateTime? now}) {
+  if (addedAt == null) return false;
+  final age = (now ?? DateTime.now()).difference(addedAt);
+  return !age.isNegative && age < foodNewItemWindow;
+}
+
+/// A dish shown on a store card in discovery rows.
+class FoodFeaturedItem {
+  const FoodFeaturedItem({
+    required this.id,
+    required this.name,
+    required this.priceVnd,
+    this.originalPriceVnd,
+    this.imageUrl,
+    this.soldCount = 0,
+    this.addedAt,
+  });
+
+  final String id;
+  final String name;
+  final int priceVnd;
+
+  /// List price shown struck through; only sent while above [priceVnd].
+  final int? originalPriceVnd;
+  final String? imageUrl;
+  final int soldCount;
+  final DateTime? addedAt;
+
+  bool get isNew => foodItemIsNew(addedAt);
+}
+
 class FoodMenuItem {
   const FoodMenuItem({
     required this.id,
@@ -109,12 +215,29 @@ class FoodMenuItem {
     this.soldCount = 0,
     this.menuCategoryId,
     this.optionGroups = const [],
+    this.originalPriceVnd,
+    this.addedAt,
   });
 
   final String id;
   final String name;
   final int priceVnd;
   final bool available;
+
+  /// List price shown struck through; null unless above [priceVnd].
+  final int? originalPriceVnd;
+
+  /// When the merchant added the dish (drives the "Mới" badge).
+  final DateTime? addedAt;
+
+  bool get isNew => foodItemIsNew(addedAt);
+
+  /// Percent saved against [originalPriceVnd]; 0 when there is no list price.
+  int get discountPercent {
+    final original = originalPriceVnd;
+    if (original == null || original <= priceVnd) return 0;
+    return ((original - priceVnd) * 100 / original).round();
+  }
 
   /// M027 (DEC-PROD-039).
   final String? description;
@@ -138,6 +261,8 @@ class FoodMenuItem {
     int? soldCount,
     String? menuCategoryId,
     List<FoodOptionGroup>? optionGroups,
+    int? originalPriceVnd,
+    bool clearOriginalPrice = false,
     bool clearDescription = false,
     bool clearPrepMinutes = false,
     bool clearImageUrl = false,
@@ -157,6 +282,10 @@ class FoodMenuItem {
           ? null
           : (menuCategoryId ?? this.menuCategoryId),
       optionGroups: optionGroups ?? this.optionGroups,
+      originalPriceVnd: clearOriginalPrice
+          ? null
+          : (originalPriceVnd ?? this.originalPriceVnd),
+      addedAt: addedAt,
     );
   }
 }
@@ -238,6 +367,8 @@ class FoodStoreDetail {
     this.category,
     this.addressLabel,
     this.logoUrl,
+    this.coverUrl,
+    this.description,
     this.lat,
     this.lng,
     this.serviceMode = StoreServiceMode.open,
@@ -246,7 +377,19 @@ class FoodStoreDetail {
     this.schedule = const StoreSchedule(),
     this.acceptSettings = const StoreAcceptSettings(),
     this.estimatedPrepMinutes,
+    this.offers = const [],
+    this.menuSections = const [],
+    this.minOrderVnd = 0,
   });
+
+  /// Smallest food subtotal the store accepts; 0 = no minimum.
+  final int minOrderVnd;
+
+  /// Live store offers, best first (customer payload only).
+  final List<StoreOffer> offers;
+
+  /// Menu sections in merchant order (customer payload only).
+  final List<FoodMenuSection> menuSections;
 
   /// Merchant-only M022 settings (the customer payload omits them → defaults).
   final StoreAcceptSettings acceptSettings;
@@ -268,6 +411,13 @@ class FoodStoreDetail {
 
   /// M030 logo path under /v1/public/store-logos; null = none (DEC-PROD-045).
   final String? logoUrl;
+
+  /// Merchant cover photo under /v1/public/store-covers; null = the page
+  /// falls back to the first dish photo.
+  final String? coverUrl;
+
+  /// Merchant "about the store" text; null = none.
+  final String? description;
 
   /// Pickup point drivers navigate to; null until the merchant sets it (M030).
   final double? lat;
@@ -293,22 +443,33 @@ class FoodStoreDetail {
     double? lng,
     String? addressLabel,
     String? name,
+    String? category,
     String? logoUrl,
     bool clearLogoUrl = false,
+    String? coverUrl,
+    bool clearCoverUrl = false,
+    String? description,
+    bool clearDescription = false,
+    int? minOrderVnd,
   }) {
     return FoodStoreDetail(
       id: id,
       name: name ?? this.name,
       items: items ?? this.items,
-      category: category,
+      category: category ?? this.category,
       addressLabel: addressLabel ?? this.addressLabel,
       logoUrl: clearLogoUrl ? null : (logoUrl ?? this.logoUrl),
+      coverUrl: clearCoverUrl ? null : (coverUrl ?? this.coverUrl),
+      description: clearDescription ? null : (description ?? this.description),
       lat: lat ?? this.lat,
       lng: lng ?? this.lng,
       closedReason: closedReason,
       schedule: schedule ?? this.schedule,
       acceptSettings: acceptSettings ?? this.acceptSettings,
       estimatedPrepMinutes: estimatedPrepMinutes ?? this.estimatedPrepMinutes,
+      offers: offers,
+      menuSections: menuSections,
+      minOrderVnd: minOrderVnd ?? this.minOrderVnd,
       serviceMode: serviceMode ?? this.serviceMode,
       serviceModeUntil: clearServiceModeUntil
           ? null

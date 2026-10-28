@@ -319,6 +319,9 @@ abstract interface class SnapshotRealtime {
   /// New transaction-chat messages for the signed-in user (no subscribe needed).
   Stream<ChatMessageHint> get chatMessages;
 
+  /// A new inbox notification for the signed-in user (`inbox` push).
+  Stream<void> get inboxEvents;
+
   /// The signed-in driver lost an assigned ride (no subscribe needed).
   Stream<RideUnassignedHint> get rideUnassigned;
 

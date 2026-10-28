@@ -23,13 +23,13 @@ import '../../identity/domain/entities/auth_state.dart';
 import '../../identity/presentation/cubit/auth_cubit.dart';
 import '../../ride/domain/entities/ride_money.dart';
 import 'account_widgets.dart';
-import 'customer_tab_bar.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/format/date_time_format.dart';
 import '../../../core/format/short_ref.dart';
 import '../../../core/design_system/components/dealgo_app_header.dart';
 import '../../../core/realtime/realtime_refresh_watcher.dart';
 import '../../../core/realtime/snapshot_realtime.dart';
+import '../../../core/design_system/components/dealgo_nav_insets.dart';
 
 enum _ActivityFilter { all, rides, food, shopping }
 
@@ -130,7 +130,7 @@ class _CustomerActivityViewState extends State<_CustomerActivityView> {
     return ColoredBox(
       color: DealGoColors.canvas,
       child: SafeArea(
-        bottom: dealGoSafeAreaBottom(context),
+        bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -183,11 +183,14 @@ class _CustomerActivityViewState extends State<_CustomerActivityView> {
                     onRefresh: () => _reload(context),
                     child: ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      padding: EdgeInsets.fromLTRB(
-                        DealGoDimensions.pageGutter,
-                        DealGoSpacing.s12,
-                        DealGoDimensions.pageGutter,
-                        customerShellBottomClearance(context),
+                      padding: dealGoScrollPadding(
+                        context,
+                        const EdgeInsets.fromLTRB(
+                          DealGoDimensions.pageGutter,
+                          DealGoSpacing.s12,
+                          DealGoDimensions.pageGutter,
+                          DealGoSpacing.s16,
+                        ),
                       ),
                       children: [
                         DealGoSegmentedControl(

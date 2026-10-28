@@ -4,7 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { OpsIcon } from "@/components/ui/ops-icons";
-import { adminNavSections, isAdminNavCurrent } from "@/lib/admin-nav-items";
+import { useSystemErrorsCountQuery } from "@/features/system-errors/hooks";
+import { navBadgeLabel } from "@/features/system-errors/mappers";
+import { adminNavSections, isAdminNavCurrent, type AdminNavItem } from "@/lib/admin-nav-items";
 
 const focusRing =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
@@ -18,6 +20,10 @@ export function AdminNav({
   collapsed?: boolean;
 }) {
   const pathname = usePathname();
+  const systemErrors = useSystemErrorsCountQuery();
+  /** Static badge, or the live unresolved Sentry count (hidden at 0). */
+  const badgeOf = (item: Pick<AdminNavItem, "href" | "badge">) =>
+    item.href === "/system-errors" ? navBadgeLabel(systemErrors.data?.count) : item.badge;
   const [openMegaMenu, setOpenMegaMenu] = useState(false);
   const [megaSearch, setMegaSearch] = useState("");
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>(
@@ -130,9 +136,9 @@ export function AdminNav({
                       </span>
                       {!collapsed && (
                         <span className="flex items-center gap-1.5 shrink-0">
-                          {item.badge && (
+                          {badgeOf(item) && (
                             <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold text-brand">
-                              {item.badge}
+                              {badgeOf(item)}
                             </span>
                           )}
                           <OpsIcon
@@ -183,9 +189,9 @@ export function AdminNav({
                           <span className="truncate">{item.label}</span>
                         )}
                       </span>
-                      {!collapsed && item.badge && (
+                      {!collapsed && badgeOf(item) && (
                         <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold text-brand shrink-0">
-                          {item.badge}
+                          {badgeOf(item)}
                         </span>
                       )}
                     </Link>
@@ -364,9 +370,9 @@ export function AdminNav({
                                 />
                                 <span>{item.label}</span>
                               </span>
-                              {item.badge && (
+                              {badgeOf(item) && (
                                 <span className="rounded-full bg-brand/10 px-1.5 py-0.2 text-[9px] font-bold text-brand">
-                                  {item.badge}
+                                  {badgeOf(item)}
                                 </span>
                               )}
                             </Link>

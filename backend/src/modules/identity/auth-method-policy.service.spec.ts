@@ -34,9 +34,27 @@ describe('AuthMethodPolicyService', () => {
       errorCode: 'AUTH_METHOD_LAST_ENABLED',
     });
 
-    await expect(service.assertEnabled('PASSKEY')).rejects.toMatchObject({
-      response: { errorCode: 'AUTH_METHOD_DISABLED' },
-    });
+    const blocked = await service.assertEnabled('PASSKEY').catch((error: unknown) => error);
+    expect(blocked).toBeInstanceOf(HttpException);
+    expect((blocked as HttpException).getStatus()).toBe(404);
+    expect(JSON.stringify((blocked as HttpException).getResponse())).not.toMatch(/passkey|disabled|method/i);
     await expect(service.assertEnabled('PHONE_SMS')).resolves.toBeUndefined();
+  });
+
+  it('public list holds only enabled methods and only their names', async () => {
+    const repo = new MemoryAuthMethodPolicyRepository();
+    const service = new AuthMethodPolicyService(repo);
+    const actor = '11111111-1111-1111-1111-111111111111';
+    expect(await service.listPublic()).toEqual([
+      { method: 'PASSKEY' },
+      { method: 'PHONE_SMS' },
+      { method: 'EMAIL_LOGIN_IDENTIFIER' },
+    ]);
+
+    await service.setEnabled('PHONE_SMS', false, 'sms off', actor);
+    await service.setEnabled('EMAIL_LOGIN_IDENTIFIER', false, 'email off', actor);
+
+    expect(await service.listPublic()).toEqual([{ method: 'PASSKEY' }]);
+    expect(await service.list()).toHaveLength(3);
   });
 });

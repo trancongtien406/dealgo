@@ -48,7 +48,10 @@ class DioAccountDeletionRemoteDataSource implements AccountDeletionRepository {
       final data = requireSuccessData(response.data);
       final method = decodeAccountDeletionMethod(data['method']);
       final id = data['requestId'];
-      if (method == null || id is! String) {
+      final options = data['passkeyOptions'];
+      if (method == null ||
+          id is! String ||
+          (method == AccountDeletionMethod.passkey && options is! Map)) {
         throw _invalid();
       }
       return AccountDeletionChallenge(
@@ -58,6 +61,9 @@ class DioAccountDeletionRemoteDataSource implements AccountDeletionRepository {
             ? data['phoneMasked'] as String
             : null,
         graceDays: _int(data['graceDays']),
+        passkeyOptions: options is Map
+            ? Map<String, Object?>.from(options)
+            : null,
       );
     } on DioException catch (error) {
       throw apiExceptionFromDio(error);
@@ -70,11 +76,12 @@ class DioAccountDeletionRemoteDataSource implements AccountDeletionRepository {
     required String requestId,
     String? code,
     String? password,
+    Map<String, Object?>? passkey,
   }) async {
     try {
       final response = await dio.post<Object?>(
         ApiPaths.meAccountDeletionConfirm(requestId),
-        data: {'code': ?code, 'password': ?password},
+        data: {'code': ?code, 'password': ?password, 'passkey': ?passkey},
         options: _auth(accessToken),
       );
       final data = requireSuccessData(response.data);
@@ -100,7 +107,8 @@ class DioAccountDeletionRemoteDataSource implements AccountDeletionRepository {
   );
 }
 
-/// In-memory twin for mock mode and widget tests. OTP is [code], password is [password].
+/// In-memory twin for mock mode and widget tests. OTP is [code], password is [password],
+/// a passkey assertion must come from [passkeyCredentialId].
 class FakeAccountDeletionRepository implements AccountDeletionRepository {
   FakeAccountDeletionRepository({
     this.method = AccountDeletionMethod.phoneOtp,
@@ -109,6 +117,7 @@ class FakeAccountDeletionRepository implements AccountDeletionRepository {
     this.code = '123456',
     this.password = 'password123',
     this.phoneMasked = '090***4567',
+    this.passkeyCredentialId = 'fake-passkey-credential',
   });
 
   AccountDeletionMethod? method;
@@ -117,6 +126,7 @@ class FakeAccountDeletionRepository implements AccountDeletionRepository {
   final String code;
   final String password;
   final String phoneMasked;
+  final String passkeyCredentialId;
   final List<String> calls = [];
   String status = 'NONE';
   var _attempts = 0;
@@ -171,6 +181,16 @@ class FakeAccountDeletionRepository implements AccountDeletionRepository {
           ? phoneMasked
           : null,
       graceDays: graceDays,
+      passkeyOptions: current == AccountDeletionMethod.passkey
+          ? {
+              'challenge': 'fake-deletion-challenge-$_seq',
+              'rpId': 'dealgo.vn',
+              'userVerification': 'required',
+              'allowCredentials': [
+                {'id': passkeyCredentialId, 'type': 'public-key'},
+              ],
+            }
+          : null,
     );
   }
 
@@ -180,8 +200,9 @@ class FakeAccountDeletionRepository implements AccountDeletionRepository {
     required String requestId,
     String? code,
     String? password,
+    Map<String, Object?>? passkey,
   }) async {
-    calls.add('confirm:${code ?? password ?? ''}');
+    calls.add('confirm:${code ?? password ?? passkey?['id'] ?? ''}');
     if (_attempts >= 5) {
       throw const ApiException(
         statusCode: 429,
@@ -189,9 +210,11 @@ class FakeAccountDeletionRepository implements AccountDeletionRepository {
         errorCode: 'AUTH_CODE_LOCKED',
       );
     }
-    final ok = method == AccountDeletionMethod.phoneOtp
-        ? code == this.code
-        : password == this.password;
+    final ok = switch (method) {
+      AccountDeletionMethod.passkey => passkey?['id'] == passkeyCredentialId,
+      AccountDeletionMethod.phoneOtp => code == this.code,
+      _ => password == this.password,
+    };
     if (!ok) {
       _attempts += 1;
       if (_attempts >= 5) {
@@ -204,9 +227,11 @@ class FakeAccountDeletionRepository implements AccountDeletionRepository {
       throw ApiException(
         statusCode: 401,
         message: 'wrong',
-        errorCode: method == AccountDeletionMethod.phoneOtp
-            ? 'AUTH_CODE_INVALID'
-            : 'AUTH_PASSWORD_INVALID',
+        errorCode: switch (method) {
+          AccountDeletionMethod.passkey => 'AUTH_PASSKEY_INVALID',
+          AccountDeletionMethod.phoneOtp => 'AUTH_CODE_INVALID',
+          _ => 'AUTH_PASSWORD_INVALID',
+        },
       );
     }
     status = 'SCHEDULED';

@@ -13,6 +13,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../identity/domain/entities/app_role.dart';
 import '../data/home_banner_tracker.dart';
 import '../domain/home_banner.dart';
+import '../../../core/design_system/components/dealgo_network_image.dart';
 
 /// Opens a web CTA; returns false when nothing could be opened.
 typedef HomeBannerWebOpener = Future<bool> Function(Uri uri);
@@ -45,10 +46,18 @@ class HomeBannerCarousel extends StatefulWidget {
     this.interval = const Duration(seconds: 5),
     this.openWeb = openHomeBannerWeb,
     this.locationTimeout = const Duration(milliseconds: 1500),
+    this.service,
+    this.empty = const SizedBox.shrink(),
     super.key,
   });
 
   final AppRole role;
+
+  /// Only banners targeted at this service (`RIDE` / `FOOD`); null keeps all.
+  final String? service;
+
+  /// Shown instead when there is no banner to show.
+  final Widget empty;
 
   /// Space under the carousel; dropped with it when there is nothing to show.
   final double gapBelow;
@@ -113,7 +122,15 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
         lat: lat,
         lng: lng,
       );
-      _show(banners);
+      final service = widget.service;
+      _show(
+        service == null
+            ? banners
+            : [
+                for (final banner in banners)
+                  if (banner.service == service) banner,
+              ],
+      );
     } catch (_) {
       _show(const []);
     }
@@ -251,7 +268,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
       );
     }
     if (banners.isEmpty) {
-      return const SizedBox.shrink();
+      return widget.empty;
     }
     final l10n = AppLocalizations.of(context);
     return Padding(
@@ -352,18 +369,13 @@ class _BannerPage extends StatelessWidget {
             if (url == null)
               fallback
             else
-              Image.network(
+              DealGoNetworkImage(
                 url,
                 fit: BoxFit.cover,
                 filterQuality: FilterQuality.medium,
                 gaplessPlayback: true,
-                frameBuilder: (context, child, frame, sync) {
-                  if (sync || frame != null) {
-                    return child;
-                  }
-                  return const ColoredBox(color: DealGoColors.skeletonBase);
-                },
-                errorBuilder: (context, error, stack) => fallback,
+
+                fallback: fallback,
               ),
           ],
         ),

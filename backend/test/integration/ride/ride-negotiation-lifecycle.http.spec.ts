@@ -19,6 +19,11 @@ import { PLATFORM_SETTINGS_REPOSITORY } from '../../../src/platform/settings/pla
 import { PARTNER_REPOSITORY } from '../../../src/modules/partner/partner.constants.js';
 import { MemoryPartnerRepository } from '../../../src/modules/partner/partner.repository.js';
 import { haversineKm, quoteReferenceFareVnd } from '../../../src/modules/ride/ride-geo.js';
+import {
+  rideBidFloorVnd,
+  roundDownToFareStep,
+  roundUpToFareStep,
+} from '../../../src/modules/ride-vehicle/ride-vehicle-class.js';
 import { RIDE_CLOCK, type RideClock } from '../../../src/modules/ride/ride.constants.js';
 import { RideModule } from '../../../src/modules/ride/ride.module.js';
 import { EarningsService } from '../../../src/modules/earnings/earnings.service.js';
@@ -102,7 +107,7 @@ describe('ride negotiation & lifecycle http', () => {
     app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
     await app.init();
     seedVehicleClassOnDriverGrant(app, repository);
-    reference = quoteReferenceFareVnd(haversineKm(pickup, dropoff), 8000, 10_000);
+    reference = roundUpToFareStep(quoteReferenceFareVnd(haversineKm(pickup, dropoff), 8000, 10_000));
   });
 
   afterAll(async () => {
@@ -114,7 +119,7 @@ describe('ride negotiation & lifecycle http', () => {
   });
 
   const http = () => request(app.getHttpServer());
-  const bid = () => Math.ceil(reference * 0.8) + 1000;
+  const bid = () => rideBidFloorVnd(reference, 80) + 1000;
 
   async function login(): Promise<Actor> {
     phoneSerial += 1;
@@ -190,13 +195,17 @@ describe('ride negotiation & lifecycle http', () => {
     const customer = await login();
     const quote = await post(customer.token, '/v1/rides/quote', { pickup, dropoff }).expect(200);
     const bike = quote.body.data.options.find((o: { code: string }) => o.code === 'MOTORBIKE');
-    expect(bike.minBidVnd).toBe(Math.max(bike.minFareVnd, Math.ceil(bike.referenceFareVnd * 0.8)));
+    expect(bike.referenceFareVnd % 1000).toBe(0);
+    expect(bike.minBidVnd).toBe(Math.max(bike.minFareVnd, rideBidFloorVnd(bike.referenceFareVnd, 80)));
+    expect(bike.minBidVnd % 1000).toBe(0);
     expect(quote.body.data.pendingFeesVnd).toBe(0);
 
-    const low = await postRide(customer.token, 'ride-neg-floor-low', bike.minBidVnd - 1);
+    const low = await postRide(customer.token, 'ride-neg-floor-low', bike.minBidVnd - 1000);
     expect(low.status).toBe(400);
     expect(low.body.errorCode).toBe('RIDE_FARE_OUT_OF_RANGE');
-    const ok = await postRide(customer.token, 'ride-neg-floor-ok', bike.minBidVnd).expect(200);
+    // An odd bid just under the floor rounds up to the floor and is stored rounded.
+    const ok = await postRide(customer.token, 'ride-neg-floor-ok', bike.minBidVnd - 1).expect(200);
+    expect(ok.body.data.offeredFareVnd).toBe(bike.minBidVnd);
     // window = RIDE_REQUEST_WINDOW_SECONDS (300), not the 60 s offer TTL
     expect(new Date(ok.body.data.expiresAt).getTime() - CLOCK_START.getTime()).toBe(300_000);
   });
@@ -208,9 +217,12 @@ describe('ride negotiation & lifecycle http', () => {
     const high = await offer(d.token, rideId, Math.floor(bid() * 1.5) + 1);
     expect(high.status).toBe(400);
     expect(high.body.errorCode).toBe('RIDE_COUNTER_OUT_OF_RANGE');
-    const under = await offer(d.token, rideId, bid() - 1);
+    const under = await offer(d.token, rideId, bid() - 1000);
     expect(under.status).toBe(400);
-    await offer(d.token, rideId, Math.floor(bid() * 1.5)).expect(200);
+    const cap = roundDownToFareStep(bid() * 1.5);
+    const top = await offer(d.token, rideId, cap - 1).expect(200);
+    // An odd counter is stored rounded up to the 1.000đ step.
+    expect(top.body.data.offers[0].amountVnd).toBe(cap);
   });
 
   it('caps offer edits per driver (RIDE_MAX_OFFER_EDITS_PER_DRIVER = 2)', async () => {
@@ -239,6 +251,8 @@ describe('ride negotiation & lifecycle http', () => {
     expect(same.body.errorCode).toBe('RIDE_FARE_RAISE_INVALID');
     const raised = await post(customer.token, `/v1/rides/${rideId}/fare`, { amountVnd: bid() + 5000 }).expect(200);
     expect(raised.body.data.offeredFareVnd).toBe(bid() + 5000);
+    const odd = await post(customer.token, `/v1/rides/${rideId}/fare`, { amountVnd: bid() + 6001 }).expect(200);
+    expect(odd.body.data.offeredFareVnd).toBe(bid() + 7000);
     expect(raised.body.data.offers[0]).toMatchObject({ amountVnd: bid() + 5000, kind: 'ACCEPT' });
     expect(new Date(raised.body.data.expiresAt).getTime()).toBe(CLOCK_START.getTime() + 420_000);
     const stranger = await login();

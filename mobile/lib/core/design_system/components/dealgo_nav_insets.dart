@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import '../tokens/dealgo_tokens.dart';
+
 /// Geometry of the floating role tab bar ([DealGoTabBar]).
 ///
 /// From top to bottom: [overhang] (the raised active circle above the pill),
@@ -32,10 +34,6 @@ class DealGoNavBarMetrics {
 
   /// Full box of the bar widget, circle included.
   double get totalHeight => overhang + barHeight + bottomGap;
-
-  /// Body clearance: content ends at the pill top; only the active circle
-  /// overlaps it.
-  double get contentClearance => barHeight + bottomGap;
 }
 
 /// Pill height on every platform (≥ 48 tap target).
@@ -74,6 +72,16 @@ DealGoNavBarMetrics dealGoNavBarMetrics(
     bottomInset: inset,
   );
 }
+
+/// Scroll padding so the last item clears whatever covers the screen bottom:
+/// the floating tab bar inside a role shell ([FloatingNavBody] publishes its
+/// height as `MediaQuery.padding.bottom`), otherwise the home indicator /
+/// system navigation. Content still scrolls behind the bar. Put FAB or sticky
+/// bar room in [base]'s bottom. Inside a bottom [SafeArea] this adds nothing.
+EdgeInsets dealGoScrollPadding(
+  BuildContext context, [
+  EdgeInsets base = const EdgeInsets.only(bottom: DealGoSpacing.s16),
+]) => base.copyWith(bottom: base.bottom + MediaQuery.paddingOf(context).bottom);
 
 DealGoNavBarMetrics dealGoNavBarMetricsOf(BuildContext context) =>
     dealGoNavBarMetrics(

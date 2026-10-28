@@ -23,7 +23,7 @@ export type MapsProvidersView = {
     key: string;
     /** The admin's stored choice. */
     chosen: 'mapbox' | 'google';
-    /** What is actually used (google only with GOOGLE_MAPS_API_KEY). */
+    /** What is actually used (google only with a Google key in Admin or env). */
     effective: 'mapbox' | 'google';
     updatedAt: string | null;
     updatedByUserId: string | null;
@@ -65,7 +65,7 @@ export class OpsMapsProvidersController {
       }),
     );
     return {
-      googleConfigured: this.providers.googleConfigured(),
+      googleConfigured: await this.providers.googleConfigured(),
       primary: {
         maps: (this.config.get('MAPS_PROVIDER', { infer: true }) ?? 'mock').toLowerCase(),
         routing: (this.config.get('ROUTING_PROVIDER', { infer: true }) ?? 'none').toLowerCase(),

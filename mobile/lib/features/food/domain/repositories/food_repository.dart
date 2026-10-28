@@ -68,6 +68,8 @@ abstract interface class FoodRepository {
     int? prepMinutes,
     String? imageUrl,
     String? menuCategoryId,
+    int? originalPriceVnd,
+    bool clearOriginalPrice = false,
   });
 
   Future<FoodMenuItem> replaceMerchantItemOptions({

@@ -1,6 +1,6 @@
 /**
- * Admin map base layers. Every styled layer is a Mapbox style served with
- * `NEXT_PUBLIC_MAPBOX_TOKEN`; without a token the map uses keyless OpenStreetMap
+ * Admin map base layers. Every styled layer is a Mapbox style served with the
+ * Mapbox public token (Admin, else `NEXT_PUBLIC_MAPBOX_TOKEN`); without one the map uses keyless OpenStreetMap
  * tiles. CARTO basemaps are not used: they now return "API KEY REQUIRED" tiles.
  */
 export type TileLayerChoice = "auto" | "streets" | "satellite" | "dark" | "osm";

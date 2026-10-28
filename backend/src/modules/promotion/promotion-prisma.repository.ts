@@ -1,6 +1,8 @@
 import { Prisma, type PrismaClient } from '../../generated/prisma/client.js';
+import { randomUUID } from 'node:crypto';
 import {
   PromotionCodeConflictError,
+  type PromotionStatusAudit,
   type NewPromotion,
   type PromotionListFilter,
   type PromotionRepository,
@@ -34,10 +36,14 @@ export class PrismaPromotionRepository implements PromotionRepository {
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         skip: (page - 1) * limit,
         take: limit,
+        include: { store: { select: { name: true } } },
       }),
       this.db.promotion.count({ where }),
     ]);
-    return { items: rows.map(mapPromotion), total };
+    return {
+      items: rows.map((row) => ({ ...mapPromotion(row), storeName: row.store?.name ?? null })),
+      total,
+    };
   }
 
   async kpi(): Promise<PromotionKpiSummary> {
@@ -65,9 +71,30 @@ export class PrismaPromotionRepository implements PromotionRepository {
     return row ? mapPromotion(row) : null;
   }
 
-  async listAvailable(now: Date, limit: number): Promise<PromotionCampaign[]> {
+  async listStoreOffers(storeIds: string[], now: Date): Promise<PromotionCampaign[]> {
+    if (storeIds.length === 0) {
+      return [];
+    }
     const rows = await this.db.promotion.findMany({
       where: {
+        storeId: { in: storeIds },
+        status: 'ACTIVE',
+        targetAudience: { in: ['ALL', 'CUSTOMER'] },
+        startDate: { lte: now },
+        endDate: { gt: now },
+      },
+      orderBy: [{ endDate: 'asc' }, { code: 'asc' }],
+      take: 500,
+    });
+    return rows
+      .filter((row) => row.usedCount < row.usageLimit && row.usedBudget < row.totalBudget)
+      .map(mapPromotion);
+  }
+
+  async listAvailable(now: Date, limit: number, storeId?: string): Promise<PromotionCampaign[]> {
+    const rows = await this.db.promotion.findMany({
+      where: {
+        OR: storeId ? [{ storeId: null }, { storeId }] : [{ storeId: null }],
         status: 'ACTIVE',
         targetAudience: { in: ['ALL', 'CUSTOMER'] },
         startDate: { lte: now },
@@ -91,7 +118,11 @@ export class PrismaPromotionRepository implements PromotionRepository {
   async create(input: NewPromotion): Promise<PromotionCampaign> {
     try {
       const row = await this.db.promotion.create({
-        data: { ...input, maxDiscountAmount: input.maxDiscountAmount ?? null },
+        data: {
+          ...input,
+          maxDiscountAmount: input.maxDiscountAmount ?? null,
+          storeId: input.storeId ?? null,
+        },
       });
       return mapPromotion(row);
     } catch (error) {
@@ -108,15 +139,30 @@ export class PrismaPromotionRepository implements PromotionRepository {
   async updateStatus(
     id: string,
     status: PromotionCampaign['status'],
+    audit?: PromotionStatusAudit,
   ): Promise<PromotionCampaign | null> {
-    const updated = await this.db.promotion.updateMany({
-      where: { id },
-      data: { status },
+    const row = await this.db.$transaction(async (tx) => {
+      const current = await tx.promotion.findUnique({ where: { id }, select: { status: true, code: true, storeId: true } });
+      if (!current) {
+        return null;
+      }
+      const updated = await tx.promotion.update({ where: { id }, data: { status } });
+      if (audit) {
+        await tx.opsAuditLog.create({
+          data: {
+            id: randomUUID(),
+            actorUserId: audit.actorUserId,
+            action: 'PROMOTION_STATUS_UPDATE',
+            entityType: 'PROMOTION',
+            entityId: id,
+            reason: audit.reason,
+            metadata: { code: current.code, storeId: current.storeId, from: current.status, to: status },
+          },
+        });
+      }
+      return updated;
     });
-    if (updated.count === 0) {
-      return null;
-    }
-    return this.findById(id);
+    return row ? mapPromotion(row) : null;
   }
 
   async countUserRedemptions(promotionId: string, userId: string): Promise<number> {
@@ -156,6 +202,12 @@ function buildWhere(filter: PromotionListFilter): Prisma.PromotionWhereInput {
   if (filter.audience) {
     and.push({ targetAudience: { in: [filter.audience, 'ALL'] } });
   }
+  if (filter.storeId) {
+    and.push({ storeId: filter.storeId });
+  }
+  if (filter.scope) {
+    and.push({ storeId: filter.scope === 'STORE' ? { not: null } : null });
+  }
   return and.length > 0 ? { AND: and } : {};
 }
 
@@ -180,6 +232,7 @@ function mapPromotion(row: DbPromotion): PromotionCampaign {
     startDate: row.startDate.toISOString(),
     endDate: row.endDate.toISOString(),
     sponsor: row.sponsor,
+    storeId: row.storeId,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

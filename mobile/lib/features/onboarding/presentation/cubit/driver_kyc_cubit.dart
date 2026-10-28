@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/config/app_env.dart';
+import '../../../../core/drafts/draft_store.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../identity/domain/entities/app_role.dart';
 import '../../../identity/domain/entities/user_profile.dart';
@@ -11,6 +14,7 @@ import '../../domain/usecases/get_my_partner_application.dart';
 import '../../domain/usecases/submit_partner_application.dart';
 import '../document_image_source.dart';
 import 'partner_document_draft.dart';
+import 'partner_draft_support.dart';
 
 export 'partner_document_draft.dart' show PartnerSubmitError;
 
@@ -280,6 +284,8 @@ class DriverKycCubit extends Cubit<DriverKycState> {
     this._getMyPartnerApplication,
     this._accessToken,
     this._loadDocumentsRequired,
+    this._draftStore,
+    this._draftOwner,
     bool? useMock,
   }) : _useMock = useMock ?? useMockData,
        super(DriverKycState.initial());
@@ -295,6 +301,144 @@ class DriverKycCubit extends Cubit<DriverKycState> {
   })?
   _loadDocumentsRequired;
   final bool _useMock;
+
+  /// Unsent-draft persistence (app killed mid-flow); off without a store/user.
+  final DraftStore? _draftStore;
+  final String? Function()? _draftOwner;
+  DraftKeeper? _keeper;
+  var _editing = false;
+  PartnerDraftSnapshot? _pendingDraft;
+
+  /// Draft found by [loadDraft], until [restoreDraft] or [discardDraft].
+  PartnerDraftSnapshot? get pendingDraft => _pendingDraft;
+
+  DraftKeeper? _draftKeeper() {
+    final store = _draftStore;
+    final owner = _draftOwner?.call()?.trim() ?? '';
+    if (store == null || owner.isEmpty) {
+      return null;
+    }
+    final key = partnerDraftKey(role, owner);
+    final current = _keeper;
+    if (current != null && current.key == key) {
+      return current;
+    }
+    return _keeper = DraftKeeper(store: store, key: key);
+  }
+
+  /// Looks for an unsent draft from an earlier session (call after
+  /// [refresh]). True when one worth resuming exists: see [pendingDraft].
+  Future<bool> loadDraft() async {
+    final keeper = _draftKeeper();
+    if (keeper == null || _editing) {
+      return false;
+    }
+    if (state.status == PartnerApplicationStatus.pending ||
+        state.status == PartnerApplicationStatus.active) {
+      _pendingDraft = null;
+      await keeper.clear();
+      return false;
+    }
+    final data = await keeper.load();
+    if (data == null || isClosed) {
+      return false;
+    }
+    final stepIndex = DriverKycStep.values.indexWhere(
+      (step) => step.name == data['step'],
+    );
+    final images = await loadDraftImages(
+      keeper.store,
+      keeper.key,
+      data['docs'],
+    );
+    if (stepIndex <= 0 && images.isEmpty) {
+      return false;
+    }
+    _pendingDraft = PartnerDraftSnapshot(
+      fields: data,
+      images: images,
+      savedAt: DateTime.tryParse('${data['savedAt']}'),
+    );
+    return true;
+  }
+
+  /// Puts the saved draft back, at the step the applicant left.
+  void restoreDraft() {
+    final draft = _pendingDraft;
+    if (draft == null) {
+      return;
+    }
+    _pendingDraft = null;
+    final d = draft.fields;
+    var documents = state.documents;
+    for (final entry in draft.images.entries) {
+      documents = documents.attach(entry.key, entry.value);
+    }
+    final saved = DriverKycStep.values
+        .where((step) => step.name == d['step'])
+        .firstOrNull;
+    final step = saved != null && state.steps.contains(saved)
+        ? saved
+        : DriverKycStep.services;
+    _editing = true;
+    emit(
+      state.copyWith(
+        status: PartnerApplicationStatus.draft,
+        step: step,
+        rideService: d['rideService'] is bool ? d['rideService'] as bool : null,
+        foodService: d['foodService'] is bool ? d['foodService'] as bool : null,
+        fullName: draftString(d, 'fullName'),
+        birthDate: draftString(d, 'birthDate'),
+        address: draftString(d, 'address'),
+        idNumber: draftString(d, 'idNumber'),
+        licenseClass: draftString(d, 'licenseClass'),
+        licenseNumber: draftString(d, 'licenseNumber'),
+        vehiclePlate: draftString(d, 'vehiclePlate'),
+        vehicleClassCode: draftString(d, 'vehicleClassCode'),
+        vehicleType: draftString(d, 'vehicleType'),
+        vehicleBrand: draftString(d, 'vehicleBrand'),
+        vehicleModel: draftString(d, 'vehicleModel'),
+        bankName: draftString(d, 'bankName'),
+        bankAccountNumber: draftString(d, 'bankAccountNumber'),
+        bankAccountHolder: draftString(d, 'bankAccountHolder'),
+        documents: documents,
+        clearSubmitError: true,
+      ),
+    );
+  }
+
+  /// "Làm lại từ đầu": drops the saved draft (fields and photos).
+  Future<void> discardDraft() async {
+    _pendingDraft = null;
+    _editing = false;
+    await _draftKeeper()?.clear();
+  }
+
+  void _finishDraft() {
+    _pendingDraft = null;
+    _editing = false;
+    unawaited(_draftKeeper()?.clear());
+  }
+
+  @override
+  void onChange(Change<DriverKycState> change) {
+    super.onChange(change);
+    final next = change.nextState;
+    if (!_editing || next.status != PartnerApplicationStatus.draft) {
+      return;
+    }
+    _draftKeeper()?.schedule({
+      ..._metadataOf(next),
+      'step': next.step.name,
+      'docs': draftDocumentTypes(next.documents),
+    });
+  }
+
+  @override
+  Future<void> close() async {
+    await _keeper?.flush();
+    return super.close();
+  }
 
   /// DEC-PROD-048: reads the admin KYC switch; keeps documents required on error.
   Future<void> loadRequirements() async {
@@ -437,13 +581,22 @@ class DriverKycCubit extends Cubit<DriverKycState> {
 
   void attachDocument(String kind, PickedDocumentImage image) {
     emit(state.copyWith(documents: state.documents.attach(kind, image)));
+    final keeper = _editing ? _draftKeeper() : null;
+    if (keeper != null) {
+      unawaited(keeper.store.writeBlob(keeper.key, kind, image.bytes));
+    }
   }
 
   void removeDocument(String kind) {
     emit(state.copyWith(documents: state.documents.detach(kind)));
+    final keeper = _editing ? _draftKeeper() : null;
+    if (keeper != null) {
+      unawaited(keeper.store.deleteBlob(keeper.key, kind));
+    }
   }
 
   void startDraft() {
+    _editing = true;
     emit(
       state.copyWith(
         status: PartnerApplicationStatus.draft,
@@ -488,6 +641,7 @@ class DriverKycCubit extends Cubit<DriverKycState> {
   void beginResubmit([String? section]) {
     final sections = [for (final issue in state.issues) issue.section];
     final target = section ?? (sections.isEmpty ? null : sections.first);
+    _editing = true;
     emit(
       state.copyWith(
         status: PartnerApplicationStatus.draft,
@@ -514,7 +668,9 @@ class DriverKycCubit extends Cubit<DriverKycState> {
 
   Future<void> resubmit() => _submitApplication();
 
-  Map<String, Object?> _metadata() => {
+  Map<String, Object?> _metadata() => _metadataOf(state);
+
+  Map<String, Object?> _metadataOf(DriverKycState state) => {
     'rideService': state.rideService,
     'foodService': state.foodService,
     'fullName': state.fullName.trim(),
@@ -546,6 +702,7 @@ class DriverKycCubit extends Cubit<DriverKycState> {
     }
     final submit = _submitPartnerApplication;
     if (_useMock || submit == null) {
+      _finishDraft();
       emit(
         state.copyWith(
           status: PartnerApplicationStatus.pending,
@@ -580,6 +737,7 @@ class DriverKycCubit extends Cubit<DriverKycState> {
       if (isClosed) {
         return;
       }
+      _finishDraft();
       emit(
         state.copyWith(
           status: partnerStatusFromServer(view.status),
@@ -592,6 +750,20 @@ class DriverKycCubit extends Cubit<DriverKycState> {
       );
     } on ApiException catch (error) {
       if (isClosed) {
+        return;
+      }
+      if (error.errorCode == partnerAlreadySubmitted) {
+        // An earlier tap (or a retry after a dropped response) already
+        // landed: show the application under review, not an error.
+        _finishDraft();
+        emit(
+          state.copyWith(
+            status: PartnerApplicationStatus.pending,
+            submitting: false,
+            clearSubmitError: true,
+          ),
+        );
+        await refresh();
         return;
       }
       emit(state.copyWith(submitting: false, submitError: error.errorCode));

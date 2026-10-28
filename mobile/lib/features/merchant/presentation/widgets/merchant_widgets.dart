@@ -160,9 +160,34 @@ class MerchantPageFrame extends StatelessWidget {
               showBack: showBack,
             ),
             Expanded(
-              child: Material(type: MaterialType.transparency, child: body),
+              child: Material(
+                type: MaterialType.transparency,
+                child: footer == null
+                    ? body
+                    : Builder(
+                        builder: (context) => MediaQuery.removePadding(
+                          context: context,
+                          removeBottom: true,
+                          child: body,
+                        ),
+                      ),
+              ),
             ),
-            ?footer,
+            if (footer case final footer?)
+              // Inside the SafeArea: lifts the footer above the home indicator or
+              // the shell's tab bar, whichever is still uncovered.
+              Builder(
+                builder: (context) => Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.paddingOf(context).bottom,
+                  ),
+                  child: MediaQuery.removePadding(
+                    context: context,
+                    removeBottom: true,
+                    child: footer,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -353,13 +378,15 @@ class MerchantMoneyRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
+            flex: 3,
             child: Text(
               label,
               style: emphasize ? textTheme.titleMedium : textTheme.bodyMedium,
             ),
           ),
           const SizedBox(width: DealGoSpacing.s8),
-          Flexible(
+          Expanded(
+            flex: 2,
             child: Text(
               value,
               textAlign: TextAlign.end,
@@ -441,21 +468,14 @@ class MerchantFooter extends StatelessWidget {
             isLoading: primaryLoading,
             onPressed: onPrimary,
           );
-          if (constraints.maxWidth < 520) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                secondary,
-                const SizedBox(height: DealGoSpacing.s12),
-                primary,
-              ],
-            );
-          }
           return Row(
             children: [
               Expanded(child: secondary),
               const SizedBox(width: DealGoSpacing.s12),
-              Expanded(child: primary),
+              Expanded(
+                flex: constraints.maxWidth < 520 ? 2 : 1,
+                child: primary,
+              ),
             ],
           );
         },

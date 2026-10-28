@@ -48,7 +48,12 @@ import {
 } from './food.constants.js';
 import { OpsDateRangeQueryDto } from '../operations/ops-date-window.js';
 
-export const FOOD_STORE_SORT_BY = ['name', 'createdAt', 'distance'] as const;
+export const FOOD_STORE_SORT_BY = [
+  'name',
+  'createdAt',
+  'distance',
+  'rating',
+] as const;
 export type FoodStoreSortBy = (typeof FOOD_STORE_SORT_BY)[number];
 
 export const FOOD_STORE_BROWSE_MAX_LIMIT = 100;
@@ -208,6 +213,14 @@ export class CreateFoodItemDto {
   priceVnd!: number;
 
   @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(2_147_483_647)
+  originalPriceVnd?: number | null;
+
+  @IsOptional()
   @IsBoolean()
   available?: boolean;
 
@@ -252,6 +265,14 @@ export class UpdateFoodItemDto {
   @Min(1)
   @Max(2_147_483_647)
   priceVnd?: number;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(2_147_483_647)
+  originalPriceVnd?: number | null;
 
   @IsOptional()
   @IsBoolean()
@@ -399,13 +420,44 @@ export class SetFoodItemAvailabilityDto {
   available!: boolean;
 }
 
-/** M030 (DEC-PROD-045): the merchant renames the store shown to customers. */
+/**
+ * M030 (DEC-PROD-045): the merchant renames the store shown to customers;
+ * DEC-PROD-067: and/or picks its category (FoodCategory.code, null clears).
+ * At least one field is required.
+ */
 export class UpdateStoreProfileDto {
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : value))
+  @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : value,
+  )
   @IsString()
   @MinLength(2)
   @MaxLength(120)
-  name!: string;
+  name?: string;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(64)
+  category?: string | null;
+
+  /** Smallest food subtotal (VND) the store accepts; 0 = none. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(10_000_000)
+  minOrderVnd?: number;
+
+  /** "About the store" text; '' or null clears it. */
+  @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim() || null : value,
+  )
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(500)
+  description?: string | null;
 }
 
 export class UpdateStoreLocationDto {
@@ -538,14 +590,20 @@ export class ListFoodStoresQueryDto {
   @MaxLength(64)
   category?: string;
 
-  @ValidateIf((query: ListFoodStoresQueryDto) => query.lng !== undefined || query.lat !== undefined)
+  @ValidateIf(
+    (query: ListFoodStoresQueryDto) =>
+      query.lng !== undefined || query.lat !== undefined,
+  )
   @Type(() => Number)
   @IsNumber({ allowInfinity: false, allowNaN: false })
   @Min(-90)
   @Max(90)
   lat?: number;
 
-  @ValidateIf((query: ListFoodStoresQueryDto) => query.lat !== undefined || query.lng !== undefined)
+  @ValidateIf(
+    (query: ListFoodStoresQueryDto) =>
+      query.lat !== undefined || query.lng !== undefined,
+  )
   @Type(() => Number)
   @IsNumber({ allowInfinity: false, allowNaN: false })
   @Min(-180)
@@ -555,6 +613,14 @@ export class ListFoodStoresQueryDto {
   @IsOptional()
   @IsIn(FOOD_STORE_SORT_BY)
   sort_by?: FoodStoreSortBy;
+
+  /** Only stores within this many km (needs lat/lng; capped by DRIVER_SEARCH_RADIUS_KM). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ allowInfinity: false, allowNaN: false })
+  @Min(0.5)
+  @Max(50)
+  max_km?: number;
 }
 
 export class OpsPageQueryDto extends OpsDateRangeQueryDto {
@@ -649,30 +715,10 @@ export class OpsCatalogModerationQueryDto extends OpsDateRangeQueryDto {
   status?: string;
 }
 
-export class OpsCatalogCategoriesQueryDto {
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit?: number;
-
-  @IsOptional()
-  @IsString()
-  q?: string;
-}
-
 export {
   OpsPageQueryDto as FoodOrderOpsPageQueryDto,
   OpsInterveneDto as FoodOrderInterveneDto,
 };
-
 
 export class MerchantStatsQueryDto {
   @IsOptional()

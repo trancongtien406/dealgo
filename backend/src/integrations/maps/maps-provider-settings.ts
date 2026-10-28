@@ -23,9 +23,12 @@ export const MAPS_CAPABILITY_SETTING: Record<MapsCapability, PlatformSettingKey>
 /** The subset of PlatformSettingsService this selector reads (keeps specs light). */
 export type MapsSettingsReader = { getString(key: PlatformSettingKey): Promise<string> };
 
+/** A fixed Google port, none, or a resolver that follows the key in Admin › Bản đồ (DB over env). */
+export type GoogleSource = GoogleMapsPort | null | (() => Promise<GoogleMapsPort | null>);
+
 /**
  * Which provider serves each map capability. Admin picks per capability in platform settings;
- * Google is only effective when GOOGLE_MAPS_API_KEY is set, otherwise everything stays on the
+ * Google is only effective when a Google key is set (Admin or GOOGLE_MAPS_API_KEY), otherwise everything stays on the
  * env-configured primary (Mapbox in production). A settings read failure also means Mapbox.
  */
 export class MapsProviderSettings {
@@ -33,11 +36,21 @@ export class MapsProviderSettings {
 
   constructor(
     private readonly settings: MapsSettingsReader,
-    readonly google: GoogleMapsPort | null,
+    private readonly google: GoogleSource,
   ) {}
 
-  googleConfigured(): boolean {
-    return this.google !== null;
+  async googlePort(): Promise<GoogleMapsPort | null> {
+    if (typeof this.google !== 'function') return this.google;
+    try {
+      return await this.google();
+    } catch (error) {
+      this.logger.warn(`Resolving Google key failed: ${(error as Error).message}`);
+      return null;
+    }
+  }
+
+  async googleConfigured(): Promise<boolean> {
+    return (await this.googlePort()) !== null;
   }
 
   /** The admin's stored choice (may be google even if the key was later removed). */
@@ -53,7 +66,7 @@ export class MapsProviderSettings {
 
   /** The provider actually used right now. */
   async effective(capability: MapsCapability): Promise<MapsProviderChoice> {
-    if (!this.google) return 'mapbox';
+    if (!(await this.googlePort())) return 'mapbox';
     return this.chosen(capability);
   }
 }
@@ -88,7 +101,7 @@ export class SwitchingMapsPort implements MapsPort {
   }
 
   private async run<T>(capability: MapsCapability, call: (port: MapsPort) => Promise<T>): Promise<T> {
-    const google = this.selector.google;
+    const google = await this.selector.googlePort();
     if (google && (await this.selector.effective(capability)) === 'google') {
       try {
         return await call(google);

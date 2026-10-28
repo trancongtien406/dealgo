@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../inbox/presentation/inbox_unread.dart';
+
 import '../../../core/config/api_base_url.dart';
 import '../../../core/design_system/components/dealgo_dialog.dart';
 import '../../../core/design_system/components/dealgo_card.dart';
@@ -20,9 +22,10 @@ import '../../merchant/presentation/utils/merchant_routes.dart';
 import '../../../l10n/app_localizations.dart';
 import 'account_routes.dart';
 import 'driver_account_vehicle.dart';
-import 'customer_tab_bar.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/components/dealgo_app_header.dart';
+import '../../../core/design_system/components/dealgo_nav_insets.dart';
+import '../../../core/design_system/components/dealgo_network_image.dart';
 
 String accountShellRoleLabel(AppLocalizations l10n, String shellPath) {
   if (shellPath.startsWith('/merchant')) {
@@ -63,7 +66,7 @@ class AccountPage extends StatelessWidget {
     return ColoredBox(
       color: DealGoColors.canvas,
       child: SafeArea(
-        bottom: dealGoSafeAreaBottom(context),
+        bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -74,23 +77,25 @@ class AccountPage extends StatelessWidget {
                 tooltip: AppLocalizations.of(context).accountNotifications,
                 onPressed: () =>
                     context.push(AccountRoutes.notifications(shellPath)),
-                icon: const Icon(
-                  DealGoIcons.notifications,
-                  color: DealGoColors.text,
+                icon: const InboxUnreadBadge(
+                  child: Icon(
+                    DealGoIcons.notifications,
+                    color: DealGoColors.text,
+                  ),
                 ),
               ),
             ),
             const Divider(height: 1, color: DealGoColors.divider),
             Expanded(
               child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(
-                  DealGoDimensions.pageGutter,
-                  DealGoSpacing.s16,
-                  DealGoDimensions.pageGutter,
-                  DealGoSpacing.s24 +
-                      (shellPath.startsWith('/customer')
-                          ? customerShellBottomClearance(context)
-                          : MediaQuery.viewPaddingOf(context).bottom),
+                padding: dealGoScrollPadding(
+                  context,
+                  const EdgeInsets.fromLTRB(
+                    DealGoDimensions.pageGutter,
+                    DealGoSpacing.s16,
+                    DealGoDimensions.pageGutter,
+                    DealGoSpacing.s24,
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -433,13 +438,13 @@ class _ProfileCard extends StatelessWidget {
                     color: DealGoColors.primary,
                     size: 32,
                   )
-                : Image.network(
+                : DealGoNetworkImage(
                     avatarUrl!,
                     key: const Key('account-avatar'),
                     width: 56,
                     height: 56,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const Icon(
+                    fallback: const Icon(
                       DealGoIcons.user,
                       color: DealGoColors.primary,
                       size: 32,

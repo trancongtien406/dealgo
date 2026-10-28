@@ -6,6 +6,11 @@ abstract final class FoodRoutes {
       '$search?q=${Uri.encodeQueryComponent(query)}';
   static const category = '/customer/food/category';
 
+  /// Stores in one Admin-managed category; null = every store, nearest first.
+  static String categoryOf(String? code) => code == null
+      ? category
+      : '$category?category=${Uri.encodeQueryComponent(code)}';
+
   static String store(String storeId) {
     return '/customer/food/stores/${Uri.encodeComponent(storeId)}';
   }

@@ -331,7 +331,7 @@ class _LiveDriverMapState extends State<LiveDriverMap> {
         : MapLatLng(lat: location.lat, lng: location.lng);
     final route = _resolvedRoute(driver);
     final map = LayoutBuilder(
-      builder: (context, constraints) => context.read<MapPort>().buildMap(
+      builder: (context, constraints) => context.watch<MapPort>().buildMap(
         fitPadding: liveMapFitPadding(
           constraints.maxHeight,
           sheetFraction: widget.sheetFraction,

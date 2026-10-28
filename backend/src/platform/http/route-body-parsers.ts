@@ -21,6 +21,10 @@ export const PARTNER_APPLICATION_JSON_LIMIT = '45mb';
 export const SUPPORT_TICKET_UPLOAD_PATHS = ['/v1/support/tickets', '/v1/ops/support-tickets'];
 export const SUPPORT_TICKET_JSON_LIMIT = '24mb';
 
+/** Amazon SNS posts JSON with `Content-Type: text/plain`; parse it as JSON on this route only. */
+export const SES_WEBHOOK_BODY_PATH = '/v1/webhooks/ses';
+export const SES_WEBHOOK_JSON_LIMIT = '256kb';
+
 /**
  * Larger JSON limits for upload routes only; every other route keeps Nest's default
  * (100kb). Must run before `app.init()`/`listen()` so it precedes the global parser,
@@ -43,6 +47,7 @@ export function registerRouteBodyParsers(app: INestApplication): void {
   for (const path of SUPPORT_TICKET_UPLOAD_PATHS) {
     app.use(path, ticketParser);
   }
+  app.use(SES_WEBHOOK_BODY_PATH, wrap(json({ limit: SES_WEBHOOK_JSON_LIMIT, type: () => true })));
 }
 
 // Wrapped because Nest skips its global parser when a middleware named `jsonParser`

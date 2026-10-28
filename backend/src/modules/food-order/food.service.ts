@@ -8,7 +8,10 @@ import { maskPersonName } from '../../shared/privacy/pii-mask.js';
 import { haversineKm } from '../../shared/geo/haversine.js';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { filterByDispatchRadius, type DispatchQuery } from '../dispatch/dispatch-filter.js';
+import {
+  filterByDispatchRadius,
+  type DispatchQuery,
+} from '../dispatch/dispatch-filter.js';
 import {
   normalizeLimit,
   normalizePage,
@@ -53,7 +56,6 @@ import {
   type ListFoodStoresQueryDto,
   type CreateFoodItemDto,
   type ReplaceFoodItemOptionsDto,
-  type OpsCatalogCategoriesQueryDto,
   type OpsCatalogModerationQueryDto,
   type PlaceFoodOrderDto,
   type SetFoodItemAvailabilityDto,
@@ -65,6 +67,10 @@ import {
   type UpdateStoreHoursDto,
 } from './food.dto.js';
 import { VoucherRejectedError } from '../promotion/promotion-redemption.js';
+import {
+  PromotionService,
+  type StoreOffer,
+} from '../promotion/promotion.service.js';
 import { FoodRuleError, foodError } from './food.error.js';
 import { activeRegionCodeAt } from '../service-area/service-regions.js';
 import {
@@ -72,7 +78,10 @@ import {
   type FoodOrderCodeKind,
   type FoodOrderCodeStore,
 } from './food-order-code.js';
-import { generatePickupCode, pickupCodeMatches } from '../ride/ride-pickup-code.js';
+import {
+  generatePickupCode,
+  pickupCodeMatches,
+} from '../ride/ride-pickup-code.js';
 import {
   PhaseRouteCache,
   RoutingService,
@@ -87,8 +96,6 @@ import type {
   FoodDriverHistoryWindow,
   FoodOrderView,
   FoodRepository,
-  OpsCatalogCategoryItem,
-  OpsCatalogCategoryPage,
   OpsCatalogModerationPage,
   OpsFoodInterveneResult,
   OpsStoreDetail,
@@ -98,13 +105,49 @@ import type {
   StoreBrowseItem,
   StoreDetail,
   StoreItemView,
+  StoreMenuSection,
+  StoreFeaturedItem,
   FoodOrderChangeView,
 } from './food.repository.js';
 import { FOOD_CHANGE_EDITABLE_STATUSES } from './food.repository.js';
 
-export type PublicStoreBrowseItem = Omit<StoreBrowseItem, 'createdAt'> & {
+export type PublicStoreBrowseItem = Omit<
+  StoreBrowseItem,
+  'createdAt' | 'ratingAverage' | 'ratingCount' | 'estimatedPrepMinutes'
+> & {
   createdAt: string;
+  /** average is null until the store has RATING_STORE_MIN_COUNT visible ratings. */
+  rating: { average: number | null; count: number };
+  /** Prep + ride at ~20 km/h; null without the customer position. */
+  etaMinutes: number | null;
+  estimatedPrepMinutes: number;
+  /** Straight-line fare estimate (the real fare follows the route); null without position. */
+  deliveryFeeFromVnd: number | null;
+  /** Up to 3 live store offers, best first. */
+  offers: StoreOffer[];
+  /** Smallest food subtotal the store accepts; 0 = none. */
+  minOrderVnd: number;
+  /** Best sellers then the newest dish (pickFeaturedItems); [] for a store without approved dishes. */
+  featuredItems: StoreFeaturedItem[];
 };
+
+/** A list price must sit above the selling price to be shown struck through. */
+function checkedOriginalPrice(
+  priceVnd: number,
+  originalPriceVnd: number | null | undefined,
+): number | null | undefined {
+  if (originalPriceVnd != null && originalPriceVnd <= priceVnd) {
+    throw foodError(
+      400,
+      'VALIDATION_ERROR',
+      'originalPriceVnd must be above priceVnd',
+    );
+  }
+  return originalPriceVnd;
+}
+
+/** City ride speed used for the browse ETA (min per km ≈ 20 km/h). */
+const BROWSE_MINUTES_PER_KM = 3;
 
 export type OpsStoreListItem = {
   id: string;
@@ -136,13 +179,18 @@ const FIXTURE_ITEMS = [
 ] as const;
 
 /** Merchant edit as sent to clients. */
-export type PublicFoodOrderChange = Omit<FoodOrderChangeView, 'expiresAt' | 'respondedAt' | 'createdAt'> & {
+export type PublicFoodOrderChange = Omit<
+  FoodOrderChangeView,
+  'expiresAt' | 'respondedAt' | 'createdAt'
+> & {
   expiresAt: string;
   respondedAt: string | null;
   createdAt: string;
 };
 
-export function publishChange(change: FoodOrderChangeView): PublicFoodOrderChange {
+export function publishChange(
+  change: FoodOrderChangeView,
+): PublicFoodOrderChange {
   return {
     ...change,
     lines: change.lines.map((line) => ({ ...line })),
@@ -174,7 +222,11 @@ export type PublicFoodOrder = Omit<
    * Cash the driver pays the store at pickup
    * (subtotal minus the merchant-funded part of the voucher) and collects at the door.
    */
-  cashPlan?: { payMerchantVnd: number; collectFromCustomerVnd: number; platformOwesDriverVnd: number };
+  cashPlan?: {
+    payMerchantVnd: number;
+    collectFromCustomerVnd: number;
+    platformOwesDriverVnd: number;
+  };
   /** Road geometry when store pickup coords exist (same Nest ROUTING_PROVIDER). */
   route?: RouteGeometryView;
   /** APPROACH while ASSIGNED (courier → store), TRIP once PICKED_UP. */
@@ -217,7 +269,11 @@ export type MerchantStatementView = {
   unsettledCommissionVnd: number;
 };
 
-type StatsDay = { deliveredCount: number; cancelledCount: number; salesVnd: number };
+type StatsDay = {
+  deliveredCount: number;
+  cancelledCount: number;
+  salesVnd: number;
+};
 
 export type MerchantStatsView = {
   timezone: 'Asia/Ho_Chi_Minh';
@@ -235,18 +291,29 @@ function vnDayKey(at: Date): string {
 }
 
 /** Merchant queue row: counterpart names masked (given name + family initial), no ids. */
-export type MerchantQueueOrder = Omit<QueueOrderSummary, 'customerId' | 'assignedDriverId'> & {
+export type MerchantQueueOrder = Omit<
+  QueueOrderSummary,
+  'customerId' | 'assignedDriverId'
+> & {
   customerName: string | null;
   driverName: string | null;
 };
 
-export type PublicStoreDetail = Omit<StoreDetail, 'acceptSettings'>;
+export type PublicStoreDetail = Omit<StoreDetail, 'acceptSettings'> & {
+  /** Live store offers (applies only at this store), best first. */
+  offers: StoreOffer[];
+  /** Named menu sections in merchant order; items point at them via menuCategoryId. */
+  menuSections: StoreMenuSection[];
+};
 
 export type MerchantCatalogView = StoreDetail & {
   sandboxSeed: boolean;
 };
 
-const FOOD_TRACKING_STATUSES: ReadonlySet<string> = new Set(['ASSIGNED', 'PICKED_UP']);
+const FOOD_TRACKING_STATUSES: ReadonlySet<string> = new Set([
+  'ASSIGNED',
+  'PICKED_UP',
+]);
 
 @Injectable()
 export class FoodService {
@@ -264,6 +331,7 @@ export class FoodService {
     private readonly routing: RoutingService,
     @Inject(FOOD_ORDER_CODE_STORE) private readonly codes: FoodOrderCodeStore,
     @Optional() private readonly phaseRoutes?: PhaseRouteCache,
+    @Optional() private readonly promotions?: PromotionService,
   ) {}
 
   async listStores(
@@ -279,9 +347,19 @@ export class FoodService {
       query.sort_by === 'distance' && !hasGeo
         ? 'createdAt'
         : (query.sort_by ?? 'createdAt');
-    const radiusKm = hasGeo
+    const settingRadiusKm = hasGeo
       ? await this.settings.getNumber('DRIVER_SEARCH_RADIUS_KM')
       : 0;
+    const radiusKm =
+      query.max_km !== undefined
+        ? Math.min(query.max_km, settingRadiusKm)
+        : settingRadiusKm;
+    const [minRatingCount, feeMin, feeMax, feePerKm] = await Promise.all([
+      this.settings.getNumber('RATING_STORE_MIN_COUNT'),
+      this.settings.getNumber('FOOD_MIN_DELIVERY_VND'),
+      this.settings.getNumber('FOOD_MAX_DELIVERY_VND'),
+      this.settings.getNumber('FOOD_DELIVERY_VND_PER_KM'),
+    ]);
     const result = await this.food.listStores({
       page,
       limit,
@@ -291,7 +369,15 @@ export class FoodService {
       lng: query.lng,
       radiusKm,
       sortBy,
+      minRatingCount,
     });
+    const storeIds = result.items.map((store) => store.id);
+    const [offers, featured] = await Promise.all([
+      this.promotions
+        ? this.promotions.storeOffers(storeIds)
+        : Promise.resolve(new Map<string, StoreOffer[]>()),
+      this.food.listFeaturedItems(storeIds),
+    ]);
     return {
       items: result.items.map((store) => ({
         id: store.id,
@@ -306,6 +392,33 @@ export class FoodService {
         openNow: store.openNow,
         closedReason: store.closedReason,
         imageUrl: store.imageUrl,
+        logoUrl: store.logoUrl ?? null,
+        rating: {
+          average:
+            store.ratingAverage !== null && store.ratingCount >= minRatingCount
+              ? Math.round(store.ratingAverage * 10) / 10
+              : null,
+          count: store.ratingCount,
+        },
+        estimatedPrepMinutes: store.estimatedPrepMinutes,
+        etaMinutes:
+          store.distanceKm === null
+            ? null
+            : store.estimatedPrepMinutes +
+              Math.ceil(store.distanceKm * BROWSE_MINUTES_PER_KM),
+        deliveryFeeFromVnd:
+          store.distanceKm === null
+            ? null
+            : Math.min(
+                feeMax,
+                Math.max(
+                  feeMin,
+                  quoteReferenceFareVnd(store.distanceKm, feePerKm, feeMin),
+                ),
+              ),
+        offers: offers.get(store.id) ?? [],
+        minOrderVnd: store.minOrderVnd ?? 0,
+        featuredItems: featured.get(store.id) ?? [],
       })),
       page,
       limit,
@@ -313,7 +426,10 @@ export class FoodService {
     };
   }
 
-  async getStore(actor: RequestActor, storeId: string): Promise<PublicStoreDetail> {
+  async getStore(
+    actor: RequestActor,
+    storeId: string,
+  ): Promise<PublicStoreDetail> {
     await this.requireActiveCustomer(actor.userId);
     await this.ensureSandboxFixtureCatalog();
     const store = await this.food.findStore(storeId);
@@ -322,7 +438,30 @@ export class FoodService {
     }
     // Capacity and accept mode are the merchant's business; customers only see the prep estimate.
     const { acceptSettings: _acceptSettings, ...publicStore } = store;
-    return publicStore;
+    const offers = this.promotions
+      ? ((await this.promotions.storeOffers([store.id], 10)).get(store.id) ??
+        [])
+      : [];
+    const menuSections = await this.food.listStoreMenuSections(store.id);
+    return { ...publicStore, offers, menuSections };
+  }
+
+  /** The signed-in merchant's store id (store offers, review replies). */
+  async merchantStoreId(actor: RequestActor): Promise<string> {
+    await this.requireActiveRole(actor.userId, 'MERCHANT');
+    return (await this.ownedStore(actor.userId)).id;
+  }
+
+  /** Store names for ops lists; unknown ids are left out. */
+  async storeNames(storeIds: string[]): Promise<Map<string, string>> {
+    const stores = await Promise.all(
+      [...new Set(storeIds)].map((id) => this.food.findStore(id)),
+    );
+    return new Map(
+      stores
+        .filter((store) => store !== null)
+        .map((store) => [store!.id, store!.name]),
+    );
   }
 
   async getMerchantCatalog(actor: RequestActor): Promise<MerchantCatalogView> {
@@ -334,7 +473,10 @@ export class FoodService {
     };
   }
 
-  async createItem(actor: RequestActor, dto: CreateFoodItemDto): Promise<StoreItemView> {
+  async createItem(
+    actor: RequestActor,
+    dto: CreateFoodItemDto,
+  ): Promise<StoreItemView> {
     await this.requireActiveRole(actor.userId, 'MERCHANT');
     await this.ownedStore(actor.userId);
     return this.unwrapCatalog(() =>
@@ -342,6 +484,10 @@ export class FoodService {
         ownerId: actor.userId,
         name: dto.name,
         priceVnd: dto.priceVnd,
+        originalPriceVnd: checkedOriginalPrice(
+          dto.priceVnd,
+          dto.originalPriceVnd,
+        ),
         available: dto.available,
         description: dto.description,
         prepMinutes: dto.prepMinutes,
@@ -368,13 +514,18 @@ export class FoodService {
     if (
       dto.name === undefined &&
       dto.priceVnd === undefined &&
+      dto.originalPriceVnd === undefined &&
       dto.available === undefined &&
       dto.description === undefined &&
       dto.prepMinutes === undefined &&
       dto.imageUrl === undefined &&
       dto.menuCategoryId === undefined
     ) {
-      throw foodError(400, 'VALIDATION_ERROR', 'Provide at least one field to update');
+      throw foodError(
+        400,
+        'VALIDATION_ERROR',
+        'Provide at least one field to update',
+      );
     }
     return this.unwrapCatalog(() =>
       this.food.updateItem({
@@ -382,6 +533,10 @@ export class FoodService {
         itemId,
         name: dto.name,
         priceVnd: dto.priceVnd,
+        originalPriceVnd:
+          dto.originalPriceVnd !== undefined && dto.priceVnd !== undefined
+            ? checkedOriginalPrice(dto.priceVnd, dto.originalPriceVnd)
+            : dto.originalPriceVnd,
         available: dto.available,
         description: dto.description,
         prepMinutes: dto.prepMinutes,
@@ -424,7 +579,10 @@ export class FoodService {
     return this.food.listMenuCategories(actor.userId);
   }
 
-  async createMenuCategory(actor: RequestActor, dto: import('./food.dto.js').UpsertMenuCategoryDto) {
+  async createMenuCategory(
+    actor: RequestActor,
+    dto: import('./food.dto.js').UpsertMenuCategoryDto,
+  ) {
     await this.requireActiveRole(actor.userId, 'MERCHANT');
     await this.ownedStore(actor.userId);
     return this.unwrapCatalog(() =>
@@ -454,15 +612,22 @@ export class FoodService {
 
   async deleteMenuCategory(actor: RequestActor, categoryId: string) {
     await this.requireActiveRole(actor.userId, 'MERCHANT');
-    return this.unwrapCatalog(() => this.food.deleteMenuCategory(actor.userId, categoryId));
+    return this.unwrapCatalog(() =>
+      this.food.deleteMenuCategory(actor.userId, categoryId),
+    );
   }
 
   async reorderMenuCategories(actor: RequestActor, orderedIds: string[]) {
     await this.requireActiveRole(actor.userId, 'MERCHANT');
-    return this.unwrapCatalog(() => this.food.reorderMenuCategories(actor.userId, orderedIds));
+    return this.unwrapCatalog(() =>
+      this.food.reorderMenuCategories(actor.userId, orderedIds),
+    );
   }
 
-  async merchantHistory(actor: RequestActor, query: import('./food.dto.js').MerchantHistoryQueryDto) {
+  async merchantHistory(
+    actor: RequestActor,
+    query: import('./food.dto.js').MerchantHistoryQueryDto,
+  ) {
     await this.requireActiveRole(actor.userId, 'MERCHANT');
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.max(1, Math.min(50, query.limit ?? 20));
@@ -485,7 +650,7 @@ export class FoodService {
     };
   }
 
-    async setItemAvailability(
+  async setItemAvailability(
     actor: RequestActor,
     itemId: string,
     dto: SetFoodItemAvailabilityDto,
@@ -500,12 +665,25 @@ export class FoodService {
     );
   }
 
-  /** M030 (DEC-PROD-045): rename the store; the logo goes through StoreLogoService. */
-  async updateStoreProfile(actor: RequestActor, dto: UpdateStoreProfileDto): Promise<StoreDetail> {
+  /**
+   * M030 (DEC-PROD-045): rename the store and/or (DEC-PROD-067) set its category.
+   * The caller validates `category` against FoodCategoryService; the logo goes
+   * through StoreLogoService.
+   */
+  async updateStoreProfile(
+    actor: RequestActor,
+    dto: UpdateStoreProfileDto,
+  ): Promise<StoreDetail> {
     await this.requireActiveRole(actor.userId, 'MERCHANT');
     await this.ownedStore(actor.userId);
     try {
-      return await this.food.updateStoreProfile({ ownerId: actor.userId, name: dto.name });
+      return await this.food.updateStoreProfile({
+        ownerId: actor.userId,
+        name: dto.name,
+        category: dto.category,
+        minOrderVnd: dto.minOrderVnd,
+        description: dto.description,
+      });
     } catch (error) {
       throw this.asHttp(error);
     }
@@ -517,9 +695,15 @@ export class FoodService {
     return this.food.ensureOwnedStore(actor.userId, 'My Store');
   }
 
-  async setStoreLogo(actor: RequestActor, logoUrl: string | null): Promise<StoreDetail> {
+  async setStoreLogo(
+    actor: RequestActor,
+    logoUrl: string | null,
+  ): Promise<StoreDetail> {
     try {
-      return await this.food.updateStoreProfile({ ownerId: actor.userId, logoUrl });
+      return await this.food.updateStoreProfile({
+        ownerId: actor.userId,
+        logoUrl,
+      });
     } catch (error) {
       throw this.asHttp(error);
     }
@@ -527,6 +711,24 @@ export class FoodService {
 
   async findStoreLogoUrl(storeId: string): Promise<string | null> {
     return this.food.findStoreLogoUrl(storeId);
+  }
+
+  async setStoreCover(
+    actor: RequestActor,
+    coverUrl: string | null,
+  ): Promise<StoreDetail> {
+    try {
+      return await this.food.updateStoreProfile({
+        ownerId: actor.userId,
+        coverUrl,
+      });
+    } catch (error) {
+      throw this.asHttp(error);
+    }
+  }
+
+  async findStoreCoverUrl(storeId: string): Promise<string | null> {
+    return this.food.findStoreCoverUrl(storeId);
   }
 
   async updateStoreLocation(
@@ -549,7 +751,10 @@ export class FoodService {
   }
 
   /** DEC-PROD-027 — M023 weekly hours, closed days and last-order cut-off. */
-  async updateStoreHours(actor: RequestActor, dto: UpdateStoreHoursDto): Promise<StoreDetail> {
+  async updateStoreHours(
+    actor: RequestActor,
+    dto: UpdateStoreHoursDto,
+  ): Promise<StoreDetail> {
     await this.requireActiveRole(actor.userId, 'MERCHANT');
     await this.ownedStore(actor.userId);
     const normalized = normalizeSchedule(dto);
@@ -596,7 +801,11 @@ export class FoodService {
     const store = await this.ownedStore(actor.userId);
     if (dto.mode !== 'PAUSED' && (store.lat == null || store.lng == null)) {
       // A store opens for orders only once it is pinned on the map.
-      throw foodError(409, 'FOOD_STORE_LOCATION_REQUIRED', 'Pin the store on the map before opening');
+      throw foodError(
+        409,
+        'FOOD_STORE_LOCATION_REQUIRED',
+        'Pin the store on the map before opening',
+      );
     }
     try {
       return await this.food.updateStoreServiceMode({
@@ -610,12 +819,19 @@ export class FoodService {
     }
   }
 
-  async place(actor: RequestActor, idempotencyKey: string, dto: PlaceFoodOrderDto): Promise<PublicFoodOrder> {
+  async place(
+    actor: RequestActor,
+    idempotencyKey: string,
+    dto: PlaceFoodOrderDto,
+  ): Promise<PublicFoodOrder> {
     await this.requireActiveCustomer(actor.userId);
     await this.probeDropoffMaps(dto.dropoff.label);
     await this.ensureSandboxFixtureCatalog();
     await this.assertWithinDeliveryRange(dto.storeId, dto.dropoff);
-    const deliveryFareVnd = await this.quoteDeliveryFare(dto.storeId, dto.dropoff);
+    const deliveryFareVnd = await this.quoteDeliveryFare(
+      dto.storeId,
+      dto.dropoff,
+    );
     const order = await this.unwrap(() =>
       this.food.place({
         customerId: actor.userId,
@@ -638,7 +854,11 @@ export class FoodService {
     await this.requireActiveCustomer(actor.userId);
     const safePage = normalizePage(page);
     const safeLimit = normalizeLimit(limit);
-    const result = await this.food.listOrdersForCustomer(actor.userId, safePage, safeLimit);
+    const result = await this.food.listOrdersForCustomer(
+      actor.userId,
+      safePage,
+      safeLimit,
+    );
     return {
       items: result.items.map(publish),
       page: safePage,
@@ -652,26 +872,59 @@ export class FoodService {
     query: DispatchQuery = {},
   ): Promise<Array<ReadyOrderSummary & { route: RouteGeometryView }>> {
     await this.eligibility.requireEligibleDriver(actor.userId);
-    const requirePresence = await this.settings.getBoolean('DISPATCH_REQUIRE_FRESH_PRESENCE');
-    if (!(await this.presence.isDispatchEligible(actor.userId, 'FOOD', requirePresence))) {
+    const requirePresence = await this.settings.getBoolean(
+      'DISPATCH_REQUIRE_FRESH_PRESENCE',
+    );
+    if (
+      !(await this.presence.isDispatchEligible(
+        actor.userId,
+        'FOOD',
+        requirePresence,
+      ))
+    ) {
       return [];
     }
     // Over the debt limit → no new cash jobs.
     await this.earnings.assertUnderDebtLimit(actor.userId);
     const now = new Date();
     // Radius from query coords or the fresh presence fix; no fix → 409.
-    const origin = await this.presence.dispatchOrigin(actor.userId, query, now, requirePresence);
-    const fallbackLimit = this.config.get('DISPATCH_FALLBACK_LIMIT', { infer: true });
+    const origin = await this.presence.dispatchOrigin(
+      actor.userId,
+      query,
+      now,
+      requirePresence,
+    );
+    const fallbackLimit = this.config.get('DISPATCH_FALLBACK_LIMIT', {
+      infer: true,
+    });
     const radiusKm = await this.settings.getNumber('DRIVER_SEARCH_RADIUS_KM');
-    const early = { leadMinutes: await this.settings.getNumber('FOOD_EARLY_ASSIGN_LEAD_MINUTES'), now };
+    const early = {
+      leadMinutes: await this.settings.getNumber(
+        'FOOD_EARLY_ASSIGN_LEAD_MINUTES',
+      ),
+      now,
+    };
     const orders = origin
-      ? await this.food.listReady(Math.max(fallbackLimit * 10, 100), { ...origin, radiusKm }, early)
+      ? await this.food.listReady(
+          Math.max(fallbackLimit * 10, 100),
+          { ...origin, radiusKm },
+          early,
+        )
       : await this.food.listReady(fallbackLimit, undefined, early);
-    const pickupPoint = (order: ReadyOrderSummary) => order.store ?? order.dropoff;
-    const filtered = filterByDispatchRadius(orders, origin ?? {}, radiusKm, fallbackLimit, pickupPoint);
+    const pickupPoint = (order: ReadyOrderSummary) =>
+      order.store ?? order.dropoff;
+    const filtered = filterByDispatchRadius(
+      orders,
+      origin ?? {},
+      radiusKm,
+      fallbackLimit,
+      pickupPoint,
+    );
     const visible = origin
       ? [...filtered].sort(
-          (a, b) => haversineKm(origin, pickupPoint(a)) - haversineKm(origin, pickupPoint(b)),
+          (a, b) =>
+            haversineKm(origin, pickupPoint(a)) -
+            haversineKm(origin, pickupPoint(b)),
         )
       : filtered;
     // Road geometry pickup→dropoff (DEC-PROD-045) so the driver map draws the
@@ -681,7 +934,10 @@ export class FoodService {
         ...order,
         route: order.pickup
           ? await this.lookupRoute(order.pickup, order.dropoff)
-          : { ...UNAVAILABLE_ROUTE_GEOMETRY, provider: this.routing.provider() },
+          : {
+              ...UNAVAILABLE_ROUTE_GEOMETRY,
+              provider: this.routing.provider(),
+            },
       })),
     );
   }
@@ -716,21 +972,33 @@ export class FoodService {
    * Merchant sales summary bucketed by Vietnam calendar day (UTC+7, no DST). Sales are item
    * subtotals of DELIVERED orders (before delivery fee, platform fee and vouchers).
    */
-  async merchantStats(actor: RequestActor, days = 7): Promise<MerchantStatsView> {
+  async merchantStats(
+    actor: RequestActor,
+    days = 7,
+  ): Promise<MerchantStatsView> {
     await this.requireActiveRole(actor.userId, 'MERCHANT');
-    const window = Math.min(Math.max(Math.trunc(days), 1), MERCHANT_STATS_MAX_DAYS);
+    const window = Math.min(
+      Math.max(Math.trunc(days), 1),
+      MERCHANT_STATS_MAX_DAYS,
+    );
     const now = new Date();
     const todayKey = vnDayKey(now);
     const startOfToday = new Date(`${todayKey}T00:00:00+07:00`);
     const since = new Date(startOfToday.getTime() - (window - 1) * 86_400_000);
     const rows = await this.food.merchantStats(actor.userId, since, 5);
-    const buckets = new Map<string, { deliveredCount: number; cancelledCount: number; salesVnd: number }>();
+    const buckets = new Map<
+      string,
+      { deliveredCount: number; cancelledCount: number; salesVnd: number }
+    >();
     for (let i = 0; i < window; i += 1) {
-      buckets.set(vnDayKey(new Date(since.getTime() + i * 86_400_000 + 3_600_000)), {
-        deliveredCount: 0,
-        cancelledCount: 0,
-        salesVnd: 0,
-      });
+      buckets.set(
+        vnDayKey(new Date(since.getTime() + i * 86_400_000 + 3_600_000)),
+        {
+          deliveredCount: 0,
+          cancelledCount: 0,
+          salesVnd: 0,
+        },
+      );
     }
     for (const row of rows.finished) {
       const bucket = buckets.get(vnDayKey(row.finishedAt));
@@ -744,8 +1012,15 @@ export class FoodService {
         bucket.cancelledCount += 1;
       }
     }
-    const series = [...buckets.entries()].map(([date, value]) => ({ date, ...value }));
-    const today = buckets.get(todayKey) ?? { deliveredCount: 0, cancelledCount: 0, salesVnd: 0 };
+    const series = [...buckets.entries()].map(([date, value]) => ({
+      date,
+      ...value,
+    }));
+    const today = buckets.get(todayKey) ?? {
+      deliveredCount: 0,
+      cancelledCount: 0,
+      salesVnd: 0,
+    };
     return {
       timezone: 'Asia/Ho_Chi_Minh',
       days: window,
@@ -767,7 +1042,11 @@ export class FoodService {
    * The merchant's own commission statement. Defaults to the last
    * MERCHANT_SETTLEMENT_CYCLE_DAYS ICT days (DRAFT 7, GrabFood pays weekly).
    */
-  async merchantStatement(actor: RequestActor, from?: string, to?: string): Promise<MerchantStatementView> {
+  async merchantStatement(
+    actor: RequestActor,
+    from?: string,
+    to?: string,
+  ): Promise<MerchantStatementView> {
     await this.requireActiveRole(actor.userId, 'MERCHANT');
     const store = await this.food.findStoreByOwner(actor.userId);
     if (!store) {
@@ -776,7 +1055,11 @@ export class FoodService {
     return this.statement(store.id, from, to);
   }
 
-  async opsMerchantStatement(storeId: string, from?: string, to?: string): Promise<MerchantStatementView> {
+  async opsMerchantStatement(
+    storeId: string,
+    from?: string,
+    to?: string,
+  ): Promise<MerchantStatementView> {
     return this.statement(storeId, from, to);
   }
 
@@ -790,7 +1073,11 @@ export class FoodService {
     input: { from: string; to: string; reason: string; note?: string },
   ): Promise<MerchantSettlementView> {
     if (input.to >= vnDayKey(new Date())) {
-      throw foodError(409, 'FOOD_SETTLEMENT_PERIOD_OPEN', 'Only closed days (before today, ICT) can be settled');
+      throw foodError(
+        409,
+        'FOOD_SETTLEMENT_PERIOD_OPEN',
+        'Only closed days (before today, ICT) can be settled',
+      );
     }
     const view = await this.statement(storeId, input.from, input.to);
     return this.unwrapCatalog(() =>
@@ -810,25 +1097,53 @@ export class FoodService {
     );
   }
 
-  private async statement(storeId: string, from?: string, to?: string): Promise<MerchantStatementView> {
+  private async statement(
+    storeId: string,
+    from?: string,
+    to?: string,
+  ): Promise<MerchantStatementView> {
     const today = vnDayKey(new Date());
     const toKey = to ?? today;
     const cycleDays = Math.max(
       1,
-      Math.min(MERCHANT_STATEMENT_MAX_DAYS, Math.round(await this.settings.getNumber('MERCHANT_SETTLEMENT_CYCLE_DAYS'))),
+      Math.min(
+        MERCHANT_STATEMENT_MAX_DAYS,
+        Math.round(
+          await this.settings.getNumber('MERCHANT_SETTLEMENT_CYCLE_DAYS'),
+        ),
+      ),
     );
     const fromKey =
-      from ?? vnDayKey(new Date(Date.parse(`${toKey}T12:00:00+07:00`) - (cycleDays - 1) * 86_400_000));
+      from ??
+      vnDayKey(
+        new Date(
+          Date.parse(`${toKey}T12:00:00+07:00`) - (cycleDays - 1) * 86_400_000,
+        ),
+      );
     const start = Date.parse(`${fromKey}T00:00:00+07:00`);
     const end = Date.parse(`${toKey}T00:00:00+07:00`) + 86_400_000;
     if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
-      throw foodError(400, 'FOOD_STATEMENT_RANGE_INVALID', 'from must be on or before to (YYYY-MM-DD)');
+      throw foodError(
+        400,
+        'FOOD_STATEMENT_RANGE_INVALID',
+        'from must be on or before to (YYYY-MM-DD)',
+      );
     }
     if ((end - start) / 86_400_000 > MERCHANT_STATEMENT_MAX_DAYS) {
-      throw foodError(400, 'FOOD_STATEMENT_RANGE_INVALID', `At most ${MERCHANT_STATEMENT_MAX_DAYS} days`);
+      throw foodError(
+        400,
+        'FOOD_STATEMENT_RANGE_INVALID',
+        `At most ${MERCHANT_STATEMENT_MAX_DAYS} days`,
+      );
     }
-    const sharedPercent = await this.settings.getNumber('VOUCHER_SHARED_PLATFORM_PERCENT');
-    const rows = await this.food.deliveredForStatement(storeId, new Date(start), new Date(end));
+    const sharedPercent = await this.settings.getNumber(
+      'VOUCHER_SHARED_PLATFORM_PERCENT',
+    );
+    const rows = await this.food.deliveredForStatement(
+      storeId,
+      new Date(start),
+      new Date(end),
+    );
     const empty = (): StatementTotals => ({
       orderCount: 0,
       grossVnd: 0,
@@ -846,7 +1161,15 @@ export class FoodService {
       const funded =
         row.merchantCashVnd != null
           ? Math.max(0, row.subtotalVnd - row.merchantCashVnd)
-          : Math.max(0, row.discountVnd - platformFundedDiscountVnd(row.discountVnd, row.voucherSponsor, sharedPercent));
+          : Math.max(
+              0,
+              row.discountVnd -
+                platformFundedDiscountVnd(
+                  row.discountVnd,
+                  row.voucherSponsor,
+                  sharedPercent,
+                ),
+            );
       const commission = row.commissionVnd ?? 0;
       for (const bucket of [days.get(vnDayKey(row.deliveredAt)), totals]) {
         if (!bucket) {
@@ -860,12 +1183,16 @@ export class FoodService {
         bucket.netVnd += row.subtotalVnd - funded - commission;
       }
     }
-    const settlements = (await this.food.listMerchantSettlements(storeId, 50)).filter(
-      (row) => row.periodStart <= toKey && row.periodEnd >= fromKey,
-    );
+    const settlements = (
+      await this.food.listMerchantSettlements(storeId, 50)
+    ).filter((row) => row.periodStart <= toKey && row.periodEnd >= fromKey);
     let settledCommission = 0;
     for (const [date, day] of days) {
-      if (settlements.some((row) => row.periodStart <= date && row.periodEnd >= date)) {
+      if (
+        settlements.some(
+          (row) => row.periodStart <= date && row.periodEnd >= date,
+        )
+      ) {
         settledCommission += day.commissionVnd;
       }
     }
@@ -874,12 +1201,17 @@ export class FoodService {
       storeId,
       from: fromKey,
       to: toKey,
-      commissionPercentNow: await this.settings.getNumber('FOOD_MERCHANT_COMMISSION_PERCENT'),
+      commissionPercentNow: await this.settings.getNumber(
+        'FOOD_MERCHANT_COMMISSION_PERCENT',
+      ),
       settlementCycleDays: cycleDays,
       totals,
       days: [...days.entries()].map(([date, value]) => ({ date, ...value })),
       settlements,
-      unsettledCommissionVnd: Math.max(0, totals.commissionVnd - settledCommission),
+      unsettledCommissionVnd: Math.max(
+        0,
+        totals.commissionVnd - settledCommission,
+      ),
     };
   }
 
@@ -898,7 +1230,11 @@ export class FoodService {
       (order.status === 'ASSIGNED' || order.status === 'PICKED_UP') &&
       (await this.settings.getBoolean('FOOD_DELIVERY_CODE_REQUIRED'))
     ) {
-      const { code } = await this.codes.ensure(order.id, 'DELIVERY', generatePickupCode());
+      const { code } = await this.codes.ensure(
+        order.id,
+        'DELIVERY',
+        generatePickupCode(),
+      );
       view.deliveryCode = code;
     }
     if (
@@ -906,26 +1242,49 @@ export class FoodService {
       order.status === 'ASSIGNED' &&
       (await this.settings.getBoolean('FOOD_HANDOVER_CODE_REQUIRED'))
     ) {
-      const { code } = await this.codes.ensure(order.id, 'HANDOVER', generatePickupCode());
+      const { code } = await this.codes.ensure(
+        order.id,
+        'HANDOVER',
+        generatePickupCode(),
+      );
       view.handoverCode = code;
     }
     if (order.pickup) {
       view.route = await this.lookupRoute(order.pickup, order.dropoff);
-      const phase = order.assignedDriverId ? routePhaseForFood(order.status) : null;
+      const phase = order.assignedDriverId
+        ? routePhaseForFood(order.status)
+        : null;
       if (phase) {
         view.routePhase = phase;
         if (phase === 'APPROACH') {
           // Cached approach leg (shared with the realtime push): no Directions call per GET.
           const now = new Date();
-          const cached = this.phaseRoutes?.forPhase('FoodOrder', order.id, 'APPROACH', now.getTime());
-          const fix = cached ? null : await this.presence.freshLocation(order.assignedDriverId!, now);
+          const cached = this.phaseRoutes?.forPhase(
+            'FoodOrder',
+            order.id,
+            'APPROACH',
+            now.getTime(),
+          );
+          const fix = cached
+            ? null
+            : await this.presence.freshLocation(order.assignedDriverId!, now);
           if (cached) {
             view.approachRoute = cached.route;
           } else if (fix) {
-            view.approachRoute = await this.lookupRoute({ lat: fix.lat, lng: fix.lng }, order.pickup);
-            this.phaseRoutes?.set('FoodOrder', order.id, { phase: 'APPROACH', route: view.approachRoute, at: now.getTime() });
+            view.approachRoute = await this.lookupRoute(
+              { lat: fix.lat, lng: fix.lng },
+              order.pickup,
+            );
+            this.phaseRoutes?.set('FoodOrder', order.id, {
+              phase: 'APPROACH',
+              route: view.approachRoute,
+              at: now.getTime(),
+            });
           } else {
-            view.approachRoute = { ...UNAVAILABLE_ROUTE_GEOMETRY, provider: this.routing.provider() };
+            view.approachRoute = {
+              ...UNAVAILABLE_ROUTE_GEOMETRY,
+              provider: this.routing.provider(),
+            };
           }
         }
       }
@@ -949,12 +1308,18 @@ export class FoodService {
     try {
       return toRouteGeometryView(await this.routing.route(from, to));
     } catch {
-      return { ...UNAVAILABLE_ROUTE_GEOMETRY, provider: this.routing.provider() };
+      return {
+        ...UNAVAILABLE_ROUTE_GEOMETRY,
+        provider: this.routing.provider(),
+      };
     }
   }
 
   /** DEC-PROD-031: the customer sees the courier's fresh position while the order is on its way. */
-  async driverLocation(actor: RequestActor, orderId: string): Promise<DriverLocationResponse> {
+  async driverLocation(
+    actor: RequestActor,
+    orderId: string,
+  ): Promise<DriverLocationResponse> {
     const order = await this.unwrapNullable(() => this.food.findOrder(orderId));
     if (!order || order.customerId !== actor.userId) {
       throw foodError(404, 'FOOD_ORDER_NOT_FOUND', 'Food order not found');
@@ -962,18 +1327,23 @@ export class FoodService {
     if (!order.assignedDriverId || !FOOD_TRACKING_STATUSES.has(order.status)) {
       return { location: null };
     }
-    const location = await this.presence.freshLocation(order.assignedDriverId, new Date());
+    const location = await this.presence.freshLocation(
+      order.assignedDriverId,
+      new Date(),
+    );
     return {
       location: location
-        ? { lat: location.lat, lng: location.lng, at: location.at.toISOString() }
+        ? {
+            lat: location.lat,
+            lng: location.lng,
+            at: location.at.toISOString(),
+          }
         : null,
     };
   }
 
   /** Who may rate the order and whom: used by the rating module. */
-  async ratingSubject(
-    orderId: string,
-  ): Promise<{
+  async ratingSubject(orderId: string): Promise<{
     customerId: string;
     driverId: string | null;
     storeId: string;
@@ -994,16 +1364,24 @@ export class FoodService {
   }
 
   /** Raw finished jobs for the driver-history module (auth is checked there). */
-  listFinishedForDriver(driverId: string, window: FoodDriverHistoryWindow): Promise<FoodOrderView[]> {
+  listFinishedForDriver(
+    driverId: string,
+    window: FoodDriverHistoryWindow,
+  ): Promise<FoodOrderView[]> {
     return this.food.listFinishedForDriver(driverId, window);
   }
 
-  countFinishedForDrivers(driverIds: readonly string[]): Promise<Map<string, DriverJobCounts>> {
+  countFinishedForDrivers(
+    driverIds: readonly string[],
+  ): Promise<Map<string, DriverJobCounts>> {
     return this.food.countFinishedForDrivers(driverIds);
   }
 
   /** Live-location room: same rule as GET /food/orders/:id/driver-location (customer only). */
-  async canSubscribeLocation(userId: string, orderId: string): Promise<boolean> {
+  async canSubscribeLocation(
+    userId: string,
+    orderId: string,
+  ): Promise<boolean> {
     const order = await this.unwrapNullable(() => this.food.findOrder(orderId));
     return Boolean(order && order.customerId === userId);
   }
@@ -1013,19 +1391,36 @@ export class FoodService {
   async routeLegsForDriver(
     orderId: string,
     driverId: string,
-  ): Promise<{ phase: RoutePhase; pickup: { lat: number; lng: number }; dropoff: { lat: number; lng: number } } | null> {
+  ): Promise<{
+    phase: RoutePhase;
+    pickup: { lat: number; lng: number };
+    dropoff: { lat: number; lng: number };
+  } | null> {
     const order = await this.unwrapNullable(() => this.food.findOrder(orderId));
-    if (!order || order.assignedDriverId !== driverId || !order.pickup) return null;
+    if (!order || order.assignedDriverId !== driverId || !order.pickup)
+      return null;
     const phase = routePhaseForFood(order.status);
-    return phase ? { phase, pickup: order.pickup, dropoff: order.dropoff } : null;
+    return phase
+      ? { phase, pickup: order.pickup, dropoff: order.dropoff }
+      : null;
   }
 
   /** Relaunch resume (DEC-PROD-057): the customer's newest order that is still open. */
-  async activeOrderForCustomer(customerId: string): Promise<{ id: string; status: string } | null> {
-    const ids = (await this.food.listIdsForCustomerInStatuses?.(customerId, OPEN_FOOD_STATUSES)) ?? [];
+  async activeOrderForCustomer(
+    customerId: string,
+  ): Promise<{ id: string; status: string } | null> {
+    const ids =
+      (await this.food.listIdsForCustomerInStatuses?.(
+        customerId,
+        OPEN_FOOD_STATUSES,
+      )) ?? [];
     for (const id of ids) {
       const order = await this.unwrapNullable(() => this.food.findOrder(id));
-      if (order && order.customerId === customerId && (OPEN_FOOD_STATUSES as readonly string[]).includes(order.status)) {
+      if (
+        order &&
+        order.customerId === customerId &&
+        (OPEN_FOOD_STATUSES as readonly string[]).includes(order.status)
+      ) {
         return { id: order.id, status: order.status };
       }
     }
@@ -1033,7 +1428,11 @@ export class FoodService {
   }
 
   async trackingOrderIdsForDriver(driverId: string): Promise<string[]> {
-    return (await this.food.listIdsForDriverInStatuses?.(driverId, [...FOOD_TRACKING_STATUSES])) ?? [];
+    return (
+      (await this.food.listIdsForDriverInStatuses?.(driverId, [
+        ...FOOD_TRACKING_STATUSES,
+      ])) ?? []
+    );
   }
 
   /** Socket room join uses the same participant checks as GET /food/orders/:id. */
@@ -1055,7 +1454,9 @@ export class FoodService {
   }
 
   /** Status + updatedAt for contact-window checks (chat/voice). */
-  async contactMeta(orderId: string): Promise<{ status: string; updatedAt: Date } | null> {
+  async contactMeta(
+    orderId: string,
+  ): Promise<{ status: string; updatedAt: Date } | null> {
     const order = await this.unwrapNullable(() => this.food.findOrder(orderId));
     if (!order) {
       return null;
@@ -1066,10 +1467,18 @@ export class FoodService {
   /** Known participant userIds for push fan-out (customer + merchant owner + assigned driver). */
   async participantRoles(
     orderId: string,
-  ): Promise<{ customerId: string; merchantId: string; driverId: string | null } | null> {
+  ): Promise<{
+    customerId: string;
+    merchantId: string;
+    driverId: string | null;
+  } | null> {
     const order = await this.unwrapNullable(() => this.food.findOrder(orderId));
     return order
-      ? { customerId: order.customerId, merchantId: order.ownerId, driverId: order.assignedDriverId ?? null }
+      ? {
+          customerId: order.customerId,
+          merchantId: order.ownerId,
+          driverId: order.assignedDriverId ?? null,
+        }
       : null;
   }
 
@@ -1087,7 +1496,9 @@ export class FoodService {
 
   async accept(actor: RequestActor, orderId: string): Promise<PublicFoodOrder> {
     await this.requireActiveRole(actor.userId, 'MERCHANT');
-    return publish(await this.unwrap(() => this.food.accept(orderId, actor.userId)));
+    return publish(
+      await this.unwrap(() => this.food.accept(orderId, actor.userId)),
+    );
   }
 
   async reject(
@@ -1096,13 +1507,22 @@ export class FoodService {
     input: { reasonCode: FoodRejectReason; note?: string },
   ): Promise<PublicFoodOrder> {
     await this.requireActiveRole(actor.userId, 'MERCHANT');
-    const note = input.note?.trim() ? input.note.trim().slice(0, FOOD_REJECT_NOTE_MAX) : null;
+    const note = input.note?.trim()
+      ? input.note.trim().slice(0, FOOD_REJECT_NOTE_MAX)
+      : null;
     if (input.reasonCode === 'OTHER' && !note) {
-      throw foodError(400, 'FOOD_REJECT_NOTE_REQUIRED', 'Describe the reason when choosing OTHER');
+      throw foodError(
+        400,
+        'FOOD_REJECT_NOTE_REQUIRED',
+        'Describe the reason when choosing OTHER',
+      );
     }
     return publish(
       await this.unwrap(() =>
-        this.food.reject(orderId, actor.userId, { code: input.reasonCode, note }),
+        this.food.reject(orderId, actor.userId, {
+          code: input.reasonCode,
+          note,
+        }),
       ),
     );
   }
@@ -1115,14 +1535,26 @@ export class FoodService {
   async proposeChange(
     actor: RequestActor,
     orderId: string,
-    input: { reasonCode: string; note?: string; lines: { lineId: string; toQuantity: number }[] },
+    input: {
+      reasonCode: string;
+      note?: string;
+      lines: { lineId: string; toQuantity: number }[];
+    },
   ): Promise<{ order: PublicFoodOrder; change: PublicFoodOrderChange }> {
     await this.requireActiveRole(actor.userId, 'MERCHANT');
-    const note = input.note?.trim() ? input.note.trim().slice(0, FOOD_REJECT_NOTE_MAX) : null;
+    const note = input.note?.trim()
+      ? input.note.trim().slice(0, FOOD_REJECT_NOTE_MAX)
+      : null;
     if (input.reasonCode === 'OTHER' && !note) {
-      throw foodError(400, 'FOOD_REJECT_NOTE_REQUIRED', 'Describe the reason when choosing OTHER');
+      throw foodError(
+        400,
+        'FOOD_REJECT_NOTE_REQUIRED',
+        'Describe the reason when choosing OTHER',
+      );
     }
-    const minutes = await this.settings.getNumber('FOOD_ORDER_CHANGE_RESPONSE_MINUTES');
+    const minutes = await this.settings.getNumber(
+      'FOOD_ORDER_CHANGE_RESPONSE_MINUTES',
+    );
     const expiresAt = new Date(Date.now() + Math.max(1, minutes) * 60_000);
     const result = await this.unwrap(() =>
       this.food.proposeChange({
@@ -1140,9 +1572,15 @@ export class FoodService {
   }
 
   /** Latest change of an order (customer or store owner). */
-  async latestChange(actor: RequestActor, orderId: string): Promise<PublicFoodOrderChange | null> {
+  async latestChange(
+    actor: RequestActor,
+    orderId: string,
+  ): Promise<PublicFoodOrderChange | null> {
     const order = await this.unwrapNullable(() => this.food.findOrder(orderId));
-    if (!order || (order.customerId !== actor.userId && order.ownerId !== actor.userId)) {
+    if (
+      !order ||
+      (order.customerId !== actor.userId && order.ownerId !== actor.userId)
+    ) {
       throw foodError(404, 'FOOD_ORDER_NOT_FOUND', 'Food order not found');
     }
     const change = await this.food.latestChange(orderId);
@@ -1157,29 +1595,53 @@ export class FoodService {
   ): Promise<{ order: PublicFoodOrder; change: PublicFoodOrderChange }> {
     await this.requireActiveCustomer(actor.userId);
     const result = await this.unwrap(() =>
-      this.food.respondChange(orderId, actor.userId, changeId, accept, new Date()),
+      this.food.respondChange(
+        orderId,
+        actor.userId,
+        changeId,
+        accept,
+        new Date(),
+      ),
     );
-    return { order: publish(result.order), change: publishChange(result.change) };
+    return {
+      order: publish(result.order),
+      change: publishChange(result.change),
+    };
   }
 
-  async markReady(actor: RequestActor, orderId: string): Promise<PublicFoodOrder> {
+  async markReady(
+    actor: RequestActor,
+    orderId: string,
+  ): Promise<PublicFoodOrder> {
     await this.requireActiveRole(actor.userId, 'MERCHANT');
-    return publish(await this.unwrap(() => this.food.markReady(orderId, actor.userId)));
+    return publish(
+      await this.unwrap(() => this.food.markReady(orderId, actor.userId)),
+    );
   }
 
   async claim(actor: RequestActor, orderId: string): Promise<PublicFoodOrder> {
     await this.eligibility.requireEligibleDriver(actor.userId);
     if (!(await this.presence.isDispatchEligible(actor.userId, 'FOOD'))) {
-      throw foodError(409, 'DRIVER_OFFLINE', 'Go online for food orders to claim one');
+      throw foodError(
+        409,
+        'DRIVER_OFFLINE',
+        'Go online for food orders to claim one',
+      );
     }
     await this.earnings.assertUnderDebtLimit(actor.userId);
-    const maxConcurrentJobs = await this.settings.getNumber('MAX_CONCURRENT_JOBS_PER_DRIVER');
+    const maxConcurrentJobs = await this.settings.getNumber(
+      'MAX_CONCURRENT_JOBS_PER_DRIVER',
+    );
     const early = {
-      leadMinutes: await this.settings.getNumber('FOOD_EARLY_ASSIGN_LEAD_MINUTES'),
+      leadMinutes: await this.settings.getNumber(
+        'FOOD_EARLY_ASSIGN_LEAD_MINUTES',
+      ),
       now: new Date(),
     };
     return publish(
-      await this.unwrap(() => this.food.claim(orderId, actor.userId, maxConcurrentJobs, early)),
+      await this.unwrap(() =>
+        this.food.claim(orderId, actor.userId, maxConcurrentJobs, early),
+      ),
     );
   }
 
@@ -1187,9 +1649,17 @@ export class FoodService {
    * Online food drivers near a READY, unassigned order, nearest first (job push audience; also
    * drivers whose app is backgrounded or killed, see DRIVER_PUSH_LOCATION_MAX_AGE_MS).
    */
-  async readyAudience(orderId: string, now = new Date()): Promise<{
+  async readyAudience(
+    orderId: string,
+    now = new Date(),
+  ): Promise<{
     driverIds: string[];
-    order: { id: string; deliveryFareVnd: number; storeName: string | null; dropoffLabel: string };
+    order: {
+      id: string;
+      deliveryFareVnd: number;
+      storeName: string | null;
+      dropoffLabel: string;
+    };
     ttlSeconds: number;
   } | null> {
     const order = await this.food.findOrder(orderId);
@@ -1198,7 +1668,12 @@ export class FoodService {
     }
     const point = order.pickup ?? order.dropoff;
     const radiusKm = await this.settings.getNumber('DRIVER_SEARCH_RADIUS_KM');
-    const rows = await this.presence.onlineNearForPush('FOOD', point, radiusKm, now);
+    const rows = await this.presence.onlineNearForPush(
+      'FOOD',
+      point,
+      radiusKm,
+      now,
+    );
     const inRange: Array<{ id: string; km: number }> = [];
     for (const row of rows) {
       if (row.userId === order.customerId) continue;
@@ -1211,7 +1686,9 @@ export class FoodService {
       }
       inRange.push({ id: row.userId, km });
     }
-    const unclaimedMinutes = await this.settings.getNumber('FOOD_UNCLAIMED_READY_TIMEOUT_MINUTES');
+    const unclaimedMinutes = await this.settings.getNumber(
+      'FOOD_UNCLAIMED_READY_TIMEOUT_MINUTES',
+    );
     return {
       driverIds: inRange.sort((a, b) => a.km - b.km).map((d) => d.id),
       order: {
@@ -1225,16 +1702,31 @@ export class FoodService {
   }
 
   /** The assigned driver hands the order back before pickup (back to the pool). */
-  async release(actor: RequestActor, orderId: string, reasonCode: string): Promise<PublicFoodOrder> {
+  async release(
+    actor: RequestActor,
+    orderId: string,
+    reasonCode: string,
+  ): Promise<PublicFoodOrder> {
     await this.requireActiveRole(actor.userId, 'DRIVER');
-    return publish(await this.unwrap(() => this.food.release(orderId, actor.userId, reasonCode)));
+    return publish(
+      await this.unwrap(() =>
+        this.food.release(orderId, actor.userId, reasonCode),
+      ),
+    );
   }
 
   /** Merchant never accepted / nobody claimed a ready order. */
-  async timeoutDue(now = new Date(), limit = 100): Promise<{ orderIds: string[] }> {
+  async timeoutDue(
+    now = new Date(),
+    limit = 100,
+  ): Promise<{ orderIds: string[] }> {
     const policy = {
-      merchantAcceptMinutes: await this.settings.getNumber('FOOD_MERCHANT_ACCEPT_TIMEOUT_MINUTES'),
-      unclaimedReadyMinutes: await this.settings.getNumber('FOOD_UNCLAIMED_READY_TIMEOUT_MINUTES'),
+      merchantAcceptMinutes: await this.settings.getNumber(
+        'FOOD_MERCHANT_ACCEPT_TIMEOUT_MINUTES',
+      ),
+      unclaimedReadyMinutes: await this.settings.getNumber(
+        'FOOD_UNCLAIMED_READY_TIMEOUT_MINUTES',
+      ),
     };
     const timedOut = await this.food.timeoutDue(now, policy, limit);
     // Unanswered merchant edits cancel the order (SYSTEM, CHANGE_EXPIRED).
@@ -1242,9 +1734,17 @@ export class FoodService {
     return { orderIds: [...timedOut.map((row) => row.orderId), ...expired] };
   }
 
-  private async cashPlan(order: FoodOrderView): Promise<NonNullable<PublicFoodOrder['cashPlan']>> {
-    const sharedPercent = await this.settings.getNumber('VOUCHER_SHARED_PLATFORM_PERCENT');
-    const platformFunded = platformFundedDiscountVnd(order.discountVnd, order.voucherSponsor, sharedPercent);
+  private async cashPlan(
+    order: FoodOrderView,
+  ): Promise<NonNullable<PublicFoodOrder['cashPlan']>> {
+    const sharedPercent = await this.settings.getNumber(
+      'VOUCHER_SHARED_PLATFORM_PERCENT',
+    );
+    const platformFunded = platformFundedDiscountVnd(
+      order.discountVnd,
+      order.voucherSponsor,
+      sharedPercent,
+    );
     const merchantFunded = Math.max(0, order.discountVnd - platformFunded);
     return {
       payMerchantVnd: Math.max(0, order.subtotalVnd - merchantFunded),
@@ -1253,29 +1753,64 @@ export class FoodService {
     };
   }
 
-  async pickup(actor: RequestActor, orderId: string, handoverCode?: string): Promise<PublicFoodOrder> {
+  async pickup(
+    actor: RequestActor,
+    orderId: string,
+    handoverCode?: string,
+  ): Promise<PublicFoodOrder> {
     await this.requireActiveRole(actor.userId, 'DRIVER');
     if (await this.settings.getBoolean('FOOD_HANDOVER_CODE_REQUIRED')) {
-      await this.verifyOrderCode(actor, orderId, 'HANDOVER', 'ASSIGNED', handoverCode);
+      await this.verifyOrderCode(
+        actor,
+        orderId,
+        'HANDOVER',
+        'ASSIGNED',
+        handoverCode,
+      );
     }
     // Snapshot the cash the driver hands the store, so a later FAILED order can
     // reimburse exactly that amount even if voucher settings change in between.
     const current = await this.food.findOrder(orderId);
     const snapshot = current
-      ? { merchantCashVnd: (await this.cashPlan(current)).payMerchantVnd, at: new Date() }
+      ? {
+          merchantCashVnd: (await this.cashPlan(current)).payMerchantVnd,
+          at: new Date(),
+        }
       : undefined;
-    return publish(await this.unwrap(() => this.food.pickup(orderId, actor.userId, snapshot)));
+    return publish(
+      await this.unwrap(() =>
+        this.food.pickup(orderId, actor.userId, snapshot),
+      ),
+    );
   }
 
-  async deliver(actor: RequestActor, orderId: string, deliveryCode?: string): Promise<PublicFoodOrder> {
+  async deliver(
+    actor: RequestActor,
+    orderId: string,
+    deliveryCode?: string,
+  ): Promise<PublicFoodOrder> {
     await this.requireActiveRole(actor.userId, 'DRIVER');
     if (await this.settings.getBoolean('FOOD_DELIVERY_CODE_REQUIRED')) {
-      await this.verifyOrderCode(actor, orderId, 'DELIVERY', 'PICKED_UP', deliveryCode);
+      await this.verifyOrderCode(
+        actor,
+        orderId,
+        'DELIVERY',
+        'PICKED_UP',
+        deliveryCode,
+      );
     }
     const feeBps = await this.earnings.currentFeeBps('FOOD_ORDER');
-    const sharedPercent = await this.settings.getNumber('VOUCHER_SHARED_PLATFORM_PERCENT');
+    const sharedPercent = await this.settings.getNumber(
+      'VOUCHER_SHARED_PLATFORM_PERCENT',
+    );
     const commissionBps = Math.round(
-      Math.max(0, Math.min(100, await this.settings.getNumber('FOOD_MERCHANT_COMMISSION_PERCENT'))) * 100,
+      Math.max(
+        0,
+        Math.min(
+          100,
+          await this.settings.getNumber('FOOD_MERCHANT_COMMISSION_PERCENT'),
+        ),
+      ) * 100,
     );
     // COD obligation, DealGo-funded discount, earnings and fee commit with the delivery itself.
     const order = await this.unwrap(() =>
@@ -1315,8 +1850,14 @@ export class FoodService {
         // (OPEN-018) Merchant commission on the food subtotal (GrabFood /
         // ShopeeFood charge the store a % of the basket). Snapshotted so statements never
         // re-price history; settled through MerchantSettlement, not at the door.
-        const commissionVnd = merchantCommissionVnd(delivered.subtotalVnd, commissionBps);
-        await this.food.snapshotCommissionWithin(tx, delivered.id, { commissionBps, commissionVnd });
+        const commissionVnd = merchantCommissionVnd(
+          delivered.subtotalVnd,
+          commissionBps,
+        );
+        await this.food.snapshotCommissionWithin(tx, delivered.id, {
+          commissionBps,
+          commissionVnd,
+        });
         if (commissionVnd > 0) {
           await this.ledger.postWithin(tx, 'MERCHANT_COMMISSION_ACCRUED', {
             entityType: 'FOOD_ORDER',
@@ -1356,11 +1897,7 @@ export class FoodService {
   ): Promise<PageResult<PublicFoodOrder>> {
     const safePage = normalizePage(page);
     const safeLimit = normalizeLimit(limit);
-    const result = await this.food.listOrdersPage(
-      safePage,
-      safeLimit,
-      filter,
-    );
+    const result = await this.food.listOrdersPage(safePage, safeLimit, filter);
     return {
       items: result.items.map(publish),
       page: safePage,
@@ -1421,31 +1958,14 @@ export class FoodService {
     return this.food.listCatalogModeration(query);
   }
 
-  async listStoreCategories(
-    query: OpsCatalogCategoriesQueryDto,
-  ): Promise<OpsCatalogCategoryPage> {
-    return this.food.listStoreCategories(query);
-  }
-
-  async renameStoreCategory(code: string, name: string) {
-    const trimmed = name.trim();
-    if (!trimmed) {
-      throw foodError(400, 'VALIDATION_ERROR', 'name must not be empty');
-    }
-    return this.food.renameStoreCategory(code, trimmed);
-  }
-
-  async getStoreCategory(code: string): Promise<OpsCatalogCategoryItem> {
-    const category = await this.food.findStoreCategoryByCode(code);
-    if (!category) {
-      throw foodError(404, 'FOOD_CATEGORY_NOT_FOUND', 'Catalog category not found');
-    }
-    return category;
-  }
-
   async approveCatalogItem(
     id: string,
-  ): Promise<{ success: boolean; id: string; available: boolean; moderationStatus: string }> {
+  ): Promise<{
+    success: boolean;
+    id: string;
+    available: boolean;
+    moderationStatus: string;
+  }> {
     const updated = await this.food.setCatalogModeration(id, 'APPROVED');
     if (!updated) {
       throw foodError(404, 'FOOD_ITEM_NOT_FOUND', 'Catalog item not found');
@@ -1460,7 +1980,12 @@ export class FoodService {
 
   async rejectCatalogItem(
     id: string,
-  ): Promise<{ success: boolean; id: string; available: boolean; moderationStatus: string }> {
+  ): Promise<{
+    success: boolean;
+    id: string;
+    available: boolean;
+    moderationStatus: string;
+  }> {
     const updated = await this.food.setCatalogModeration(id, 'REJECTED');
     if (!updated) {
       throw foodError(404, 'FOOD_ITEM_NOT_FOUND', 'Catalog item not found');
@@ -1493,17 +2018,30 @@ export class FoodService {
     input: { reasonCode: FoodFailReason; note?: string },
   ): Promise<PublicFoodOrder> {
     await this.requireActiveRole(actor.userId, 'DRIVER');
-    const note = input.note?.trim() ? input.note.trim().slice(0, FOOD_FAIL_NOTE_MAX) : null;
+    const note = input.note?.trim()
+      ? input.note.trim().slice(0, FOOD_FAIL_NOTE_MAX)
+      : null;
     if (input.reasonCode === 'OTHER' && !note) {
-      throw foodError(400, 'FOOD_FAIL_NOTE_REQUIRED', 'Describe the reason when choosing OTHER');
+      throw foodError(
+        400,
+        'FOOD_FAIL_NOTE_REQUIRED',
+        'Describe the reason when choosing OTHER',
+      );
     }
-    const minWaitMinutes = await this.settings.getNumber('FOOD_FAIL_MIN_WAIT_MINUTES');
+    const minWaitMinutes = await this.settings.getNumber(
+      'FOOD_FAIL_MIN_WAIT_MINUTES',
+    );
     return publish(
       await this.unwrap(() =>
         this.food.fail(
           orderId,
           actor.userId,
-          { reasonCode: input.reasonCode, note, minWaitMinutes, now: new Date() },
+          {
+            reasonCode: input.reasonCode,
+            note,
+            minWaitMinutes,
+            now: new Date(),
+          },
           async (tx, failed) => {
             const cash = failed.merchantCashVnd ?? 0;
             if (cash > 0) {
@@ -1524,10 +2062,16 @@ export class FoodService {
 
   async cancel(actor: RequestActor, orderId: string): Promise<PublicFoodOrder> {
     await this.requireActiveCustomer(actor.userId);
-    return publish(await this.unwrap(() => this.food.cancel(orderId, actor.userId)));
+    return publish(
+      await this.unwrap(() => this.food.cancel(orderId, actor.userId)),
+    );
   }
 
-  async opsCancel(actor: RequestActor, orderId: string, reason: string): Promise<PublicFoodOrder> {
+  async opsCancel(
+    actor: RequestActor,
+    orderId: string,
+    reason: string,
+  ): Promise<PublicFoodOrder> {
     const result = await this.unwrapIntervene(() =>
       this.food.opsCancel(orderId, actor.userId, reason),
     );
@@ -1535,7 +2079,11 @@ export class FoodService {
   }
 
   /** Clear assignment back to READY when status is ASSIGNED. */
-  async opsReassign(actor: RequestActor, orderId: string, reason: string): Promise<PublicFoodOrder> {
+  async opsReassign(
+    actor: RequestActor,
+    orderId: string,
+    reason: string,
+  ): Promise<PublicFoodOrder> {
     const result = await this.unwrapIntervene(() =>
       this.food.opsReassign(orderId, actor.userId, reason),
     );
@@ -1554,30 +2102,54 @@ export class FoodService {
     submitted: string | undefined,
   ): Promise<void> {
     const order = await this.unwrapNullable(() => this.food.findOrder(orderId));
-    if (!order || order.assignedDriverId !== actor.userId || order.status !== status) {
+    if (
+      !order ||
+      order.assignedDriverId !== actor.userId ||
+      order.status !== status
+    ) {
       return;
     }
-    const prefix = kind === 'DELIVERY' ? 'FOOD_DELIVERY_CODE' : 'FOOD_HANDOVER_CODE';
+    const prefix =
+      kind === 'DELIVERY' ? 'FOOD_DELIVERY_CODE' : 'FOOD_HANDOVER_CODE';
     const label = kind === 'DELIVERY' ? 'delivery' : 'handover';
     if (!submitted) {
       throw foodError(422, `${prefix}_REQUIRED`, `Enter the ${label} code`);
     }
-    const max = await this.settings.getNumber('FOOD_DELIVERY_CODE_MAX_ATTEMPTS');
+    const max = await this.settings.getNumber(
+      'FOOD_DELIVERY_CODE_MAX_ATTEMPTS',
+    );
     const record = await this.codes.ensure(orderId, kind, generatePickupCode());
     if (!(await this.codes.reserveAttempt(orderId, kind, max))) {
-      throw foodError(423, `${prefix}_LOCKED`, `Too many wrong ${label} codes; contact support`);
+      throw foodError(
+        423,
+        `${prefix}_LOCKED`,
+        `Too many wrong ${label} codes; contact support`,
+      );
     }
     if (!pickupCodeMatches(record.code, submitted)) {
-      throw foodError(422, `${prefix}_INVALID`, `The ${label} code does not match`);
+      throw foodError(
+        422,
+        `${prefix}_INVALID`,
+        `The ${label} code does not match`,
+      );
     }
     await this.codes.markVerified(orderId, kind, new Date());
   }
 
-  private async canRead(userId: string, order: FoodOrderView): Promise<boolean> {
-    if (order.customerId === userId && (await this.hasActiveGrant(userId, 'CUSTOMER'))) {
+  private async canRead(
+    userId: string,
+    order: FoodOrderView,
+  ): Promise<boolean> {
+    if (
+      order.customerId === userId &&
+      (await this.hasActiveGrant(userId, 'CUSTOMER'))
+    ) {
       return true;
     }
-    if (order.ownerId === userId && (await this.hasActiveGrant(userId, 'MERCHANT'))) {
+    if (
+      order.ownerId === userId &&
+      (await this.hasActiveGrant(userId, 'MERCHANT'))
+    ) {
       return true;
     }
     if (await this.hasActiveGrant(userId, 'DRIVER')) {
@@ -1599,7 +2171,7 @@ export class FoodService {
    * Production never auto-creates stores or merchants.
    */
   private async ensureSandboxFixtureCatalog(): Promise<void> {
-    if (await this.food.hasStore() || !this.sandbox()) {
+    if ((await this.food.hasStore()) || !this.sandbox()) {
       return;
     }
     const owner = await this.fixtureMerchant();
@@ -1659,18 +2231,30 @@ export class FoodService {
         return;
       }
     }
-    throw foodError(403, 'ROLE_NOT_ACTIVE', 'An active customer role is required');
+    throw foodError(
+      403,
+      'ROLE_NOT_ACTIVE',
+      'An active customer role is required',
+    );
   }
 
-  private async requireActiveRole(userId: string, role: Extract<RoleName, 'MERCHANT' | 'DRIVER'>): Promise<void> {
+  private async requireActiveRole(
+    userId: string,
+    role: Extract<RoleName, 'MERCHANT' | 'DRIVER'>,
+  ): Promise<void> {
     if (!(await this.hasActiveGrant(userId, role))) {
       throw foodError(403, 'ROLE_NOT_ACTIVE', 'An active role is required');
     }
   }
 
-  private async hasActiveGrant(userId: string, role: Extract<RoleName, 'CUSTOMER' | 'MERCHANT' | 'DRIVER'>): Promise<boolean> {
+  private async hasActiveGrant(
+    userId: string,
+    role: Extract<RoleName, 'CUSTOMER' | 'MERCHANT' | 'DRIVER'>,
+  ): Promise<boolean> {
     const grants = await this.identity.listGrants(userId);
-    return grants.some((grant) => grant.role === role && grant.status === 'ACTIVE');
+    return grants.some(
+      (grant) => grant.role === role && grant.status === 'ACTIVE',
+    );
   }
 
   private sandbox(): boolean {
@@ -1707,7 +2291,11 @@ export class FoodService {
       return;
     }
     if (store.lat == null || store.lng == null) {
-      throw foodError(409, 'FOOD_STORE_LOCATION_REQUIRED', 'This store is not taking delivery orders yet');
+      throw foodError(
+        409,
+        'FOOD_STORE_LOCATION_REQUIRED',
+        'This store is not taking delivery orders yet',
+      );
     }
     await this.assertInServiceZone(dropoff);
     const maxKm = await this.settings.getNumber('FOOD_MAX_DELIVERY_KM');
@@ -1715,17 +2303,28 @@ export class FoodService {
       return;
     }
     if (haversineKm({ lat: store.lat, lng: store.lng }, dropoff) > maxKm) {
-      throw foodError(422, 'FOOD_TOO_FAR', `Drop-off is more than ${maxKm} km from the store`);
+      throw foodError(
+        422,
+        'FOOD_TOO_FAR',
+        `Drop-off is more than ${maxKm} km from the store`,
+      );
     }
   }
 
   /** Same zone rule as rides (SERVICE_ZONE_ENFORCED). */
-  private async assertInServiceZone(point: { lat: number; lng: number }): Promise<void> {
+  private async assertInServiceZone(point: {
+    lat: number;
+    lng: number;
+  }): Promise<void> {
     if (!(await this.settings.getBoolean('SERVICE_ZONE_ENFORCED'))) {
       return;
     }
     if (!activeRegionCodeAt(point.lat, point.lng)) {
-      throw foodError(422, 'FOOD_OUTSIDE_SERVICE_ZONE', 'DealGo does not serve this area yet');
+      throw foodError(
+        422,
+        'FOOD_OUTSIDE_SERVICE_ZONE',
+        'DealGo does not serve this area yet',
+      );
     }
   }
 
@@ -1786,7 +2385,10 @@ export class FoodService {
     }
   }
 
-  private async recordSandboxCodIntent(entityId: string, amountVnd: number): Promise<void> {
+  private async recordSandboxCodIntent(
+    entityId: string,
+    amountVnd: number,
+  ): Promise<void> {
     try {
       await this.payments.createSandboxIntent({
         entityType: 'FOOD_ORDER',
@@ -1820,7 +2422,9 @@ export class FoodService {
     }
   }
 
-  private async unwrapNullable(work: () => Promise<FoodOrderView | null>): Promise<FoodOrderView | null> {
+  private async unwrapNullable(
+    work: () => Promise<FoodOrderView | null>,
+  ): Promise<FoodOrderView | null> {
     try {
       return await work();
     } catch (error) {
@@ -1848,11 +2452,17 @@ export class FoodService {
 }
 
 /** Commission in whole VND (rounded half up), never above the subtotal. */
-export function merchantCommissionVnd(subtotalVnd: number, commissionBps: number): number {
+export function merchantCommissionVnd(
+  subtotalVnd: number,
+  commissionBps: number,
+): number {
   if (!(subtotalVnd > 0) || !(commissionBps > 0)) {
     return 0;
   }
-  return Math.min(subtotalVnd, Math.round((subtotalVnd * commissionBps) / 10_000));
+  return Math.min(
+    subtotalVnd,
+    Math.round((subtotalVnd * commissionBps) / 10_000),
+  );
 }
 
 function publish(order: FoodOrderView): PublicFoodOrder {
@@ -1900,4 +2510,3 @@ function toOpsStoreView(store: OpsStoreDetail): OpsStoreView {
 }
 
 export { FoodService as FoodOrderService };
-

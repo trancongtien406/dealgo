@@ -19,6 +19,7 @@ import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
 import '../utils/driver_routes.dart';
 import '../widgets/driver_widgets.dart';
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 
 enum _EarnRange { today, week }
 
@@ -67,7 +68,6 @@ class _DriverEarningsViewState extends State<_DriverEarningsView> {
     final state = context.watch<DriverHistoryCubit>().state;
     return DriverPageFrame(
       title: l10n.drvHistTitle,
-      subtitle: l10n.drvHistSubtitle,
       showBack: false,
       body: _body(context, state),
     );
@@ -79,7 +79,7 @@ class _DriverEarningsViewState extends State<_DriverEarningsView> {
     final summary = state.summary;
     if (state.status == DriverHistoryStatus.failed && summary == null) {
       return ListView(
-        padding: _padding,
+        padding: dealGoScrollPadding(context, _padding),
         children: [
           DealGoStateView.failure(
             context,
@@ -102,7 +102,7 @@ class _DriverEarningsViewState extends State<_DriverEarningsView> {
       child: ListView(
         key: const Key('driver-history-list'),
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: _padding,
+        padding: dealGoScrollPadding(context, _padding),
         children: [
           DealGoSegmentedControl(
             value: _range.name,
@@ -331,13 +331,6 @@ class _Hero extends StatelessWidget {
               style: textTheme.bodyMedium?.copyWith(
                 color: DealGoColors.card,
                 fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              l10n.drvHistNetNote,
-              style: textTheme.bodySmall?.copyWith(
-                color: DealGoColors.card.withValues(alpha: 0.85),
               ),
             ),
           ],

@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 const useMockData = bool.fromEnvironment('USE_MOCK_DATA', defaultValue: false);
 
 /// Optional map provider key, substituted into `{key}` of [mapTileUrl].
@@ -14,7 +16,27 @@ const mapAttribution = String.fromEnvironment(
   defaultValue: '',
 );
 
-/// Default Mapbox Streets raster XYZ template when only `MAPS_API_KEY` is set.
+/// Mapbox public token set in Admin › Bản đồ, resolved by `MapsClientConfig`
+/// under the native splash (cache first, network on first launch) and kept
+/// fresh in the background. Wins over [mapsApiKey] for Mapbox tiles; empty →
+/// the build-time key. Map pages rebuild when it changes.
+final ValueNotifier<String> adminMapboxTokenListenable = ValueNotifier('');
+
+String get adminMapboxToken => adminMapboxTokenListenable.value;
+set adminMapboxToken(String value) => adminMapboxTokenListenable.value = value;
+
+/// Key filled into `{key}`: the Admin Mapbox token for Mapbox tiles, else
+/// `MAPS_API_KEY`.
+String get effectiveMapsApiKey {
+  final custom = mapTileUrl.trim();
+  final mapboxTiles = custom.isEmpty || custom.contains('api.mapbox.com');
+  if (mapboxTiles && adminMapboxToken.isNotEmpty) {
+    return adminMapboxToken;
+  }
+  return mapsApiKey;
+}
+
+/// Default Mapbox Streets raster XYZ template when only a key is set.
 /// Matches Admin web (`256` + `@2x`) for crisp tiles on phone screens.
 const mapboxStreetsTileUrl =
     'https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token={key}';
@@ -27,7 +49,7 @@ String get effectiveMapTileUrl {
   if (trimmed.isNotEmpty) {
     return trimmed;
   }
-  if (mapsApiKey.trim().isNotEmpty) {
+  if (effectiveMapsApiKey.trim().isNotEmpty) {
     return mapboxStreetsTileUrl;
   }
   return '';
@@ -48,7 +70,8 @@ String get effectiveMapAttribution {
 /// True when a usable live tile source is configured.
 bool get useLiveMaps =>
     !useMockData &&
-    resolveTileUrlTemplate(effectiveMapTileUrl, apiKey: mapsApiKey) != null;
+    resolveTileUrlTemplate(effectiveMapTileUrl, apiKey: effectiveMapsApiKey) !=
+        null;
 
 /// Validates a tile template and fills `{key}`; null when unusable (missing
 /// `{z}/{x}/{y}`, not https, or `{key}` required but no key given).

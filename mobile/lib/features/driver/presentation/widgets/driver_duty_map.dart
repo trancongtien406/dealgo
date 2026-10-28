@@ -123,7 +123,7 @@ class _DriverDutyMapState extends State<DriverDutyMap> {
           children: [
             // A preview card inside a scrolling page: let the page scroll.
             IgnorePointer(
-              child: context.read<MapPort>().buildMap(
+              child: context.watch<MapPort>().buildMap(
                 key: const ValueKey('driver-duty-map-port'),
                 center: fix ?? danangViewportCenter,
                 driver: fix,

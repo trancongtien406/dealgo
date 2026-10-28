@@ -12,6 +12,7 @@ import '../../../food/domain/entities/food_models.dart';
 import '../../domain/usecases/get_merchant_catalog.dart';
 import '../../domain/usecases/update_store_service_mode.dart';
 import '../widgets/merchant_widgets.dart';
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 
 /// Auto-resume presets the backend accepts (DEC-PROD-026); null = manual.
 const merchantResumePresets = <int?>[30, 60, 120, null];
@@ -159,7 +160,7 @@ class _MerchantBusyPageState extends State<MerchantBusyPage> {
     final accepting = _mode != StoreServiceMode.paused;
     final until = store.serviceModeUntil;
     return ListView(
-      padding: merchantPagePadding,
+      padding: dealGoScrollPadding(context, merchantPagePadding),
       children: [
         Text(
           l10n.merchantBusyEyebrow,
@@ -171,8 +172,6 @@ class _MerchantBusyPageState extends State<MerchantBusyPage> {
         ),
         const SizedBox(height: DealGoSpacing.s4),
         Text(l10n.merchantBusyHeading, style: textTheme.headlineSmall),
-        const SizedBox(height: DealGoSpacing.s4),
-        Text(l10n.merchantBusyIntro, style: textTheme.bodySmall),
         const SizedBox(height: DealGoSpacing.s16),
         MerchantPanel(
           color: accepting
@@ -334,7 +333,6 @@ class _MerchantBusyPageState extends State<MerchantBusyPage> {
           ),
           const SizedBox(height: DealGoSpacing.s12),
         ],
-        MerchantNote(message: l10n.merchantBusyPolicyNote),
         if (_saveError case final error?) ...[
           const SizedBox(height: DealGoSpacing.s12),
           Text(

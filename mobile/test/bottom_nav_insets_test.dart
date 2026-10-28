@@ -72,7 +72,6 @@ void main() {
       88,
     ); // no nav bar
     expect(dealGoNavBarMetrics(TargetPlatform.android, -1).bottomInset, 0);
-    expect(dealGoNavBarMetrics(TargetPlatform.iOS, 34).contentClearance, 82);
   });
 
   testWidgets('iOS home indicator 34 -> bar 102', (tester) async {

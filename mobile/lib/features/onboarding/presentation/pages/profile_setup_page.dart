@@ -11,12 +11,15 @@ import '../../../../core/design_system/components/dealgo_date_time_picker.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/drafts/text_draft.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/permissions/app_permission_service.dart';
 import '../../../identity/domain/entities/app_role.dart';
+import '../../../identity/domain/entities/auth_method_policy.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/domain/entities/user_profile.dart';
 import '../../../identity/domain/repositories/identity_repository.dart';
+import '../../../identity/presentation/auth_methods_store.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
 import '../../../identity/presentation/widgets/auth_widgets.dart';
 import '../avatar_image_source.dart';
@@ -40,7 +43,8 @@ class ProfileSetupPage extends StatefulWidget {
   State<ProfileSetupPage> createState() => _ProfileSetupPageState();
 }
 
-class _ProfileSetupPageState extends State<ProfileSetupPage> {
+class _ProfileSetupPageState extends State<ProfileSetupPage>
+    with TextDraftMixin {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   DateTime? _selectedDob;
@@ -59,6 +63,11 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     if (auth is AuthSignedIn) {
       _avatarUrl = auth.profile.avatarUrl;
     }
+    // Name/email typed before an app kill come back on the next launch.
+    bindTextDraft('profile.setup', {
+      'name': _nameController,
+      'email': _emailController,
+    });
   }
 
   @override
@@ -107,7 +116,11 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       final repo = _maybeRepo();
       if (auth != null && repo != null && auth.state is AuthSignedIn) {
         final token = (auth.state as AuthSignedIn).tokens.accessToken;
-        final email = _emailController.text.trim();
+        // Email is a sign-in method: only collected while it is switched on.
+        final email =
+            authMethodEnabled(context, AuthMethodPolicy.email, listen: false)
+            ? _emailController.text.trim()
+            : '';
         final dob = _selectedDob;
         final updated = await repo.updateMe(
           accessToken: token,
@@ -122,6 +135,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         );
         await auth.applyUpdatedProfile(updated);
       }
+      clearTextDraft();
       if (!mounted) {
         return;
       }
@@ -141,8 +155,11 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         return;
       }
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error.toString())));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(apiErrorText(AppLocalizations.of(context), error)),
+        ),
+      );
     }
   }
 
@@ -236,13 +253,17 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         return;
       }
       setState(() => _uploadingAvatar = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error.toString())));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(apiErrorText(AppLocalizations.of(context), error)),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final canSubmit = _nameController.text.trim().isNotEmpty && !_submitting;
 
     return Scaffold(
@@ -252,19 +273,18 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(
-                horizontal: DealGoDimensions.pageGutter,
-                vertical: DealGoSpacing.s8,
+                horizontal: DealGoSpacing.s8,
+                vertical: DealGoSpacing.s4,
               ),
               child: Row(
                 children: [
                   if (Navigator.of(context).canPop())
                     AuthBackButton(onPressed: () => Navigator.of(context).pop())
                   else
-                    const SizedBox(width: DealGoDimensions.minTapTarget),
+                    const SizedBox(width: DealGoSpacing.s8),
                   Expanded(
                     child: Text(
-                      AppLocalizations.of(context).profileSetupTitle,
-                      textAlign: TextAlign.center,
+                      l10n.profileSetupTitle,
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -272,7 +292,24 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: DealGoDimensions.minTapTarget),
+                  TextButton(
+                    key: const Key('profile-skip'),
+                    onPressed: _submitting ? null : _onSkip,
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(
+                        DealGoDimensions.minTapTarget,
+                        DealGoDimensions.minTapTarget,
+                      ),
+                    ),
+                    child: Text(
+                      l10n.profileLater,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF6D28D9),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -281,337 +318,60 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(
                   DealGoDimensions.pageGutter,
-                  0,
-                  DealGoDimensions.pageGutter,
                   DealGoSpacing.s8,
+                  DealGoDimensions.pageGutter,
+                  DealGoSpacing.s16,
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(16, 16, 10, 16),
-                      decoration: BoxDecoration(
-                        color: DealGoColors.subtlePurple,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: const Color(0xFF6D28D9)
-                              .withValues(alpha: 0.12),
-                        ),
+                    Center(child: _avatarPicker(l10n)),
+                    const SizedBox(height: 20),
+                    DealGoTextField(
+                      fieldKey: const Key('name-field'),
+                      label: l10n.profileFullName,
+                      controller: _nameController,
+                      onChanged: (_) => setState(() {}),
+                      prefixIcon: DealGoIcons.user,
+                      textCapitalization: TextCapitalization.words,
+                    ),
+                    if (authMethodEnabled(context, AuthMethodPolicy.email)) ...[
+                      const SizedBox(height: 12),
+                      DealGoTextField(
+                        fieldKey: const Key('email-field'),
+                        label: 'Email',
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        prefixIcon: DealGoIcons.mail,
                       ),
+                    ],
+                    const SizedBox(height: 12),
+                    DealGoDateField(
+                      label: l10n.profileBirthdayOptional,
+                      value: _selectedDob,
+                      firstDate: DateTime(1920),
+                      lastDate: DateTime.now(),
+                      onChanged: (picked) =>
+                          setState(() => _selectedDob = picked),
+                    ),
+                    const SizedBox(height: 12),
+                    _FormField(
+                      label: l10n.profileGender,
                       child: Row(
                         children: [
-                          Expanded(
-                            flex: 6,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  AppLocalizations.of(context)
-                                      .profileSetupHeadline,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF4338CA),
-                                    height: 1.25,
-                                    letterSpacing: -0.3,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text.rich(
-                                  TextSpan(
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w400,
-                                      color: Color(0xFF475569),
-                                      height: 1.35,
-                                    ),
-                                    children: [
-                                      TextSpan(
-                                        text: AppLocalizations.of(context)
-                                            .profileSetupLead,
-                                      ),
-                                      const TextSpan(
-                                        text: 'Deal',
-                                        style: TextStyle(
-                                          color: Color(0xFF6D28D9),
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      const TextSpan(
-                                        text: 'Go',
-                                        style: TextStyle(
-                                          color: Color(0xFF10B981),
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      const TextSpan(text: '.'),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                          for (final option in Gender.values) ...[
+                            if (option != Gender.male) const SizedBox(width: 8),
+                            Expanded(
+                              child: _GenderPill(
+                                label: _genderLabel(l10n, option),
+                                icon: _genderIcon(option),
+                                color: _genderColor(option),
+                                selected: _selectedGender == option,
+                                onTap: () =>
+                                    setState(() => _selectedGender = option),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            flex: 5,
-                            child: Image.asset(
-                              'assets/images/hero_dealgo_danang.png',
-                              height: 108,
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const Icon(
-                                    DealGoIcons.stars,
-                                    size: 48,
-                                    color: Color(0xFF6D28D9),
-                                  ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(18, 22, 18, 18),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(28),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 18,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          GestureDetector(
-                            onTap: () => unawaited(_onAvatarTap()),
-                            behavior: HitTestBehavior.opaque,
-                            child: Column(
-                              children: [
-                                Stack(
-                                  alignment: Alignment.bottomRight,
-                                  children: [
-                                    Container(
-                                      width: 92,
-                                      height: 92,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFEDE9FE),
-                                        shape: BoxShape.circle,
-                                        image: _avatarPreview != null
-                                            ? DecorationImage(
-                                                image: MemoryImage(
-                                                  _avatarPreview!,
-                                                ),
-                                                fit: BoxFit.cover,
-                                              )
-                                            : resolveMediaUrl(_avatarUrl) !=
-                                                  null
-                                            ? DecorationImage(
-                                                image: NetworkImage(
-                                                  resolveMediaUrl(_avatarUrl)!,
-                                                ),
-                                                fit: BoxFit.cover,
-                                              )
-                                            : null,
-                                      ),
-                                      child:
-                                          _avatarPreview == null &&
-                                              resolveMediaUrl(_avatarUrl) ==
-                                                  null
-                                          ? const Center(
-                                              child: Icon(
-                                                DealGoIcons.user,
-                                                size: 52,
-                                                color: Color(0xFF8B5CF6),
-                                              ),
-                                            )
-                                          : (_uploadingAvatar
-                                                ? Container(
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.black
-                                                          .withValues(
-                                                            alpha: 0.35,
-                                                          ),
-                                                      shape: BoxShape.circle,
-                                                    ),
-                                                    child: const Center(
-                                                      child: SizedBox(
-                                                        width: 22,
-                                                        height: 22,
-                                                        child:
-                                                            CircularProgressIndicator(
-                                                              strokeWidth: 2,
-                                                              color:
-                                                                  Colors.white,
-                                                            ),
-                                                      ),
-                                                    ),
-                                                  )
-                                                : null),
-                                    ),
-                                    Container(
-                                      width: 30,
-                                      height: 30,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF6D28D9),
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: Colors.white,
-                                          width: 2,
-                                        ),
-                                      ),
-                                      child: const Center(
-                                        child: Icon(
-                                          DealGoIcons.camera,
-                                          size: 14,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  AppLocalizations.of(context)
-                                      .profileAvatarOptional,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF0F172A),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          DealGoTextField(
-                            fieldKey: const Key('name-field'),
-                            label: AppLocalizations.of(context).profileFullName,
-                            controller: _nameController,
-                            onChanged: (_) => setState(() {}),
-                            prefixIcon: DealGoIcons.user,
-                            textCapitalization: TextCapitalization.words,
-                          ),
-                          const SizedBox(height: 16),
-                          DealGoTextField(
-                            fieldKey: const Key('email-field'),
-                            label: 'Email',
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            prefixIcon: DealGoIcons.mail,
-                          ),
-                          const SizedBox(height: 16),
-                          DealGoDateField(
-                            label: AppLocalizations.of(context)
-                                .profileBirthdayOptional,
-                            value: _selectedDob,
-                            firstDate: DateTime(1920),
-                            lastDate: DateTime.now(),
-                            onChanged: (picked) =>
-                                setState(() => _selectedDob = picked),
-                          ),
-                          const SizedBox(height: 16),
-                          _FormField(
-                            label: AppLocalizations.of(context).profileGender,
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: _GenderPill(
-                                    label: AppLocalizations.of(context)
-                                        .profileGenderMale,
-                                    icon: DealGoIcons.male,
-                                    color: const Color(0xFF6D28D9),
-                                    selected: _selectedGender == Gender.male,
-                                    onTap: () => setState(
-                                      () => _selectedGender = Gender.male,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: _GenderPill(
-                                    label: AppLocalizations.of(context)
-                                        .profileGenderFemale,
-                                    icon: DealGoIcons.female,
-                                    color: const Color(0xFFEC4899),
-                                    selected: _selectedGender == Gender.female,
-                                    onTap: () => setState(
-                                      () => _selectedGender = Gender.female,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: _GenderPill(
-                                    label: AppLocalizations.of(context)
-                                        .profileGenderOther,
-                                    icon: DealGoIcons.genderOther,
-                                    color: const Color(0xFF10B981),
-                                    selected: _selectedGender == Gender.other,
-                                    onTap: () => setState(
-                                      () => _selectedGender = Gender.other,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 12,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF5F3FF),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  DealGoIcons.info,
-                                  size: 18,
-                                  color: Color(0xFF6D28D9),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text.rich(
-                                    TextSpan(
-                                      style: const TextStyle(
-                                        fontSize: 12.5,
-                                        color: Color(0xFF475569),
-                                        height: 1.35,
-                                      ),
-                                      children: [
-                                        TextSpan(
-                                          text: AppLocalizations.of(context)
-                                              .profilePersonalizeNote,
-                                        ),
-                                        const TextSpan(
-                                          text: 'Deal',
-                                          style: TextStyle(
-                                            color: Color(0xFF6D28D9),
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                        const TextSpan(
-                                          text: 'Go',
-                                          style: TextStyle(
-                                            color: Color(0xFF10B981),
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                        const TextSpan(text: '.'),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
@@ -626,28 +386,84 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                 DealGoDimensions.pageGutter,
                 DealGoSpacing.s16,
               ),
-              child: Column(
-                children: [
-                  DealGoPrimaryButton(
-                    label: AppLocalizations.of(context).profileDone,
-                    trailingIcon: DealGoIcons.arrowRight,
-                    isLoading: _submitting,
-                    enabled: canSubmit,
-                    onPressed: _onSubmit,
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: _onSkip,
-                    child: Text(
-                      AppLocalizations.of(context).profileLater,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF3B82F6),
+              child: DealGoPrimaryButton(
+                label: l10n.profileDone,
+                trailingIcon: DealGoIcons.arrowRight,
+                isLoading: _submitting,
+                enabled: canSubmit,
+                onPressed: _onSubmit,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _avatarPicker(AppLocalizations l10n) {
+    final remote = resolveMediaUrl(_avatarUrl);
+    final ImageProvider? image = _avatarPreview != null
+        ? MemoryImage(_avatarPreview!)
+        : remote != null
+        ? NetworkImage(remote)
+        : null;
+    return Semantics(
+      button: true,
+      label: l10n.profileAvatarOptional,
+      child: InkWell(
+        key: const Key('avatar-picker'),
+        onTap: _uploadingAvatar ? null : () => unawaited(_onAvatarTap()),
+        customBorder: const CircleBorder(),
+        child: Stack(
+          alignment: Alignment.bottomRight,
+          children: [
+            Container(
+              width: 84,
+              height: 84,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEDE9FE),
+                shape: BoxShape.circle,
+                image: image == null
+                    ? null
+                    : DecorationImage(image: image, fit: BoxFit.cover),
+              ),
+              child: image == null
+                  ? const Icon(
+                      DealGoIcons.user,
+                      size: 44,
+                      color: Color(0xFF8B5CF6),
+                    )
+                  : _uploadingAvatar
+                  ? DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        shape: BoxShape.circle,
                       ),
-                    ),
-                  ),
-                ],
+                      child: const Center(
+                        child: SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    )
+                  : null,
+            ),
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: const Color(0xFF6D28D9),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: const Icon(
+                DealGoIcons.camera,
+                size: 14,
+                color: Colors.white,
               ),
             ),
           ],
@@ -656,6 +472,24 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     );
   }
 }
+
+String _genderLabel(AppLocalizations l10n, Gender gender) => switch (gender) {
+  Gender.male => l10n.profileGenderMale,
+  Gender.female => l10n.profileGenderFemale,
+  Gender.other => l10n.profileGenderOther,
+};
+
+IconData _genderIcon(Gender gender) => switch (gender) {
+  Gender.male => DealGoIcons.male,
+  Gender.female => DealGoIcons.female,
+  Gender.other => DealGoIcons.genderOther,
+};
+
+Color _genderColor(Gender gender) => switch (gender) {
+  Gender.male => const Color(0xFF6D28D9),
+  Gender.female => const Color(0xFFEC4899),
+  Gender.other => const Color(0xFF10B981),
+};
 
 class _FormField extends StatelessWidget {
   const _FormField({required this.label, required this.child});

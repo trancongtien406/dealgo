@@ -15,16 +15,18 @@ import { MemoryAuthMethodPolicyRepository } from './auth-method.repository.js';
 const webauthn = { WEBAUTHN_RP_ID: 'dealgo.vn', WEBAUTHN_RP_NAME: 'DealGo', WEBAUTHN_ORIGIN: 'https://dealgo.vn' };
 const actor = '11111111-1111-1111-1111-111111111111';
 const status = (ready: Partial<Record<AuthMethodName, boolean>>) =>
-  ({ isAvailable: (method: AuthMethodName) => ready[method] ?? true }) as AuthMethodProviderStatus;
+  ({ isAvailable: async (method: AuthMethodName) => ready[method] ?? true }) as AuthMethodProviderStatus;
 const config = (nodeEnv: string) => ({ get: () => nodeEnv }) as never;
 
 describe('authMethodProviderAvailable', () => {
-  it('reflects SMS, mail and WebAuthn configuration', () => {
+  it('reflects SMS, mail and WebAuthn configuration', async () => {
     const ok = { sms: new MockSmsSender('test'), mail: new MockMailSender('test'), env: webauthn };
     const none = { sms: new UnavailableSmsSender(), mail: new UnavailableMailSender(), env: { ...webauthn, WEBAUTHN_ORIGIN: undefined } };
     for (const method of ['PHONE_SMS', 'EMAIL_LOGIN_IDENTIFIER', 'PASSKEY'] as const) {
-      expect(authMethodProviderAvailable(method, ok as never)).toBe(true);
-      expect(authMethodProviderAvailable(method, none as never)).toBe(false);
+      for (const purpose of ['enable', 'boot'] as const) {
+        expect(await authMethodProviderAvailable(method, purpose, ok as never)).toBe(true);
+        expect(await authMethodProviderAvailable(method, purpose, none as never)).toBe(false);
+      }
     }
   });
 });

@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'food_category_tile.dart';
 import '../../../../core/config/api_base_url.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
 import '../../domain/entities/food_money.dart';
-import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../../core/design_system/components/dealgo_network_image.dart';
 
 String? currentAccessToken(BuildContext context) {
   final auth = context.read<AuthCubit>().state;
@@ -57,44 +58,53 @@ class FoodCoverImage extends StatelessWidget {
   const FoodCoverImage({
     this.imageUrl,
     this.height = 180,
+    this.aspectRatio,
     this.badge,
+    this.placeholderAsset = foodPlaceholderImage,
     super.key,
   });
 
   final String? imageUrl;
   final double height;
+
+  /// Width / height of the frame. When set it wins over [height], so the
+  /// photo keeps the same shape on every screen width.
+  final double? aspectRatio;
   final Widget? badge;
+  final String placeholderAsset;
 
   @override
   Widget build(BuildContext context) {
     final resolved = resolveMediaUrl(imageUrl);
     final radius = BorderRadius.circular(DealGoRadius.card);
-    final placeholder = ColoredBox(
-      color: DealGoColors.amberSurface,
-      child: SizedBox(
-        height: height,
-        width: double.infinity,
-        child: const Icon(
-          DealGoIcons.food,
-          color: DealGoColors.amber,
-          size: 64,
-        ),
+    final double? h = aspectRatio == null ? height : null;
+    final placeholder = Image.asset(
+      placeholderAsset,
+      height: h ?? double.infinity,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stack) => ColoredBox(
+        color: DealGoColors.amberSurface,
+        child: SizedBox(height: h, width: double.infinity),
       ),
     );
     final image = resolved == null || resolved.isEmpty
         ? placeholder
-        : Image.network(
+        : DealGoNetworkImage(
             resolved,
-            height: height,
+            height: h ?? double.infinity,
             width: double.infinity,
             fit: BoxFit.cover,
-            errorBuilder: (context, error, stack) => placeholder,
+            fallback: placeholder,
           );
     return ClipRRect(
       borderRadius: radius,
       child: Stack(
         children: [
-          SizedBox(height: height, width: double.infinity, child: image),
+          if (aspectRatio != null)
+            AspectRatio(aspectRatio: aspectRatio!, child: image)
+          else
+            SizedBox(height: height, width: double.infinity, child: image),
           if (badge != null)
             Positioned(
               right: DealGoSpacing.s12,
@@ -184,13 +194,15 @@ class FoodMoneyRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
+            flex: 3,
             child: Text(
               label,
               style: emphasize ? textTheme.titleMedium : textTheme.bodyMedium,
             ),
           ),
           const SizedBox(width: DealGoSpacing.s8),
-          Flexible(
+          Expanded(
+            flex: 2,
             child: Text(amount, style: valueStyle, textAlign: TextAlign.end),
           ),
         ],
@@ -274,28 +286,37 @@ class FoodStatusChip extends StatelessWidget {
   }
 }
 
+/// Hero tag shared by a menu row's photo and the item options cover.
+String foodItemHeroTag(String itemId) => 'food-item-photo-$itemId';
+
 class FoodThumb extends StatelessWidget {
-  const FoodThumb({this.size = 56, this.imageUrl, super.key});
+  const FoodThumb({
+    this.size = 56,
+    this.imageUrl,
+    this.placeholderAsset = foodPlaceholderImage,
+    super.key,
+  });
 
   final double size;
   final String? imageUrl;
+
+  /// Bundled photo while the dish has no picture (e.g. its category photo).
+  final String placeholderAsset;
 
   @override
   Widget build(BuildContext context) {
     final resolved = resolveMediaUrl(imageUrl);
     final radius = BorderRadius.circular(DealGoRadius.input);
-    final placeholder = DecoratedBox(
-      decoration: BoxDecoration(
-        color: DealGoColors.amberSurface,
-        borderRadius: radius,
-      ),
-      child: SizedBox(
+    final placeholder = ClipRRect(
+      borderRadius: radius,
+      child: Image.asset(
+        placeholderAsset,
         width: size,
         height: size,
-        child: Icon(
-          DealGoIcons.food,
-          color: DealGoColors.amber,
-          size: size * 0.46,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stack) => ColoredBox(
+          color: DealGoColors.amberSurface,
+          child: SizedBox(width: size, height: size),
         ),
       ),
     );
@@ -304,12 +325,12 @@ class FoodThumb extends StatelessWidget {
     }
     return ClipRRect(
       borderRadius: radius,
-      child: Image.network(
+      child: DealGoNetworkImage(
         resolved,
         width: size,
         height: size,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stack) => placeholder,
+        fallback: placeholder,
       ),
     );
   }
@@ -371,6 +392,7 @@ class FoodLineSummary extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(width: DealGoSpacing.s8),
           Text(
             formatVnd(lineTotalVnd),
             style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),

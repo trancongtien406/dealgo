@@ -477,7 +477,7 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
                           trip: ride.route,
                           approachSeed: ride.approachRoute,
                           builder: (context, route) =>
-                              context.read<MapPort>().buildMap(
+                              context.watch<MapPort>().buildMap(
                                 // Pins are bottom-anchored (~44 px tall): extra top room so they
                                 // never touch the card edge on the small inline map.
                                 fitPadding: const EdgeInsets.fromLTRB(

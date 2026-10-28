@@ -5,6 +5,7 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../core/network/api_paths.dart';
 import '../../../../core/network/dio_mapper.dart';
 import '../../domain/entities/available_voucher.dart';
+import '../../domain/entities/voucher_discount.dart';
 import '../../domain/entities/voucher_quote.dart';
 
 abstract interface class PromotionRemoteDataSource {
@@ -20,6 +21,7 @@ abstract interface class PromotionRemoteDataSource {
   Future<List<AvailableVoucher>> listAvailable({
     required String accessToken,
     VoucherService? service,
+    String? storeId,
   });
 }
 
@@ -59,11 +61,12 @@ class DioPromotionRemoteDataSource implements PromotionRemoteDataSource {
   Future<List<AvailableVoucher>> listAvailable({
     required String accessToken,
     VoucherService? service,
+    String? storeId,
   }) async {
     try {
       final response = await dio.get<Object?>(
         ApiPaths.promotionsAvailable,
-        queryParameters: {'serviceType': ?service?.wire},
+        queryParameters: {'serviceType': ?service?.wire, 'storeId': ?storeId},
         options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       );
       return decodeAvailableVouchers(readSuccessPayload(response.data));
@@ -204,7 +207,7 @@ class FakePromotionRemoteDataSource implements PromotionRemoteDataSource {
         rejectCode: 'VOUCHER_NOT_FOUND',
       );
     }
-    final discount = (orderAmountVnd * 0.1).round().clamp(0, 20000);
+    final discount = percentVoucherDiscountVnd(orderAmountVnd, 10, 20000);
     return VoucherQuote(
       valid: true,
       code: normalized,
@@ -218,6 +221,7 @@ class FakePromotionRemoteDataSource implements PromotionRemoteDataSource {
   Future<List<AvailableVoucher>> listAvailable({
     required String accessToken,
     VoucherService? service,
+    String? storeId,
   }) async {
     final failure = error;
     if (failure != null) {

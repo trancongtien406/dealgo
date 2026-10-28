@@ -37,4 +37,23 @@ void main() {
     expect(metadata['shopLat'], 16.06);
     expect(metadata['shopLng'], 108.22);
   });
+
+  test('submit sends the picked shop category only when chosen', () async {
+    Future<Map<String, Object?>> submitWith(String? code) async {
+      final partners = FakePartnerApplicationsClient();
+      final cubit = MerchantKybCubit(
+        submitPartnerApplication: SubmitPartnerApplication(
+          PartnerApplicationsRepositoryImpl(partners),
+        ),
+        accessToken: () => 'token',
+        useMock: false,
+      )..setShopPin(lat: 16.06, lng: 108.22, label: 'Ghim');
+      if (code != null) cubit.setShopCategory(code);
+      await cubit.submit();
+      return partners.submitCalls.single.metadata;
+    }
+
+    expect((await submitWith('noodles'))['shopCategory'], 'noodles');
+    expect((await submitWith(null)).containsKey('shopCategory'), isFalse);
+  });
 }

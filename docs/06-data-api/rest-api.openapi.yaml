@@ -133,7 +133,7 @@ paths:
         "401":
           description: AUTH_INVALID_CREDENTIALS
         "403":
-          description: "AUTH_METHOD_DISABLED, or AUTH_EMAIL_NOT_VERIFIED (right password, email never verified): an activation code is emailed and the error body carries `details`: { challengeId, expiresAt, resendAvailableAt } for POST /v1/auth/email/register/{id}/verify"
+          description: "AUTH_EMAIL_NOT_VERIFIED (right password, email never verified): an activation code is emailed and the error body carries `details`: { challengeId, expiresAt, resendAvailableAt } for POST /v1/auth/email/register/{id}/verify"
         "429":
           description: AUTH_OTP_RATE_LIMITED (activation codes share the 5 per email per hour cap) or throttled
         "503":
@@ -207,8 +207,8 @@ paths:
           description: "Pending sign-up challenge (no account yet). `data`: { challengeId, expiresAt, resendAvailableAt }"
         "400":
           description: VALIDATION_ERROR
-        "403":
-          description: AUTH_METHOD_DISABLED
+        "404":
+          description: NOT_FOUND when the method is disabled (same body as an unknown route; nothing is sent)
         "429":
           description: AUTH_OTP_RATE_LIMITED (5 challenges per email per hour) or throttled
         "503":
@@ -299,8 +299,8 @@ paths:
       parameters: []
       responses:
         "200":
-          description: ""
-      summary: List public enabled authentication methods
+          description: "Enabled methods only, `data`: [{ method }] (PHONE_SMS | EMAIL_LOGIN_IDENTIFIER | PASSKEY). Disabled methods are omitted; the full table is staff-only at /v1/ops/auth-methods"
+      summary: Sign-in methods that are currently enabled (disabled ones are omitted)
       tags: *a2
   /v1/auth/passkeys/authentication/options:
     post:
@@ -610,7 +610,7 @@ paths:
         "403":
           description: Other merchant / not owner
       security: *a7
-      summary: M027 update an owned catalog item (name/price/description/category/prep/image/availability)
+      summary: M027 update an owned catalog item (name/price/originalPriceVnd/description/category/prep/image/availability); originalPriceVnd is shown struck through only while above the price, null clears
       tags: *a8
   /v1/food/merchant/items/{itemId}/availability:
     patch:
@@ -781,6 +781,82 @@ paths:
       security: *a7
       summary: M020 finished order history with filters (DEC-PROD-039)
       tags: *a8
+  /v1/food/merchant/promotions:
+    get:
+      operationId: list
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      security: &a9
+        - bearer: []
+      summary: Offers of the signed-in merchant store (all statuses)
+      tags: &a10
+        - food-merchant
+    post:
+      operationId: create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStoreOfferDto"
+      responses:
+        "201":
+          description: ""
+      security: *a9
+      summary: Create a store offer (percent with cap or fixed, min order, dates, usage limits)
+      tags: *a10
+  /v1/food/merchant/promotions/{id}/status:
+    patch:
+      operationId: setStatus
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStoreOfferStatusDto"
+      responses:
+        "200":
+          description: ""
+      security: *a9
+      summary: Pause, resume or end one of the store offers
+      tags: *a10
+  /v1/food/merchant/reviews:
+    get:
+      operationId: list
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      security: &a11
+        - bearer: []
+      summary: Reviews of the signed-in merchant store, newest first (hidden ones flagged)
+      tags: &a12
+        - ratings
+  /v1/food/merchant/reviews/{id}/reply:
+    put:
+      operationId: reply
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplyReviewDto"
+      responses:
+        "200":
+          description: ""
+      security: *a11
+      summary: Set or clear the store public reply to one review (max 500 chars)
+      tags: *a12
   /v1/food/merchant/statement:
     get:
       operationId: merchantStatement
@@ -788,10 +864,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a9
+      security: &a13
         - bearer: []
       summary: Merchant commission statement by Vietnam day (cash received at pickup, commission owed, settlements)
-      tags: &a10
+      tags: &a14
         - food
   /v1/food/merchant/stats:
     get:
@@ -805,9 +881,9 @@ paths:
             topItems[{name, quantity}]}. Days are Vietnam calendar days (Asia/Ho_Chi_Minh); sales = subtotal of DELIVERED orders.
         "403":
           description: Active MERCHANT role required
-      security: *a9
+      security: *a13
       summary: "Merchant sales summary by Vietnam day: delivered/cancelled counts, item sales, open orders, top items"
-      tags: *a10
+      tags: *a14
   /v1/food/merchant/store/accept-settings:
     put:
       operationId: updateStoreAcceptSettings
@@ -891,6 +967,31 @@ paths:
       security: *a7
       summary: M030 remove the store logo and discard the stored object
       tags: *a8
+  /v1/food/merchant/store/cover:
+    post:
+      operationId: uploadStoreCover
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadAvatarDto"
+      responses:
+        "200":
+          description: ""
+      security: *a7
+      summary: M030 upload the store cover photo (JPEG/PNG/WebP, base64 or data URL, max UPLOAD_MAX_FILE_KB). Returns the store with coverUrl under /v1/public/store-covers.
+      tags: *a8
+    delete:
+      operationId: clearStoreCover
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      security: *a7
+      summary: M030 remove the store cover photo and discard the stored object
+      tags: *a8
   /v1/food/merchant/store/profile:
     patch:
       operationId: updateStoreProfile
@@ -905,7 +1006,7 @@ paths:
         "200":
           description: ""
       security: *a7
-      summary: M030 rename the merchant-owned store (2–120 chars)
+      summary: M030 rename the merchant-owned store (2–120 chars), set its category (active FoodCategory code, null clears), its minimum food subtotal (minOrderVnd 0–10,000,000, 0 = none) and/or its description (≤ 500 chars, empty clears)
       tags: *a8
   /v1/food/merchant/store/status:
     patch:
@@ -941,12 +1042,12 @@ paths:
         "200":
           description: Order placed or replay. Includes subtotalVnd, deliveryFareVnd, discountVnd, voucherCode and totalVnd (net).
         "409":
-          description: FOOD_ORDER_ALREADY_OPEN / FOOD_ITEM_UNAVAILABLE
+          description: FOOD_ORDER_ALREADY_OPEN / FOOD_ITEM_UNAVAILABLE / FOOD_MIN_ORDER_NOT_MET (subtotal below the store minOrderVnd)
         "422":
           description: Voucher rejected (errorCode VOUCHER_NOT_FOUND, VOUCHER_PAUSED, VOUCHER_INACTIVE, VOUCHER_NOT_STARTED, VOUCHER_EXPIRED, VOUCHER_WRONG_SERVICE, VOUCHER_MIN_ORDER, VOUCHER_USAGE_EXHAUSTED, VOUCHER_BUDGET_EXHAUSTED, VOUCHER_USER_LIMIT); no order is created.
-      security: *a9
+      security: *a13
       summary: Place a food order (Idempotency-Key required)
-      tags: *a10
+      tags: *a14
     get:
       operationId: listMine
       parameters:
@@ -965,9 +1066,9 @@ paths:
       responses:
         "200":
           description: Page of orders owned by the customer
-      security: *a9
+      security: *a13
       summary: Customer paginated food order history (actor-scoped)
-      tags: *a10
+      tags: *a14
   /v1/food/orders/{id}:
     get:
       operationId: getOrder
@@ -980,9 +1081,9 @@ paths:
       responses:
         "200":
           description: Order
-      security: *a9
+      security: *a13
       summary: Get a food order by id
-      tags: *a10
+      tags: *a14
   /v1/food/orders/{id}/accept:
     post:
       operationId: accept
@@ -995,9 +1096,9 @@ paths:
       responses:
         "200":
           description: PREPARING
-      security: *a9
+      security: *a13
       summary: Merchant accepts order (PLACED → PREPARING)
-      tags: *a10
+      tags: *a14
   /v1/food/orders/{id}/cancel:
     post:
       operationId: cancel
@@ -1012,9 +1113,9 @@ paths:
           description: CANCELLED (cancelledBy CUSTOMER, DEC-PROD-035). A voucher used on the order is released (use and budget returned to the campaign, no longer counted for userLimit); idempotent. DEC-PROD-010 (PROPOSED).
         "409":
           description: Not cancellable
-      security: *a9
+      security: *a13
       summary: Customer cancels while PLACED only
-      tags: *a10
+      tags: *a14
   /v1/food/orders/{id}/change:
     get:
       operationId: latestChange
@@ -1027,9 +1128,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a9
+      security: *a13
       summary: Latest merchant edit of the order (customer or store owner), or null
-      tags: *a10
+      tags: *a14
   /v1/food/orders/{id}/changes:
     post:
       operationId: proposeChange
@@ -1048,9 +1149,9 @@ paths:
       responses:
         "201":
           description: ""
-      security: *a9
+      security: *a13
       summary: Merchant lowers quantities / removes out-of-stock lines (PLACED|PREPARING); customer must confirm
-      tags: *a10
+      tags: *a14
   /v1/food/orders/{id}/changes/{changeId}/accept:
     post:
       operationId: acceptChange
@@ -1068,9 +1169,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a9
+      security: *a13
       summary: Customer accepts the merchant edit (new total applies)
-      tags: *a10
+      tags: *a14
   /v1/food/orders/{id}/changes/{changeId}/reject:
     post:
       operationId: rejectChange
@@ -1088,9 +1189,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a9
+      security: *a13
       summary: Customer declines the merchant edit (order cancelled, no fee)
-      tags: *a10
+      tags: *a14
   /v1/food/orders/{id}/claim:
     post:
       operationId: claim
@@ -1103,9 +1204,9 @@ paths:
       responses:
         "200":
           description: ASSIGNED
-      security: *a9
+      security: *a13
       summary: Driver claims a READY order (→ ASSIGNED) or an early-claimable PREPARING one (stays PREPARING, assigned)
-      tags: *a10
+      tags: *a14
   /v1/food/orders/{id}/courier:
     get:
       operationId: foodCourier
@@ -1120,10 +1221,10 @@ paths:
           description: DriverCard
         "404":
           description: FOOD_ORDER_NOT_FOUND or DRIVER_NOT_ASSIGNED
-      security: &a11
+      security: &a15
         - bearer: []
       summary: Courier's name, declared vehicle and rating (order customer only)
-      tags: &a12
+      tags: &a16
         - rides
         - food
   /v1/food/orders/{id}/customer:
@@ -1138,9 +1239,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a11
+      security: *a15
       summary: Customer's name and avatar (assigned courier only)
-      tags: *a12
+      tags: *a16
   /v1/food/orders/{id}/deliver:
     post:
       operationId: deliver
@@ -1167,9 +1268,9 @@ paths:
           description: FOOD_DELIVERY_CODE_REQUIRED / FOOD_DELIVERY_CODE_INVALID
         "423":
           description: FOOD_DELIVERY_CODE_LOCKED (FOOD_DELIVERY_CODE_MAX_ATTEMPTS reached)
-      security: *a9
+      security: *a13
       summary: Assigned driver delivers (PICKED_UP → DELIVERED); deliveryCode required when FOOD_DELIVERY_CODE_REQUIRED (DEC-PROD-036)
-      tags: *a10
+      tags: *a14
   /v1/food/orders/{id}/driver-location:
     get:
       operationId: driverLocation
@@ -1184,9 +1285,9 @@ paths:
           description: "{ location: { lat, lng, at } | null }"
         "404":
           description: Not found or not the customer
-      security: *a9
+      security: *a13
       summary: "Customer: courier position while the order is ASSIGNED/PICKED_UP (DEC-PROD-031). location=null when unknown or older than 2 minutes."
-      tags: *a10
+      tags: *a14
   /v1/food/orders/{id}/fail:
     post:
       operationId: fail
@@ -1209,9 +1310,9 @@ paths:
           description: Not assigned driver
         "409":
           description: Illegal transition
-      security: *a9
+      security: *a13
       summary: Assigned driver marks delivery failed after pickup (PICKED_UP → FAILED) with a reason; before pickup use release
-      tags: *a10
+      tags: *a14
   /v1/food/orders/{id}/ledger:
     get:
       operationId: getOrderLedger
@@ -1226,9 +1327,9 @@ paths:
           description: POSTED balanced journal
         "404":
           description: Order or journal not found
-      security: *a9
+      security: *a13
       summary: Sandbox COD ledger journal for an order (owner/participants)
-      tags: *a10
+      tags: *a14
   /v1/food/orders/{id}/pickup:
     post:
       operationId: pickup
@@ -1255,9 +1356,9 @@ paths:
           description: FOOD_HANDOVER_CODE_REQUIRED / FOOD_HANDOVER_CODE_INVALID
         "423":
           description: FOOD_HANDOVER_CODE_LOCKED (FOOD_DELIVERY_CODE_MAX_ATTEMPTS reached)
-      security: *a9
+      security: *a13
       summary: Assigned driver picks up (ASSIGNED → PICKED_UP); handoverCode required when FOOD_HANDOVER_CODE_REQUIRED (DEC-PROD-036)
-      tags: *a10
+      tags: *a14
   /v1/food/orders/{id}/ready:
     post:
       operationId: ready
@@ -1270,9 +1371,9 @@ paths:
       responses:
         "200":
           description: READY
-      security: *a9
+      security: *a13
       summary: Merchant marks ready (PREPARING → READY)
-      tags: *a10
+      tags: *a14
   /v1/food/orders/{id}/reject:
     post:
       operationId: reject
@@ -1299,9 +1400,9 @@ paths:
           description: FOOD_ORDER_NOT_FOUND (not this merchant's store).
         "409":
           description: FOOD_STATUS_CONFLICT (order already accepted/cancelled).
-      security: *a9
+      security: *a13
       summary: Merchant declines a new order with a reason (PLACED → CANCELLED)
-      tags: *a10
+      tags: *a14
   /v1/food/orders/{id}/release:
     post:
       operationId: release
@@ -1320,9 +1421,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a9
+      security: *a13
       summary: Assigned driver hands the order back before pickup (ASSIGNED → READY, early claim → PREPARING); counted as a driver cancellation
-      tags: *a10
+      tags: *a14
   /v1/food/orders/{orderId}/calls:
     post:
       operationId: start
@@ -1352,10 +1453,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a13
+      security: &a17
         - bearer: []
       summary: List transaction chat messages for a food order (participants only; text only)
-      tags: &a14
+      tags: &a18
         - chat
     post:
       operationId: post
@@ -1374,9 +1475,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a13
+      security: *a17
       summary: Post a text chat message on a food order (participants only)
-      tags: *a14
+      tags: *a18
   /v1/food/orders/queue:
     get:
       operationId: listQueue
@@ -1384,9 +1485,9 @@ paths:
       responses:
         "200":
           description: Queue. Each order carries customerName / driverName masked to given name + family initial ("Tiến T."), null when unknown.
-      security: *a9
+      security: *a13
       summary: List open orders for the merchant store queue
-      tags: *a10
+      tags: *a14
   /v1/food/orders/ready:
     get:
       operationId: listReady
@@ -1394,9 +1495,9 @@ paths:
       responses:
         "200":
           description: Ready orders (radius or capped fallback; DRIVER eligibility gate). Each row carries storeName and storeAddress (nullable) for the pickup card, plus `pickup {lat, lng, label}` (DEC-PROD-034, the store point snapshotted on the order at placement; legacy rows fall back to the store's current point; null when the store has no coordinates). `store {lat, lng}` is kept for older clients and equals the pickup point. Each row also carries `route {available, provider, coords [[lat,lng]...], distanceM, durationSec}` (DEC-PROD-045, RoutingService/Mapbox, pickup→dropoff) so the driver map draws the road path; `available=false` with empty coords when there is no pickup point or the lookup fails — clients draw NO line then (never a straight A→B).
-      security: *a9
+      security: *a13
       summary: List ready orders for drivers. Optional lat/lng filters by DRIVER_SEARCH_RADIUS_KM from store coords when present, else dropoff; offline presence returns empty.
-      tags: *a10
+      tags: *a14
   /v1/food/quote:
     post:
       operationId: quote
@@ -1412,9 +1513,9 @@ paths:
           description: "`{ deliveryFareVnd }` — the fee placement will charge (client deliveryFareVnd is ignored)."
         "404":
           description: FOOD_STORE_NOT_FOUND
-      security: *a9
+      security: *a13
       summary: Server delivery fare for a store and drop-off (same rule as placement)
-      tags: *a10
+      tags: *a14
   /v1/food/stores:
     get:
       operationId: listStores
@@ -1422,9 +1523,9 @@ paths:
       responses:
         "200":
           description: PageResult of stores (items, page, limit, total)
-      security: *a9
+      security: *a13
       summary: Browse food stores with page/search/category/geo/sort (DRIVER_SEARCH_RADIUS_KM when lat+lng set)
-      tags: *a10
+      tags: *a14
   /v1/food/stores/{id}:
     get:
       operationId: getStore
@@ -1436,10 +1537,10 @@ paths:
             type: string
       responses:
         "200":
-          description: Store detail { id, name, category | null, addressLabel | null, items[] }. Ratings come from GET /v1/ratings/stores/{storeId}/reviews.
-      security: *a9
+          description: Store detail { id, name, category | null, addressLabel | null, coverUrl | null, description | null, items[], menuSections[], offers[] } (offers = running store offers { id, code, name, discountType, discountValue, maxDiscountVnd, minOrderVnd, endsAt, remainingUses }, DEC-PROD-068). Ratings come from GET /v1/ratings/stores/{storeId}/reviews.
+      security: *a13
       summary: Get store catalog
-      tags: *a10
+      tags: *a14
   /v1/me:
     get:
       operationId: getMe
@@ -1447,10 +1548,10 @@ paths:
       responses:
         "200":
           description: Profile
-      security: &a15
+      security: &a19
         - bearer: []
       summary: Current user profile and role grants
-      tags: &a16
+      tags: &a20
         - identity
     patch:
       operationId: updateMe
@@ -1464,32 +1565,34 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a15
+      security: *a19
       summary: Update profile fields. Email changes start EmailVerification (do not set verified email directly).
-      tags: *a16
+      tags: *a20
   /v1/me/account-deletion:
     get:
       operationId: overview
       parameters: []
       responses:
         "200":
-          description: "{ status: NONE|PENDING|CANCELLED|SCHEDULED|PURGED, graceDays, method: PHONE_OTP|PASSWORD|null, phoneMasked, blockers: [{ code: ACTIVE_RIDE|ACTIVE_FOOD_ORDER|ACTIVE_DRIVER_JOB|STORE_OPEN_ORDERS|UNSETTLED_COD|OPS_ACCOUNT, count?, amountVnd? }], purgeAfter }"
-      security: &a17
+          description: "{ status: NONE|PENDING|CANCELLED|SCHEDULED|PURGED, graceDays, method: PASSKEY|PHONE_OTP|PASSWORD|null (first enabled sign-in method the account can use; never a disabled one), phoneMasked, blockers: [{ code: ACTIVE_RIDE|ACTIVE_FOOD_ORDER|ACTIVE_DRIVER_JOB|STORE_OPEN_ORDERS|UNSETTLED_COD|OPS_ACCOUNT, count?, amountVnd? }], purgeAfter }"
+      security: &a21
         - bearer: []
       summary: "S027: grace days, re-auth method, blockers and latest request status"
-      tags: &a18
+      tags: &a22
         - identity
     post:
       operationId: start
       parameters: []
       responses:
         "201":
-          description: "{ requestId, method, expiresAt, phoneMasked, graceDays } — sends an SMS code when method is PHONE_OTP"
+          description: "{ requestId, method, expiresAt, phoneMasked, graceDays, passkeyOptions } — PASSKEY: passkeyOptions are WebAuthn request options (single-use challenge bound to this user and request, allowCredentials = the user's own passkeys, userVerification required, 5 min); PHONE_OTP sends an SMS code; passkeyOptions is null otherwise"
         "409":
-          description: ACCOUNT_DELETION_BLOCKED (details.blockers), ACCOUNT_DELETION_REAUTH_UNAVAILABLE
-      security: *a17
-      summary: "S027: start deletion; 409 ACCOUNT_DELETION_BLOCKED lists blockers; sends SMS OTP"
-      tags: *a18
+          description: ACCOUNT_DELETION_BLOCKED (details.blockers), ACCOUNT_DELETION_REAUTH_UNAVAILABLE (no enabled sign-in method can re-verify this account)
+        "429":
+          description: Rate limited
+      security: *a21
+      summary: "S027: start deletion (rate limited); 409 ACCOUNT_DELETION_BLOCKED lists blockers; PASSKEY returns passkeyOptions, PHONE_OTP sends an SMS code"
+      tags: *a22
   /v1/me/account-deletion/{id}/confirm:
     post:
       operationId: confirm
@@ -1509,16 +1612,16 @@ paths:
         "200":
           description: "{ status: SCHEDULED, purgeAfter, graceDays } — account soft-deleted, every session revoked; PII anonymized after the grace period (ACCOUNT_DELETION_GRACE_DAYS)"
         "401":
-          description: AUTH_CODE_INVALID, AUTH_PASSWORD_INVALID, AUTH_CODE_EXPIRED (start again)
+          description: AUTH_PASSKEY_INVALID (assertion not from one of the user's passkeys, or for another challenge), AUTH_CODE_INVALID, AUTH_PASSWORD_INVALID, AUTH_CODE_EXPIRED (start again)
         "404":
-          description: ACCOUNT_DELETION_NOT_FOUND
+          description: ACCOUNT_DELETION_NOT_FOUND (also when the request's method has since been disabled, or the request was superseded)
         "409":
           description: ACCOUNT_DELETION_BLOCKED (re-checked under lock)
         "429":
-          description: AUTH_CODE_LOCKED (5 wrong attempts)
-      security: *a17
-      summary: "S027: re-auth (code or password) → soft-delete, revoke all sessions, schedule purge"
-      tags: *a18
+          description: AUTH_CODE_LOCKED (5 failed attempts), or rate limited
+      security: *a21
+      summary: "S027: re-auth (passkey assertion, code or password; rate limited) → soft-delete, revoke all sessions, schedule purge"
+      tags: *a22
   /v1/me/addresses:
     get:
       operationId: list
@@ -1526,10 +1629,10 @@ paths:
       responses:
         "200":
           description: "{ items: SavedAddress[] } default first, then newest."
-      security: &a19
+      security: &a23
         - bearer: []
       summary: Saved addresses of the signed-in app user (default first)
-      tags: &a20
+      tags: &a24
         - me
     post:
       operationId: create
@@ -1547,9 +1650,9 @@ paths:
           description: Validation error (lat and lng must be sent together).
         "409":
           description: ADDRESS_LIMIT_REACHED (20 per user) or ADDRESS_KIND_TAKEN (one HOME, one WORK).
-      security: *a19
+      security: *a23
       summary: Save an address (max 20; one HOME, one WORK)
-      tags: *a20
+      tags: *a24
   /v1/me/addresses/{id}:
     patch:
       operationId: update
@@ -1572,9 +1675,9 @@ paths:
           description: ADDRESS_NOT_FOUND (missing or owned by another user).
         "409":
           description: ADDRESS_KIND_TAKEN.
-      security: *a19
+      security: *a23
       summary: Edit a saved address or make it the default
-      tags: *a20
+      tags: *a24
     delete:
       operationId: remove
       parameters:
@@ -1588,9 +1691,9 @@ paths:
           description: "{ deleted: true }. Deleting the default promotes the newest remaining address."
         "404":
           description: ADDRESS_NOT_FOUND.
-      security: *a19
+      security: *a23
       summary: Delete a saved address (the newest remaining becomes default)
-      tags: *a20
+      tags: *a24
   /v1/me/avatar:
     post:
       operationId: upload
@@ -1616,10 +1719,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a21
+      security: &a25
         - bearer: []
       summary: S024 notification category preferences (DEC-PROD-038)
-      tags: &a22
+      tags: &a26
         - me
     patch:
       operationId: updatePrefs
@@ -1633,9 +1736,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a21
+      security: *a25
       summary: Update S024 notification preferences (DEC-PROD-038)
-      tags: *a22
+      tags: *a26
   /v1/me/notifications:
     get:
       operationId: list
@@ -1643,10 +1746,10 @@ paths:
       responses:
         "200":
           description: "Newest first: { items: [{ id, category, title, body, data, read, readAt, createdAt }], total, unreadCount, page, limit }. Rows are written by the outbox relay alongside FCM pushes (status changes, campaigns); data carries aggregateType, aggregateId, status when known."
-      security: &a23
+      security: &a27
         - bearer: []
       summary: In-app notification inbox for the signed-in app user (newest first)
-      tags: &a24
+      tags: &a28
         - notifications
   /v1/me/notifications/{id}/read:
     post:
@@ -1662,9 +1765,9 @@ paths:
           description: The notification, now read. Idempotent.
         "404":
           description: NOTIFICATION_NOT_FOUND (missing or owned by another user).
-      security: *a23
+      security: *a27
       summary: Mark one notification as read (owner only; others get 404)
-      tags: *a24
+      tags: *a28
   /v1/me/notifications/read-all:
     post:
       operationId: markAllRead
@@ -1672,9 +1775,9 @@ paths:
       responses:
         "200":
           description: "{ updated } number of rows marked read."
-      security: *a23
+      security: *a27
       summary: Mark every unread notification as read
-      tags: *a24
+      tags: *a28
   /v1/me/partner-applications:
     get:
       operationId: listMine
@@ -1682,10 +1785,10 @@ paths:
       responses:
         "200":
           description: Applications
-      security: &a25
+      security: &a29
         - bearer: []
       summary: List my KYC/KYB partner applications
-      tags: &a26
+      tags: &a30
         - identity
     post:
       operationId: submit
@@ -1701,9 +1804,9 @@ paths:
           description: Submitted application
         "409":
           description: Already submitted or approved
-      security: *a25
+      security: *a29
       summary: Submit KYC (DRIVER) or KYB (MERCHANT) application
-      tags: *a26
+      tags: *a30
   /v1/me/partner-applications/{role}:
     get:
       operationId: getMine
@@ -1718,9 +1821,9 @@ paths:
           description: Application
         "404":
           description: Not found
-      security: *a25
+      security: *a29
       summary: Get my partner application for a role
-      tags: *a26
+      tags: *a30
   /v1/me/partner-applications/requirements/{role}:
     get:
       operationId: requirements
@@ -1738,9 +1841,9 @@ paths:
       responses:
         "200":
           description: "{ role, documentsRequired: boolean } from ONBOARDING_DRIVER_KYC_REQUIRED / ONBOARDING_MERCHANT_KYB_REQUIRED (DEC-PROD-048, DRAFT). Clients treat errors as documentsRequired=true."
-      security: *a25
+      security: *a29
       summary: "DEC-PROD-048: whether KYC/KYB documents are required for a role and which kinds"
-      tags: *a26
+      tags: *a30
   /v1/me/password:
     post:
       operationId: changePassword
@@ -1754,9 +1857,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a21
+      security: *a25
       summary: S025 change customer password; revokes other sessions
-      tags: *a22
+      tags: *a26
   /v1/me/place-history:
     get:
       operationId: list
@@ -1764,10 +1867,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a27
+      security: &a31
         - bearer: []
       summary: Places this user picked from search, newest first (max 20)
-      tags: &a28
+      tags: &a32
         - me
     post:
       operationId: record
@@ -1781,18 +1884,18 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a27
+      security: *a31
       summary: Record a picked place (same place moves to the top; keeps 20)
-      tags: *a28
+      tags: *a32
     delete:
       operationId: clear
       parameters: []
       responses:
         "200":
           description: ""
-      security: *a27
+      security: *a31
       summary: Clear the whole place history
-      tags: *a28
+      tags: *a32
   /v1/me/place-history/{id}:
     delete:
       operationId: remove
@@ -1805,9 +1908,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a27
+      security: *a31
       summary: Delete one history entry
-      tags: *a28
+      tags: *a32
   /v1/me/presence:
     post:
       operationId: setPresence
@@ -1823,18 +1926,18 @@ paths:
           description: Presence upserted
         "403":
           description: Active DRIVER role required
-      security: *a15
+      security: *a19
       summary: Upsert driver presence (online/offline, optional rideEnabled/foodEnabled, lat/lng). Dispatch lists are empty while offline or for a service switched off.
-      tags: *a16
+      tags: *a20
     get:
       operationId: getPresence
       parameters: []
       responses:
         "200":
           description: Presence or null
-      security: *a15
+      security: *a19
       summary: Get current driver presence, if any
-      tags: *a16
+      tags: *a20
   /v1/me/presence/location:
     post:
       operationId: reportLocation
@@ -1852,9 +1955,9 @@ paths:
           description: Invalid coordinates
         "403":
           description: Active DRIVER role required
-      security: *a15
+      security: *a19
       summary: Driver location heartbeat (DEC-PROD-031). Updates lat/lng only; customers see it on an active ride/food order while it is under 2 minutes old.
-      tags: *a16
+      tags: *a20
   /v1/me/push-tokens:
     post:
       operationId: register
@@ -1868,10 +1971,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a29
+      security: &a33
         - bearer: []
       summary: Register an FCM device token for the current user
-      tags: &a30
+      tags: &a34
         - push
     delete:
       operationId: unregister
@@ -1885,9 +1988,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a29
+      security: *a33
       summary: Unregister an FCM device token (logout)
-      tags: *a30
+      tags: *a34
   /v1/me/role-grants:
     get:
       operationId: listMine
@@ -1895,10 +1998,10 @@ paths:
       responses:
         "200":
           description: Grants
-      security: &a31
+      security: &a35
         - bearer: []
       summary: List my role grants
-      tags: &a32
+      tags: &a36
         - identity
     post:
       operationId: requestRole
@@ -1912,9 +2015,9 @@ paths:
       responses:
         "200":
           description: Grant created/updated
-      security: *a31
+      security: *a35
       summary: Request a role grant
-      tags: *a32
+      tags: *a36
   /v1/me/sessions:
     get:
       operationId: listSessions
@@ -1922,9 +2025,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a21
+      security: *a25
       summary: S028 list active sessions (DEC-PROD-038)
-      tags: *a22
+      tags: *a26
   /v1/me/sessions/{id}:
     delete:
       operationId: revokeOne
@@ -1937,9 +2040,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a21
+      security: *a25
       summary: S028 revoke one other session
-      tags: *a22
+      tags: *a26
   /v1/me/sessions/current:
     patch:
       operationId: touchCurrent
@@ -1953,9 +2056,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a21
+      security: *a25
       summary: Update the current session device label (S028)
-      tags: *a22
+      tags: *a26
   /v1/me/sessions/others:
     delete:
       operationId: revokeOthers
@@ -1963,9 +2066,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a21
+      security: *a25
       summary: S028 revoke every session except the current one
-      tags: *a22
+      tags: *a26
   /v1/ops/audit-logs:
     get:
       operationId: list
@@ -2017,10 +2120,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a33
+      security: &a37
         - bearer: []
       summary: List global auth method flags (PASSKEY, PHONE_SMS, EMAIL_LOGIN_IDENTIFIER). Defaults ENABLED.
-      tags: &a34
+      tags: &a38
         - ops
   /v1/ops/auth-methods/{method}:
     patch:
@@ -2040,56 +2143,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a33
+      security: *a37
       summary: Enable/disable a global auth method with reason; refuses disabling the last enabled method. Writes OpsAuditLog.
-      tags: *a34
-  /v1/ops/catalog/categories:
-    get:
-      operationId: listCategories
-      parameters: []
-      responses:
-        "200":
-          description: ""
-      security: &a35
-        - bearer: []
-      summary: List food store categories aggregated from FoodStore.category
-      tags: &a36
-        - ops
-  /v1/ops/catalog/categories/{code}:
-    get:
-      operationId: getCategory
-      parameters:
-        - name: code
-          required: true
-          in: path
-          schema:
-            type: string
-      responses:
-        "200":
-          description: ""
-      security: *a35
-      summary: Get one aggregated store category by slug code
-      tags: *a36
-    patch:
-      operationId: renameCategory
-      parameters:
-        - name: code
-          required: true
-          in: path
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RenameCatalogCategoryDto"
-      responses:
-        "200":
-          description: ""
-      security: *a35
-      summary: A030 rename a store-type category (updates FoodStore.category for every matching store)
-      tags: *a36
+      tags: *a38
   /v1/ops/catalog/items/{id}/approve:
     post:
       operationId: approve
@@ -2102,9 +2158,11 @@ paths:
       responses:
         "201":
           description: ""
-      security: *a35
+      security: &a39
+        - bearer: []
       summary: Approve catalog item
-      tags: *a36
+      tags: &a40
+        - ops
   /v1/ops/catalog/items/{id}/reject:
     post:
       operationId: reject
@@ -2117,9 +2175,9 @@ paths:
       responses:
         "201":
           description: ""
-      security: *a35
+      security: *a39
       summary: Reject catalog item
-      tags: *a36
+      tags: *a40
   /v1/ops/catalog/moderation:
     get:
       operationId: list
@@ -2139,9 +2197,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a35
+      security: *a39
       summary: Ops catalog moderation queue with server filters & pagination; optional from/to (inclusive Vietnam business days on item submission time)
-      tags: *a36
+      tags: *a40
   /v1/ops/chat-review:
     post:
       operationId: read
@@ -2171,10 +2229,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a37
+      security: &a41
         - bearer: []
       summary: Ops paginated customers (users with CUSTOMER role grant)
-      tags: &a38
+      tags: &a42
         - ops
   /v1/ops/customers/{id}:
     get:
@@ -2188,9 +2246,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a37
+      security: *a41
       summary: Ops customer detail (safe fields; no credentials or session tokens)
-      tags: *a38
+      tags: *a42
   /v1/ops/customers/{id}/activities:
     get:
       operationId: getActivities
@@ -2218,9 +2276,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a37
+      security: *a41
       summary: Ops customer activities by tab (rides, food orders, deliveries, payments, notes)
-      tags: *a38
+      tags: *a42
   /v1/ops/disputes:
     get:
       operationId: list
@@ -2263,10 +2321,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a39
+      security: &a43
         - bearer: []
       summary: List disputes with filters (search, status, priority, pagination).
-      tags: &a40
+      tags: &a44
         - ops
   /v1/ops/disputes/{code}:
     get:
@@ -2280,9 +2338,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a39
+      security: *a43
       summary: Get detailed dispute case by code. Returns 404 when unknown (no synthesized demo cases).
-      tags: *a40
+      tags: *a44
   /v1/ops/disputes/{code}/resolve:
     post:
       operationId: resolve
@@ -2301,9 +2359,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a39
+      security: *a43
       summary: Resolve dispute. Money remedies record RefundRequest + ledger journal. Status remedies update case + OpsAuditLog.
-      tags: *a40
+      tags: *a44
   /v1/ops/drivers:
     get:
       operationId: list
@@ -2311,10 +2369,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a41
+      security: &a45
         - bearer: []
       summary: Ops paginated drivers (users with DRIVER role grant + presence summary)
-      tags: &a42
+      tags: &a46
         - ops
   /v1/ops/drivers/{id}:
     get:
@@ -2328,9 +2386,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a41
+      security: *a45
       summary: Ops driver detail (safe fields + presence; no credentials or session tokens)
-      tags: *a42
+      tags: *a46
   /v1/ops/exceptions:
     get:
       operationId: list
@@ -2354,10 +2412,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a43
+      security: &a47
         - bearer: []
       summary: List Ops FAQ entries (Admin sees all statuses). Lazy-seeds OPEN-001..021 DRAFT answers labeled PROPOSED. Filter ?status=
-      tags: &a44
+      tags: &a48
         - ops
     post:
       operationId: create
@@ -2371,9 +2429,9 @@ paths:
       responses:
         "201":
           description: ""
-      security: *a43
+      security: *a47
       summary: Create an Ops FAQ entry; writes OpsAuditLog FAQ_UPDATE.
-      tags: *a44
+      tags: *a48
   /v1/ops/faqs/{id}:
     patch:
       operationId: patch
@@ -2392,9 +2450,108 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a43
+      security: *a47
       summary: Patch FAQ (question/answer/status/category/sortOrder). Only PUBLISHED intended for future public/help.
-      tags: *a44
+      tags: *a48
+  /v1/ops/food-categories:
+    get:
+      operationId: list
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      security: &a49
+        - bearer: []
+      summary: All store categories in display order, with store counts
+      tags: &a50
+        - ops
+    post:
+      operationId: create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFoodCategoryDto"
+      responses:
+        "201":
+          description: ""
+      security: *a49
+      summary: Create a store category; code is generated from nameVi and never changes
+      tags: *a50
+  /v1/ops/food-categories/{code}:
+    patch:
+      operationId: patch
+      parameters:
+        - name: code
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchFoodCategoryDto"
+      responses:
+        "200":
+          description: ""
+      security: *a49
+      summary: Rename, change icon/colour, turn on/off or remove the image
+      tags: *a50
+    delete:
+      operationId: remove
+      parameters:
+        - name: code
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+      security: *a49
+      summary: Delete a category no store uses (409 FOOD_CATEGORY_IN_USE otherwise)
+      tags: *a50
+  /v1/ops/food-categories/{code}/image:
+    post:
+      operationId: uploadImage
+      parameters:
+        - name: code
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadFoodCategoryImageDto"
+      responses:
+        "200":
+          description: ""
+      security: *a49
+      summary: Upload the tile image (JPEG/PNG/WebP, square, ≤ 1 MB)
+      tags: *a50
+  /v1/ops/food-categories/reorder:
+    post:
+      operationId: reorder
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderFoodCategoriesDto"
+      responses:
+        "200":
+          description: ""
+      security: *a49
+      summary: "Set display order: codes first-to-last"
+      tags: *a50
   /v1/ops/food-orders:
     get:
       operationId: list
@@ -2414,10 +2571,10 @@ paths:
       responses:
         "200":
           description: Page of food orders
-      security: &a45
+      security: &a51
         - bearer: []
       summary: Ops paginated food order list; optional from/to (inclusive Vietnam business days on createdAt)
-      tags: &a46
+      tags: &a52
         - ops
   /v1/ops/food-orders/{id}:
     get:
@@ -2431,9 +2588,9 @@ paths:
       responses:
         "200":
           description: Order
-      security: *a45
+      security: *a51
       summary: Ops food order detail
-      tags: *a46
+      tags: *a52
   /v1/ops/food-orders/{id}/cancel:
     post:
       operationId: cancel
@@ -2454,9 +2611,9 @@ paths:
           description: Cancelled
         "409":
           description: Not cancellable (terminal)
-      security: *a45
+      security: *a51
       summary: Ops cancel food order (CAP-OPS-05). Allowed until DELIVERED/FAILED/CANCELLED. Writes OpsAuditLog + outbox.
-      tags: *a46
+      tags: *a52
   /v1/ops/food-orders/{id}/ledger:
     get:
       operationId: getLedger
@@ -2469,9 +2626,9 @@ paths:
       responses:
         "200":
           description: Journal
-      security: *a45
+      security: *a51
       summary: Ops sandbox COD ledger journal for a food order
-      tags: *a46
+      tags: *a52
   /v1/ops/food-orders/{id}/reassign:
     post:
       operationId: reassign
@@ -2492,9 +2649,9 @@ paths:
           description: Back to READY
         "409":
           description: Status does not allow reassign
-      security: *a45
+      security: *a51
       summary: Clear food assignment back to READY when status is ASSIGNED.
-      tags: *a46
+      tags: *a52
   /v1/ops/food-stores/{id}/settlements:
     post:
       operationId: record
@@ -2513,10 +2670,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a47
+      security: &a53
         - bearer: []
       summary: Record that the store paid the commission for a closed ICT period (no overlaps; audited)
-      tags: &a48
+      tags: &a54
         - ops
   /v1/ops/food-stores/{id}/statement:
     get:
@@ -2530,9 +2687,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a47
+      security: *a53
       summary: Store commission statement by Vietnam day (max 31 days)
-      tags: *a48
+      tags: *a54
   /v1/ops/home-banners:
     get:
       operationId: list
@@ -2540,10 +2697,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a49
+      security: &a55
         - bearer: []
       summary: All home banners with state (LIVE/SCHEDULED/EXPIRED/INACTIVE/NO_IMAGE) and impression/click stats
-      tags: &a50
+      tags: &a56
         - ops
     post:
       operationId: create
@@ -2557,9 +2714,9 @@ paths:
       responses:
         "201":
           description: ""
-      security: *a49
+      security: *a55
       summary: Create a home banner (inactive until an image is uploaded)
-      tags: *a50
+      tags: *a56
   /v1/ops/home-banners/{id}:
     patch:
       operationId: patch
@@ -2578,9 +2735,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a49
+      security: *a55
       summary: Update a home banner; CTA must be an allowlisted in-app page or https
-      tags: *a50
+      tags: *a56
     delete:
       operationId: remove
       parameters:
@@ -2592,9 +2749,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a49
+      security: *a55
       summary: Delete a home banner and its image
-      tags: *a50
+      tags: *a56
   /v1/ops/home-banners/{id}/image:
     post:
       operationId: uploadImage
@@ -2613,9 +2770,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a49
+      security: *a55
       summary: Upload the banner image (JPEG/PNG/WebP, 2:1 recommended, e.g. 1200×600)
-      tags: *a50
+      tags: *a56
   /v1/ops/home-banners/reorder:
     post:
       operationId: reorder
@@ -2629,9 +2786,136 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a49
+      security: *a55
       summary: "Set display order: ids first-to-last"
-      tags: *a50
+      tags: *a56
+  /v1/ops/integrations/email:
+    get:
+      operationId: email
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      security: &a57
+        - bearer: []
+      summary: Effective email provider config (secrets as set/unset), sources and test status.
+      tags: &a58
+        - ops
+    put:
+      operationId: updateEmail
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PutEmailSettingsDto"
+      responses:
+        "200":
+          description: ""
+      security: *a57
+      summary: Update email provider settings; null/"" clears a field. Audited with reason.
+      tags: *a58
+  /v1/ops/integrations/email/test:
+    post:
+      operationId: testEmail
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestEmailDto"
+      responses:
+        "200":
+          description: ""
+      security: *a57
+      summary: Send a test email with the saved config; a pass unlocks email login.
+      tags: *a58
+  /v1/ops/integrations/maps:
+    get:
+      operationId: maps
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      security: *a57
+      summary: "Map keys: set/unset, source (admin/env) and last 4 characters."
+      tags: *a58
+    put:
+      operationId: updateMaps
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PutMapKeysDto"
+      responses:
+        "200":
+          description: ""
+      security: *a57
+      summary: Replace or clear map keys (encrypted). Audited with reason.
+      tags: *a58
+  /v1/ops/integrations/maps/test:
+    post:
+      operationId: testMaps
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestMapKeysDto"
+      responses:
+        "200":
+          description: ""
+      security: *a57
+      summary: Check each effective map key against Mapbox / Google.
+      tags: *a58
+  /v1/ops/integrations/sentry:
+    get:
+      operationId: view
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      security: &a59
+        - bearer: []
+      summary: "Sentry settings: org, region, projects, token set/unset (last 4), scopes, test status."
+      tags: &a60
+        - ops
+    put:
+      operationId: update
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PutSentrySettingsDto"
+      responses:
+        "200":
+          description: ""
+      security: *a59
+      summary: Update Sentry settings; null/"" clears a field. Token is encrypted. Audited with reason.
+      tags: *a60
+  /v1/ops/integrations/sentry/test:
+    post:
+      operationId: test
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestSentryDto"
+      responses:
+        "200":
+          description: ""
+      security: *a59
+      summary: Check the token scopes and that every configured project is readable. Audited.
+      tags: *a60
   /v1/ops/maps-providers:
     get:
       operationId: get
@@ -2651,10 +2935,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a53
+      security: &a63
         - bearer: []
       summary: "Live board: core KPIs + mapMarkers, queue, areaDemand, recentActivity, systemAlerts, optional pilotZoneLabel. Enrichment fail-soft."
-      tags: &a54
+      tags: &a64
         - ops
   /v1/ops/notifications:
     get:
@@ -2663,10 +2947,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a51
+      security: &a61
         - bearer: []
       summary: List notification campaigns. Server-side filter ?tab=ALL|RUNNING|SENT|PENDING|DRAFT &channel= &audience= &q=; returns per-tab counts.
-      tags: &a52
+      tags: &a62
         - ops
     post:
       operationId: create
@@ -2680,9 +2964,9 @@ paths:
       responses:
         "201":
           description: ""
-      security: *a51
+      security: *a61
       summary: Create a campaign as DRAFT (code TB-YYMMDD-NNN). OTP / verification-code content is rejected.
-      tags: *a52
+      tags: *a62
   /v1/ops/notifications/{code}:
     get:
       operationId: get
@@ -2695,9 +2979,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a51
+      security: *a61
       summary: Get one campaign by code.
-      tags: *a52
+      tags: *a62
     patch:
       operationId: update
       parameters:
@@ -2715,9 +2999,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a51
+      security: *a61
       summary: Edit a campaign. Only DRAFT campaigns are editable (409 otherwise).
-      tags: *a52
+      tags: *a62
   /v1/ops/notifications/{code}/approve:
     post:
       operationId: approve
@@ -2736,9 +3020,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a51
+      security: *a61
       summary: PENDING_APPROVAL → RUNNING (scheduled / automatic) or SENDING (due now). PUSH channel enqueues outbox fan-out to registered device tokens.
-      tags: *a52
+      tags: *a62
   /v1/ops/notifications/{code}/cancel:
     post:
       operationId: cancel
@@ -2757,9 +3041,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a51
+      security: *a61
       summary: DRAFT | PENDING_APPROVAL | RUNNING → CANCELLED.
-      tags: *a52
+      tags: *a62
   /v1/ops/notifications/{code}/reject:
     post:
       operationId: reject
@@ -2778,9 +3062,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a51
+      security: *a61
       summary: PENDING_APPROVAL → DRAFT with a reviewer note (rejectionReason).
-      tags: *a52
+      tags: *a62
   /v1/ops/notifications/{code}/submit:
     post:
       operationId: submit
@@ -2799,9 +3083,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a51
+      security: *a61
       summary: DRAFT → PENDING_APPROVAL.
-      tags: *a52
+      tags: *a62
   /v1/ops/notifications/cms:
     get:
       operationId: listCms
@@ -2809,9 +3093,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a51
+      security: *a61
       summary: List CMS content (articles / banners / policies). ?kind= &status= &q=
-      tags: *a52
+      tags: *a62
     post:
       operationId: createCms
       parameters: []
@@ -2824,9 +3108,9 @@ paths:
       responses:
         "201":
           description: ""
-      security: *a51
+      security: *a61
       summary: Create CMS content; writes OpsAuditLog CMS_UPDATE.
-      tags: *a52
+      tags: *a62
   /v1/ops/notifications/cms/{id}:
     get:
       operationId: getCms
@@ -2839,9 +3123,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a51
+      security: *a61
       summary: Get one CMS content item.
-      tags: *a52
+      tags: *a62
     patch:
       operationId: patchCms
       parameters:
@@ -2859,9 +3143,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a51
+      security: *a61
       summary: Edit CMS content or move it through DRAFT → IN_REVIEW → PUBLISHED; writes OpsAuditLog CMS_UPDATE.
-      tags: *a52
+      tags: *a62
   /v1/ops/overview:
     get:
       operationId: getOverview
@@ -2869,9 +3153,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a53
+      security: *a63
       summary: Ops dashboard KPIs + optional panels (hourlyTrend, recentActivity, ridesByArea, foodByCategory). Today = Asia/Ho_Chi_Minh. revenueVnd = gross booking value of completed rides + delivered food today; commissionVnd = driver fees + merchant commission today (null only if that query failed). Enrichment fail-soft → empty arrays.
-      tags: *a54
+      tags: *a64
   /v1/ops/partner-applications:
     get:
       operationId: list
@@ -2879,10 +3163,10 @@ paths:
       responses:
         "200":
           description: Queue
-      security: &a55
+      security: &a65
         - bearer: []
       summary: List partner applications (default status=SUBMITTED)
-      tags: &a56
+      tags: &a66
         - ops
   /v1/ops/partner-applications/{id}:
     get:
@@ -2896,9 +3180,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a55
+      security: *a65
       summary: Get partner application by ID for ops
-      tags: *a56
+      tags: *a66
   /v1/ops/partner-applications/{id}/approve:
     post:
       operationId: approve
@@ -2919,9 +3203,9 @@ paths:
           description: Approved
         "400":
           description: PARTNER_VEHICLE_CLASS_REQUIRED (DRIVER without a vehicle class)
-      security: *a55
+      security: *a65
       summary: Approve submitted KYC/KYB; sets RoleGrant ACTIVE
-      tags: *a56
+      tags: *a66
   /v1/ops/partner-applications/{id}/documents/{index}:
     get:
       operationId: document
@@ -2931,9 +3215,9 @@ paths:
           description: Stored file bytes (image/jpeg, image/png, application/pdf), Cache-Control private no-store.
         "404":
           description: PARTNER_DOCUMENT_NOT_FOUND (seed rows have metadata only).
-      security: *a55
+      security: *a65
       summary: Download one stored KYC/KYB document (ops review only)
-      tags: *a56
+      tags: *a66
   /v1/ops/partner-applications/{id}/reject:
     post:
       operationId: reject
@@ -2952,9 +3236,9 @@ paths:
       responses:
         "200":
           description: Rejected
-      security: *a55
+      security: *a65
       summary: Reject submitted KYC/KYB with reason; sets RoleGrant SUSPENDED
-      tags: *a56
+      tags: *a66
   /v1/ops/people:
     get:
       operationId: list
@@ -3020,10 +3304,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a57
+      security: &a67
         - bearer: []
       summary: List Admin PlatformSettings with optional search and category filters. Lazy-seeds from env bootstrap; DB overrides env.
-      tags: &a58
+      tags: &a68
         - ops
   /v1/ops/platform-settings/{key}:
     patch:
@@ -3043,9 +3327,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a57
+      security: *a67
       summary: Patch a platform setting by key { value, reason }. Validates type/range; writes OpsAuditLog SETTINGS_UPDATE.
-      tags: *a58
+      tags: *a68
   /v1/ops/promotions:
     get:
       operationId: list
@@ -3053,10 +3337,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a59
+      security: &a69
         - bearer: []
       summary: Ops list promotions with filters, pagination and KPIs
-      tags: &a60
+      tags: &a70
         - ops
     post:
       operationId: create
@@ -3070,9 +3354,9 @@ paths:
       responses:
         "201":
           description: ""
-      security: *a59
+      security: *a69
       summary: Ops create a new promotion voucher campaign
-      tags: *a60
+      tags: *a70
   /v1/ops/promotions/{id}:
     get:
       operationId: get
@@ -3085,9 +3369,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a59
+      security: *a69
       summary: Ops get promotion campaign detail
-      tags: *a60
+      tags: *a70
   /v1/ops/promotions/{id}/status:
     patch:
       operationId: updateStatus
@@ -3106,9 +3390,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a59
+      security: *a69
       summary: Ops update promotion status (active, paused, cancelled)
-      tags: *a60
+      tags: *a70
   /v1/ops/public-pages:
     get:
       operationId: list
@@ -3116,10 +3400,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a61
+      security: &a71
         - bearer: []
       summary: All public pages (draft state) for every locale
-      tags: &a62
+      tags: &a72
         - ops
   /v1/ops/public-pages/{slug}/{locale}:
     get:
@@ -3138,8 +3422,8 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a61
-      tags: *a62
+      security: *a71
+      tags: *a72
     put:
       operationId: save
       parameters:
@@ -3162,9 +3446,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a61
+      security: *a71
       summary: Save draft (not public until published)
-      tags: *a62
+      tags: *a72
   /v1/ops/public-pages/{slug}/{locale}/publish:
     post:
       operationId: publish
@@ -3190,9 +3474,9 @@ paths:
           description: ""
         "201":
           description: ""
-      security: *a61
+      security: *a71
       summary: Publish draft as a new version (audited with reason)
-      tags: *a62
+      tags: *a72
   /v1/ops/public-pages/{slug}/{locale}/reset:
     post:
       operationId: reset
@@ -3212,9 +3496,9 @@ paths:
           description: ""
         "201":
           description: ""
-      security: *a61
+      security: *a71
       summary: Replace the draft with the built-in default content
-      tags: *a62
+      tags: *a72
   /v1/ops/public-pages/{slug}/{locale}/revisions:
     get:
       operationId: revisions
@@ -3232,8 +3516,8 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a61
-      tags: *a62
+      security: *a71
+      tags: *a72
   /v1/ops/refunds:
     get:
       operationId: list
@@ -3268,6 +3552,34 @@ paths:
       summary: "Period report per Vietnam business day (Asia/Ho_Chi_Minh): completed/cancelled rides and food orders, gross booking value (revenueVnd) and platform commission. Max 92 days."
       tags:
         - ops
+  /v1/ops/reviews:
+    get:
+      operationId: list
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      security: &a73
+        - bearer: []
+      summary: Ops list store reviews (filter by store, visibility, max stars, text)
+      tags: &a74
+        - ops
+  /v1/ops/reviews/{id}/visibility:
+    patch:
+      operationId: setVisibility
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetReviewHiddenDto"
+      responses:
+        "200":
+          description: ""
+      security: *a73
+      summary: Ops hide or show a store review with a reason (audited; hidden reviews leave the average)
+      tags: *a74
   /v1/ops/ride-vehicle-classes:
     get:
       operationId: list
@@ -3275,10 +3587,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a63
+      security: &a75
         - bearer: []
       summary: List ride vehicle classes and their reference-fare parameters. Rows are bid bounds, not an approved tariff.
-      tags: &a64
+      tags: &a76
         - ops
   /v1/ops/ride-vehicle-classes/{code}:
     patch:
@@ -3298,9 +3610,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a63
+      security: *a75
       summary: Update one ride vehicle class. Code is immutable.
-      tags: *a64
+      tags: *a76
   /v1/ops/ride-vehicle-classes/{code}/image:
     post:
       operationId: uploadImage
@@ -3319,9 +3631,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a63
+      security: *a75
       summary: Upload a JPEG, PNG or WebP image for a vehicle class
-      tags: *a64
+      tags: *a76
     delete:
       operationId: clearImage
       parameters:
@@ -3333,9 +3645,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a63
+      security: *a75
       summary: Remove the image for a vehicle class
-      tags: *a64
+      tags: *a76
   /v1/ops/rides:
     get:
       operationId: list
@@ -3347,10 +3659,10 @@ paths:
           description: Missing/invalid ops session
         "403":
           description: Not ops channel
-      security: &a65
+      security: &a77
         - bearer: []
       summary: Ops paginated ride list
-      tags: &a66
+      tags: &a78
         - ops
   /v1/ops/rides/{id}:
     get:
@@ -3366,9 +3678,9 @@ paths:
           description: Ride
         "404":
           description: Not found
-      security: *a65
+      security: *a77
       summary: Ops ride detail
-      tags: *a66
+      tags: *a78
   /v1/ops/rides/{id}/cancel:
     post:
       operationId: cancel
@@ -3389,9 +3701,9 @@ paths:
           description: "Cancelled (cancelledBy: OPS, DEC-PROD-035)"
         "409":
           description: Not cancellable (terminal)
-      security: *a65
+      security: *a77
       summary: Ops cancel ride (CAP-OPS-05). Allowed while NEGOTIATING / pre-trip / IN_TRIP. Writes OpsAuditLog + outbox.
-      tags: *a66
+      tags: *a78
   /v1/ops/rides/{id}/ledger:
     get:
       operationId: getLedger
@@ -3404,9 +3716,9 @@ paths:
       responses:
         "200":
           description: Journal
-      security: *a65
+      security: *a77
       summary: Ops sandbox COD ledger journal for a ride
-      tags: *a66
+      tags: *a78
   /v1/ops/rides/{id}/reassign:
     post:
       operationId: reassign
@@ -3427,9 +3739,9 @@ paths:
           description: Reopened negotiating
         "409":
           description: Status does not allow reassign
-      security: *a65
+      security: *a77
       summary: Clear ride assignment back to NEGOTIATING when status is ASSIGNED / DRIVER_EN_ROUTE / DRIVER_ARRIVED.
-      tags: *a66
+      tags: *a78
   /v1/ops/role-grants:
     get:
       operationId: list
@@ -3452,10 +3764,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a67
+      security: &a79
         - bearer: []
       summary: List role grants for staff review. Default ?status=PENDING; also ACTIVE|SUSPENDED.
-      tags: &a68
+      tags: &a80
         - identity
   /v1/ops/role-grants/{id}/approve:
     post:
@@ -3469,9 +3781,9 @@ paths:
       responses:
         "200":
           description: Approved
-      security: *a67
+      security: *a79
       summary: Approve a pending role grant
-      tags: *a68
+      tags: *a80
   /v1/ops/role-grants/{id}/reject:
     post:
       operationId: reject
@@ -3484,9 +3796,9 @@ paths:
       responses:
         "200":
           description: Rejected
-      security: *a67
+      security: *a79
       summary: Reject a pending role grant
-      tags: *a68
+      tags: *a80
   /v1/ops/routing/route:
     get:
       operationId: route
@@ -3513,7 +3825,7 @@ paths:
         "200":
           description: Ops session
       summary: Ops email/password login (5 attempts per email per 5 minutes)
-      tags: &a69
+      tags: &a81
         - identity
     delete:
       operationId: logout
@@ -3527,7 +3839,7 @@ paths:
         "200":
           description: ""
       summary: Ops logout and revoke session/refresh token
-      tags: *a69
+      tags: *a81
   /v1/ops/settlements:
     get:
       operationId: list
@@ -3563,10 +3875,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a70
+      security: &a82
         - bearer: []
       summary: Ops paginated staff members (users with OPS role grant)
-      tags: &a71
+      tags: &a83
         - ops
   /v1/ops/staff/{id}:
     get:
@@ -3580,9 +3892,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a70
+      security: *a82
       summary: Ops staff detail (safe fields; no credentials or session tokens)
-      tags: *a71
+      tags: *a83
   /v1/ops/staff/{id}/password-reset:
     post:
       operationId: resetPassword
@@ -3609,9 +3921,9 @@ paths:
           description: OPS_STAFF_NOT_FOUND (no OPS grant)
         "409":
           description: OPS_NO_PASSWORD_LOGIN (target has no Admin password)
-      security: *a70
+      security: *a82
       summary: Super-admin sets another operator password; revokes their Admin sessions; audited (DEC-PROD-036)
-      tags: *a71
+      tags: *a83
   /v1/ops/staff/{id}/staff-role:
     post:
       operationId: setStaffRole
@@ -3630,9 +3942,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a70
+      security: *a82
       summary: Super-admin assigns OpsStaffRole; audited (DEC-PROD-043)
-      tags: *a71
+      tags: *a83
   /v1/ops/staff/{id}/super-admin:
     post:
       operationId: setSuperAdmin
@@ -3657,9 +3969,9 @@ paths:
           description: OPS_STAFF_NOT_FOUND (no OPS grant)
         "409":
           description: OPS_LAST_SUPER_ADMIN (cannot revoke the last one), OPS_STAFF_NOT_ACTIVE (grant needs an ACTIVE OPS grant), OPS_NO_PASSWORD_LOGIN
-      security: *a70
+      security: *a82
       summary: Super-admin grants/revokes the super-admin flag; the last one cannot be revoked; audited
-      tags: *a71
+      tags: *a83
   /v1/ops/staff/me:
     get:
       operationId: me
@@ -3667,9 +3979,9 @@ paths:
       responses:
         "200":
           description: "{ id, superAdmin } of the signed-in operator"
-      security: *a70
+      security: *a82
       summary: "The signed-in operator: id + superAdmin (DEC-PROD-036)"
-      tags: *a71
+      tags: *a83
   /v1/ops/staff/rbac-matrix:
     get:
       operationId: rbacMatrix
@@ -3677,9 +3989,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a70
+      security: *a82
       summary: Default ops role → permission matrix (DEC-PROD-043)
-      tags: *a71
+      tags: *a83
   /v1/ops/stores:
     get:
       operationId: list
@@ -3699,10 +4011,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a72
+      security: &a84
         - bearer: []
       summary: Ops paginated food store list
-      tags: &a73
+      tags: &a85
         - ops
   /v1/ops/stores/{id}:
     get:
@@ -3716,9 +4028,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a72
+      security: *a84
       summary: Ops food store detail (catalog items included)
-      tags: *a73
+      tags: *a85
   /v1/ops/support-tickets:
     get:
       operationId: list
@@ -3726,10 +4038,10 @@ paths:
       responses:
         "200":
           description: "{ items, total, page, limit } newest lastMessageAt first; items include requester { userId, displayName, phone, email } or web contact."
-      security: &a74
+      security: &a86
         - bearer: []
       summary: Support tickets for Ops. ?status=&category=&channel=&q=&page=&limit=
-      tags: &a75
+      tags: &a87
         - ops
   /v1/ops/support-tickets/{id}:
     get:
@@ -3745,9 +4057,9 @@ paths:
           description: Ticket with full thread including staff authorUserId.
         "404":
           description: SUPPORT_TICKET_NOT_FOUND.
-      security: *a74
+      security: *a86
       summary: Ticket detail with requester and full thread
-      tags: *a75
+      tags: *a87
     patch:
       operationId: patch
       parameters:
@@ -3769,9 +4081,9 @@ paths:
           description: SUPPORT_PATCH_EMPTY, validation.
         "404":
           description: SUPPORT_TICKET_NOT_FOUND.
-      security: *a74
+      security: *a86
       summary: Change status and/or priority; writes OpsAuditLog SUPPORT_TICKET_UPDATE
-      tags: *a75
+      tags: *a87
   /v1/ops/support-tickets/{id}/messages/{messageId}/attachments/{index}:
     get:
       operationId: attachment
@@ -3779,9 +4091,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a74
+      security: *a86
       summary: Download a ticket attachment (Ops)
-      tags: *a75
+      tags: *a87
   /v1/ops/support-tickets/{id}/replies:
     post:
       operationId: reply
@@ -3804,9 +4116,67 @@ paths:
           description: Updated ticket. OPEN moves to IN_PROGRESS. APP requesters get an inbox notice (aggregateType SupportTicket, sourceEventKey support-reply:<messageId>). Audited.
         "409":
           description: SUPPORT_TICKET_CLOSED.
-      security: *a74
+      security: *a86
       summary: Reply as DealGo support (OPEN → IN_PROGRESS; CLOSED → 409). Notifies an app requester in the inbox.
-      tags: *a75
+      tags: *a87
+  /v1/ops/system-errors/issues:
+    get:
+      operationId: list
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      security: &a88
+        - bearer: []
+      summary: Sentry issues (25 per page) filtered by project, environment, status, period, search.
+      tags: &a89
+        - ops
+  /v1/ops/system-errors/issues/{id}:
+    get:
+      operationId: detail
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+      security: *a88
+      summary: Issue detail with the latest event (top frames, tags).
+      tags: *a89
+  /v1/ops/system-errors/issues/{id}/status:
+    put:
+      operationId: updateStatus
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateIssueStatusDto"
+      responses:
+        "200":
+          description: ""
+      security: *a88
+      summary: Resolve / ignore / unresolve (needs a token with event:write). Audited with reason.
+      tags: *a89
+  /v1/ops/system-errors/issues/count:
+    get:
+      operationId: count
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      security: *a88
+      summary: Unresolved issues in the last 14 days (nav badge); count is null when not configured.
+      tags: *a89
   /v1/ops/transactions:
     get:
       operationId: list
@@ -3853,10 +4223,10 @@ paths:
           description: USER_NOT_FOUND
         "409":
           description: ACCOUNT_DELETION_NOT_SCHEDULED (not deleted, or already purged)
-      security: &a76
+      security: &a90
         - bearer: []
       summary: Restore an account during its deletion grace period (audited)
-      tags: &a77
+      tags: &a91
         - ops
   /v1/ops/users/{id}/driver-balance:
     get:
@@ -3870,9 +4240,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a76
+      security: *a90
       summary: Unsettled fees + signed adjustments (cancel/no-show fee hand-overs, voucher reimbursements) vs DRIVER_DEBT_LIMIT_VND
-      tags: *a77
+      tags: *a91
   /v1/ops/users/{id}/driver-payments:
     post:
       operationId: driverPayment
@@ -3891,9 +4261,9 @@ paths:
       responses:
         "201":
           description: ""
-      security: *a76
+      security: *a90
       summary: Record a partial driver payment / top-up or a DealGo payout (audited)
-      tags: *a77
+      tags: *a91
   /v1/ops/users/{id}/fee-balance:
     get:
       operationId: feeBalance
@@ -3908,9 +4278,9 @@ paths:
           description: "{ amountVnd, settledThrough } — platform fees on COD jobs since the last settlement"
         "404":
           description: USER_NOT_FOUND
-      security: *a76
+      security: *a90
       summary: Driver platform fee accrued on cash jobs and not yet settled
-      tags: *a77
+      tags: *a91
   /v1/ops/users/{id}/fee-settlements:
     post:
       operationId: settle
@@ -3933,9 +4303,9 @@ paths:
           description: USER_NOT_FOUND
         "409":
           description: DRIVER_FEE_NOTHING_OUTSTANDING
-      security: *a76
+      security: *a90
       summary: Ops confirms the driver paid the outstanding platform fee (audited)
-      tags: *a77
+      tags: *a91
   /v1/ops/zones:
     get:
       operationId: listZones
@@ -3943,10 +4313,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a78
+      security: &a92
         - bearer: []
       summary: List service zones with open demand counts by serviceRegionCode. Default status=ACTIVE; use status=ALL for the management table.
-      tags: &a79
+      tags: &a93
         - ops
     post:
       operationId: createZone
@@ -3960,9 +4330,9 @@ paths:
       responses:
         "201":
           description: ""
-      security: *a78
+      security: *a92
       summary: Create a service zone { code, label, center, bbox, status?, reason }. Writes OpsAuditLog SERVICE_REGION_UPDATE. Zones are never deleted — set status PLANNED to disable.
-      tags: *a79
+      tags: *a93
   /v1/ops/zones/{code}:
     patch:
       operationId: patchZone
@@ -3981,9 +4351,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a78
+      security: *a92
       summary: Patch a service zone (label/center/bbox/status) with a required reason. Cannot deactivate the last ACTIVE zone.
-      tags: *a79
+      tags: *a93
   /v1/ops/zones/rules:
     get:
       operationId: listRules
@@ -3991,9 +4361,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a78
+      security: *a92
       summary: List pricing rules derived from PlatformSetting fare / radius knobs
-      tags: *a79
+      tags: *a93
   /v1/payments/webhooks/momo:
     post:
       operationId: momo
@@ -4002,7 +4372,7 @@ paths:
         "200":
           description: Ack; may mark CAPTURED_STUB — not real settlement
       summary: MoMo IPN stub — verify signature when MoMo keys set; idempotent by orderId/transId
-      tags: &a80
+      tags: &a94
         - payments
   /v1/payments/webhooks/vnpay:
     post:
@@ -4014,7 +4384,7 @@ paths:
         "400":
           description: Invalid signature when secret configured
       summary: VNPAY IPN stub — verify SecureHash when VNPAY_HASH_SECRET set; idempotent event id
-      tags: *a80
+      tags: *a94
   /v1/places/reverse:
     get:
       operationId: reverse
@@ -4040,10 +4410,10 @@ paths:
           description: "`{ place: { lat, lng, name, address, provider } | null, available }` — names a GPS fix; coordinates stay the device's."
         "400":
           description: Invalid coordinates
-      security: &a81
+      security: &a95
         - bearer: []
       summary: Nearest address for a GPS fix; { place {lat,lng,name,address,provider} | null, available }
-      tags: &a82
+      tags: &a96
         - places
   /v1/places/search:
     get:
@@ -4084,9 +4454,9 @@ paths:
           description: |
             `{ items: [{ lat, lng, name, address, provider }], available }` from MapsPort (Goong/Google, or the
             Da Nang landmark mock in dev). `available=false` when no provider is configured (DEC-PROD-016).
-      security: *a81
+      security: *a95
       summary: Search places in Vietnam (Mapbox + optional OSM/Photon), ranked city-first by distance and text; { items[{lat,lng,name,address,provider,distanceKm?,approximate?}], available }
-      tags: *a82
+      tags: *a96
   /v1/promotions/available:
     get:
       operationId: available
@@ -4094,10 +4464,10 @@ paths:
       responses:
         "200":
           description: "Up to 20 running ACTIVE campaigns for audience ALL/CUSTOMER with budget/usage left and per-user uses left, ordered by end date: [{ code, name, description, serviceType, discountType, discountValue, maxDiscountVnd, minOrderVnd, endsAt, usesLeft }]. No budget/sponsor fields."
-      security: &a83
+      security: &a97
         - bearer: []
       summary: Vouchers the signed-in customer can still use (ACTIVE, running, budget left, per-user limit not reached)
-      tags: &a84
+      tags: &a98
         - promotions
   /v1/promotions/validate:
     post:
@@ -4112,9 +4482,9 @@ paths:
       responses:
         "200":
           description: "Quote only (nothing reserved): { valid, code, discountAmount, finalAmount, reason?, rejectCode?, campaign? }. Counts the caller's past redemptions for userLimit."
-      security: *a83
+      security: *a97
       summary: Validate and calculate discount for Ride or Food order checkout (customer session)
-      tags: *a84
+      tags: *a98
   /v1/public/avatars/{userId}/{file}:
     get:
       operationId: read
@@ -4137,6 +4507,16 @@ paths:
       summary: A user's current avatar image (404 for replaced or unknown files)
       tags:
         - identity
+  /v1/public/client-config:
+    get:
+      operationId: get
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      summary: "{ mapboxPublicToken } — Mapbox pk.* token for map tiles (null when unset)."
+      tags:
+        - public
   /v1/public/cms:
     get:
       operationId: list
@@ -4147,6 +4527,35 @@ paths:
       summary: Public CMS content (terms, privacy, support). ?kind= &q=
       tags:
         - public
+  /v1/public/food-categories:
+    get:
+      operationId: list
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      summary: Active store categories in display order; { items[{code,nameVi,nameEn,icon,tone,imageUrl}] }
+      tags: &a99
+        - food
+  /v1/public/food-categories/images/{code}/{file}:
+    get:
+      operationId: image
+      parameters:
+        - name: code
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: file
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+      summary: Current tile image of a store category
+      tags: *a99
   /v1/public/help/faqs:
     get:
       operationId: list
@@ -4165,7 +4574,7 @@ paths:
         "200":
           description: ""
       summary: Live home banners for one role (CUSTOMER/DRIVER/MERCHANT), optional service and region (code or lat/lng); { items[{id,imageUrl,cta{kind:app|web,target},service}] }
-      tags: &a85
+      tags: &a100
         - home-banners
   /v1/public/home-banners/events:
     post:
@@ -4181,7 +4590,7 @@ paths:
         "200":
           description: ""
       summary: Record banner impressions / clicks (batch ≤ 50); unknown or non-live ids are ignored
-      tags: *a85
+      tags: *a100
   /v1/public/home-banners/images/{id}/{file}:
     get:
       operationId: image
@@ -4200,7 +4609,7 @@ paths:
         "200":
           description: ""
       summary: Current image of a home banner
-      tags: *a85
+      tags: *a100
   /v1/public/menu-items/{itemId}/{file}:
     get:
       operationId: read
@@ -4305,6 +4714,26 @@ paths:
       summary: A store's current logo (404 for replaced or unknown files)
       tags:
         - food
+  /v1/public/store-covers/{storeId}/{file}:
+    get:
+      operationId: readCover
+      parameters:
+        - name: storeId
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: file
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+      summary: A store's current cover photo (404 for replaced or unknown files)
+      tags:
+        - food
   /v1/public/support/tickets:
     post:
       operationId: create
@@ -4346,10 +4775,10 @@ paths:
           description: RATING_ALREADY_SUBMITTED (one rating per ride/order).
         "422":
           description: RATING_NOT_ALLOWED (ride not COMPLETED / order not DELIVERED), RATING_WINDOW_EXPIRED (more than RATING_WINDOW_DAYS days after completion; admin setting, seed 7; DEC-PROD-013).
-      security: &a86
+      security: &a101
         - bearer: []
       summary: Rate a completed ride or delivered food order (customer, once)
-      tags: &a87
+      tags: &a102
         - ratings
   /v1/ratings/{subjectType}/{subjectId}:
     get:
@@ -4360,9 +4789,9 @@ paths:
           description: "{ rating | null, canRate, rateableUntil | null }. canRate is false once rateableUntil (completion + RATING_WINDOW_DAYS) has passed."
         "404":
           description: RATING_SUBJECT_NOT_FOUND.
-      security: *a86
+      security: *a101
       summary: The rating of one ride/order, and whether it can still be rated
-      tags: *a87
+      tags: *a102
   /v1/ratings/stores:
     get:
       operationId: stores
@@ -4372,21 +4801,21 @@ paths:
           description: "[{ storeId, count, average | null }]. average (1 decimal) is null while count < RATING_STORE_MIN_COUNT (Admin setting, default 3); unknown ids return count 0."
         "400":
           description: VALIDATION_FAILED (non-UUID id or more than 50 ids).
-      security: *a86
+      security: *a101
       summary: Store rating summaries for browse cards (average hidden below RATING_STORE_MIN_COUNT)
-      tags: *a87
+      tags: *a102
   /v1/ratings/stores/{storeId}/reviews:
     get:
       operationId: storeReviews
       parameters: []
       responses:
         "200":
-          description: "{ summary: { storeId, count, average | null }, items: [{ stars, tags, comment | null, createdAt }] } — latest 20 reviews, no rater identity; items is empty while the average is hidden."
+          description: "{ summary: { storeId, count, average | null, distribution | null }, items: [{ id, stars, tags, comment | null, createdAt, merchantReply | null, repliedAt | null }], page, hasMore } — newest first, optional stars filter, hidden reviews excluded, no rater identity; items is empty while the average is hidden."
         "400":
           description: VALIDATION_FAILED.
-      security: *a86
+      security: *a101
       summary: Store rating summary and newest reviews (no rater identity; hidden below RATING_STORE_MIN_COUNT)
-      tags: *a87
+      tags: *a102
   /v1/rides:
     post:
       operationId: create
@@ -4400,10 +4829,10 @@ paths:
       responses:
         "200":
           description: Ride created or idempotent replay
-      security: &a88
+      security: &a103
         - bearer: []
       summary: Create a negotiating ride (Idempotency-Key required)
-      tags: &a89
+      tags: &a104
         - rides
     get:
       operationId: listMine
@@ -4411,9 +4840,9 @@ paths:
       responses:
         "200":
           description: Page of rides owned by the customer
-      security: *a88
+      security: *a103
       summary: Customer paginated ride history (actor-scoped)
-      tags: *a89
+      tags: *a104
   /v1/rides/{id}:
     get:
       operationId: get
@@ -4428,9 +4857,9 @@ paths:
           description: Ride
         "404":
           description: Not found / not visible
-      security: *a88
+      security: *a103
       summary: Get a ride by id
-      tags: *a89
+      tags: *a104
   /v1/rides/{id}/arrived:
     post:
       operationId: markArrived
@@ -4447,9 +4876,9 @@ paths:
           description: Not assigned driver
         "409":
           description: Illegal transition
-      security: *a88
+      security: *a103
       summary: Assigned driver marks arrived (DRIVER_EN_ROUTE → DRIVER_ARRIVED)
-      tags: *a89
+      tags: *a104
   /v1/rides/{id}/cancel:
     post:
       operationId: cancel
@@ -4464,9 +4893,9 @@ paths:
           description: "CANCELLED with cancelledBy: CUSTOMER (DEC-PROD-035)"
         "409":
           description: Not cancellable
-      security: *a88
+      security: *a103
       summary: Customer cancels while NEGOTIATING or before IN_TRIP. After RIDE_FREE_CANCEL_MINUTES from assignment (or once the driver arrived) a class late-cancel fee is recorded.
-      tags: *a89
+      tags: *a104
   /v1/rides/{id}/complete:
     post:
       operationId: complete
@@ -4483,9 +4912,9 @@ paths:
           description: Not assigned driver
         "409":
           description: Illegal transition
-      security: *a88
+      security: *a103
       summary: Assigned driver completes trip (IN_TRIP → COMPLETED). Records committed agreedFareVnd only; no payment mock.
-      tags: *a89
+      tags: *a104
   /v1/rides/{id}/customer:
     get:
       operationId: rideCustomer
@@ -4498,9 +4927,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a11
+      security: *a15
       summary: Customer's name and avatar (assigned driver only)
-      tags: *a12
+      tags: *a16
   /v1/rides/{id}/customer-rating:
     get:
       operationId: customerRating
@@ -4513,9 +4942,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a88
+      security: *a103
       summary: "Assigned driver: own rating of this ride's customer and the customer's average"
-      tags: *a89
+      tags: *a104
     post:
       operationId: rateCustomer
       parameters:
@@ -4533,9 +4962,9 @@ paths:
       responses:
         "201":
           description: ""
-      security: *a88
+      security: *a103
       summary: Assigned driver rates the customer once (completed or no-show ride)
-      tags: *a89
+      tags: *a104
   /v1/rides/{id}/driver:
     get:
       operationId: rideDriver
@@ -4550,9 +4979,9 @@ paths:
           description: DriverCard {driverId, displayName, avatarUrl, vehiclePlate, vehicleType, ratingAverage, ratingCount}
         "404":
           description: RIDE_NOT_FOUND or DRIVER_NOT_ASSIGNED
-      security: *a11
+      security: *a15
       summary: Assigned driver's name, declared vehicle and rating (ride customer only)
-      tags: *a12
+      tags: *a16
   /v1/rides/{id}/driver-cancel:
     post:
       operationId: driverCancel
@@ -4571,9 +5000,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a88
+      security: *a103
       summary: Assigned driver cancels before the trip starts (reason required); the ride goes back to bidding
-      tags: *a89
+      tags: *a104
   /v1/rides/{id}/driver-location:
     get:
       operationId: driverLocation
@@ -4588,9 +5017,9 @@ paths:
           description: "{ location: { lat, lng, at } | null }"
         "404":
           description: Not found or not the customer
-      security: *a88
+      security: *a103
       summary: "Customer: assigned driver position while the ride is active (DEC-PROD-031). location=null when unknown or older than 2 minutes."
-      tags: *a89
+      tags: *a104
   /v1/rides/{id}/en-route:
     post:
       operationId: markEnRoute
@@ -4607,9 +5036,9 @@ paths:
           description: Not assigned driver
         "409":
           description: Illegal transition
-      security: *a88
+      security: *a103
       summary: Assigned driver marks en route to pickup (ASSIGNED → DRIVER_EN_ROUTE)
-      tags: *a89
+      tags: *a104
   /v1/rides/{id}/fare:
     post:
       operationId: raiseFare
@@ -4628,9 +5057,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a88
+      security: *a103
       summary: Customer raises the bid while NEGOTIATING (extends the request window)
-      tags: *a89
+      tags: *a104
   /v1/rides/{id}/ledger:
     get:
       operationId: getLedger
@@ -4645,9 +5074,9 @@ paths:
           description: POSTED balanced journal
         "404":
           description: Ride or journal not found
-      security: *a88
+      security: *a103
       summary: Sandbox COD ledger journal for a ride (customer/assigned driver)
-      tags: *a89
+      tags: *a104
   /v1/rides/{id}/no-show:
     post:
       operationId: markNoShow
@@ -4660,9 +5089,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a88
+      security: *a103
       summary: Driver reports a customer no-show after waiting RIDE_NO_SHOW_WAIT_MINUTES at pickup
-      tags: *a89
+      tags: *a104
   /v1/rides/{id}/offers:
     post:
       operationId: offer
@@ -4681,9 +5110,9 @@ paths:
       responses:
         "200":
           description: Offer recorded
-      security: *a88
+      security: *a103
       summary: Driver offer or counter on a negotiating ride
-      tags: *a89
+      tags: *a104
   /v1/rides/{id}/offers/{offerId}/driver:
     get:
       operationId: offerDriver
@@ -4703,9 +5132,9 @@ paths:
           description: DriverCard
         "404":
           description: RIDE_NOT_FOUND or RIDE_OFFER_NOT_FOUND
-      security: *a11
+      security: *a15
       summary: Driver behind an offer on the customer ride (name, vehicle, rating)
-      tags: *a12
+      tags: *a16
   /v1/rides/{id}/offers/decline:
     post:
       operationId: declineOffer
@@ -4724,9 +5153,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a88
+      security: *a103
       summary: Customer rejects one driver's offer
-      tags: *a89
+      tags: *a104
   /v1/rides/{id}/offers/withdraw:
     post:
       operationId: withdrawOffer
@@ -4739,9 +5168,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a88
+      security: *a103
       summary: Driver withdraws their pending offer
-      tags: *a89
+      tags: *a104
   /v1/rides/{id}/selection:
     post:
       operationId: select
@@ -4762,9 +5191,9 @@ paths:
           description: Assigned. RideView includes discountVnd, voucherCode and cashDueVnd.
         "422":
           description: Voucher rejected (errorCode VOUCHER_*); nothing is assigned and the ride stays NEGOTIATING.
-      security: *a88
+      security: *a103
       summary: Customer selects an offer (Idempotency-Key required)
-      tags: *a89
+      tags: *a104
   /v1/rides/{id}/share-link:
     post:
       operationId: create
@@ -4816,9 +5245,9 @@ paths:
           description: RIDE_PICKUP_CODE_INVALID
         "423":
           description: RIDE_PICKUP_CODE_LOCKED (RIDE_PICKUP_CODE_MAX_ATTEMPTS reached)
-      security: *a88
+      security: *a103
       summary: Assigned driver starts trip with the customer pickup code (DRIVER_ARRIVED → IN_TRIP)
-      tags: *a89
+      tags: *a104
   /v1/rides/{rideId}/calls:
     post:
       operationId: start
@@ -4848,10 +5277,10 @@ paths:
       responses:
         "200":
           description: ""
-      security: &a90
+      security: &a105
         - bearer: []
       summary: List transaction chat messages for a ride (participants only; text only)
-      tags: &a91
+      tags: &a106
         - chat
     post:
       operationId: post
@@ -4870,9 +5299,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a90
+      security: *a105
       summary: Post a text chat message on a ride (participants only)
-      tags: *a91
+      tags: *a106
   /v1/rides/open:
     get:
       operationId: listOpen
@@ -4881,9 +5310,9 @@ paths:
         "200":
           description: |
             Open rides within DRIVER_SEARCH_RADIUS_KM of driver when lat/lng provided; otherwise a capped recent list (DISPATCH_FALLBACK_LIMIT). Requires ACTIVE DRIVER (+ approved KYC unless PARTNER_ELIGIBILITY_BYPASS).
-      security: *a88
+      security: *a103
       summary: List open negotiating rides near the driver (query lat/lng or the fresh presence fix) within DRIVER_SEARCH_RADIUS_KM, nearest first. With DISPATCH_REQUIRE_FRESH_PRESENCE a missing/stale fix is 409 DRIVER_LOCATION_STALE; over DRIVER_DEBT_LIMIT_VND is 403.
-      tags: *a89
+      tags: *a104
   /v1/rides/pending-fees:
     get:
       operationId: pendingFees
@@ -4891,9 +5320,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a88
+      security: *a103
       summary: Customer unpaid late-cancel / no-show fees (added to the next completed ride cash)
-      tags: *a89
+      tags: *a104
   /v1/rides/quote:
     post:
       operationId: quote
@@ -4907,14 +5336,16 @@ paths:
       responses:
         "200":
           description: |
-            `{ distanceKm, referenceFareVnd, minFareVnd, maxFareVnd }` — same reference rule as create
-            (RIDE_REFERENCE_VND_PER_KM × route km, floored at RIDE_MIN_FARE_VND); bounds are the admin
-            settings RIDE_MIN_FARE_VND / RIDE_MAX_FARE_VND (DEC-PROD-016).
+            `{ distanceKm, referenceFareVnd, minFareVnd, maxFareVnd, options[] }` — same reference rule as create:
+            per vehicle class, base + km × per-km + minutes × per-minute, rounded up to 1.000đ and kept inside the
+            class bounds; `minBidVnd` = RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE % of it, rounded up to 1.000đ. Bids,
+            raises and driver counters are rounded up to 1.000đ before they are checked and stored (DEC-PROD-016,
+            DEC-PROD-059).
         "400":
           description: Missing or invalid pickup/dropoff
-      security: *a88
+      security: *a103
       summary: Route distance, server reference fare and admin fare bounds before booking
-      tags: *a89
+      tags: *a104
   /v1/rides/route:
     get:
       operationId: route
@@ -4922,9 +5353,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a88
+      security: *a103
       summary: Road geometry for the app via Nest ROUTING_PROVIDER (DEC-PROD-045). available=false → draw a straight line.
-      tags: *a89
+      tags: *a104
   /v1/rides/vehicle-classes:
     get:
       operationId: vehicleClasses
@@ -4932,9 +5363,9 @@ paths:
       responses:
         "200":
           description: ""
-      security: *a88
+      security: *a103
       summary: Enabled ride vehicle classes for booking and driver registration
-      tags: *a89
+      tags: *a104
   /v1/support/tickets:
     get:
       operationId: list
@@ -4942,10 +5373,10 @@ paths:
       responses:
         "200":
           description: "{ items: SupportTicket[] (no messages), total, page, limit, activeCount, doneCount }, newest lastMessageAt first. Only tickets the caller created."
-      security: &a92
+      security: &a107
         - bearer: []
       summary: My support tickets, latest activity first. ?state=ACTIVE|DONE
-      tags: &a93
+      tags: &a108
         - support
     post:
       operationId: create
@@ -4965,9 +5396,9 @@ paths:
           description: SUPPORT_RELATED_NOT_FOUND (related ride/order missing or caller not a participant).
         "409":
           description: SUPPORT_TICKET_LIMIT_REACHED (SUPPORT_TICKET_MAX_OPEN_PER_USER active tickets, default 5; enforced under a user row lock).
-      security: *a92
+      security: *a107
       summary: Open a support ticket (optionally about one of my rides/orders). Open tickets per user are capped by SUPPORT_TICKET_MAX_OPEN_PER_USER.
-      tags: *a93
+      tags: *a108
   /v1/support/tickets/{id}:
     get:
       operationId: get
@@ -4982,9 +5413,9 @@ paths:
           description: SupportTicket with messages. Staff identities are never exposed.
         "404":
           description: SUPPORT_TICKET_NOT_FOUND (also for other users' tickets).
-      security: *a92
+      security: *a107
       summary: One of my tickets with its message thread
-      tags: *a93
+      tags: *a108
   /v1/support/tickets/{id}/messages:
     post:
       operationId: message
@@ -5009,9 +5440,9 @@ paths:
           description: SUPPORT_TICKET_NOT_FOUND.
         "409":
           description: SUPPORT_TICKET_CLOSED.
-      security: *a92
+      security: *a107
       summary: Add a message to my ticket (reopens a RESOLVED ticket; CLOSED → 409)
-      tags: *a93
+      tags: *a108
   /v1/support/tickets/{id}/messages/{messageId}/attachments/{index}:
     get:
       operationId: attachment
@@ -5021,9 +5452,9 @@ paths:
           description: Attachment bytes (owner only; ops use /v1/ops/support-tickets/{id}/messages/{messageId}/attachments/{index}).
         "404":
           description: SUPPORT_ATTACHMENT_NOT_FOUND.
-      security: *a92
+      security: *a107
       summary: Download an attachment from one of my tickets
-      tags: *a93
+      tags: *a108
 components:
   securitySchemes:
     bearer:
@@ -5338,7 +5769,22 @@ components:
     SetFoodItemAvailabilityDto:
       type: object
       properties: {}
-    RenameCatalogCategoryDto:
+    CreateStoreOfferDto:
+      type: object
+      properties: {}
+    UpdateStoreOfferStatusDto:
+      type: object
+      properties: {}
+    CreateFoodCategoryDto:
+      type: object
+      properties: {}
+    ReorderFoodCategoriesDto:
+      type: object
+      properties: {}
+    PatchFoodCategoryDto:
+      type: object
+      properties: {}
+    UploadFoodCategoryImageDto:
       type: object
       properties: {}
     CreateSavedAddressDto:
@@ -5371,6 +5817,12 @@ components:
     SubmitRatingDto:
       type: object
       properties: {}
+    ReplyReviewDto:
+      type: object
+      properties: {}
+    SetReviewHiddenDto:
+      type: object
+      properties: {}
     CreateSupportTicketDto:
       type: object
       properties: {}
@@ -5392,6 +5844,9 @@ components:
         password:
           type: string
           description: Account password when method = PASSWORD
+        passkey:
+          type: object
+          description: WebAuthn assertion (AuthenticationResponseJSON) over start.passkeyOptions when method = PASSKEY
     OpsReasonDto:
       type: object
       properties:
@@ -5437,5 +5892,26 @@ components:
       type: object
       properties: {}
     PatchAuthMethodDto:
+      type: object
+      properties: {}
+    PutEmailSettingsDto:
+      type: object
+      properties: {}
+    TestEmailDto:
+      type: object
+      properties: {}
+    PutMapKeysDto:
+      type: object
+      properties: {}
+    TestMapKeysDto:
+      type: object
+      properties: {}
+    PutSentrySettingsDto:
+      type: object
+      properties: {}
+    TestSentryDto:
+      type: object
+      properties: {}
+    UpdateIssueStatusDto:
       type: object
       properties: {}

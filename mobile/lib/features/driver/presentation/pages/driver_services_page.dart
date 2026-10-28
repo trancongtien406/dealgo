@@ -77,13 +77,6 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
           ),
           children: [
             Text(l10n.driverServicesHeadline, style: textTheme.titleLarge),
-            const SizedBox(height: DealGoSpacing.s8),
-            Text(
-              l10n.driverServicesBody,
-              style: textTheme.bodyMedium?.copyWith(
-                color: DealGoColors.textSecondary,
-              ),
-            ),
             const SizedBox(height: DealGoSpacing.s16),
             DriverPanel(
               color: online
@@ -107,12 +100,6 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
                               ? l10n.driverServicesOnlineTitle
                               : l10n.driverServicesOfflineTitle,
                           style: textTheme.titleMedium,
-                        ),
-                        Text(
-                          online
-                              ? l10n.driverServicesOnlineBody
-                              : l10n.driverServicesOfflineBody,
-                          style: textTheme.bodySmall,
                         ),
                       ],
                     ),
@@ -170,7 +157,6 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
                     icon: DealGoIcons.motorbike,
                     iconColor: DealGoColors.primary,
                     title: l10n.driverServicesRideTitle,
-                    subtitle: l10n.driverServicesRideBody,
                     registered: kyc.rideService != false,
                     value: prefs.rideEnabled,
                     onChanged: services.busy
@@ -185,7 +171,6 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
                     icon: DealGoIcons.store,
                     iconColor: DealGoColors.brandGreen,
                     title: l10n.driverServicesFoodTitle,
-                    subtitle: l10n.driverServicesFoodBody,
                     registered: kyc.foodService != false,
                     value: prefs.foodEnabled,
                     onChanged: services.busy
@@ -298,13 +283,6 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
                 ],
               ),
             ),
-            const SizedBox(height: DealGoSpacing.s12),
-            Text(
-              l10n.driverServicesPolicyHint,
-              style: textTheme.bodySmall?.copyWith(
-                color: DealGoColors.textSecondary,
-              ),
-            ),
             if (services.status == DriverServicesStatus.saved) ...[
               const SizedBox(height: DealGoSpacing.s12),
               DriverNote(
@@ -332,7 +310,6 @@ class _ServiceRow extends StatelessWidget {
     required this.icon,
     required this.iconColor,
     required this.title,
-    required this.subtitle,
     required this.registered,
     required this.value,
     required this.onChanged,
@@ -342,7 +319,6 @@ class _ServiceRow extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String title;
-  final String subtitle;
 
   /// False only when the KYC application says the driver did not apply for this service.
   final bool registered;
@@ -374,7 +350,6 @@ class _ServiceRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, style: textTheme.titleMedium),
-                Text(subtitle, style: textTheme.bodySmall),
                 const SizedBox(height: DealGoSpacing.s8),
                 DriverChip(
                   label: registered

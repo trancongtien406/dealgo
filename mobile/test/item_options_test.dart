@@ -451,8 +451,8 @@ void main() {
     GoRouter.of(tester.element(find.text('Tổng quan cửa hàng')))
         .push(MerchantRoutes.itemVariants('item-tea', itemName: 'Trà sữa'));
     await tester.pumpAndSettle();
-    expect(find.text('Size, biến thể & topping'), findsOneWidget);
-    expect(find.text('Giá gốc 45.000đ'), findsOneWidget);
+    expect(find.text('Tùy chọn món'), findsOneWidget);
+    expect(find.text('Giá bán 45.000đ'), findsOneWidget);
     // Required single-choice group shows absolute prices (M028).
     expect(find.text('55.000đ'), findsOneWidget);
     expect(find.text('+8.000đ'), findsNWidgets(2));
@@ -530,9 +530,22 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(card);
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('food-add-item-tea')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('food-add-item-tea')));
       await tester.pumpAndSettle();
 
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('food-option-o-l')),
+        120,
+        scrollable: find
+            .descendant(
+              of: find.byType(FoodItemOptionsPage),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('food-option-o-l')));
       await tester.pumpAndSettle();
       final topping = find.byKey(const Key('food-option-o-tc'));

@@ -235,11 +235,6 @@ class _RideOfferDetailViewState extends State<_RideOfferDetailView> {
                               ],
                             ),
                           ),
-                          const SizedBox(height: DealGoSpacing.s12),
-                          DealGoBanner(
-                            tone: DealGoBannerTone.info,
-                            message: l10n.rideOfferDetailHint,
-                          ),
                         ],
                       ],
                     ),

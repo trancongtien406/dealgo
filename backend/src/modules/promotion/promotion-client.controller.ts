@@ -30,7 +30,7 @@ export class PromotionClientController {
       'Vouchers the signed-in customer can still use (ACTIVE, running, budget left, per-user limit not reached)',
   })
   available(@CurrentActor() actor: RequestActor, @Query() query: AvailableVouchersQueryDto) {
-    return this.promotions.listAvailableForCustomer(actor.userId, query.serviceType);
+    return this.promotions.listAvailableForCustomer(actor.userId, query.serviceType, query.storeId);
   }
 
   @Post('validate')

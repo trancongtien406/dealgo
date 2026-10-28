@@ -6,6 +6,7 @@ import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/motion/dealgo_motion_widgets.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/food_models.dart';
 import '../../domain/usecases/list_food_stores.dart';
@@ -13,17 +14,19 @@ import '../../../../core/location/location_service.dart';
 import '../../../rating/domain/service_rating.dart';
 import '../cubit/food_discovery_cubit.dart';
 import '../utils/food_routes.dart';
+import '../widgets/food_cart_bar.dart';
 import '../widgets/food_widgets.dart';
-import '../widgets/store_meta.dart';
+import '../widgets/food_badges.dart';
+import '../food_categories_store.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 /// C024 — category / nearby store results list.
 class FoodCategoryPage extends StatelessWidget {
-  const FoodCategoryPage({this.group, super.key});
+  const FoodCategoryPage({this.categoryCode, super.key});
 
-  /// Null or [FoodStoreGroup.near] = every store.
-  final FoodStoreGroup? group;
+  /// Admin-managed category code; null = every store.
+  final String? categoryCode;
 
   @override
   Widget build(BuildContext context) {
@@ -33,15 +36,15 @@ class FoodCategoryPage extends StatelessWidget {
         ratings: context.read<RatingRepository>(),
         location: context.read<LocationService>(),
       )..load(currentAccessToken(context)),
-      child: _FoodCategoryView(group: group),
+      child: _FoodCategoryView(categoryCode: categoryCode),
     );
   }
 }
 
 class _FoodCategoryView extends StatefulWidget {
-  const _FoodCategoryView({this.group});
+  const _FoodCategoryView({this.categoryCode});
 
-  final FoodStoreGroup? group;
+  final String? categoryCode;
 
   @override
   State<_FoodCategoryView> createState() => _FoodCategoryViewState();
@@ -59,11 +62,14 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
       FoodDiscoveryReady(:final ratings) => ratings,
       _ => const <String, StoreRating>{},
     };
-    final group = widget.group ?? FoodStoreGroup.near;
+    final code = widget.categoryCode?.trim().toLowerCase();
     final stores = switch (discovery) {
       FoodDiscoveryReady(:final stores) => [
         for (final store in stores)
-          if (group.matches(store)) store,
+          if (code == null ||
+              code.isEmpty ||
+              store.category?.toLowerCase() == code)
+            store,
       ],
       _ => <FoodStoreSummary>[],
     };
@@ -81,11 +87,14 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
       );
     }
     final loading = discovery is FoodDiscoveryLoading;
-    final title = widget.group == null
-        ? l10n.foodCategoryTitle
-        : group.label(l10n);
+    final title =
+        foodCategoryLabel(context, widget.categoryCode) ??
+        l10n.foodCategoryTitle;
 
     return Scaffold(
+      // The body's SafeArea sits above the bar while the cart has items.
+      extendBody: true,
+      bottomNavigationBar: const FoodCartBar(),
       backgroundColor: DealGoColors.canvas,
       body: SafeArea(
         child: Column(
@@ -198,11 +207,15 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
                       compact: true,
                     )
                   else
-                    for (final store in stores) ...[
-                      _StoreRow(
-                        store: store,
-                        rating: ratings[store.id],
-                        onTap: () => context.push(FoodRoutes.store(store.id)),
+                    for (final (index, store) in stores.indexed) ...[
+                      DealGoStaggerIn(
+                        key: ValueKey(store.id),
+                        index: index,
+                        child: _StoreRow(
+                          store: store,
+                          rating: ratings[store.id],
+                          onTap: () => context.push(FoodRoutes.store(store.id)),
+                        ),
                       ),
                       const SizedBox(height: DealGoSpacing.s12),
                     ],
@@ -225,31 +238,6 @@ class _StoreRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(DealGoRadius.card),
-        child: FoodPanel(
-          child: Row(
-            children: [
-              FoodThumb(imageUrl: store.imageUrl),
-              const SizedBox(width: DealGoSpacing.s12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(store.name, style: textTheme.titleMedium),
-                    const SizedBox(height: DealGoSpacing.s4),
-                    StoreMetaLine(store: store, rating: rating),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    return FoodStoreListCard(store: store, rating: rating, onTap: onTap);
   }
 }

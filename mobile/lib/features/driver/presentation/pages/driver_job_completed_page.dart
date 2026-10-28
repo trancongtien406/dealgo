@@ -5,7 +5,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../core/design_system/components/dealgo_info_tip.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
@@ -219,10 +218,6 @@ class _Detail extends StatelessWidget {
                 label: l10n.driverCompletedNetLabel,
                 value: formatVnd(item.earningsVnd),
                 emphasize: true,
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: DealGoInfoTip(message: l10n.driverCompletedEarningsHint),
               ),
             ],
           ),

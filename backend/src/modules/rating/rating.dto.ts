@@ -1,7 +1,8 @@
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -9,6 +10,7 @@ import {
   IsUUID,
   Max,
   MaxLength,
+  MinLength,
   Min,
 } from 'class-validator';
 import {
@@ -81,4 +83,87 @@ export class StoreRatingQueryDto {
 export class StoreIdParamsDto {
   @IsUUID()
   storeId!: string;
+}
+
+export class StoreReviewsQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  page?: number;
+
+  /** Only reviews with exactly this many stars. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  stars?: number;
+}
+
+export class RatingIdParamsDto {
+  @IsUUID()
+  id!: string;
+}
+
+export class MerchantReviewsQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+}
+
+export class ReplyReviewDto {
+  /** Empty or omitted clears the reply. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  text?: string;
+}
+
+export class OpsReviewsQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+
+  @IsOptional()
+  @IsUUID()
+  storeId?: string;
+
+  @IsOptional()
+  @IsIn(['VISIBLE', 'HIDDEN'])
+  visibility?: 'VISIBLE' | 'HIDDEN';
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  maxStars?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+}
+
+export class SetReviewHiddenDto {
+  @IsBoolean()
+  hidden!: boolean;
+
+  @IsString()
+  @MinLength(3)
+  @MaxLength(500)
+  reason!: string;
 }

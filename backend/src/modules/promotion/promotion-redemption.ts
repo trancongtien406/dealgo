@@ -13,12 +13,35 @@ export type VoucherRejectCode =
   | 'VOUCHER_MIN_ORDER'
   | 'VOUCHER_USAGE_EXHAUSTED'
   | 'VOUCHER_BUDGET_EXHAUSTED'
-  | 'VOUCHER_USER_LIMIT';
+  | 'VOUCHER_USER_LIMIT'
+  | 'VOUCHER_WRONG_STORE';
+
+/**
+ * Percentage vouchers take off whole 1.000đ steps: the discount is rounded down, so the customer
+ * never gets less than the app showed and a round fare stays round after the discount.
+ */
+export const VOUCHER_DISCOUNT_STEP_VND = 1000;
+
+/**
+ * `orderAmount × percent`, capped at `maxDiscount` when set, then rounded down to
+ * {@link VOUCHER_DISCOUNT_STEP_VND}. Never negative.
+ */
+export function percentVoucherDiscountVnd(
+  orderAmount: number,
+  percent: number,
+  maxDiscount?: number | null,
+): number {
+  const raw = (Math.max(0, orderAmount) * Math.max(0, percent)) / 100;
+  const capped = maxDiscount ? Math.min(raw, maxDiscount) : raw;
+  return Math.floor(capped / VOUCHER_DISCOUNT_STEP_VND) * VOUCHER_DISCOUNT_STEP_VND;
+}
 
 export type VoucherCheckInput = {
   serviceType: 'RIDE' | 'FOOD';
   orderAmount: number;
   deliveryFee?: number;
+  /** The food store being ordered from; store offers only apply there. */
+  storeId?: string;
 };
 
 export type VoucherEvaluation =
@@ -82,7 +105,7 @@ type EvaluableCampaign = Pick<
   | 'discountValue'
   | 'maxDiscountAmount'
 > &
-  Partial<Pick<PromotionCampaign, 'sponsor'>>;
+  Partial<Pick<PromotionCampaign, 'sponsor' | 'storeId'>>;
 
 /**
  * Pure rule check shared by the checkout quote and the redemption transaction.
@@ -135,6 +158,9 @@ export function evaluateVoucher(
       'Mã do cửa hàng đồng tài trợ chỉ áp dụng cho đơn đồ ăn.',
     );
   }
+  if (campaign.storeId && campaign.storeId !== input.storeId) {
+    return reject('VOUCHER_WRONG_STORE', 'Ưu đãi này chỉ áp dụng tại cửa hàng đã tạo.');
+  }
   if (input.orderAmount < campaign.minOrderAmount) {
     return reject(
       'VOUCHER_MIN_ORDER',
@@ -153,10 +179,17 @@ export function evaluateVoucher(
   if (campaign.discountType === 'FIXED_AMOUNT') {
     discount = campaign.discountValue;
   } else if (campaign.discountType === 'PERCENTAGE') {
-    const rawPercent = Math.round((input.orderAmount * campaign.discountValue) / 100);
-    discount = campaign.maxDiscountAmount
-      ? Math.min(rawPercent, campaign.maxDiscountAmount)
-      : rawPercent;
+    discount = percentVoucherDiscountVnd(
+      input.orderAmount,
+      campaign.discountValue,
+      campaign.maxDiscountAmount,
+    );
+    if (discount <= 0) {
+      return reject(
+        'VOUCHER_MIN_ORDER',
+        `Đơn hàng quá nhỏ để mã giảm ${campaign.discountValue}% có hiệu lực (giảm dưới ${VOUCHER_DISCOUNT_STEP_VND.toLocaleString('vi-VN')}đ).`,
+      );
+    }
   } else if (campaign.discountType === 'DELIVERY_DISCOUNT') {
     discount = Math.min(deliveryFee, campaign.discountValue);
   }
@@ -185,6 +218,7 @@ type LockedPromotionRow = {
   startDate: Date;
   endDate: Date;
   sponsor: PromotionCampaign['sponsor'];
+  storeId: string | null;
 };
 
 /**
@@ -201,7 +235,7 @@ export async function redeemVoucherInTx(
   const rows = await tx.$queryRaw<LockedPromotionRow[]>`
     SELECT "id", "code", "status", "serviceType", "discountType", "discountValue",
            "maxDiscountAmount", "minOrderAmount", "totalBudget", "usedBudget",
-           "usageLimit", "usedCount", "userLimit", "startDate", "endDate", "sponsor"
+           "usageLimit", "usedCount", "userLimit", "startDate", "endDate", "sponsor", "storeId"
     FROM "promotions" WHERE "code" = ${code} FOR UPDATE`;
   const row = rows[0];
   if (!row) {

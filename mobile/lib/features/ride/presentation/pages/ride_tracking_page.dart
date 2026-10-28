@@ -245,21 +245,24 @@ class _TrackingLive extends StatelessWidget {
     final canCancel = _preTrip.contains(current.status);
     return TrackingScaffold(
       onBack: onBack,
-      topCenter: DealGoChip(
-        key: const Key('ride-tracking-status-chip'),
-        label: title,
-        tone: DealGoChipTone.neutral,
-        leading: resolveMediaUrl(current.imageUrl) == null
-            ? Icon(rideVehicleClassIcon(current.vehicleClassCode), size: 14)
-            : RideVehicleClassPhoto(
-                imageUrl: current.imageUrl,
-                code: current.vehicleClassCode,
-                size: 18,
-              ),
-      ),
-      topTrailing: Row(
-        mainAxisSize: MainAxisSize.min,
+      // Status and route chips wrap onto a second line on narrow phones
+      // instead of squeezing the status label to nothing.
+      topCenter: Wrap(
+        spacing: DealGoSpacing.s8,
+        runSpacing: DealGoSpacing.s4,
         children: [
+          DealGoChip(
+            key: const Key('ride-tracking-status-chip'),
+            label: title,
+            tone: DealGoChipTone.neutral,
+            leading: resolveMediaUrl(current.imageUrl) == null
+                ? Icon(rideVehicleClassIcon(current.vehicleClassCode), size: 14)
+                : RideVehicleClassPhoto(
+                    imageUrl: current.imageUrl,
+                    code: current.vehicleClassCode,
+                    size: 18,
+                  ),
+          ),
           DealGoChip(
             key: const Key('ride-tracking-route-chip'),
             label: current.route.hasRoadPolyline
@@ -269,14 +272,13 @@ class _TrackingLive extends StatelessWidget {
                 ? DealGoChipTone.brand
                 : DealGoChipTone.neutral,
           ),
-          const SizedBox(width: DealGoSpacing.s8),
-          TrackingRoundButton(
-            key: const Key('ride-tracking-retry'),
-            tooltip: l10n.actionReload,
-            icon: DealGoIcons.refresh,
-            onPressed: busy ? null : onRefresh,
-          ),
         ],
+      ),
+      topTrailing: TrackingRoundButton(
+        key: const Key('ride-tracking-retry'),
+        tooltip: l10n.actionReload,
+        icon: DealGoIcons.refresh,
+        onPressed: busy ? null : onRefresh,
       ),
       map: LiveDriverMap(
         job: TrackedJob.ride,
@@ -343,11 +345,6 @@ class _TrackingLive extends StatelessWidget {
                 Text(
                   l10n.rideMatchingWaiting,
                   style: Theme.of(context).textTheme.titleSmall,
-                ),
-                const SizedBox(height: DealGoSpacing.s4),
-                Text(
-                  l10n.rideMatchingWaitingHint,
-                  style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: DealGoSpacing.s8),
                 DealGoPrimaryButton(
@@ -552,8 +549,6 @@ class _TrackingOffline extends StatelessWidget {
                     ],
                   ),
                 ),
-              const SizedBox(height: DealGoSpacing.s12),
-              RideNote(message: l10n.rideOfflineNote),
             ],
           ),
         ),

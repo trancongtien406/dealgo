@@ -103,40 +103,6 @@ class RideBottomSheet extends StatelessWidget {
   }
 }
 
-/// Floating circular back — unused on map/fare/waiting (system back only).
-/// Kept for rare recovery screens; prefer no chrome on map-first hot path.
-class RideMapBackButton extends StatelessWidget {
-  const RideMapBackButton({this.onPressed, super.key});
-
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final top = MediaQuery.paddingOf(context).top;
-    return Positioned(
-      top: top + DealGoSpacing.s8,
-      left: DealGoDimensions.pageGutter,
-      child: Material(
-        color: DealGoColors.card.withValues(alpha: 0.96),
-        elevation: 2,
-        shadowColor: DealGoColors.text.withValues(alpha: 0.18),
-        shape: const CircleBorder(),
-        child: IconButton(
-          key: const Key('header-back'),
-          tooltip: l10n.actionBack,
-          onPressed: onPressed ?? () => Navigator.maybeOf(context)?.maybePop(),
-          icon: const Icon(
-            DealGoIcons.back,
-            color: DealGoColors.text,
-            size: 22,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// inDrive-like persistent sheet: drag + snap sizes over a full-bleed map.
 /// Prefer this over [showModalBottomSheet] for book / fare / waiting (map stays
 /// interactive; sheet is not a dismissible modal).
@@ -557,7 +523,7 @@ class RideStateHero extends StatelessWidget {
     required this.iconColor,
     required this.background,
     required this.title,
-    required this.message,
+    this.message = '',
     super.key,
   });
 
@@ -589,14 +555,16 @@ class RideStateHero extends StatelessWidget {
           textAlign: TextAlign.center,
           style: textTheme.titleLarge?.copyWith(fontSize: 22),
         ),
-        const SizedBox(height: DealGoSpacing.s8),
-        Text(
-          message,
-          textAlign: TextAlign.center,
-          style: textTheme.bodyMedium?.copyWith(
-            color: DealGoColors.textSecondary,
+        if (message.isNotEmpty) ...[
+          const SizedBox(height: DealGoSpacing.s8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: textTheme.bodyMedium?.copyWith(
+              color: DealGoColors.textSecondary,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

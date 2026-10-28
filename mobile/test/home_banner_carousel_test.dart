@@ -296,4 +296,44 @@ void main() {
       ['b2', 'b1'],
     );
   });
+
+  testWidgets('a service carousel keeps its banners, else shows the fallback', (
+    tester,
+  ) async {
+    Future<void> pump(List<HomeBanner> banners) async {
+      await tester.pumpWidget(
+        RepositoryProvider<HomeBannerRepository>.value(
+          value: FakeHomeBannerRepository(banners: banners),
+          child: MaterialApp(
+            locale: const Locale('vi'),
+            localizationsDelegates: testLocalizationsDelegates,
+            supportedLocales: const [Locale('vi'), Locale('en')],
+            home: Scaffold(
+              body: HomeBannerCarousel(
+                key: ValueKey(banners.length),
+                role: AppRole.customer,
+                service: 'FOOD',
+                empty: const Text('STATIC'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    await pump(_banners);
+    expect(find.text('STATIC'), findsOneWidget);
+    expect(find.byKey(const Key('home-banner-carousel')), findsNothing);
+
+    await pump(const [
+      HomeBanner(
+        id: 'f1',
+        imageUrl: 'https://img.test/f1.png',
+        service: 'FOOD',
+      ),
+    ]);
+    expect(find.byKey(const Key('home-banner-carousel')), findsOneWidget);
+    expect(find.text('STATIC'), findsNothing);
+  });
 }

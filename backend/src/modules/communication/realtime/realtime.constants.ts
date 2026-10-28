@@ -210,6 +210,17 @@ export type CallEventPayload = {
  */
 export const CHAT_MESSAGE_EVENT = 'chatMessage';
 
+/**
+ * To each recipient's private room when an inbox row is written. The app bumps
+ * its unread badge; `GET /v1/me/notifications` stays the count snapshot.
+ */
+export const INBOX_EVENT = 'inbox';
+
+export type InboxEventPayload = {
+  category: string;
+  at: string;
+};
+
 export type ChatMessageEventPayload = {
   aggregateType: 'Ride' | 'FoodOrder';
   aggregateId: string;

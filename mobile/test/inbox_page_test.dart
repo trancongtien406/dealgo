@@ -1,4 +1,6 @@
+import 'package:dealgo/core/realtime/fake_snapshot_realtime.dart';
 import 'package:dealgo/features/inbox/data/datasources/inbox_remote_datasource.dart';
+import 'package:dealgo/features/inbox/presentation/inbox_unread.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -22,8 +24,8 @@ void main() {
     await _openInbox(tester);
 
     expect(find.text('Hôm nay'), findsOneWidget);
-    expect(find.text('Tài xế đã đến điểm đón'), findsOneWidget);
-    expect(find.text('Quán đang chuẩn bị món'), findsOneWidget);
+    expect(find.text('Tài xế đã đến'), findsOneWidget);
+    expect(find.text('Quán đang làm món'), findsOneWidget);
     expect(find.byKey(const Key('inbox-unread-dot')), findsNWidgets(2));
     expect(find.byKey(const Key('inbox-mark-all')), findsOneWidget);
   });
@@ -50,5 +52,48 @@ void main() {
 
     expect(find.text('Giảm 20.000đ cho đơn đồ ăn'), findsOneWidget);
     expect(find.text('Tài xế đã đến điểm đón'), findsNothing);
+  });
+
+  testWidgets('bell badges follow the real unread count', (tester) async {
+    final inbox = FakeInboxRemoteDataSource(now: DateTime.now());
+    await pumpSignedIn(tester, profile: customerProfile, inboxRemote: inbox);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('home-bell-unread')), findsOneWidget);
+
+    await tester.tap(navLabel('Tôi'));
+    await tester.pumpAndSettle();
+    expect(InboxUnread.instance.count, 2);
+    await tester.tap(find.byTooltip('Thông báo'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('inbox-mark-all')));
+    await tester.pumpAndSettle();
+
+    expect(InboxUnread.instance.count, 0);
+    await tester.tap(navLabel('Trang'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('home-bell-unread')), findsNothing);
+  });
+
+  test('an inbox push bumps the count and a reconnect re-reads it', () async {
+    final realtime = FakeSnapshotRealtime();
+    var server = 0;
+    InboxUnread.instance.attach(
+      userId: 'u1',
+      realtime: realtime,
+      fetch: () async => server,
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(InboxUnread.instance.count, 0);
+
+    realtime.emitInbox();
+    await Future<void>.delayed(Duration.zero);
+    expect(InboxUnread.instance.count, 1);
+
+    server = 5;
+    realtime.emitReconnect();
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+    expect(InboxUnread.instance.count, 5);
+    await realtime.dispose();
   });
 }

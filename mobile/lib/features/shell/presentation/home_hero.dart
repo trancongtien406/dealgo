@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../inbox/presentation/inbox_unread.dart';
+
 import '../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
@@ -102,8 +104,19 @@ class _LocationChip extends StatelessWidget {
   }
 }
 
-class _Bell extends StatelessWidget {
+class _Bell extends StatefulWidget {
   const _Bell();
+
+  @override
+  State<_Bell> createState() => _BellState();
+}
+
+class _BellState extends State<_Bell> {
+  @override
+  void initState() {
+    super.initState();
+    attachInboxUnread(context);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -136,16 +149,26 @@ class _Bell extends StatelessWidget {
               ),
             ),
           ),
+          // Dot only while the inbox really has unread items.
           Positioned(
             right: 6,
             top: 6,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: DealGoColors.danger,
-                shape: BoxShape.circle,
-                border: Border.all(color: DealGoColors.card, width: 1.5),
-              ),
-              child: const SizedBox(width: 8, height: 8),
+            child: ListenableBuilder(
+              listenable: InboxUnread.instance,
+              builder: (context, _) => InboxUnread.instance.count > 0
+                  ? DecoratedBox(
+                      key: const Key('home-bell-unread'),
+                      decoration: BoxDecoration(
+                        color: DealGoColors.danger,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: DealGoColors.card,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: const SizedBox(width: 8, height: 8),
+                    )
+                  : const SizedBox.shrink(),
             ),
           ),
         ],

@@ -13,6 +13,7 @@ class FakeSnapshotRealtime implements SnapshotRealtime {
   final _callEvents = StreamController<Map<String, Object?>>.broadcast();
   final _chatMessages = StreamController<ChatMessageHint>.broadcast();
   final _rideUnassigned = StreamController<RideUnassignedHint>.broadcast();
+  final _inboxEvents = StreamController<void>.broadcast();
   final subscribed = <String>{};
   var connectCalls = 0;
   var disconnectCalls = 0;
@@ -43,6 +44,9 @@ class FakeSnapshotRealtime implements SnapshotRealtime {
 
   @override
   Stream<ChatMessageHint> get chatMessages => _chatMessages.stream;
+
+  @override
+  Stream<void> get inboxEvents => _inboxEvents.stream;
 
   @override
   Stream<void> get reconnects => _reconnects.stream;
@@ -91,6 +95,8 @@ class FakeSnapshotRealtime implements SnapshotRealtime {
 
   void emitRideUnassigned(RideUnassignedHint hint) => _rideUnassigned.add(hint);
 
+  void emitInbox() => _inboxEvents.add(null);
+
   Future<void> dispose() async {
     await _routeUpdates.close();
     await _partnerStatuses.close();
@@ -101,5 +107,6 @@ class FakeSnapshotRealtime implements SnapshotRealtime {
     await _snapshots.close();
     await _reconnects.close();
     await _driverLocations.close();
+    await _inboxEvents.close();
   }
 }

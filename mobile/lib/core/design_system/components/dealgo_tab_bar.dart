@@ -31,10 +31,10 @@ class DealGoTabDestination {
 /// pill has a smooth concave notch around that circle. Circle and notch slide
 /// to the selected tab ([DealGoMotion.medium], [DealGoMotion.standard]; no
 /// motion when the platform asks for reduced motion). Every tab keeps its
-/// short label inside the pill.
+/// short label inside the pill, scaled down rather than cut on narrow phones.
 ///
-/// Use with `Scaffold(extendBody: true)` and clear the body by
-/// [DealGoNavBarMetrics.contentClearance] (see `RoleShell`).
+/// Use with `Scaffold(extendBody: true)`; `FloatingNavBody` hands the bar
+/// height down so lists pad with `dealGoScrollPadding` (see `RoleShell`).
 class DealGoTabBar extends StatelessWidget {
   const DealGoTabBar({
     required this.destinations,
@@ -293,16 +293,20 @@ class _TabItem extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  destination.label,
-                  maxLines: 1,
-                  softWrap: false,
-                  overflow: TextOverflow.fade,
-                  style: (textTheme.labelSmall ?? const TextStyle()).copyWith(
-                    color: color,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    fontSize: 11,
-                    height: 1.1,
+                // Shrink, never cut: five tabs on a 320 pt phone leave about
+                // 51 pt per label ("Tổng quan", "Việc nhận").
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    destination.label,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: (textTheme.labelSmall ?? const TextStyle()).copyWith(
+                      color: color,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      fontSize: 11,
+                      height: 1.1,
+                    ),
                   ),
                 ),
               ],

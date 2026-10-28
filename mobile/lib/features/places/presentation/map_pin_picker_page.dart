@@ -342,7 +342,7 @@ class _MapPinPickerPageState extends State<MapPinPickerPage> {
 
   @override
   Widget build(BuildContext context) {
-    final port = context.read<MapPort>();
+    final port = context.watch<MapPort>();
     final top = MediaQuery.paddingOf(context).top + DealGoSpacing.s8;
     return PopScope(
       canPop: !_searchOpen,

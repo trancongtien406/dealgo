@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { isMailSenderAvailable, type MailSender } from '../../integrations/email/index.js';
+import { mailSenderStatus, type MailSender } from '../../integrations/email/index.js';
 import { isSmsSenderAvailable, type SmsSender } from '../../integrations/sms/index.js';
 import type { AppEnv } from '../../platform/config/env.js';
 import { AUTH_METHOD_POLICY_REPOSITORY, type AuthMethodName } from './auth-method.constants.js';
@@ -10,9 +10,14 @@ import { MAIL_SENDER, SMS_SENDER } from './identity.constants.js';
 export type AuthMethodProviderEnv = Pick<AppEnv, 'WEBAUTHN_RP_ID' | 'WEBAUTHN_RP_NAME' | 'WEBAUTHN_ORIGIN'>;
 
 /**
+ * `enable`: may an Admin switch the method on (email also needs a passed test email for the current
+ * config). `boot`: is the provider configured at all (production refuses to start otherwise).
+ */
+export type ProviderCheckPurpose = 'enable' | 'boot';
+
+/**
  * Which auth methods have a working provider behind them (DEC-PROD-052). Methods are toggled in DB
- * (AuthMethodPolicy); providers come from env. An enabled method without a provider is refused at
- * admin toggle time and blocks production boot.
+ * (AuthMethodPolicy); SMS/passkey providers come from env, email from Admin › Email over env.
  */
 @Injectable()
 export class AuthMethodProviderStatus {
@@ -22,8 +27,8 @@ export class AuthMethodProviderStatus {
     private readonly config: ConfigService<AppEnv, true>,
   ) {}
 
-  isAvailable(method: AuthMethodName): boolean {
-    return authMethodProviderAvailable(method, {
+  isAvailable(method: AuthMethodName, purpose: ProviderCheckPurpose = 'enable'): Promise<boolean> {
+    return authMethodProviderAvailable(method, purpose, {
       sms: this.sms,
       mail: this.mail,
       env: {
@@ -35,15 +40,18 @@ export class AuthMethodProviderStatus {
   }
 }
 
-export function authMethodProviderAvailable(
+export async function authMethodProviderAvailable(
   method: AuthMethodName,
+  purpose: ProviderCheckPurpose,
   deps: { sms: SmsSender; mail: MailSender; env: AuthMethodProviderEnv },
-): boolean {
+): Promise<boolean> {
   switch (method) {
     case 'PHONE_SMS':
       return isSmsSenderAvailable(deps.sms);
-    case 'EMAIL_LOGIN_IDENTIFIER':
-      return isMailSenderAvailable(deps.mail);
+    case 'EMAIL_LOGIN_IDENTIFIER': {
+      const status = await mailSenderStatus(deps.mail);
+      return purpose === 'boot' ? status.configured : status.verified;
+    }
     case 'PASSKEY':
       return Boolean(deps.env.WEBAUTHN_RP_ID && deps.env.WEBAUTHN_RP_NAME && deps.env.WEBAUTHN_ORIGIN);
     default: {
@@ -55,7 +63,7 @@ export function authMethodProviderAvailable(
 
 export const AUTH_METHOD_PROVIDER_HINT: Record<AuthMethodName, string> = {
   PHONE_SMS: 'SMS_PROVIDER=esms|speedsms with its keys',
-  EMAIL_LOGIN_IDENTIFIER: 'EMAIL_PROVIDER=ses|smtp with its keys',
+  EMAIL_LOGIN_IDENTIFIER: 'Admin › Email (Gmail SMTP or Amazon SES) configured and a test email passed',
   PASSKEY: 'WEBAUTHN_RP_ID, WEBAUTHN_RP_NAME, WEBAUTHN_ORIGIN',
 };
 
@@ -91,5 +99,9 @@ export async function enabledMethodsWithoutProvider(
   providers: Pick<AuthMethodProviderStatus, 'isAvailable'>,
 ): Promise<AuthMethodName[]> {
   const rows = await policies.list();
-  return rows.filter((row) => row.enabled && !providers.isAvailable(row.method)).map((row) => row.method);
+  const missing: AuthMethodName[] = [];
+  for (const row of rows) {
+    if (row.enabled && !(await providers.isAvailable(row.method, 'boot'))) missing.push(row.method);
+  }
+  return missing;
 }

@@ -14,6 +14,7 @@ import '../../../food/domain/entities/food_models.dart';
 import '../../domain/usecases/get_merchant_catalog.dart';
 import '../../domain/usecases/update_store_hours.dart';
 import '../widgets/merchant_widgets.dart';
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 
 /// Cut-off presets the backend accepts (DEC-PROD-027).
 const merchantLastOrderPresets = <int>[0, 15, 30, 45, 60];
@@ -256,7 +257,7 @@ class _MerchantHoursPageState extends State<MerchantHoursPage> {
   ) {
     final textTheme = Theme.of(context).textTheme;
     return ListView(
-      padding: merchantPagePadding,
+      padding: dealGoScrollPadding(context, merchantPagePadding),
       children: [
         Text(
           l10n.merchantHoursEyebrow,
@@ -268,8 +269,6 @@ class _MerchantHoursPageState extends State<MerchantHoursPage> {
         ),
         const SizedBox(height: DealGoSpacing.s4),
         Text(l10n.merchantHoursHeading, style: textTheme.headlineSmall),
-        const SizedBox(height: DealGoSpacing.s4),
-        Text(l10n.merchantHoursIntro, style: textTheme.bodySmall),
         if (!store.schedule.hoursConfigured) ...[
           const SizedBox(height: DealGoSpacing.s12),
           DealGoBanner(
@@ -378,8 +377,6 @@ class _MerchantHoursPageState extends State<MerchantHoursPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(l10n.merchantHoursCutoffTitle, style: textTheme.titleSmall),
-              Text(l10n.merchantHoursCutoffHint, style: textTheme.bodySmall),
-              const SizedBox(height: DealGoSpacing.s8),
               Wrap(
                 spacing: DealGoSpacing.s8,
                 runSpacing: DealGoSpacing.s8,
@@ -400,11 +397,6 @@ class _MerchantHoursPageState extends State<MerchantHoursPage> {
               ),
             ],
           ),
-        ),
-        const SizedBox(height: DealGoSpacing.s12),
-        MerchantNote(
-          tone: MerchantNoteTone.green,
-          message: l10n.merchantHoursEnforcedNote,
         ),
         if (_saveError case final error?) ...[
           const SizedBox(height: DealGoSpacing.s12),

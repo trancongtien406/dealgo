@@ -637,15 +637,19 @@ export class OpsOverviewService implements OnModuleInit {
     };
   }
 
-  /** Category distribution from store table — O(stores) not O(open food orders). */
+  /**
+   * Category distribution from store table — O(stores) not O(open food orders).
+   * Names come from food_categories (DEC-PROD-067); stores without one = "Khác".
+   */
   private async queryFoodCategoriesFast(
     db: QueryClient,
   ): Promise<Array<{ name: string; count: number }>> {
     const rows = await db.$queryRaw<Array<{ name: string; cnt: bigint }>>`
       SELECT
-        COALESCE(NULLIF(BTRIM(category), ''), 'Khác') AS name,
+        COALESCE(c."nameVi", 'Khác') AS name,
         COUNT(*)::bigint AS cnt
-      FROM food_stores
+      FROM food_stores s
+      LEFT JOIN food_categories c ON c.code = s.category
       GROUP BY 1
       ORDER BY cnt DESC, name ASC
       LIMIT 5
@@ -942,11 +946,12 @@ export class OpsOverviewService implements OnModuleInit {
       SELECT name, COUNT(*)::bigint AS cnt
       FROM (
         SELECT
-          COALESCE(NULLIF(BTRIM(s.category), ''), 'Khác') AS name
+          COALESCE(c."nameVi", 'Khác') AS name
         FROM (
           ${arms.join('\nUNION ALL\n')}
         ) o
         INNER JOIN food_stores s ON s.id = o."storeId"
+        LEFT JOIN food_categories c ON c.code = s.category
       ) sample
       GROUP BY name
       ORDER BY cnt DESC, name ASC

@@ -123,23 +123,27 @@ class _SegmentPill extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(
                   horizontal: DealGoSpacing.s8,
                 ),
+                // Equal-width segments on a 320 pt phone: shrink the label
+                // ("Ẩn / nháp (1)") rather than cut the count off.
                 child: Center(
-                  child: Text(
-                    item.label,
-                    maxLines: 1,
-                    softWrap: false,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style:
-                        (Theme.of(context).textTheme.labelSmall ??
-                                const TextStyle())
-                            .copyWith(
-                              color: selected
-                                  ? Colors.white
-                                  : DealGoColors.text,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      item.label,
+                      maxLines: 1,
+                      softWrap: false,
+                      textAlign: TextAlign.center,
+                      style:
+                          (Theme.of(context).textTheme.labelSmall ??
+                                  const TextStyle())
+                              .copyWith(
+                                color: selected
+                                    ? Colors.white
+                                    : DealGoColors.text,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                    ),
                   ),
                 ),
               ),

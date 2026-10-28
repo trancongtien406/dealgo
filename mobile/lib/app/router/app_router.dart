@@ -36,6 +36,8 @@ import '../../features/merchant/domain/usecases/list_merchant_order_queue.dart';
 import '../../features/merchant/domain/usecases/mark_merchant_order_ready.dart';
 import '../../features/merchant/presentation/pages/merchant_accept_settings_page.dart';
 import '../../features/merchant/presentation/pages/merchant_busy_page.dart';
+import '../../features/merchant/presentation/pages/merchant_offers_page.dart';
+import '../../features/merchant/presentation/pages/merchant_reviews_page.dart';
 import '../../features/merchant/presentation/pages/merchant_hours_page.dart';
 import '../../features/merchant/presentation/pages/merchant_location_page.dart';
 import '../../features/merchant/presentation/pages/merchant_profile_page.dart';
@@ -50,7 +52,6 @@ import '../../features/merchant/presentation/utils/merchant_routes.dart';
 import '../../features/food/presentation/pages/food_cancel_page.dart';
 import '../../features/food/presentation/pages/food_cart_page.dart';
 import '../../features/food/presentation/pages/food_category_page.dart';
-import '../../features/food/presentation/widgets/store_meta.dart';
 import '../../features/food/presentation/pages/food_checkout_page.dart';
 import '../../features/food/presentation/pages/food_invoice_page.dart';
 import '../../features/food/presentation/pages/food_item_options_page.dart';
@@ -121,6 +122,7 @@ GoRouter createAppRouter({
   PostAuthGate? postAuth,
   String initialLocation = AuthRoutes.splash,
   DeepLinkGate? deepLinks,
+  AuthMethodAvailable? methodAvailable,
 }) {
   final rootNavigatorKey = GlobalKey<NavigatorState>();
   final router = GoRouter(
@@ -129,7 +131,12 @@ GoRouter createAppRouter({
     refreshListenable: refreshListenable,
     redirect: (context, state) =>
         deepLinks?.intercept(state.uri) ??
-        authRedirect(auth.state, state.uri, postAuth: postAuth),
+        authRedirect(
+          auth.state,
+          state.uri,
+          postAuth: postAuth,
+          methodAvailable: methodAvailable,
+        ),
     // Unknown/broken deep links must not show GoRouter's debug page.
     errorBuilder: (context, state) => const DealGoRouteNotFoundPage(),
     routes: [
@@ -251,12 +258,11 @@ GoRouter createAppRouter({
         path: FoodRoutes.category,
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (context, state) {
-          final group = FoodStoreGroup.fromWire(
-            state.uri.queryParameters['group'],
-          );
           return dealgoFadeSlidePage(
             key: state.pageKey,
-            child: FoodCategoryPage(group: group),
+            child: FoodCategoryPage(
+              categoryCode: state.uri.queryParameters['category'],
+            ),
           );
         },
       ),
@@ -858,6 +864,18 @@ ShellRoute _merchantScopedShell() {
       GoRoute(
         path: MerchantRoutes.history,
         builder: (context, state) => const MerchantHistoryPageView(),
+      ),
+      GoRoute(
+        path: MerchantRoutes.offers,
+        builder: (context, state) => const MerchantOffersPage(),
+      ),
+      GoRoute(
+        path: MerchantRoutes.offerNew,
+        builder: (context, state) => const MerchantOfferCreatePage(),
+      ),
+      GoRoute(
+        path: MerchantRoutes.reviews,
+        builder: (context, state) => const MerchantReviewsPage(),
       ),
       GoRoute(
         path: '/merchant/products/:itemId/edit',

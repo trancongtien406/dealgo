@@ -9,7 +9,7 @@ flutter pub get
 ./tool/run_dev.sh   # API mặc định http://localhost:3001; Android emulator: API_BASE_URL=http://10.0.2.2:3001
 ```
 
-Các `--dart-define` chính: `API_BASE_URL` (debug/profile mặc định `http://localhost:3001`; release mặc định `https://api-dealgo.trancongtien.com`), `APP_LINK_HOST` (mặc định `dealgo.trancongtien.com`), `USE_MOCK_DATA`, `MAPS_API_KEY`, `MAP_TILE_URL`, `SENTRY_DSN`. Bản release từ chối `API_BASE_URL` dạng `http://`.
+Các `--dart-define` chính: `API_BASE_URL` (debug/profile mặc định `http://localhost:3001`; release mặc định `https://api-dealgo.trancongtien.com`), `APP_LINK_HOST` (mặc định `dealgo.trancongtien.com`), `USE_MOCK_DATA`, `MAPS_API_KEY`, `MAP_TILE_URL`, `SENTRY_DSN` (mặc định bật ở build có flavor/release, rỗng = tắt). Bản release từ chối `API_BASE_URL` dạng `http://`.
 
 ## Build production
 
@@ -34,6 +34,31 @@ flutter run --release -d <thiết bị> "${DEFINES[@]}" # chạy thử bản rel
 
 Profile build vẫn dùng API local; thêm `--dart-define=API_BASE_URL=https://api-dealgo.trancongtien.com` nếu cần đo trên VPS.
 Chạy debug với API VPS: `API_BASE_URL=https://api-dealgo.trancongtien.com ./tool/run_dev.sh`.
+
+## Build bằng Xcode (scheme `dev` / `prod`)
+
+Plugin iOS dùng Swift Package Manager, không dùng CocoaPods (`flutter config --enable-swift-package-manager`). Lần đầu (hoặc sau khi đổi plugin) chạy để sinh `ios/Flutter/Generated.xcconfig` và gói Swift `ios/Flutter/ephemeral/Packages`:
+
+```bash
+cd mobile && flutter pub get && flutter build ios --config-only --flavor dev
+open ios/Runner.xcworkspace
+```
+
+| Scheme | Cấu hình (Run / Profile / Archive) | API | APNs | Tên trên máy |
+|---|---|---|---|---|
+| `dev` | `Debug-dev` / `Profile-dev` / `Release-dev` | Debug, Profile: `http://localhost:3001` (máy ảo); Release: VPS | Debug: development, còn lại: production | DealGo Dev |
+| `prod` | `Debug-prod` / `Profile-prod` / `Release-prod` | luôn `https://api-dealgo.trancongtien.com` | Debug: development, còn lại: production | DealGo |
+| `Runner` | `Debug` / `Profile` / `Release` | như `flutter run` / `flutter build ipa` không `--flavor` | như trên | DealGo |
+
+- Cả ba dùng bundle id `com.trancongtien.dealgo`, team `6J3522877H`, associated domains `applinks:` + `webcredentials:`
+  `dealgo.trancongtien.com` (`DEALGO_APP_LINK_HOST` trong `ios/Flutter/App.xcconfig`). Cài `dev` sẽ thay bản `prod` trên cùng máy.
+- Scheme chọn flavor qua `FLAVOR` trong `ios/Flutter/Dev.xcconfig` / `Prod.xcconfig`; app đọc bằng `FLUTTER_APP_FLAVOR`
+  (`lib/core/config/api_base_url.dart`). `--dart-define=API_BASE_URL=...` vẫn thắng mọi mặc định.
+- Build trong Xcode dùng `--dart-define` của lần chạy `flutter` gần nhất (lưu trong `Generated.xcconfig`). Token Mapbox app lấy
+  từ Admin (`GET /v1/public/client-config`); `MAPS_API_KEY` chỉ là dự phòng khi Admin để trống.
+- CLI tương đương: `flutter run --flavor dev`, `flutter build ipa --flavor prod`.
+
+Kiểm tra cấu hình: `xcodebuild -list -workspace ios/Runner.xcworkspace` phải có scheme `dev`, `prod`, `Runner`.
 
 ## Kiểm tra
 

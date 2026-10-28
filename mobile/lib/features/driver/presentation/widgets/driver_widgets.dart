@@ -75,8 +75,32 @@ class DriverPageFrame extends StatelessWidget {
               trailing: trailing,
               showBack: showBack,
             ),
-            Expanded(child: body),
-            ?footer,
+            Expanded(
+              child: footer == null
+                  ? body
+                  : Builder(
+                      builder: (context) => MediaQuery.removePadding(
+                        context: context,
+                        removeBottom: true,
+                        child: body,
+                      ),
+                    ),
+            ),
+            if (footer case final footer?)
+              // Inside the SafeArea: lifts the footer above the home indicator or
+              // the shell's tab bar, whichever is still uncovered.
+              Builder(
+                builder: (context) => Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.paddingOf(context).bottom,
+                  ),
+                  child: MediaQuery.removePadding(
+                    context: context,
+                    removeBottom: true,
+                    child: footer,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -268,6 +292,7 @@ class DriverMoneyRow extends StatelessWidget {
         textBaseline: TextBaseline.alphabetic,
         children: [
           Expanded(
+            flex: 3,
             child: Text(
               label,
               style: textTheme.bodyMedium?.copyWith(
@@ -277,16 +302,21 @@ class DriverMoneyRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: DealGoSpacing.s8),
-          // Amounts are short; never let them squeeze the label into 2 lines.
-          Text(
-            value,
-            textAlign: TextAlign.end,
-            style: emphasize
-                ? textTheme.titleSmall?.copyWith(
-                    color: DealGoColors.primary,
-                    fontWeight: FontWeight.w800,
-                  )
-                : textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+          // The label keeps at least 3/5 of the row: amounts are short, and a
+          // long value ("Khách mới – chưa có đánh giá") wraps on its own side
+          // instead of squeezing the label to "Đá".
+          Flexible(
+            flex: 2,
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: emphasize
+                  ? textTheme.titleSmall?.copyWith(
+                      color: DealGoColors.primary,
+                      fontWeight: FontWeight.w800,
+                    )
+                  : textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),

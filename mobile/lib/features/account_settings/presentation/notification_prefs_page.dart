@@ -148,16 +148,10 @@ class _NotificationPrefsPageState extends State<NotificationPrefsPage> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          l10n.notifPrefsSubtitle,
-                          style: textTheme.bodyMedium,
-                        ),
                         const SizedBox(height: 16),
                         _Banner(
                           icon: DealGoIcons.notifications,
                           title: l10n.notifPrefsPushOn,
-                          body: l10n.notifPrefsPushHint,
                         ),
                         const SizedBox(height: 20),
                         Text(
@@ -274,7 +268,7 @@ class _NotificationPrefsPageState extends State<NotificationPrefsPage> {
 }
 
 class _Banner extends StatelessWidget {
-  const _Banner({required this.icon, required this.title, required this.body});
+  const _Banner({required this.icon, required this.title, this.body = ''});
   final IconData icon;
   final String title;
   final String body;

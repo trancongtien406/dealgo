@@ -28,6 +28,9 @@ export type CampaignItem = {
   owner: string;
   targetAudience: string;
   createdAt: string;
+  /** Set for a merchant-created store offer (applies only at that store). */
+  storeId: string | null;
+  storeName: string | null;
 };
 
 export type PromotionKpiSummary = {
@@ -48,6 +51,7 @@ export type FetchPromotionsParams = {
   channel?: string | null;
   serviceType?: string | null;
   audience?: string | null;
+  scope?: string | null;
 };
 
 export type PromotionsResponseData = PaginatedList<CampaignItem> & {
@@ -71,6 +75,9 @@ export async function fetchPromotions(
   }
   if (params.audience && params.audience !== "ALL") {
     search.set("audience", params.audience);
+  }
+  if (params.scope === "STORE" || params.scope === "PLATFORM") {
+    search.set("scope", params.scope);
   }
 
   const envelope = await apiFetch<{
@@ -115,6 +122,7 @@ export async function createPromotion(
 export async function updatePromotionStatus(
   id: string,
   status: "ACTIVE" | "PAUSED" | "CANCELLED",
+  reason?: string,
 ): Promise<CampaignItem> {
   const envelope = await apiFetch<{
     success: boolean;
@@ -122,7 +130,7 @@ export async function updatePromotionStatus(
   }>(apiPaths.opsPromotionStatus(id), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(reason ? { status, reason } : { status }),
   });
   return envelope.data;
 }

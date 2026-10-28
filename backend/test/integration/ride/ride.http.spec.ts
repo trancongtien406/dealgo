@@ -40,6 +40,7 @@ import { MemoryPartnerRepository } from '../../../src/modules/partner/partner.re
 import { PAYMENT_REPOSITORY } from '../../../src/modules/payment/payment.constants.js';
 import { MemoryPaymentRepository } from '../../../src/modules/payment/payment.repository.js';
 import { haversineKm, quoteReferenceFareVnd } from '../../../src/modules/ride/ride-geo.js';
+import { roundUpToFareStep } from '../../../src/modules/ride-vehicle/ride-vehicle-class.js';
 import { RIDE_CLOCK, RIDE_REPOSITORY, type RideClock } from '../../../src/modules/ride/ride.constants.js';
 import { RideModule } from '../../../src/modules/ride/ride.module.js';
 import { PROMOTION_REPOSITORY } from '../../../src/modules/promotion/promotion.constants.js';
@@ -47,6 +48,12 @@ import { MemoryPromotionRepository } from '../../../src/modules/promotion/promot
 import { MemoryRideRepository } from '../../../src/modules/ride/ride.repository.js';
 import { RIDE_VEHICLE_CLASS_REPOSITORY } from '../../../src/modules/ride-vehicle/ride-vehicle-class.constants.js';
 import { MemoryRideVehicleClassRepository } from '../../../src/modules/ride-vehicle/ride-vehicle-class.repository.js';
+import {
+  EMAIL_SUPPRESSION_REPOSITORY,
+  MemoryEmailSuppressionRepository,
+} from '../../../src/integrations/email/email-suppression.repository.js';
+import { INTEGRATION_SETTINGS_REPOSITORY } from '../../../src/platform/integration-settings/integration-settings.constants.js';
+import { MemoryIntegrationSettingsRepository } from '../../../src/platform/integration-settings/integration-settings.repository.js';
 import { RideVehicleClassService } from '../../../src/modules/ride-vehicle/ride-vehicle-class.service.js';
 
 const OPS_EMAIL = 'ops@dealgo.test';
@@ -147,7 +154,7 @@ describe('ride negotiation http', () => {
     expect(first.body.data.status).toBe('NEGOTIATING');
     expect(first.body.data.offeredFareVnd).toBe(30_000);
     expect(first.body.data.referenceFareVnd).toBe(
-      quoteReferenceFareVnd(haversineKm(pickup, dropoff), 8000, 10_000),
+      roundUpToFareStep(quoteReferenceFareVnd(haversineKm(pickup, dropoff), 8000, 10_000)),
     );
     expect(Number.isInteger(first.body.data.referenceFareVnd)).toBe(true);
 
@@ -175,7 +182,8 @@ describe('ride negotiation http', () => {
       .send({ pickup, dropoff })
       .expect(200);
     const km = haversineKm(pickup, dropoff);
-    const referenceFareVnd = quoteReferenceFareVnd(km, 8000, 10_000);
+    const referenceFareVnd = roundUpToFareStep(quoteReferenceFareVnd(km, 8000, 10_000));
+    expect(referenceFareVnd % 1000).toBe(0);
     expect(quote.body.data).toMatchObject({
       distanceKm: Math.round(km * 10) / 10,
       referenceFareVnd,
@@ -1219,6 +1227,10 @@ describe('ride negotiation in production', () => {
       .useValue(new MemoryPromotionRepository([]))
       .overrideProvider(RIDE_VEHICLE_CLASS_REPOSITORY)
       .useValue(new MemoryRideVehicleClassRepository())
+      .overrideProvider(INTEGRATION_SETTINGS_REPOSITORY)
+      .useValue(new MemoryIntegrationSettingsRepository())
+      .overrideProvider(EMAIL_SUPPRESSION_REPOSITORY)
+      .useValue(new MemoryEmailSuppressionRepository())
       .compile();
 
     app = moduleRef.createNestApplication();

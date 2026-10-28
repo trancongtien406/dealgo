@@ -20,6 +20,10 @@ import {
   type RequestActor,
 } from '../identity/access-auth.guard.js';
 import {
+  AuthMethodEnabledGuard,
+  RequireAuthMethod,
+} from '../identity/auth-method-enabled.guard.js';
+import {
   ChangePasswordDto,
   SessionDeviceDto,
   UpdateNotificationPrefsDto,
@@ -85,6 +89,8 @@ export class AccountSettingsController {
   }
 
   @Post('password')
+  @RequireAuthMethod('EMAIL_LOGIN_IDENTIFIER')
+  @UseGuards(AuthMethodEnabledGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'S025 change customer password; revokes other sessions' })
   changePassword(@CurrentActor() actor: RequestActor, @Body() dto: ChangePasswordDto) {

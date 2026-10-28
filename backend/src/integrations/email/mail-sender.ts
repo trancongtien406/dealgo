@@ -8,6 +8,21 @@ export interface MailSender {
   sendSignupCode(input: SignupCodeMail): Promise<void>;
   /** Sent instead of a code when someone tries to sign up with an address that already has an account. */
   sendSignupAccountExists(input: { email: string }): Promise<void>;
+  /** Admin "send test email": proves the configured provider delivers. */
+  sendTestEmail(input: { email: string }): Promise<void>;
+}
+
+export type MailFailureReason = 'auth_failed' | 'rejected' | 'rate_limited' | 'provider_unavailable' | 'suppressed';
+
+export class MailDeliveryError extends Error {
+  constructor(
+    readonly reason: MailFailureReason,
+    readonly provider: string,
+    readonly providerCode?: string,
+  ) {
+    super(`Email ${provider} failed: ${reason}${providerCode ? ` (${providerCode})` : ''}`);
+    this.name = 'MailDeliveryError';
+  }
 }
 
 export type DeliveredMail = {
@@ -40,6 +55,7 @@ export class MockMailSender implements MailSender {
   readonly passwordResets: DeliveredPasswordReset[] = [];
   readonly signupCodes: DeliveredSignupCode[] = [];
   readonly signupAccountExists: string[] = [];
+  readonly testEmails: string[] = [];
 
   constructor(private readonly nodeEnv: 'development' | 'test' | 'production') {}
 
@@ -74,6 +90,14 @@ export class MockMailSender implements MailSender {
     this.signupAccountExists.push(input.email);
     this.logger.log(`Signup account-exists notice mock to ${input.email}`);
   }
+
+  async sendTestEmail(input: { email: string }): Promise<void> {
+    if (this.nodeEnv === 'production') {
+      throw new Error('Email mock is not available in production');
+    }
+    this.testEmails.push(input.email);
+    this.logger.log(`Test email mock to ${input.email}`);
+  }
 }
 
 @Injectable()
@@ -91,6 +115,10 @@ export class UnavailableMailSender implements MailSender {
   }
 
   async sendSignupAccountExists(): Promise<void> {
+    throw new Error('Email provider is not configured');
+  }
+
+  async sendTestEmail(): Promise<void> {
     throw new Error('Email provider is not configured');
   }
 }

@@ -1,0 +1,3 @@
+// `dev` scheme: Flutter flavor dev, home-screen name "DealGo Dev".
+FLAVOR=dev
+DEALGO_DISPLAY_NAME=DealGo Dev

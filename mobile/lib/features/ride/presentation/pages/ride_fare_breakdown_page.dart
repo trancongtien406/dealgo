@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/design_system/components/dealgo_banner.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
@@ -161,11 +160,6 @@ class RideFareBreakdownPage extends StatelessWidget {
                           amount: formatRideVnd(total),
                           emphasize: true,
                         ),
-                        const SizedBox(height: DealGoSpacing.s8),
-                        Text(
-                          l10n.rideFareReferenceExplain,
-                          style: textTheme.bodySmall,
-                        ),
                       ],
                     ),
                   ),
@@ -182,11 +176,6 @@ class RideFareBreakdownPage extends StatelessWidget {
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: DealGoSpacing.s12),
-                  DealGoBanner(
-                    tone: DealGoBannerTone.warning,
-                    message: l10n.rideFareBreakdownNote,
                   ),
                 ],
               ),

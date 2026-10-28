@@ -87,23 +87,22 @@ void main() {
     expect(navLabel('Thực đơn'), findsNothing);
   });
 
-  testWidgets(
-    'multi-role user lands on customer home without a role picker',
-    (tester) async {
-      await pumpSignedIn(tester, profile: multiRoleProfile);
+  testWidgets('multi-role user lands on customer home without a role picker', (
+    tester,
+  ) async {
+    await pumpSignedIn(tester, profile: multiRoleProfile);
 
-      expect(
-        find.text('Bạn muốn dùng DealGo theo vai trò nào?', findRichText: true),
-        findsNothing,
-      );
-      expect(find.byType(CustomerTabBar), findsOneWidget);
-      expect(navLabel('Trang'), findsOneWidget);
+    expect(
+      find.text('Bạn muốn dùng DealGo theo vai trò nào?', findRichText: true),
+      findsNothing,
+    );
+    expect(find.byType(CustomerTabBar), findsOneWidget);
+    expect(navLabel('Trang'), findsOneWidget);
 
-      await tester.tap(navLabel('Tôi'));
-      await tester.pumpAndSettle();
-      expect(find.text('Đổi vai trò'), findsOneWidget);
-    },
-  );
+    await tester.tap(navLabel('Tôi'));
+    await tester.pumpAndSettle();
+    expect(find.text('Đổi vai trò'), findsOneWidget);
+  });
 }
 
 Future<void> _switchRole(WidgetTester tester, String roleTitle) async {

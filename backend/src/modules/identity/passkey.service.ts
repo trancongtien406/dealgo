@@ -8,6 +8,7 @@ import {
 } from '@simplewebauthn/server';
 import type {
   AuthenticationResponseJSON,
+  PublicKeyCredentialRequestOptionsJSON,
   RegistrationResponseJSON,
 } from '@simplewebauthn/server';
 import type { AppEnv } from '../../platform/config/env.js';
@@ -172,6 +173,58 @@ export class PasskeyService {
     return this.sessions.issue(user, 'customer');
   }
 
+  /**
+   * Step-up re-authentication of a signed-in user (account deletion): assertion options limited
+   * to the user's own passkeys. The caller stores the challenge (bound to its own purpose and TTL)
+   * and passes a matcher to [verifyReauthentication].
+   */
+  async reauthenticationOptions(userId: string): Promise<PublicKeyCredentialRequestOptionsJSON> {
+    const passkeys = await this.repository.listPasskeys(userId);
+    return generateAuthenticationOptions({
+      rpID: this.relyingParty().rpID,
+      userVerification: 'required',
+      allowCredentials: passkeys.map((passkey) => ({
+        id: passkey.credentialId,
+        transports: passkey.transports,
+      })),
+    });
+  }
+
+  /** True only for a valid assertion over the expected challenge by one of [userId]'s passkeys. */
+  async verifyReauthentication(
+    userId: string,
+    expectedChallenge: (challenge: string) => boolean,
+    response: AuthenticationResponseJSON,
+  ): Promise<boolean> {
+    const passkey = await this.repository.findPasskeyByCredentialId(response.id);
+    if (!passkey || passkey.userId !== userId) {
+      return false;
+    }
+    const relyingParty = this.relyingParty();
+    try {
+      const verification = await verifyAuthenticationResponse({
+        response,
+        expectedChallenge,
+        expectedOrigin: relyingParty.origins,
+        expectedRPID: relyingParty.rpID,
+        requireUserVerification: true,
+        credential: {
+          id: passkey.credentialId,
+          publicKey: copyBytes(passkey.publicKey),
+          counter: passkey.counter,
+          transports: passkey.transports,
+        },
+      });
+      if (!verification.verified) {
+        return false;
+      }
+      await this.repository.updatePasskeyCounter(passkey.id, verification.authenticationInfo.newCounter);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async signupOptions(): Promise<Awaited<ReturnType<typeof generateRegistrationOptions>> & { ceremonyId: string }> {
     await this.authMethods.assertEnabled('PASSKEY');
     const options = await generateRegistrationOptions({
@@ -238,10 +291,15 @@ export class PasskeyService {
 
   private async requireVerifiedUser(userId: string) {
     const user = await this.repository.findUserById(userId);
-    // Phone OTP and email sign-up are independently toggleable (DEC-PROD-052); either verified
-    // identifier is enough to bind a passkey, so an email + passkey launch works without SMS.
-    if (!user || (!user.phoneVerifiedAt && !user.emailVerifiedAt)) {
-      throw authError(403, 'FORBIDDEN', 'A verified phone or email session is required');
+    // Sign-in methods are independently toggleable (DEC-PROD-052): a verified phone, a verified
+    // email or an existing passkey (passkey-only accounts) is enough to bind another passkey.
+    const verified =
+      user &&
+      (user.phoneVerifiedAt ||
+        user.emailVerifiedAt ||
+        (await this.repository.listPasskeys(user.id)).length > 0);
+    if (!user || !verified) {
+      throw authError(403, 'FORBIDDEN', 'A verified account is required');
     }
     return user;
   }

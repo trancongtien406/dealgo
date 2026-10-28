@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../core/design_system/components/dealgo_banner.dart';
 import '../../../core/design_system/components/dealgo_segmented_control.dart';
 import '../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../core/design_system/components/dealgo_state_view.dart';
@@ -197,11 +196,6 @@ class _PaymentHistoryViewState extends State<_PaymentHistoryView> {
                         amount: '-${formatRideVnd(item.amountVnd!)}',
                         amountColor: DealGoColors.text,
                       ),
-                  const SizedBox(height: DealGoSpacing.s16),
-                  DealGoBanner(
-                    tone: DealGoBannerTone.info,
-                    message: l10n.paymentHistoryNote,
-                  ),
                 ],
               ),
             ),

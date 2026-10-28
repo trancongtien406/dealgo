@@ -169,8 +169,11 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
     final next = cart.state;
     if (!next.canCheckout) {
       setState(() {
+        final l10n = AppLocalizations.of(context);
         _phase = CheckoutRejected(
-          AppLocalizations.of(context).checkoutMenuChangedEmpty,
+          next.lines.isNotEmpty && next.minOrderShortVnd > 0
+              ? l10n.checkoutErrMinOrder
+              : l10n.checkoutMenuChangedEmpty,
         );
       });
       return;

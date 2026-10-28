@@ -6,12 +6,17 @@ const prodApiBaseUrl = 'https://api-dealgo.trancongtien.com';
 /// Local Nest listens on 3001 (Admin Web takes 3000).
 const devApiBaseUrl = 'http://localhost:3001';
 
-/// Release builds default to [prodApiBaseUrl]; debug/profile to [devApiBaseUrl].
-/// Override with `--dart-define=API_BASE_URL=...` (Android emulator:
-/// `http://10.0.2.2:3001`, staging, etc.).
+/// Flutter flavor from `--flavor` or the Xcode `dev` / `prod` scheme.
+const _flavor = String.fromEnvironment('FLUTTER_APP_FLAVOR');
+
+/// Release builds and the `prod` flavor default to [prodApiBaseUrl]; other
+/// debug/profile builds to [devApiBaseUrl]. Override with
+/// `--dart-define=API_BASE_URL=...` (Android emulator: `http://10.0.2.2:3001`).
 const apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: kReleaseMode ? prodApiBaseUrl : devApiBaseUrl,
+  defaultValue: kReleaseMode || _flavor == 'prod'
+      ? prodApiBaseUrl
+      : devApiBaseUrl,
 );
 
 /// Chat and all API traffic must use TLS outside local debug.

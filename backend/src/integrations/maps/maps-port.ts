@@ -46,6 +46,42 @@ export class UnavailableMapsError extends Error {
   }
 }
 
+/**
+ * Port whose API key is resolved per call (Admin key in DB over env); one inner port per key.
+ * An empty key behaves as UnavailableMapsPort.
+ */
+export class KeyedMapsPort implements MapsPort {
+  private cached: { key: string; port: MapsPort } | null = null;
+
+  constructor(
+    private readonly resolveKey: () => Promise<string>,
+    private readonly create: (key: string) => MapsPort,
+  ) {}
+
+  async geocode(query: string): Promise<GeocodeResult> {
+    return (await this.port()).geocode(query);
+  }
+
+  async searchPlaces(query: string, limit: number, near?: GeoPoint): Promise<PlaceSuggestion[]> {
+    return (await this.port()).searchPlaces(query, limit, near);
+  }
+
+  async reverseGeocode(point: GeoPoint): Promise<PlaceSuggestion | null> {
+    return (await this.port()).reverseGeocode(point);
+  }
+
+  async routeDistanceKm(origin: GeoPoint, destination: GeoPoint): Promise<number> {
+    return (await this.port()).routeDistanceKm(origin, destination);
+  }
+
+  private async port(): Promise<MapsPort> {
+    const key = (await this.resolveKey()).trim();
+    if (!key) return new UnavailableMapsPort();
+    if (this.cached?.key !== key) this.cached = { key, port: this.create(key) };
+    return this.cached.port;
+  }
+}
+
 @Injectable()
 export class MockMapsPort implements MapsPort {
   async geocode(query: string): Promise<GeocodeResult> {

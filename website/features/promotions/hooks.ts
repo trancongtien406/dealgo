@@ -20,6 +20,7 @@ export function usePromotionsFilters() {
     status: parseAsString.withDefault(""),
     channel: parseAsString.withDefault(""),
     audience: parseAsString.withDefault(""),
+    scope: parseAsString.withDefault(""),
   });
 }
 
@@ -32,6 +33,7 @@ export function usePromotionsQuery() {
     status: filters.status || null,
     channel: filters.channel || null,
     audience: filters.audience || null,
+    scope: filters.scope || null,
   };
   return useQuery({
     queryKey: promotionsQueryKeys.list(params),

@@ -1,7 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { AppEnv } from '../../platform/config/env.js';
 import { authError } from './auth-error.js';
+import { AuthMethodPolicyService } from './auth-method-policy.service.js';
 import { EmailVerificationService } from './email-verification.service.js';
 import { IDENTITY_REPOSITORY } from './identity.constants.js';
 import type {
@@ -45,6 +46,7 @@ export class CurrentUserService {
     @Inject(IDENTITY_REPOSITORY) private readonly repository: IdentityRepository,
     private readonly emailVerification: EmailVerificationService,
     private readonly config: ConfigService<AppEnv, true>,
+    @Optional() private readonly authMethods?: AuthMethodPolicyService,
   ) {}
 
   async getProfile(userId: string): Promise<CurrentUserResult> {
@@ -53,7 +55,18 @@ export class CurrentUserService {
   }
 
   async updateProfile(userId: string, input: UpdateMeInput): Promise<UpdateMeResult> {
-    await this.requireUser(userId);
+    const before = await this.requireUser(userId);
+    // Email is a sign-in method: while it is off, a new address is refused like an unknown
+    // property, before any write and without a verification email. Re-sending the current
+    // verified address (older app builds do) stays a no-op.
+    if (
+      input.email !== undefined &&
+      !(before.email === normalizeEmail(input.email) && before.emailVerifiedAt !== null) &&
+      this.authMethods &&
+      !(await this.authMethods.isEnabled('EMAIL_LOGIN_IDENTIFIER'))
+    ) {
+      throw authError(400, 'VALIDATION_ERROR', 'property email should not exist');
+    }
 
     const profilePatch: {
       displayName?: string;

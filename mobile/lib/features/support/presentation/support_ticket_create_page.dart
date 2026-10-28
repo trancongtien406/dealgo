@@ -7,6 +7,7 @@ import '../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../core/drafts/text_draft.dart';
 import '../../../core/format/short_ref.dart';
 import '../../../core/motion/dealgo_sheet.dart';
 import '../../../core/network/api_exception.dart';
@@ -38,7 +39,8 @@ class SupportTicketCreatePage extends StatefulWidget {
       _SupportTicketCreatePageState();
 }
 
-class _SupportTicketCreatePageState extends State<SupportTicketCreatePage> {
+class _SupportTicketCreatePageState extends State<SupportTicketCreatePage>
+    with TextDraftMixin {
   final _subject = TextEditingController();
   final _description = TextEditingController();
   late SupportCategory _category =
@@ -55,6 +57,16 @@ class _SupportTicketCreatePageState extends State<SupportTicketCreatePage> {
   String? get _token {
     final auth = context.read<AuthCubit>().state;
     return auth is AuthSignedIn ? auth.tokens.accessToken : null;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Typed request survives an app kill; cleared once the ticket is stored.
+    bindTextDraft('support.${supportRoleForShell(widget.shellPath)}', {
+      'subject': _subject,
+      'description': _description,
+    });
   }
 
   @override
@@ -201,6 +213,7 @@ class _SupportTicketCreatePageState extends State<SupportTicketCreatePage> {
           attachments: supportUploads(_photos),
         ),
       );
+      clearTextDraft();
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(l10n.supportCreated)));
@@ -245,8 +258,6 @@ class _SupportTicketCreatePageState extends State<SupportTicketCreatePage> {
                     l10n.supportCreateHeading,
                     style: textTheme.headlineSmall,
                   ),
-                  const SizedBox(height: DealGoSpacing.s4),
-                  Text(l10n.supportCreateSubtitle, style: textTheme.bodySmall),
                   const SizedBox(height: DealGoSpacing.s20),
                   _PickerField(
                     fieldKey: const Key('support-category-field'),
@@ -270,7 +281,6 @@ class _SupportTicketCreatePageState extends State<SupportTicketCreatePage> {
                     fieldKey: const Key('support-subject'),
                     label: l10n.supportFieldSubject,
                     controller: _subject,
-                    hint: l10n.supportSubjectHint,
                     maxLength: 120,
                     errorText: _subjectError,
                     textCapitalization: TextCapitalization.sentences,
@@ -280,7 +290,6 @@ class _SupportTicketCreatePageState extends State<SupportTicketCreatePage> {
                     fieldKey: const Key('support-description'),
                     label: l10n.supportFieldDescription,
                     controller: _description,
-                    hint: l10n.supportDescriptionHint,
                     maxLines: 5,
                     maxLength: 2000,
                     errorText: _descriptionError,

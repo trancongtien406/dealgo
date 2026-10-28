@@ -166,7 +166,7 @@ void main() {
       find.textContaining('test@dealgo.vn', findRichText: true),
       findsOneWidget,
     );
-    expect(find.text('Đổi email'), findsOneWidget);
+    expect(find.byKey(const Key('otp-back')), findsOneWidget);
 
     await submitOtp(tester, '123456');
     await tester.pumpAndSettle(const Duration(seconds: 1));
@@ -217,7 +217,9 @@ void main() {
     await submitOtp(tester, '000000');
     await tester.pumpAndSettle();
 
-    expect(find.text('Mã xác thực không đúng'), findsOneWidget);
+    // Title copy is owned by l10n (T87 shortened it); assert the pane.
+    expect(find.byKey(const Key('auth-error')), findsOneWidget);
+    // Header is a back arrow; only the pane button reads "Đổi email".
     expect(find.text('Đổi email'), findsOneWidget);
     expect(await store.read(), isNull);
   });
@@ -303,7 +305,7 @@ void main() {
         find.textContaining('old@dealgo.vn', findRichText: true),
         findsOneWidget,
       );
-      expect(find.text('Đổi email'), findsOneWidget);
+      expect(find.byKey(const Key('otp-back')), findsOneWidget);
 
       await submitOtp(tester, '123456');
       await tester.pumpAndSettle(const Duration(seconds: 1));
@@ -357,6 +359,7 @@ void main() {
       ),
       findsOneWidget,
     );
+    // Header is a back arrow; only the pane button reads "Đổi email".
     expect(find.text('Đổi email'), findsOneWidget);
     expect(find.text('Thử lại'), findsNothing);
   });

@@ -1,8 +1,14 @@
-import { type OpsDateWindow, prismaDateFilter } from '../operations/ops-date-window.js';
+import {
+  type OpsDateWindow,
+  prismaDateFilter,
+} from '../operations/ops-date-window.js';
 import { cancellationCountsAgainstDriver } from '../../shared/cancel-actor.js';
 import type { CancelActorName } from '../../shared/cancel-actor.js';
 import type { DriverJobCounts } from '../../shared/driver-job-counts.js';
-import type { CompletionHook, TxHandle } from '../../shared/tx/completion-hook.js';
+import type {
+  CompletionHook,
+  TxHandle,
+} from '../../shared/tx/completion-hook.js';
 import { randomUUID } from 'node:crypto';
 import {
   normalizeRegionFilter,
@@ -17,7 +23,10 @@ import {
   writeStatusOutbox,
 } from '../communication/outbox/outbox.write.js';
 import { FoodRuleError } from './food.error.js';
-import { effectiveServiceMode, type StoreServiceMode } from './store-service-mode.js';
+import {
+  effectiveServiceMode,
+  type StoreServiceMode,
+} from './store-service-mode.js';
 import {
   acceptSettingsFromRow,
   atCapacity,
@@ -33,7 +42,9 @@ import {
   vnClock,
   type StoreSchedule,
 } from './store-schedule.js';
+import { pickFeaturedItems, shownOriginalPrice } from './food.repository.js';
 import type {
+  StoreFeaturedItem,
   CatalogItemInput,
   FoodFailInput,
   MerchantSettlementView,
@@ -43,8 +54,6 @@ import type {
   FoodDriverHistoryWindow,
   FoodOrderView,
   FoodRepository,
-  OpsCatalogCategoryItem,
-  OpsCatalogCategoryPage,
   OpsCatalogModerationPage,
   OpsFoodInterveneResult,
   OpsFoodOrderPage,
@@ -94,10 +103,7 @@ import {
   DRIVER_HISTORY_FOOD_STATUSES,
   assertFailWaitOver,
   earlyClaimOpensAt,
-  aggregateStoreCategories,
-  filterStoreCategories,
-  normalizeStoreCategoryName,
-  slugifyStoreCategory,
+  UNCATEGORIZED_STORE_CATEGORY_NAME,
   snapshotFoodLines,
 } from './food.repository.js';
 import {
@@ -111,7 +117,13 @@ import {
   VoucherRejectedError,
 } from '../promotion/promotion-redemption.js';
 
-const OPEN_STATUSES = ['PLACED', 'PREPARING', 'READY', 'ASSIGNED', 'PICKED_UP'] as const;
+const OPEN_STATUSES = [
+  'PLACED',
+  'PREPARING',
+  'READY',
+  'ASSIGNED',
+  'PICKED_UP',
+] as const;
 
 type OrderRow = {
   id: string;
@@ -183,7 +195,10 @@ export class PrismaFoodRepository implements FoodRepository {
     return count > 0;
   }
 
-  async createFixtureStore(ownerId: string, items: CatalogItemInput[]): Promise<void> {
+  async createFixtureStore(
+    ownerId: string,
+    items: CatalogItemInput[],
+  ): Promise<void> {
     await this.db.$transaction(async (tx) => {
       const existing = await tx.foodStore.count();
       if (existing > 0) {
@@ -231,12 +246,19 @@ export class PrismaFoodRepository implements FoodRepository {
       : Prisma.sql`NULL::double precision`;
 
     // A store without coordinates cannot take delivery orders, so it is not listed.
-    const filters: Prisma.Sql[] = [Prisma.sql`s."lat" IS NOT NULL`, Prisma.sql`s."lng" IS NOT NULL`];
+    const filters: Prisma.Sql[] = [
+      Prisma.sql`s."lat" IS NOT NULL`,
+      Prisma.sql`s."lng" IS NOT NULL`,
+    ];
     if (hasGeo) {
       filters.push(Prisma.sql`${distanceSql} <= ${query.radiusKm}`);
     }
     if (search) {
-      filters.push(Prisma.sql`s."name" ILIKE ${'%' + search + '%'}`);
+      const like = '%' + search + '%';
+      // Store name or any dish/drink on its menu.
+      filters.push(Prisma.sql`(s."name" ILIKE ${like} OR EXISTS (
+        SELECT 1 FROM "food_items" fi WHERE fi."storeId" = s."id" AND fi."name" ILIKE ${like}
+      ))`);
     }
     if (category) {
       filters.push(Prisma.sql`LOWER(s."category") = LOWER(${category})`);
@@ -244,12 +266,15 @@ export class PrismaFoodRepository implements FoodRepository {
     const whereSql = Prisma.join(filters, ' AND ');
     const openSql = openNowSql(now);
 
+    const minRatingCount = Math.max(1, query.minRatingCount ?? 1);
     const orderSql =
       sortBy === 'name'
         ? Prisma.sql`s."name" ASC, s."id" ASC`
         : sortBy === 'createdAt'
           ? Prisma.sql`s."createdAt" DESC, s."id" ASC`
-          : Prisma.sql`distance_km ASC, s."id" ASC`;
+          : sortBy === 'rating'
+            ? Prisma.sql`(CASE WHEN rt.rating_count >= ${minRatingCount} THEN rt.rating_avg END) DESC NULLS LAST, rt.rating_count DESC, s."id" ASC`
+            : Prisma.sql`distance_km ASC, s."id" ASC`;
 
     const countRows = await this.db.$queryRaw<Array<{ total: bigint }>>`
       SELECT COUNT(*)::bigint AS total
@@ -273,6 +298,11 @@ export class PrismaFoodRepository implements FoodRepository {
         distance_km: number | null;
         imageUrl: string | null;
         logoUrl: string | null;
+        minOrderVnd: number;
+        defaultPrepMinutes: number;
+        busyExtraMinutes: number;
+        rating_count: number;
+        rating_avg: number | null;
       }>
     >`
       SELECT
@@ -287,9 +317,19 @@ export class PrismaFoodRepository implements FoodRepository {
         s."serviceModeUntil",
         ${openSql} AS open_now,
         ${distanceSql} AS distance_km,
-        cover."imageUrl" AS "imageUrl",
-        s."logoUrl"
+        COALESCE(s."coverUrl", cover."imageUrl") AS "imageUrl",
+        s."logoUrl",
+        s."minOrderVnd",
+        s."defaultPrepMinutes",
+        s."busyExtraMinutes",
+        rt.rating_count,
+        rt.rating_avg
       FROM "food_stores" s
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS rating_count, AVG(r."storeStars")::float8 AS rating_avg
+        FROM "service_ratings" r
+        WHERE r."storeId" = s."id" AND r."storeStars" IS NOT NULL AND r."hiddenAt" IS NULL
+      ) rt ON TRUE
       LEFT JOIN LATERAL (
         SELECT i."imageUrl"
         FROM "food_items" i
@@ -308,7 +348,11 @@ export class PrismaFoodRepository implements FoodRepository {
     return {
       total,
       items: rows.map((row) => {
-        const mode = effectiveServiceMode(row.serviceMode, row.serviceModeUntil, now).serviceMode;
+        const mode = effectiveServiceMode(
+          row.serviceMode,
+          row.serviceModeUntil,
+          now,
+        ).serviceMode;
         return {
           id: row.id,
           name: row.name,
@@ -320,9 +364,20 @@ export class PrismaFoodRepository implements FoodRepository {
           distanceKm: row.distance_km === null ? null : Number(row.distance_km),
           serviceMode: mode,
           openNow: row.open_now,
-          closedReason: row.open_now ? null : mode === 'PAUSED' ? 'PAUSED' : 'CLOSED',
+          closedReason: row.open_now
+            ? null
+            : mode === 'PAUSED'
+              ? 'PAUSED'
+              : 'CLOSED',
           imageUrl: row.imageUrl,
           logoUrl: row.logoUrl,
+          minOrderVnd: Number(row.minOrderVnd ?? 0),
+          estimatedPrepMinutes:
+            row.defaultPrepMinutes +
+            (mode === 'BUSY' ? row.busyExtraMinutes : 0),
+          ratingCount: Number(row.rating_count ?? 0),
+          ratingAverage:
+            row.rating_avg === null ? null : Number(row.rating_avg),
         };
       }),
     };
@@ -368,12 +423,7 @@ export class PrismaFoodRepository implements FoodRepository {
       );
     }
     if (filter?.category && filter.category !== 'ALL') {
-      and.push({
-        category: {
-          contains: mapStoreCategoryFilter(filter.category),
-          mode: 'insensitive',
-        },
-      });
+      and.push({ category: filter.category });
     }
     // sale / status: OPEN ≈ available items; CLOSED ≈ none available; SUSPENDED ≈ merchant grant
     const saleOrStatus =
@@ -388,11 +438,17 @@ export class PrismaFoodRepository implements FoodRepository {
       // DEC-PROD-026: merchant-set intake mode that has not auto-resumed yet.
       and.push({
         serviceMode: saleOrStatus,
-        OR: [{ serviceModeUntil: null }, { serviceModeUntil: { gt: new Date() } }],
+        OR: [
+          { serviceModeUntil: null },
+          { serviceModeUntil: { gt: new Date() } },
+        ],
       });
     } else if (saleOrStatus === 'CLOSED') {
       and.push({
-        OR: [{ items: { none: {} } }, { items: { every: { available: false } } }],
+        OR: [
+          { items: { none: {} } },
+          { items: { every: { available: false } } },
+        ],
       });
     } else if (saleOrStatus === 'SUSPENDED') {
       and.push({
@@ -459,7 +515,11 @@ export class PrismaFoodRepository implements FoodRepository {
       items: stores.map((store) => ({
         ...acceptFromRow(store),
         ...effectiveServiceMode(store.serviceMode, store.serviceModeUntil),
-        ...storeAvailability(store.serviceMode, store.serviceModeUntil, scheduleFromRow(store)),
+        ...storeAvailability(
+          store.serviceMode,
+          store.serviceModeUntil,
+          scheduleFromRow(store),
+        ),
         id: store.id,
         name: store.name,
         ownerId: store.ownerId,
@@ -498,17 +558,18 @@ export class PrismaFoodRepository implements FoodRepository {
       storeFilter.name = { contains: query.store, mode: 'insensitive' };
     }
     if (query.category && query.category !== 'ALL') {
-      storeFilter.category = {
-        contains: mapStoreCategoryFilter(query.category),
-        mode: 'insensitive',
-      };
+      storeFilter.category = query.category;
     }
     if (Object.keys(storeFilter).length > 0) {
       where.store = storeFilter;
     }
     if (query.status && query.status !== 'ALL') {
       const status = query.status.toUpperCase();
-      if (status === 'APPROVED' || status === 'PENDING' || status === 'REJECTED') {
+      if (
+        status === 'APPROVED' ||
+        status === 'PENDING' ||
+        status === 'REJECTED'
+      ) {
         where.moderationStatus = status;
       }
     }
@@ -521,7 +582,9 @@ export class PrismaFoodRepository implements FoodRepository {
       this.db.foodItem.count({ where }),
       this.db.foodItem.findMany({
         where,
-        include: { store: true },
+        include: {
+          store: { include: { categoryRef: { select: { nameVi: true } } } },
+        },
         orderBy: [{ name: 'asc' }],
         skip: (page - 1) * limit,
         take: limit,
@@ -533,7 +596,8 @@ export class PrismaFoodRepository implements FoodRepository {
         id: r.id,
         code: `SP-${r.id.slice(0, 5).toUpperCase()}`,
         name: r.name,
-        category: normalizeStoreCategoryName(r.store.category),
+        category:
+          r.store.categoryRef?.nameVi ?? UNCATEGORIZED_STORE_CATEGORY_NAME,
         store: r.store.name,
         price: r.priceVnd,
         submittedAt: r.createdAt.toISOString(),
@@ -545,56 +609,6 @@ export class PrismaFoodRepository implements FoodRepository {
       page,
       limit,
     };
-  }
-
-  async listStoreCategories(query: {
-    page?: number;
-    limit?: number;
-    q?: string;
-  }): Promise<OpsCatalogCategoryPage> {
-    return filterStoreCategories(await this.loadStoreCategories(), query);
-  }
-
-  async findStoreCategoryByCode(code: string): Promise<OpsCatalogCategoryItem | null> {
-    const normalized = code.trim().toLowerCase();
-    return (await this.loadStoreCategories()).find((c) => c.code === normalized) ?? null;
-  }
-
-  async renameStoreCategory(code: string, name: string): Promise<OpsCatalogCategoryItem> {
-    const current = await this.findStoreCategoryByCode(code);
-    if (!current) {
-      throw new FoodRuleError('FOOD_CATEGORY_NOT_FOUND');
-    }
-    const stores = await this.db.foodStore.findMany({ select: { id: true, category: true } });
-    const targets = stores.filter(
-      (store) => slugifyStoreCategory(normalizeStoreCategoryName(store.category)) === current.code,
-    );
-    if (targets.length > 0) {
-      await this.db.foodStore.updateMany({
-        where: { id: { in: targets.map((t) => t.id) } },
-        data: { category: name },
-      });
-    }
-    const next = await this.findStoreCategoryByCode(slugifyStoreCategory(name));
-    if (!next) {
-      throw new FoodRuleError('FOOD_CATEGORY_NOT_FOUND');
-    }
-    return next;
-  }
-
-  private async loadStoreCategories(): Promise<OpsCatalogCategoryItem[]> {
-    const stores = await this.db.foodStore.findMany({
-      select: {
-        category: true,
-        _count: { select: { items: true } },
-      },
-    });
-    return aggregateStoreCategories(
-      stores.map((store) => ({
-        category: store.category,
-        itemCount: store._count.items,
-      })),
-    );
   }
 
   async findStore(storeId: string): Promise<StoreDetail | null> {
@@ -619,7 +633,11 @@ export class PrismaFoodRepository implements FoodRepository {
     return {
       ...acceptFromRow(store),
       ...effectiveServiceMode(store.serviceMode, store.serviceModeUntil),
-      ...storeAvailability(store.serviceMode, store.serviceModeUntil, scheduleFromRow(store)),
+      ...storeAvailability(
+        store.serviceMode,
+        store.serviceModeUntil,
+        scheduleFromRow(store),
+      ),
       id: store.id,
       name: store.name,
       ownerId: store.ownerId,
@@ -676,15 +694,30 @@ export class PrismaFoodRepository implements FoodRepository {
         typeof meta.shopAddress === 'string' && meta.shopAddress.trim()
           ? meta.shopAddress.trim().slice(0, 200)
           : undefined;
+      // DEC-PROD-067: category picked at registration, if still offered.
+      const shopCategory =
+        typeof meta.shopCategory === 'string'
+          ? await tx.foodCategory.findFirst({
+              where: { code: meta.shopCategory, active: true },
+              select: { code: true },
+            })
+          : null;
       return tx.foodStore.create({
-        data: { ownerId, name: shopName, addressLabel: shopAddress },
+        data: {
+          ownerId,
+          name: shopName,
+          addressLabel: shopAddress,
+          category: shopCategory?.code,
+        },
         include: storeDetailInclude,
       });
     });
     return toStoreDetail(created);
   }
 
-  async updateStoreSchedule(input: UpdateStoreScheduleInput): Promise<StoreDetail> {
+  async updateStoreSchedule(
+    input: UpdateStoreScheduleInput,
+  ): Promise<StoreDetail> {
     const store = await this.db.foodStore.findFirst({
       where: { ownerId: input.ownerId },
       orderBy: { createdAt: 'asc' },
@@ -723,7 +756,9 @@ export class PrismaFoodRepository implements FoodRepository {
     return toStoreDetail(updated);
   }
 
-  async updateStoreAcceptSettings(input: UpdateStoreAcceptSettingsInput): Promise<StoreDetail> {
+  async updateStoreAcceptSettings(
+    input: UpdateStoreAcceptSettingsInput,
+  ): Promise<StoreDetail> {
     const store = await this.db.foodStore.findFirst({
       where: { ownerId: input.ownerId },
       orderBy: { createdAt: 'asc' },
@@ -745,7 +780,9 @@ export class PrismaFoodRepository implements FoodRepository {
     return toStoreDetail(updated);
   }
 
-  async updateStoreServiceMode(input: UpdateStoreServiceModeInput): Promise<StoreDetail> {
+  async updateStoreServiceMode(
+    input: UpdateStoreServiceModeInput,
+  ): Promise<StoreDetail> {
     const store = await this.db.foodStore.findFirst({
       where: { ownerId: input.ownerId },
       orderBy: { createdAt: 'asc' },
@@ -759,14 +796,18 @@ export class PrismaFoodRepository implements FoodRepository {
       data: {
         serviceMode: input.mode,
         serviceModeUntil: input.until,
-        ...(input.busyExtraMinutes !== undefined ? { busyExtraMinutes: input.busyExtraMinutes } : {}),
+        ...(input.busyExtraMinutes !== undefined
+          ? { busyExtraMinutes: input.busyExtraMinutes }
+          : {}),
       },
       include: storeDetailInclude,
     });
     return toStoreDetail(updated);
   }
 
-  async updateStoreProfile(input: UpdateStoreProfileInput): Promise<StoreDetail> {
+  async updateStoreProfile(
+    input: UpdateStoreProfileInput,
+  ): Promise<StoreDetail> {
     const store = await this.db.foodStore.findFirst({
       where: { ownerId: input.ownerId },
       orderBy: { createdAt: 'asc' },
@@ -780,6 +821,14 @@ export class PrismaFoodRepository implements FoodRepository {
       data: {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.logoUrl !== undefined ? { logoUrl: input.logoUrl } : {}),
+        ...(input.coverUrl !== undefined ? { coverUrl: input.coverUrl } : {}),
+        ...(input.description !== undefined
+          ? { description: input.description }
+          : {}),
+        ...(input.category !== undefined ? { category: input.category } : {}),
+        ...(input.minOrderVnd !== undefined
+          ? { minOrderVnd: input.minOrderVnd }
+          : {}),
       },
       include: storeDetailInclude,
     });
@@ -794,7 +843,17 @@ export class PrismaFoodRepository implements FoodRepository {
     return row?.logoUrl ?? null;
   }
 
-  async updateStoreLocation(input: UpdateStoreLocationInput): Promise<StoreDetail> {
+  async findStoreCoverUrl(storeId: string): Promise<string | null> {
+    const row = await this.db.foodStore.findUnique({
+      where: { id: storeId },
+      select: { coverUrl: true },
+    });
+    return row?.coverUrl ?? null;
+  }
+
+  async updateStoreLocation(
+    input: UpdateStoreLocationInput,
+  ): Promise<StoreDetail> {
     const store = await this.db.foodStore.findFirst({
       where: { ownerId: input.ownerId },
       orderBy: { createdAt: 'asc' },
@@ -836,6 +895,10 @@ export class PrismaFoodRepository implements FoodRepository {
         storeId: store.id,
         name: input.name,
         priceVnd: input.priceVnd,
+        originalPriceVnd: shownOriginalPrice(
+          input.priceVnd,
+          input.originalPriceVnd,
+        ),
         available,
         moderationStatus: available ? 'APPROVED' : 'PENDING',
         description: input.description ?? null,
@@ -850,21 +913,43 @@ export class PrismaFoodRepository implements FoodRepository {
 
   async updateItem(input: UpdateCatalogItemInput): Promise<StoreItemView> {
     const item = await this.requireOwnedItem(input.ownerId, input.itemId);
+    const current = await this.db.foodItem.findUniqueOrThrow({
+      where: { id: item.id },
+      select: { priceVnd: true, originalPriceVnd: true },
+    });
+    const nextPrice = input.priceVnd ?? current.priceVnd;
+    const nextOriginal = shownOriginalPrice(
+      nextPrice,
+      input.originalPriceVnd !== undefined
+        ? input.originalPriceVnd
+        : current.originalPriceVnd,
+    );
     const updated = await this.db.foodItem.update({
       where: { id: item.id },
       data: {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.priceVnd !== undefined ? { priceVnd: input.priceVnd } : {}),
-        ...(input.available !== undefined ? { available: input.available } : {}),
-        ...(input.description !== undefined ? { description: input.description } : {}),
-        ...(input.prepMinutes !== undefined ? { prepMinutes: input.prepMinutes } : {}),
+        ...(nextOriginal !== current.originalPriceVnd
+          ? { originalPriceVnd: nextOriginal }
+          : {}),
+        ...(input.available !== undefined
+          ? { available: input.available }
+          : {}),
+        ...(input.description !== undefined
+          ? { description: input.description }
+          : {}),
+        ...(input.prepMinutes !== undefined
+          ? { prepMinutes: input.prepMinutes }
+          : {}),
         ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}),
         ...(input.imageUrls !== undefined
           ? { imageUrls: input.imageUrls, imageUrl: input.imageUrls[0] ?? null }
           : input.imageUrl !== undefined
             ? { imageUrls: input.imageUrl ? [input.imageUrl] : [] }
             : {}),
-        ...(input.menuCategoryId !== undefined ? { menuCategoryId: input.menuCategoryId } : {}),
+        ...(input.menuCategoryId !== undefined
+          ? { menuCategoryId: input.menuCategoryId }
+          : {}),
       },
       include: itemOptionsInclude,
     });
@@ -879,7 +964,9 @@ export class PrismaFoodRepository implements FoodRepository {
     if (!row) return [];
     const rawUrls = row.imageUrls as unknown;
     const fromJson = Array.isArray(rawUrls)
-      ? rawUrls.filter((u): u is string => typeof u === 'string' && u.length > 0)
+      ? rawUrls.filter(
+          (u): u is string => typeof u === 'string' && u.length > 0,
+        )
       : [];
     if (fromJson.length) return fromJson;
     return row.imageUrl ? [row.imageUrl] : [];
@@ -893,7 +980,65 @@ export class PrismaFoodRepository implements FoodRepository {
     return row?.imageUrl ?? null;
   }
 
-  async listMenuCategories(ownerId: string): Promise<import('./food.repository.js').MenuCategoryView[]> {
+  async listFeaturedItems(
+    storeIds: string[],
+  ): Promise<Map<string, StoreFeaturedItem[]>> {
+    const unique = [...new Set(storeIds)];
+    const byStore = new Map<string, StoreFeaturedItem[]>();
+    if (unique.length === 0) return byStore;
+    const rows = await this.db.foodItem.findMany({
+      where: {
+        storeId: { in: unique },
+        available: true,
+        moderationStatus: 'APPROVED',
+      },
+      select: {
+        id: true,
+        storeId: true,
+        name: true,
+        priceVnd: true,
+        originalPriceVnd: true,
+        imageUrl: true,
+        soldCount: true,
+        createdAt: true,
+      },
+    });
+    const grouped = new Map<string, StoreFeaturedItem[]>();
+    for (const row of rows) {
+      const list = grouped.get(row.storeId) ?? [];
+      list.push({
+        id: row.id,
+        name: row.name,
+        priceVnd: row.priceVnd,
+        originalPriceVnd: shownOriginalPrice(
+          row.priceVnd,
+          row.originalPriceVnd,
+        ),
+        imageUrl: row.imageUrl,
+        soldCount: row.soldCount,
+        addedAt: row.createdAt.toISOString(),
+      });
+      grouped.set(row.storeId, list);
+    }
+    for (const [storeId, list] of grouped) {
+      byStore.set(storeId, pickFeaturedItems(list));
+    }
+    return byStore;
+  }
+
+  async listStoreMenuSections(
+    storeId: string,
+  ): Promise<import('./food.repository.js').StoreMenuSection[]> {
+    return this.db.foodMenuCategory.findMany({
+      where: { storeId, items: { some: {} } },
+      orderBy: [{ position: 'asc' }, { name: 'asc' }],
+      select: { id: true, name: true },
+    });
+  }
+
+  async listMenuCategories(
+    ownerId: string,
+  ): Promise<import('./food.repository.js').MenuCategoryView[]> {
     const store = await this.db.foodStore.findFirst({
       where: { ownerId },
       orderBy: { createdAt: 'asc' },
@@ -937,7 +1082,13 @@ export class PrismaFoodRepository implements FoodRepository {
         position: (max._max.position ?? -1) + 1,
       },
     });
-    return { id: row.id, name: row.name, description: row.description, position: row.position, itemCount: 0 };
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      position: row.position,
+      itemCount: 0,
+    };
   }
 
   async updateMenuCategory(input: {
@@ -970,7 +1121,10 @@ export class PrismaFoodRepository implements FoodRepository {
     };
   }
 
-  async deleteMenuCategory(ownerId: string, categoryId: string): Promise<{ deleted: true }> {
+  async deleteMenuCategory(
+    ownerId: string,
+    categoryId: string,
+  ): Promise<{ deleted: true }> {
     const owned = await this.db.foodMenuCategory.findFirst({
       where: { id: categoryId, store: { ownerId } },
       select: { id: true },
@@ -980,16 +1134,24 @@ export class PrismaFoodRepository implements FoodRepository {
     return { deleted: true };
   }
 
-  async reorderMenuCategories(ownerId: string, orderedIds: string[]): Promise<import('./food.repository.js').MenuCategoryView[]> {
+  async reorderMenuCategories(
+    ownerId: string,
+    orderedIds: string[],
+  ): Promise<import('./food.repository.js').MenuCategoryView[]> {
     const store = await this.db.foodStore.findFirst({
       where: { ownerId },
       orderBy: { createdAt: 'asc' },
       select: { id: true },
     });
     if (!store) throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
-    const existing = await this.db.foodMenuCategory.findMany({ where: { storeId: store.id } });
+    const existing = await this.db.foodMenuCategory.findMany({
+      where: { storeId: store.id },
+    });
     const idSet = new Set(existing.map((r) => r.id));
-    if (orderedIds.length !== existing.length || orderedIds.some((id) => !idSet.has(id))) {
+    if (
+      orderedIds.length !== existing.length ||
+      orderedIds.some((id) => !idSet.has(id))
+    ) {
       throw new FoodRuleError('FOOD_CATEGORY_REORDER_INVALID');
     }
     await this.db.$transaction(
@@ -1000,7 +1162,9 @@ export class PrismaFoodRepository implements FoodRepository {
     return this.listMenuCategories(ownerId);
   }
 
-  async listMerchantHistory(filter: import('./food.repository.js').MerchantHistoryFilter) {
+  async listMerchantHistory(
+    filter: import('./food.repository.js').MerchantHistoryFilter,
+  ) {
     const store = await this.db.foodStore.findFirst({
       where: { ownerId: filter.ownerId },
       orderBy: { createdAt: 'asc' },
@@ -1054,7 +1218,11 @@ export class PrismaFoodRepository implements FoodRepository {
         take: filter.limit,
         include: {
           customer: { select: { displayName: true } },
-          lines: { select: { name: true, quantity: true }, orderBy: { name: 'asc' }, take: 4 },
+          lines: {
+            select: { name: true, quantity: true },
+            orderBy: { name: 'asc' },
+            take: 4,
+          },
         },
       }),
       this.db.foodOrder.aggregate({
@@ -1095,7 +1263,9 @@ export class PrismaFoodRepository implements FoodRepository {
     };
   }
 
-  async replaceItemOptions(input: ReplaceItemOptionsInput): Promise<StoreItemView> {
+  async replaceItemOptions(
+    input: ReplaceItemOptionsInput,
+  ): Promise<StoreItemView> {
     await this.requireOwnedItem(input.ownerId, input.itemId);
     return this.db.$transaction(async (tx) => {
       // Lock the item so two editors cannot interleave delete/create.
@@ -1140,15 +1310,15 @@ export class PrismaFoodRepository implements FoodRepository {
     });
   }
 
-  async setItemAvailability(input: SetItemAvailabilityInput): Promise<StoreItemView> {
+  async setItemAvailability(
+    input: SetItemAvailabilityInput,
+  ): Promise<StoreItemView> {
     const item = await this.requireOwnedItem(input.ownerId, input.itemId);
     const updated = await this.db.foodItem.update({
       where: { id: item.id },
       data: {
         available: input.available,
-        ...(input.available
-          ? { moderationStatus: 'APPROVED' as const }
-          : {}),
+        ...(input.available ? { moderationStatus: 'APPROVED' as const } : {}),
       },
       include: itemOptionsInclude,
     });
@@ -1158,8 +1328,14 @@ export class PrismaFoodRepository implements FoodRepository {
   async setCatalogModeration(
     itemId: string,
     decision: 'APPROVED' | 'REJECTED',
-  ): Promise<{ id: string; available: boolean; moderationStatus: string } | null> {
-    const existing = await this.db.foodItem.findUnique({ where: { id: itemId } });
+  ): Promise<{
+    id: string;
+    available: boolean;
+    moderationStatus: string;
+  } | null> {
+    const existing = await this.db.foodItem.findUnique({
+      where: { id: itemId },
+    });
     if (!existing) {
       return null;
     }
@@ -1199,7 +1375,9 @@ export class PrismaFoodRepository implements FoodRepository {
         and.push({ status: { in: statuses } });
       }
     } else if (filter?.status && filter.status !== 'ALL') {
-      and.push({ status: filter.status.toUpperCase() as FoodOrderView['status'] });
+      and.push({
+        status: filter.status.toUpperCase() as FoodOrderView['status'],
+      });
     }
     if (filter?.store && filter.store !== 'ALL') {
       const store = filter.store.trim();
@@ -1266,7 +1444,9 @@ export class PrismaFoodRepository implements FoodRepository {
     };
   }
 
-  private async foodOrderIdsForPaymentFilter(payment: string): Promise<string[]> {
+  private async foodOrderIdsForPaymentFilter(
+    payment: string,
+  ): Promise<string[]> {
     const { dbMethods } = paymentFilterMatchers(payment);
     if (dbMethods.length === 0) {
       return [];
@@ -1321,8 +1501,12 @@ export class PrismaFoodRepository implements FoodRepository {
     for (const row of rows) {
       if (!row.assignedDriverId) continue;
       // DEC-PROD-035: only driver cancellations count against the driver.
-      if (!cancellationCountsAgainstDriver(row.status, row.cancelledBy)) continue;
-      const current = counts.get(row.assignedDriverId) ?? { completed: 0, finished: 0 };
+      if (!cancellationCountsAgainstDriver(row.status, row.cancelledBy))
+        continue;
+      const current = counts.get(row.assignedDriverId) ?? {
+        completed: 0,
+        finished: 0,
+      };
       current.finished += row._count._all;
       if (row.status === 'DELIVERED') {
         current.completed += row._count._all;
@@ -1332,15 +1516,24 @@ export class PrismaFoodRepository implements FoodRepository {
     return counts;
   }
 
-  async listIdsForDriverInStatuses(driverId: string, statuses: readonly string[]): Promise<string[]> {
+  async listIdsForDriverInStatuses(
+    driverId: string,
+    statuses: readonly string[],
+  ): Promise<string[]> {
     const rows = await this.db.foodOrder.findMany({
-      where: { assignedDriverId: driverId, status: { in: [...statuses] as never } },
+      where: {
+        assignedDriverId: driverId,
+        status: { in: [...statuses] as never },
+      },
       select: { id: true },
     });
     return rows.map((row) => row.id);
   }
 
-  async listIdsForCustomerInStatuses(customerId: string, statuses: readonly string[]): Promise<string[]> {
+  async listIdsForCustomerInStatuses(
+    customerId: string,
+    statuses: readonly string[],
+  ): Promise<string[]> {
     const rows = await this.db.foodOrder.findMany({
       where: { customerId, status: { in: [...statuses] as never } },
       orderBy: { createdAt: 'desc' },
@@ -1386,7 +1579,10 @@ export class PrismaFoodRepository implements FoodRepository {
           return toView(replay);
         }
         const open = await tx.foodOrder.findFirst({
-          where: { customerId: input.customerId, status: { in: [...OPEN_STATUSES] } },
+          where: {
+            customerId: input.customerId,
+            status: { in: [...OPEN_STATUSES] },
+          },
           select: { id: true },
         });
         if (open) {
@@ -1394,7 +1590,11 @@ export class PrismaFoodRepository implements FoodRepository {
         }
         const store = await tx.foodStore.findUnique({
           where: { id: input.storeId },
-          include: { items: { include: itemOptionsInclude }, hours: true, closures: true },
+          include: {
+            items: { include: itemOptionsInclude },
+            hours: true,
+            closures: true,
+          },
         });
         if (!store) {
           throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
@@ -1416,14 +1616,26 @@ export class PrismaFoodRepository implements FoodRepository {
           // "one slot left"; the count below runs after the lock is held.
           await tx.$queryRaw`SELECT 1 FROM "food_stores" WHERE "id" = ${store.id}::uuid FOR UPDATE`;
           const active = await tx.foodOrder.count({
-            where: { storeId: store.id, status: { in: [...KITCHEN_ACTIVE_STATUSES] } },
+            where: {
+              storeId: store.id,
+              status: { in: [...KITCHEN_ACTIVE_STATUSES] },
+            },
           });
           if (atCapacity(acceptSettings, active)) {
             throw new FoodRuleError('FOOD_STORE_AT_CAPACITY');
           }
         }
-        const lines = snapshotFoodLines(store.items.map(prismaItemView), input.items);
-        const subtotalVnd = lines.reduce((sum, line) => sum + line.unitPriceVnd * line.quantity, 0);
+        const lines = snapshotFoodLines(
+          store.items.map(prismaItemView),
+          input.items,
+        );
+        const subtotalVnd = lines.reduce(
+          (sum, line) => sum + line.unitPriceVnd * line.quantity,
+          0,
+        );
+        if (subtotalVnd < store.minOrderVnd) {
+          throw new FoodRuleError('FOOD_MIN_ORDER_NOT_MET');
+        }
         const orderId = randomUUID();
         const voucher = input.voucherCode
           ? await redeemVoucherInTx(tx, {
@@ -1432,6 +1644,7 @@ export class PrismaFoodRepository implements FoodRepository {
               serviceType: 'FOOD',
               orderAmount: subtotalVnd,
               deliveryFee: input.deliveryFareVnd,
+              storeId: store.id,
               entityType: 'FOOD_ORDER',
               entityId: orderId,
             })
@@ -1449,14 +1662,22 @@ export class PrismaFoodRepository implements FoodRepository {
             discountVnd,
             voucherCode: voucher?.code ?? null,
             voucherSponsor: voucher?.sponsor ?? null,
-            totalVnd: Math.max(0, subtotalVnd + input.deliveryFareVnd - discountVnd),
+            totalVnd: Math.max(
+              0,
+              subtotalVnd + input.deliveryFareVnd - discountVnd,
+            ),
             dropoffLat: input.dropoff.lat,
             dropoffLng: input.dropoff.lng,
             dropoffLabel: input.dropoff.label,
             // DEC-PROD-034: the driver navigates to where the store was when the order was placed.
-            pickupLat: store.lat != null && store.lng != null ? store.lat : null,
-            pickupLng: store.lat != null && store.lng != null ? store.lng : null,
-            pickupLabel: store.lat != null && store.lng != null ? (store.addressLabel ?? null) : null,
+            pickupLat:
+              store.lat != null && store.lng != null ? store.lat : null,
+            pickupLng:
+              store.lat != null && store.lng != null ? store.lng : null,
+            pickupLabel:
+              store.lat != null && store.lng != null
+                ? (store.addressLabel ?? null)
+                : null,
             serviceRegionCode: resolveServiceRegionCode({
               lat: input.dropoff.lat,
               lng: input.dropoff.lng,
@@ -1478,7 +1699,9 @@ export class PrismaFoodRepository implements FoodRepository {
           },
           include: orderInclude,
         });
-        await this.writeFoodStatusOutbox(tx, created.id, created.status, { storeId: created.storeId });
+        await this.writeFoodStatusOutbox(tx, created.id, created.status, {
+          storeId: created.storeId,
+        });
         return toView(created);
       });
     } catch (error) {
@@ -1523,19 +1746,28 @@ export class PrismaFoodRepository implements FoodRepository {
     early?: FoodEarlyClaim,
   ): Promise<ReadyOrderSummary[]> {
     const take =
-      limit !== undefined && Number.isSafeInteger(limit) && limit > 0 ? limit : undefined;
+      limit !== undefined && Number.isSafeInteger(limit) && limit > 0
+        ? limit
+        : undefined;
     // Bounding-box prefilter in SQL; the service still applies the exact haversine radius.
     let box: Prisma.FoodOrderWhereInput = {};
     if (near) {
       const dLat = near.radiusKm / 111.32;
-      const dLng = near.radiusKm / (111.32 * Math.max(Math.cos((near.lat * Math.PI) / 180), 0.01));
+      const dLng =
+        near.radiusKm /
+        (111.32 * Math.max(Math.cos((near.lat * Math.PI) / 180), 0.01));
       const lat = { gte: near.lat - dLat, lte: near.lat + dLat };
       const lng = { gte: near.lng - dLng, lte: near.lng + dLng };
       box = {
         OR: [
           { pickupLat: lat, pickupLng: lng },
           { pickupLat: null, store: { lat, lng } },
-          { pickupLat: null, store: { lat: null }, dropoffLat: lat, dropoffLng: lng },
+          {
+            pickupLat: null,
+            store: { lat: null },
+            dropoffLat: lat,
+            dropoffLng: lng,
+          },
         ],
       };
     }
@@ -1544,7 +1776,12 @@ export class PrismaFoodRepository implements FoodRepository {
       where: {
         assignedDriverId: null,
         ...(early
-          ? { OR: [{ status: 'READY' }, { status: 'PREPARING', prepMinutes: { not: null } }] }
+          ? {
+              OR: [
+                { status: 'READY' },
+                { status: 'PREPARING', prepMinutes: { not: null } },
+              ],
+            }
           : { status: 'READY' }),
         ...(near ? { AND: [box] } : {}),
       },
@@ -1566,13 +1803,17 @@ export class PrismaFoodRepository implements FoodRepository {
         pickupLat: true,
         pickupLng: true,
         pickupLabel: true,
-        store: { select: { lat: true, lng: true, name: true, addressLabel: true } },
+        store: {
+          select: { lat: true, lng: true, name: true, addressLabel: true },
+        },
         _count: { select: { lines: true } },
       },
     });
     const claimable = orders.filter((order) => {
       if (order.status === 'READY') return true;
-      const opensAt = early ? earlyClaimOpensAt(order, early.leadMinutes) : null;
+      const opensAt = early
+        ? earlyClaimOpensAt(order, early.leadMinutes)
+        : null;
       return !!early && !!opensAt && opensAt.getTime() <= early.now.getTime();
     });
     return claimable.map((order) => {
@@ -1580,14 +1821,24 @@ export class PrismaFoodRepository implements FoodRepository {
       return {
         id: order.id,
         storeId: order.storeId,
-        status: order.status === 'PREPARING' ? ('PREPARING' as const) : ('READY' as const),
-        estimatedReadyAt: estimatedReadyAt(order.acceptedAt ?? order.createdAt, order.prepMinutes ?? null),
+        status:
+          order.status === 'PREPARING'
+            ? ('PREPARING' as const)
+            : ('READY' as const),
+        estimatedReadyAt: estimatedReadyAt(
+          order.acceptedAt ?? order.createdAt,
+          order.prepMinutes ?? null,
+        ),
         storeName: order.store.name,
         storeAddress: order.store.addressLabel,
         deliveryFareVnd: order.deliveryFareVnd,
         subtotalVnd: order.subtotalVnd,
         totalVnd: order.totalVnd,
-        dropoff: { lat: order.dropoffLat, lng: order.dropoffLng, label: order.dropoffLabel },
+        dropoff: {
+          lat: order.dropoffLat,
+          lng: order.dropoffLng,
+          label: order.dropoffLabel,
+        },
         store: pickup ? { lat: pickup.lat, lng: pickup.lng } : null,
         pickup,
         lineCount: order._count.lines,
@@ -1630,7 +1881,11 @@ export class PrismaFoodRepository implements FoodRepository {
           deliveryFareVnd: order.deliveryFareVnd,
           subtotalVnd: order.subtotalVnd,
           totalVnd: order.totalVnd,
-          dropoff: { lat: order.dropoffLat, lng: order.dropoffLng, label: order.dropoffLabel },
+          dropoff: {
+            lat: order.dropoffLat,
+            lng: order.dropoffLng,
+            label: order.dropoffLabel,
+          },
           lineCount: order._count.lines,
           createdAt: order.createdAt,
           customerId: order.customerId,
@@ -1640,7 +1895,11 @@ export class PrismaFoodRepository implements FoodRepository {
     });
   }
 
-  async merchantStats(ownerId: string, since: Date, topLimit: number): Promise<MerchantStatsRows> {
+  async merchantStats(
+    ownerId: string,
+    since: Date,
+    topLimit: number,
+  ): Promise<MerchantStatsRows> {
     const [finished, openCount, top] = await Promise.all([
       this.db.foodOrder.findMany({
         where: {
@@ -1655,7 +1914,13 @@ export class PrismaFoodRepository implements FoodRepository {
       }),
       this.db.foodOrderLine.groupBy({
         by: ['name'],
-        where: { order: { store: { ownerId }, status: 'DELIVERED', updatedAt: { gte: since } } },
+        where: {
+          order: {
+            store: { ownerId },
+            status: 'DELIVERED',
+            updatedAt: { gte: since },
+          },
+        },
         _sum: { quantity: true },
         orderBy: [{ _sum: { quantity: 'desc' } }, { name: 'asc' }],
         take: topLimit,
@@ -1668,11 +1933,18 @@ export class PrismaFoodRepository implements FoodRepository {
         finishedAt: row.updatedAt,
       })),
       openCount,
-      topItems: top.map((row) => ({ name: row.name, quantity: row._sum.quantity ?? 0 })),
+      topItems: top.map((row) => ({
+        name: row.name,
+        quantity: row._sum.quantity ?? 0,
+      })),
     };
   }
 
-  async deliveredForStatement(storeId: string, from: Date, to: Date): Promise<MerchantStatementRow[]> {
+  async deliveredForStatement(
+    storeId: string,
+    from: Date,
+    to: Date,
+  ): Promise<MerchantStatementRow[]> {
     const rows = await this.db.foodOrder.findMany({
       where: { storeId, status: 'DELIVERED', updatedAt: { gte: from, lt: to } },
       orderBy: { updatedAt: 'asc' },
@@ -1691,13 +1963,17 @@ export class PrismaFoodRepository implements FoodRepository {
       deliveredAt: row.updatedAt,
       subtotalVnd: row.subtotalVnd,
       discountVnd: row.discountVnd,
-      voucherSponsor: (row.voucherSponsor ?? null) as MerchantStatementRow['voucherSponsor'],
+      voucherSponsor: (row.voucherSponsor ??
+        null) as MerchantStatementRow['voucherSponsor'],
       merchantCashVnd: row.merchantCashVnd ?? null,
       commissionVnd: row.merchantCommissionVnd ?? null,
     }));
   }
 
-  async listMerchantSettlements(storeId: string, limit: number): Promise<MerchantSettlementView[]> {
+  async listMerchantSettlements(
+    storeId: string,
+    limit: number,
+  ): Promise<MerchantSettlementView[]> {
     const rows = await this.db.merchantSettlement.findMany({
       where: { storeId },
       orderBy: { periodEnd: 'desc' },
@@ -1706,7 +1982,9 @@ export class PrismaFoodRepository implements FoodRepository {
     return rows.map(toSettlementView);
   }
 
-  async recordMerchantSettlement(input: RecordMerchantSettlementInput): Promise<MerchantSettlementView> {
+  async recordMerchantSettlement(
+    input: RecordMerchantSettlementInput,
+  ): Promise<MerchantSettlementView> {
     return this.db.$transaction(async (tx) => {
       // Serialise per store so two Ops clicks cannot record overlapping periods.
       const locked = await tx.$queryRaw<Array<{ id: string }>>`
@@ -1717,7 +1995,11 @@ export class PrismaFoodRepository implements FoodRepository {
       const periodStart = dayDate(input.periodStart);
       const periodEnd = dayDate(input.periodEnd);
       const overlap = await tx.merchantSettlement.findFirst({
-        where: { storeId: input.storeId, periodStart: { lte: periodEnd }, periodEnd: { gte: periodStart } },
+        where: {
+          storeId: input.storeId,
+          periodStart: { lte: periodEnd },
+          periodEnd: { gte: periodStart },
+        },
         select: { id: true },
       });
       if (overlap) {
@@ -1758,10 +2040,16 @@ export class PrismaFoodRepository implements FoodRepository {
   }
 
   async accept(orderId: string, ownerId: string): Promise<FoodOrderView> {
-    return this.transition(orderId, ownerId, 'PLACED', 'PREPARING', { acceptedAt: new Date() });
+    return this.transition(orderId, ownerId, 'PLACED', 'PREPARING', {
+      acceptedAt: new Date(),
+    });
   }
 
-  async reject(orderId: string, ownerId: string, reason: FoodCancelReason): Promise<FoodOrderView> {
+  async reject(
+    orderId: string,
+    ownerId: string,
+    reason: FoodCancelReason,
+  ): Promise<FoodOrderView> {
     return this.db.$transaction(async (tx) => {
       const updated = await tx.foodOrder.updateMany({
         where: { id: orderId, status: 'PLACED', store: { ownerId } },
@@ -1773,7 +2061,10 @@ export class PrismaFoodRepository implements FoodRepository {
         },
       });
       if (updated.count === 1) {
-        await releaseVoucherInTx(tx, { entityType: 'FOOD_ORDER', entityId: orderId });
+        await releaseVoucherInTx(tx, {
+          entityType: 'FOOD_ORDER',
+          entityId: orderId,
+        });
         await this.writeFoodStatusOutbox(tx, orderId, 'CANCELLED');
         const order = await this.findOrderIn(tx, orderId);
         if (!order) {
@@ -1805,14 +2096,24 @@ export class PrismaFoodRepository implements FoodRepository {
         throw new FoodRuleError('FOOD_CHANGE_PENDING');
       }
       const early = await tx.foodOrder.updateMany({
-        where: { id: orderId, status: 'PREPARING', store: { ownerId }, assignedDriverId: { not: null } },
+        where: {
+          id: orderId,
+          status: 'PREPARING',
+          store: { ownerId },
+          assignedDriverId: { not: null },
+        },
         data: { status: 'ASSIGNED', readyAt },
       });
       const open =
         early.count === 1
           ? early
           : await tx.foodOrder.updateMany({
-              where: { id: orderId, status: 'PREPARING', store: { ownerId }, assignedDriverId: null },
+              where: {
+                id: orderId,
+                status: 'PREPARING',
+                store: { ownerId },
+                assignedDriverId: null,
+              },
               data: { status: 'READY', readyAt },
             });
       if (open.count === 1) {
@@ -1822,7 +2123,9 @@ export class PrismaFoodRepository implements FoodRepository {
         }
         await this.writeFoodStatusOutbox(tx, orderId, order.status, {
           storeId: order.storeId,
-          ...(order.assignedDriverId ? { assignedDriverId: order.assignedDriverId } : {}),
+          ...(order.assignedDriverId
+            ? { assignedDriverId: order.assignedDriverId }
+            : {}),
         });
         return order;
       }
@@ -1864,9 +2167,12 @@ export class PrismaFoodRepository implements FoodRepository {
       if (current.customerId === driverId) {
         throw new FoodRuleError('FOOD_SELF_CLAIM');
       }
-      const isEarly = current.status === 'PREPARING' && current.assignedDriverId === null;
+      const isEarly =
+        current.status === 'PREPARING' && current.assignedDriverId === null;
       if (isEarly) {
-        const opensAt = early ? earlyClaimOpensAt(current, early.leadMinutes) : null;
+        const opensAt = early
+          ? earlyClaimOpensAt(current, early.leadMinutes)
+          : null;
         if (!early || !opensAt || opensAt.getTime() > early.now.getTime()) {
           throw new FoodRuleError('FOOD_NOT_YET_CLAIMABLE');
         }
@@ -1882,7 +2188,9 @@ export class PrismaFoodRepository implements FoodRepository {
         tx.ride.count({
           where: {
             assignedDriverId: driverId,
-            status: { in: ['ASSIGNED', 'DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_TRIP'] },
+            status: {
+              in: ['ASSIGNED', 'DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_TRIP'],
+            },
           },
         }),
       ]);
@@ -1899,12 +2207,19 @@ export class PrismaFoodRepository implements FoodRepository {
           assignedDriverId: null,
           customerId: { not: driverId },
         },
-        data: isEarly ? { assignedDriverId: driverId } : { status: 'ASSIGNED', assignedDriverId: driverId },
+        data: isEarly
+          ? { assignedDriverId: driverId }
+          : { status: 'ASSIGNED', assignedDriverId: driverId },
       });
       if (updated.count === 1) {
-        await this.writeFoodStatusOutbox(tx, orderId, isEarly ? 'PREPARING' : 'ASSIGNED', {
-          assignedDriverId: driverId,
-        });
+        await this.writeFoodStatusOutbox(
+          tx,
+          orderId,
+          isEarly ? 'PREPARING' : 'ASSIGNED',
+          {
+            assignedDriverId: driverId,
+          },
+        );
         const order = await this.findOrderIn(tx, orderId);
         if (!order) {
           throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
@@ -1930,10 +2245,17 @@ export class PrismaFoodRepository implements FoodRepository {
     driverId: string,
     snapshot?: { merchantCashVnd: number; at: Date },
   ): Promise<FoodOrderView> {
-    return this.assignedDriverTransition(orderId, driverId, 'ASSIGNED', 'PICKED_UP', undefined, {
-      pickedUpAt: snapshot?.at ?? new Date(),
-      merchantCashVnd: snapshot?.merchantCashVnd ?? null,
-    });
+    return this.assignedDriverTransition(
+      orderId,
+      driverId,
+      'ASSIGNED',
+      'PICKED_UP',
+      undefined,
+      {
+        pickedUpAt: snapshot?.at ?? new Date(),
+        merchantCashVnd: snapshot?.merchantCashVnd ?? null,
+      },
+    );
   }
 
   async snapshotCommissionWithin(
@@ -1950,7 +2272,11 @@ export class PrismaFoodRepository implements FoodRepository {
     });
   }
 
-  async release(orderId: string, driverId: string, reasonCode: string): Promise<FoodOrderView> {
+  async release(
+    orderId: string,
+    driverId: string,
+    reasonCode: string,
+  ): Promise<FoodOrderView> {
     return this.db.$transaction(async (tx) => {
       const current = await tx.foodOrder.findUnique({
         where: { id: orderId },
@@ -1967,7 +2293,11 @@ export class PrismaFoodRepository implements FoodRepository {
       }
       const to = current.status === 'ASSIGNED' ? 'READY' : 'PREPARING';
       const updated = await tx.foodOrder.updateMany({
-        where: { id: orderId, assignedDriverId: driverId, status: current.status },
+        where: {
+          id: orderId,
+          assignedDriverId: driverId,
+          status: current.status,
+        },
         data: { status: to, assignedDriverId: null },
       });
       if (updated.count !== 1) {
@@ -1983,7 +2313,9 @@ export class PrismaFoodRepository implements FoodRepository {
           fromStatus: current.status,
         },
       });
-      await this.writeFoodStatusOutbox(tx, orderId, to, { releasedBy: driverId });
+      await this.writeFoodStatusOutbox(tx, orderId, to, {
+        releasedBy: driverId,
+      });
       const order = await this.findOrderIn(tx, orderId);
       if (!order) {
         throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
@@ -1992,9 +2324,17 @@ export class PrismaFoodRepository implements FoodRepository {
     });
   }
 
-  async timeoutDue(now: Date, policy: FoodTimeoutPolicy, limit = 100): Promise<FoodTimedOut[]> {
-    const placedCutoff = new Date(now.getTime() - policy.merchantAcceptMinutes * 60_000);
-    const readyCutoff = new Date(now.getTime() - policy.unclaimedReadyMinutes * 60_000);
+  async timeoutDue(
+    now: Date,
+    policy: FoodTimeoutPolicy,
+    limit = 100,
+  ): Promise<FoodTimedOut[]> {
+    const placedCutoff = new Date(
+      now.getTime() - policy.merchantAcceptMinutes * 60_000,
+    );
+    const readyCutoff = new Date(
+      now.getTime() - policy.unclaimedReadyMinutes * 60_000,
+    );
     const due = await this.db.foodOrder.findMany({
       where: {
         OR: [
@@ -2002,7 +2342,10 @@ export class PrismaFoodRepository implements FoodRepository {
           {
             status: 'READY',
             assignedDriverId: null,
-            OR: [{ readyAt: { lte: readyCutoff } }, { readyAt: null, updatedAt: { lte: readyCutoff } }],
+            OR: [
+              { readyAt: { lte: readyCutoff } },
+              { readyAt: null, updatedAt: { lte: readyCutoff } },
+            ],
           },
         ],
       },
@@ -2012,16 +2355,24 @@ export class PrismaFoodRepository implements FoodRepository {
     });
     const out: FoodTimedOut[] = [];
     for (const row of due) {
-      const reason: FoodSystemCancelReason = row.status === 'PLACED' ? 'MERCHANT_TIMEOUT' : 'NO_DRIVER';
+      const reason: FoodSystemCancelReason =
+        row.status === 'PLACED' ? 'MERCHANT_TIMEOUT' : 'NO_DRIVER';
       const done = await this.db.$transaction(async (tx) => {
         const updated = await tx.foodOrder.updateMany({
           where: { id: row.id, status: row.status, assignedDriverId: null },
-          data: { status: 'CANCELLED', cancelledBy: 'SYSTEM', cancelReasonCode: reason },
+          data: {
+            status: 'CANCELLED',
+            cancelledBy: 'SYSTEM',
+            cancelReasonCode: reason,
+          },
         });
         if (updated.count !== 1) {
           return false;
         }
-        await releaseVoucherInTx(tx, { entityType: 'FOOD_ORDER', entityId: row.id });
+        await releaseVoucherInTx(tx, {
+          entityType: 'FOOD_ORDER',
+          entityId: row.id,
+        });
         await this.writeFoodStatusOutbox(tx, row.id, 'CANCELLED', { reason });
         return true;
       });
@@ -2037,7 +2388,13 @@ export class PrismaFoodRepository implements FoodRepository {
     driverId: string,
     onDelivered?: CompletionHook<FoodOrderView>,
   ): Promise<FoodOrderView> {
-    return this.assignedDriverTransition(orderId, driverId, 'PICKED_UP', 'DELIVERED', onDelivered);
+    return this.assignedDriverTransition(
+      orderId,
+      driverId,
+      'PICKED_UP',
+      'DELIVERED',
+      onDelivered,
+    );
   }
 
   async fail(
@@ -2049,7 +2406,12 @@ export class PrismaFoodRepository implements FoodRepository {
     return this.db.$transaction(async (tx) => {
       const current = await tx.foodOrder.findUnique({
         where: { id: orderId },
-        select: { id: true, assignedDriverId: true, status: true, pickedUpAt: true },
+        select: {
+          id: true,
+          assignedDriverId: true,
+          status: true,
+          pickedUpAt: true,
+        },
       });
       if (!current) {
         throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
@@ -2079,7 +2441,10 @@ export class PrismaFoodRepository implements FoodRepository {
           failReasonCode: input.reasonCode,
         });
         // Confirmed (DEC-PROD-012): a failed delivery gives the voucher use back.
-        await releaseVoucherInTx(tx, { entityType: 'FOOD_ORDER', entityId: orderId });
+        await releaseVoucherInTx(tx, {
+          entityType: 'FOOD_ORDER',
+          entityId: orderId,
+        });
         const order = await this.findOrderIn(tx, orderId);
         if (!order) {
           throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
@@ -2091,7 +2456,9 @@ export class PrismaFoodRepository implements FoodRepository {
     });
   }
 
-  async proposeChange(input: ProposeFoodOrderChangeInput): Promise<FoodOrderChangeResult> {
+  async proposeChange(
+    input: ProposeFoodOrderChangeInput,
+  ): Promise<FoodOrderChangeResult> {
     return this.db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "food_orders" WHERE id = ${input.orderId}::uuid FOR UPDATE`;
       const owned = await tx.foodOrder.findFirst({
@@ -2129,7 +2496,10 @@ export class PrismaFoodRepository implements FoodRepository {
           expiresAt: input.expiresAt,
         },
       });
-      await tx.foodOrder.update({ where: { id: order.id }, data: { updatedAt: new Date() } });
+      await tx.foodOrder.update({
+        where: { id: order.id },
+        data: { updatedAt: new Date() },
+      });
       await writeFoodChangeOutbox(tx, {
         orderId: order.id,
         changeId: row.id,
@@ -2163,7 +2533,9 @@ export class PrismaFoodRepository implements FoodRepository {
       if (!order || order.customerId !== customerId) {
         throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
       }
-      const row = await tx.foodOrderChange.findFirst({ where: { id: changeId, orderId } });
+      const row = await tx.foodOrderChange.findFirst({
+        where: { id: changeId, orderId },
+      });
       if (!row) {
         throw new FoodRuleError('FOOD_CHANGE_NOT_FOUND');
       }
@@ -2178,7 +2550,9 @@ export class PrismaFoodRepository implements FoodRepository {
       if (accept) {
         for (const line of change.lines) {
           if (line.toQuantity === 0) {
-            await tx.foodOrderLine.deleteMany({ where: { id: line.lineId, orderId } });
+            await tx.foodOrderLine.deleteMany({
+              where: { id: line.lineId, orderId },
+            });
           } else {
             await tx.foodOrderLine.updateMany({
               where: { id: line.lineId, orderId },
@@ -2196,7 +2570,11 @@ export class PrismaFoodRepository implements FoodRepository {
         });
         // Keep the redemption amount in line with what the order really discounts.
         await tx.promotionRedemption.updateMany({
-          where: { entityType: 'FOOD_ORDER', entityId: orderId, releasedAt: null },
+          where: {
+            entityType: 'FOOD_ORDER',
+            entityId: orderId,
+            releasedAt: null,
+          },
           data: { discountVnd: change.newDiscountVnd },
         });
         await tx.foodOrderChange.update({
@@ -2217,13 +2595,24 @@ export class PrismaFoodRepository implements FoodRepository {
         });
         await tx.foodOrder.update({
           where: { id: orderId },
-          data: { status: 'CANCELLED', cancelledBy: 'CUSTOMER', cancelReasonCode: 'CHANGE_REJECTED' },
+          data: {
+            status: 'CANCELLED',
+            cancelledBy: 'CUSTOMER',
+            cancelReasonCode: 'CHANGE_REJECTED',
+          },
         });
-        await releaseVoucherInTx(tx, { entityType: 'FOOD_ORDER', entityId: orderId });
-        await this.writeFoodStatusOutbox(tx, orderId, 'CANCELLED', { reason: 'CHANGE_REJECTED' });
+        await releaseVoucherInTx(tx, {
+          entityType: 'FOOD_ORDER',
+          entityId: orderId,
+        });
+        await this.writeFoodStatusOutbox(tx, orderId, 'CANCELLED', {
+          reason: 'CHANGE_REJECTED',
+        });
       }
       const updated = await this.findOrderIn(tx, orderId);
-      const after = await tx.foodOrderChange.findUnique({ where: { id: changeId } });
+      const after = await tx.foodOrderChange.findUnique({
+        where: { id: changeId },
+      });
       if (!updated || !after) {
         throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
       }
@@ -2250,14 +2639,26 @@ export class PrismaFoodRepository implements FoodRepository {
           return false;
         }
         const updated = await tx.foodOrder.updateMany({
-          where: { id: row.orderId, status: { in: [...FOOD_CHANGE_EDITABLE_STATUSES] } },
-          data: { status: 'CANCELLED', cancelledBy: 'SYSTEM', cancelReasonCode: 'CHANGE_EXPIRED' },
+          where: {
+            id: row.orderId,
+            status: { in: [...FOOD_CHANGE_EDITABLE_STATUSES] },
+          },
+          data: {
+            status: 'CANCELLED',
+            cancelledBy: 'SYSTEM',
+            cancelReasonCode: 'CHANGE_EXPIRED',
+          },
         });
         if (updated.count !== 1) {
           return false;
         }
-        await releaseVoucherInTx(tx, { entityType: 'FOOD_ORDER', entityId: row.orderId });
-        await this.writeFoodStatusOutbox(tx, row.orderId, 'CANCELLED', { reason: 'CHANGE_EXPIRED' });
+        await releaseVoucherInTx(tx, {
+          entityType: 'FOOD_ORDER',
+          entityId: row.orderId,
+        });
+        await this.writeFoodStatusOutbox(tx, row.orderId, 'CANCELLED', {
+          reason: 'CHANGE_EXPIRED',
+        });
         return true;
       });
       if (cancelled) {
@@ -2274,7 +2675,10 @@ export class PrismaFoodRepository implements FoodRepository {
         data: { status: 'CANCELLED', cancelledBy: 'CUSTOMER' },
       });
       if (updated.count === 1) {
-        await releaseVoucherInTx(tx, { entityType: 'FOOD_ORDER', entityId: orderId });
+        await releaseVoucherInTx(tx, {
+          entityType: 'FOOD_ORDER',
+          entityId: orderId,
+        });
         await this.writeFoodStatusOutbox(tx, orderId, 'CANCELLED');
         const order = await this.findOrderIn(tx, orderId);
         if (!order) {
@@ -2323,7 +2727,10 @@ export class PrismaFoodRepository implements FoodRepository {
       if (updated.count !== 1) {
         throw new FoodRuleError('FOOD_NOT_CANCELLABLE');
       }
-      await releaseVoucherInTx(tx, { entityType: 'FOOD_ORDER', entityId: orderId });
+      await releaseVoucherInTx(tx, {
+        entityType: 'FOOD_ORDER',
+        entityId: orderId,
+      });
       const auditId = randomUUID();
       await tx.opsAuditLog.create({
         data: {
@@ -2344,7 +2751,10 @@ export class PrismaFoodRepository implements FoodRepository {
         status: 'CANCELLED',
         payload: { reason },
       });
-      await this.writeFoodStatusOutbox(tx, orderId, 'CANCELLED', { reason, auditId });
+      await this.writeFoodStatusOutbox(tx, orderId, 'CANCELLED', {
+        reason,
+        auditId,
+      });
       const order = await this.findOrderIn(tx, orderId);
       if (!order) {
         throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
@@ -2393,7 +2803,10 @@ export class PrismaFoodRepository implements FoodRepository {
         status: 'READY',
         payload: { reason },
       });
-      await this.writeFoodStatusOutbox(tx, orderId, 'READY', { reason, auditId });
+      await this.writeFoodStatusOutbox(tx, orderId, 'READY', {
+        reason,
+        auditId,
+      });
       const order = await this.findOrderIn(tx, orderId);
       if (!order) {
         throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
@@ -2467,7 +2880,9 @@ export class PrismaFoodRepository implements FoodRepository {
         if (!order) {
           throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
         }
-        await this.writeFoodStatusOutbox(tx, orderId, to, { storeId: order.storeId });
+        await this.writeFoodStatusOutbox(tx, orderId, to, {
+          storeId: order.storeId,
+        });
         return order;
       }
       const existing = await tx.foodOrder.findFirst({
@@ -2480,7 +2895,6 @@ export class PrismaFoodRepository implements FoodRepository {
       throw new FoodRuleError('FOOD_STATUS_CONFLICT');
     });
   }
-
 
   private async writeFoodStatusOutbox(
     tx: Prisma.TransactionClient,
@@ -2514,7 +2928,12 @@ export class PrismaFoodRepository implements FoodRepository {
   private async requireOwnedItem(
     ownerId: string,
     itemId: string,
-  ): Promise<{ id: string; name: string; priceVnd: number; available: boolean }> {
+  ): Promise<{
+    id: string;
+    name: string;
+    priceVnd: number;
+    available: boolean;
+  }> {
     const item = await this.db.foodItem.findUnique({
       where: { id: itemId },
       include: { store: { select: { ownerId: true } } },
@@ -2540,6 +2959,8 @@ type ItemRow = {
   id: string;
   name: string;
   priceVnd: number;
+  originalPriceVnd?: number | null;
+  createdAt?: Date;
   available: boolean;
   description?: string | null;
   prepMinutes?: number | null;
@@ -2562,9 +2983,14 @@ type ItemRow = {
   }[];
 };
 
-function parseImageUrls(raw: unknown, cover: string | null | undefined): string[] {
+function parseImageUrls(
+  raw: unknown,
+  cover: string | null | undefined,
+): string[] {
   if (Array.isArray(raw)) {
-    const urls = raw.filter((u): u is string => typeof u === 'string' && u.length > 0);
+    const urls = raw.filter(
+      (u): u is string => typeof u === 'string' && u.length > 0,
+    );
     if (urls.length > 0) return urls;
   }
   return cover ? [cover] : [];
@@ -2575,7 +3001,9 @@ function prismaItemView(item: ItemRow): StoreItemView {
     id: item.id,
     name: item.name,
     priceVnd: item.priceVnd,
+    originalPriceVnd: shownOriginalPrice(item.priceVnd, item.originalPriceVnd),
     available: item.available,
+    addedAt: item.createdAt ? item.createdAt.toISOString() : null,
     description: item.description ?? null,
     prepMinutes: item.prepMinutes ?? null,
     imageUrl: item.imageUrl ?? null,
@@ -2671,8 +3099,14 @@ function acceptFromRow(store: {
   busyExtraMinutes?: number;
 }): Pick<StoreDetail, 'acceptSettings' | 'estimatedPrepMinutes'> {
   const acceptSettings = acceptSettingsFromRow(store);
-  const mode = effectiveServiceMode(store.serviceMode, store.serviceModeUntil).serviceMode;
-  return { acceptSettings, estimatedPrepMinutes: prepMinutesFor(acceptSettings, mode) };
+  const mode = effectiveServiceMode(
+    store.serviceMode,
+    store.serviceModeUntil,
+  ).serviceMode;
+  return {
+    acceptSettings,
+    estimatedPrepMinutes: prepMinutesFor(acceptSettings, mode),
+  };
 }
 
 function toStoreDetail(store: {
@@ -2684,6 +3118,9 @@ function toStoreDetail(store: {
   category?: string | null;
   addressLabel?: string | null;
   logoUrl?: string | null;
+  coverUrl?: string | null;
+  description?: string | null;
+  minOrderVnd?: number;
   serviceMode?: StoreServiceMode | null;
   serviceModeUntil?: Date | null;
   hoursConfigured?: boolean;
@@ -2710,6 +3147,9 @@ function toStoreDetail(store: {
     category: store.category ?? null,
     addressLabel: store.addressLabel ?? null,
     logoUrl: store.logoUrl ?? null,
+    coverUrl: store.coverUrl ?? null,
+    description: store.description ?? null,
+    minOrderVnd: store.minOrderVnd ?? 0,
     items: store.items.map(prismaItemView),
   };
 }
@@ -2719,13 +3159,25 @@ function orderPickup(order: {
   pickupLat: number | null;
   pickupLng: number | null;
   pickupLabel: string | null;
-  store: { lat: number | null; lng: number | null; addressLabel: string | null };
+  store: {
+    lat: number | null;
+    lng: number | null;
+    addressLabel: string | null;
+  };
 }): FoodOrderView['pickup'] {
   if (order.pickupLat != null && order.pickupLng != null) {
-    return { lat: order.pickupLat, lng: order.pickupLng, label: order.pickupLabel };
+    return {
+      lat: order.pickupLat,
+      lng: order.pickupLng,
+      label: order.pickupLabel,
+    };
   }
   if (order.store.lat != null && order.store.lng != null) {
-    return { lat: order.store.lat, lng: order.store.lng, label: order.store.addressLabel };
+    return {
+      lat: order.store.lat,
+      lng: order.store.lng,
+      label: order.store.addressLabel,
+    };
   }
   return null;
 }
@@ -2772,7 +3224,11 @@ function toView(order: OrderRow): FoodOrderView {
     voucherCode: order.voucherCode,
     voucherSponsor: order.voucherSponsor ?? null,
     totalVnd: order.totalVnd,
-    dropoff: { lat: order.dropoffLat, lng: order.dropoffLng, label: order.dropoffLabel },
+    dropoff: {
+      lat: order.dropoffLat,
+      lng: order.dropoffLng,
+      label: order.dropoffLabel,
+    },
     pickup: orderPickup(order),
     assignedDriverId: order.assignedDriverId,
     cancelReason: toCancelReason(order.cancelReasonCode, order.cancelNote),
@@ -2787,7 +3243,10 @@ function toView(order: OrderRow): FoodOrderView {
       options: parseLineOptions(line.options),
     })),
     prepMinutes: order.prepMinutes ?? null,
-    estimatedReadyAt: estimatedReadyAt(order.createdAt, order.prepMinutes ?? null),
+    estimatedReadyAt: estimatedReadyAt(
+      order.createdAt,
+      order.prepMinutes ?? null,
+    ),
     pickedUpAt: order.pickedUpAt ?? null,
     failReason: order.failReasonCode
       ? { code: order.failReasonCode, note: order.failNote ?? null }
@@ -2803,18 +3262,13 @@ function isOpenStatus(status: string): status is QueueOrderSummary['status'] {
 }
 
 function isUniqueConflict(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002'
+  );
 }
 
 /** Map Admin UI category codes to FoodStore.category substrings used in seed. */
-function mapStoreCategoryFilter(raw: string): string {
-  const key = raw.trim().toUpperCase();
-  if (key === 'FOOD' || key === 'DO_AN') return 'Đồ ăn';
-  if (key === 'DRINK' || key === 'DO_UONG') return 'Đồ uống';
-  if (key === 'GROCERY' || key === 'TAP_HOA') return 'Tạp';
-  return raw.trim();
-}
-
 /**
  * UI KYB: PENDING | APPROVED | REJECTED
  * PartnerApplication: DRAFT | SUBMITTED | APPROVED | REJECTED
@@ -2823,7 +3277,12 @@ function mapKybFilterToPartnerStatus(
   raw: string,
 ): 'PENDING' | 'APPROVED' | 'REJECTED' | null {
   const key = raw.trim().toUpperCase();
-  if (key === 'PENDING' || key === 'PENDING_KYB' || key === 'NEED_MORE' || key === 'NEEDS_VERIFY') {
+  if (
+    key === 'PENDING' ||
+    key === 'PENDING_KYB' ||
+    key === 'NEED_MORE' ||
+    key === 'NEEDS_VERIFY'
+  ) {
     return 'PENDING';
   }
   if (key === 'APPROVED') return 'APPROVED';
@@ -2831,11 +3290,18 @@ function mapKybFilterToPartnerStatus(
   return null;
 }
 
-function toCancelReason(code: string | null, note: string | null): FoodCancelReason | null {
+function toCancelReason(
+  code: string | null,
+  note: string | null,
+): FoodCancelReason | null {
   if (!code) {
     return null;
   }
-  const known = [...FOOD_REJECT_REASONS, ...FOOD_SYSTEM_CANCEL_REASONS, ...FOOD_CHANGE_CANCEL_REASONS] as readonly string[];
+  const known = [
+    ...FOOD_REJECT_REASONS,
+    ...FOOD_SYSTEM_CANCEL_REASONS,
+    ...FOOD_CHANGE_CANCEL_REASONS,
+  ] as readonly string[];
   return {
     code: (known.includes(code) ? code : 'OTHER') as FoodCancelReasonCode,
     note: note ?? null,
@@ -2859,7 +3325,9 @@ type FoodOrderChangeRow = {
 };
 
 function toChangeView(row: FoodOrderChangeRow): FoodOrderChangeView {
-  const lines = Array.isArray(row.lines) ? (row.lines as unknown as FoodOrderChangeLine[]) : [];
+  const lines = Array.isArray(row.lines)
+    ? (row.lines as unknown as FoodOrderChangeLine[])
+    : [];
   return {
     id: row.id,
     orderId: row.orderId,

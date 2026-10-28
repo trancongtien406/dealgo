@@ -1,5 +1,6 @@
 /// S027 account deletion (DEC-PROD-037): request → re-auth → soft-delete → purge after grace.
-enum AccountDeletionMethod { phoneOtp, password }
+/// Re-auth the server picked from the sign-in methods that are on (passkey first).
+enum AccountDeletionMethod { passkey, phoneOtp, password }
 
 /// Why the server refuses to delete right now (codes from the backend).
 class AccountDeletionBlocker {
@@ -37,7 +38,7 @@ class AccountDeletionOverview {
   final String status;
   final int graceDays;
 
-  /// Null when the account has neither a verified phone nor a password.
+  /// Null when no enabled sign-in method can re-verify this account.
   final AccountDeletionMethod? method;
   final String? phoneMasked;
   final List<AccountDeletionBlocker> blockers;
@@ -49,12 +50,16 @@ class AccountDeletionChallenge {
     required this.method,
     required this.phoneMasked,
     required this.graceDays,
+    this.passkeyOptions,
   });
 
   final String requestId;
   final AccountDeletionMethod method;
   final String? phoneMasked;
   final int graceDays;
+
+  /// WebAuthn request options for the native passkey prompt (method = passkey).
+  final Map<String, Object?>? passkeyOptions;
 }
 
 class AccountDeletionScheduled {
@@ -78,6 +83,7 @@ abstract interface class AccountDeletionRepository {
     required String requestId,
     String? code,
     String? password,
+    Map<String, Object?>? passkey,
   });
 }
 
@@ -101,6 +107,7 @@ List<AccountDeletionBlocker> decodeAccountDeletionBlockers(Object? raw) {
 
 AccountDeletionMethod? decodeAccountDeletionMethod(Object? raw) =>
     switch (raw) {
+      'PASSKEY' => AccountDeletionMethod.passkey,
       'PHONE_OTP' => AccountDeletionMethod.phoneOtp,
       'PASSWORD' => AccountDeletionMethod.password,
       _ => null,

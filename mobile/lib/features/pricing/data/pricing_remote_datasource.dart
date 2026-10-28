@@ -208,7 +208,7 @@ int? _int(Object? value) {
 }
 
 /// Offline quotes for tests, screenshots and `useMockData`, mirroring the
-/// backend rule with the seeded setting values.
+/// backend rule with the seeded setting values (fares rounded up to 1.000đ).
 class FakePricingRemoteDataSource implements PricingRepository {
   FakePricingRemoteDataSource({
     this.vndPerKm = 12000,
@@ -247,7 +247,8 @@ class FakePricingRemoteDataSource implements PricingRepository {
     final km = _haversineKm(pickup, dropoff);
     final distanceKm = (km * 10).round() / 10;
     final reference =
-        fixedReferenceVnd ?? math.max(minFareVnd, (km * vndPerKm).round());
+        fixedReferenceVnd ??
+        math.max(minFareVnd, _roundUpToFareStep((km * vndPerKm).round()));
     final bikeReference = math.min(reference, maxFareVnd);
     final options = [
       _fakeClass(
@@ -378,8 +379,12 @@ int _fakeCarFare({
 }) {
   final durationMin = ((km / speedKmh) * 60).round();
   final raw = base + (km * perKm).round() + durationMin * perMinute;
-  return raw.clamp(minFare, maxFare).toInt();
+  return _roundUpToFareStep(raw).clamp(minFare, maxFare).toInt();
 }
+
+/// Mirrors the server's RIDE_FARE_ROUNDING_STEP_VND: suggested fares are whole
+/// thousands, rounded up.
+int _roundUpToFareStep(int vnd) => ((vnd + 999) ~/ 1000) * 1000;
 
 double _haversineKm(PricePoint a, PricePoint b) {
   const earthKm = 6371.0;

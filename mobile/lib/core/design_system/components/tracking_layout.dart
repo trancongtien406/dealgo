@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../motion/dealgo_motion.dart';
+import '../../motion/dealgo_motion_widgets.dart';
 import '../icons/dealgo_icons.dart';
 import '../tokens/dealgo_tokens.dart';
 
@@ -174,11 +176,16 @@ class TrackingHeadline extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                key: const Key('tracking-headline'),
-                style: textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
+              DealGoStatusSwitcher(
+                child: KeyedSubtree(
+                  key: ValueKey(title),
+                  child: Text(
+                    title,
+                    key: const Key('tracking-headline'),
+                    style: textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ),
               ),
               if (subtitle != null && subtitle!.isNotEmpty)
@@ -246,8 +253,18 @@ class TrackingTimeline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final duration = DealGoMotion.durationFor(context, DealGoMotion.medium);
     Color lineColor(bool on) =>
         on && !failed ? DealGoColors.primary : DealGoColors.border;
+    // Connectors fill in as the order advances instead of snapping.
+    Widget connector(bool on) => AnimatedContainer(
+      duration: duration,
+      curve: DealGoMotion.standard,
+      height: 2.5,
+      color: lineColor(on),
+    );
+    // The step being worked on keeps a soft pulse until the flow ends.
+    final live = !failed && current >= 0 && current < steps.length - 1;
     final children = <Widget>[];
     for (var i = 0; i < steps.length; i++) {
       final done = i <= current;
@@ -269,34 +286,35 @@ class TrackingTimeline extends StatelessWidget {
                 child: Row(
                   children: [
                     Expanded(
-                      child: i == 0
-                          ? const SizedBox.shrink()
-                          : Container(height: 2.5, color: lineColor(done)),
+                      child: i == 0 ? const SizedBox.shrink() : connector(done),
                     ),
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      width: active ? 30 : 24,
-                      height: active ? 30 : 24,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: done && !failed
-                            ? DealGoColors.primary
-                            : DealGoColors.card,
-                        border: Border.all(color: color, width: 2),
-                      ),
-                      child: Icon(
-                        steps[i].icon,
-                        size: active ? 16 : 12,
-                        color: done && !failed ? DealGoColors.card : color,
+                    DealGoPulse(
+                      active: active && live,
+                      color: DealGoColors.primary,
+                      diameter: 30,
+                      child: AnimatedContainer(
+                        duration: duration,
+                        curve: DealGoMotion.standard,
+                        width: active ? 30 : 24,
+                        height: active ? 30 : 24,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: done && !failed
+                              ? DealGoColors.primary
+                              : DealGoColors.card,
+                          border: Border.all(color: color, width: 2),
+                        ),
+                        child: Icon(
+                          steps[i].icon,
+                          size: active ? 16 : 12,
+                          color: done && !failed ? DealGoColors.card : color,
+                        ),
                       ),
                     ),
                     Expanded(
                       child: i == steps.length - 1
                           ? const SizedBox.shrink()
-                          : Container(
-                              height: 2.5,
-                              color: lineColor(i < current),
-                            ),
+                          : connector(i < current),
                     ),
                   ],
                 ),

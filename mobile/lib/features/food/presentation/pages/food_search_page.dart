@@ -8,14 +8,18 @@ import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../domain/entities/food_category.dart';
 import '../../domain/entities/food_models.dart';
 import '../../domain/usecases/list_food_stores.dart';
 import '../../../../core/location/location_service.dart';
 import '../../../rating/domain/service_rating.dart';
 import '../cubit/food_discovery_cubit.dart';
 import '../utils/food_routes.dart';
+import '../widgets/food_cart_bar.dart';
 import '../widgets/food_widgets.dart';
-import '../widgets/store_meta.dart';
+import '../widgets/food_badges.dart';
+import '../food_categories_store.dart';
+import '../widgets/food_category_tile.dart';
 import '../../data/food_search_history.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
@@ -102,8 +106,8 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
       for (final store in stores)
         if (q.isEmpty ||
             store.name.toLowerCase().contains(q) ||
-            (storeCategoryLabel(
-                  l10n,
+            (foodCategoryLabel(
+                  context,
                   store.category,
                 )?.toLowerCase().contains(q) ??
                 false))
@@ -124,6 +128,9 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
     }
 
     return Scaffold(
+      // The body's SafeArea sits above the bar while the cart has items.
+      extendBody: true,
+      bottomNavigationBar: const FoodCartBar(),
       backgroundColor: DealGoColors.canvas,
       body: SafeArea(
         child: Column(
@@ -192,10 +199,6 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
                   Text(
                     l10n.foodSearchSuggestions,
                     style: textTheme.titleMedium,
-                  ),
-                  Text(
-                    l10n.foodSearchSuggestionsHint,
-                    style: textTheme.bodySmall,
                   ),
                   const SizedBox(height: DealGoSpacing.s12),
                   if (discovery is FoodDiscoveryFailed)
@@ -275,17 +278,21 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
                     spacing: DealGoSpacing.s8,
                     runSpacing: DealGoSpacing.s8,
                     children: [
-                      for (final group in FoodStoreGroup.values.skip(1))
+                      for (final category
+                          in maybeFoodCategories(context)?.items ??
+                              const <FoodCategory>[])
                         DealGoChip(
-                          label: group.label(l10n),
+                          key: Key('food-search-category-${category.code}'),
+                          label: category.name(
+                            Localizations.localeOf(context).languageCode,
+                          ),
                           tone: DealGoChipTone.neutral,
-                          leading: Icon(
-                            group.icon,
-                            size: 14,
-                            color: group.color,
+                          leading: FoodCategoryAvatar(
+                            category: category,
+                            size: 20,
                           ),
                           onTap: () => context.push(
-                            '${FoodRoutes.category}?group=${group.wire}',
+                            FoodRoutes.categoryOf(category.code),
                           ),
                         ),
                     ],
@@ -309,31 +316,6 @@ class _ResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(DealGoRadius.card),
-        child: FoodPanel(
-          child: Row(
-            children: [
-              FoodThumb(imageUrl: store.imageUrl),
-              const SizedBox(width: DealGoSpacing.s12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(store.name, style: textTheme.titleMedium),
-                    const SizedBox(height: DealGoSpacing.s4),
-                    StoreMetaLine(store: store, rating: rating),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    return FoodStoreListCard(store: store, rating: rating, onTap: onTap);
   }
 }

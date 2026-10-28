@@ -65,6 +65,62 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.13.1"
+  audioplayers:
+    dependency: "direct main"
+    description:
+      name: audioplayers
+      sha256: "2ba4bb2944baacbdd5372ff8254a8e7feb8c10d7739545e392f5605a8f618745"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.8.1"
+  audioplayers_android:
+    dependency: transitive
+    description:
+      name: audioplayers_android
+      sha256: f5ff5b15620fbab8cb0849e9636c48e2b96c3f0f71723bbbe2ad3c761b205f05
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.3.0"
+  audioplayers_darwin:
+    dependency: transitive
+    description:
+      name: audioplayers_darwin
+      sha256: "1ca553add991384ecf421b9569da850f3ab2472ffb83f6970b0416365abc51be"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.5.0"
+  audioplayers_linux:
+    dependency: transitive
+    description:
+      name: audioplayers_linux
+      sha256: "15178b726b7cdee5364d0463c8d445630c4e0fb7d26612b73c767e7d25de9417"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.3.0"
+  audioplayers_platform_interface:
+    dependency: transitive
+    description:
+      name: audioplayers_platform_interface
+      sha256: "765f6f0e6dca55cb471c9483fc77700564b3484d19198aca4ebb5147c6c85acb"
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.2.0"
+  audioplayers_web:
+    dependency: transitive
+    description:
+      name: audioplayers_web
+      sha256: ae1e0103c865a03e273f6d13d97b93f5595eac09915729cd5e37ef96e2857319
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.3.0"
+  audioplayers_windows:
+    dependency: transitive
+    description:
+      name: audioplayers_windows
+      sha256: a70ae82bba2dfcb6eb03dd4815d737a2d46d33ea5a96a03f535cfcaac490e413
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.4.1"
   bloc:
     dependency: "direct main"
     description:
@@ -499,14 +555,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.35"
-  flutter_ringtone_player:
-    dependency: "direct main"
-    description:
-      name: flutter_ringtone_player
-      sha256: ae4a2caab2cfd14902f3ee5fe0307c454b396f0077fa34700238d6c4bd99cfec
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.0.0+4"
   flutter_secure_storage:
     dependency: "direct main"
     description:
@@ -669,6 +717,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.0"
+  globbing:
+    dependency: transitive
+    description:
+      name: globbing
+      sha256: "4f89cfaf6fa74c9c1740a96259da06bd45411ede56744e28017cc534a12b6e2d"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.0"
   go_router:
     dependency: "direct main"
     description:
@@ -821,6 +877,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.12.1"
+  injector:
+    dependency: transitive
+    description:
+      name: injector
+      sha256: ed389bed5b48a699d5b9561c985023d0d5cc88dd5ff2237aadcce5a5ab433e4e
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.0"
   intl:
     dependency: "direct main"
     description:
@@ -1110,7 +1174,7 @@ packages:
     source: hosted
     version: "1.1.0"
   path_provider:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: path_provider
       sha256: a7f4874f987173da295a61c181b8ee71dab59b332a486b391babf26a1b884825
@@ -1230,7 +1294,7 @@ packages:
     source: hosted
     version: "2.1.8"
   pointycastle:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: pointycastle
       sha256: "92aa3841d083cc4b0f4709b5c74fd6409a3e6ba833ffc7dc6a8fee096366acf5"
@@ -1253,6 +1317,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.5.2"
+  process:
+    dependency: transitive
+    description:
+      name: process
+      sha256: "4242ba3508d37e01808bdf71ad1d5bb93a8d671bf2e7450e6b1b353fb0808891"
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.0.6"
   proj4dart:
     dependency: transitive
     description:
@@ -1261,6 +1333,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.0"
+  properties:
+    dependency: transitive
+    description:
+      name: properties
+      sha256: "333f427dd4ed07bdbe8c75b9ff864a1e70b5d7a8426a2e8bdd457b65ae5ac598"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.1.1"
   protobuf:
     dependency: transitive
     description:
@@ -1325,6 +1405,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "9.30.1"
+  sentry_dart_plugin:
+    dependency: "direct dev"
+    description:
+      name: sentry_dart_plugin
+      sha256: da9c1d0b3c87a251bfc36301f16af090a88c2d59128fe9a6f908f5ac20340c97
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.4.0"
   sentry_flutter:
     dependency: "direct main"
     description:
@@ -1333,6 +1421,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "9.30.1"
+  share_plus:
+    dependency: "direct main"
+    description:
+      name: share_plus
+      sha256: db40767f130189d53f3ae8a6393c217ff4a492da1baff718a9873679c0c00224
+      url: "https://pub.dev"
+    source: hosted
+    version: "13.3.1"
+  share_plus_platform_interface:
+    dependency: transitive
+    description:
+      name: share_plus_platform_interface
+      sha256: "365ef7379fc22507256adda3385152942ffce08935452bc972c2e52a0bebae41"
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.2.0"
   shared_preferences:
     dependency: "direct main"
     description:
@@ -1490,6 +1594,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.5.0"
+  system_info2:
+    dependency: transitive
+    description:
+      name: system_info2
+      sha256: "2d5e586c5e6b569d2e3afab1e61542d8fc0603be2d6ee671e573c041541a1541"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.2.0"
   term_glyph:
     dependency: transitive
     description:

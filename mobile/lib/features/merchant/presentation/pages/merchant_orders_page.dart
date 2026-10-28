@@ -15,6 +15,7 @@ import '../cubit/merchant_states.dart';
 import '../widgets/merchant_widgets.dart';
 import '../../../../core/format/short_ref.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 
 class MerchantOrdersPage extends StatefulWidget {
   const MerchantOrdersPage({super.key});
@@ -94,7 +95,7 @@ class _QueueList extends StatelessWidget {
         onPressed: () => _open(context, focus),
       ),
       body: ListView(
-        padding: merchantPagePadding,
+        padding: dealGoScrollPadding(context, merchantPagePadding),
         children: [
           MerchantPanel(
             elevated: true,

@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { AppEnv } from '../../platform/config/index.js';
 import { MapsProviderSettings } from '../../integrations/maps/maps-provider-settings.js';
+import { MapKeysService } from '../../platform/integration-settings/map-keys.service.js';
 
 export const ROUTING_FETCH = Symbol('ROUTING_FETCH');
 
@@ -41,8 +42,9 @@ const MAX_ROUTES = 3;
  *   | osrm (ROUTING_OSRM_URL; self-hosted fallback — public demo OSRM is DEV-only).
  * Owner prefers Mapbox when a Directions token is present; do not confuse with
  * NEXT_PUBLIC_MAPBOX_TOKEN (Admin tiles) or a misnamed MAPBOX_ACCESS_TOKEN.
- * Admin › Cài đặt › Bản đồ may switch routing to Google (Routes API) when GOOGLE_MAPS_API_KEY is
- * set; a Google failure falls back to the env provider above.
+ * Admin › Cài đặt › Bản đồ may switch routing to Google (Routes API) when a Google key is set; a
+ * Google failure falls back to the env provider above. The Mapbox server token and Google key set
+ * in Admin override env.
  * When unavailable, clients draw a straight pickup→dropoff line with an illustrative watermark.
  */
 @Injectable()
@@ -55,6 +57,7 @@ export class RoutingService {
     private readonly config: ConfigService<AppEnv, true>,
     @Optional() @Inject(ROUTING_FETCH) fetcher?: FetchLike,
     @Optional() private readonly mapsProviders?: MapsProviderSettings,
+    @Optional() private readonly mapKeys?: MapKeysService,
   ) {
     this.fetcher = fetcher ?? ((url, init) => fetch(url, init));
   }
@@ -63,12 +66,12 @@ export class RoutingService {
   provider(): Exclude<RoutingProviderName, 'google'> {
     const raw = (this.config.get('ROUTING_PROVIDER', { infer: true }) ?? '').trim().toLowerCase();
     if (raw === 'osrm' && this.osrmBase()) return 'osrm';
-    if (raw === 'mapbox' && this.mapboxToken()) return 'mapbox';
+    if (raw === 'mapbox' && this.mapboxTokenSnapshot()) return 'mapbox';
     return 'none';
   }
 
   async route(from: RoutePoint, to: RoutePoint): Promise<RouteLookup> {
-    const google = this.mapsProviders?.google;
+    const google = await this.mapsProviders?.googlePort();
     if (google && (await this.mapsProviders?.effective('route')) === 'google') {
       const viaGoogle = await this.cached('google', from, to, async () => {
         const routes = await google.computeRoutes(from, to);
@@ -117,10 +120,11 @@ export class RoutingService {
     to: RoutePoint,
   ): Promise<RouteOption[]> {
     const pair = `${from.lng},${from.lat};${to.lng},${to.lat}`;
+    const mapboxToken = provider === 'mapbox' ? await this.mapboxToken() : '';
     const url =
       provider === 'osrm'
         ? `${this.osrmBase()}/route/v1/driving/${pair}?overview=full&geometries=geojson&alternatives=true`
-        : `https://api.mapbox.com/directions/v5/mapbox/driving/${pair}?geometries=geojson&overview=full&alternatives=true&access_token=${encodeURIComponent(this.mapboxToken())}`;
+        : `https://api.mapbox.com/directions/v5/mapbox/driving/${pair}?geometries=geojson&overview=full&alternatives=true&access_token=${encodeURIComponent(mapboxToken)}`;
     const timeout = this.config.get('ROUTING_TIMEOUT_MS', { infer: true }) ?? 4000;
     const res = await this.fetcher(url, { signal: AbortSignal.timeout(timeout) });
     if (!res.ok) {
@@ -133,7 +137,16 @@ export class RoutingService {
     return (this.config.get('ROUTING_OSRM_URL', { infer: true }) ?? '').trim().replace(/\/+$/, '');
   }
 
-  private mapboxToken(): string {
+  private async mapboxToken(): Promise<string> {
+    if (this.mapKeys) return (await this.mapKeys.effective()).mapboxServerToken;
+    return this.envMapboxToken();
+  }
+
+  private mapboxTokenSnapshot(): string {
+    return this.mapKeys ? this.mapKeys.snapshot().mapboxServerToken : this.envMapboxToken();
+  }
+
+  private envMapboxToken(): string {
     return (this.config.get('MAPBOX_DIRECTIONS_TOKEN', { infer: true }) ?? '').trim();
   }
 }

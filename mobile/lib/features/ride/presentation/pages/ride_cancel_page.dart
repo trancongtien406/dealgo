@@ -143,11 +143,6 @@ class _RideCancelViewState extends State<_RideCancelView> {
                   DealGoSpacing.s16,
                 ),
                 children: [
-                  DealGoBanner(
-                    tone: DealGoBannerTone.warning,
-                    message: l10n.rideCancelPolicyHint,
-                  ),
-                  const SizedBox(height: DealGoSpacing.s16),
                   Text(l10n.rideCancelPickReason, style: textTheme.titleMedium),
                   const SizedBox(height: DealGoSpacing.s12),
                   for (final reason in reasons) ...[
@@ -178,35 +173,34 @@ class _RideCancelViewState extends State<_RideCancelView> {
                 DealGoDimensions.pageGutter,
                 DealGoSpacing.s12,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (!_done)
-                    DealGoPrimaryButton(
-                      key: const Key('ride-cancel-confirm'),
-                      label: l10n.rideCancelConfirm,
-                      isLoading: _busy,
-                      enabled: _reasonId != null,
-                      onPressed: _confirm,
-                    ),
-                  if (_done) ...[
-                    DealGoPrimaryButton(
+              child: _done
+                  ? DealGoPrimaryButton(
                       key: const Key('ride-cancel-done'),
                       label: l10n.actionBack,
                       onPressed: () => context.go('/customer'),
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: DealGoSecondaryButton(
+                            key: const Key('ride-cancel-keep'),
+                            label: l10n.rideCancelKeep,
+                            enabled: !_busy,
+                            onPressed: _back,
+                          ),
+                        ),
+                        const SizedBox(width: DealGoSpacing.s8),
+                        Expanded(
+                          child: DealGoPrimaryButton(
+                            key: const Key('ride-cancel-confirm'),
+                            label: l10n.rideCancelConfirm,
+                            isLoading: _busy,
+                            enabled: _reasonId != null,
+                            onPressed: _confirm,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                  if (!_done) ...[
-                    const SizedBox(height: DealGoSpacing.s8),
-                    DealGoSecondaryButton(
-                      key: const Key('ride-cancel-keep'),
-                      label: l10n.rideCancelKeep,
-                      enabled: !_busy,
-                      onPressed: _back,
-                    ),
-                  ],
-                ],
-              ),
             ),
           ],
         ),

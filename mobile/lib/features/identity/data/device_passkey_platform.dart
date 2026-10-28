@@ -14,26 +14,32 @@ class DevicePasskeyPlatform implements PasskeyPlatform {
   final PasskeyAuthenticator _authenticator;
 
   @override
-  Future<Map<String, Object?>> authenticate(
-    Map<String, Object?> options,
-  ) async {
-    final normalized = _asStringKeyedMap(options);
-    final request = AuthenticateRequestType.fromJson(
-      normalized,
-      mediation: MediationType.Optional,
-      preferImmediatelyAvailableCredentials: false,
-    );
-    final response = await _authenticator.authenticate(request);
-    final json = response.toJson();
-    return _asObjectMap(json);
-  }
+  Future<Map<String, Object?>> authenticate(Map<String, Object?> options) =>
+      _guard(() async {
+        final request = AuthenticateRequestType.fromJson(
+          _asStringKeyedMap(options),
+          mediation: MediationType.Optional,
+          preferImmediatelyAvailableCredentials: false,
+        );
+        final response = await _authenticator.authenticate(request);
+        return _asObjectMap(response.toJson());
+      });
 
   @override
-  Future<Map<String, Object?>> register(Map<String, Object?> options) async {
-    try {
+  Future<Map<String, Object?>> register(Map<String, Object?> options) => _guard(
+    () async {
       final request = RegisterRequestType.fromJson(_asStringKeyedMap(options));
       final response = await _authenticator.register(request);
       return _asObjectMap(response.toJson());
+    },
+  );
+
+  /// Maps plugin errors to [PasskeyPlatformException] so callers can stay calm on cancel.
+  Future<Map<String, Object?>> _guard(
+    Future<Map<String, Object?>> Function() ceremony,
+  ) async {
+    try {
+      return await ceremony();
     } on PasskeyAuthCancelledException {
       throw const PasskeyPlatformException(PasskeyFailureKind.cancelled);
     } on ExcludeCredentialsCanNotBeRegisteredException {

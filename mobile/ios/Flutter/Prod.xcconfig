@@ -1,0 +1,2 @@
+// `prod` scheme: Flutter flavor prod (API on the VPS even in Debug).
+FLAVOR=prod

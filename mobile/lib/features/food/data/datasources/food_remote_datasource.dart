@@ -84,19 +84,30 @@ abstract interface class FoodRemoteDataSource {
   Future<FoodStoreDetail> getMerchantCatalog(String accessToken);
 
   /// M030 store pickup point (`PATCH /v1/food/merchant/store/location`).
-  /// M030 (DEC-PROD-045): rename the store; upload / remove its logo.
+  /// M030 (DEC-PROD-045): rename the store and/or set its category
+  /// (Admin-managed code); upload / remove its logo.
   Future<FoodStoreDetail> updateStoreProfile({
     required String accessToken,
-    required String name,
+    String? name,
+    String? category,
+    int? minOrderVnd,
+
+    /// '' clears it.
+    String? description,
   });
 
+  /// [cover] targets the store cover photo instead of the logo.
   Future<FoodStoreDetail> uploadStoreLogo({
     required String accessToken,
     required String contentBase64,
     String? contentType,
+    bool cover = false,
   });
 
-  Future<FoodStoreDetail> clearStoreLogo({required String accessToken});
+  Future<FoodStoreDetail> clearStoreLogo({
+    required String accessToken,
+    bool cover = false,
+  });
 
   Future<FoodStoreDetail> updateStoreLocation({
     required String accessToken,
@@ -140,6 +151,8 @@ abstract interface class FoodRemoteDataSource {
     int? prepMinutes,
     String? imageUrl,
     String? menuCategoryId,
+    int? originalPriceVnd,
+    bool clearOriginalPrice = false,
   });
 
   /// DEC-PROD-033 — full replacement of a dish's option groups.

@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/design_system/components/dealgo_banner.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../ride/domain/entities/ride_models.dart';
@@ -284,16 +283,6 @@ class _DriverPassengerOtpPageState extends State<DriverPassengerOtpPage>
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          DealGoBanner(
-            tone: DealGoBannerTone.info,
-            message: l10n.driverOtpGuide,
-          ),
-          const SizedBox(height: DealGoSpacing.s8),
-          DealGoBanner(
-            tone: DealGoBannerTone.warning,
-            message: l10n.driverOtpPrivacy,
           ),
           if (actionError != null) ...[
             const SizedBox(height: DealGoSpacing.s12),

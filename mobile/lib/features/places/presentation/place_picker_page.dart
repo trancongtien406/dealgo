@@ -174,8 +174,11 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
     if (mounted && cached.isNotEmpty && _history.isEmpty) {
       setState(() => _history = cached);
     }
+    if (!mounted) {
+      return;
+    }
     final token = _token;
-    if (token == null || !mounted) {
+    if (token == null) {
       return;
     }
     try {

@@ -98,8 +98,21 @@ void main() {
 
     await tester.tap(find.byKey(const Key('food-store-tab-info')));
     await tester.pumpAndSettle();
-    expect(find.text('12 Lê Lợi, Hải Châu'), findsOneWidget);
-    expect(find.text('Bún, mì'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('food-store-address')),
+        matching: find.text('12 Lê Lợi, Hải Châu'),
+        matchRoot: true,
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('info')),
+        matching: find.text('Bún, mì'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('store with too few ratings hides the score and the reviews', (
@@ -144,11 +157,11 @@ void main() {
 
     expect(food.storeListGeo, contains(true));
     await tester.dragUntilVisible(
-      find.text('Đặt nhiều tuần này'),
+      find.text('Đánh giá cao'),
       find.byType(ListView).first,
       const Offset(0, -300),
     );
-    expect(find.text('Đặt nhiều tuần này'), findsOneWidget);
+    expect(find.text('Đánh giá cao'), findsOneWidget);
     expect(find.textContaining('4,5 (4)', findRichText: true), findsWidgets);
     expect(find.textContaining('1,2 km', findRichText: true), findsWidgets);
   });
@@ -163,11 +176,13 @@ void main() {
       foodClient: _client(),
       ratings: _ratings(),
     );
-    await _go(tester, '/customer/food/category?group=tea');
+    await _go(tester, '/customer/food/category?category=tea');
     expect(find.text('Trà Sữa Mây'), findsWidgets);
     expect(find.text('Bún Bò Huế'), findsNothing);
+    // Title comes from the Admin-managed list (FoodCategoriesStore).
+    expect(find.text('Trà sữa'), findsWidgets);
 
-    await _go(tester, '/customer/food/category?group=cafe');
+    await _go(tester, '/customer/food/category?category=cafe');
     expect(find.byKey(const Key('food-category-empty')), findsOneWidget);
   });
 

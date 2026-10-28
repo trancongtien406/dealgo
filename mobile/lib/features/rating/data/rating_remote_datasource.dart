@@ -48,10 +48,13 @@ class DioRatingRemoteDataSource implements RatingRepository {
   Future<StoreReviews> storeReviews({
     required String accessToken,
     required String storeId,
+    int page = 1,
+    int? stars,
   }) async {
     try {
       final response = await dio.get<Object?>(
         ApiPaths.storeReviews(storeId),
+        queryParameters: {if (page > 1) 'page': page, 'stars': ?stars},
         options: _auth(accessToken),
       );
       final data = requireSuccessData(response.data);
@@ -64,13 +67,78 @@ class DioRatingRemoteDataSource implements RatingRepository {
         );
       }
       final rawItems = data['items'];
+      final rawPage = data['page'];
       return StoreReviews(
         summary: summary,
         items: [
           if (rawItems is List)
             for (final raw in rawItems) ?decodeStoreReview(raw),
         ],
+        page: rawPage is num ? rawPage.toInt() : page,
+        hasMore: data['hasMore'] == true,
       );
+    } on DioException catch (error) {
+      throw apiExceptionFromDio(error);
+    }
+  }
+
+  @override
+  Future<MerchantReviews> merchantReviews({
+    required String accessToken,
+    int page = 1,
+  }) async {
+    try {
+      final response = await dio.get<Object?>(
+        ApiPaths.foodMerchantReviews,
+        queryParameters: {if (page > 1) 'page': page},
+        options: _auth(accessToken),
+      );
+      final data = requireSuccessData(response.data);
+      final summary = decodeStoreRating(data['summary']);
+      if (summary == null) {
+        throw const ApiException(
+          statusCode: 200,
+          message: 'Invalid response',
+          errorCode: 'INVALID_RESPONSE',
+        );
+      }
+      final rawItems = data['items'];
+      final total = data['total'];
+      return MerchantReviews(
+        summary: summary,
+        items: [
+          if (rawItems is List)
+            for (final raw in rawItems) ?decodeStoreReview(raw),
+        ],
+        total: total is num ? total.toInt() : 0,
+        page: page,
+      );
+    } on DioException catch (error) {
+      throw apiExceptionFromDio(error);
+    }
+  }
+
+  @override
+  Future<StoreReview> replyToReview({
+    required String accessToken,
+    required String reviewId,
+    required String text,
+  }) async {
+    try {
+      final response = await dio.put<Object?>(
+        ApiPaths.foodMerchantReviewReply(reviewId),
+        data: {'text': text},
+        options: _auth(accessToken),
+      );
+      final review = decodeStoreReview(requireSuccessData(response.data));
+      if (review == null) {
+        throw const ApiException(
+          statusCode: 200,
+          message: 'Invalid response',
+          errorCode: 'INVALID_RESPONSE',
+        );
+      }
+      return review;
     } on DioException catch (error) {
       throw apiExceptionFromDio(error);
     }
@@ -134,7 +202,13 @@ StoreReview? decodeStoreReview(Object? raw) {
   }
   final tags = map['tags'];
   final comment = map['comment'];
+  final id = map['id'];
+  final reply = map['merchantReply'];
   return StoreReview(
+    id: id is String ? id : '',
+    merchantReply: reply is String && reply.trim().isNotEmpty ? reply : null,
+    repliedAt: DateTime.tryParse('${map['repliedAt'] ?? ''}')?.toLocal(),
+    hidden: map['hidden'] == true,
     stars: stars.toInt(),
     tags: [
       if (tags is List)
@@ -153,10 +227,14 @@ StoreRating? decodeStoreRating(Object? raw) {
   }
   final count = map['count'];
   final average = map['average'];
+  final distribution = map['distribution'];
   return StoreRating(
     storeId: id,
     count: count is num ? count.toInt() : 0,
     average: average is num ? average.toDouble() : null,
+    distribution: distribution is List && distribution.length == 5
+        ? [for (final n in distribution) n is num ? n.toInt() : 0]
+        : null,
   );
 }
 
@@ -227,12 +305,66 @@ class FakeRatingRemoteDataSource implements RatingRepository {
   Future<StoreReviews> storeReviews({
     required String accessToken,
     required String storeId,
+    int page = 1,
+    int? stars,
   }) async {
     final summary = stores[storeId] ?? StoreRating(storeId: storeId, count: 0);
+    final all = summary.average == null
+        ? const <StoreReview>[]
+        : [
+            for (final r in reviews[storeId] ?? const <StoreReview>[])
+              if (!r.hidden && (stars == null || r.stars == stars)) r,
+          ];
+    final start = (page - 1) * 20;
     return StoreReviews(
       summary: summary,
-      items: summary.average == null ? const [] : reviews[storeId] ?? const [],
+      items: all.skip(start).take(20).toList(growable: false),
+      page: page,
+      hasMore: all.length > start + 20,
     );
+  }
+
+  /// Store whose inbox [merchantReviews] serves.
+  String merchantStoreId = 'store-1';
+
+  @override
+  Future<MerchantReviews> merchantReviews({
+    required String accessToken,
+    int page = 1,
+  }) async {
+    final all = reviews[merchantStoreId] ?? const <StoreReview>[];
+    return MerchantReviews(
+      summary:
+          stores[merchantStoreId] ??
+          StoreRating(storeId: merchantStoreId, count: all.length),
+      items: all.skip((page - 1) * 20).take(20).toList(growable: false),
+      total: all.length,
+      page: page,
+    );
+  }
+
+  @override
+  Future<StoreReview> replyToReview({
+    required String accessToken,
+    required String reviewId,
+    required String text,
+  }) async {
+    final list = reviews[merchantStoreId] ?? <StoreReview>[];
+    final index = list.indexWhere((r) => r.id == reviewId);
+    if (index < 0) {
+      throw const ApiException(
+        statusCode: 404,
+        message: 'RATING_NOT_FOUND',
+        errorCode: 'RATING_NOT_FOUND',
+      );
+    }
+    final trimmed = text.trim();
+    final updated = list[index].withReply(
+      trimmed.isEmpty ? null : trimmed,
+      trimmed.isEmpty ? null : DateTime.now(),
+    );
+    reviews[merchantStoreId] = [...list]..[index] = updated;
+    return updated;
   }
 
   @override

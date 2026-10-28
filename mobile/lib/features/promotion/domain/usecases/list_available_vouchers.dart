@@ -10,5 +10,10 @@ class ListAvailableVouchers {
   Future<List<AvailableVoucher>> call({
     required String accessToken,
     VoucherService? service,
-  }) => _repository.listAvailable(accessToken: accessToken, service: service);
+    String? storeId,
+  }) => _repository.listAvailable(
+    accessToken: accessToken,
+    service: service,
+    storeId: storeId,
+  );
 }

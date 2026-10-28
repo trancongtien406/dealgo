@@ -7,12 +7,15 @@ import '../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../core/drafts/text_draft.dart';
 import '../../../core/l10n/api_error_text.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../identity/domain/entities/auth_method_policy.dart';
 import '../../identity/domain/entities/auth_state.dart';
 import '../../identity/domain/entities/user_profile.dart';
 import '../../identity/domain/repositories/identity_repository.dart';
+import '../../identity/presentation/auth_methods_store.dart';
 import '../../identity/presentation/cubit/auth_cubit.dart';
 
 class EditProfilePage extends StatefulWidget {
@@ -22,7 +25,7 @@ class EditProfilePage extends StatefulWidget {
   State<EditProfilePage> createState() => _EditProfilePageState();
 }
 
-class _EditProfilePageState extends State<EditProfilePage> {
+class _EditProfilePageState extends State<EditProfilePage> with TextDraftMixin {
   final _name = TextEditingController();
   final _email = TextEditingController();
   DateTime? _dob;
@@ -44,6 +47,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _dob = DateTime.tryParse(p.dateOfBirth!);
       }
     }
+    // Unsaved edits survive an app kill; cleared after a successful save.
+    bindTextDraft('profile.edit', {'name': _name, 'email': _email});
   }
 
   @override
@@ -67,11 +72,21 @@ class _EditProfilePageState extends State<EditProfilePage> {
       final updated = await repo.updateMe(
         accessToken: auth.tokens.accessToken,
         displayName: _name.text.trim(),
-        email: _email.text.trim().isEmpty ? null : _email.text.trim(),
+        // Email is a sign-in method: only sent while it is switched on.
+        email:
+            !authMethodEnabled(
+                  context,
+                  AuthMethodPolicy.email,
+                  listen: false,
+                ) ||
+                _email.text.trim().isEmpty
+            ? null
+            : _email.text.trim(),
         dateOfBirth: _dob?.toIso8601String().split('T').first,
         gender: _gender,
       );
       await cubit.applyUpdatedProfile(updated);
+      clearTextDraft();
       if (!mounted) return;
       setState(() => _ok = AppLocalizations.of(context).editProfileSaved);
     } on ApiException catch (e) {
@@ -131,16 +146,20 @@ class _EditProfilePageState extends State<EditProfilePage> {
               controller: _name,
               onChanged: (_) => setState(() {}),
             ),
-            const SizedBox(height: DealGoSpacing.s12),
-            DealGoTextField(
-              label: l10n.editProfilePhone,
-              controller: TextEditingController(text: phone),
-              enabled: false,
-              suffix: const Icon(DealGoIcons.lock, size: 18),
-              helper: l10n.editProfilePhoneLocked,
-            ),
-            const SizedBox(height: DealGoSpacing.s12),
-            DealGoTextField(label: l10n.editProfileEmail, controller: _email),
+            if (phone.isNotEmpty) ...[
+              const SizedBox(height: DealGoSpacing.s12),
+              DealGoTextField(
+                label: l10n.editProfilePhone,
+                controller: TextEditingController(text: phone),
+                enabled: false,
+                suffix: const Icon(DealGoIcons.lock, size: 18),
+                helper: l10n.editProfilePhoneLocked,
+              ),
+            ],
+            if (authMethodEnabled(context, AuthMethodPolicy.email)) ...[
+              const SizedBox(height: DealGoSpacing.s12),
+              DealGoTextField(label: l10n.editProfileEmail, controller: _email),
+            ],
             const SizedBox(height: DealGoSpacing.s12),
             DealGoDateField(
               label: l10n.editProfileDob,
@@ -167,32 +186,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   ),
               ],
             ),
-            const SizedBox(height: DealGoSpacing.s16),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: DealGoColors.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(DealGoRadius.card),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(DealGoSpacing.s12),
-                child: Row(
-                  children: [
-                    const Icon(
-                      DealGoIcons.shield,
-                      color: DealGoColors.primary,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        l10n.editProfilePrivacy,
-                        style: textTheme.bodySmall,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
             if (_error != null) ...[
               const SizedBox(height: 12),
               Text(
@@ -217,12 +210,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
               isLoading: _busy,
               enabled: _name.text.trim().isNotEmpty,
               onPressed: _save,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              l10n.editProfileHint,
-              textAlign: TextAlign.center,
-              style: textTheme.bodySmall,
             ),
           ],
         ),

@@ -13,6 +13,7 @@ import '../../domain/usecases/get_merchant_catalog.dart';
 import '../../domain/usecases/update_store_accept_settings.dart';
 import '../widgets/merchant_widgets.dart';
 import 'merchant_hours_page.dart' show merchantLastOrderPresets;
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 
 /// Kitchen caps offered in the picker; null = no cap (backend allows 1–50).
 const merchantMaxActivePresets = <int?>[null, 3, 5, 8, 10, 15, 20, 30];
@@ -220,7 +221,7 @@ class _MerchantAcceptSettingsPageState
         ? l10n.merchantHoursCutoffNone
         : l10n.merchantBusyResumeMinutes(value);
     return ListView(
-      padding: merchantPagePadding,
+      padding: dealGoScrollPadding(context, merchantPagePadding),
       children: [
         Text(
           l10n.merchantAcceptEyebrow,
@@ -232,8 +233,6 @@ class _MerchantAcceptSettingsPageState
         ),
         const SizedBox(height: DealGoSpacing.s4),
         Text(l10n.merchantAcceptHeading, style: textTheme.headlineSmall),
-        const SizedBox(height: DealGoSpacing.s4),
-        Text(l10n.merchantAcceptIntro, style: textTheme.bodySmall),
         const SizedBox(height: DealGoSpacing.s16),
         MerchantPanel(
           color: DealGoColors.subtlePurple,
@@ -303,7 +302,6 @@ class _MerchantAcceptSettingsPageState
               _LimitRow(
                 key: const Key('merchant-accept-max'),
                 title: l10n.merchantAcceptMaxActive,
-                hint: l10n.merchantAcceptMaxActiveHint,
                 value: maxLabel(_settings.maxActiveOrders),
                 onTap: () => _pick<int?>(
                   keyPrefix: 'merchant-accept-max-option',
@@ -322,7 +320,6 @@ class _MerchantAcceptSettingsPageState
               _LimitRow(
                 key: const Key('merchant-accept-prep'),
                 title: l10n.merchantAcceptPrep,
-                hint: l10n.merchantAcceptPrepHint,
                 value: minutesLabel(_settings.defaultPrepMinutes),
                 onTap: () => _pick<int>(
                   keyPrefix: 'merchant-accept-prep-option',
@@ -337,7 +334,6 @@ class _MerchantAcceptSettingsPageState
               _LimitRow(
                 key: const Key('merchant-accept-cutoff'),
                 title: l10n.merchantAcceptCutoff,
-                hint: l10n.merchantAcceptCutoffHint,
                 value: minutesLabel(_lastOrder),
                 onTap: () => _pick<int>(
                   keyPrefix: 'merchant-accept-cutoff-option',
@@ -352,11 +348,6 @@ class _MerchantAcceptSettingsPageState
               ),
             ],
           ),
-        ),
-        const SizedBox(height: DealGoSpacing.s12),
-        MerchantNote(
-          tone: MerchantNoteTone.green,
-          message: l10n.merchantAcceptPolicyNote,
         ),
         if (_saveError case final error?) ...[
           const SizedBox(height: DealGoSpacing.s12),
@@ -382,14 +373,12 @@ class _MerchantAcceptSettingsPageState
 class _LimitRow extends StatelessWidget {
   const _LimitRow({
     required this.title,
-    required this.hint,
     required this.value,
     required this.onTap,
     super.key,
   });
 
   final String title;
-  final String hint;
   final String value;
   final VoidCallback onTap;
 
@@ -404,10 +393,7 @@ class _LimitRow extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: textTheme.titleSmall),
-                Text(hint, style: textTheme.bodySmall),
-              ],
+              children: [Text(title, style: textTheme.titleSmall)],
             ),
           ),
           const SizedBox(width: DealGoSpacing.s8),

@@ -30,6 +30,15 @@ export type PromotionListFilter = {
   status?: PromotionStatus;
   serviceType?: Exclude<PromotionServiceType, 'ALL'>;
   audience?: Exclude<PromotionAudience, 'ALL'>;
+  /** STORE = merchant offers only, PLATFORM = DealGo campaigns only. */
+  scope?: 'STORE' | 'PLATFORM';
+  storeId?: string;
+};
+
+/** Ops status changes are audited (OpsAuditLog PROMOTION_STATUS_UPDATE). */
+export type PromotionStatusAudit = {
+  actorUserId: string;
+  reason: string;
 };
 
 export type NewPromotion = {
@@ -49,6 +58,7 @@ export type NewPromotion = {
   startDate: Date;
   endDate: Date;
   sponsor: PromotionSponsor;
+  storeId?: string | null;
 };
 
 export interface PromotionRepository extends VoucherRedeemer {
@@ -65,6 +75,7 @@ export interface PromotionRepository extends VoucherRedeemer {
   updateStatus(
     id: string,
     status: PromotionStatus,
+    audit?: PromotionStatusAudit,
   ): Promise<PromotionCampaign | null>;
   /** Orders this user already paid with the campaign (drives `userLimit`). */
   countUserRedemptions(promotionId: string, userId: string): Promise<number>;
@@ -72,12 +83,33 @@ export interface PromotionRepository extends VoucherRedeemer {
    * ACTIVE customer-facing campaigns running at `now` with budget and usage left,
    * soonest-ending first (DEC-PROD-021).
    */
-  listAvailable(now: Date, limit: number): Promise<PromotionCampaign[]>;
+  listAvailable(now: Date, limit: number, storeId?: string): Promise<PromotionCampaign[]>;
+  /** Store offers that a customer can use right now, per store, best-first. */
+  listStoreOffers(storeIds: string[], now: Date): Promise<PromotionCampaign[]>;
+}
+
+/** Running and not used up; shared by both repositories' availability reads. */
+export function isRedeemableNow(c: PromotionCampaign, at: number): boolean {
+  return (
+    c.status === 'ACTIVE' &&
+    (c.targetAudience === 'ALL' || c.targetAudience === 'CUSTOMER') &&
+    Date.parse(c.startDate) <= at &&
+    Date.parse(c.endDate) > at &&
+    c.usedCount < c.usageLimit &&
+    c.usedBudget < c.totalBudget
+  );
+}
+
+/** Platform campaigns everywhere; a store offer only inside its own store. */
+export function visibleInStore(c: PromotionCampaign, storeId?: string): boolean {
+  return !c.storeId || c.storeId === storeId;
 }
 
 /** Test-only store; production resolves PrismaPromotionRepository. */
 export class MemoryPromotionRepository implements PromotionRepository {
   private readonly byId = new Map<string, PromotionCampaign>();
+  /** Audit entries (in-memory mode only). */
+  readonly audits: Array<PromotionStatusAudit & { entityId: string; from: string; to: string }> = [];
   private readonly redemptions: {
     promotionId: string;
     userId: string;
@@ -112,6 +144,11 @@ export class MemoryPromotionRepository implements PromotionRepository {
           !filter.serviceType ||
           c.serviceType === filter.serviceType ||
           c.serviceType === 'ALL',
+      )
+      .filter((c) => !filter.storeId || c.storeId === filter.storeId)
+      .filter(
+        (c) =>
+          !filter.scope || (filter.scope === 'STORE' ? Boolean(c.storeId) : !c.storeId),
       )
       .filter(
         (c) =>
@@ -151,18 +188,19 @@ export class MemoryPromotionRepository implements PromotionRepository {
     return found ? { ...found } : null;
   }
 
-  async listAvailable(now: Date, limit: number): Promise<PromotionCampaign[]> {
+  async listStoreOffers(storeIds: string[], now: Date): Promise<PromotionCampaign[]> {
+    const wanted = new Set(storeIds);
     const at = now.getTime();
     return [...this.byId.values()]
-      .filter(
-        (c) =>
-          c.status === 'ACTIVE' &&
-          (c.targetAudience === 'ALL' || c.targetAudience === 'CUSTOMER') &&
-          Date.parse(c.startDate) <= at &&
-          Date.parse(c.endDate) > at &&
-          c.usedCount < c.usageLimit &&
-          c.usedBudget < c.totalBudget,
-      )
+      .filter((c) => c.storeId && wanted.has(c.storeId) && isRedeemableNow(c, at))
+      .sort((a, b) => Date.parse(a.endDate) - Date.parse(b.endDate) || a.code.localeCompare(b.code))
+      .map((c) => ({ ...c }));
+  }
+
+  async listAvailable(now: Date, limit: number, storeId?: string): Promise<PromotionCampaign[]> {
+    const at = now.getTime();
+    return [...this.byId.values()]
+      .filter((c) => isRedeemableNow(c, at) && visibleInStore(c, storeId))
       .sort((a, b) => Date.parse(a.endDate) - Date.parse(b.endDate) || a.code.localeCompare(b.code))
       .slice(0, limit)
       .map((c) => ({ ...c }));
@@ -180,6 +218,7 @@ export class MemoryPromotionRepository implements PromotionRepository {
     const now = new Date().toISOString();
     const campaign: PromotionCampaign = {
       ...input,
+      storeId: input.storeId ?? null,
       id: randomUUID(),
       usedBudget: 0,
       usedCount: 0,
@@ -195,10 +234,14 @@ export class MemoryPromotionRepository implements PromotionRepository {
   async updateStatus(
     id: string,
     status: PromotionStatus,
+    audit?: PromotionStatusAudit,
   ): Promise<PromotionCampaign | null> {
     const current = this.byId.get(id);
     if (!current) {
       return null;
+    }
+    if (audit) {
+      this.audits.push({ ...audit, entityId: id, from: current.status, to: status });
     }
     const next = { ...current, status, updatedAt: new Date().toISOString() };
     this.byId.set(id, next);

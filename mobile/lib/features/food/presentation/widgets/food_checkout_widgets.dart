@@ -22,6 +22,7 @@ import '../../../promotion/presentation/widgets/voucher_field.dart';
 import '../cubit/food_cart_cubit.dart';
 import 'food_dropoff_tile.dart';
 import 'food_widgets.dart';
+import 'food_badges.dart';
 import '../utils/food_routes.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
@@ -304,6 +305,10 @@ class _Receipt extends StatelessWidget {
             ],
           ),
         ),
+        if (order == null && !placed && cart.etaMinutes != null) ...[
+          const SizedBox(height: DealGoSpacing.s12),
+          FoodEtaLine(minutes: cart.etaMinutes!),
+        ],
         const SizedBox(height: DealGoSpacing.s16),
         FoodPanel(
           child: Column(
@@ -493,11 +498,6 @@ class _SubmittingBody extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: DealGoSpacing.s16),
-        FoodNote(
-          tone: FoodNoteTone.amber,
-          message: AppLocalizations.of(context).checkoutLockedNote,
-        ),
       ],
     );
   }
@@ -558,11 +558,6 @@ class _OfflineBody extends StatelessWidget {
               ),
             ],
           ),
-        ),
-        const SizedBox(height: DealGoSpacing.s16),
-        FoodNote(
-          tone: FoodNoteTone.amber,
-          message: AppLocalizations.of(context).checkoutOfflineNote,
         ),
       ],
     );
@@ -791,6 +786,9 @@ class _CheckoutVoucherPanelState extends State<_CheckoutVoucherPanel> {
       context: context,
       isScrollControlled: true,
       builder: (context) => FoodVoucherPickerSheet(
+        orderAmountVnd: widget.subtotal,
+        deliveryFeeVnd: widget.delivery,
+        selectedCode: _pickedCode ?? widget.initialCode,
         load: () {
           if (token == null || token.isEmpty) {
             throw const ApiException(
@@ -799,7 +797,11 @@ class _CheckoutVoucherPanelState extends State<_CheckoutVoucherPanel> {
               errorCode: 'UNAUTHORIZED',
             );
           }
-          return vouchers(accessToken: token, service: VoucherService.food);
+          return vouchers(
+            accessToken: token,
+            service: VoucherService.food,
+            storeId: widget.storeId,
+          );
         },
       ),
     );

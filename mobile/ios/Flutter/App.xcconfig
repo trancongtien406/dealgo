@@ -1,0 +1,4 @@
+// Shared by every build configuration.
+// App Links / passkey domain (DEC-PROD-058); keep equal to APP_LINK_HOST + WEBAUTHN_RP_ID.
+DEALGO_APP_LINK_HOST=dealgo.trancongtien.com
+DEALGO_DISPLAY_NAME=DealGo

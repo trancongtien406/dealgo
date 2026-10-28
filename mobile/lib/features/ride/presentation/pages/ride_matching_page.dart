@@ -11,6 +11,7 @@ import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/motion/dealgo_motion_widgets.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/ride_money.dart';
 import '../../domain/entities/ride_models.dart';
@@ -22,6 +23,7 @@ import '../utils/ride_vehicle_label.dart';
 import '../cubit/ride_session.dart';
 import '../widgets/ride_widgets.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/maps/map_controls.dart';
 import '../../../../core/maps/map_lat_lng.dart';
 import '../../../../core/maps/map_port.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
@@ -292,6 +294,7 @@ class _RideMatchingPageState extends State<_RideMatchingView> {
       ride: ride,
       busy: _busy,
       offline: _offline,
+      onBack: _back,
       onCancel: () => context.push(RideRoutes.cancel(ride.id)),
       onOpenOffers: ride.liveOffers.isEmpty
           ? null
@@ -305,6 +308,7 @@ class _MatchingWait extends StatelessWidget {
     required this.ride,
     required this.busy,
     required this.offline,
+    required this.onBack,
     required this.onCancel,
     required this.onOpenOffers,
   });
@@ -312,6 +316,10 @@ class _MatchingWait extends StatelessWidget {
   final RideView ride;
   final bool busy;
   final bool offline;
+
+  /// Leaves the page; the search keeps running and is reopened from the fare
+  /// or map screen.
+  final VoidCallback onBack;
   final VoidCallback onCancel;
   final VoidCallback? onOpenOffers;
 
@@ -335,7 +343,7 @@ class _MatchingWait extends StatelessWidget {
     return Stack(
       children: [
         Positioned.fill(
-          child: context.read<MapPort>().buildMap(
+          child: context.watch<MapPort>().buildMap(
             center: MapLatLng(lat: ride.pickup.lat, lng: ride.pickup.lng),
             markers: [
               MapLatLng(lat: ride.pickup.lat, lng: ride.pickup.lng),
@@ -375,7 +383,10 @@ class _MatchingWait extends StatelessWidget {
                       const SizedBox(height: DealGoSpacing.s8),
                       Row(
                         children: [
-                          _VehicleMark(ride: ride),
+                          DealGoPulse(
+                            color: DealGoColors.primary,
+                            child: _VehicleMark(ride: ride),
+                          ),
                           const SizedBox(width: DealGoSpacing.s12),
                           Expanded(
                             child: Column(
@@ -385,13 +396,6 @@ class _MatchingWait extends StatelessWidget {
                                   l10n.rideMatchingWaiting,
                                   style: textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(height: DealGoSpacing.s4),
-                                Text(
-                                  l10n.rideMatchingWaitingHint,
-                                  style: textTheme.bodySmall?.copyWith(
-                                    color: DealGoColors.textSecondary,
                                   ),
                                 ),
                               ],
@@ -486,31 +490,39 @@ class _MatchingWait extends StatelessWidget {
                     DealGoSpacing.s12 +
                         MediaQuery.viewPaddingOf(context).bottom,
                   ),
-                  child: Column(
+                  child: Row(
                     children: [
-                      if (offers != null) ...[
-                        DealGoPrimaryButton(
-                          key: const Key('ride-open-offers-from-wait'),
-                          label: l10n.rideViewOffers,
-                          trailingIcon: DealGoIcons.arrowRight,
+                      Expanded(
+                        child: DealGoSecondaryButton(
+                          key: const Key('ride-cancel-search'),
+                          label: l10n.rideCancelSearch,
                           compact: true,
-                          onPressed: offers,
+                          enabled: !busy,
+                          onPressed: onCancel,
                         ),
-                        const SizedBox(height: DealGoSpacing.s8),
-                      ],
-                      DealGoSecondaryButton(
-                        key: const Key('ride-cancel-search'),
-                        label: l10n.rideCancelSearch,
-                        compact: true,
-                        enabled: !busy,
-                        onPressed: onCancel,
                       ),
+                      if (offers != null) ...[
+                        const SizedBox(width: DealGoSpacing.s8),
+                        Expanded(
+                          child: DealGoPrimaryButton(
+                            key: const Key('ride-open-offers-from-wait'),
+                            label: l10n.rideViewOffers,
+                            compact: true,
+                            onPressed: offers,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
               ],
             );
           },
+        ),
+        MapBackOverlay(
+          buttonKey: const Key('ride-matching-back'),
+          enabled: !busy,
+          onPressed: onBack,
         ),
       ],
     );
@@ -553,14 +565,6 @@ class _WaitingOfferCard extends StatelessWidget {
                   rideOfferKindLabel(l10n, offer.kind),
                   style: textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Text(
-                  l10n.rideOffersNote,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: DealGoColors.textSecondary,
                   ),
                 ),
               ],
@@ -658,8 +662,6 @@ class _MatchingTimeout extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: DealGoSpacing.s12),
-              RideNote(message: AppLocalizations.of(context).rideTimeoutNote),
             ],
           ),
         ),
@@ -741,7 +743,6 @@ class _CancelledMatch extends StatelessWidget {
                 iconColor: DealGoColors.danger,
                 background: DealGoColors.dangerSurface,
                 title: l10n.rideRequestCancelled,
-                message: l10n.rideCancelledNote,
               ),
             ],
           ),

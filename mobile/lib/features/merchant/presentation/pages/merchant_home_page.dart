@@ -9,6 +9,9 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_models.dart';
 import '../../../food/domain/entities/food_money.dart';
+import '../../../food/presentation/widgets/food_category_tile.dart';
+import '../../../food/presentation/widgets/food_widgets.dart';
+import '../../../food/presentation/widgets/store_meta.dart';
 import '../../domain/merchant_stats.dart';
 import '../../domain/usecases/get_merchant_catalog.dart';
 import '../cubit/merchant_queue_cubit.dart';
@@ -18,6 +21,7 @@ import '../cubit/merchant_states.dart';
 import '../widgets/merchant_widgets.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/format/short_ref.dart';
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 
 class MerchantHomePage extends StatefulWidget {
   const MerchantHomePage({super.key});
@@ -127,7 +131,7 @@ class _Dashboard extends StatelessWidget {
       title: l10n.merchantHomeTitle,
       showBack: false,
       body: ListView(
-        padding: merchantPagePadding,
+        padding: dealGoScrollPadding(context, merchantPagePadding),
         children: [
           if (store != null && !store.hasLocation) ...[
             DealGoBanner(
@@ -145,19 +149,13 @@ class _Dashboard extends StatelessWidget {
           MerchantPanel(
             child: Row(
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: const SizedBox(
-                    width: 56,
-                    height: 56,
-                    child: ColoredBox(
-                      color: DealGoColors.subtlePurple,
-                      child: Icon(
-                        DealGoIcons.restaurant,
-                        color: DealGoColors.primary,
-                      ),
-                    ),
-                  ),
+                FoodThumb(
+                  key: const Key('merchant-home-logo'),
+                  size: 56,
+                  imageUrl: store?.logoUrl,
+                  placeholderAsset: store == null
+                      ? foodStoreCoverImage
+                      : foodDishFallbackImage(store.category),
                 ),
                 const SizedBox(width: DealGoSpacing.s12),
                 Expanded(
@@ -170,6 +168,30 @@ class _Dashboard extends StatelessWidget {
                       ),
                       if (store?.addressLabel case final address?)
                         Text(address, style: textTheme.bodySmall),
+                      if (storeRatingText(context, ready?.rating)
+                          case final rating?)
+                        Padding(
+                          padding: const EdgeInsets.only(top: DealGoSpacing.s4),
+                          child: Row(
+                            key: const Key('merchant-home-rating'),
+                            children: [
+                              const Icon(
+                                DealGoIcons.starFilled,
+                                size: 16,
+                                color: DealGoColors.amber,
+                              ),
+                              const SizedBox(width: DealGoSpacing.s4),
+                              Flexible(
+                                child: Text(
+                                  rating,
+                                  style: textTheme.labelMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -195,6 +217,8 @@ class _Dashboard extends StatelessWidget {
             children: [
               Expanded(
                 child: _StatTile(
+                  icon: DealGoIcons.notificationsActive,
+                  tint: DealGoColors.amber,
                   label: l10n.merchantHomeToConfirm,
                   value: merchantCountLabel(totals.placed),
                 ),
@@ -202,6 +226,8 @@ class _Dashboard extends StatelessWidget {
               const SizedBox(width: DealGoSpacing.s12),
               Expanded(
                 child: _StatTile(
+                  icon: DealGoIcons.timer,
+                  tint: DealGoColors.primary,
                   label: l10n.merchantHomePreparing,
                   value: merchantCountLabel(totals.preparing),
                 ),
@@ -213,6 +239,8 @@ class _Dashboard extends StatelessWidget {
             children: [
               Expanded(
                 child: _StatTile(
+                  icon: DealGoIcons.check,
+                  tint: DealGoColors.brandGreen,
                   label: l10n.merchantHomeCompletedToday,
                   value: today == null
                       ? '—'
@@ -222,6 +250,8 @@ class _Dashboard extends StatelessWidget {
               const SizedBox(width: DealGoSpacing.s12),
               Expanded(
                 child: _StatTile(
+                  icon: DealGoIcons.wallet,
+                  tint: DealGoColors.primaryDeep,
                   label: l10n.merchantHomeFoodToday,
                   value: today == null ? '—' : formatVnd(today.salesVnd),
                 ),
@@ -276,11 +306,6 @@ class _Dashboard extends StatelessWidget {
                   label: l10n.merchantHomeOpenOrders,
                   value: merchantCountLabel(orders.length),
                 ),
-                const SizedBox(height: DealGoSpacing.s8),
-                MerchantNote(
-                  tone: MerchantNoteTone.green,
-                  message: AppLocalizations.of(context).merchantHomeFinanceHint,
-                ),
               ],
             ),
           ),
@@ -293,6 +318,20 @@ class _Dashboard extends StatelessWidget {
           MerchantPanel(
             child: Column(
               children: [
+                _SettingsLink(
+                  key: const Key('merchant-open-offers'),
+                  icon: DealGoIcons.voucher,
+                  label: AppLocalizations.of(context).merchantOffersTitle,
+                  onTap: () => context.push(MerchantRoutes.offers),
+                ),
+                const SizedBox(height: DealGoSpacing.s8),
+                _SettingsLink(
+                  key: const Key('merchant-open-reviews'),
+                  icon: DealGoIcons.star,
+                  label: AppLocalizations.of(context).merchantReviewsTitle,
+                  onTap: () => context.push(MerchantRoutes.reviews),
+                ),
+                const SizedBox(height: DealGoSpacing.s8),
                 _SettingsLink(
                   key: const Key('merchant-open-accept'),
                   icon: DealGoIcons.filter,
@@ -375,8 +414,15 @@ class _SettingsLink extends StatelessWidget {
 }
 
 class _StatTile extends StatelessWidget {
-  const _StatTile({required this.label, required this.value});
+  const _StatTile({
+    required this.icon,
+    required this.tint,
+    required this.label,
+    required this.value,
+  });
 
+  final IconData icon;
+  final Color tint;
   final String label;
   final String value;
 
@@ -387,8 +433,18 @@ class _StatTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: textTheme.bodySmall),
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: tint.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(DealGoRadius.small),
+            ),
+            child: Icon(icon, size: 18, color: tint),
+          ),
           const SizedBox(height: DealGoSpacing.s8),
+          SizedBox(height: 36, child: Text(label, style: textTheme.bodySmall)),
+          const SizedBox(height: DealGoSpacing.s4),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,

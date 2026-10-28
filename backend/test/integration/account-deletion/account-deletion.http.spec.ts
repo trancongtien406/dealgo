@@ -16,6 +16,12 @@ import { MemoryIdentityRepository } from '../../../src/modules/identity/identity
 import { IdentityModule } from '../../../src/modules/identity/identity.module.js';
 import { OpsAuthService } from '../../../src/modules/identity/ops-auth.service.js';
 import { MockSmsSender } from '../../../src/integrations/sms/sms-sender.js';
+import {
+  AUTH_METHOD_POLICY_REPOSITORY,
+  type AuthMethodName,
+} from '../../../src/modules/identity/auth-method.constants.js';
+import { MemoryAuthMethodPolicyRepository } from '../../../src/modules/identity/auth-method.repository.js';
+import { SoftwarePasskey } from '../../support/software-passkey.js';
 import { AccountDeletionModule } from '../../../src/modules/account-deletion/account-deletion.module.js';
 import { AccountDeletionService } from '../../../src/modules/account-deletion/account-deletion.service.js';
 import {
@@ -26,12 +32,16 @@ import {
 
 const OPS = { email: 'ops@dealgo.test', password: 'ops-password-123' };
 const DAY = 24 * 60 * 60 * 1000;
+const RP_ID = 'dealgo.test';
+const ORIGIN = 'https://dealgo.test';
+const OPS_ACTOR = '00000000-0000-4000-8000-000000000001';
 
 describe('S027 account deletion (DEC-PROD-037)', () => {
   let app: INestApplication;
   let identity: MemoryIdentityRepository;
   let deletion: MemoryAccountDeletionRepository;
   let sms: MockSmsSender;
+  let policies: MemoryAuthMethodPolicyRepository;
   let opsToken: string;
 
   const http = () => request(app.getHttpServer());
@@ -54,8 +64,32 @@ describe('S027 account deletion (DEC-PROD-037)', () => {
     };
   }
 
+  async function setMethod(method: AuthMethodName, enabled: boolean) {
+    await policies.setEnabled({ method, enabled, updatedByUserId: OPS_ACTOR, reason: 'spec' });
+  }
+
+  /** Signs in through the public passkey endpoints with [passkey]. */
+  async function passkeySignedIn(passkey: SoftwarePasskey) {
+    const options = await http().post('/v1/auth/passkeys/authentication/options').expect(200);
+    const res = await http()
+      .post('/v1/auth/passkeys/authentication/verify')
+      .send({ ceremonyId: options.body.data.ceremonyId, ...passkey.assert(options.body.data.challenge) })
+      .expect(200);
+    return {
+      auth: { Authorization: `Bearer ${res.body.data.accessToken as string}` },
+      userId: res.body.data.user.id as string,
+    };
+  }
+
+  async function passkeyUser() {
+    const passkey = new SoftwarePasskey(RP_ID, ORIGIN);
+    await identity.createPasskeyUser(passkey.record());
+    return { passkey, ...(await passkeySignedIn(passkey)) };
+  }
+
   beforeAll(async () => {
     identity = new MemoryIdentityRepository();
+    policies = new MemoryAuthMethodPolicyRepository();
     deletion = new MemoryAccountDeletionRepository(identity);
     sms = new MockSmsSender('test');
     const moduleRef = await Test.createTestingModule({
@@ -71,6 +105,9 @@ describe('S027 account deletion (DEC-PROD-037)', () => {
               SMS_PROVIDER: 'mock',
               OTP_THROTTLE_LIMIT: '1000',
               OTP_PHONE_LIMIT: '1000',
+              WEBAUTHN_RP_ID: RP_ID,
+              WEBAUTHN_RP_NAME: 'DealGo',
+              WEBAUTHN_ORIGIN: ORIGIN,
             }),
         }),
         ThrottlerModule.forRoot([{ ttl: 60_000, limit: 1000 }]),
@@ -84,6 +121,8 @@ describe('S027 account deletion (DEC-PROD-037)', () => {
       .useValue(identity)
       .overrideProvider(ACCOUNT_DELETION_REPOSITORY)
       .useValue(deletion)
+      .overrideProvider(AUTH_METHOD_POLICY_REPOSITORY)
+      .useValue(policies)
       .overrideProvider(PLATFORM_SETTINGS_REPOSITORY)
       .useValue(new MemoryPlatformSettingsRepository())
       .compile();
@@ -95,6 +134,13 @@ describe('S027 account deletion (DEC-PROD-037)', () => {
     await app.get(OpsAuthService).ensureOperator(OPS.email, OPS.password, 'test');
     const ops = await http().post('/v1/ops/sessions').send(OPS).expect(200);
     opsToken = ops.body.data.accessToken;
+  });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    for (const method of ['PHONE_SMS', 'EMAIL_LOGIN_IDENTIFIER', 'PASSKEY'] as const) {
+      await setMethod(method, true);
+    }
   });
 
   afterAll(async () => {
@@ -310,5 +356,156 @@ describe('S027 account deletion (DEC-PROD-037)', () => {
       .set('Authorization', `Bearer ${user.token}`)
       .send({ reason: 'not ops' })
       .expect(403);
+  });
+
+  describe('passkey re-auth (DEC-PROD-052)', () => {
+    const confirm = (auth: Record<string, string>, id: string, body: object) =>
+      http().post(`/v1/me/account-deletion/${id}/confirm`).set(auth).send(body);
+
+    it('passkey-only account: assertion bound to its own passkeys → scheduled, no SMS', async () => {
+      const smsBefore = sms.sent.length;
+      const user = await passkeyUser();
+
+      const overview = await http().get('/v1/me/account-deletion').set(user.auth).expect(200);
+      expect(overview.body.data).toMatchObject({ method: 'PASSKEY', phoneMasked: null });
+
+      const started = await http().post('/v1/me/account-deletion').set(user.auth).expect(201);
+      const options = started.body.data.passkeyOptions;
+      expect(started.body.data).toMatchObject({ method: 'PASSKEY', phoneMasked: null, graceDays: 7 });
+      expect(options).toMatchObject({ rpId: RP_ID, userVerification: 'required' });
+      expect(options.allowCredentials).toEqual([
+        expect.objectContaining({ id: user.passkey.credentialId, type: 'public-key' }),
+      ]);
+
+      const confirmed = await confirm(user.auth, started.body.data.requestId, {
+        passkey: user.passkey.assert(options.challenge),
+      }).expect(200);
+      expect(confirmed.body.data).toMatchObject({ status: 'SCHEDULED', graceDays: 7 });
+      expect((await identity.findPasskeyByCredentialId(user.passkey.credentialId))!.counter).toBe(2);
+      expect(sms.sent.length).toBe(smsBefore);
+
+      await http().get('/v1/me/account-deletion').set(user.auth).expect(401);
+      const relogin = await http().post('/v1/auth/passkeys/authentication/options').expect(200);
+      const refused = await http()
+        .post('/v1/auth/passkeys/authentication/verify')
+        .send({ ceremonyId: relogin.body.data.ceremonyId, ...user.passkey.assert(relogin.body.data.challenge) })
+        .expect(403);
+      expect(refused.body.errorCode).toBe('ACCOUNT_DELETED');
+    });
+
+    it("rejects another user's passkey, a missing or foreign challenge, and a replayed request", async () => {
+      const owner = await passkeyUser();
+      const other = await passkeyUser();
+
+      const first = await http().post('/v1/me/account-deletion').set(owner.auth).expect(201);
+      const challenge = first.body.data.passkeyOptions.challenge as string;
+      const id = first.body.data.requestId as string;
+
+      // Valid signature, but by a credential that belongs to someone else.
+      const foreign = await confirm(owner.auth, id, { passkey: other.passkey.assert(challenge) }).expect(401);
+      expect(foreign.body.errorCode).toBe('AUTH_PASSKEY_INVALID');
+      // The owner's passkey over a challenge this request did not issue.
+      const otherStart = await http().post('/v1/me/account-deletion').set(other.auth).expect(201);
+      await confirm(owner.auth, id, {
+        passkey: owner.passkey.assert(otherStart.body.data.passkeyOptions.challenge),
+      }).expect(401);
+      // A code or password is not accepted in place of the passkey.
+      await confirm(owner.auth, id, { code: '123456' }).expect(401);
+      // Another user cannot confirm the owner's request, even with the owner's assertion.
+      await confirm(other.auth, id, { passkey: owner.passkey.assert(challenge) }).expect(404);
+
+      // Starting again supersedes the first request: its challenge can no longer be used.
+      const second = await http().post('/v1/me/account-deletion').set(owner.auth).expect(201);
+      const replayed = await confirm(owner.auth, id, { passkey: owner.passkey.assert(challenge) }).expect(404);
+      expect(replayed.body.errorCode).toBe('ACCOUNT_DELETION_NOT_FOUND');
+      await confirm(owner.auth, second.body.data.requestId, {
+        passkey: owner.passkey.assert(challenge),
+      }).expect(401);
+
+      // Misses count toward the lock like codes and passwords.
+      const third = await http().post('/v1/me/account-deletion').set(owner.auth).expect(201);
+      for (let i = 0; i < 4; i += 1) {
+        await confirm(owner.auth, third.body.data.requestId, {
+          passkey: other.passkey.assert(third.body.data.passkeyOptions.challenge),
+        }).expect(401);
+      }
+      await confirm(owner.auth, third.body.data.requestId, {
+        passkey: other.passkey.assert(third.body.data.passkeyOptions.challenge),
+      }).expect(429);
+      await confirm(owner.auth, third.body.data.requestId, {
+        passkey: owner.passkey.assert(third.body.data.passkeyOptions.challenge),
+      }).expect(429);
+      expect((await identity.findUserById(owner.userId))!.deletedAt).toBeNull();
+    });
+
+    it('expires the challenge after the passkey ceremony TTL', async () => {
+      const user = await passkeyUser();
+      const started = await http().post('/v1/me/account-deletion').set(user.auth).expect(201);
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(Date.now() + 5 * 60 * 1000 + 1_000);
+      const expired = await confirm(user.auth, started.body.data.requestId, {
+        passkey: user.passkey.assert(started.body.data.passkeyOptions.challenge),
+      }).expect(401);
+      expect(expired.body.errorCode).toBe('AUTH_CODE_EXPIRED');
+    });
+
+    it('never falls back to a disabled method', async () => {
+      // Verified phone + passkey while phone sign-in is off → passkey, no SMS.
+      const withPasskey = await signedIn('0907000011');
+      const passkey = new SoftwarePasskey(RP_ID, ORIGIN);
+      await identity.savePasskey({ ...passkey.record(), userId: withPasskey.userId });
+      const pendingOtp = await http()
+        .post('/v1/me/account-deletion')
+        .set({ Authorization: `Bearer ${withPasskey.token}` })
+        .expect(201);
+      expect(pendingOtp.body.data.method).toBe('PASSKEY');
+
+      const phoneOnly = await signedIn('0907000012');
+      const phoneAuth = { Authorization: `Bearer ${phoneOnly.token}` };
+      const otp = await http().post('/v1/me/account-deletion').set(phoneAuth).expect(201);
+      expect(otp.body.data.method).toBe('PHONE_OTP');
+      const code = sms.sent.at(-1)!.code;
+
+      await setMethod('PHONE_SMS', false);
+      const smsBefore = sms.sent.length;
+
+      // An SMS request started before the switch-off cannot be finished any more.
+      const stale = await confirm(phoneAuth, otp.body.data.requestId, { code }).expect(404);
+      expect(stale.body.errorCode).toBe('ACCOUNT_DELETION_NOT_FOUND');
+
+      // Verified phone, no passkey, no password: neutral refusal and no SMS.
+      const overview = await http().get('/v1/me/account-deletion').set(phoneAuth).expect(200);
+      expect(overview.body.data).toMatchObject({ method: null, phoneMasked: null });
+      const refused = await http().post('/v1/me/account-deletion').set(phoneAuth).expect(409);
+      expect(refused.body.errorCode).toBe('ACCOUNT_DELETION_REAUTH_UNAVAILABLE');
+      expect(JSON.stringify(refused.body)).not.toMatch(/sms|phone|disabled|email/i);
+      expect(sms.sent.length).toBe(smsBefore);
+
+      // Password user while email sign-in is off: the password is not used either.
+      await setMethod('PHONE_SMS', true);
+      const hasher = new PasswordHasher();
+      const email = 'pw-off@dealgo.test';
+      await identity.createEmailPasswordUser({
+        email,
+        displayName: 'Pw Off',
+        passwordHash: await hasher.hash('correct-horse-1'),
+        verifiedAt: new Date(),
+      });
+      const login = await http()
+        .post('/v1/auth/email/login')
+        .send({ email, password: 'correct-horse-1' })
+        .expect(200);
+      const pwAuth = { Authorization: `Bearer ${login.body.data.accessToken}` };
+      await setMethod('EMAIL_LOGIN_IDENTIFIER', false);
+      await http().post('/v1/me/account-deletion').set(pwAuth).expect(409);
+
+      // Passkey switched off too: the phone+passkey user goes back to SMS (phone is on).
+      await setMethod('PASSKEY', false);
+      const fallback = await http()
+        .post('/v1/me/account-deletion')
+        .set({ Authorization: `Bearer ${withPasskey.token}` })
+        .expect(201);
+      expect(fallback.body.data).toMatchObject({ method: 'PHONE_OTP', passkeyOptions: null });
+    });
   });
 });

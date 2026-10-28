@@ -207,7 +207,6 @@ class _VoucherFieldState extends State<VoucherField> {
                       ),
                       style: textTheme.titleSmall,
                     ),
-                    Text(l10n.voucherPreviewNote, style: textTheme.bodySmall),
                   ],
                 ),
               ),

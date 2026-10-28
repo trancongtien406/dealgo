@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { signSigV4 } from './aws-sigv4.js';
-import { createMailSender, isMailSenderAvailable, type MailEnv } from './mail-factory.js';
-import { MockMailSender } from './mail-sender.js';
-import { MailDeliveryError, SesMailSender } from './ses-mail-sender.js';
-import { SmtpMailSender } from './smtp-mail-sender.js';
+import { effectiveEmailConfig, senderForConfig, type MailEnv } from './email-config.js';
+import { isMailSenderAvailable } from './mail-factory.js';
+import { MailDeliveryError, MockMailSender } from './mail-sender.js';
+import { SesMailSender } from './ses-mail-sender.js';
+import { passwordResetMail, signupAccountExistsMail, signupCodeMail, testMail } from './mail-templates.js';
+import { buildMimeMessage, encodeHeader, SmtpMailSender } from './smtp-mail-sender.js';
 
 describe('signSigV4', () => {
   it('matches the AWS SigV4 test-suite "get-vanilla" vector', () => {
@@ -39,6 +41,8 @@ describe('SesMailSender', () => {
     const body = JSON.parse(init.body as string);
     expect(body.Destination.ToAddresses).toEqual(['user@example.com']);
     expect(body.Content.Simple.Body.Text.Data).toContain('123456');
+    expect(body.Content.Simple.Body.Html.Data).toContain('123456');
+    expect(body.Content.Simple.Subject.Data).toBe('Mã đặt lại mật khẩu DealGo: 123456');
   });
 
   it('classifies SES errors', async () => {
@@ -50,16 +54,92 @@ describe('SesMailSender', () => {
   });
 });
 
-describe('createMailSender', () => {
+describe('senderForConfig (env only)', () => {
   const env = (patch: Partial<MailEnv>): MailEnv => ({ NODE_ENV: 'development', EMAIL_HTTP_TIMEOUT_MS: 1000, ...patch }) as MailEnv;
+  const sender = (patch: Partial<MailEnv>) => {
+    const e = env(patch);
+    return senderForConfig(effectiveEmailConfig(e, { config: {}, secrets: {} }), e);
+  };
 
   it('picks smtp, ses, mock, or unavailable', () => {
-    expect(createMailSender(env({}))).toBeInstanceOf(MockMailSender);
-    expect(createMailSender(env({ EMAIL_PROVIDER: 'smtp', SMTP_URL: 'smtp://localhost:1025' }))).toBeInstanceOf(SmtpMailSender);
+    expect(sender({})).toBeInstanceOf(MockMailSender);
+    expect(sender({ EMAIL_PROVIDER: 'smtp', SMTP_URL: 'smtp://localhost:1025', SMTP_FROM: 'DealGo <a@b.vn>' })).toBeInstanceOf(
+      SmtpMailSender,
+    );
     expect(
-      createMailSender(env({ EMAIL_PROVIDER: 'ses', SES_REGION: 'ap-southeast-1', SES_ACCESS_KEY_ID: 'a', SES_SECRET_ACCESS_KEY: 'b' })),
+      sender({
+        EMAIL_PROVIDER: 'ses',
+        SES_REGION: 'ap-southeast-1',
+        SES_ACCESS_KEY_ID: 'a',
+        SES_SECRET_ACCESS_KEY: 'b',
+        EMAIL_FROM: 'a@b.vn',
+      }),
     ).toBeInstanceOf(SesMailSender);
-    expect(isMailSenderAvailable(createMailSender(env({ NODE_ENV: 'production' })))).toBe(false);
-    expect(isMailSenderAvailable(createMailSender(env({ EMAIL_PROVIDER: 'ses' })))).toBe(false);
+    expect(isMailSenderAvailable(sender({ NODE_ENV: 'production' }))).toBe(false);
+    expect(isMailSenderAvailable(sender({ EMAIL_PROVIDER: 'ses' }))).toBe(false);
+    expect(isMailSenderAvailable(sender({ EMAIL_PROVIDER: 'smtp', SMTP_URL: 'smtp://localhost:1025' }))).toBe(false);
+  });
+});
+
+describe('mail templates', () => {
+  const expiresAt = new Date(Date.now() + 10 * 60_000);
+
+  it('puts the code in the subject, preheader, HTML and text', () => {
+    const mail = signupCodeMail({ email: 'a@b.vn', code: '482913', expiresAt });
+    expect(mail.subject).toBe('Mã xác thực DealGo: 482913');
+    expect(mail.preheader).toContain('482913');
+    expect(mail.text).toContain('482913');
+    expect(mail.text).toContain('10 phút');
+    expect(mail.html).toContain('>482913</span>');
+    expect(mail.html).toContain('https://dealgo.trancongtien.com/apple-icon.png');
+    expect(mail.html).toContain('lang="vi"');
+    expect(mail.text).not.toMatch(/<[a-z]/i);
+  });
+
+  it('renders every template with a text alternative', () => {
+    for (const mail of [
+      signupCodeMail({ email: 'a@b.vn', code: '111111', expiresAt, purpose: 'activation' }),
+      passwordResetMail({ email: 'a@b.vn', code: '222222', expiresAt }),
+      signupAccountExistsMail(),
+      testMail(),
+    ]) {
+      expect(mail.subject.length).toBeGreaterThan(5);
+      expect(mail.html).toMatch(/^<!DOCTYPE html>/);
+      expect(mail.text).toContain('Đội ngũ DealGo');
+    }
+  });
+});
+
+describe('SMTP MIME', () => {
+  it('sends multipart/alternative with base64 parts and folded encoded-word subject', () => {
+    const lines = buildMimeMessage({
+      from: 'DealGo <no-reply@dealgo.vn>',
+      to: 'u@example.com',
+      subject: 'Mã xác thực DealGo: 482913 — một tiêu đề khá dài để kiểm tra',
+      text: 'Mã: 482913',
+      html: '<p>482913</p>',
+    });
+    const raw = lines.join('\r\n');
+    expect(raw).toMatch(/Content-Type: multipart\/alternative; boundary="dealgo-/);
+    expect(raw).toContain('Content-Type: text/plain; charset=utf-8');
+    expect(raw).toContain('Content-Type: text/html; charset=utf-8');
+    expect(raw).toContain(Buffer.from('<p>482913</p>').toString('base64'));
+    expect(raw).toMatch(/Message-ID: <[0-9a-f-]+@dealgo\.vn>/);
+    expect(lines.every((line) => line.length <= 998 && !line.startsWith('.'))).toBe(true);
+    const subject = encodeHeader('Mã xác thực DealGo: 482913 — một tiêu đề khá dài để kiểm tra');
+    for (const word of subject.split('\r\n ')) {
+      expect(word.length).toBeLessThanOrEqual(75);
+    }
+    const decoded = subject
+      .split('\r\n ')
+      .map((w) => Buffer.from(w.slice(10, -2), 'base64').toString('utf8'))
+      .join('');
+    expect(decoded).toBe('Mã xác thực DealGo: 482913 — một tiêu đề khá dài để kiểm tra');
+  });
+
+  it('keeps text-only mail when there is no HTML', () => {
+    const raw = buildMimeMessage({ from: 'a@b.vn', to: 'c@d.vn', subject: 'Test', text: 'hello' }).join('\r\n');
+    expect(raw).not.toContain('multipart');
+    expect(raw).toContain(Buffer.from('hello').toString('base64'));
   });
 });

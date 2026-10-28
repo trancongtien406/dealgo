@@ -200,7 +200,8 @@ describePg('account deletion (postgres)', () => {
     const restored = await repo.cancelScheduled({ userId: user.id, actorUserId: ops.id, reason: 'hotline', at: new Date() });
     expect(restored?.status).toBe('CANCELLED');
     expect((await identity.findUserById(user.id))?.deletedAt).toBeNull();
-    const again = await repo.createRequest({ userId: user.id, method: 'PHONE_OTP', codeHash: 'h', expiresAt: future });
+    // Passkey re-auth requests persist like OTP ones (enum value from the migration).
+    const again = await repo.createRequest({ userId: user.id, method: 'PASSKEY', codeHash: 'h', expiresAt: future });
     await repo.confirm({ requestId: again.id, userId: user.id, at: new Date(), purgeAfter: new Date() });
 
     const due = await repo.listDue(new Date(Date.now() + 1_000), 500);

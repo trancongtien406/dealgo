@@ -7,6 +7,7 @@ import {
   AdminListErrorBanner,
 } from "@/components/ui/admin-state-ui";
 import { OpsInterveneDialog } from "@/components/ui/ops-intervene-dialog";
+import { MapKeysSection } from "@/features/integrations/components/map-keys-section";
 import {
   useMapsProvidersQuery,
   useSetMapsProviderMutation,
@@ -77,8 +78,7 @@ export function MapsProvidersBoard() {
               </p>
               {!isPending && !data?.googleConfigured ? (
                 <p className="mt-2 text-xs leading-5 text-muted">
-                  Thêm GOOGLE_MAPS_API_KEY vào backend.env rồi khởi động lại
-                  API để bật lựa chọn Google.
+                  Nhập Google Maps API key bên dưới để bật lựa chọn Google.
                 </p>
               ) : null}
             </li>
@@ -105,8 +105,15 @@ export function MapsProvidersBoard() {
                 đồ Google; app đang dùng nền Mapbox và ghi chú “Google Maps”
                 — cần xem lại trước khi bật lâu dài.
               </p>
+              <p className="mt-2 text-xs leading-5 text-muted">
+                Key mới có hiệu lực trên server sau ~15 giây; app/web nhận
+                Mapbox public token mới trong ~5 phút hoặc lần mở sau. Public
+                token nằm trong app nên cần giới hạn URL/bundle trên Mapbox.
+              </p>
             </li>
           </ul>
+
+          <MapKeysSection />
 
           <section className="min-w-0 overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
             <div className="border-b border-border px-4 py-3">
@@ -148,6 +155,7 @@ export function MapsProvidersBoard() {
             title: `Chuyển sang ${PROVIDER_LABELS[pending.value]}`,
             confirm: "Xác nhận đổi",
             hint: "Lý do được ghi vào nhật ký kiểm toán. Thay đổi có hiệu lực sau vài giây.",
+            success: "Đã đổi nhà cung cấp.",
           }}
           confirmTone="brand"
           entityLabel={pending.label}
@@ -210,7 +218,7 @@ function CapabilityRow({
               role="radio"
               aria-checked={selected}
               disabled={disabled || !allowed || selected}
-              title={allowed ? undefined : "Cần GOOGLE_MAPS_API_KEY trên server"}
+              title={allowed ? undefined : "Cần Google Maps API key"}
               onClick={() => onPick(value)}
               className={`h-9 rounded-lg px-3 text-sm font-medium transition-colors disabled:cursor-not-allowed ${
                 selected

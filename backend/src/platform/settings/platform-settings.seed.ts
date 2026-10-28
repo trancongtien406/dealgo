@@ -93,7 +93,7 @@ export const PLATFORM_SETTING_SEED_DEFAULTS: Readonly<Partial<Record<PlatformSet
     RIDE_REPOST_RAISE_HINT_PERCENT: '10',
     // DEC-PROD-062 DRAFT: merchant commission settlement cycle (GrabFood pays weekly).
     MERCHANT_SETTLEMENT_CYCLE_DAYS: '7',
-    // Map providers per capability; google needs GOOGLE_MAPS_API_KEY (Admin › Cài đặt › Bản đồ).
+    // Map providers per capability; google needs a Google key (Admin › Cài đặt › Bản đồ or GOOGLE_MAPS_API_KEY).
     MAPS_SEARCH_PROVIDER: 'mapbox',
     MAPS_REVERSE_PROVIDER: 'mapbox',
     MAPS_ROUTE_PROVIDER: 'mapbox',

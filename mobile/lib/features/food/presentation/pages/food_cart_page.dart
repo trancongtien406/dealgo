@@ -13,6 +13,7 @@ import '../cubit/food_cart_cubit.dart';
 import '../utils/food_routes.dart';
 import '../widgets/food_dropoff_tile.dart';
 import '../widgets/food_widgets.dart';
+import '../widgets/food_badges.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 class FoodCartPage extends StatelessWidget {
@@ -66,9 +67,21 @@ class FoodCartPage extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            cart.storeName ?? '',
-                            style: textTheme.titleMedium,
+                          Row(
+                            children: [
+                              const Icon(
+                                DealGoIcons.store,
+                                size: 18,
+                                color: DealGoColors.primary,
+                              ),
+                              const SizedBox(width: DealGoSpacing.s8),
+                              Expanded(
+                                child: Text(
+                                  cart.storeName ?? '',
+                                  style: textTheme.titleMedium,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: DealGoSpacing.s8),
                           for (final line in cart.lines)
@@ -79,9 +92,23 @@ class FoodCartPage extends StatelessWidget {
                               unitPriceVnd: line.unitPriceVnd,
                               lineTotalVnd: line.lineTotalVnd,
                             ),
+                          if (cart.minOrderShortVnd > 0) ...[
+                            const SizedBox(height: DealGoSpacing.s8),
+                            FoodNote(
+                              key: const Key('food-cart-min-order'),
+                              message: l10n.foodCartMinOrderMissing(
+                                formatVnd(cart.minOrderShortVnd),
+                              ),
+                              tone: FoodNoteTone.amber,
+                            ),
+                          ],
                         ],
                       ),
                     ),
+                  if (cart.lines.isNotEmpty && cart.etaMinutes != null) ...[
+                    const SizedBox(height: DealGoSpacing.s12),
+                    FoodEtaLine(minutes: cart.etaMinutes!),
+                  ],
                   const SizedBox(height: DealGoSpacing.s16),
                   FoodPanel(
                     elevated: true,

@@ -219,22 +219,49 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
   @override
   Future<FoodStoreDetail> updateStoreProfile({
     required String accessToken,
-    required String name,
-  }) => _profileUpdate('name:$name', (s) => s.copyWith(name: name));
+    String? name,
+    String? category,
+    int? minOrderVnd,
+    String? description,
+  }) => _profileUpdate(
+    [
+      if (name != null) 'name:$name',
+      if (category != null) 'category:$category',
+      if (minOrderVnd != null) 'minOrder:$minOrderVnd',
+      if (description != null) 'description:$description',
+    ].join(','),
+    (s) => s.copyWith(
+      name: name,
+      category: category,
+      minOrderVnd: minOrderVnd,
+      description: description,
+      clearDescription: description != null && description.isEmpty,
+    ),
+  );
 
   @override
   Future<FoodStoreDetail> uploadStoreLogo({
     required String accessToken,
     required String contentBase64,
     String? contentType,
+    bool cover = false,
   }) => _profileUpdate(
-    'logo',
-    (s) => s.copyWith(logoUrl: '/v1/public/store-logos/${s.id}/fake.png'),
+    cover ? 'cover' : 'logo',
+    (s) => cover
+        ? s.copyWith(coverUrl: '/v1/public/store-covers/${s.id}/fake.png')
+        : s.copyWith(logoUrl: '/v1/public/store-logos/${s.id}/fake.png'),
   );
 
   @override
-  Future<FoodStoreDetail> clearStoreLogo({required String accessToken}) =>
-      _profileUpdate('clear-logo', (s) => s.copyWith(clearLogoUrl: true));
+  Future<FoodStoreDetail> clearStoreLogo({
+    required String accessToken,
+    bool cover = false,
+  }) => _profileUpdate(
+    cover ? 'clear-cover' : 'clear-logo',
+    (s) => cover
+        ? s.copyWith(clearCoverUrl: true)
+        : s.copyWith(clearLogoUrl: true),
+  );
 
   /// M030 saves: (lat, lng, addressLabel).
   final storeLocationCalls = <(double, double, String?)>[];
@@ -352,6 +379,8 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
     int? prepMinutes,
     String? imageUrl,
     String? menuCategoryId,
+    int? originalPriceVnd,
+    bool clearOriginalPrice = false,
   }) async {
     updateCalls.add((itemId: itemId, name: name, priceVnd: priceVnd));
     final error = updateError;
@@ -373,6 +402,8 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
       prepMinutes: prepMinutes,
       imageUrl: imageUrl,
       menuCategoryId: menuCategoryId,
+      originalPriceVnd: originalPriceVnd,
+      clearOriginalPrice: clearOriginalPrice,
     );
   }
 

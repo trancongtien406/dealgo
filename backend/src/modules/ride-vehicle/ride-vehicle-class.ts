@@ -39,6 +39,48 @@ export type VehicleClassFareInput = Pick<
   'baseFareVnd' | 'perKmVnd' | 'perMinuteVnd' | 'minFareVnd' | 'maxFareVnd' | 'assumedSpeedKmh'
 >;
 
+/**
+ * Every ride price the server shows or settles (suggested fare, minimum bid,
+ * bids, counters, raises, the agreed fare) is a whole multiple of this step,
+ * so customers and drivers never see amounts like 23.487đ.
+ */
+export const RIDE_FARE_ROUNDING_STEP_VND = 1000;
+
+/** Rounds up to the next {@link RIDE_FARE_ROUNDING_STEP_VND} (23.487 → 24.000). */
+export function roundUpToFareStep(amountVnd: number): number {
+  return Math.ceil(amountVnd / RIDE_FARE_ROUNDING_STEP_VND) * RIDE_FARE_ROUNDING_STEP_VND;
+}
+
+/** Rounds down to the previous {@link RIDE_FARE_ROUNDING_STEP_VND} (34.500 → 34.000). */
+export function roundDownToFareStep(amountVnd: number): number {
+  return Math.floor(amountVnd / RIDE_FARE_ROUNDING_STEP_VND) * RIDE_FARE_ROUNDING_STEP_VND;
+}
+
+/**
+ * Rounds `amountVnd` up to the step, then keeps it inside the class bounds
+ * using the stepped bounds (min rounded up, max rounded down). When the
+ * bounds are narrower than one step, falls back to the plain clamp.
+ */
+export function clampToFareSteps(amountVnd: number, minVnd: number, maxVnd: number): number {
+  const lo = roundUpToFareStep(minVnd);
+  const hi = roundDownToFareStep(maxVnd);
+  if (lo > hi) {
+    return Math.min(maxVnd, Math.max(minVnd, amountVnd));
+  }
+  return Math.min(hi, Math.max(lo, roundUpToFareStep(amountVnd)));
+}
+
+/**
+ * Lowest bid the customer may send: RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE of the
+ * suggested fare, rounded up to the step. 0 when the floor is off.
+ */
+export function rideBidFloorVnd(referenceFareVnd: number, floorPercent: number): number {
+  if (floorPercent <= 0 || referenceFareVnd <= 0) {
+    return 0;
+  }
+  return roundUpToFareStep((referenceFareVnd * floorPercent) / 100);
+}
+
 export function quoteVehicleClassFare(input: {
   distanceKm: number;
   vehicle: VehicleClassFareInput;
@@ -49,9 +91,11 @@ export function quoteVehicleClassFare(input: {
   const distanceComponentVnd = Math.round(km * input.vehicle.perKmVnd);
   const timeComponentVnd = durationMin * input.vehicle.perMinuteVnd;
   const raw = input.vehicle.baseFareVnd + distanceComponentVnd + timeComponentVnd;
-  const clamped = Math.min(input.vehicle.maxFareVnd, Math.max(input.vehicle.minFareVnd, raw));
   return {
-    referenceFareVnd: Math.min(MAX_STORED_VND, Math.max(0, clamped)),
+    referenceFareVnd: Math.min(
+      MAX_STORED_VND,
+      Math.max(0, clampToFareSteps(raw, input.vehicle.minFareVnd, input.vehicle.maxFareVnd)),
+    ),
     durationMin,
     distanceComponentVnd,
     timeComponentVnd,

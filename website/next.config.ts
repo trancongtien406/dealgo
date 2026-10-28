@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -70,7 +71,9 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   // Docker image (website/Dockerfile) sets NEXT_OUTPUT=standalone; local `next start` is unchanged.
-  ...(process.env.NEXT_OUTPUT === "standalone" ? { output: "standalone" as const } : {}),
+  ...(process.env.NEXT_OUTPUT === "standalone"
+    ? { output: "standalone" as const }
+    : {}),
   // cacheComponents + async admin layout (cookies/Nest probe) left private
   // page client trees stuck on SSR pending without firing React Query.
   // Re-enable once ops session is moved behind a streaming Suspense boundary
@@ -89,7 +92,8 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        source: "/.well-known/:file(apple-app-site-association|assetlinks.json)",
+        source:
+          "/.well-known/:file(apple-app-site-association|assetlinks.json)",
         destination: "/api/public/app-links/:file",
       },
     ];
@@ -104,4 +108,22 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+/**
+ * Source maps go to Sentry (org tiendev, project dealgo-web) only when the build
+ * has SENTRY_AUTH_TOKEN (VPS: Docker build secret). Maps are deleted after upload
+ * so they are never served; builds without the token are left untouched.
+ */
+const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN?.trim();
+const sentryRelease = process.env.NEXT_PUBLIC_SENTRY_RELEASE?.trim();
+
+export default sentryAuthToken
+  ? withSentryConfig(nextConfig, {
+      org: "tiendev",
+      project: "dealgo-web",
+      authToken: sentryAuthToken,
+      silent: !process.env.CI,
+      telemetry: false,
+      ...(sentryRelease ? { release: { name: sentryRelease } } : {}),
+      sourcemaps: { deleteSourcemapsAfterUpload: true },
+    })
+  : nextConfig;

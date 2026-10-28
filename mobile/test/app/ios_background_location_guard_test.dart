@@ -2,9 +2,11 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-/// App Review 2.5.4: only declare the `location` background mode / "Always"
-/// string when the app really tracks in background. Today tracking is
-/// foreground-only (no allowBackgroundLocationUpdates anywhere in lib/).
+/// App Review 2.5.4: only declare the `location` background mode when the app
+/// really tracks in background. Today tracking is foreground-only (no
+/// allowBackgroundLocationUpdates anywhere in lib/). The "Always" purpose
+/// string stays: the linked location plugin references that API and App Store
+/// Connect rejects the upload without it (ITMS-90683).
 void main() {
   test('no unused iOS background-location declarations', () {
     final plist = File('ios/Runner/Info.plist').readAsStringSync();
@@ -18,10 +20,6 @@ void main() {
           ),
         );
     if (!usesBg) {
-      expect(
-        plist.contains('NSLocationAlwaysAndWhenInUseUsageDescription'),
-        isFalse,
-      );
       expect(
         RegExp(
           r'UIBackgroundModes</key>\s*<array>[^<]*(<string>[^<]*</string>\s*)*<string>location</string>',

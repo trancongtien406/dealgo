@@ -183,70 +183,73 @@ class _SupportTicketDetailPageState extends State<SupportTicketDetailPage> {
         ),
       );
     }
-    return Material(
-      color: DealGoColors.card,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          DealGoSpacing.s16,
-          DealGoSpacing.s8,
-          DealGoSpacing.s8,
-          DealGoSpacing.s8,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (ticket.status == SupportStatus.resolved)
-              Padding(
-                padding: const EdgeInsets.only(bottom: DealGoSpacing.s8),
-                child: Text(
-                  l10n.supportResolvedNote,
-                  style: textTheme.bodySmall,
-                ),
-              ),
-            if (_sendError != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: DealGoSpacing.s8),
-                child: Text(
-                  _sendError!,
-                  key: const Key('support-send-error'),
-                  style: textTheme.bodySmall?.copyWith(
-                    color: DealGoColors.danger,
+    // Send counts as part of the field: tapping it keeps the keyboard up.
+    return TextFieldTapRegion(
+      child: Material(
+        color: DealGoColors.card,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            DealGoSpacing.s16,
+            DealGoSpacing.s8,
+            DealGoSpacing.s8,
+            DealGoSpacing.s8,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (ticket.status == SupportStatus.resolved)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: DealGoSpacing.s8),
+                  child: Text(
+                    l10n.supportResolvedNote,
+                    style: textTheme.bodySmall,
                   ),
                 ),
-              ),
-            if (supportImageSource(context) case final source?)
-              SupportAttachmentPicker(
-                source: source,
-                picked: _photos,
-                compact: true,
-                enabled: !_sending,
-                onChanged: (next) => setState(() => _photos = next),
-              ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: DealGoTextField(
-                    fieldKey: const Key('support-reply-field'),
-                    label: l10n.supportReplyHint,
-                    showLabel: false,
-                    controller: _reply,
-                    maxLines: 4,
-                    maxLength: 2000,
-                    textCapitalization: TextCapitalization.sentences,
+              if (_sendError != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: DealGoSpacing.s8),
+                  child: Text(
+                    _sendError!,
+                    key: const Key('support-send-error'),
+                    style: textTheme.bodySmall?.copyWith(
+                      color: DealGoColors.danger,
+                    ),
                   ),
                 ),
-                const SizedBox(width: DealGoSpacing.s8),
-                IconButton.filled(
-                  key: const Key('support-reply-send'),
-                  tooltip: l10n.supportReplySend,
-                  onPressed: _sending ? null : _send,
-                  icon: const Icon(DealGoIcons.send, size: 18),
+              if (supportImageSource(context) case final source?)
+                SupportAttachmentPicker(
+                  source: source,
+                  picked: _photos,
+                  compact: true,
+                  enabled: !_sending,
+                  onChanged: (next) => setState(() => _photos = next),
                 ),
-              ],
-            ),
-          ],
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: DealGoTextField(
+                      fieldKey: const Key('support-reply-field'),
+                      label: l10n.supportReplyHint,
+                      showLabel: false,
+                      controller: _reply,
+                      maxLines: 4,
+                      maxLength: 2000,
+                      textCapitalization: TextCapitalization.sentences,
+                    ),
+                  ),
+                  const SizedBox(width: DealGoSpacing.s8),
+                  IconButton.filled(
+                    key: const Key('support-reply-send'),
+                    tooltip: l10n.supportReplySend,
+                    onPressed: _sending ? null : _send,
+                    icon: const Icon(DealGoIcons.send, size: 18),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

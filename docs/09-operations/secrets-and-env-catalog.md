@@ -72,7 +72,7 @@ Phương thức đăng nhập (SĐT / email / passkey) bật tắt ở Admin ›
 | `SPEEDSMS_ACCESS_TOKEN`, `SPEEDSMS_SENDER`, `SPEEDSMS_SMS_TYPE`, `SPEEDSMS_BASE_URL` | Token bắt buộc khi `speedsms` | |
 | `SMS_OTP_TEMPLATE` | — | Phải trùng mẫu đã đăng ký với nhà mạng |
 | `SMS_HTTP_TIMEOUT_MS`, `SMS_HTTP_MAX_ATTEMPTS` | — | Mặc định `8000`, `2` |
-| `EMAIL_PROVIDER` | Không được `mock` | `ses` / `smtp` / `none`. Thiếu cấu hình → đăng ký email trả 503 `EMAIL_DELIVERY_FAILED`, không tạo tài khoản |
+| `EMAIL_PROVIDER` | Không được `mock` | Giá trị khởi tạo; Admin › Cài đặt › Email (nhà cung cấp, người gửi, thông tin đăng nhập) ghi đè. `smtp` (mặc định Gmail) / `ses` / `none`. Thiếu cấu hình → đăng ký email trả 503 `EMAIL_DELIVERY_FAILED`, không tạo tài khoản |
 | `EMAIL_FROM` | Bắt buộc khi `ses` (identity đã xác minh) | Dùng `SMTP_FROM` nếu trống |
 | `SES_REGION`, `SES_ACCESS_KEY_ID`, `SES_SECRET_ACCESS_KEY`, `SES_CONFIGURATION_SET` | Ba khoá đầu bắt buộc khi `ses` | |
 | `SMTP_URL` hoặc `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_TLS` | `SMTP_URL` (hoặc bộ 4 biến) khi `smtp` | Bộ 4 biến được ghép thành `SMTP_URL` |
@@ -83,12 +83,12 @@ Phương thức đăng nhập (SĐT / email / passkey) bật tắt ở Admin ›
 | Biến | Production | Ghi chú |
 |---|---|---|
 | `MAPS_PROVIDER` | Bắt buộc `mapbox` / `goong` / `google` kèm key | Geocoding / tìm địa điểm |
-| `MAPBOX_ACCESS_TOKEN` | Khi `mapbox` (hoặc `MAPBOX_DIRECTIONS_TOKEN`) | Token public `pk.*` |
+| `MAPBOX_ACCESS_TOKEN` | Khi `mapbox` (hoặc `MAPBOX_DIRECTIONS_TOKEN`) | Token public `pk.*`. Admin › Cài đặt › Bản đồ ghi đè (lưu mã hoá) |
 | `GOONG_API_KEY` | Khi `MAPS_PROVIDER=goong` | |
-| `GOOGLE_MAPS_API_KEY` **SECRET** | Tuỳ chọn | Chỉ ở server. Bật Google Maps làm nhà cung cấp thứ hai mà Admin chọn được theo từng chức năng (Cài đặt › Bản đồ). Key cần Places API (New), Geocoding API, Routes API; nên giới hạn theo IP server và theo 3 API này. Trống → Admin hiện Google "Chưa cấu hình", mọi chức năng dùng Mapbox. Cũng dùng được với `MAPS_PROVIDER=google`. Xem `05-architecture/places-search.md` |
+| `GOOGLE_MAPS_API_KEY` **SECRET** | Tuỳ chọn | Chỉ ở server. Bật Google Maps làm nhà cung cấp thứ hai mà Admin chọn được theo từng chức năng (Cài đặt › Bản đồ). Key cần Places API (New), Geocoding API, Routes API; nên giới hạn theo IP server và theo 3 API này. Trống → Admin hiện Google "Chưa cấu hình", mọi chức năng dùng Mapbox. Cũng dùng được với `MAPS_PROVIDER=google`. Admin › Cài đặt › Bản đồ ghi đè. Xem `05-architecture/places-search.md` |
 | `PLACES_OSM_SEARCH_URL` | Tuỳ chọn; nếu đặt thì là Photon tự host (bản trích Việt Nam), ví dụ `http://photon:2322` | Thêm ứng viên OSM cho tìm địa điểm (bù chỗ Mapbox thiếu tên đường ở VN). Trống → chỉ Mapbox. Không dùng `photon.komoot.io` cho production (fair-use, chỉ cho dev). Xem `05-architecture/places-search.md` |
 | `ROUTING_PROVIDER` | Bắt buộc `mapbox` hoặc `osrm` | Hình học đường đi và ETA cho Admin và app. Ngoài production, không đặt / `none` → đường thẳng |
-| `MAPBOX_DIRECTIONS_TOKEN` | Bắt buộc khi `ROUTING_PROVIDER=mapbox` | Chỉ dùng ở server; không dùng `NEXT_PUBLIC_MAPBOX_TOKEN` cho Directions |
+| `MAPBOX_DIRECTIONS_TOKEN` | Bắt buộc khi `ROUTING_PROVIDER=mapbox` | Chỉ dùng ở server; không dùng `NEXT_PUBLIC_MAPBOX_TOKEN` cho Directions. Admin › Cài đặt › Bản đồ ghi đè |
 | `ROUTING_OSRM_URL` | Bắt buộc khi `osrm`, phải là server tự host | Server demo `router.project-osrm.org` bị từ chối ở production |
 | `ROUTING_TIMEOUT_MS` | — | Mặc định `4000` |
 
@@ -106,6 +106,7 @@ Phương thức đăng nhập (SĐT / email / passkey) bật tắt ở Admin ›
 | `APNS_ENV` (`sandbox` \| `production`), `APNS_SANDBOX` | `production` ở production | `sandbox` gửi tới `api.sandbox.push.apple.com` (bản debug cài từ Xcode); `production` gửi tới `api.push.apple.com` (TestFlight / App Store). Nếu không đặt: theo `APNS_SANDBOX`, nếu cũng không có thì theo `NODE_ENV` |
 | `CHAT_ENCRYPTION_KEY` **SECRET** | Bắt buộc | Base64 đúng 32 byte (`openssl rand -base64 32`); kiểm tra định dạng ở mọi môi trường |
 | `CHAT_ENCRYPTION_KEY_VERSION`, `CHAT_ENCRYPTION_PREVIOUS_KEYS` | — | Xoay khoá: [chat-encryption-keys.md](chat-encryption-keys.md) |
+| `SECRETS_ENCRYPTION_KEY` **SECRET** | Nên có | Base64 đúng 32 byte (`openssl rand -base64 32`). Mã hoá thông tin đăng nhập lưu trong Admin (Email, key bản đồ). Trống → Admin chỉ xem giá trị env, không lưu được. Đổi khoá → các giá trị đã lưu không đọc được, phải nhập lại |
 | `CONTACT_WINDOW_MINUTES` | — | Giá trị khởi tạo cho cài đặt Admin cùng tên (mặc định 120) |
 
 ### Thanh toán
@@ -147,7 +148,7 @@ Phương thức đăng nhập (SĐT / email / passkey) bật tắt ở Admin ›
 
 | Biến | Ghi chú |
 |---|---|
-| `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE` | DSN trống = tắt |
+| `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE`, `SENTRY_RELEASE` | DSN trống = tắt. Prod (project `dealgo-backend`): `production`, traces `0.1`, release = tag deploy. Chỉ gửi user id; bỏ lỗi 4xx dự kiến; lọc token/OTP/mật khẩu/email/SĐT/query |
 | `LOG_FORMAT` | `json` mặc định ở production |
 
 ### Seed
@@ -165,10 +166,11 @@ Sao chép từ `website/.env.example`.
 |---|---|
 | `DEALGO_API_BASE_URL` (hoặc `API_BASE_URL`) | Origin Nest cho các lệnh gọi BFF phía server; mặc định `http://localhost:3001` |
 | `NEXT_PUBLIC_API_BASE_URL` | Đọc lúc build, chỉ để thêm origin vào CSP `connect-src`. Trình duyệt luôn gọi BFF cùng origin |
-| `NEXT_PUBLIC_MAPBOX_TOKEN` | Token public `pk.*` (giới hạn URL trong Mapbox) cho tile bản đồ Admin. Trống → tile OSM/Carto. Đường đi lấy từ API định tuyến của server |
+| `NEXT_PUBLIC_MAPBOX_TOKEN` | Token public `pk.*` (giới hạn URL trong Mapbox) cho tile bản đồ Admin. Token public lưu trong Admin › Cài đặt › Bản đồ thay thế giá trị này khi tải trang (`/api/public/client-config`, cache 5 phút). Trống → tile OSM/Carto. Đường đi lấy từ API định tuyến của server |
 | `NEXT_PUBLIC_APP_ENV` | Nhãn môi trường hiển thị ở trang Cài đặt (mặc định `DEVELOPMENT`) |
 | `OPS_SESSION_PROBE_TTL_MS` | Thời gian cache kết quả kiểm tra phiên ops thành công; mặc định 15 s, giới hạn 5–30 s |
-| `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_ENVIRONMENT`, `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE` | Sentry; trống = không tải SDK |
+| `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_ENVIRONMENT`, `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE`, `NEXT_PUBLIC_SENTRY_RELEASE`, `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE` | Sentry (project `dealgo-web`); trống = không tải SDK. `NEXT_PUBLIC_*` là build arg Docker (VPS: `/opt/dealgo/.env`). Cùng chính sách lọc như backend |
+| `SENTRY_AUTH_TOKEN` (chỉ lúc build) | Token org `tiendev` (scope CI) để upload source map lên `dealgo-web`. VPS: file `/opt/dealgo/secrets/sentry-auth-token` (600) truyền vào build bằng Docker secret `sentry_auth_token`, không vào image/layer; map bị xoá sau upload. Trống = build không upload |
 | `NEXT_OUTPUT=standalone` | Build Docker (`website/Dockerfile`) |
 
 Phiên ops lưu trong cookie do BFF `/api/ops/session` đặt; không lưu token trong `localStorage`. Không đặt token hay secret trong biến `NEXT_PUBLIC_*`.
@@ -179,10 +181,10 @@ Phiên ops lưu trong cookie do BFF `/api/ops/session` đặt; không lưu token
 |---|---|---|
 | `API_BASE_URL` | debug/profile `http://localhost:3001`; release `https://api-dealgo.trancongtien.com` | Origin Nest (REST + Socket.IO cùng host), trùng `PORT` mặc định của backend; `mobile/tool/run_dev.sh` dùng cùng mặc định. Android emulator: `http://10.0.2.2:3001`. Bản release từ chối `http://`; bản debug chỉ cho `http://` với `localhost`, `127.0.0.1`, `10.0.2.2` |
 | `USE_MOCK_DATA` | `false` | `true` = dùng client giả và dữ liệu seed, không cần backend |
-| `MAPS_API_KEY` | — | **Bắt buộc cho mọi bản build dùng bản đồ thật** (debug, simulator, release). Token Mapbox public `pk.*`; tile mặc định Mapbox Streets `streets-v12`. `mobile/tool/run_dev.sh` truyền sẵn từ `MAPBOX_ACCESS_TOKEN`; lệnh `flutter build`/`flutter run` tự gõ phải thêm `--dart-define=MAPS_API_KEY=…` và `MAP_ATTRIBUTION`. Thiếu → bản đồ minh hoạ (`PlaceholderMapPort`): không có tile, nhưng điểm đón/đến và tuyến vẫn vẽ đúng toạ độ thật theo phép chiếu. Tuyến đường luôn lấy từ server (routing) |
+| `MAPS_API_KEY` | — | Token Mapbox public `pk.*` dự phòng. App lấy token public lưu trong Admin › Cài đặt › Bản đồ (`GET /v1/public/client-config`), cache trên máy. Lần mở đầu chưa có cache thì splash chờ lấy token tối đa 3 s; có cache thì dùng ngay và làm mới ngầm, token đổi thì mọi bản đồ đang mở dựng lại với token mới, không cần cấu hình gì ở mobile. Chưa có token nào thì dùng key này; tile mặc định Mapbox Streets `streets-v12`. `mobile/tool/run_dev.sh` truyền sẵn từ `MAPBOX_ACCESS_TOKEN`; lệnh `flutter build`/`flutter run` tự gõ phải thêm `--dart-define=MAPS_API_KEY=…` và `MAP_ATTRIBUTION`. Thiếu → bản đồ minh hoạ (`PlaceholderMapPort`): không có tile, nhưng điểm đón/đến và tuyến vẫn vẽ đúng toạ độ thật theo phép chiếu. Tuyến đường luôn lấy từ server (routing) |
 | `MAP_TILE_URL`, `MAP_ATTRIBUTION` | — | Ghi đè nguồn tile (`https://…/{z}/{x}/{y}…{key}`). Không dùng tile OSM công cộng cho production. Bản đồ giữ một tile provider suốt vòng đời màn hình; chỉ lớp tuyến chạy hiệu ứng, nên tile không tải lại theo từng khung hình |
 | `APP_LINK_HOST` | `dealgo.trancongtien.com` | Domain universal link + passkey; phải trùng `dealgoAppLinkHost` (`android/gradle.properties`), `DEALGO_APP_LINK_HOST` (`ios/Flutter/*.xcconfig`) và `WEBAUTHN_RP_ID` |
-| `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE` | trống, `production`/`development` theo build, `0` | Crash reporting; DSN trống = tắt |
+| `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE` | build có flavor (`dev`/`prod`, kể cả scheme Xcode) hoặc release: DSN public của project Sentry mobile (`dealGoMobileSentryDsn`); `flutter run`/`flutter test` không flavor: trống. Môi trường `dev`/`prod` theo flavor (release không flavor = `prod`). `0` | Crash reporting (`mobile/lib/core/observability/crash_reporting.dart`). `--dart-define=SENTRY_DSN=` (rỗng) = tắt. DSN client là public (chỉ gửi được sự kiện), không phải secret. Release = `com.trancongtien.dealgo@<version>+<build>`. Chỉ gửi user id; không header/body/query, không breadcrumb từ `print`. Upload debug symbol/obfuscation map: `sentry_dart_plugin` (dev dependency, cấu hình khối `sentry:` trong `pubspec.yaml`: org `tiendev`, project `flutter`, `symbols_path: build/debug-info`). Token org đặt ở `mobile/sentry.properties` (`auth_token=…`, gitignore, chỉ máy chủ dự án) hoặc env `SENTRY_AUTH_TOKEN`. Build release: `flutter build ipa --release --flavor prod --obfuscate --split-debug-info=build/debug-info` (tương tự `appbundle`) rồi `dart run sentry_dart_plugin` |
 | `SMOKE_ACCESS_TOKEN`, `SMOKE_REFRESH_TOKEN` | — | Chỉ cho smoke test tự động |
 
 Khác:
@@ -214,5 +216,6 @@ Khác:
 - [ ] `APNS_ENV=production` và `APNS_KEY_PATH` trỏ tới `AuthKey_TL36K38ZKR.p8` (team `6J3522877H`) khi bật gọi thoại trên iOS. Log khởi động `VoipPush` phải báo `iOS VoIP pushes on`
 - [ ] Secret nằm ở vault / CI secrets, không trong git
 - [ ] `APP_REVIEW_LOGIN_ENABLED` tắt sau khi duyệt xong; `APP_REVIEW_OTP_CODE` đổi mỗi đợt
+- [ ] Tài khoản review: mật khẩu + mã ở `/opt/dealgo/env/app-review.txt` (600, chỉ trên VPS và máy chủ dự án); `APP_REVIEW_PASSWORD` chỉ là biến lúc chạy `npm run seed:app-review` để đặt/đổi mật khẩu, không phải env của API
 - [ ] `/.well-known/apple-app-site-association` và `assetlinks.json` trả 200 trên domain thật
 - [ ] `android/key.properties` và keystore được backup ngoài git

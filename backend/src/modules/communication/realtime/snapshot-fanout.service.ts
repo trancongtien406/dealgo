@@ -21,6 +21,8 @@ import {
   type CallEventPayload,
   CHAT_MESSAGE_EVENT,
   type ChatMessageEventPayload,
+  INBOX_EVENT,
+  type InboxEventPayload,
   type PartnerStatusEventPayload,
   SNAPSHOT_EVENT,
   type SnapshotEventPayload,
@@ -181,6 +183,14 @@ export class SnapshotFanoutService {
       return;
     }
     this.server.to(userIds.map((id) => roomForUser(id))).emit(CHAT_MESSAGE_EVENT, payload);
+  }
+
+  /** New inbox row(s) for these users (their private rooms only). */
+  emitInbox(userIds: readonly string[], payload: InboxEventPayload): void {
+    if (!this.server || userIds.length === 0) {
+      return;
+    }
+    this.server.to(userIds.map((id) => roomForUser(id))).emit(INBOX_EVENT, payload);
   }
 
   emitCall(payload: CallEventPayload): void {

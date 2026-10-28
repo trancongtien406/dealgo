@@ -1,12 +1,21 @@
 import '../../l10n/app_localizations.dart';
 import '../network/api_exception.dart';
+import '../observability/crash_reporting.dart';
 
 /// User-facing text for a failed call. Server `message` fields are English developer text,
 /// so they are never shown: known codes get their own sentence, the rest fall back by status.
+///
+/// Failures that are bugs rather than answers (non-API errors, malformed
+/// responses) go to crash reporting with their details; the user only sees the
+/// friendly sentence. Sentry drops repeats of the same error object, so
+/// resolving one message on every rebuild reports it once. 5xx answers are
+/// reported where they happen (`DioErrorReporter`).
 String apiErrorText(AppLocalizations l10n, Object? error, {String? fallback}) {
   if (error is! ApiException) {
+    if (error != null) reportHandledError(error);
     return fallback ?? l10n.apiErrGeneric;
   }
+  if (_malformed.contains(error.errorCode)) reportHandledError(error);
   final byCode = _byCode(l10n, error.errorCode);
   if (byCode != null) {
     return byCode;
@@ -25,6 +34,8 @@ String apiErrorText(AppLocalizations l10n, Object? error, {String? fallback}) {
     _ => fallback ?? l10n.apiErrGeneric,
   };
 }
+
+const _malformed = {'INVALID_RESPONSE', 'MALFORMED_RESPONSE'};
 
 String? _byCode(AppLocalizations l10n, String code) => switch (code) {
   'NETWORK_ERROR' => l10n.apiErrNetwork,
@@ -71,6 +82,7 @@ String? _byCode(AppLocalizations l10n, String code) => switch (code) {
   'FOOD_STORE_NOT_FOUND' => l10n.checkoutErrStoreNotFound,
   'FOOD_STORE_PAUSED' => l10n.checkoutErrStorePaused,
   'FOOD_STORE_CLOSED' => l10n.checkoutErrStoreClosed,
+  'FOOD_MIN_ORDER_NOT_MET' => l10n.checkoutErrMinOrder,
   'FOOD_STORE_AT_CAPACITY' => l10n.checkoutErrStoreAtCapacity,
   'FOOD_HOURS_INVALID' => l10n.merchantHoursErrInvalid,
   'FOOD_ORDER_ALREADY_OPEN' => l10n.checkoutErrOrderOpen,

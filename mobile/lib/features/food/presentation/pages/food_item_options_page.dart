@@ -4,12 +4,16 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/motion/dealgo_motion_widgets.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/food_models.dart';
 import '../../domain/entities/food_money.dart';
 import '../cubit/food_cart_cubit.dart';
 import '../utils/food_routes.dart';
+import '../widgets/food_cart_bar.dart';
 import '../widgets/food_widgets.dart';
+import '../widgets/food_badges.dart';
+import '../widgets/food_category_tile.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
 
@@ -30,6 +34,8 @@ void openFoodItemOptions({
       storeId: store.id,
       storeName: store.name,
       item: item,
+      minOrderVnd: store.minOrderVnd,
+      prepMinutes: store.estimatedPrepMinutes,
     );
     return;
   }
@@ -76,6 +82,8 @@ class _FoodItemOptionsPageState extends State<FoodItemOptionsPage> {
       catalogItemId: item.id,
       optionIds: _selection.optionIds,
       imageUrl: item.imageUrl,
+      minOrderVnd: widget.args.store.minOrderVnd,
+      prepMinutes: widget.args.store.estimatedPrepMinutes,
     );
     if (context.canPop()) {
       context.pop();
@@ -96,6 +104,8 @@ class _FoodItemOptionsPageState extends State<FoodItemOptionsPage> {
     final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
     final item = widget.args.item;
+    final bestSeller = foodBestSellerIds(widget.args.store.items)
+        .contains(item.id);
     return Scaffold(
       backgroundColor: DealGoColors.canvas,
       body: SafeArea(
@@ -111,34 +121,67 @@ class _FoodItemOptionsPageState extends State<FoodItemOptionsPage> {
                   DealGoSpacing.s24 + DealGoDimensions.buttonMinHeight,
                 ),
                 children: [
-                  FoodCoverImage(imageUrl: item.imageUrl, height: 200),
-                  const SizedBox(height: DealGoSpacing.s16),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(item.name, style: textTheme.titleLarge),
+                  DealGoHero(
+                    tag: foodItemHeroTag(item.id),
+                    child: FoodCoverImage(
+                      imageUrl: item.imageUrl,
+                      aspectRatio: 4 / 3,
+                      placeholderAsset: foodDishFallbackImage(
+                        widget.args.store.category,
                       ),
-                      Text(
-                        formatVnd(item.priceVnd),
-                        style: textTheme.titleLarge?.copyWith(
-                          color: DealGoColors.primary,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (item.soldCount > 0) ...[
-                    const SizedBox(height: DealGoSpacing.s8),
-                    Text(
-                      l10n.merchantProductsSoldCount('${item.soldCount}'),
-                      style: textTheme.bodySmall,
                     ),
-                  ],
-                  if ((item.description ?? '').trim().isNotEmpty) ...[
-                    const SizedBox(height: DealGoSpacing.s8),
-                    Text(item.description!.trim(), style: textTheme.bodySmall),
-                  ],
+                  ),
+                  const SizedBox(height: DealGoSpacing.s16),
+                  Container(
+                    padding: const EdgeInsets.all(DealGoSpacing.s16),
+                    decoration: BoxDecoration(
+                      color: DealGoColors.card,
+                      borderRadius: BorderRadius.circular(DealGoRadius.card),
+                      boxShadow: DealGoShadows.card,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (item.isNew || bestSeller) ...[
+                          FoodItemBadges(
+                            isNew: item.isNew,
+                            bestSeller: bestSeller,
+                          ),
+                          const SizedBox(height: DealGoSpacing.s8),
+                        ],
+                        Text(item.name, style: textTheme.titleLarge),
+                        if ((item.description ?? '').trim().isNotEmpty) ...[
+                          const SizedBox(height: DealGoSpacing.s6),
+                          Text(
+                            item.description!.trim(),
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: DealGoColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: DealGoSpacing.s12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: FoodPriceText(
+                                key: const Key('food-item-options-price'),
+                                priceVnd: item.priceVnd,
+                                originalPriceVnd: item.originalPriceVnd,
+                                size: 20,
+                              ),
+                            ),
+                            if (item.soldCount > 0)
+                              Text(
+                                l10n.merchantProductsSoldCount(
+                                  '${item.soldCount}',
+                                ),
+                                style: textTheme.bodySmall,
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: DealGoSpacing.s16),
                   if (_groups.isEmpty)
                     FoodNote(
@@ -178,34 +221,45 @@ class _FoodItemOptionsPageState extends State<FoodItemOptionsPage> {
                     DealGoDimensions.pageGutter,
                     DealGoSpacing.s12,
                   ),
-                  child: Row(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
+                      // What is already in the cart, one tap from checkout.
+                      FoodCartBar(
+                        storeId: widget.args.store.id,
+                        offers: widget.args.store.offers,
+                        inline: true,
+                      ),
+                      Row(
                         children: [
-                          Text(
-                            l10n.foodItemOptionsTotal,
-                            style: textTheme.bodySmall,
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                l10n.foodItemOptionsTotal,
+                                style: textTheme.bodySmall,
+                              ),
+                              Text(
+                                formatVnd(_unitPrice),
+                                style: textTheme.titleLarge?.copyWith(
+                                  color: DealGoColors.primary,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
                           ),
-                          Text(
-                            formatVnd(_unitPrice),
-                            style: textTheme.titleLarge?.copyWith(
-                              color: DealGoColors.primary,
-                              fontWeight: FontWeight.w800,
+                          const SizedBox(width: DealGoSpacing.s12),
+                          Expanded(
+                            child: DealGoPrimaryButton(
+                              key: const Key('food-options-add'),
+                              label: l10n.foodItemOptionsAdd,
+                              trailingIcon: DealGoIcons.arrowRight,
+                              enabled: _canAdd,
+                              onPressed: _add,
                             ),
                           ),
                         ],
-                      ),
-                      const SizedBox(width: DealGoSpacing.s12),
-                      Expanded(
-                        child: DealGoPrimaryButton(
-                          key: const Key('food-options-add'),
-                          label: l10n.foodItemOptionsAdd,
-                          trailingIcon: DealGoIcons.arrowRight,
-                          enabled: _canAdd,
-                          onPressed: _add,
-                        ),
                       ),
                     ],
                   ),

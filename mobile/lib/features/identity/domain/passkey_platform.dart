@@ -40,6 +40,9 @@ class FakePasskeyPlatform implements PasskeyPlatform {
   /// Set to simulate a device that cannot (or will not) create the passkey.
   PasskeyFailureKind? registerFailure;
 
+  /// Set to simulate a cancelled or failed system prompt on the next assertions.
+  PasskeyFailureKind? authenticateFailure;
+
   @override
   Future<Map<String, Object?>> register(Map<String, Object?> options) async {
     registerCalls.add(Map<String, Object?>.from(options));
@@ -65,6 +68,10 @@ class FakePasskeyPlatform implements PasskeyPlatform {
     Map<String, Object?> options,
   ) async {
     authenticateCalls.add(Map<String, Object?>.from(options));
+    final failure = authenticateFailure;
+    if (failure != null) {
+      throw PasskeyPlatformException(failure);
+    }
     return {
       'id': credentialId,
       'rawId': credentialId,

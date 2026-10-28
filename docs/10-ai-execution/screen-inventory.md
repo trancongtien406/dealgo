@@ -34,7 +34,7 @@ related:
 
 ## Platform facts that apply to many rows
 
-- **Maps:** `MapPort` — `TileMapPort` (flutter_map; Mapbox raster from `MAPS_API_KEY`, or `MAP_TILE_URL` override) when configured, otherwise `PlaceholderMapView` chrome. With a Mapbox source the user picks a map style (Chuẩn `streets-v12` / Vệ tinh `satellite-streets-v12` / Tối `dark-v11`) from a compact layers button; the choice is saved (`map_style` pref) and applies to every live map, switching only the tile URL (attribution adds © Maxar for satellite). A custom `MAP_TILE_URL` has a single look and shows no switcher. Admin monitor/detail maps read `NEXT_PUBLIC_MAPBOX_TOKEN` only for tiles (no hardcoded token) and fall back to the non-map view (DEC-PROD-031/032); road routes come from Nest `GET /v1/ops/routing/route` (`ROUTING_PROVIDER`, straight line when unconfigured, DEC-PROD-045).
+- **Maps:** `MapPort` — `TileMapPort` (flutter_map; Mapbox raster from the Admin public token in `GET /v1/public/client-config`, then `MAPS_API_KEY`, or `MAP_TILE_URL` override) when configured, otherwise `PlaceholderMapView` chrome. The token is resolved under the launch splash (cached token used at once and refreshed in the background; first launch waits ≤ 3 s), held in `MapPortSource` (a `ValueNotifier`), and every map screen watches it, so a token that arrives or changes later rebuilds open maps. With a Mapbox source the user picks a map style (Chuẩn `streets-v12` / Vệ tinh `satellite-streets-v12` / Tối `dark-v11`) from a compact layers button; the choice is saved (`map_style` pref) and applies to every live map, switching only the tile URL (attribution adds © Maxar for satellite). A custom `MAP_TILE_URL` has a single look and shows no switcher. Admin monitor/detail maps read `NEXT_PUBLIC_MAPBOX_TOKEN` only for tiles (no hardcoded token) and fall back to the non-map view (DEC-PROD-031/032); road routes come from Nest `GET /v1/ops/routing/route` (`ROUTING_PROVIDER`, straight line when unconfigured, DEC-PROD-045).
 - **Live updates:** driver location is **pushed** via Socket.IO `ride-location:`/`food-location:` rooms (REST snapshot only on open/reconnect, DEC-PROD-031); status and offers via `ride:`/`food:` snapshot rooms — no offer polling. Driver GPS cadence follows the server policy per mode (client default before the first reply: 15 s / 50 m / 60 s keep-alive). Markers: pickup dot, dropoff pin, top-down vehicle icon per class rotated by heading (`core/maps/map_markers.dart`).
 - **Payments:** cash only at launch. Platform fees on cash jobs become driver debt (Admin driver detail, `DRIVER_DEBT_LIMIT_VND`); merchants pay commission per closed settlement period (Admin store detail). No card/wallet/payout rails.
 - **Uploads:** KYC/KYB documents are sent as base64 in the partner application and served to Ops via `GET /v1/ops/partner-applications/:id/documents/:index`.
@@ -50,15 +50,15 @@ related:
 | C003 | Tổng quan điểm đón/đến & tuyến | `/customer/ride/route` | LIVE | Server quote (distance/duration) |
 | C004 | Chọn loại phương tiện (Golden) | `/customer/ride/vehicle` | FOLDED | Hot path picks class (MOTORBIKE / CAR_4 / CAR_7) inside C006 fare sheet; standalone route kept (`app_router.dart:344`). MOTORBIKE + CAR catalog (`DG-DEC-VEH-001`); customer must pick `vehicleClassCode`; priced from server quote / class knobs (OPEN-003 Car tariffs still OPEN) |
 | C005 | Chi tiết giá cước / điều kiện | `/customer/ride/fare-detail` | LIVE | From the server quote; prices first if opened without one |
-| C006 | Tự đề xuất giá chuyến | `/customer/ride/fare` | LIVE | Fare bid within server bounds |
+| C006 | Tự đề xuất giá chuyến | `/customer/ride/fare` | LIVE | Fare bid within server bounds; round map back button (`MapBackOverlay`) |
 | C007 | Danh sách tài xế chào giá | `/customer/ride/offers/:rideId` | LIVE | Sort, match/counter chips; empty/expired/taken states |
 | C008 | Chi tiết báo giá và tài xế | `/customer/ride/offers/:rideId/detail` | LIVE | Real driver card (rating, vehicle) |
 | C009 | Xác nhận chuyến & thanh toán | `/customer/ride/confirm/:rideId` | LIVE | `C009__fare_changed`; COD |
-| C010 | Đang tìm tài xế | `/customer/ride/matching/:rideId` | LIVE | Timeout state |
+| C010 | Đang tìm tài xế | `/customer/ride/matching/:rideId` | LIVE | Timeout state; round map back button in every state (`ride-matching-back`, keeps the ride) |
 | C011 | Tài xế đã nhận, đang đến đón | `/customer/ride/tracking/:rideId` | LIVE | Driver location on map; offline state; transaction chat sheet |
 | C012 | Xác thực mã đón khách | `/customer/ride/tracking/:rideId/pickup-code` | LIVE | Server pickup code |
 | C013 | Bản đồ chuyến đang chạy | `/customer/ride/tracking/:rideId` | LIVE | Same route as C011 (IN_TRIP phase) |
-| C014 | Trung tâm an toàn chuyến đi | `/customer/ride/tracking/:rideId/safety` | PARTIAL | Public share link (`/chia-se-chuyen/[token]` on web) + local emergency contacts; **no SOS backend** |
+| C014 | Trung tâm an toàn chuyến đi | `/customer/ride/tracking/:rideId/safety` | PARTIAL | Public share link (`/chia-se-chuyen/[token]` on web) sent via the system share sheet (`share_plus`; falls back to copy; `ride-safety-copy` copies; link reused until <1 min from expiry) + local emergency contacts; **no SOS backend** |
 | C015 | Đổi điểm đến trong chuyến | — | DEFERRED | Needs re-pricing policy for negotiated fares |
 | C016 | Hủy chuyến & chọn lý do | `/customer/ride/cancel/:rideId` | LIVE | No invented cancel fee |
 | C017 | Biên nhận sau chuyến | `/customer/ride/receipt/:rideId` | LIVE | Includes rating card |
@@ -66,14 +66,14 @@ related:
 | C019 | Đặt xe theo lịch | — | DEFERRED | P2 scheduled booking |
 | C020 | Thêm / đổi điểm dừng | — | DEFERRED | P2 multi-stop |
 | C021 | Chi tiết chuyến đặt trước | — | DEFERRED | P2 with C019 |
-| C022 | Khám phá đồ ăn | `/customer/shop` | LIVE | Categories + stores from Nest |
+| C022 | Khám phá đồ ăn | `/customer/shop` | LIVE | Image-only categories + stores from Nest; store cards show rating (count), km, ETA, fee or green "Miễn phí giao", offer pill, min order, featured dish with struck-through original price |
 | C023 | Tìm kiếm quán / món | `/customer/food/search` | LIVE | |
-| C024 | Kết quả danh mục | `/customer/food/category` | LIVE | |
-| C025 | Chi tiết quán & menu | `/customer/food/stores/:storeId` | LIVE | Open/closed/busy from store settings |
-| C026 | Chi tiết món & tùy chọn | `/customer/food/stores/:storeId/items/:itemId` | LIVE | Real option groups/prices (DEC-PROD-033) |
-| C027 | Giỏ hàng | `/customer/food/cart` | LIVE | Lines keyed by options |
+| C024 | Kết quả danh mục | `/customer/food/category?category=<code>` | LIVE | Categories from `GET /v1/public/food-categories` (DEC-PROD-067) |
+| C025 | Chi tiết quán & menu | `/customer/food/stores/:storeId` | LIVE | Open/closed/busy from store settings; hero + logo, address, today's hours, rating/ETA/sold chips, min order, "Khách khen" tags, merchant cover + description, ticket-style offers strip with "Dùng"/"Đã dùng" and "Xem tất cả" sheet, floating cart bar (count, total, shortfall/saving, "Xem giỏ hàng"), pinned tabs, menu section chips, best sellers, "Bán chạy"/"Mới" badges, original price struck through, in-store search (DEC-PROD-068) |
+| C026 | Chi tiết món & tùy chọn | `/customer/food/stores/:storeId/items/:itemId` | LIVE | Real option groups/prices (DEC-PROD-033); cart bar above the add button when the cart has items (DEC-PROD-068) |
+| C027 | Giỏ hàng | `/customer/food/cart` | LIVE | Lines keyed by options; ETA; min-order shortfall blocks checkout (DEC-PROD-068) |
 | C028 | Checkout đơn đồ ăn (Golden) | `/customer/food/checkout` | LIVE | Server pricing, voucher code, COD; offline/repriced/submitting states |
-| C029 | Chọn voucher | `/customer/account/vouchers` + checkout code field | PARTIAL | List from `GET /v1/promotions/available` (FOOD); checkout takes a code — no in-checkout picker sheet |
+| C029 | Chọn voucher | `/customer/account/vouchers` + checkout "Ưu đãi của tôi" sheet | LIVE | List from `GET /v1/promotions/available` (FOOD) plus the store's offers; ticket cards with full conditions, best pick, estimated saving and "Dùng"/"Đã dùng"; code field kept |
 | C030 | Đề xuất phí giao hàng | — | DEFERRED | Food delivery fee is server-priced, no fee bidding |
 | C031 | Báo giá giao của tài xế | — | DEFERRED | With C030 |
 | C032 | Đặt hàng thành công | `/customer/food/order-success` | LIVE | |
@@ -82,7 +82,7 @@ related:
 | C035 | Hủy đơn & chọn lý do | `/customer/food/orders/:orderId/cancel` | LIVE | |
 | C036 | Chi tiết đơn / hóa đơn Food | `/customer/food/orders/:orderId/invoice` | LIVE | Option lines; rating card |
 | C037 | Đánh giá món / quán / giao | `/customer/food/orders/:orderId/invoice` | LIVE | Store stars + driver stars + comment (`RateServiceCard`); no per-dish score |
-| C038 | Xem đánh giá cửa hàng | `/customer/food/stores/:storeId` (Reviews tab) | LIVE | `GET /v1/ratings/stores/:storeId/reviews` + summary in heading |
+| C038 | Xem đánh giá cửa hàng | `/customer/food/stores/:storeId` (Reviews tab) | LIVE | `GET /v1/ratings/stores/:storeId/reviews` paged, star filter, 1–5 distribution, merchant replies (DEC-PROD-068) |
 | C039 | Quán / món yêu thích | — | DEFERRED | P1 |
 | C040 | Hình thức giao (tiết kiệm/nhanh/hẹn) | — | DEFERRED | Needs delivery-tier policy |
 | C041 | Đơn đặt trước Food | — | DEFERRED | P2 |
@@ -94,7 +94,7 @@ related:
 | C047 | Chi tiết hoàn tiền | — | DEFERRED | COD only — no customer-side refunds yet; Ops sees `/refunds` |
 | C048 | Danh sách đơn/chuyến đặt trước | — | DEFERRED | P2 |
 
-**Customer:** LIVE 31 · PARTIAL 3 · FOLDED 1 · DEFERRED 13 · MISSING 0.
+**Customer:** LIVE 31 · PARTIAL 2 · FOLDED 2 · DEFERRED 13 · MISSING 0.
 
 ---
 
@@ -168,7 +168,7 @@ related:
 | M010 | Kiểm tra & gửi duyệt | `/merchant/kyb/steps` | LIVE | |
 | M011 | Trạng thái duyệt | `/merchant/kyb/status` | LIVE | |
 | M012 | Bổ sung / nộp lại | `/merchant/kyb/rejected` | LIVE | |
-| M013 | Dashboard Shop (Golden) | `/merchant` | LIVE | Queue + today stats |
+| M013 | Dashboard Shop (Golden) | `/merchant` | LIVE | Store logo + rating, queue with item thumbnails, today stats with icons |
 | M014 | Chọn cửa hàng / chi nhánh | — | DEFERRED | P1 multi-branch |
 | M015 | Hàng đợi đơn (Golden) | `/merchant/orders` | LIVE | Empty/error states |
 | M016 | Chi tiết đơn & xác nhận | `/merchant/orders/:orderId` | LIVE | Accept/reject, option lines; conflict state |
@@ -181,12 +181,12 @@ related:
 | M023 | Giờ hoạt động / lịch nghỉ | `/merchant/settings/hours` | LIVE | DEC-PROD-027 |
 | M024 | Chế độ bận / tạm ngưng | `/merchant/settings/busy` | LIVE | DEC-PROD-026/028 |
 | M025 | Danh mục menu | `/merchant/products/categories` | LIVE | CRUD + DnD reorder (DEC-PROD-040) + search filter (DEC-PROD-042) |
-| M026 | Danh sách sản phẩm / menu | `/merchant/products` | LIVE | Search + filter tabs All/On sale/Hidden + soldCount (DEC-PROD-042) |
-| M027 | Tạo / sửa món | `/merchant/products/:itemId/edit` | LIVE | Edit fields (039); photo upload (040); gallery up to MENU_ITEM_MAX_IMAGES + draft/hidden badge + soldCount (042) |
+| M026 | Danh sách sản phẩm / menu | `/merchant/products` | LIVE | Search + filter tabs All/On sale/Hidden + soldCount (DEC-PROD-042); price with struck-through original price |
+| M027 | Tạo / sửa món | `/merchant/products/:itemId/edit` | LIVE | Edit fields (039) incl. original price (068); photo upload (040); gallery up to MENU_ITEM_MAX_IMAGES + draft/hidden badge + soldCount (042) |
 | M028 | Biến thể / size / topping | `/merchant/products/:itemId/variants` | LIVE | Real option groups (DEC-PROD-033) |
 | M029 | Tồn kho còn/hết | `/merchant/products` | LIVE | Availability toggle (no stock counts by design) |
-| M030 | Hồ sơ Shop | `/merchant/account`, `/merchant/settings/profile`, `/merchant/settings/location` | LIVE | Store name + logo upload/remove (DEC-PROD-045); store pickup location (DEC-PROD-044) |
-| M031 | Đánh giá & phản hồi | `/merchant/stats` | PARTIAL | Rating average in stats; no review list / reply |
+| M030 | Hồ sơ Shop | `/merchant/account`, `/merchant/settings/profile`, `/merchant/settings/location` | LIVE | Store name + logo upload/remove (DEC-PROD-045); cover photo upload/remove and description (DEC-PROD-068); store category picker (DEC-PROD-067); minimum order (DEC-PROD-068); store pickup location (DEC-PROD-044) |
+| M031 | Đánh giá & phản hồi | `/merchant/reviews` | LIVE | Review list + public reply / remove reply (DEC-PROD-068) |
 | M032 | Khu vực phục vụ & pickup | — | DEFERRED | Pickup point from KYB; service radius is platform-wide |
 | M033 | Doanh thu & đơn hoàn tất | `/merchant/stats` | LIVE | Real stats |
 | M034 | Số dư & công nợ | — | DEFERRED | Partner wallet |
@@ -195,8 +195,8 @@ related:
 | M037 | Ngân hàng & rút | — | DEFERRED | Wallet |
 | M038 | Rút tiền & lịch sử | — | DEFERRED | Wallet |
 | M039 | Báo cáo bán hàng | `/merchant/stats` | PARTIAL | Same as M033; no export |
-| M040 | Chiến dịch khuyến mãi Shop | — | DEFERRED | Promotions are Ops-run (A029) |
-| M041 | Tạo / sửa khuyến mãi Shop | — | DEFERRED | With M040 |
+| M040 | Chiến dịch khuyến mãi Shop | `/merchant/offers` | LIVE | Store offers as ticket cards: conditions, usage, dates, pause/resume/end (DEC-PROD-068) |
+| M041 | Tạo / sửa khuyến mãi Shop | `/merchant/offers/new` | LIVE | Create percent / fixed offer; no edit after create (DEC-PROD-068) |
 | M042 | Nhân viên & cấp quyền | — | DEFERRED | Multi-staff |
 | M043 | Mời / sửa quyền nhân viên | — | DEFERRED | Multi-staff |
 | M044 | Cập nhật giấy tờ hết hạn | — | DEFERRED | Same as D015 |
@@ -240,7 +240,7 @@ All pages read Nest through the `/api/ops/*` BFF; none renders fixtures.
 | A027 | Khiếu nại / tranh chấp | `/disputes` | LIVE | |
 | A028 | Chi tiết xử lý khiếu nại | `/disputes/[code]` | LIVE | Resolve |
 | A029 | Quản lý khuyến mãi | `/promotions` | LIVE | Create + status |
-| A030 | Quản lý danh mục | `/catalog` | LIVE | Rename store categories (DEC-PROD-039) |
+| A030 | Quản lý danh mục | `/catalog` | LIVE | Food store categories CRUD: image/icon, drag reorder, active toggle, auto code (DEC-PROD-067) |
 | A031 | Thông báo & CMS | `/notifications`, `/settings/content` | LIVE | Campaign submit → approve/reject → cancel (DEC-PROD-044), CMS items |
 | A032 | Thống kê & phân tích | `/reports` | PARTIAL | From overview metrics; no BI/export |
 | A033 | Khu vực & quy tắc giá | `/zones` | PARTIAL | Zones CRUD; pricing rules read-only |

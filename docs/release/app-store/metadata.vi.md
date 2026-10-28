@@ -31,8 +31,8 @@ AN TOÀN & QUYỀN RIÊNG TƯ
 Thanh toán: tiền mặt khi hoàn tất chuyến/nhận hàng.
 Khu vực hoạt động hiện tại: Đà Nẵng (ASSUMED).
 
-- **URL hỗ trợ:** https://dealgo.vn/support (ASSUMED domain; route `/support` VERIFIED có trong website)
-- **URL chính sách quyền riêng tư:** https://dealgo.vn/privacy (route VERIFIED; domain ASSUMED)
-- **URL marketing:** https://dealgo.vn
+- **URL hỗ trợ:** https://dealgo.trancongtien.com/support (ASSUMED domain; route `/support` VERIFIED có trong website)
+- **URL chính sách quyền riêng tư:** https://dealgo.trancongtien.com/privacy (route VERIFIED; domain ASSUMED)
+- **URL marketing:** https://dealgo.trancongtien.com
 - **Bản quyền:** © 2026 DealGo (ASSUMED tên pháp nhân)
 - **Có gì mới (1.0):** Phát hành đầu tiên: đặt xe trả giá, gọi món, theo dõi thời gian thực, ứng dụng cho tài xế và cửa hàng.

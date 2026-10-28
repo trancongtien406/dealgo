@@ -6,7 +6,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../home_banner/presentation/home_banner_carousel.dart';
 import '../../identity/domain/entities/app_role.dart';
 import 'customer_home_widgets.dart';
-import 'customer_tab_bar.dart';
+import '../../../core/design_system/components/dealgo_nav_insets.dart';
 
 class CustomerHomePage extends StatefulWidget {
   const CustomerHomePage({super.key});
@@ -32,14 +32,17 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      bottom: dealGoSafeAreaBottom(context),
+      bottom: false,
       child: ListView(
         controller: _scroll,
-        padding: EdgeInsets.fromLTRB(
-          DealGoDimensions.pageGutter,
-          DealGoSpacing.s8,
-          DealGoDimensions.pageGutter,
-          customerShellBottomClearance(context),
+        padding: dealGoScrollPadding(
+          context,
+          const EdgeInsets.fromLTRB(
+            DealGoDimensions.pageGutter,
+            DealGoSpacing.s8,
+            DealGoDimensions.pageGutter,
+            DealGoSpacing.s16,
+          ),
         ),
         children: [
           const HomeHeader(),

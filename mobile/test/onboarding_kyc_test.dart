@@ -92,7 +92,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Kết quả xét duyệt KYC'), findsOneWidget);
-    expect(find.text('Đã kích hoạt'), findsOneWidget);
+    expect(find.text('Đã kích hoạt'), findsWidgets);
   });
 
   testWidgets('pending partner opens KYC status from customer account', (

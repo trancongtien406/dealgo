@@ -74,7 +74,7 @@ class _JobCustomerNameState extends State<JobCustomerName> {
         Text(
           _name ?? l10n.driverPassenger,
           key: const Key('job-customer-name'),
-          maxLines: 1,
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: textTheme.titleMedium,
         ),

@@ -20,6 +20,7 @@ import '../../domain/merchant_stats.dart';
 import '../../domain/usecases/get_merchant_catalog.dart';
 import '../cubit/merchant_stats_cubit.dart';
 import '../widgets/merchant_widgets.dart';
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 
 class MerchantStatsPage extends StatefulWidget {
   const MerchantStatsPage({super.key});
@@ -67,7 +68,7 @@ class _MerchantStatsPageState extends State<MerchantStatsPage> {
           body: switch (state) {
             MerchantStatsLoading() => const DealGoSkeletonList(itemCount: 3),
             MerchantStatsIneligible() => ListView(
-              padding: merchantPagePadding,
+              padding: dealGoScrollPadding(context, merchantPagePadding),
               children: [
                 MerchantNote(
                   tone: MerchantNoteTone.warning,
@@ -124,7 +125,7 @@ class _StatsBody extends StatelessWidget {
       (max, day) => day.deliveredCount > max ? day.deliveredCount : max,
     );
     return ListView(
-      padding: merchantPagePadding,
+      padding: dealGoScrollPadding(context, merchantPagePadding),
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         if (state.store != null) ...[
@@ -256,11 +257,6 @@ class _StatsBody extends StatelessWidget {
         ),
         const SizedBox(height: DealGoSpacing.s12),
         _StoreReviews(state: state),
-        const SizedBox(height: DealGoSpacing.s12),
-        MerchantNote(
-          tone: MerchantNoteTone.green,
-          message: l10n.merchantStatsNote,
-        ),
       ],
     );
   }
@@ -430,7 +426,7 @@ class _ReviewSummary extends StatelessWidget {
           );
     return Row(
       children: [
-        const Icon(DealGoIcons.star, color: DealGoColors.amber, size: 18),
+        const Icon(DealGoIcons.starFilled, color: DealGoColors.amber, size: 18),
         const SizedBox(width: DealGoSpacing.s8),
         Expanded(
           child: Text(
@@ -460,7 +456,7 @@ class _ReviewRow extends StatelessWidget {
           children: [
             for (var i = 0; i < 5; i++)
               Icon(
-                DealGoIcons.star,
+                DealGoIcons.starFilled,
                 size: 14,
                 color: i < review.stars
                     ? DealGoColors.amber

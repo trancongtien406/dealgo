@@ -147,8 +147,6 @@ class EmptyOffers extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: DealGoSpacing.s12),
-              RideNote(message: AppLocalizations.of(context).rideNoOffersHint),
               if (offline) ...[
                 const SizedBox(height: DealGoSpacing.s12),
                 RideOfflineNotice(
@@ -221,7 +219,6 @@ class ExpiredRide extends StatelessWidget {
       badge: AppLocalizations.of(context).rideQuoteExpiredBadge,
       quoteLabel: AppLocalizations.of(context).rideOldFare,
       quoteAmount: formatRideVnd(ride.offeredFareVnd),
-      note: AppLocalizations.of(context).rideQuoteExpiredNote,
       onBack: onBack,
       secondaryLabel: AppLocalizations.of(context).rideChangeOffer,
       primaryLabel: AppLocalizations.of(context).rideFindNewOffers,
@@ -262,7 +259,6 @@ class BlockedOffers extends StatelessWidget {
         badge: AppLocalizations.of(context).rideOfferUnavailable,
         quoteLabel: AppLocalizations.of(context).ridePreviousOffer,
         quoteAmount: formatRideVnd(amount),
-        note: AppLocalizations.of(context).rideOfferTakenNote,
         onBack: onBack,
         secondaryLabel: AppLocalizations.of(context).rideRefreshList,
         primaryLabel: AppLocalizations.of(context).rideSeeOtherDrivers,
@@ -280,7 +276,6 @@ class BlockedOffers extends StatelessWidget {
       badge: AppLocalizations.of(context).rideQuoteExpiredBadge,
       quoteLabel: AppLocalizations.of(context).rideOldFare,
       quoteAmount: formatRideVnd(amount),
-      note: AppLocalizations.of(context).rideQuoteExpiredNote,
       onBack: onBack,
       secondaryLabel: AppLocalizations.of(context).rideChangeOffer,
       primaryLabel: AppLocalizations.of(context).rideFindNewOffers,
@@ -301,7 +296,6 @@ class _QuoteState extends StatelessWidget {
     required this.badge,
     required this.quoteLabel,
     required this.quoteAmount,
-    required this.note,
     required this.onBack,
     required this.secondaryLabel,
     required this.primaryLabel,
@@ -320,7 +314,6 @@ class _QuoteState extends StatelessWidget {
   final String badge;
   final String quoteLabel;
   final String quoteAmount;
-  final String note;
   final VoidCallback onBack;
   final String secondaryLabel;
   final String primaryLabel;
@@ -391,8 +384,6 @@ class _QuoteState extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: DealGoSpacing.s12),
-              RideNote(message: note),
             ],
           ),
         ),
@@ -635,13 +626,6 @@ class OfferList extends StatelessWidget {
                           emphasize: true,
                         ),
                       ],
-                      const SizedBox(height: DealGoSpacing.s8),
-                      Text(
-                        l10n.rideVoucherNote,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: DealGoColors.textSecondary,
-                        ),
-                      ),
                     ],
                   ),
                 ),

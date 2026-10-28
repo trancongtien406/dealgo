@@ -4,6 +4,7 @@ import { RatingService } from './rating.service.js';
 
 const RIDE = '00000000-0000-4000-8000-0000000000a1';
 const ORDER = '00000000-0000-4000-8000-0000000000b1';
+const MERCHANT_STORE = '00000000-0000-4000-8000-00000000eeee';
 
 function setup(
   overrides: {
@@ -30,6 +31,8 @@ function setup(
     ),
   };
   const food = {
+    merchantStoreId: vi.fn(async () => MERCHANT_STORE),
+    storeNames: vi.fn(async (ids: string[]) => new Map(ids.map((id) => [id, `Quán ${id.slice(-4)}`]))),
     ratingSubject: vi.fn(async (id: string) =>
       id === ORDER
         ? {
@@ -178,9 +181,9 @@ describe('RatingService', () => {
 
     const out = await service.storeSummaries([STORE_A, STORE_B, STORE_C, STORE_A]);
     expect(out).toEqual([
-      { storeId: STORE_A, count: 3, average: 4.3 },
-      { storeId: STORE_B, count: 1, average: null },
-      { storeId: STORE_C, count: 0, average: null },
+      { storeId: STORE_A, count: 3, average: 4.3, distribution: [0, 0, 0, 2, 1] },
+      { storeId: STORE_B, count: 1, average: null, distribution: null },
+      { storeId: STORE_C, count: 0, average: null, distribution: null },
     ]);
   });
 
@@ -202,13 +205,111 @@ describe('RatingService', () => {
     await rate(5, 1, 'Ngon');
     await rate(4, 2, null);
     const hidden = await service.storeReviews(STORE);
-    expect(hidden).toEqual({ summary: { storeId: STORE, count: 2, average: null }, items: [] });
+    expect(hidden).toEqual({
+      summary: { storeId: STORE, count: 2, average: null, distribution: null },
+      items: [],
+      page: 1,
+      hasMore: false,
+    });
 
     await rate(3, 3, 'Hơi mặn');
     const shown = await service.storeReviews(STORE);
-    expect(shown.summary).toEqual({ storeId: STORE, count: 3, average: 4 });
+    expect(shown.summary).toEqual({
+      storeId: STORE,
+      count: 3,
+      average: 4,
+      distribution: [0, 0, 1, 1, 1],
+    });
     expect(shown.items).toHaveLength(3);
     expect(shown.items[0]).not.toHaveProperty('raterId');
     expect(new Set(shown.items.map((i) => i.comment))).toEqual(new Set(['Hơi mặn', 'Ngon', null]));
+  });
+
+  describe('store review reply and moderation', () => {
+    async function seed(ratings: MemoryRatingRepository, storeId: string, stars: number[]) {
+      const rows = [];
+      for (const [i, value] of stars.entries()) {
+        rows.push(
+          await ratings.create({
+            subjectType: 'FOOD_ORDER',
+            subjectId: `00000000-0000-4000-8000-${String(500 + i).padStart(12, '0')}`,
+            raterId: `cust-${i}`,
+            driverId: null,
+            storeId,
+            driverStars: null,
+            storeStars: value,
+            tags: [],
+            comment: value <= 2 ? 'Món nguội' : 'Ngon',
+          }),
+        );
+      }
+      return rows;
+    }
+
+    it('lets the merchant reply to its own review and shows the reply publicly', async () => {
+      const { service, ratings } = setup();
+      const [first] = await seed(ratings, MERCHANT_STORE, [5, 4, 2]);
+      const replied = await service.replyAsMerchant({ userId: 'merchant' } as never, first.id, '  Cảm ơn bạn!  ');
+      expect(replied.merchantReply).toBe('Cảm ơn bạn!');
+      expect(replied.repliedAt).not.toBeNull();
+
+      const pub = await service.storeReviews(MERCHANT_STORE);
+      expect(pub.items.find((item) => item.id === first.id)?.merchantReply).toBe('Cảm ơn bạn!');
+
+      const cleared = await service.replyAsMerchant({ userId: 'merchant' } as never, first.id, '   ');
+      expect(cleared.merchantReply).toBeNull();
+      expect(cleared.repliedAt).toBeNull();
+    });
+
+    it('refuses a reply to another store review', async () => {
+      const { service, ratings } = setup();
+      const [other] = await seed(ratings, '00000000-0000-4000-8000-00000000ffff', [5]);
+      await expect(
+        service.replyAsMerchant({ userId: 'merchant' } as never, other.id, 'Hi'),
+      ).rejects.toMatchObject({ status: 404 });
+    });
+
+    it('hides a review from the public list and the average, with an audit, and can show it again', async () => {
+      const { service, ratings } = setup();
+      const rows = await seed(ratings, MERCHANT_STORE, [5, 5, 5, 1]);
+      const low = rows[3];
+      const before = await service.storeSummaries([MERCHANT_STORE]);
+      expect(before[0].average).toBe(4);
+
+      const hidden = await service.setHidden('ops-1', low.id, true, 'Ngôn từ xúc phạm');
+      expect(hidden).toMatchObject({ hidden: true, hiddenReason: 'Ngôn từ xúc phạm', storeName: 'Quán eeee' });
+      expect(ratings.audits.at(-1)).toMatchObject({ hidden: true, entityId: low.id, actorUserId: 'ops-1' });
+
+      const after = await service.storeReviews(MERCHANT_STORE);
+      expect(after.summary).toMatchObject({ count: 3, average: 5 });
+      expect(after.items.map((item) => item.id)).not.toContain(low.id);
+
+      const merchant = await service.merchantReviews({ userId: 'merchant' } as never);
+      expect(merchant.items.find((item) => item.id === low.id)?.hidden).toBe(true);
+
+      const ops = await service.opsReviews({ visibility: 'HIDDEN' });
+      expect(ops.items.map((item) => item.id)).toEqual([low.id]);
+
+      await service.setHidden('ops-1', low.id, false, 'Khiếu nại hợp lệ');
+      expect(ratings.audits.at(-1)).toMatchObject({ hidden: false });
+      expect((await service.storeSummaries([MERCHANT_STORE]))[0].count).toBe(4);
+    });
+
+    it('pages and filters public reviews by stars', async () => {
+      const { service, ratings } = setup();
+      await seed(ratings, MERCHANT_STORE, [5, 4, 4, 2]);
+      const fours = await service.storeReviews(MERCHANT_STORE, { stars: 4 });
+      expect(fours.items).toHaveLength(2);
+      expect(fours.items.every((item) => item.stars === 4)).toBe(true);
+      expect(fours.hasMore).toBe(false);
+    });
+
+    it('filters ops reviews by max stars and folded text', async () => {
+      const { service, ratings } = setup();
+      await seed(ratings, MERCHANT_STORE, [5, 2, 1]);
+      const low = await service.opsReviews({ maxStars: 2, q: 'mon nguoi' });
+      expect(low.total).toBe(2);
+      expect(low.items.every((item) => item.stars <= 2)).toBe(true);
+    });
   });
 });

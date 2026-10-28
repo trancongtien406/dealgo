@@ -156,6 +156,22 @@ class DealGoStateView extends StatelessWidget {
   final VoidCallback? onSecondary;
   final bool compact;
 
+  bool get _hasPrimary => actionLabel != null && onAction != null;
+  bool get _hasSecondary => secondaryLabel != null && onSecondary != null;
+
+  Widget _primaryButton() => DealGoPrimaryButton(
+    key: const Key('state-view-action'),
+    label: actionLabel!,
+    onPressed: onAction!,
+    leadingIcon:
+        art == DealGoStateArt.serverError || art == DealGoStateArt.offline
+        ? DealGoIcons.refresh
+        : null,
+  );
+
+  Widget _secondaryButton() =>
+      DealGoSecondaryButton(label: secondaryLabel!, onPressed: onSecondary!);
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -194,30 +210,23 @@ class DealGoStateView extends StatelessWidget {
             ),
           ),
         ],
-        if (actionLabel != null && onAction != null) ...[
+        if (_hasPrimary || _hasSecondary) ...[
           SizedBox(height: compact ? DealGoSpacing.s16 : DealGoSpacing.s24),
           ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 180, maxWidth: 320),
-            child: DealGoPrimaryButton(
-              key: const Key('state-view-action'),
-              label: actionLabel!,
-              onPressed: onAction!,
-              leadingIcon:
-                  art == DealGoStateArt.serverError ||
-                      art == DealGoStateArt.offline
-                  ? DealGoIcons.refresh
-                  : null,
-            ),
-          ),
-        ],
-        if (secondaryLabel != null && onSecondary != null) ...[
-          const SizedBox(height: DealGoSpacing.s12),
-          ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 180, maxWidth: 320),
-            child: DealGoSecondaryButton(
-              label: secondaryLabel!,
-              onPressed: onSecondary!,
-            ),
+            constraints: const BoxConstraints(minWidth: 180, maxWidth: 360),
+            child: _hasPrimary && _hasSecondary
+                // Side by side so two actions never stack into a column.
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(child: _secondaryButton()),
+                      const SizedBox(width: DealGoSpacing.s8),
+                      Flexible(child: _primaryButton()),
+                    ],
+                  )
+                : _hasPrimary
+                ? _primaryButton()
+                : _secondaryButton(),
           ),
         ],
       ],

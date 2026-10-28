@@ -38,6 +38,10 @@ export const OPS_PERMISSIONS = [
   'chat.review',
   /** DEC-PROD-055: edit and publish public pages (privacy, terms, support…). */
   'content.write',
+  /** Admin › Lỗi hệ thống: read Sentry issues through the server-side proxy. */
+  'errors.read',
+  /** Resolve / ignore Sentry issues (only when the stored token has event:write). */
+  'errors.write',
 ] as const;
 
 export type OpsPermission = (typeof OPS_PERMISSIONS)[number];

@@ -31,7 +31,7 @@ import {
   SMS_SENDER,
 } from './identity.constants.js';
 import { MemoryIdentityRepository, type IdentityRepository } from './identity.repository.js';
-import { createMailSender, type MailSender } from '../../integrations/email/index.js';
+import { DynamicMailSender, EmailDeliveryModule } from '../../integrations/email/index.js';
 import { MeController } from './me.controller.js';
 import { OpsAuthService } from './ops-auth.service.js';
 import { OpsCustomersController } from './ops-customers.controller.js';
@@ -56,7 +56,7 @@ import { createSmsSender, type SmsSender } from '../../integrations/sms/index.js
 
 @Module({
   // forwardRef: PlatformSettingsModule imports this module for its ops guards.
-  imports: [PrismaModule, forwardRef(() => PlatformSettingsModule)],
+  imports: [PrismaModule, EmailDeliveryModule, forwardRef(() => PlatformSettingsModule)],
   controllers: [
     AuthController,
     OpsSessionsController,
@@ -93,11 +93,8 @@ import { createSmsSender, type SmsSender } from '../../integrations/sms/index.js
       useFactory: (config: ConfigService<AppEnv, true>): SmsSender =>
         createSmsSender(appEnvFrom(config), Math.round(PHONE_CHALLENGE_TTL_MS / 60_000)),
     },
-    {
-      provide: MAIL_SENDER,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService<AppEnv, true>): MailSender => createMailSender(appEnvFrom(config)),
-    },
+    // Transport resolved per send from Admin › Email (DB) over env; tests override this token.
+    { provide: MAIL_SENDER, useExisting: DynamicMailSender },
     {
       provide: DRIVER_PRESENCE_REPOSITORY,
       inject: [PrismaService, ConfigService],
@@ -173,6 +170,7 @@ import { createSmsSender, type SmsSender } from '../../integrations/sms/index.js
     DriverPresenceService,
     DriverLocationEvents,
     AuthMethodPolicyService,
+    PasskeyService,
   ],
 })
 export class IdentityModule {}

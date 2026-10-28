@@ -8,7 +8,11 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { type RequestWithId, readOrCreateRequestId, REQUEST_ID_HEADER } from './request-id.js';
+import {
+  type RequestWithId,
+  readOrCreateRequestId,
+  REQUEST_ID_HEADER,
+} from './request-id.js';
 import { captureServerError } from '../observability/sentry.js';
 
 type ErrorBody = {
@@ -44,7 +48,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = http.getResponse<Response>();
     const request = http.getRequest<RequestWithId>();
     const requestId =
-      request.requestId ?? readOrCreateRequestId(request.headers?.[REQUEST_ID_HEADER]);
+      request.requestId ??
+      readOrCreateRequestId(request.headers?.[REQUEST_ID_HEADER]);
     request.requestId = requestId;
     response.setHeader(REQUEST_ID_HEADER, requestId);
     const body = this.toErrorBody(
@@ -53,10 +58,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
       requestId,
     );
 
-    if (!(exception instanceof HttpException) && readBodyParserStatus(exception) === null) {
+    if (
+      !(exception instanceof HttpException) &&
+      readBodyParserStatus(exception) === null
+    ) {
       if (exception instanceof Error) {
         const sanitizedMessage = sanitizeLogMessage(exception.message);
-        const sanitizedStack = exception.stack ? sanitizeLogMessage(exception.stack) : undefined;
+        const sanitizedStack = exception.stack
+          ? sanitizeLogMessage(exception.stack)
+          : undefined;
         this.logger.error(
           `Unhandled exception: ${exception.name}: ${sanitizedMessage}`,
           sanitizedStack,
@@ -67,12 +77,20 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     if (body.statusCode >= 500) {
-      captureServerError(exception, { requestId, path: request.originalUrl || request.url });
+      captureServerError(exception, {
+        requestId,
+        path: request.originalUrl || request.url,
+        userId: (request as { actor?: { userId?: string } }).actor?.userId,
+      });
     }
     response.status(body.statusCode).json(body);
   }
 
-  private toErrorBody(exception: unknown, path: string, requestId: string): ErrorBody {
+  private toErrorBody(
+    exception: unknown,
+    path: string,
+    requestId: string,
+  ): ErrorBody {
     const timestamp = new Date().toISOString();
 
     if (exception instanceof HttpException) {
@@ -140,16 +158,25 @@ function readHttpException(
     return { message, errorCode };
   }
 
-  return { message: exception.message, errorCode: errorCodeForStatus(statusCode) };
+  return {
+    message: exception.message,
+    errorCode: errorCodeForStatus(statusCode),
+  };
 }
 
-function readDetails(exception: HttpException): Record<string, unknown> | undefined {
+function readDetails(
+  exception: HttpException,
+): Record<string, unknown> | undefined {
   const response = exception.getResponse();
   if (typeof response !== 'object' || response === null) {
     return undefined;
   }
   const details = (response as { details?: unknown }).details;
-  if (typeof details !== 'object' || details === null || Array.isArray(details)) {
+  if (
+    typeof details !== 'object' ||
+    details === null ||
+    Array.isArray(details)
+  ) {
     return undefined;
   }
   return details as Record<string, unknown>;
@@ -160,7 +187,9 @@ function normalizeMessage(message: unknown, fallback: string): string {
     return message;
   }
   if (Array.isArray(message)) {
-    const parts = message.filter((part): part is string => typeof part === 'string' && part !== '');
+    const parts = message.filter(
+      (part): part is string => typeof part === 'string' && part !== '',
+    );
     if (parts.length > 0) {
       return parts.join('; ');
     }
@@ -176,7 +205,11 @@ function readBodyParserStatus(exception: unknown): number | null {
   if (!(exception instanceof Error)) {
     return null;
   }
-  const candidate = exception as Error & { expose?: unknown; status?: unknown; type?: unknown };
+  const candidate = exception as Error & {
+    expose?: unknown;
+    status?: unknown;
+    type?: unknown;
+  };
   if (
     candidate.expose === true &&
     typeof candidate.type === 'string' &&
@@ -199,7 +232,8 @@ function errorCodeForStatus(statusCode: number): string {
 const SENSITIVE_KEY_VALUE_REGEX =
   /(?:password|passwd|pwd|secret|token|access_key|secret_key|api_key|authorization)\s*[:=]\s*(?:'[^']*'|"[^"]*"|[^\s,;&]+)/gi;
 const BEARER_REGEX = /bearer\s+[a-zA-Z0-9_\-.]+/gi;
-const URI_CREDENTIALS_REGEX = /((?:postgres|postgresql|mysql|mongodb|redis|amqp|smtp|https?):\/\/[^:\s]+:)[^@\s]+(@)/gi;
+const URI_CREDENTIALS_REGEX =
+  /((?:postgres|postgresql|mysql|mongodb|redis|amqp|smtp|https?):\/\/[^:\s]+:)[^@\s]+(@)/gi;
 
 export function sanitizeLogMessage(input: string): string {
   return input
@@ -208,7 +242,10 @@ export function sanitizeLogMessage(input: string): string {
       if (!separatorMatch || separatorMatch.index === undefined) {
         return '[REDACTED]';
       }
-      const prefix = match.slice(0, separatorMatch.index + separatorMatch[0].length);
+      const prefix = match.slice(
+        0,
+        separatorMatch.index + separatorMatch[0].length,
+      );
       return `${prefix}[REDACTED]`;
     })
     .replace(BEARER_REGEX, 'bearer [REDACTED]')

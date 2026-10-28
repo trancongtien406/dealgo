@@ -8,6 +8,7 @@ import '../config/api_base_url.dart';
 import 'api_envelope.dart';
 import 'api_exception.dart';
 import 'api_paths.dart';
+import 'dio_error_reporter.dart';
 import 'dio_log.dart';
 import 'dio_mapper.dart';
 
@@ -75,6 +76,8 @@ Dio createDealGoDio({
     onUnauthorized: onUnauthorized,
   );
   dio.interceptors.add(auth);
+  // After auth: a 401 that refresh recovers never reaches the reporter.
+  dio.interceptors.add(DioErrorReporter());
   sessionRefresher?._impl = auth._refreshSingleFlight;
   return dio;
 }

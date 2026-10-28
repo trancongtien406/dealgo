@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { ProviderHttpError, providerHttp, safeJson, type FetchLike } from '../http/provider-http.js';
 import { signSigV4 } from './aws-sigv4.js';
+import { MailDeliveryError } from './mail-sender.js';
 import { redactEmail, TemplatedMailSender, type RenderedMail } from './mail-templates.js';
 
 export type SesConfig = {
@@ -14,19 +15,6 @@ export type SesConfig = {
   /** Override for tests / VPC endpoints. */
   endpoint?: string;
 };
-
-export type MailFailureReason = 'auth_failed' | 'rejected' | 'rate_limited' | 'provider_unavailable';
-
-export class MailDeliveryError extends Error {
-  constructor(
-    readonly reason: MailFailureReason,
-    readonly provider: string,
-    readonly providerCode?: string,
-  ) {
-    super(`Email ${provider} failed: ${reason}${providerCode ? ` (${providerCode})` : ''}`);
-    this.name = 'MailDeliveryError';
-  }
-}
 
 /**
  * Amazon SES v2 HTTPS API adapter (DEC-PROD-051). POST /v2/email/outbound-emails, SigV4 "ses".
@@ -51,7 +39,10 @@ export class SesMailSender extends TemplatedMailSender {
       Content: {
         Simple: {
           Subject: { Data: mail.subject, Charset: 'UTF-8' },
-          Body: { Text: { Data: mail.text, Charset: 'UTF-8' } },
+          Body: {
+            Text: { Data: mail.text, Charset: 'UTF-8' },
+            ...(mail.html ? { Html: { Data: mail.html, Charset: 'UTF-8' } } : {}),
+          },
         },
       },
       ...(this.config.configurationSet ? { ConfigurationSetName: this.config.configurationSet } : {}),
@@ -78,7 +69,7 @@ export class SesMailSender extends TemplatedMailSender {
           headers,
           body,
           timeoutMs: this.config.timeoutMs,
-          maxAttempts: this.config.maxAttempts ?? 2,
+          maxAttempts: this.config.maxAttempts ?? 3,
         },
         this.fetchImpl,
       );

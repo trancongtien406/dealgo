@@ -27,6 +27,7 @@ import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/format/short_ref.dart';
 import '../../../../core/l10n/api_error_text.dart';
 import '../../../../core/network/request_failure.dart';
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 
 class DriverJobsPage extends StatefulWidget {
   const DriverJobsPage({super.key});
@@ -111,7 +112,10 @@ class _JobsOffline extends StatelessWidget {
       title: l10n.driverOpenRequests,
       showBack: false,
       body: ListView(
-        padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
+        padding: dealGoScrollPadding(
+          context,
+          const EdgeInsets.all(DealGoDimensions.pageGutter),
+        ),
         children: [
           DriverHero(
             icon: DealGoIcons.bolt,
@@ -164,11 +168,14 @@ class _JobsOnline extends StatelessWidget {
               ),
             ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          DealGoDimensions.pageGutter,
-          DealGoSpacing.s8,
-          DealGoDimensions.pageGutter,
-          DealGoSpacing.s16,
+        padding: dealGoScrollPadding(
+          context,
+          const EdgeInsets.fromLTRB(
+            DealGoDimensions.pageGutter,
+            DealGoSpacing.s8,
+            DealGoDimensions.pageGutter,
+            DealGoSpacing.s16,
+          ),
         ),
         children: [
           DriverPanel(
@@ -248,11 +255,6 @@ class _JobsOnline extends StatelessWidget {
               const SizedBox(height: DealGoSpacing.s12),
             ],
           ],
-          DriverNote(
-            tone: DriverNoteTone.green,
-            message: l10n.driverOneJobNote,
-          ),
-          const SizedBox(height: DealGoSpacing.s16),
           Text(
             AppLocalizations.of(context).driverJobsHistorySection,
             style: textTheme.titleMedium,
@@ -300,36 +302,42 @@ class _RideJobCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            // Ref and chips share one line when they fit and wrap on narrow
+            // phones; the ref never breaks mid-word or shrinks to nothing.
+            Wrap(
+              spacing: DealGoSpacing.s8,
+              runSpacing: DealGoSpacing.s8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                if (photo != null) ...[
-                  RideVehicleClassPhoto(
-                    imageUrl: ride.imageUrl,
-                    code: ride.vehicleClassCode,
-                    size: 32,
-                  ),
-                  const SizedBox(width: DealGoSpacing.s8),
-                ],
-                // One line: next to two chips on a narrow phone the ref
-                // ("Chuyến #1573") used to break mid-word; shrink instead.
-                Expanded(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: AlignmentDirectional.centerStart,
-                    child: Text(
-                      l10n.rideRef(shortRef(ride.id)),
-                      key: Key('driver-ride-ref-${ride.id}'),
-                      style: textTheme.titleSmall,
-                      maxLines: 1,
-                      softWrap: false,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (photo != null) ...[
+                      RideVehicleClassPhoto(
+                        imageUrl: ride.imageUrl,
+                        code: ride.vehicleClassCode,
+                        size: 32,
+                      ),
+                      const SizedBox(width: DealGoSpacing.s8),
+                    ],
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          l10n.rideRef(shortRef(ride.id)),
+                          key: Key('driver-ride-ref-${ride.id}'),
+                          style: textTheme.titleSmall,
+                          maxLines: 1,
+                          softWrap: false,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
                 DriverChip(
                   label: rideVehicleClassLabel(l10n, ride.vehicleClassCode),
                   tone: DriverChipTone.neutral,
                 ),
-                const SizedBox(width: DealGoSpacing.s8),
                 DriverChip(
                   label: AppLocalizations.of(context).driverRideChip,
                   tone: DriverChipTone.green,
@@ -437,12 +445,6 @@ class _FoodJobCard extends StatelessWidget {
               label: l10n.driverDeliveryFare,
               value: formatVnd(job.deliveryFareVnd),
               emphasize: true,
-            ),
-            Text(
-              l10n.driverDeliveryFareNote,
-              style: textTheme.bodySmall?.copyWith(
-                color: DealGoColors.textSecondary,
-              ),
             ),
           ],
         ),

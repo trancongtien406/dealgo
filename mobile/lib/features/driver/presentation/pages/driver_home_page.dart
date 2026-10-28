@@ -22,6 +22,7 @@ import '../utils/driver_routes.dart';
 import '../widgets/driver_widgets.dart';
 import '../widgets/driver_duty_map.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 
 class DriverHomePage extends StatelessWidget {
   const DriverHomePage({super.key});
@@ -59,11 +60,14 @@ class DriverOfflineView extends StatelessWidget {
         onPrimary: () => context.read<DriverDutyCubit>().connect(),
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          DealGoDimensions.pageGutter,
-          DealGoSpacing.s12,
-          DealGoDimensions.pageGutter,
-          DealGoSpacing.s16,
+        padding: dealGoScrollPadding(
+          context,
+          const EdgeInsets.fromLTRB(
+            DealGoDimensions.pageGutter,
+            DealGoSpacing.s12,
+            DealGoDimensions.pageGutter,
+            DealGoSpacing.s16,
+          ),
         ),
         children: [
           DriverHero(
@@ -118,11 +122,14 @@ class DriverIneligibleView extends StatelessWidget {
         onPrimary: () => context.push(DriverKycRoutes.root),
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          DealGoDimensions.pageGutter,
-          DealGoSpacing.s12,
-          DealGoDimensions.pageGutter,
-          DealGoSpacing.s16,
+        padding: dealGoScrollPadding(
+          context,
+          const EdgeInsets.fromLTRB(
+            DealGoDimensions.pageGutter,
+            DealGoSpacing.s12,
+            DealGoDimensions.pageGutter,
+            DealGoSpacing.s16,
+          ),
         ),
         children: [
           DriverHero(
@@ -153,8 +160,6 @@ class DriverIneligibleView extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: DealGoSpacing.s12),
-          DriverNote(message: l10n.driverIneligibleNote),
         ],
       ),
     );
@@ -268,11 +273,14 @@ class _DriverOnlineViewState extends State<DriverOnlineView> {
       title: l10n.driverHomeTitle,
       showBack: false,
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          DealGoDimensions.pageGutter,
-          DealGoSpacing.s8,
-          DealGoDimensions.pageGutter,
-          DealGoSpacing.s24,
+        padding: dealGoScrollPadding(
+          context,
+          const EdgeInsets.fromLTRB(
+            DealGoDimensions.pageGutter,
+            DealGoSpacing.s8,
+            DealGoDimensions.pageGutter,
+            DealGoSpacing.s24,
+          ),
         ),
         children: [
           DriverPanel(
@@ -396,7 +404,6 @@ class _DriverOnlineViewState extends State<DriverOnlineView> {
                   key: const Key('driver-home-food-switch'),
                   icon: DealGoIcons.package,
                   title: l10n.driverServicesFoodTitle,
-                  subtitle: l10n.driverServicesFoodBody,
                   value: services.prefs.foodEnabled,
                   onChanged: services.busy
                       ? null
@@ -404,11 +411,6 @@ class _DriverOnlineViewState extends State<DriverOnlineView> {
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          DriverNote(
-            tone: DriverNoteTone.green,
-            message: l10n.driverOnlinePolicyNote,
           ),
         ],
       ),
@@ -488,7 +490,7 @@ class _ServiceSwitch extends StatelessWidget {
     required this.icon,
     super.key,
     required this.title,
-    required this.subtitle,
+    this.subtitle = '',
     required this.value,
     required this.onChanged,
   });
@@ -521,7 +523,8 @@ class _ServiceSwitch extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(title, style: textTheme.titleMedium?.copyWith(fontSize: 16)),
-              Text(subtitle, style: textTheme.bodySmall),
+              if (subtitle.isNotEmpty)
+                Text(subtitle, style: textTheme.bodySmall),
             ],
           ),
         ),

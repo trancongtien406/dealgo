@@ -28,12 +28,16 @@ export type AdminNavHref =
   | "/settings/faqs"
   | "/settings/auth-methods"
   | "/settings/maps"
+  | "/settings/email"
+  | "/settings/sentry"
+  | "/system-errors"
   | "/settings/vehicle-classes"
   | "/settings/content"
   | "/settings/home-banners"
   | "/drivers/kyc"
   | "/stores/approvals"
   | "/catalog/moderation"
+  | "/reviews"
   | "/support"
   | "/terms"
   | "/privacy";
@@ -144,6 +148,7 @@ export const adminNavSections: readonly AdminNavSection[] = [
             href: "/catalog/moderation",
             badge: "Kiểm duyệt",
           },
+          { label: "Đánh giá quán", href: "/reviews" },
         ],
       },
     ],
@@ -186,6 +191,12 @@ export const adminNavSections: readonly AdminNavSection[] = [
         keywords: ["audit", "logs", "kiểm toán"],
       },
       {
+        label: "Lỗi hệ thống",
+        icon: "alert",
+        href: "/system-errors",
+        keywords: ["sentry", "errors", "crash", "lỗi"],
+      },
+      {
         label: "Báo cáo",
         icon: "chart",
         href: "/reports",
@@ -220,6 +231,8 @@ export const adminNavSections: readonly AdminNavSection[] = [
           { label: "Chính sách OPEN", href: "/settings/faqs" },
           { label: "Đăng nhập", href: "/settings/auth-methods" },
           { label: "Bản đồ", href: "/settings/maps" },
+          { label: "Email", href: "/settings/email" },
+          { label: "Sentry", href: "/settings/sentry" },
           { label: "Loại xe", href: "/settings/vehicle-classes" },
           { label: "Nội dung & Pháp lý", href: "/settings/content" },
           { label: "Banner trang chủ", href: "/settings/home-banners" },
@@ -264,6 +277,18 @@ export const adminCommandExtras: readonly AdminNavItem[] = [
     icon: "pin",
     href: "/settings/maps",
     keywords: ["maps", "bản đồ", "google", "mapbox", "địa chỉ"],
+  },
+  {
+    label: "Email (Gmail / SES)",
+    icon: "mail",
+    href: "/settings/email",
+    keywords: ["email", "smtp", "gmail", "ses", "otp"],
+  },
+  {
+    label: "Sentry (theo dõi lỗi)",
+    icon: "alert",
+    href: "/settings/sentry",
+    keywords: ["sentry", "token", "errors"],
   },
   {
     label: "Loại xe",

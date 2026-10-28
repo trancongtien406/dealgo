@@ -168,8 +168,6 @@ class _FoodDropoffTileState extends State<FoodDropoffTile> {
                       Expanded(
                         child: Text(
                           chosen ? cart.dropoffLabel : l10n.foodDropoffChoose,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
                           style: textTheme.bodyMedium?.copyWith(
                             fontWeight: chosen
                                 ? FontWeight.w700
@@ -180,13 +178,15 @@ class _FoodDropoffTileState extends State<FoodDropoffTile> {
                           ),
                         ),
                       ),
-                      if (widget.enabled)
+                      if (widget.enabled && chosen) ...[
+                        const SizedBox(width: DealGoSpacing.s8),
                         Text(
-                          chosen ? l10n.foodDropoffChange : '',
+                          l10n.foodDropoffChange,
                           style: textTheme.labelMedium?.copyWith(
                             color: DealGoColors.primary,
                           ),
                         ),
+                      ],
                       if (widget.enabled && !chosen)
                         const Icon(
                           DealGoIcons.chevronRight,

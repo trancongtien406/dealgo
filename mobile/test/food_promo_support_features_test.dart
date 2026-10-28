@@ -1,4 +1,7 @@
 import 'package:dealgo/core/config/api_base_url.dart';
+
+import 'support/visual_shot.dart';
+
 import 'package:dealgo/core/mock/fake_food_client.dart';
 import 'package:dealgo/core/network/api_exception.dart';
 import 'package:dealgo/features/food/data/datasources/dio_food_remote_datasource.dart';
@@ -271,46 +274,113 @@ void main() {
     expect(find.textContaining('Đã gắn mã DEALGO10'), findsOneWidget);
   });
 
-  testWidgets('trip share copies the server link and maps the 409', (
-    tester,
-  ) async {
-    _tallPhone(tester);
+  group('trip share', () {
+    const shareChannel = MethodChannel('dev.fluttercommunity.plus/share');
+    late List<Map<Object?, Object?>> shared;
+    late String shareReply;
     String? copied;
-    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      SystemChannels.platform,
-      (call) async {
+
+    setUp(() {
+      shared = [];
+      shareReply = 'com.zing.zalo';
+      copied = null;
+    });
+
+    Future<FakeRideShareRepository> open(WidgetTester tester) async {
+      _tallPhone(tester);
+      final messenger = tester.binding.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(shareChannel, (call) async {
+        shared.add(call.arguments as Map<Object?, Object?>);
+        return shareReply;
+      });
+      messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
         if (call.method == 'Clipboard.setData') {
           copied = (call.arguments as Map)['text'] as String?;
         }
         return null;
-      },
-    );
-    addTearDown(
-      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        SystemChannels.platform,
-        null,
-      ),
-    );
-    final share = FakeRideShareRepository();
-    await pumpSignedIn(tester, profile: customerProfile, rideShare: share);
-    await _go(tester, RideRoutes.safety('ride-9'));
-    await tester.tap(find.byKey(const Key('ride-safety-share')));
-    await tester.pumpAndSettle();
-    expect(share.calls, ['ride-9']);
-    expect(copied, 'http://localhost:3000/chia-se-chuyen/demo-1');
-    expect(find.text('Đã sao chép'), findsOneWidget);
+      });
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(shareChannel, null);
+        messenger.setMockMethodCallHandler(SystemChannels.platform, null);
+      });
+      final share = FakeRideShareRepository();
+      await pumpSignedIn(tester, profile: customerProfile, rideShare: share);
+      await _go(tester, RideRoutes.safety('ride-9'));
+      return share;
+    }
 
-    share.error = const ApiException(
-      statusCode: 409,
-      message: 'x',
-      errorCode: 'RIDE_SHARE_NOT_ACTIVE',
-    );
-    await tester.tap(find.byKey(const Key('ride-safety-share')));
-    await tester.pumpAndSettle();
-    expect(
-      find.text('Chỉ chia sẻ được khi đã có tài xế nhận chuyến.'),
-      findsOneWidget,
-    );
+    testWidgets('opens the system share sheet with the server link', (
+      tester,
+    ) async {
+      await loadShotFonts(tester);
+      final share = await open(tester);
+      await saveShot(tester, 'G-safety-before-share');
+      await tester.tap(find.byKey(const Key('ride-safety-share')));
+      await tester.pumpAndSettle();
+      await saveShot(tester, 'G-safety-after-share');
+      expect(share.calls, ['ride-9']);
+      expect(shared, hasLength(1));
+      expect(
+        shared.single['text'],
+        'Theo dõi chuyến đi DealGo của mình: '
+        'http://localhost:3000/chia-se-chuyen/demo-1',
+      );
+      expect(shared.single['subject'], 'Chuyến đi DealGo của mình');
+      expect(shared.single.containsKey('originX'), isTrue);
+      expect(copied, isNull);
+      expect(find.text('Đã chia sẻ'), findsOneWidget);
+
+      // Sharing again reuses the link instead of minting another.
+      await tester.tap(find.byKey(const Key('ride-safety-share')));
+      await tester.pumpAndSettle();
+      expect(share.calls, ['ride-9']);
+      expect(shared, hasLength(2));
+    });
+
+    testWidgets('a dismissed sheet changes nothing', (tester) async {
+      shareReply = '';
+      await open(tester);
+      await tester.tap(find.byKey(const Key('ride-safety-share')));
+      await tester.pumpAndSettle();
+      expect(shared, hasLength(1));
+      expect(find.byKey(const Key('ride-safety-share-outcome')), findsNothing);
+      expect(copied, isNull);
+    });
+
+    testWidgets('no share sheet falls back to copying the link', (
+      tester,
+    ) async {
+      shareReply = 'dev.fluttercommunity.plus/share/unavailable';
+      await open(tester);
+      await tester.tap(find.byKey(const Key('ride-safety-share')));
+      await tester.pumpAndSettle();
+      expect(copied, 'http://localhost:3000/chia-se-chuyen/demo-1');
+      expect(find.text('Đã sao chép'), findsOneWidget);
+    });
+
+    testWidgets('copy link copies without the sheet', (tester) async {
+      await open(tester);
+      await tester.tap(find.byKey(const Key('ride-safety-copy')));
+      await tester.pumpAndSettle();
+      expect(shared, isEmpty);
+      expect(copied, 'http://localhost:3000/chia-se-chuyen/demo-1');
+    });
+
+    testWidgets('a trip without a driver maps the 409', (tester) async {
+      final share = await open(tester);
+      share.error = const ApiException(
+        statusCode: 409,
+        message: 'x',
+        errorCode: 'RIDE_SHARE_NOT_ACTIVE',
+      );
+      await tester.tap(find.byKey(const Key('ride-safety-share')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Chỉ chia sẻ được khi đã có tài xế nhận chuyến.'),
+        findsOneWidget,
+      );
+      expect(shared, isEmpty);
+    });
   });
 
   test('fake voucher list filters by service', () async {

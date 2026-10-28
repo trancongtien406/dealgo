@@ -65,6 +65,40 @@ class MapBackButton extends StatelessWidget {
   }
 }
 
+/// [MapBackButton] at the standard top-left spot of a full-bleed map page
+/// (below the status bar). Must be a direct child of the page's [Stack].
+/// A null [onPressed] keeps the default `maybePop`; pass [enabled] false to
+/// keep it visible but inert while the page is busy.
+class MapBackOverlay extends StatelessWidget {
+  const MapBackOverlay({
+    this.onPressed,
+    this.enabled = true,
+    this.buttonKey,
+    super.key,
+  });
+
+  final VoidCallback? onPressed;
+  final bool enabled;
+  final Key? buttonKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      left: DealGoDimensions.pageGutter,
+      top: MediaQuery.paddingOf(context).top + DealGoSpacing.s8,
+      child: enabled
+          ? MapBackButton(key: buttonKey, onPressed: onPressed)
+          : MapRoundButton(
+              key: buttonKey,
+              icon: DealGoIcons.arrowLeft,
+              tooltip: AppLocalizations.of(context).actionBack,
+              color: DealGoColors.textTertiary,
+              onPressed: null,
+            ),
+    );
+  }
+}
+
 /// True when the live map can switch looks (Mapbox style tiles).
 bool mapStylesAvailable(MapPort port) =>
     port is TileMapPort && mapStylesSupported(port.urlTemplate);

@@ -717,8 +717,6 @@ class _JobTaken extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: DealGoSpacing.s12),
-            DriverNote(message: l10n.driverJobTakenHint),
           ],
         ),
       ),
@@ -770,7 +768,7 @@ class DriverFoodJobMap extends StatelessWidget {
               approach: showNavigate && !focusDropoff,
               trip: job.route,
               approachSeed: job.approachRoute,
-              builder: (context, route) => context.read<MapPort>().buildMap(
+              builder: (context, route) => context.watch<MapPort>().buildMap(
                 // Pins are bottom-anchored (~44 px tall): extra top room so they
                 // never touch the card edge on the small inline map.
                 fitPadding: const EdgeInsets.fromLTRB(36, 56, 36, 28),

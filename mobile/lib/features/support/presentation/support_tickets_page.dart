@@ -135,8 +135,6 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                       l10n.supportListHeading,
                       style: textTheme.headlineSmall,
                     ),
-                    const SizedBox(height: DealGoSpacing.s4),
-                    Text(l10n.supportListSubtitle, style: textTheme.bodySmall),
                     const SizedBox(height: DealGoSpacing.s16),
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,

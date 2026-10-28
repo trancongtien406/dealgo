@@ -384,15 +384,28 @@ class FakeFoodClient implements FoodClient {
   /// M030 profile saves (DEC-PROD-045).
   final storeProfileCalls = <String>[];
   String? _storeName;
+  String? _storeCategory;
+  int? _storeMinOrder;
   String? _storeLogo;
+  String? _storeCover;
+  String? _storeDescription;
 
   @override
   Future<FoodStoreDetail> updateStoreProfile({
     required String accessToken,
-    required String name,
+    String? name,
+    String? category,
+    int? minOrderVnd,
+    String? description,
   }) async {
-    storeProfileCalls.add(name);
-    _storeName = name;
+    if (name != null) storeProfileCalls.add(name);
+    if (description != null) {
+      _storeDescription = description.isEmpty ? null : description;
+    }
+    if (category != null) storeProfileCalls.add('category:$category');
+    if (name != null) _storeName = name;
+    if (category != null) _storeCategory = category;
+    if (minOrderVnd != null) _storeMinOrder = minOrderVnd;
     return _ownedCatalog();
   }
 
@@ -401,15 +414,27 @@ class FakeFoodClient implements FoodClient {
     required String accessToken,
     required String contentBase64,
     String? contentType,
+    bool cover = false,
   }) async {
     final store = _ownedCatalog();
-    _storeLogo = '/v1/public/store-logos/${store.id}/fake.png';
+    if (cover) {
+      _storeCover = '/v1/public/store-covers/${store.id}/fake.png';
+    } else {
+      _storeLogo = '/v1/public/store-logos/${store.id}/fake.png';
+    }
     return _ownedCatalog();
   }
 
   @override
-  Future<FoodStoreDetail> clearStoreLogo({required String accessToken}) async {
-    _storeLogo = null;
+  Future<FoodStoreDetail> clearStoreLogo({
+    required String accessToken,
+    bool cover = false,
+  }) async {
+    if (cover) {
+      _storeCover = null;
+    } else {
+      _storeLogo = null;
+    }
     return _ownedCatalog();
   }
 
@@ -536,6 +561,8 @@ class FakeFoodClient implements FoodClient {
     int? prepMinutes,
     String? imageUrl,
     String? menuCategoryId,
+    int? originalPriceVnd,
+    bool clearOriginalPrice = false,
   }) async {
     updateItemCalls.add((itemId: itemId, name: name, priceVnd: priceVnd));
     final error = catalogWriteError;
@@ -548,7 +575,9 @@ class FakeFoodClient implements FoodClient {
         description == null &&
         prepMinutes == null &&
         imageUrl == null &&
-        menuCategoryId == null) {
+        menuCategoryId == null &&
+        originalPriceVnd == null &&
+        !clearOriginalPrice) {
       throw const ApiException(
         statusCode: 400,
         message: 'Provide at least one field to update',
@@ -564,6 +593,8 @@ class FakeFoodClient implements FoodClient {
         prepMinutes: prepMinutes,
         imageUrl: imageUrl,
         menuCategoryId: menuCategoryId,
+        originalPriceVnd: originalPriceVnd,
+        clearOriginalPrice: clearOriginalPrice,
       );
     });
   }
@@ -639,8 +670,12 @@ class FakeFoodClient implements FoodClient {
         lng: _storeLocation?.$2,
         addressLabel: _storeLocation?.$3,
         name: _storeName,
+        category: _storeCategory,
+        minOrderVnd: _storeMinOrder,
         logoUrl: _storeLogo,
         clearLogoUrl: _storeLogo == null,
+        coverUrl: _storeCover,
+        description: _storeDescription,
         schedule: _storeSchedule,
         serviceMode: _storeMode,
         serviceModeUntil: _storeModeUntil,

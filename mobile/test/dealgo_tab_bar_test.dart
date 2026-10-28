@@ -178,7 +178,7 @@ void main() {
   group('FloatingNavBody', () {
     Future<(Size, EdgeInsets)> pumpBody(
       WidgetTester tester, {
-      required bool keyboardOpen,
+      required double? coveredBottom,
     }) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       tester.view.physicalSize = const Size(390 * 3, 844 * 3);
@@ -195,7 +195,7 @@ void main() {
           child: Directionality(
             textDirection: TextDirection.ltr,
             child: FloatingNavBody(
-              keyboardOpen: keyboardOpen,
+              coveredBottom: coveredBottom,
               child: Builder(
                 key: const Key('body'),
                 builder: (context) {
@@ -212,18 +212,26 @@ void main() {
       return (size, seen);
     }
 
-    testWidgets('body ends at the pill top and gets no bottom padding', (
+    testWidgets('body runs behind the bar; bar height becomes padding', (
       tester,
     ) async {
-      final (size, padding) = await pumpBody(tester, keyboardOpen: false);
       final m = dealGoNavBarMetrics(TargetPlatform.iOS, 34);
-      expect(size.height, 844 - m.contentClearance);
+      final (size, padding) = await pumpBody(
+        tester,
+        coveredBottom: m.totalHeight,
+      );
+      expect(size.height, 844);
+      expect(padding.bottom, 102);
+    });
+
+    testWidgets('keyboard over the bar: nothing reserved', (tester) async {
+      final (_, padding) = await pumpBody(tester, coveredBottom: 0);
       expect(padding.bottom, 0);
     });
 
-    testWidgets('keyboard open: no clearance', (tester) async {
-      final (size, _) = await pumpBody(tester, keyboardOpen: true);
-      expect(size.height, 844);
+    testWidgets('bar not shown: insets untouched', (tester) async {
+      final (_, padding) = await pumpBody(tester, coveredBottom: null);
+      expect(padding.bottom, 34);
     });
   });
 }

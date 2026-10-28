@@ -5,8 +5,12 @@ import 'package:dealgo/features/places/data/places_remote_datasource.dart';
 import 'package:dealgo/features/places/domain/place.dart';
 import 'package:dealgo/features/pricing/data/pricing_remote_datasource.dart';
 import 'package:dealgo/core/design_system/components/dealgo_primary_button.dart';
+import 'package:dealgo/core/design_system/icons/dealgo_icons.dart';
 import 'package:dealgo/features/ride/presentation/widgets/ride_widgets.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import 'package:dealgo/features/ride/presentation/cubit/ride_session.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/auth_test_harness.dart';
@@ -127,13 +131,8 @@ void main() {
     await tester.tap(find.byKey(const Key('ride-submit-fare')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Chưa có tài xế chào giá'), findsOneWidget);
-    expect(
-      find.text(
-        'Trong khu vực này chưa có báo giá hợp lệ cho yêu cầu hiện tại.',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('Chưa có báo giá'), findsOneWidget);
+    expect(find.text('Chưa có tài xế báo giá.'), findsOneWidget);
   });
 
   testWidgets('selecting an offer shows agreedFareVnd from the server', (
@@ -169,7 +168,7 @@ void main() {
           .containsKey('agreedFareVnd'),
       isFalse,
     );
-    expect(find.text('Giá chuyến vừa thay đổi'), findsOneWidget);
+    expect(find.text('Giá đã thay đổi'), findsOneWidget);
     expect(find.text('45.000đ'), findsWidgets);
     expect(find.text('42.000đ'), findsWidgets);
   });
@@ -226,7 +225,7 @@ void main() {
       selectedOfferId: request.offerId,
       assignedDriverId: _driverId,
       offers: [offer],
-      discountVnd: 4200,
+      discountVnd: 4000,
       voucherCode: request.voucherCode,
     );
     await _openFare(tester, rides);
@@ -241,7 +240,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('voucher-applied')), findsOneWidget);
     expect(find.text('Tiền mặt trả tài xế'), findsOneWidget);
-    expect(find.text('37.800đ'), findsOneWidget);
+    expect(find.text('38.000đ'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('ride-select-offer')));
     await tester.pumpAndSettle();
@@ -251,7 +250,7 @@ void main() {
     final paid = tester.widget<RideMoneyLine>(
       find.byKey(const Key('ride-agreed-fare')),
     );
-    expect(paid.amount, '37.800đ');
+    expect(paid.amount, '38.000đ');
     expect(find.text('Ưu đãi DEALGO10'), findsOneWidget);
   });
 
@@ -332,6 +331,95 @@ void main() {
     expect(rides.getCalls, isEmpty);
   });
 
+  group('book tab draft', () {
+    Finder dropoffField() => find.byKey(const Key('ride-dropoff-label'));
+    Finder inDropoff(String text) =>
+        find.descendant(of: dropoffField(), matching: find.text(text));
+
+    testWidgets(
+      'a created ride clears the draft; the waiting ride stays one tap away',
+      (tester) async {
+        await _openFare(tester, _negotiatingClient());
+        await tester.ensureVisible(find.byKey(const Key('ride-submit-fare')));
+        await tester.tap(find.byKey(const Key('ride-submit-fare')));
+        await tester.pumpAndSettle();
+        expect(find.text('Đang thương lượng'), findsWidgets);
+
+        GoRouter.of(tester.element(find.byType(Scaffold).first))
+            .go('/customer/book');
+        await tester.pumpAndSettle();
+        expect(inDropoff('Chọn điểm đến'), findsOneWidget);
+        expect(inDropoff(_airport.label), findsNothing);
+        // Recent places are offered, never pre-filled.
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('ride-suggestion-0')),
+            matching: find.text(_airport.name),
+          ),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('ride-open-pending')), findsOneWidget);
+
+        // Cancelled / finished: nothing to resume, the tab stays empty.
+        tester.element(dropoffField()).read<RideSessionCubit>().clear();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('ride-open-pending')), findsNothing);
+        expect(inDropoff('Chọn điểm đến'), findsOneWidget);
+
+        // A suggestion is only used when tapped.
+        await tester.tap(find.byKey(const Key('ride-suggestion-0')));
+        await tester.pumpAndSettle();
+        expect(inDropoff(_airport.label), findsOneWidget);
+      },
+    );
+
+    testWidgets('backing out of the book tab drops the draft', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(400, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await pumpSignedIn(
+        tester,
+        profile: customerProfile,
+        rideClient: _negotiatingClient(),
+        locationOverride: FakeLocationService(),
+        places: FakePlacesRemoteDataSource(recent: [_airport]),
+      );
+      await tester.tap(navLabel('Đặt'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(_airport.name));
+      await tester.pumpAndSettle();
+      expect(inDropoff(_airport.label), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('ride-map-back')));
+      await tester.pumpAndSettle();
+      await tester.tap(navLabel('Đặt'));
+      await tester.pumpAndSettle();
+      expect(inDropoff('Chọn điểm đến'), findsOneWidget);
+      expect(find.byKey(const Key('ride-open-pending')), findsNothing);
+    });
+
+    testWidgets('going back from the fare sheet keeps the draft to edit', (
+      tester,
+    ) async {
+      await _openFare(tester, _negotiatingClient());
+      await tester.tap(find.byKey(const Key('ride-fare-back')));
+      await tester.pumpAndSettle();
+      expect(inDropoff(_airport.label), findsOneWidget);
+    });
+  });
+
+  testWidgets('the chosen vehicle and price use the border, not a check', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await _openFare(tester, _negotiatingClient());
+    expect(find.byIcon(DealGoIcons.check), findsNothing);
+    expect(
+      tester.getSemantics(find.byKey(const Key('ride-vehicle-bike'))),
+      isSemantics(isButton: true, isSelected: true, hasTapAction: true),
+    );
+    semantics.dispose();
+  });
+
   testWidgets('the book tab opens the ride map', (tester) async {
     await tester.binding.setSurfaceSize(const Size(400, 1600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -353,6 +441,22 @@ void main() {
     expect(find.text('Chọn điểm đón'), findsOneWidget);
     expect(find.text('Chọn điểm đến'), findsOneWidget);
     expect(find.textContaining('mẫu'), findsNothing);
+
+    // Pickup sits on top, the destination below it; swap is on the lower row.
+    final pickupTop = tester
+        .getTopLeft(find.byKey(const Key('ride-pickup-label')))
+        .dy;
+    final dropoffTop = tester
+        .getTopLeft(find.byKey(const Key('ride-dropoff-label')))
+        .dy;
+    expect(pickupTop, lessThan(dropoffTop));
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('ride-dropoff-label')),
+        matching: find.byIcon(DealGoIcons.swapVert),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('the place picker searches and returns real coordinates', (

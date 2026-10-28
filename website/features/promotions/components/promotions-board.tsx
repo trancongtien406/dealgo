@@ -16,6 +16,7 @@ import {
 } from "@/features/promotions/mappers";
 import type { PromotionCampaignStatus } from "@/features/promotions/types";
 import { CreatePromotionDialog } from "./create-promotion-dialog";
+import { ReasonDialog } from "@/components/ui/reason-dialog";
 import { OpsIcon } from "@/components/ui/ops-icons";
 import {
   AdminBreadcrumb,
@@ -82,6 +83,10 @@ export function PromotionsBoard() {
   );
   const [createOpen, setCreateOpen] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [statusTarget, setStatusTarget] = useState<{
+    campaign: CampaignItem;
+    status: "ACTIVE" | "PAUSED" | "CANCELLED";
+  } | null>(null);
 
   const rawItems: readonly CampaignItem[] = useMemo(
     () => data?.items ?? [],
@@ -91,6 +96,7 @@ export function PromotionsBoard() {
   const kpi = data?.kpi;
 
   const audience = filters.audience || null;
+  const scope = filters.scope || null;
   const channel = filters.channel || null;
   const status = filters.status || null;
   const searchQuery = filters.q;
@@ -146,6 +152,10 @@ export function PromotionsBoard() {
     void setFilters({ audience: selectedAudience ?? "", page: 1 });
   };
 
+  const handleScopeChange = (selectedScope: string | null) => {
+    void setFilters({ scope: selectedScope ?? "", page: 1 });
+  };
+
   const handleChannelChange = (selectedChannel: string | null) => {
     void setFilters({ channel: selectedChannel ?? "", page: 1 });
   };
@@ -161,6 +171,7 @@ export function PromotionsBoard() {
   const handleResetFilters = () => {
     void setFilters({
       audience: "",
+      scope: "",
       channel: "",
       status: "",
       q: "",
@@ -176,13 +187,21 @@ export function PromotionsBoard() {
     void setFilters({ limit: newSize, page: 1 });
   };
 
-  const handleStatusAction = async (
+  const handleStatusAction = (
     targetCampaign: CampaignItem,
     newStatus: "ACTIVE" | "PAUSED" | "CANCELLED",
   ) => {
+    setStatusTarget({ campaign: targetCampaign, status: newStatus });
+  };
+
+  const applyStatus = async (
+    targetCampaign: CampaignItem,
+    newStatus: "ACTIVE" | "PAUSED" | "CANCELLED",
+    reason: string,
+  ) => {
     setUpdatingId(targetCampaign.id);
     try {
-      await updatePromotionStatus(targetCampaign.id, newStatus);
+      await updatePromotionStatus(targetCampaign.id, newStatus, reason);
       const actionName =
         newStatus === "ACTIVE"
           ? "kích hoạt"
@@ -319,6 +338,18 @@ export function PromotionsBoard() {
               )}
               placeholder="Tất cả đối tượng"
               onChange={handleAudienceChange}
+            />
+          </AdminFilterField>
+          <AdminFilterField>
+            <SearchSelect
+              label="Nguồn"
+              value={scope}
+              options={[
+                { value: "PLATFORM", label: "DealGo" },
+                { value: "STORE", label: "Ưu đãi cửa hàng" },
+              ]}
+              placeholder="Tất cả nguồn"
+              onChange={handleScopeChange}
             />
           </AdminFilterField>
           <AdminFilterField>
@@ -684,6 +715,24 @@ export function PromotionsBoard() {
           </div>
         </div>
       )}
+
+      <ReasonDialog
+        open={statusTarget !== null}
+        title={
+          statusTarget
+            ? `${statusTarget.status === "ACTIVE" ? "Kích hoạt lại" : statusTarget.status === "PAUSED" ? "Tạm dừng" : "Hủy"} ${statusTarget.campaign.code}`
+            : ""
+        }
+        description={statusTarget?.campaign.storeName ?? "Chương trình DealGo"}
+        confirmLabel="Xác nhận"
+        tone={statusTarget?.status === "CANCELLED" ? "danger" : "brand"}
+        testId="promotion-status-dialog"
+        onClose={() => setStatusTarget(null)}
+        onSubmit={async (reason) => {
+          if (!statusTarget) return;
+          await applyStatus(statusTarget.campaign, statusTarget.status, reason);
+        }}
+      />
 
       <CreatePromotionDialog
         open={createOpen}

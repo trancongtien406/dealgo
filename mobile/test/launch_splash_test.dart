@@ -54,6 +54,26 @@ Widget _app(GoRouter router, {AuthCubit? auth}) {
 
 void main() {
   group('launchRouteReady', () {
+    test('holds the sign-in picker until its methods are known', () {
+      expect(
+        launchRouteReady(
+          auth: const AuthSignedOut(),
+          postAuthLoaded: true,
+          location: AuthRoutes.login,
+          authMethodsLoading: true,
+        ),
+        isFalse,
+      );
+      expect(
+        launchRouteReady(
+          auth: const AuthSignedOut(),
+          postAuthLoaded: true,
+          location: AuthRoutes.login,
+        ),
+        isTrue,
+      );
+    });
+
     test('waits for session restore', () {
       expect(
         launchRouteReady(

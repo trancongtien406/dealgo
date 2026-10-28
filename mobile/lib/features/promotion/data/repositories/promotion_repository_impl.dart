@@ -31,5 +31,10 @@ class PromotionRepositoryImpl implements PromotionRepository {
   Future<List<AvailableVoucher>> listAvailable({
     required String accessToken,
     VoucherService? service,
-  }) => _remote.listAvailable(accessToken: accessToken, service: service);
+    String? storeId,
+  }) => _remote.listAvailable(
+    accessToken: accessToken,
+    service: service,
+    storeId: storeId,
+  );
 }

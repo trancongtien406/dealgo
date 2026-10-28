@@ -12,6 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import {
   CurrentActor,
   CustomerSessionGuard,
@@ -41,8 +42,10 @@ export class AccountDeletionController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @UseGuards(ThrottlerGuard)
   @ApiOperation({
-    summary: 'S027: start deletion; 409 ACCOUNT_DELETION_BLOCKED lists blockers; sends SMS OTP',
+    summary:
+      'S027: start deletion (rate limited); 409 ACCOUNT_DELETION_BLOCKED lists blockers; PASSKEY returns passkeyOptions, PHONE_OTP sends an SMS code',
   })
   start(@CurrentActor() actor: RequestActor) {
     return this.deletion.start(actor.userId);
@@ -50,15 +53,21 @@ export class AccountDeletionController {
 
   @Post(':id/confirm')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
   @ApiOperation({
-    summary: 'S027: re-auth (code or password) → soft-delete, revoke all sessions, schedule purge',
+    summary:
+      'S027: re-auth (passkey assertion, code or password; rate limited) → soft-delete, revoke all sessions, schedule purge',
   })
   confirm(
     @CurrentActor() actor: RequestActor,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: ConfirmAccountDeletionDto,
   ) {
-    return this.deletion.confirm(actor.userId, id, { code: body.code, password: body.password });
+    return this.deletion.confirm(actor.userId, id, {
+      code: body.code,
+      password: body.password,
+      passkey: body.passkey,
+    });
   }
 }
 

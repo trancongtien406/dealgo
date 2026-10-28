@@ -34,6 +34,10 @@ export interface PromotionCampaign {
   startDate: string;
   endDate: string;
   sponsor: PromotionSponsor;
+  /** Set when a merchant created the offer for its own store (FOOD only, MERCHANT-funded). */
+  storeId?: string | null;
+  /** Store name for ops lists; absent outside them. */
+  storeName?: string | null;
   createdAt: string;
   updatedAt: string;
 }

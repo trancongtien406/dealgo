@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/entities/food_models.dart';
@@ -87,6 +89,9 @@ class FoodCartState {
     required this.idempotencyKey,
     this.voucherCode,
     this.voucherDiscountVnd = 0,
+    this.minOrderVnd = 0,
+    this.prepMinutes,
+    this.storeDistanceKm,
   });
 
   factory FoodCartState.initial() {
@@ -123,6 +128,28 @@ class FoodCartState {
   /// Quoted discount for display only. The server recomputes it at placement.
   final int voucherDiscountVnd;
 
+  /// The store's minimum subtotal (0 = none); the server enforces it too.
+  final int minOrderVnd;
+
+  /// Store prep estimate and the buyer's straight-line distance to it, both
+  /// display-only inputs for the arrival estimate.
+  final int? prepMinutes;
+  final double? storeDistanceKm;
+
+  /// Same estimate as the store list: prep + 3 min per km.
+  int? get etaMinutes {
+    final prep = prepMinutes;
+    if (prep == null) return null;
+    final km = storeDistanceKm;
+    return km == null ? prep : prep + (km * 3).round();
+  }
+
+  /// How much more the buyer must add to reach [minOrderVnd]; 0 when met.
+  int get minOrderShortVnd {
+    final short = minOrderVnd - subtotalVnd;
+    return short > 0 ? short : 0;
+  }
+
   int get itemCount => lines.fold(0, (sum, line) => sum + line.quantity);
 
   int get subtotalVnd => lines.fold(0, (sum, line) => sum + line.lineTotalVnd);
@@ -136,6 +163,7 @@ class FoodCartState {
     return storeId != null &&
         lines.isNotEmpty &&
         hasDropoff &&
+        minOrderShortVnd == 0 &&
         dropoffLabel.length <= 160 &&
         deliveryFareVnd != null;
   }
@@ -154,6 +182,9 @@ class FoodCartState {
     String? voucherCode,
     int? voucherDiscountVnd,
     bool clearVoucher = false,
+    int? minOrderVnd,
+    int? prepMinutes,
+    double? storeDistanceKm,
   }) {
     // Any change to what is being bought invalidates the quoted discount.
     final dropVoucher =
@@ -175,6 +206,13 @@ class FoodCartState {
       voucherCode: voucherCode ?? (dropVoucher ? null : this.voucherCode),
       voucherDiscountVnd:
           voucherDiscountVnd ?? (dropVoucher ? 0 : this.voucherDiscountVnd),
+      minOrderVnd: clearStore ? 0 : minOrderVnd ?? this.minOrderVnd,
+      prepMinutes: clearStore
+          ? null
+          : prepMinutes ?? (storeChanged ? null : this.prepMinutes),
+      storeDistanceKm: clearStore
+          ? null
+          : storeDistanceKm ?? (storeChanged ? null : this.storeDistanceKm),
     );
   }
 
@@ -190,7 +228,10 @@ class FoodCartState {
         other.dropoffLng == dropoffLng &&
         other.idempotencyKey == idempotencyKey &&
         other.voucherCode == voucherCode &&
-        other.voucherDiscountVnd == voucherDiscountVnd;
+        other.voucherDiscountVnd == voucherDiscountVnd &&
+        other.minOrderVnd == minOrderVnd &&
+        other.prepMinutes == prepMinutes &&
+        other.storeDistanceKm == storeDistanceKm;
   }
 
   @override
@@ -205,6 +246,9 @@ class FoodCartState {
     idempotencyKey,
     voucherCode,
     voucherDiscountVnd,
+    minOrderVnd,
+    prepMinutes,
+    storeDistanceKm,
   );
 }
 
@@ -223,10 +267,15 @@ bool _sameLines(List<FoodCartLine> left, List<FoodCartLine> right) {
 class FoodCartCubit extends Cubit<FoodCartState> {
   FoodCartCubit() : super(FoodCartState.initial());
 
+  /// Last known distance per store, so the first dish added picks it up.
+  final Map<String, double> _distanceKm = {};
+
   void addItem({
     required String storeId,
     required String storeName,
     required FoodMenuItem item,
+    int minOrderVnd = 0,
+    int? prepMinutes,
   }) {
     if (!item.available || item.priceVnd < 0 || storeId.isEmpty) {
       return;
@@ -239,6 +288,8 @@ class FoodCartCubit extends Cubit<FoodCartState> {
       unitPriceVnd: item.priceVnd,
       catalogItemId: item.id,
       imageUrl: item.imageUrl,
+      minOrderVnd: minOrderVnd,
+      prepMinutes: prepMinutes,
     );
   }
 
@@ -251,6 +302,8 @@ class FoodCartCubit extends Cubit<FoodCartState> {
     String? catalogItemId,
     List<String> optionIds = const [],
     String? imageUrl,
+    int minOrderVnd = 0,
+    int? prepMinutes,
   }) {
     if (unitPriceVnd < 0 || storeId.isEmpty || lineId.isEmpty) {
       return;
@@ -271,6 +324,9 @@ class FoodCartCubit extends Cubit<FoodCartState> {
           storeName: storeName,
           lines: [nextLine],
           idempotencyKey: createFoodIdempotencyKey(),
+          minOrderVnd: minOrderVnd,
+          prepMinutes: prepMinutes,
+          storeDistanceKm: _distanceKm[storeId],
         ),
       );
       return;
@@ -292,8 +348,20 @@ class FoodCartCubit extends Cubit<FoodCartState> {
         storeName: storeName,
         lines: List.unmodifiable(lines),
         idempotencyKey: createFoodIdempotencyKey(),
+        minOrderVnd: minOrderVnd,
+        prepMinutes: prepMinutes,
+        storeDistanceKm: _distanceKm[storeId],
       ),
     );
+  }
+
+  /// Distance from the buyer to the cart's store, for the arrival estimate.
+  void setStoreDistance(String storeId, double km) {
+    _distanceKm[storeId] = km;
+    if (state.storeId != storeId || state.storeDistanceKm == km) {
+      return;
+    }
+    emit(state.copyWith(storeDistanceKm: km));
   }
 
   void setQuantity(String itemId, int quantity) {
@@ -419,6 +487,8 @@ class FoodCartCubit extends Cubit<FoodCartState> {
         lines: List.unmodifiable(lines),
         clearStore: lines.isEmpty,
         idempotencyKey: createFoodIdempotencyKey(),
+        minOrderVnd: store.minOrderVnd,
+        prepMinutes: store.estimatedPrepMinutes,
       ),
     );
   }
@@ -475,6 +545,8 @@ class FoodCartCubit extends Cubit<FoodCartState> {
         lines: List.unmodifiable(lines),
         clearStore: lines.isEmpty,
         idempotencyKey: createFoodIdempotencyKey(),
+        minOrderVnd: store.minOrderVnd,
+        prepMinutes: store.estimatedPrepMinutes,
       ),
     );
     return dropped;
@@ -491,6 +563,29 @@ class FoodCartCubit extends Cubit<FoodCartState> {
 
   void rotateIdempotencyKey() {
     emit(state.copyWith(idempotencyKey: createFoodIdempotencyKey()));
+    // Only the checkout calls this, right after the order was accepted.
+    if (!_placed.isClosed) _placed.add(null);
+  }
+
+  final _placed = StreamController<void>.broadcast(sync: true);
+
+  /// T85 — fires when an order from this cart was accepted (key rotated).
+  Stream<void> get orderPlaced => _placed.stream;
+
+  @override
+  Future<void> close() async {
+    await _placed.close();
+    return super.close();
+  }
+
+  /// T85 — puts back a cart saved before the app was killed. Ignored once the
+  /// buyer has started a new cart. Keeps the saved idempotency key so a
+  /// re-sent order is deduplicated by the server.
+  void restoreDraft(FoodCartState snapshot) {
+    if (state.lines.isNotEmpty || snapshot.lines.isEmpty) {
+      return;
+    }
+    emit(snapshot);
   }
 }
 

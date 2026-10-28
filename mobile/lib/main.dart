@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
@@ -8,8 +9,10 @@ import 'app/dealgo_app.dart';
 import 'core/design_system/components/dealgo_nav_insets.dart';
 import 'core/auth/secure_token_store.dart';
 import 'core/auth/token_store.dart';
+import 'core/config/api_base_url.dart';
 import 'core/config/app_env.dart';
 import 'core/launch/launch_splash.dart';
+import 'core/maps/maps_client_config.dart';
 import 'core/mock/mock_seed.dart';
 import 'core/observability/crash_reporting.dart';
 import 'core/push/fcm_push.dart';
@@ -24,6 +27,19 @@ Future<void> _start() async {
   LaunchSplash.hold();
   enableAndroidEdgeToEdge();
   await CustomerBookingPrefs.warmUp();
+  if (!useMockData) {
+    // Map token before the first frame: cached → instant, first launch →
+    // short network wait under the native splash (see MapsClientConfig).
+    await MapsClientConfig.resolveAtLaunch(
+      Dio(
+        BaseOptions(
+          baseUrl: normalizeBaseUrl(apiBaseUrl),
+          connectTimeout: MapsClientConfig.launchWait,
+          receiveTimeout: MapsClientConfig.launchWait,
+        ),
+      ),
+    );
+  }
   await _initFirebaseSafely();
   await _maybeSeedSmokeSession();
 

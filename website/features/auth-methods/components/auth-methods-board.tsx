@@ -241,6 +241,7 @@ export function AuthMethodsBoard() {
               : "Tắt phương thức xác thực",
             confirm: pendingToggle.enabled ? "Xác nhận bật" : "Xác nhận tắt",
             hint: "Lý do được ghi vào nhật ký kiểm toán trên máy chủ.",
+            success: pendingToggle.enabled ? "Đã bật." : "Đã tắt.",
           }}
           confirmTone={pendingToggle.enabled ? "brand" : "danger"}
           entityLabel={authMethodLabel(pendingToggle.method)}

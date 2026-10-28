@@ -182,31 +182,34 @@ class _FoodCancelPageState extends State<FoodCancelPage> {
                 DealGoDimensions.pageGutter,
                 DealGoSpacing.s12,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (!_submitted)
-                    DealGoPrimaryButton(
-                      key: const Key('food-cancel-confirm'),
-                      label: l10n.foodCancelConfirm,
-                      enabled: _reasonId != null && !_busy,
-                      isLoading: _busy,
-                      onPressed: _confirm,
-                    )
-                  else
-                    DealGoPrimaryButton(
+              child: _submitted
+                  ? DealGoPrimaryButton(
                       key: const Key('food-cancel-done'),
                       label: l10n.actionBack,
                       onPressed: _back,
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: DealGoSecondaryButton(
+                            key: const Key('food-cancel-keep'),
+                            label: l10n.foodCancelKeep,
+                            enabled: !_busy,
+                            onPressed: _back,
+                          ),
+                        ),
+                        const SizedBox(width: DealGoSpacing.s8),
+                        Expanded(
+                          child: DealGoPrimaryButton(
+                            key: const Key('food-cancel-confirm'),
+                            label: l10n.foodCancelConfirm,
+                            enabled: _reasonId != null && !_busy,
+                            isLoading: _busy,
+                            onPressed: _confirm,
+                          ),
+                        ),
+                      ],
                     ),
-                  const SizedBox(height: DealGoSpacing.s8),
-                  DealGoSecondaryButton(
-                    label: l10n.foodCancelKeep,
-                    enabled: !_submitted && !_busy,
-                    onPressed: _back,
-                  ),
-                ],
-              ),
             ),
           ],
         ),

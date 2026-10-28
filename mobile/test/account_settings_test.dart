@@ -5,6 +5,7 @@ import 'package:dealgo/features/identity/data/models/auth_method_policy_model.da
 import 'package:dealgo/features/identity/domain/entities/auth_method_policy.dart';
 import 'package:dealgo/features/identity/domain/passkey_platform.dart';
 import 'package:dealgo/features/identity/domain/entities/user_profile.dart';
+import 'package:dealgo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -161,21 +162,28 @@ void main() {
     expect(find.textContaining('chưa hỗ trợ passkey'), findsOneWidget);
   });
 
-  testWidgets('S025 shows a calm message when passkey sign-in is turned off', (
-    tester,
-  ) async {
-    final repo = FakeAccountSettingsRepository()
-      ..passkeyError = const ApiException(
-        statusCode: 403,
-        errorCode: 'AUTH_METHOD_DISABLED',
-        message: 'Auth method PASSKEY is disabled',
+  testWidgets(
+    'S025 a passkey switched off mid-session gets the generic not-found copy',
+    (tester) async {
+      final repo = FakeAccountSettingsRepository()
+        ..passkeyError = const ApiException(
+          statusCode: 404,
+          errorCode: 'NOT_FOUND',
+          message: 'Cannot POST /v1/auth/passkeys/register/options',
+        );
+      await pumpSignedIn(
+        tester,
+        profile: customerProfile,
+        accountSettings: repo,
       );
-    await pumpSignedIn(tester, profile: customerProfile, accountSettings: repo);
-    await openSecurity(tester);
-    await tester.tap(find.byKey(const Key('security-passkey-row')));
-    await tester.pumpAndSettle();
-    expect(find.text('Đăng nhập bằng passkey đang tạm tắt.'), findsOneWidget);
-  });
+      await openSecurity(tester);
+      await tester.tap(find.byKey(const Key('security-passkey-row')));
+      await tester.pumpAndSettle();
+      final l10n = lookupAppLocalizations(const Locale('vi'));
+      expect(find.text(l10n.apiErrNotFound), findsOneWidget);
+      expect(find.textContaining('tạm tắt'), findsNothing);
+    },
+  );
 
   testWidgets('S025 hides passkey enrolment when the method is switched off', (
     tester,

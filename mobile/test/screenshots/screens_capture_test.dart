@@ -2,6 +2,9 @@
 // fonts and writes PNGs. Skipped unless run with:
 //   flutter test test/screenshots --dart-define=SCREENSHOTS=true \
 //     --dart-define=SHOT_DIR=/abs/output/dir
+// Optional `--dart-define=SHOT_SIZE=320x568` (logical px, default 390x844).
+// Every shot also appends cut-off text (ellipsis, fade, clip) to
+// `<SHOT_DIR>/truncated.tsv` for a small-screen text audit.
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -39,6 +42,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:dealgo/features/merchant/data/datasources/merchant_offers_remote_datasource.dart';
+
 import '../support/auth_test_harness.dart';
 import '../support/fake_food_client.dart';
 import '../support/fake_identity_client.dart';
@@ -49,6 +54,12 @@ const _outDir = String.fromEnvironment(
   'SHOT_DIR',
   defaultValue: 'build/screenshots',
 );
+const _shotSize = String.fromEnvironment('SHOT_SIZE', defaultValue: '390x844');
+
+Size get _logicalSize {
+  final parts = _shotSize.split('x').map(double.parse).toList();
+  return Size(parts[0], parts[1]);
+}
 
 const _customer = UserProfile(
   id: 'user-customer',
@@ -97,51 +108,154 @@ const _shotOptionGroups = [
 
 FakeFoodClient _food() =>
     FakeFoodClient(
-        stores: const [
+        stores: [
           FoodStoreSummary(
             id: _storeId,
             name: 'Bún chả cá Bà Lữ',
             category: 'noodles',
             distanceKm: 0.8,
+            etaMinutes: 22,
+            deliveryFeeFromVnd: 12000,
+            ratingAverage: 4.6,
+            ratingCount: 12,
+            minOrderVnd: 40000,
+            offers: [_shotOffers.first],
+            featuredItems: [
+              const FoodFeaturedItem(
+                id: 'i1',
+                name: 'Bún chả cá đặc biệt',
+                priceVnd: 55000,
+                originalPriceVnd: 65000,
+                soldCount: 320,
+              ),
+              FoodFeaturedItem(
+                id: 'i5',
+                name: 'Bún chả cá trộn',
+                priceVnd: 49000,
+                addedAt: DateTime.now().subtract(const Duration(days: 2)),
+              ),
+            ],
           ),
           FoodStoreSummary(
             id: '5b0f6c9e-1d2a-4e3b-8c4d-000000000002',
             name: 'Trà sữa Mây',
             category: 'tea',
             distanceKm: 1.6,
+            etaMinutes: 28,
+            deliveryFeeFromVnd: 0,
+            ratingCount: 2,
+            featuredItems: const [
+              FoodFeaturedItem(
+                id: 't1',
+                name: 'Trà sữa trân châu',
+                priceVnd: 32000,
+                originalPriceVnd: 40000,
+                soldCount: 210,
+              ),
+            ],
+            offers: [
+              StoreOffer(
+                id: 'offer-tea',
+                code: 'MAY15',
+                name: 'Giảm 15K',
+                kind: StoreOfferKind.fixedAmount,
+                discountValue: 15000,
+                minOrderVnd: 60000,
+                endsAt: DateTime(2026, 11, 30),
+              ),
+            ],
           ),
           FoodStoreSummary(
             id: '5b0f6c9e-1d2a-4e3b-8c4d-000000000003',
             name: 'Cơm gà Hội An',
             category: 'rice',
             distanceKm: 2.3,
+            etaMinutes: 35,
+            deliveryFeeFromVnd: 18000,
+            ratingAverage: 4.8,
+            ratingCount: 56,
+            featuredItems: [
+              FoodFeaturedItem(
+                id: 'c1',
+                name: 'Cơm gà xé',
+                priceVnd: 45000,
+                soldCount: 180,
+                addedAt: DateTime.now().subtract(const Duration(days: 5)),
+              ),
+            ],
           ),
         ],
-        details: const {
+        details: {
           _storeId: FoodStoreDetail(
             id: _storeId,
             name: 'Bún chả cá Bà Lữ',
             category: 'noodles',
             addressLabel: '319 Hùng Vương, Hải Châu, Đà Nẵng',
+            description:
+                'Chả cá thu làm mỗi sáng, nước dùng ngọt xương, '
+                'ăn kèm rau sống Đà Nẵng.',
+            offers: _shotOffers,
+            minOrderVnd: 40000,
+            estimatedPrepMinutes: 15,
+            schedule: StoreSchedule(
+              hoursConfigured: true,
+              weekly: [
+                for (var d = 1; d <= 6; d++)
+                  StoreDayHours(
+                    weekday: d,
+                    opensAt: '07:00',
+                    closesAt: '21:00',
+                  ),
+              ],
+            ),
+            menuSections: const [
+              FoodMenuSection(id: 'sec-bun', name: 'Bún & bánh canh'),
+              FoodMenuSection(id: 'sec-side', name: 'Món thêm'),
+              FoodMenuSection(id: 'sec-drink', name: 'Đồ uống'),
+            ],
             items: [
-              FoodMenuItem(
+              const FoodMenuItem(
                 id: 'i1',
                 name: 'Bún chả cá đặc biệt',
+                description: 'Chả cá thu, chả hấp, bánh canh, nước dùng xương',
                 priceVnd: 55000,
+                originalPriceVnd: 65000,
                 available: true,
+                soldCount: 320,
+                menuCategoryId: 'sec-bun',
                 optionGroups: _shotOptionGroups,
               ),
-              FoodMenuItem(
+              const FoodMenuItem(
                 id: 'i2',
                 name: 'Bánh canh chả cá',
                 priceVnd: 45000,
                 available: true,
+                soldCount: 140,
+                menuCategoryId: 'sec-bun',
               ),
               FoodMenuItem(
+                id: 'i5',
+                name: 'Bún chả cá trộn',
+                description: 'Bún trộn mắm nêm, chả cá chiên giòn',
+                priceVnd: 49000,
+                available: true,
+                menuCategoryId: 'sec-bun',
+                addedAt: DateTime.now().subtract(const Duration(days: 2)),
+              ),
+              const FoodMenuItem(
                 id: 'i3',
                 name: 'Chả cá chiên',
                 priceVnd: 30000,
                 available: false,
+                menuCategoryId: 'sec-side',
+              ),
+              const FoodMenuItem(
+                id: 'i4',
+                name: 'Trà chanh',
+                priceVnd: 15000,
+                available: true,
+                soldCount: 95,
+                menuCategoryId: 'sec-drink',
               ),
             ],
           ),
@@ -229,11 +343,39 @@ FakeFoodClient _food() =>
         ),
       ];
 
+final _shotOffers = [
+  StoreOffer(
+    id: 'offer-1',
+    code: 'BUNBO20',
+    name: 'Giảm 20%',
+    kind: StoreOfferKind.percentage,
+    discountValue: 20,
+    maxDiscountVnd: 30000,
+    minOrderVnd: 80000,
+    endsAt: DateTime(2026, 11, 30),
+    remainingUses: 12,
+  ),
+  StoreOffer(
+    id: 'offer-2',
+    code: 'SHIP15',
+    name: 'Giảm 15K',
+    kind: StoreOfferKind.fixedAmount,
+    discountValue: 15000,
+    minOrderVnd: 120000,
+    endsAt: DateTime(2026, 11, 15),
+  ),
+];
+
 FakeRatingRemoteDataSource _ratings() {
   final now = DateTime.now();
   return FakeRatingRemoteDataSource(
     stores: {
-      _storeId: const StoreRating(storeId: _storeId, count: 12, average: 4.6),
+      _storeId: const StoreRating(
+        storeId: _storeId,
+        count: 12,
+        average: 4.6,
+        distribution: [0, 0, 1, 3, 8],
+      ),
       '5b0f6c9e-1d2a-4e3b-8c4d-000000000002': const StoreRating(
         storeId: '5b0f6c9e-1d2a-4e3b-8c4d-000000000002',
         count: 2,
@@ -242,20 +384,24 @@ FakeRatingRemoteDataSource _ratings() {
     reviews: {
       _storeId: [
         StoreReview(
+          id: 'review-1',
           stars: 5,
-          tags: const [],
+          tags: const [RatingTag.tastyFood, RatingTag.wellPacked],
           comment: 'Chả cá dai, nước dùng ngọt thanh. Giao nhanh.',
           createdAt: now.subtract(const Duration(days: 1)),
+          merchantReply: 'Cảm ơn bạn đã ủng hộ quán!',
+          repliedAt: now.subtract(const Duration(hours: 20)),
         ),
         StoreReview(
+          id: 'review-2',
           stars: 4,
-          tags: const [],
+          tags: const [RatingTag.tastyFood, RatingTag.onTime],
           comment: 'Ngon, hơi nhiều hành.',
           createdAt: now.subtract(const Duration(days: 3)),
         ),
         StoreReview(
           stars: 5,
-          tags: const [],
+          tags: const [RatingTag.wellPacked, RatingTag.tastyFood],
           createdAt: now.subtract(const Duration(days: 4)),
         ),
       ],
@@ -286,6 +432,14 @@ Future<void> _loadFonts() async {
     for (final w in ['Regular', 'Medium', 'SemiBold', 'Bold', 'ExtraBold'])
       'assets/fonts/BeVietnamPro-$w.ttf',
   ]);
+  // Material Icons (solid rating stars) are not loaded by flutter_tester.
+  final flutterRoot = Platform.environment['FLUTTER_ROOT'];
+  final materialIcons = File(
+    '$flutterRoot/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
+  );
+  if (flutterRoot != null && materialIcons.existsSync()) {
+    await family('MaterialIcons', [materialIcons.path]);
+  }
   final config = jsonDecode(
     File('.dart_tool/package_config.json').readAsStringSync(),
   ) as Map<String, dynamic>;
@@ -348,6 +502,34 @@ Future<void> _shoot(WidgetTester tester, String name) async {
   });
   Directory(_outDir).createSync(recursive: true);
   File('$_outDir/$name.png').writeAsBytesSync(bytes!);
+  final cut = _truncatedTexts(boundary);
+  if (cut.isNotEmpty) {
+    File('$_outDir/truncated.tsv').writeAsStringSync(
+      cut.map((t) => '$name\t$t\n').join(),
+      mode: FileMode.append,
+    );
+  }
+}
+
+/// Visible text that does not fit its box: more lines than `maxLines`, or a
+/// single line wider than its paragraph.
+List<String> _truncatedTexts(RenderObject root) {
+  final out = <String>[];
+  void visit(RenderObject node) {
+    if (node is RenderParagraph && node.hasSize && node.size.width > 0) {
+      final singleLine = node.maxLines == 1 || !node.softWrap;
+      final tooWide =
+          singleLine &&
+          node.getMaxIntrinsicWidth(double.infinity) > node.size.width + 0.5;
+      if (node.didExceedMaxLines || tooWide) {
+        out.add(node.text.toPlainText().replaceAll('\n', ' '));
+      }
+    }
+    node.visitChildren(visit);
+  }
+
+  visit(root);
+  return out;
 }
 
 /// DEC-PROD-024 shots: a negotiating ride with one offer, and a finished discounted ride.
@@ -413,7 +595,7 @@ Future<void> _pump(
   UserProfile? profile,
   FakeFoodClient? food,
 }) async {
-  tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+  tester.view.physicalSize = _logicalSize * 3;
   tester.view.devicePixelRatio = 3;
   final store = MemoryTokenStore();
   if (profile != null) {
@@ -479,7 +661,8 @@ Future<void> _pump(
         addressBook: FakeAddressBookRemoteDataSource(
           seed: FakeAddressBookRemoteDataSource.sample(),
         ),
-        ratings: _ratings(),
+        ratings: _ratings()..merchantStoreId = _storeId,
+        merchantOffers: FakeMerchantOfferRepository.sample(),
         driverHistory: FakeDriverHistoryRemoteDataSource(
           seed: FakeDriverHistoryRemoteDataSource.sample(DateTime.now()),
         ),
@@ -586,17 +769,17 @@ void main() {
     '03_email_login': (AuthRoutes.emailLogin, null, null, null),
     '04_onboarding': (AuthRoutes.onboarding, null, null, null),
     '05_customer_home': ('/customer', _customer, null, null),
-    '06_customer_trips': ('/customer', _customer, 'Chuyến đi', null),
-    '07_customer_shop': ('/customer', _customer, 'Mua hàng', null),
-    '08_customer_account': ('/customer', _customer, 'Tài khoản', null),
+    '06_customer_trips': ('/customer', _customer, 'Chuyến', null),
+    '07_customer_shop': ('/customer', _customer, 'Mua', null),
+    '08_customer_account': ('/customer', _customer, 'Tôi', null),
     '09_ride_route': ('/customer', _customer, null, null),
     '10_ride_fare': ('/customer', _customer, null, null),
     '11_food_search': ('/customer', _customer, null, '/customer/food/search'),
     '12_driver_home': ('/driver', _driver, null, null),
     '13_driver_jobs': ('/driver', _driver, 'Việc nhận', null),
     '14_driver_earnings': ('/driver', _driver, 'Thu nhập', null),
-    '15_account_addresses': ('/customer', _customer, 'Tài khoản', 'addresses'),
-    '16_notifications': ('/customer', _customer, 'Tài khoản', 'notifications'),
+    '15_account_addresses': ('/customer', _customer, 'Tôi', 'addresses'),
+    '16_notifications': ('/customer', _customer, 'Tôi', 'notifications'),
     '17_driver_active_ride': (
       '/driver',
       _driver,
@@ -618,19 +801,19 @@ void main() {
       null,
       '/customer/ride/tracking/ride-track',
     ),
-    '25_payment_history': ('/customer', _customer, 'Tài khoản', 'payments'),
-    '26_help_center': ('/customer', _customer, 'Tài khoản', 'help'),
-    '27_support_tickets': ('/customer', _customer, 'Tài khoản', 'help/tickets'),
+    '25_payment_history': ('/customer', _customer, 'Tôi', 'payments'),
+    '26_help_center': ('/customer', _customer, 'Tôi', 'help'),
+    '27_support_tickets': ('/customer', _customer, 'Tôi', 'help/tickets'),
     '28_support_ticket_detail': (
       '/customer',
       _customer,
-      'Tài khoản',
+      'Tôi',
       'help/tickets/ticket-replied',
     ),
     '29_support_ticket_new': (
       '/customer',
       _customer,
-      'Tài khoản',
+      'Tôi',
       'help/tickets/new',
     ),
     '30_food_store': (
@@ -648,6 +831,72 @@ void main() {
     '32_merchant_order_new': ('/merchant', _merchant, 'Đơn hàng', null),
     '42_merchant_products': ('/merchant', _merchant, 'Thực đơn', null),
     '43_merchant_home': ('/merchant', _merchant, null, null),
+    '80_food_home': ('/customer', _customer, 'Mua', null),
+    '81_food_store_offers': (
+      '/customer',
+      _customer,
+      null,
+      '/customer/food/stores/$_storeId',
+    ),
+    '82_food_store_search': (
+      '/customer',
+      _customer,
+      null,
+      '/customer/food/stores/$_storeId',
+    ),
+    '83_food_store_reviews': (
+      '/customer',
+      _customer,
+      null,
+      '/customer/food/stores/$_storeId',
+    ),
+    '84_food_rating_sheet': ('/customer', _customer, null, null),
+    '85_merchant_offers': ('/merchant', _merchant, null, '/merchant/offers'),
+    '94_food_store_cart': (
+      '/customer',
+      _customer,
+      null,
+      '/customer/food/stores/$_storeId',
+    ),
+    '95_food_store_offers_sheet': (
+      '/customer',
+      _customer,
+      null,
+      '/customer/food/stores/$_storeId',
+    ),
+    '96_food_options_cart': (
+      '/customer',
+      _customer,
+      null,
+      '/customer/food/stores/$_storeId',
+    ),
+    '97_checkout_voucher_sheet': ('/customer', _customer, null, null),
+    '98_merchant_profile': (
+      '/merchant',
+      _merchant,
+      null,
+      '/merchant/settings/profile',
+    ),
+    '86_merchant_offer_new': (
+      '/merchant',
+      _merchant,
+      null,
+      '/merchant/offers/new',
+    ),
+    '87_merchant_reviews': ('/merchant', _merchant, null, '/merchant/reviews'),
+    '90_food_tracking': (
+      '/customer',
+      _customer,
+      null,
+      '/customer/food/orders/9a8b7c6d-0000-4000-8000-00000004a1f3',
+    ),
+    '92_food_search_results': (
+      '/customer',
+      _customer,
+      null,
+      '/customer/food/search',
+    ),
+    '93_food_order_history': ('/customer', _customer, 'Chuyến', null),
     '44_ride_offers_voucher': (
       '/customer',
       _customer,
@@ -719,29 +968,31 @@ void main() {
     ),
     '56_driver_delivery_code': ('/driver', _driver, null, null),
     '57_merchant_handover_code': ('/merchant', _merchant, 'Đơn hàng', null),
-    '58_delete_account': (
-      '/customer',
-      _customer,
-      'Tài khoản',
-      'delete-account',
-    ),
+    '58_delete_account': ('/customer', _customer, 'Tôi', 'delete-account'),
     '59_delete_account_filled': (
       '/customer',
       _customer,
-      'Tài khoản',
+      'Tôi',
       'delete-account',
     ),
     '60_delete_account_verify': (
       '/customer',
       _customer,
-      'Tài khoản',
+      'Tôi',
       'delete-account',
     ),
-    '61_delete_account_done': (
+    '61_delete_account_done': ('/customer', _customer, 'Tôi', 'delete-account'),
+    '62_food_category_tea': (
       '/customer',
       _customer,
-      'Tài khoản',
-      'delete-account',
+      null,
+      '/customer/food/category?category=tea',
+    ),
+    '63_merchant_store_category': (
+      '/merchant',
+      _merchant,
+      null,
+      '/merchant/settings/profile',
     ),
   };
 
@@ -809,6 +1060,20 @@ void main() {
       label: 'Sân bay Quốc tế Đà Nẵng, Nguyễn Văn Linh, Hải Châu',
     ),
   );
+  void addStoreItem(BuildContext context) {
+    context.read<FoodCartCubit>().addItem(
+      storeId: _storeId,
+      storeName: 'Bún chả cá Bà Lữ',
+      minOrderVnd: 40000,
+      item: const FoodMenuItem(
+        id: 'i2',
+        name: 'Bún chả cá thường',
+        priceVnd: 35000,
+        available: true,
+      ),
+    );
+  }
+
   void addSampleItem(BuildContext context) {
     context.read<FoodCartCubit>()
       ..addItem(
@@ -830,6 +1095,48 @@ void main() {
 
   // Extra interaction after navigation, for screens without a direct route.
   final setups = <String, Future<void> Function(WidgetTester)>{
+    '94_food_store_cart': (tester) async {
+      addStoreItem(tester.element(find.byType(Scaffold).last));
+      await tester.pumpAndSettle();
+    },
+    '95_food_store_offers_sheet': (tester) async {
+      final all = find.byKey(const Key('food-store-offers-all'));
+      await _reveal(tester, all);
+      await tester.ensureVisible(all);
+      await tester.pumpAndSettle();
+      await tester.tap(all);
+      await tester.pumpAndSettle();
+    },
+    '96_food_options_cart': (tester) async {
+      addStoreItem(tester.element(find.byType(Scaffold).last));
+      await tester.pumpAndSettle();
+      await _reveal(tester, find.byKey(const Key('food-add-i1')));
+      final add = find.byKey(const Key('food-add-i1')).last;
+      await tester.ensureVisible(add);
+      await tester.pumpAndSettle();
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('food-option-o-large')));
+      await tester.pumpAndSettle();
+    },
+    '97_checkout_voucher_sheet': (tester) async {
+      final context = tester.element(find.byType(Scaffold).first);
+      addSampleItem(context);
+      context.read<FoodCartCubit>().setDeliveryFare(15000);
+      GoRouter.of(context).push(FoodRoutes.checkout);
+      await tester.pumpAndSettle();
+      final open = find.byKey(const Key('checkout-voucher-picker'));
+      await _reveal(tester, open);
+      await tester.ensureVisible(open);
+      await tester.pumpAndSettle();
+      await tester.tap(open);
+      await tester.pumpAndSettle();
+    },
+    '63_merchant_store_category': (tester) async {
+      final tea = find.byKey(const Key('food-category-pick-tea'));
+      await _reveal(tester, tea);
+      await tester.pumpAndSettle();
+    },
     '18_rating_sheet': (tester) async {
       showModalBottomSheet<ServiceRating>(
         context: tester.element(find.byType(Scaffold).first),
@@ -878,6 +1185,42 @@ void main() {
       );
       await tester.pumpAndSettle();
     },
+    '92_food_search_results': (tester) async {
+      await tester.enterText(find.byKey(const Key('food-search-field')), 'bún');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+    },
+    '82_food_store_search': (tester) async {
+      await tester.ensureVisible(find.byKey(const Key('food-store-search')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('food-store-search')),
+        'chả cá',
+      );
+      await tester.pumpAndSettle();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+    },
+    '83_food_store_reviews': (tester) async {
+      await tester.tap(find.byKey(const Key('food-store-tab-reviews')));
+      await tester.pumpAndSettle();
+    },
+    '84_food_rating_sheet': (tester) async {
+      showModalBottomSheet<ServiceRating>(
+        context: tester.element(find.byType(Scaffold).first),
+        isScrollControlled: true,
+        builder: (_) => const RatingSheet(
+          type: RatingSubjectType.foodOrder,
+          subjectId: 'order-1',
+          hasDriver: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('rate-driver-stars-5')));
+      await tester.pumpAndSettle();
+    },
     '31_food_store_reviews': (tester) async {
       await tester.tap(find.byKey(const Key('food-store-tab-reviews')));
       await tester.pumpAndSettle();
@@ -894,7 +1237,7 @@ void main() {
       final row = find.byKey(
         const Key('driver-history-item-7d1f0c2a-0000-4000-8000-000000000001'),
       );
-      await tester.ensureVisible(row);
+      await _reveal(tester, row);
       await tester.pumpAndSettle();
       await tester.tap(row);
       await tester.pumpAndSettle();
@@ -926,7 +1269,7 @@ void main() {
     },
     '44_ride_offers_voucher': (tester) async {
       final field = find.byKey(const Key('voucher-field'));
-      await tester.ensureVisible(field);
+      await _reveal(tester, field);
       await tester.enterText(field, 'DEALGO10');
       await tester.tap(find.byKey(const Key('voucher-apply')));
       await tester.pumpAndSettle();
@@ -934,7 +1277,11 @@ void main() {
       await tester.pumpAndSettle();
     },
     '52_food_item_options': (tester) async {
-      await tester.tap(find.byKey(const Key('food-add-i1')).first);
+      await _reveal(tester, find.byKey(const Key('food-add-i1')));
+      final add = find.byKey(const Key('food-add-i1')).last;
+      await tester.ensureVisible(add);
+      await tester.pumpAndSettle();
+      await tester.tap(add);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('food-option-o-large')));
       await tester.pumpAndSettle();
@@ -956,7 +1303,7 @@ void main() {
       final job = find.byKey(
         const Key('driver-food-9a8b7c6d-0000-4000-8000-00000004b2c4'),
       );
-      await tester.ensureVisible(job);
+      await _reveal(tester, job);
       await tester.pumpAndSettle();
       await tester.tap(job);
       await tester.pumpAndSettle();
@@ -969,15 +1316,13 @@ void main() {
       final job = find.byKey(
         const Key('driver-food-9a8b7c6d-0000-4000-8000-00000004b2c4'),
       );
-      await tester.ensureVisible(job);
+      await _reveal(tester, job);
       await tester.pumpAndSettle();
       await tester.tap(job);
       await tester.pumpAndSettle();
       for (final key in [
         'driver-claim-job',
-        'driver-arrived-pickup',
         'driver-food-pickup',
-        'driver-food-deliver',
         'driver-food-complete',
       ]) {
         await tester.tap(find.byKey(Key(key)));
@@ -1052,4 +1397,18 @@ void main() {
       addTearDown(tester.view.reset);
     }, skip: !_enabled);
   }
+}
+
+/// Lazy lists on a 320x568 viewport do not build rows below the fold, so
+/// [WidgetTester.ensureVisible] cannot find them. Scroll until built.
+Future<void> _reveal(WidgetTester tester, Finder target) async {
+  for (var i = 0; i < 20 && target.evaluate().isEmpty; i++) {
+    final view = tester.view.physicalSize / tester.view.devicePixelRatio;
+    await tester.dragFrom(
+      Offset(view.width / 2, view.height * 0.6),
+      const Offset(0, -240),
+    );
+    await tester.pumpAndSettle();
+  }
+  await tester.ensureVisible(target);
 }

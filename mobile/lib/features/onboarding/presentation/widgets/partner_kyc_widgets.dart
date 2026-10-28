@@ -289,7 +289,6 @@ class PartnerReviewIssuesCard extends StatelessWidget {
             ),
             const SizedBox(height: DealGoSpacing.s12),
           ],
-        OnboardingInfoBanner(message: l10n.partnerResubmitNote),
       ],
     );
   }
@@ -299,7 +298,7 @@ class PartnerReviewIssuesCard extends StatelessWidget {
 class PartnerTimelineRow extends StatelessWidget {
   const PartnerTimelineRow({
     required this.title,
-    required this.subtitle,
+    this.subtitle = '',
     this.done = false,
     this.current = false,
     super.key,
@@ -341,7 +340,8 @@ class PartnerTimelineRow extends StatelessWidget {
                     title,
                     style: textTheme.titleMedium?.copyWith(fontSize: 15),
                   ),
-                  Text(subtitle, style: textTheme.bodySmall),
+                  if (subtitle.isNotEmpty)
+                    Text(subtitle, style: textTheme.bodySmall),
                 ],
               ),
             ),
@@ -451,7 +451,6 @@ class PartnerBankFields extends StatelessWidget {
           value: bankName,
           required: true,
           fieldKey: const Key('bank-name'),
-          hint: l10n.partnerBankNameHint,
           onChanged: onBankName,
         ),
         const SizedBox(height: DealGoSpacing.s12),

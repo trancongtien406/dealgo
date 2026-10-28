@@ -90,7 +90,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
 
-    expect(find.text('Không tìm thấy địa điểm'), findsOneWidget);
+    expect(find.text('Không tìm thấy'), findsOneWidget);
     expect(find.text('Cầu Rồng'), findsNothing);
   });
 
@@ -124,7 +124,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Trung tâm hỗ trợ'), findsWidgets);
-    expect(find.text('Chúng mình có thể giúp gì cho bạn?'), findsOneWidget);
   });
 
   testWidgets('the account bell opens the notification inbox', (tester) async {

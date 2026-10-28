@@ -128,11 +128,6 @@ class DriverRideDetailPage extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: DealGoSpacing.s12),
-            DriverNote(
-              tone: DriverNoteTone.green,
-              message: AppLocalizations.of(context).driverCounterNote,
-            ),
           ],
         ),
       ),
@@ -519,11 +514,6 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: DealGoSpacing.s12),
-              DriverNote(
-                tone: DriverNoteTone.green,
-                message: l10n.driverOfferKindNote,
               ),
             ],
             if (_error != null) ...[

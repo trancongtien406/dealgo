@@ -248,7 +248,6 @@ class _AddressFormSheetState extends State<AddressFormSheet> {
               DealGoTextField(
                 key: const Key('address-label'),
                 label: l10n.addrBookLabel,
-                hint: l10n.addrBookLabelHint,
                 controller: _label,
                 maxLength: 60,
                 textInputAction: TextInputAction.next,
@@ -273,7 +272,6 @@ class _AddressFormSheetState extends State<AddressFormSheet> {
               DealGoTextField(
                 key: const Key('address-note'),
                 label: l10n.addrBookNote,
-                hint: l10n.addrBookNoteHint,
                 controller: _note,
                 maxLength: 200,
                 textInputAction: TextInputAction.done,

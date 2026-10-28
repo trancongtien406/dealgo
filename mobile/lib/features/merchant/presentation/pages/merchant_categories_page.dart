@@ -236,14 +236,7 @@ class _MerchantCategoriesPageState extends State<MerchantCategoriesPage> {
                         l10n.merchantCategoriesHeadline,
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
-                      Text(l10n.merchantCategoriesSubtitle),
-                      const SizedBox(height: DealGoSpacing.s8),
                       Text(l10n.merchantCategoriesCount('${_items.length}')),
-                      Text(
-                        l10n.merchantCategoriesReorderHint,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      const SizedBox(height: DealGoSpacing.s8),
                       DealGoTextField(
                         label: l10n.merchantCategoriesSearchHint,
                         showLabel: false,

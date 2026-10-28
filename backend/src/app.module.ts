@@ -38,6 +38,8 @@ import { PromotionModule } from './modules/promotion/index.js';
 import { InboxModule } from './modules/communication/inbox/index.js';
 import { AddressBookModule } from './modules/address-book/index.js';
 import { PlacesModule } from './modules/places/index.js';
+import { IntegrationsAdminModule } from './modules/integrations-admin/index.js';
+import { SystemErrorsModule } from './modules/system-errors/index.js';
 import { RatingModule } from './modules/rating/index.js';
 import { DriverCardModule } from './modules/driver-card/index.js';
 import { RideShareModule } from './modules/ride-share/index.js';
@@ -49,6 +51,7 @@ import { AccountDeletionModule } from './modules/account-deletion/index.js';
 import { AccountSettingsModule } from './modules/account-settings/index.js';
 import { RoutingModule } from './modules/routing/index.js';
 import { HomeBannerModule } from './modules/home-banner/index.js';
+import { FoodCategoryModule } from './modules/food-category/index.js';
 
 function buildThrottlerOptions(config: ConfigService<AppEnv, true>): ThrottlerModuleOptions {
   const throttlers = [
@@ -119,7 +122,10 @@ function buildThrottlerOptions(config: ConfigService<AppEnv, true>): ThrottlerMo
     AccountSettingsModule,
     RoutingModule,
     HomeBannerModule,
+    FoodCategoryModule,
     OpsModule,
+    IntegrationsAdminModule,
+    SystemErrorsModule,
   ],
   controllers: [AppController],
   providers: [

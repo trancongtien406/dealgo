@@ -16,6 +16,13 @@ abstract final class MerchantRoutes {
   static const categories = '/merchant/products/categories';
   static const history = '/merchant/history';
 
+  /// M040 store-funded offers; M041 creates one.
+  static const offers = '/merchant/offers';
+  static const offerNew = '/merchant/offers/new';
+
+  /// M031 customer reviews with replies.
+  static const reviews = '/merchant/reviews';
+
   static String itemEdit(String itemId) =>
       '/merchant/products/${Uri.encodeComponent(itemId)}/edit';
 

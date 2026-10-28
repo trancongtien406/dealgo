@@ -13,6 +13,7 @@ import '../../../food/domain/entities/food_money.dart';
 import '../../domain/entities/merchant_menu_models.dart';
 import '../../domain/repositories/merchant_orders_repository.dart';
 import '../widgets/merchant_widgets.dart';
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 
 /// M020 — finished order history (DEC-PROD-039).
 class MerchantHistoryPageView extends StatefulWidget {
@@ -79,14 +80,12 @@ class _MerchantHistoryPageViewState extends State<MerchantHistoryPageView> {
       title: l10n.merchantHistoryTitle,
       onBack: () => merchantBack(context),
       body: ListView(
-        padding: merchantPagePadding,
+        padding: dealGoScrollPadding(context, merchantPagePadding),
         children: [
           Text(
             l10n.merchantHistoryHeadline,
             style: Theme.of(context).textTheme.titleLarge,
           ),
-          Text(l10n.merchantHistorySubtitle),
-          const SizedBox(height: DealGoSpacing.s12),
           DealGoTextField(
             label: l10n.merchantHistorySearch,
             showLabel: false,

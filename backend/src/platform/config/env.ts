@@ -156,6 +156,8 @@ const envSchema = z.object({
   /** Error monitoring (DEC-PROD-054). Empty = disabled (no-op). */
   SENTRY_DSN: optionalString,
   SENTRY_ENVIRONMENT: optionalString,
+  /** Release tag set per deploy (e.g. 2026.10.27-1930); groups issues by deploy. */
+  SENTRY_RELEASE: optionalString,
   SENTRY_TRACES_SAMPLE_RATE: z.preprocess(
     (value) =>
       value === undefined || value === null || value === '' ? undefined : value,
@@ -221,6 +223,9 @@ const envSchema = z.object({
   CHAT_ENCRYPTION_KEY: optionalString,
   CHAT_ENCRYPTION_KEY_VERSION: positiveInt(1),
   CHAT_ENCRYPTION_PREVIOUS_KEYS: optionalString,
+  // Admin-managed integration credentials (email provider, map keys) at rest. Base64 32-byte key;
+  // unset → Admin can view env defaults but cannot save credentials.
+  SECRETS_ENCRYPTION_KEY: optionalString,
   KYC_STORAGE_PROVIDER: optionalString,
   // memory | local | s3 (DEC-PROD-020); see platform/storage/storage.module.ts for defaults.
   OBJECT_STORAGE_PROVIDER: optionalString,
@@ -312,6 +317,7 @@ export function loadEnv(source: Record<string, unknown>): AppEnv {
   }
 
   assertChatEncryptionKeys(parsed.data);
+  assertSecretsEncryptionKey(parsed.data);
   assertAppReviewCode(parsed.data);
   assertNoProductionBypass(parsed.data);
   assertProductionProviders(parsed.data);
@@ -753,6 +759,14 @@ export function assertChatEncryptionKeys(
         'CHAT_ENCRYPTION_PREVIOUS_KEYS entries must be version:base64 (32-byte keys)',
       );
     }
+  }
+}
+
+function assertSecretsEncryptionKey(env: Pick<AppEnv, 'SECRETS_ENCRYPTION_KEY'>): void {
+  if (env.SECRETS_ENCRYPTION_KEY !== undefined && !isBase64Key32(env.SECRETS_ENCRYPTION_KEY)) {
+    throw new EnvValidationError(
+      'SECRETS_ENCRYPTION_KEY must be base64 of exactly 32 bytes (generate: openssl rand -base64 32)',
+    );
   }
 }
 

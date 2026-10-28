@@ -18,9 +18,11 @@ import '../../identity/domain/entities/auth_state.dart';
 import '../../identity/presentation/cubit/auth_cubit.dart';
 import '../../inbox/domain/entities/inbox_notification.dart';
 import '../../inbox/domain/usecases/inbox_usecases.dart';
+import '../../inbox/presentation/inbox_unread.dart';
 import 'account_widgets.dart';
 import 'inbox_copy.dart';
 import '../../../core/design_system/components/dealgo_app_header.dart';
+import '../../../core/design_system/components/dealgo_nav_insets.dart';
 
 enum _InboxFilter { all, orders, rides, promos }
 
@@ -95,6 +97,7 @@ class _NotificationsInboxPageState extends State<NotificationsInboxPage> {
         return;
       }
       setState(() => _state = _Loaded(page.items, page.unreadCount));
+      InboxUnread.instance.set(page.unreadCount);
     } catch (error) {
       if (!mounted) {
         return;
@@ -113,6 +116,7 @@ class _NotificationsInboxPageState extends State<NotificationsInboxPage> {
             entry.id == item.id ? entry.markedRead() : entry,
         ], state.unreadCount > 0 ? state.unreadCount - 1 : 0);
       });
+      InboxUnread.instance.set(InboxUnread.instance.count - 1);
       // Best effort: the next refresh re-syncs from the server.
       context
           .read<MarkInboxNotificationRead>()(accessToken: token, id: item.id)
@@ -141,6 +145,7 @@ class _NotificationsInboxPageState extends State<NotificationsInboxPage> {
     setState(() {
       _state = _Loaded([for (final item in state.items) item.markedRead()], 0);
     });
+    InboxUnread.instance.set(0);
     try {
       await context.read<MarkAllInboxNotificationsRead>()(accessToken: token);
     } catch (_) {
@@ -158,7 +163,7 @@ class _NotificationsInboxPageState extends State<NotificationsInboxPage> {
     return ColoredBox(
       color: DealGoColors.canvas,
       child: SafeArea(
-        bottom: dealGoSafeAreaBottom(context),
+        bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -199,11 +204,14 @@ class _NotificationsInboxPageState extends State<NotificationsInboxPage> {
 
   Widget _body(BuildContext context, _InboxState state) {
     final l10n = AppLocalizations.of(context);
-    const padding = EdgeInsets.fromLTRB(
-      DealGoDimensions.pageGutter,
-      DealGoSpacing.s16,
-      DealGoDimensions.pageGutter,
-      DealGoSpacing.s24,
+    final padding = dealGoScrollPadding(
+      context,
+      const EdgeInsets.fromLTRB(
+        DealGoDimensions.pageGutter,
+        DealGoSpacing.s16,
+        DealGoDimensions.pageGutter,
+        DealGoSpacing.s24,
+      ),
     );
     switch (state) {
       case _Loading():

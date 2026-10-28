@@ -16,6 +16,7 @@ import {
   UpdatePromotionStatusDto,
 } from './promotion.dto.js';
 import { PromotionService } from './promotion.service.js';
+import { CurrentActor, type RequestActor } from '../identity/access-auth.guard.js';
 import { OpsPermissionGuard } from '../identity/ops-rbac/ops-permission.guard.js';
 import { RequireOpsPermission } from '../identity/ops-rbac/ops-permission.decorator.js';
 
@@ -49,9 +50,13 @@ export class PromotionOpsController {
   @Patch(':id/status')
   @ApiOperation({ summary: 'Ops update promotion status (active, paused, cancelled)' })
   updateStatus(
+    @CurrentActor() actor: RequestActor,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: UpdatePromotionStatusDto,
   ) {
-    return this.promotions.updateStatus(id, body.status);
+    return this.promotions.updateStatus(id, body.status, {
+      actorUserId: actor.userId,
+      reason: body.reason,
+    });
   }
 }

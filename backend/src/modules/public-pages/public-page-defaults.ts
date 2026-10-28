@@ -158,7 +158,7 @@ const TERMS_VI: LegalContent = {
       id: 'account',
       title: '2. Tài khoản',
       content:
-        'Bạn đăng nhập bằng phương thức đang được hỗ trợ (số điện thoại, email hoặc passkey) và chịu trách nhiệm giữ an toàn thiết bị, mã xác thực của mình. Thông tin cung cấp phải chính xác. Một người chỉ sử dụng một tài khoản.',
+        'Bạn đăng nhập bằng phương thức DealGo đang hỗ trợ và chịu trách nhiệm giữ an toàn thiết bị, thông tin đăng nhập của mình. Thông tin cung cấp phải chính xác. Một người chỉ sử dụng một tài khoản.',
     },
     {
       id: 'partners',
@@ -217,7 +217,7 @@ const TERMS_EN: LegalContent = {
       id: 'account',
       title: '2. Account',
       content:
-        'You sign in with a supported method (phone, email or passkey) and are responsible for keeping your device and codes safe. Information you provide must be accurate. One person, one account.',
+        'You sign in with a method DealGo currently supports and are responsible for keeping your device and sign-in details safe. Information you provide must be accurate. One person, one account.',
     },
     {
       id: 'partners',
@@ -291,7 +291,7 @@ const SUPPORT_VI: SupportContent = {
       role: 'CUSTOMER',
       icon: 'user',
       tone: 'neutral',
-      items: ['Không nhận được mã đăng nhập', 'Đổi số điện thoại hoặc email', 'Xoá tài khoản (Cài đặt → Xoá tài khoản)'],
+      items: ['Không đăng nhập được', 'Đổi thông tin tài khoản', 'Xoá tài khoản (Cài đặt → Xoá tài khoản)'],
     },
     {
       id: 'partner',
@@ -333,7 +333,7 @@ const SUPPORT_EN: SupportContent = {
       role: 'CUSTOMER',
       icon: 'user',
       tone: 'neutral',
-      items: ['Not receiving a sign-in code', 'Change phone or email', 'Delete account (Settings → Delete account)'],
+      items: ['Cannot sign in', 'Change account details', 'Delete account (Settings → Delete account)'],
     },
     {
       id: 'partner',

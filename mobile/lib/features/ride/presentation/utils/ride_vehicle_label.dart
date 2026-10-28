@@ -5,6 +5,7 @@ import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/ride_models.dart';
+import '../../../../core/design_system/components/dealgo_network_image.dart';
 
 IconData rideVehicleClassIcon(String? code) {
   return switch (code) {
@@ -48,11 +49,10 @@ class RideVehicleClassPhoto extends StatelessWidget {
       child: SizedBox(
         width: size,
         height: size,
-        child: Image.network(
+        child: DealGoNetworkImage(
           resolved,
           fit: BoxFit.cover,
-          errorBuilder: (_, _, _) =>
-              _RideVehicleClassArt(code: code, size: size),
+          fallback: _RideVehicleClassArt(code: code, size: size),
         ),
       ),
     );

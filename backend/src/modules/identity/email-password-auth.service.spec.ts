@@ -487,13 +487,18 @@ describe('EmailPasswordAuthService', () => {
       '11111111-1111-1111-1111-111111111111',
     );
 
+    const sentBefore = mail.signupCodes.length;
     for (const attempt of [
       service.register({ email: 'blocked@dealgo.vn', password: 'password123' }),
       service.verifyRegistration(challenge.challengeId, mail.signupCodes.at(-1)!.code),
       service.resendRegistration(challenge.challengeId),
       service.login({ email: 'blocked@dealgo.vn', password: 'password123' }),
     ]) {
-      expectError(await errorOf(attempt), 403, 'AUTH_METHOD_DISABLED');
+      const error = await errorOf(attempt);
+      // Generic 404, same as an unknown route: nothing names the method or says it is off.
+      expect(error.getStatus()).toBe(404);
+      expect(JSON.stringify(error.getResponse())).not.toMatch(/email|disabled|method/i);
     }
+    expect(mail.signupCodes).toHaveLength(sentBefore);
   });
 });

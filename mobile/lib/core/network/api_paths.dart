@@ -95,6 +95,7 @@ abstract final class ApiPaths {
   /// M030 store name / logo (DEC-PROD-045).
   static const foodMerchantStoreProfile = '/v1/food/merchant/store/profile';
   static const foodMerchantStoreLogo = '/v1/food/merchant/store/logo';
+  static const foodMerchantStoreCover = '/v1/food/merchant/store/cover';
   static const foodMerchantStoreAcceptSettings =
       '/v1/food/merchant/store/accept-settings';
 
@@ -228,6 +229,12 @@ abstract final class ApiPaths {
   static const storeRatings = '/v1/ratings/stores';
   static String storeReviews(String storeId) =>
       '/v1/ratings/stores/$storeId/reviews';
+  static const foodMerchantReviews = '/v1/food/merchant/reviews';
+  static String foodMerchantReviewReply(String id) =>
+      '/v1/food/merchant/reviews/${Uri.encodeComponent(id)}/reply';
+  static const foodMerchantPromotions = '/v1/food/merchant/promotions';
+  static String foodMerchantPromotionStatus(String id) =>
+      '/v1/food/merchant/promotions/${Uri.encodeComponent(id)}/status';
   static String rating(String subjectType, String subjectId) =>
       '/v1/ratings/$subjectType/$subjectId';
   static const driverHistory = '/v1/driver/history';
@@ -243,6 +250,7 @@ abstract final class ApiPaths {
   static const placesSearch = '/v1/places/search';
   static const publicHomeBanners = '/v1/public/home-banners';
   static const publicHomeBannerEvents = '/v1/public/home-banners/events';
+  static const publicFoodCategories = '/v1/public/food-categories';
   static const placesReverse = '/v1/places/reverse';
   static const mePlaceHistory = '/v1/me/place-history';
   static String mePlaceHistoryItem(String id) => '/v1/me/place-history/$id';
@@ -270,6 +278,7 @@ abstract final class ApiPaths {
   static const supportTickets = '/v1/support/tickets';
   static const helpFaqs = '/v1/public/help/faqs';
   static const promotionsAvailable = '/v1/promotions/available';
+  static const publicClientConfig = '/v1/public/client-config';
   static String rideShareLink(String rideId) =>
       '/v1/rides/${Uri.encodeComponent(rideId)}/share-link';
   static String supportTicketAttachment(

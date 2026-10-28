@@ -266,8 +266,6 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: DealGoSpacing.s8),
-                  Text(l10n.helpAnswersNote, style: textTheme.bodySmall),
                 ],
               ),
             ),
@@ -332,13 +330,6 @@ class _SupportBanner extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: DealGoSpacing.s8),
-                  Text(
-                    AppLocalizations.of(context).helpBannerBody,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.9),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -380,7 +371,6 @@ class _TopicGrid extends StatelessWidget {
                 selected: selected == _HelpTopic.ride,
                 icon: DealGoIcons.car,
                 title: l10n.helpTopicRide,
-                subtitle: l10n.helpTopicRideSub,
                 onSelected: onSelected,
               ),
             ),
@@ -391,7 +381,6 @@ class _TopicGrid extends StatelessWidget {
                 selected: selected == _HelpTopic.food,
                 icon: DealGoIcons.restaurant,
                 title: l10n.helpTopicFood,
-                subtitle: l10n.helpTopicFoodSub,
                 onSelected: onSelected,
               ),
             ),
@@ -406,7 +395,6 @@ class _TopicGrid extends StatelessWidget {
                 selected: selected == _HelpTopic.payment,
                 icon: DealGoIcons.wallet,
                 title: l10n.helpTopicPayment,
-                subtitle: l10n.helpTopicPaymentSub,
                 onSelected: onSelected,
               ),
             ),
@@ -417,7 +405,6 @@ class _TopicGrid extends StatelessWidget {
                 selected: selected == _HelpTopic.account,
                 icon: DealGoIcons.shieldPlain,
                 title: l10n.helpTopicAccount,
-                subtitle: l10n.helpTopicAccountSub,
                 onSelected: onSelected,
               ),
             ),
@@ -434,7 +421,6 @@ class _TopicCard extends StatelessWidget {
     required this.selected,
     required this.icon,
     required this.title,
-    required this.subtitle,
     required this.onSelected,
   });
 
@@ -442,7 +428,6 @@ class _TopicCard extends StatelessWidget {
   final bool selected;
   final IconData icon;
   final String title;
-  final String subtitle;
   final ValueChanged<_HelpTopic> onSelected;
 
   @override
@@ -460,8 +445,6 @@ class _TopicCard extends StatelessWidget {
           ),
           const SizedBox(height: DealGoSpacing.s12),
           Text(title, style: textTheme.titleMedium?.copyWith(fontSize: 16)),
-          const SizedBox(height: 2),
-          Text(subtitle, style: textTheme.bodySmall),
           if (selected) ...[
             const SizedBox(height: DealGoSpacing.s8),
             Text(

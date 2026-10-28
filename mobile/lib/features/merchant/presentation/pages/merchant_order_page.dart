@@ -14,6 +14,7 @@ import '../../domain/usecases/accept_merchant_order.dart';
 import '../../domain/usecases/get_merchant_order.dart';
 import '../../domain/usecases/mark_merchant_order_ready.dart';
 import '../../domain/usecases/reject_merchant_order.dart';
+import '../../../food/presentation/widgets/food_category_tile.dart';
 import '../../../food/presentation/widgets/food_reject_reason.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
 import '../cubit/merchant_order_cubit.dart';
@@ -23,6 +24,7 @@ import '../widgets/merchant_widgets.dart';
 import '../../../../core/design_system/components/handover_ref_badge.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/format/short_ref.dart';
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 
 class MerchantMissingOrderPage extends StatelessWidget {
   const MerchantMissingOrderPage({super.key});
@@ -226,7 +228,7 @@ class _Detail extends StatelessWidget {
       onBack: () => merchantBack(context),
       footer: footer,
       body: ListView(
-        padding: merchantPagePadding,
+        padding: dealGoScrollPadding(context, merchantPagePadding),
         children: [
           MerchantPanel(
             child: Column(
@@ -335,10 +337,16 @@ class _Detail extends StatelessWidget {
                     const SizedBox(height: DealGoSpacing.s8),
                     Row(
                       children: [
-                        const SizedBox(
-                          width: 40,
-                          height: 40,
-                          child: ColoredBox(color: DealGoColors.subtlePurple),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(
+                            DealGoRadius.small,
+                          ),
+                          child: Image.asset(
+                            foodPlaceholderImage,
+                            width: 44,
+                            height: 44,
+                            fit: BoxFit.cover,
+                          ),
                         ),
                         const SizedBox(width: DealGoSpacing.s12),
                         Expanded(
@@ -365,6 +373,7 @@ class _Detail extends StatelessWidget {
                             ],
                           ),
                         ),
+                        const SizedBox(width: DealGoSpacing.s8),
                         Text(
                           formatVnd(line.unitPriceVnd * line.qty),
                           style: textTheme.bodyMedium?.copyWith(
@@ -392,10 +401,16 @@ class _Detail extends StatelessWidget {
                     const SizedBox(height: DealGoSpacing.s8),
                     Row(
                       children: [
-                        const SizedBox(
-                          width: 40,
-                          height: 40,
-                          child: ColoredBox(color: DealGoColors.subtlePurple),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(
+                            DealGoRadius.small,
+                          ),
+                          child: Image.asset(
+                            foodPlaceholderImage,
+                            width: 44,
+                            height: 44,
+                            fit: BoxFit.cover,
+                          ),
                         ),
                         const SizedBox(width: DealGoSpacing.s12),
                         Expanded(
@@ -422,6 +437,7 @@ class _Detail extends StatelessWidget {
                             ],
                           ),
                         ),
+                        const SizedBox(width: DealGoSpacing.s8),
                         Text(
                           formatVnd(line.unitPriceVnd * line.qty),
                           style: textTheme.bodyMedium?.copyWith(
@@ -587,13 +603,6 @@ class _Detail extends StatelessWidget {
                 ),
               ),
           ],
-          if (!preparing && !ready) ...[
-            const SizedBox(height: DealGoSpacing.s12),
-            MerchantNote(
-              tone: MerchantNoteTone.green,
-              message: l10n.merchantOrderCodNote,
-            ),
-          ],
           if (message != null) ...[
             const SizedBox(height: DealGoSpacing.s12),
             MerchantNote(message: message!),
@@ -644,7 +653,7 @@ class _Conflict extends StatelessWidget {
         onPrimary: () => onReload(),
       ),
       body: ListView(
-        padding: merchantPagePadding,
+        padding: dealGoScrollPadding(context, merchantPagePadding),
         children: [
           MerchantHero(
             icon: DealGoIcons.swapHoriz,
@@ -680,8 +689,6 @@ class _Conflict extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: DealGoSpacing.s12),
-          MerchantNote(message: l10n.merchantConflictNote),
         ],
       ),
     );

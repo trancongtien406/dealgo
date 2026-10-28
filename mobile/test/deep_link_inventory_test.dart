@@ -163,7 +163,10 @@ void main() {
       expect(open('dealgo://customer', customer), '/customer');
       expect(open('dealgo://merchant', merchant), '/merchant');
       expect(open('dealgo://app/driver', driver), '/driver');
-      expect(open('https://dealgo.trancongtien.com/app/driver', driver), '/driver');
+      expect(
+        open('https://dealgo.trancongtien.com/app/driver', driver),
+        '/driver',
+      );
       // Nothing to open → splash, which forwards to the entry page.
       expect(open('dealgo://', driver), '/splash');
       expect(open('dealgo://app', driver), '/splash');
@@ -216,7 +219,10 @@ void main() {
         '/customer/account/help/tickets/t1',
       );
       expect(
-        open('https://dealgo.trancongtien.com/app/customer/food/orders/o1', customer),
+        open(
+          'https://dealgo.trancongtien.com/app/customer/food/orders/o1',
+          customer,
+        ),
         '/customer/food/orders/o1',
       );
     });

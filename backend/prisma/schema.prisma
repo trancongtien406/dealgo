@@ -90,6 +90,7 @@ model User {
   authMethodPolicies          AuthMethodPolicy[]          @relation("AuthMethodPolicyActor")
   pushDeviceTokens            PushDeviceToken[]
   platformSettings            PlatformSetting[]           @relation("PlatformSettingActor")
+  integrationSettings         IntegrationSetting[]        @relation("IntegrationSettingActor")
   opsFaqCreated               OpsFaqEntry[]               @relation("OpsFaqCreatedBy")
   opsFaqUpdated               OpsFaqEntry[]               @relation("OpsFaqUpdatedBy")
   notifications               UserNotification[]
@@ -521,18 +522,46 @@ enum StoreAcceptMode {
   AUTO
 }
 
+/// DEC-PROD-067 — admin-managed store categories (app chips, labels, home tiles).
+/// `code` is generated from the Vietnamese name once and never changes.
+model FoodCategory {
+  code      String      @id @db.VarChar(64)
+  nameVi    String      @db.VarChar(60)
+  nameEn    String      @db.VarChar(60)
+  /// Lucide icon key from FOOD_CATEGORY_ICONS (shared with the app).
+  icon      String      @db.VarChar(32)
+  /// Colour key from FOOD_CATEGORY_TONES.
+  tone      String      @db.VarChar(16)
+  /// Optional square artwork; replaces the icon when set.
+  imageUrl  String?     @db.VarChar(300)
+  sortOrder Int         @default(0)
+  active    Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  stores    FoodStore[]
+
+  @@index([active, sortOrder])
+  @@map("food_categories")
+}
+
 model FoodStore {
   id                 String             @id @default(uuid()) @db.Uuid
   ownerId            String             @db.Uuid
   owner              User               @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   name               String             @db.VarChar(120)
+  /// DEC-PROD-067 — FoodCategory.code; null = not chosen yet.
   category           String?            @db.VarChar(64)
+  categoryRef        FoodCategory?      @relation(fields: [category], references: [code], onDelete: Restrict, onUpdate: Cascade)
   lat                Float?
   lng                Float?
   serviceRegionCode  String?            @db.VarChar(8)
   addressLabel       String?            @db.VarChar(200)
   /// M030 (DEC-PROD-045) — merchant logo, /v1/public/store-logos/<storeId>/<file>.
   logoUrl            String?            @db.VarChar(400)
+  /// Merchant cover photo, /v1/public/store-covers/<storeId>/<file>; null = first dish photo.
+  coverUrl           String?            @db.VarChar(400)
+  /// Merchant "about the store" text; null = none.
+  description        String?            @db.VarChar(500)
   /// M024 — merchant-controlled intake mode; PAUSED blocks new orders (DEC-PROD-026).
   serviceMode        StoreServiceMode   @default(OPEN)
   /// Auto-resume to OPEN after this instant; null = until the merchant changes it.
@@ -548,12 +577,15 @@ model FoodStore {
   defaultPrepMinutes Int                @default(15)
   /// M024 BUSY adds these minutes to the prep estimate.
   busyExtraMinutes   Int                @default(15)
+  /// Smallest food subtotal the store accepts (VND); 0 = no minimum. Enforced at placement.
+  minOrderVnd        Int                @default(0)
   createdAt          DateTime           @default(now())
   items              FoodItem[]
   menuCategories     FoodMenuCategory[]
   hours              FoodStoreHour[]
   closures           FoodStoreClosure[]
   orders             FoodOrder[]
+  promotions         Promotion[]
 
   @@index([category])
   @@index([lat, lng])
@@ -624,6 +656,8 @@ model FoodItem {
   /// M027 (DEC-PROD-039).
   description      String?                  @db.VarChar(500)
   priceVnd         Int
+  /// List price shown struck through next to priceVnd; null = no markdown. Kept only while above priceVnd.
+  originalPriceVnd Int?
   /// Prep estimate shown to customers; null = use store defaultPrepMinutes.
   prepMinutes      Int?
   imageUrl         String?                  @db.VarChar(400)
@@ -1081,6 +1115,10 @@ enum OpsAuditEntityType {
   /// entityId = rideVehicleClassAuditId(code) (UUID v5); metadata.code holds the class code.
   RIDE_VEHICLE_CLASS
   HOME_BANNER
+  INTEGRATION_SETTING
+  FOOD_CATEGORY
+  PROMOTION
+  SERVICE_RATING
 }
 
 enum OpsAuditAction {
@@ -1110,6 +1148,16 @@ enum OpsAuditAction {
   HOME_BANNER_UPDATE
   HOME_BANNER_DELETE
   HOME_BANNER_REORDER
+  INTEGRATION_SETTING_UPDATE
+  INTEGRATION_SETTING_TEST
+  SENTRY_ISSUE_STATUS_UPDATE
+  FOOD_CATEGORY_CREATE
+  FOOD_CATEGORY_UPDATE
+  FOOD_CATEGORY_DELETE
+  FOOD_CATEGORY_REORDER
+  PROMOTION_STATUS_UPDATE
+  REVIEW_HIDE
+  REVIEW_UNHIDE
 }
 
 enum ServiceRegionStatus {
@@ -1158,6 +1206,46 @@ model PlatformSetting {
   updatedBy       User?                    @relation("PlatformSettingActor", fields: [updatedByUserId], references: [id], onDelete: SetNull)
 
   @@map("platform_settings")
+}
+
+enum IntegrationKind {
+  EMAIL
+  MAPS
+  SENTRY
+}
+
+// Admin-managed integration credentials (Cài đặt › Email, › Bản đồ, › Sentry). Env values are the
+// bootstrap defaults; a field set here overrides its env counterpart. `config` holds non-secret
+// fields; `secretsCiphertext` is an AES-256-GCM envelope (SECRETS_ENCRYPTION_KEY) of the secret
+// fields and never leaves the server. `testedFingerprint` = config hash of the last passing test.
+model IntegrationSetting {
+  id                String          @id @default(uuid()) @db.Uuid
+  kind              IntegrationKind @unique
+  config            Json            @default("{}")
+  secretsCiphertext String?         @db.Text
+  testedFingerprint String?         @db.VarChar(64)
+  testedAt          DateTime?
+  updatedAt         DateTime        @updatedAt
+  updatedByUserId   String?         @db.Uuid
+  updatedBy         User?           @relation("IntegrationSettingActor", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@map("integration_settings")
+}
+
+enum EmailSuppressionReason {
+  BOUNCE
+  COMPLAINT
+}
+
+// Addresses Amazon SES reported as permanently bounced or complained (SNS webhook); never mailed again.
+model EmailSuppression {
+  email     String                 @id @db.VarChar(320)
+  reason    EmailSuppressionReason
+  detail    String?                @db.VarChar(500)
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+
+  @@map("email_suppressions")
 }
 
 enum OpsFaqStatus {
@@ -1471,12 +1559,17 @@ model Promotion {
   startDate         DateTime
   endDate           DateTime
   sponsor           PromotionSponsor      @default(PLATFORM)
+  /// Set for a store's own offer (merchant-created, FOOD only, MERCHANT-funded):
+  /// it applies only to orders from this store. Null = DealGo campaign.
+  storeId           String?               @db.Uuid
+  store             FoodStore?            @relation(fields: [storeId], references: [id], onDelete: Restrict)
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
   redemptions       PromotionRedemption[]
 
   @@index([status, createdAt])
   @@index([createdAt])
+  @@index([storeId, status])
   @@map("promotions")
 }
 
@@ -1631,18 +1724,24 @@ model JobEarning {
 /// Customer rating of a finished ride or delivered food order (one per subject).
 /// driverId/storeId are snapshots of who handled it, for driver summaries and history.
 model ServiceRating {
-  id          String            @id @default(uuid()) @db.Uuid
-  subjectType RatingSubjectType
-  subjectId   String            @db.Uuid
-  raterId     String            @db.Uuid
-  rater       User              @relation(fields: [raterId], references: [id], onDelete: Cascade)
-  driverId    String?           @db.Uuid
-  storeId     String?           @db.Uuid
-  driverStars Int?              @db.SmallInt
-  storeStars  Int?              @db.SmallInt
-  tags        String[]          @db.VarChar(40)
-  comment     String?           @db.VarChar(500)
-  createdAt   DateTime          @default(now())
+  id            String            @id @default(uuid()) @db.Uuid
+  subjectType   RatingSubjectType
+  subjectId     String            @db.Uuid
+  raterId       String            @db.Uuid
+  rater         User              @relation(fields: [raterId], references: [id], onDelete: Cascade)
+  driverId      String?           @db.Uuid
+  storeId       String?           @db.Uuid
+  driverStars   Int?              @db.SmallInt
+  storeStars    Int?              @db.SmallInt
+  tags          String[]          @db.VarChar(40)
+  comment       String?           @db.VarChar(500)
+  createdAt     DateTime          @default(now())
+  /// The store's one public answer to a food review (editable).
+  merchantReply String?           @db.VarChar(500)
+  repliedAt     DateTime?
+  /// Ops moderation: hidden reviews leave the public list and the store average.
+  hiddenAt      DateTime?
+  hiddenReason  String?           @db.VarChar(500)
 
   @@unique([subjectType, subjectId])
   @@index([driverId, createdAt(sort: Desc)])
@@ -1754,10 +1853,12 @@ model RideShareLink {
 enum AccountDeletionMethod {
   PHONE_OTP
   PASSWORD
+  /// WebAuthn assertion with one of the user's own passkeys (codeHash = hash of the challenge).
+  PASSKEY
 }
 
 enum AccountDeletionStatus {
-  /// Waiting for re-authentication (OTP / password).
+  /// Waiting for re-authentication (OTP / password / passkey).
   PENDING
   /// Confirmed: account soft-deleted, purge after the grace period.
   SCHEDULED

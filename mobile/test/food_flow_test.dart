@@ -19,6 +19,19 @@ const _storeId = 'store-bun-bo';
 const _bunId = 'item-bun';
 
 void main() {
+  testWidgets('the shop banner is tappable as a whole', (tester) async {
+    await pumpSignedIn(tester, profile: customerProfile);
+    await tester.tap(navLabel('Mua'));
+    await tester.pumpAndSettle();
+
+    final banner = find.byKey(const Key('food-banner'));
+    expect(banner, findsOneWidget);
+    expect(tester.widget<InkWell>(banner).onTap, isNotNull);
+    await tester.tapAt(tester.getTopLeft(banner) + const Offset(24, 24));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
   test(
     'store list reads array or items payload and orders keep server subtotal',
     () {
@@ -127,7 +140,7 @@ void main() {
     await tester.tap(find.text('Đồ ăn').first);
     await tester.pumpAndSettle();
 
-    expect(find.text('Quán ngon gần bạn'), findsOneWidget);
+    expect(find.text('Gần bạn'), findsOneWidget);
     expect(find.text('Bún Bò Huế'), findsWidgets);
     expect(
       find.byWidgetPredicate(
@@ -171,7 +184,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('61.000đ'), findsOneWidget);
-    expect(find.text('Giá giỏ hàng đã thay đổi'), findsOneWidget);
+    expect(find.text('Giá đã thay đổi'), findsOneWidget);
     expect(food.placeCalls, hasLength(1));
     final request = food.placeCalls.single;
     expect(request.deliveryFareVnd, 25000);
@@ -248,7 +261,7 @@ void main() {
 
     expect(find.byKey(const Key('food-checkout-empty')), findsOneWidget);
     expect(find.text('Giỏ hàng trống'), findsOneWidget);
-    expect(find.text('Hãy chọn món trước khi thanh toán.'), findsOneWidget);
+    expect(find.text('Chưa có món.'), findsOneWidget);
     expect(find.byKey(const Key('state-view-action')), findsOneWidget);
     expect(find.text('Quay lại thực đơn'), findsOneWidget);
     expect(find.byKey(const Key('food-place-order')), findsNothing);

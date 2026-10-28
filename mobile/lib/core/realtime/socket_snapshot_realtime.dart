@@ -46,6 +46,7 @@ class SocketSnapshotRealtime implements SnapshotRealtime {
   final _callEvents = StreamController<Map<String, Object?>>.broadcast();
   final _chatMessages = StreamController<ChatMessageHint>.broadcast();
   final _rideUnassigned = StreamController<RideUnassignedHint>.broadcast();
+  final _inboxEvents = StreamController<void>.broadcast();
   final _rooms = <String>{};
 
   io.Socket? _socket;
@@ -83,6 +84,9 @@ class SocketSnapshotRealtime implements SnapshotRealtime {
 
   @override
   Stream<ChatMessageHint> get chatMessages => _chatMessages.stream;
+
+  @override
+  Stream<void> get inboxEvents => _inboxEvents.stream;
 
   @override
   Stream<void> get reconnects => _reconnects.stream;
@@ -191,6 +195,11 @@ class SocketSnapshotRealtime implements SnapshotRealtime {
       final hint = parseChatMessageHint(raw);
       if (hint != null && !_chatMessages.isClosed) {
         _chatMessages.add(hint);
+      }
+    });
+    created.on('inbox', (dynamic _) {
+      if (!_inboxEvents.isClosed) {
+        _inboxEvents.add(null);
       }
     });
     created.on('call', (dynamic raw) {
@@ -325,6 +334,7 @@ class SocketSnapshotRealtime implements SnapshotRealtime {
     await _callEvents.close();
     await _chatMessages.close();
     await _rideUnassigned.close();
+    await _inboxEvents.close();
   }
 }
 

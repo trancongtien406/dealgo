@@ -12,13 +12,15 @@ import { IdentityModule } from '../identity/index.js';
 import { RideModule } from '../ride/ride.module.js';
 import { RATING_REPOSITORY } from './rating.constants.js';
 import { RatingController } from './rating.controller.js';
+import { RatingMerchantController } from './rating-merchant.controller.js';
+import { RatingOpsController } from './rating-ops.controller.js';
 import { PrismaRatingRepository } from './rating-prisma.repository.js';
 import { MemoryRatingRepository, type RatingRepository } from './rating.repository.js';
 import { RatingService } from './rating.service.js';
 
 @Module({
   imports: [PrismaModule, IdentityModule, RideModule, FoodModule, PlatformSettingsModule],
-  controllers: [RatingController],
+  controllers: [RatingController, RatingMerchantController, RatingOpsController],
   providers: [
     RatingService,
     {

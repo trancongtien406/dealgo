@@ -9,7 +9,10 @@ import { createValidationPipe } from '../../../src/platform/http/create-validati
 import { HttpExceptionFilter } from '../../../src/platform/http/http-exception.filter.js';
 import { ResponseInterceptor } from '../../../src/platform/http/response.interceptor.js';
 import { loadEnv } from '../../../src/platform/config/env.js';
-import { IDENTITY_REPOSITORY, SMS_SENDER } from '../../../src/modules/identity/identity.constants.js';
+import {
+  IDENTITY_REPOSITORY,
+  SMS_SENDER,
+} from '../../../src/modules/identity/identity.constants.js';
 import { MemoryIdentityRepository } from '../../../src/modules/identity/identity.repository.js';
 import { OpsAuthService } from '../../../src/modules/identity/ops-auth.service.js';
 import { MockSmsSender } from '../../../src/integrations/sms/sms-sender.js';
@@ -73,7 +76,9 @@ describe('food order http', () => {
     app.useGlobalFilters(new HttpExceptionFilter());
     app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
     await app.init();
-    await app.get(OpsAuthService).ensureOperator(OPS_EMAIL, OPS_PASSWORD, 'test');
+    await app
+      .get(OpsAuthService)
+      .ensureOperator(OPS_EMAIL, OPS_PASSWORD, 'test');
   });
 
   afterAll(async () => {
@@ -94,16 +99,25 @@ describe('food order http', () => {
       .get(`/v1/food/stores/${store.id}`)
       .set('Authorization', `Bearer ${customer.token}`)
       .expect(200);
-    const items = detail.body.data.items as { id: string; name: string; priceVnd: number }[];
+    const items = detail.body.data.items as {
+      id: string;
+      name: string;
+      priceVnd: number;
+    }[];
     const bun = items.find((item) => item.name === 'Bún bò đặc biệt');
     const tea = items.find((item) => item.name === 'Trà tắc');
     expect(bun?.priceVnd).toBe(60_000);
     expect(tea?.priceVnd).toBe(25_000);
 
-    const first = await place(customer.token, 'idem-food-snapshot-1', store.id, [
-      { itemId: bun!.id, quantity: 2 },
-      { itemId: tea!.id, quantity: 1 },
-    ]);
+    const first = await place(
+      customer.token,
+      'idem-food-snapshot-1',
+      store.id,
+      [
+        { itemId: bun!.id, quantity: 2 },
+        { itemId: tea!.id, quantity: 1 },
+      ],
+    );
     expect(first.status).toBe(200);
     expect(first.body.data.subtotalVnd).toBe(145_000);
     // Fixture store has no lat/lng → server quotes FOOD_MIN_DELIVERY_VND.
@@ -111,9 +125,12 @@ describe('food order http', () => {
     expect(first.body.data.totalVnd).toBe(150_000);
     expect(first.body.data.status).toBe('PLACED');
 
-    const replay = await place(customer.token, 'idem-food-snapshot-1', store.id, [
-      { itemId: bun!.id, quantity: 1 },
-    ]);
+    const replay = await place(
+      customer.token,
+      'idem-food-snapshot-1',
+      store.id,
+      [{ itemId: bun!.id, quantity: 1 }],
+    );
     expect(replay.status).toBe(200);
     expect(replay.body.data.id).toBe(first.body.data.id);
     expect(replay.body.data.subtotalVnd).toBe(145_000);
@@ -180,9 +197,16 @@ describe('food order http', () => {
       .post('/v1/food/orders')
       .set('Authorization', `Bearer ${customer.token}`)
       .set('Idempotency-Key', 'idem-food-quote-1')
-      .send({ storeId, items: [{ itemId, quantity: 1 }], dropoff, deliveryFareVnd: 1 })
+      .send({
+        storeId,
+        items: [{ itemId, quantity: 1 }],
+        dropoff,
+        deliveryFareVnd: 1,
+      })
       .expect(200);
-    expect(placed.body.data.deliveryFareVnd).toBe(quote.body.data.deliveryFareVnd);
+    expect(placed.body.data.deliveryFareVnd).toBe(
+      quote.body.data.deliveryFareVnd,
+    );
     await request(app.getHttpServer())
       .post('/v1/food/quote')
       .set('Authorization', `Bearer ${customer.token}`)
@@ -193,9 +217,13 @@ describe('food order http', () => {
   it('rejects a second open order', async () => {
     const customer = await login();
     const { storeId, itemId } = await oneItem(customer.token);
-    const first = await place(customer.token, 'idem-food-open-1', storeId, [{ itemId, quantity: 1 }]);
+    const first = await place(customer.token, 'idem-food-open-1', storeId, [
+      { itemId, quantity: 1 },
+    ]);
     expect(first.status).toBe(200);
-    const second = await place(customer.token, 'idem-food-open-2', storeId, [{ itemId, quantity: 1 }]);
+    const second = await place(customer.token, 'idem-food-open-2', storeId, [
+      { itemId, quantity: 1 },
+    ]);
     expect(second.status).toBe(409);
     expect(second.body.errorCode).toBe('FOOD_ORDER_ALREADY_OPEN');
   });
@@ -208,7 +236,9 @@ describe('food order http', () => {
     const stranger = await login();
 
     const { storeId, itemId } = await oneItem(customer.token);
-    const created = await place(customer.token, 'idem-food-owner-1', storeId, [{ itemId, quantity: 1 }]);
+    const created = await place(customer.token, 'idem-food-owner-1', storeId, [
+      { itemId, quantity: 1 },
+    ]);
     expect(created.status).toBe(200);
     const orderId = created.body.data.id as string;
 
@@ -240,7 +270,9 @@ describe('food order http', () => {
     await repository.insertGrant(secondDriver.userId, 'DRIVER', 'ACTIVE');
 
     const { storeId, itemId } = await oneItem(customer.token);
-    const created = await place(customer.token, 'idem-food-claim-1', storeId, [{ itemId, quantity: 1 }]);
+    const created = await place(customer.token, 'idem-food-claim-1', storeId, [
+      { itemId, quantity: 1 },
+    ]);
     const orderId = created.body.data.id as string;
 
     await request(app.getHttpServer())
@@ -279,15 +311,21 @@ describe('food order http', () => {
     await repository.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');
 
     const placedCatalog = await oneItem(placedCustomer.token);
-    const placed = await place(placedCustomer.token, 'idem-food-ready-placed', placedCatalog.storeId, [
-      { itemId: placedCatalog.itemId, quantity: 1 },
-    ]);
+    const placed = await place(
+      placedCustomer.token,
+      'idem-food-ready-placed',
+      placedCatalog.storeId,
+      [{ itemId: placedCatalog.itemId, quantity: 1 }],
+    );
     expect(placed.status).toBe(200);
 
     const readyCatalog = await oneItem(readyCustomer.token);
-    const created = await place(readyCustomer.token, 'idem-food-ready-list', readyCatalog.storeId, [
-      { itemId: readyCatalog.itemId, quantity: 1 },
-    ]);
+    const created = await place(
+      readyCustomer.token,
+      'idem-food-ready-list',
+      readyCatalog.storeId,
+      [{ itemId: readyCatalog.itemId, quantity: 1 }],
+    );
     expect(created.status).toBe(200);
     const orderId = created.body.data.id as string;
     await request(app.getHttpServer())
@@ -312,7 +350,9 @@ describe('food order http', () => {
     const ids = (listed.body.data as { id: string }[]).map((order) => order.id);
     expect(ids).toContain(orderId);
     expect(ids).not.toContain(placed.body.data.id);
-    const match = (listed.body.data as { id: string }[]).find((order) => order.id === orderId);
+    const match = (listed.body.data as { id: string }[]).find(
+      (order) => order.id === orderId,
+    );
     expect(match).toEqual({
       id: orderId,
       storeId: readyCatalog.storeId,
@@ -337,7 +377,12 @@ describe('food order http', () => {
   it('rejects a customer without a driver grant from ready food orders', async () => {
     const customer = await login();
     const { storeId, itemId } = await oneItem(customer.token);
-    const placed = await place(customer.token, 'idem-food-ready-denied', storeId, [{ itemId, quantity: 1 }]);
+    const placed = await place(
+      customer.token,
+      'idem-food-ready-denied',
+      storeId,
+      [{ itemId, quantity: 1 }],
+    );
     expect(placed.status).toBe(200);
 
     const denied = await request(app.getHttpServer())
@@ -355,7 +400,12 @@ describe('food order http', () => {
     await repository.insertGrant(otherMerchant.userId, 'MERCHANT', 'ACTIVE');
 
     const { storeId, itemId } = await oneItem(customer.token);
-    const created = await place(customer.token, 'idem-food-queue-own', storeId, [{ itemId, quantity: 1 }]);
+    const created = await place(
+      customer.token,
+      'idem-food-queue-own',
+      storeId,
+      [{ itemId, quantity: 1 }],
+    );
     expect(created.status).toBe(200);
     const orderId = created.body.data.id as string;
 
@@ -363,16 +413,22 @@ describe('food order http', () => {
     if (!(foods instanceof MemoryFoodRepository)) {
       throw new Error('Expected the in-memory food repository');
     }
-    const otherStore = await createPinnedStore(foods, otherMerchant.userId, 'Cơm Tấm', [
-      { name: 'Cơm sườn', priceVnd: 40_000 },
-    ]);
+    const otherStore = await createPinnedStore(
+      foods,
+      otherMerchant.userId,
+      'Cơm Tấm',
+      [{ name: 'Cơm sườn', priceVnd: 40_000 }],
+    );
     const foreignItem = otherStore.items[0];
     if (!foreignItem) {
       throw new Error('Expected a seeded menu item');
     }
-    const foreign = await place(otherCustomer.token, 'idem-food-queue-other', otherStore.id, [
-      { itemId: foreignItem.id, quantity: 1 },
-    ]);
+    const foreign = await place(
+      otherCustomer.token,
+      'idem-food-queue-other',
+      otherStore.id,
+      [{ itemId: foreignItem.id, quantity: 1 }],
+    );
     expect(foreign.status).toBe(200);
 
     const listed = await request(app.getHttpServer())
@@ -385,7 +441,9 @@ describe('food order http', () => {
     expect(ids).not.toContain(foreign.body.data.id);
     const createdAts = rows.map((order) => order.createdAt);
     expect([...createdAts].sort()).toEqual(createdAts);
-    const match = (listed.body.data as { id: string }[]).find((order) => order.id === orderId);
+    const match = (listed.body.data as { id: string }[]).find(
+      (order) => order.id === orderId,
+    );
     expect(match).toEqual({
       id: orderId,
       storeId,
@@ -396,29 +454,38 @@ describe('food order http', () => {
       dropoff,
       lineCount: (created.body.data.lines as unknown[]).length,
       createdAt: expect.any(String),
-      customerName: maskPersonName((await repository.findUserById(customer.userId))?.displayName),
+      customerName: maskPersonName(
+        (await repository.findUserById(customer.userId))?.displayName,
+      ),
       driverName: null,
     });
     expect(JSON.stringify(listed.body.data)).not.toContain('"phone"');
     expect(JSON.stringify(listed.body.data)).not.toContain(customer.userId);
   });
 
-  it('summarises a merchant\'s own sales by Vietnam day with masked queue names', async () => {
+  it("summarises a merchant's own sales by Vietnam day with masked queue names", async () => {
     const customer = await login();
     const secondCustomer = await login();
     const driver = await login();
     await repository.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');
     const owner = await login();
     await repository.insertGrant(owner.userId, 'MERCHANT', 'ACTIVE');
-    await repository.updateUserProfile(secondCustomer.userId, { displayName: 'Trần Công Tiến' });
-    await repository.updateUserProfile(driver.userId, { displayName: 'Lê Văn Bình' });
+    await repository.updateUserProfile(secondCustomer.userId, {
+      displayName: 'Trần Công Tiến',
+    });
+    await repository.updateUserProfile(driver.userId, {
+      displayName: 'Lê Văn Bình',
+    });
     const foods = app.get(FOOD_REPOSITORY);
     if (!(foods instanceof MemoryFoodRepository)) {
       throw new Error('Expected the in-memory food repository');
     }
-    const store = await createPinnedStore(foods, owner.userId, 'Quán Thống Kê', [
-      { name: 'Mì Quảng', priceVnd: 45_000 },
-    ]);
+    const store = await createPinnedStore(
+      foods,
+      owner.userId,
+      'Quán Thống Kê',
+      [{ name: 'Mì Quảng', priceVnd: 45_000 }],
+    );
     const item = store.items[0]!;
 
     const empty = await request(app.getHttpServer())
@@ -451,39 +518,61 @@ describe('food order http', () => {
       .get('/v1/food/orders/queue')
       .set('Authorization', `Bearer ${owner.token}`)
       .expect(200);
-    expect(queue.body.data[0]).toMatchObject({ id: orderId, driverName: 'Bình L.' });
+    expect(queue.body.data[0]).toMatchObject({
+      id: orderId,
+      driverName: 'Bình L.',
+    });
     for (const step of ['pickup', 'deliver']) {
-      const body = step === 'deliver' ? { deliveryCode: await deliveryCodeOf(customer.token, orderId) } : {};
+      const body =
+        step === 'deliver'
+          ? { deliveryCode: await deliveryCodeOf(customer.token, orderId) }
+          : {};
       await request(app.getHttpServer())
         .post(`/v1/food/orders/${orderId}/${step}`)
         .set('Authorization', `Bearer ${driver.token}`)
         .send(body)
         .expect(200);
     }
-    const open = await place(secondCustomer.token, 'idem-food-stats-2', store.id, [
-      { itemId: item.id, quantity: 1 },
-    ]);
+    const open = await place(
+      secondCustomer.token,
+      'idem-food-stats-2',
+      store.id,
+      [{ itemId: item.id, quantity: 1 }],
+    );
     expect(open.status).toBe(200);
     const queue2 = await request(app.getHttpServer())
       .get('/v1/food/orders/queue')
       .set('Authorization', `Bearer ${owner.token}`)
       .expect(200);
     expect(queue2.body.data).toHaveLength(1);
-    expect(queue2.body.data[0]).toMatchObject({ customerName: 'Tiến T.', driverName: null });
+    expect(queue2.body.data[0]).toMatchObject({
+      customerName: 'Tiến T.',
+      driverName: null,
+    });
 
     const stats = await request(app.getHttpServer())
       .get('/v1/food/merchant/stats')
       .query({ days: 3 })
       .set('Authorization', `Bearer ${owner.token}`)
       .expect(200);
-    const todayKey = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+    const todayKey = new Date(Date.now() + 7 * 3_600_000)
+      .toISOString()
+      .slice(0, 10);
     expect(stats.body.data).toMatchObject({
       days: 3,
-      today: { date: todayKey, deliveredCount: 1, salesVnd: 90_000, openCount: 1, cancelledCount: 0 },
+      today: {
+        date: todayKey,
+        deliveredCount: 1,
+        salesVnd: 90_000,
+        openCount: 1,
+        cancelledCount: 0,
+      },
       totals: { deliveredCount: 1, salesVnd: 90_000 },
       topItems: [{ name: 'Mì Quảng', quantity: 2 }],
     });
-    expect(stats.body.data.series.map((d: { date: string }) => d.date).at(-1)).toBe(todayKey);
+    expect(
+      stats.body.data.series.map((d: { date: string }) => d.date).at(-1),
+    ).toBe(todayKey);
     expect(stats.body.data.series).toHaveLength(3);
 
     // Another merchant sees none of it; customers are refused.
@@ -492,7 +581,11 @@ describe('food order http', () => {
       .get('/v1/food/merchant/stats')
       .set('Authorization', `Bearer ${other.token}`)
       .expect(200);
-    expect(fixtureStats.body.data.topItems.some((row: { name: string }) => row.name === 'Mì Quảng')).toBe(false);
+    expect(
+      fixtureStats.body.data.topItems.some(
+        (row: { name: string }) => row.name === 'Mì Quảng',
+      ),
+    ).toBe(false);
     await request(app.getHttpServer())
       .get('/v1/food/merchant/stats')
       .set('Authorization', `Bearer ${customer.token}`)
@@ -507,7 +600,12 @@ describe('food order http', () => {
   it('rejects a customer without a merchant grant from the food queue', async () => {
     const customer = await login();
     const { storeId, itemId } = await oneItem(customer.token);
-    const placed = await place(customer.token, 'idem-food-queue-denied', storeId, [{ itemId, quantity: 1 }]);
+    const placed = await place(
+      customer.token,
+      'idem-food-queue-denied',
+      storeId,
+      [{ itemId, quantity: 1 }],
+    );
     expect(placed.status).toBe(200);
 
     const denied = await request(app.getHttpServer())
@@ -521,7 +619,9 @@ describe('food order http', () => {
     const customer = await login();
     const merchant = await loginPhone('0901110001');
     const { storeId, itemId } = await oneItem(customer.token);
-    const created = await place(customer.token, 'idem-food-cancel-1', storeId, [{ itemId, quantity: 1 }]);
+    const created = await place(customer.token, 'idem-food-cancel-1', storeId, [
+      { itemId, quantity: 1 },
+    ]);
     const orderId = created.body.data.id as string;
 
     const cancelled = await request(app.getHttpServer())
@@ -531,7 +631,9 @@ describe('food order http', () => {
     expect(cancelled.body.data.status).toBe('CANCELLED');
     expect(cancelled.body.data.cancelledBy).toBe('CUSTOMER');
 
-    const again = await place(customer.token, 'idem-food-cancel-2', storeId, [{ itemId, quantity: 1 }]);
+    const again = await place(customer.token, 'idem-food-cancel-2', storeId, [
+      { itemId, quantity: 1 },
+    ]);
     expect(again.status).toBe(200);
     await request(app.getHttpServer())
       .post(`/v1/food/orders/${again.body.data.id}/accept`)
@@ -550,7 +652,9 @@ describe('food order http', () => {
     const otherMerchant = await login();
     await repository.insertGrant(otherMerchant.userId, 'MERCHANT', 'ACTIVE');
     const { storeId, itemId } = await oneItem(customer.token);
-    const created = await place(customer.token, 'idem-food-reject-1', storeId, [{ itemId, quantity: 1 }]);
+    const created = await place(customer.token, 'idem-food-reject-1', storeId, [
+      { itemId, quantity: 1 },
+    ]);
     const orderId = created.body.data.id as string;
 
     const denied = await request(app.getHttpServer())
@@ -601,7 +705,9 @@ describe('food order http', () => {
     expect(twice.body.errorCode).toBe('FOOD_STATUS_CONFLICT');
 
     // The customer can order again right away.
-    const again = await place(customer.token, 'idem-food-reject-2', storeId, [{ itemId, quantity: 1 }]);
+    const again = await place(customer.token, 'idem-food-reject-2', storeId, [
+      { itemId, quantity: 1 },
+    ]);
     expect(again.status).toBe(200);
   });
 
@@ -613,9 +719,18 @@ describe('food order http', () => {
     await request(app.getHttpServer())
       .patch('/v1/food/merchant/store/location')
       .set('Authorization', `Bearer ${merchant.token}`)
-      .send({ lat: dropoff.lat, lng: dropoff.lng, addressLabel: '12 Bạch Đằng, Hải Châu' })
+      .send({
+        lat: dropoff.lat,
+        lng: dropoff.lng,
+        addressLabel: '12 Bạch Đằng, Hải Châu',
+      })
       .expect(200);
-    const orderId = await claimReadyOrder(customer, merchant, driver, 'idem-food-pickup-point');
+    const orderId = await claimReadyOrder(
+      customer,
+      merchant,
+      driver,
+      'idem-food-pickup-point',
+    );
     const seen = await request(app.getHttpServer())
       .get(`/v1/food/orders/${orderId}`)
       .set('Authorization', `Bearer ${driver.token}`)
@@ -651,13 +766,20 @@ describe('food order http', () => {
     const merchant = await loginPhone('0901110001');
     const driver = await login();
     await repository.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');
-    const orderId = await claimReadyOrder(customer, merchant, driver, 'idem-food-location');
+    const orderId = await claimReadyOrder(
+      customer,
+      merchant,
+      driver,
+      'idem-food-location',
+    );
     const locationOf = (token: string) =>
       request(app.getHttpServer())
         .get(`/v1/food/orders/${orderId}/driver-location`)
         .set('Authorization', `Bearer ${token}`);
 
-    expect((await locationOf(customer.token).expect(200)).body.data).toEqual({ location: null });
+    expect((await locationOf(customer.token).expect(200)).body.data).toEqual({
+      location: null,
+    });
     await request(app.getHttpServer())
       .post('/v1/me/presence/location')
       .set('Authorization', `Bearer ${driver.token}`)
@@ -671,14 +793,18 @@ describe('food order http', () => {
       .post(`/v1/food/orders/${orderId}/pickup`)
       .set('Authorization', `Bearer ${driver.token}`)
       .expect(200);
-    expect((await locationOf(customer.token).expect(200)).body.data.location).not.toBeNull();
+    expect(
+      (await locationOf(customer.token).expect(200)).body.data.location,
+    ).not.toBeNull();
     const deliveryCode = await deliveryCodeOf(customer.token, orderId);
     await request(app.getHttpServer())
       .post(`/v1/food/orders/${orderId}/deliver`)
       .set('Authorization', `Bearer ${driver.token}`)
       .send({ deliveryCode })
       .expect(200);
-    expect((await locationOf(customer.token).expect(200)).body.data).toEqual({ location: null });
+    expect((await locationOf(customer.token).expect(200)).body.data).toEqual({
+      location: null,
+    });
   });
 
   it('runs assigned → pickup → deliver for the assigned driver', async () => {
@@ -730,9 +856,11 @@ describe('food order http', () => {
       .get('/v1/ops/food-orders?page=1&limit=5')
       .set('Authorization', `Bearer ${ops.body.data.accessToken}`)
       .expect(200);
-    expect(opsList.body.data.items.some((order: { id: string }) => order.id === orderId)).toBe(
-      true,
-    );
+    expect(
+      opsList.body.data.items.some(
+        (order: { id: string }) => order.id === orderId,
+      ),
+    ).toBe(true);
 
     const filteredByStatus = await request(app.getHttpServer())
       .get('/v1/ops/food-orders?page=1&limit=5&status=PLACED')
@@ -870,7 +998,12 @@ describe('food order http', () => {
     const other = await login();
     await repository.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');
     await repository.insertGrant(other.userId, 'DRIVER', 'ACTIVE');
-    const orderId = await claimReadyOrder(customer, merchant, driver, 'idem-food-wrong-driver');
+    const orderId = await claimReadyOrder(
+      customer,
+      merchant,
+      driver,
+      'idem-food-wrong-driver',
+    );
 
     const denied = await request(app.getHttpServer())
       .post(`/v1/food/orders/${orderId}/pickup`)
@@ -884,7 +1017,12 @@ describe('food order http', () => {
     const merchant = await loginPhone('0901110001');
     const driver = await login();
     await repository.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');
-    const orderId = await claimReadyOrder(customer, merchant, driver, 'idem-food-illegal');
+    const orderId = await claimReadyOrder(
+      customer,
+      merchant,
+      driver,
+      'idem-food-illegal',
+    );
 
     const skipped = await request(app.getHttpServer())
       .post(`/v1/food/orders/${orderId}/deliver`)
@@ -899,10 +1037,25 @@ describe('food order http', () => {
     const driver = await login();
     await repository.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');
     const settings = app.get(PlatformSettingsService);
-    await settings.patch('FOOD_HANDOVER_CODE_REQUIRED', 'true', 'test handover', 'ops-test');
-    await settings.patch('FOOD_DELIVERY_CODE_MAX_ATTEMPTS', '2', 'test attempts', 'ops-test');
+    await settings.patch(
+      'FOOD_HANDOVER_CODE_REQUIRED',
+      'true',
+      'test handover',
+      'ops-test',
+    );
+    await settings.patch(
+      'FOOD_DELIVERY_CODE_MAX_ATTEMPTS',
+      '2',
+      'test attempts',
+      'ops-test',
+    );
     try {
-      const orderId = await claimReadyOrder(customer, merchant, driver, 'idem-food-codes');
+      const orderId = await claimReadyOrder(
+        customer,
+        merchant,
+        driver,
+        'idem-food-codes',
+      );
       const read = (token: string) =>
         request(app.getHttpServer())
           .get(`/v1/food/orders/${orderId}`)
@@ -925,33 +1078,55 @@ describe('food order http', () => {
       expect(driverView).not.toHaveProperty('deliveryCode');
       expect(driverView).not.toHaveProperty('handoverCode');
 
-      expect((await post('pickup', {})).body.errorCode).toBe('FOOD_HANDOVER_CODE_REQUIRED');
+      expect((await post('pickup', {})).body.errorCode).toBe(
+        'FOOD_HANDOVER_CODE_REQUIRED',
+      );
       await post('pickup', { handoverCode: 'abcd' }).expect(400);
-      const wrongHandover = merchantView.handoverCode === '0000' ? '1111' : '0000';
-      expect((await post('pickup', { handoverCode: wrongHandover })).body.errorCode).toBe(
-        'FOOD_HANDOVER_CODE_INVALID',
-      );
-      expect((await post('pickup', { handoverCode: merchantView.handoverCode }).expect(200)).body.data.status).toBe(
-        'PICKED_UP',
-      );
+      const wrongHandover =
+        merchantView.handoverCode === '0000' ? '1111' : '0000';
+      expect(
+        (await post('pickup', { handoverCode: wrongHandover })).body.errorCode,
+      ).toBe('FOOD_HANDOVER_CODE_INVALID');
+      expect(
+        (
+          await post('pickup', {
+            handoverCode: merchantView.handoverCode,
+          }).expect(200)
+        ).body.data.status,
+      ).toBe('PICKED_UP');
       // After pickup the merchant no longer sees the handover code.
-      expect((await read(merchant.token)).body.data).not.toHaveProperty('handoverCode');
+      expect((await read(merchant.token)).body.data).not.toHaveProperty(
+        'handoverCode',
+      );
 
-      const code = (await read(customer.token)).body.data.deliveryCode as string;
+      const code = (await read(customer.token)).body.data
+        .deliveryCode as string;
       expect(code).toBe(customerView.deliveryCode);
       const wrong = code === '0000' ? '1111' : '0000';
       const missing = await post('deliver', {});
       expect(missing.status).toBe(422);
       expect(missing.body.errorCode).toBe('FOOD_DELIVERY_CODE_REQUIRED');
       expect((await post('deliver', { deliveryCode: wrong })).status).toBe(422);
-      expect((await post('deliver', { deliveryCode: wrong })).body.errorCode).toBe('FOOD_DELIVERY_CODE_INVALID');
+      expect(
+        (await post('deliver', { deliveryCode: wrong })).body.errorCode,
+      ).toBe('FOOD_DELIVERY_CODE_INVALID');
       // Attempts used up: even the right code is locked now.
       const locked = await post('deliver', { deliveryCode: code });
       expect(locked.status).toBe(423);
       expect(locked.body.errorCode).toBe('FOOD_DELIVERY_CODE_LOCKED');
     } finally {
-      await settings.patch('FOOD_HANDOVER_CODE_REQUIRED', 'false', 'test reset', 'ops-test');
-      await settings.patch('FOOD_DELIVERY_CODE_MAX_ATTEMPTS', '5', 'test reset', 'ops-test');
+      await settings.patch(
+        'FOOD_HANDOVER_CODE_REQUIRED',
+        'false',
+        'test reset',
+        'ops-test',
+      );
+      await settings.patch(
+        'FOOD_DELIVERY_CODE_MAX_ATTEMPTS',
+        '5',
+        'test reset',
+        'ops-test',
+      );
     }
   });
 
@@ -961,9 +1136,19 @@ describe('food order http', () => {
     const driver = await login();
     await repository.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');
     const settings = app.get(PlatformSettingsService);
-    await settings.patch('FOOD_DELIVERY_CODE_REQUIRED', 'false', 'test off', 'ops-test');
+    await settings.patch(
+      'FOOD_DELIVERY_CODE_REQUIRED',
+      'false',
+      'test off',
+      'ops-test',
+    );
     try {
-      const orderId = await claimReadyOrder(customer, merchant, driver, 'idem-food-nocode');
+      const orderId = await claimReadyOrder(
+        customer,
+        merchant,
+        driver,
+        'idem-food-nocode',
+      );
       const view = await request(app.getHttpServer())
         .get(`/v1/food/orders/${orderId}`)
         .set('Authorization', `Bearer ${customer.token}`)
@@ -975,9 +1160,21 @@ describe('food order http', () => {
           .set('Authorization', `Bearer ${driver.token}`)
           .expect(200);
       }
-      await expect(settings.patch('FOOD_DELIVERY_CODE_REQUIRED', '"yes"', 'bad', 'ops-test')).rejects.toThrow();
+      await expect(
+        settings.patch(
+          'FOOD_DELIVERY_CODE_REQUIRED',
+          '"yes"',
+          'bad',
+          'ops-test',
+        ),
+      ).rejects.toThrow();
     } finally {
-      await settings.patch('FOOD_DELIVERY_CODE_REQUIRED', 'true', 'test reset', 'ops-test');
+      await settings.patch(
+        'FOOD_DELIVERY_CODE_REQUIRED',
+        'true',
+        'test reset',
+        'ops-test',
+      );
     }
   });
 
@@ -986,7 +1183,12 @@ describe('food order http', () => {
     const merchant = await loginPhone('0901110001');
     const driver = await login();
     await repository.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');
-    const orderId = await claimReadyOrder(customer, merchant, driver, 'idem-food-cancel-assigned');
+    const orderId = await claimReadyOrder(
+      customer,
+      merchant,
+      driver,
+      'idem-food-cancel-assigned',
+    );
 
     const blocked = await request(app.getHttpServer())
       .post(`/v1/food/orders/${orderId}/cancel`)
@@ -1001,15 +1203,22 @@ describe('food order http', () => {
     const merchant = await loginPhone('0901110001');
     const driver = await login();
     await repository.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');
-    const orderId = await claimReadyOrder(customer, merchant, driver, 'idem-food-ops-intervene');
+    const orderId = await claimReadyOrder(
+      customer,
+      merchant,
+      driver,
+      'idem-food-ops-intervene',
+    );
 
     const history = await request(app.getHttpServer())
       .get('/v1/food/orders?page=1&limit=10')
       .set('Authorization', `Bearer ${customer.token}`)
       .expect(200);
-    expect(history.body.data.items.some((order: { id: string }) => order.id === orderId)).toBe(
-      true,
-    );
+    expect(
+      history.body.data.items.some(
+        (order: { id: string }) => order.id === orderId,
+      ),
+    ).toBe(true);
 
     const ops = await request(app.getHttpServer())
       .post('/v1/ops/sessions')
@@ -1062,6 +1271,17 @@ describe('food order http', () => {
       .set(auth)
       .send({ name: 'x' })
       .expect(400);
+    const minOrder = await request(app.getHttpServer())
+      .patch('/v1/food/merchant/store/profile')
+      .set(auth)
+      .send({ minOrderVnd: 40000 })
+      .expect(200);
+    expect(minOrder.body.data.minOrderVnd).toBe(40000);
+    await request(app.getHttpServer())
+      .patch('/v1/food/merchant/store/profile')
+      .set(auth)
+      .send({})
+      .expect(400);
 
     const png =
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
@@ -1071,7 +1291,9 @@ describe('food order http', () => {
       .send({ dataUrl: `data:image/png;base64,${png}` })
       .expect(200);
     const logoUrl = uploaded.body.data.logoUrl as string;
-    expect(logoUrl).toMatch(/^\/v1\/public\/store-logos\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.png$/);
+    expect(logoUrl).toMatch(
+      /^\/v1\/public\/store-logos\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.png$/,
+    );
     const served = await request(app.getHttpServer()).get(logoUrl).expect(200);
     expect(served.headers['content-type']).toContain('image/png');
     await request(app.getHttpServer())
@@ -1095,6 +1317,59 @@ describe('food order http', () => {
       .expect(403);
   });
 
+  it('lets the merchant set the store description and cover photo shown on the store page', async () => {
+    const owner = await login();
+    await repository.insertGrant(owner.userId, 'MERCHANT', 'ACTIVE');
+    const auth = { Authorization: `Bearer ${owner.token}` };
+    const described = await request(app.getHttpServer())
+      .patch('/v1/food/merchant/store/profile')
+      .set(auth)
+      .send({ description: '  Cơm gà nhà làm mỗi sáng.  ' })
+      .expect(200);
+    expect(described.body.data.description).toBe('Cơm gà nhà làm mỗi sáng.');
+    await request(app.getHttpServer())
+      .patch('/v1/food/merchant/store/profile')
+      .set(auth)
+      .send({ description: 'x'.repeat(501) })
+      .expect(400);
+    const cleared = await request(app.getHttpServer())
+      .patch('/v1/food/merchant/store/profile')
+      .set(auth)
+      .send({ description: '   ' })
+      .expect(200);
+    expect(cleared.body.data.description).toBeNull();
+
+    const png =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const uploaded = await request(app.getHttpServer())
+      .post('/v1/food/merchant/store/cover')
+      .set(auth)
+      .send({ dataUrl: `data:image/png;base64,${png}` })
+      .expect(200);
+    const coverUrl = uploaded.body.data.coverUrl as string;
+    expect(coverUrl).toMatch(
+      /^\/v1\/public\/store-covers\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.png$/,
+    );
+    expect(uploaded.body.data.logoUrl).toBeNull();
+    const served = await request(app.getHttpServer()).get(coverUrl).expect(200);
+    expect(served.headers['content-type']).toContain('image/png');
+    // The cover path is not readable through the logo route.
+    await request(app.getHttpServer())
+      .get(coverUrl.replace('store-covers', 'store-logos'))
+      .expect(404);
+    await request(app.getHttpServer())
+      .post('/v1/food/merchant/store/cover')
+      .set(auth)
+      .send({ dataUrl: 'data:application/pdf;base64,JVBERi0xLjQK' })
+      .expect(415);
+    const removed = await request(app.getHttpServer())
+      .delete('/v1/food/merchant/store/cover')
+      .set(auth)
+      .expect(200);
+    expect(removed.body.data.coverUrl).toBeNull();
+    await request(app.getHttpServer()).get(coverUrl).expect(404);
+  });
+
   it('A store without a map pin is hidden, cannot open and cannot take orders', async () => {
     const owner = await login();
     await repository.insertGrant(owner.userId, 'MERCHANT', 'ACTIVE');
@@ -1115,7 +1390,9 @@ describe('food order http', () => {
         .expect(200);
     expect((await browse()).body.data.items).toHaveLength(0);
 
-    const blocked = await place(customer.token, 'idem-food-nopin-1', store.id, [{ itemId, quantity: 1 }]);
+    const blocked = await place(customer.token, 'idem-food-nopin-1', store.id, [
+      { itemId, quantity: 1 },
+    ]);
     expect(blocked.status).toBe(409);
     expect(blocked.body.errorCode).toBe('FOOD_STORE_LOCATION_REQUIRED');
     const quote = await request(app.getHttpServer())
@@ -1140,7 +1417,9 @@ describe('food order http', () => {
       .send({ lat: 16.0544, lng: 108.2022, addressLabel: 'Hải Châu' })
       .expect(200);
     expect((await browse()).body.data.items).toHaveLength(1);
-    const placed = await place(customer.token, 'idem-food-nopin-2', store.id, [{ itemId, quantity: 1 }]);
+    const placed = await place(customer.token, 'idem-food-nopin-2', store.id, [
+      { itemId, quantity: 1 },
+    ]);
     expect(placed.status).toBe(200);
     const after = await foods.listStoresPage(1, 100, { location: 'MISSING' });
     expect(after.items.map((row) => row.id)).not.toContain(store.id);
@@ -1164,19 +1443,27 @@ describe('food order http', () => {
     ]);
     expect(res.status).toBe(200);
     const order = res.body.data;
-    const drink = order.lines.find((line: { name: string }) => line.name === 'Nước ngọt');
+    const drink = order.lines.find(
+      (line: { name: string }) => line.name === 'Nước ngọt',
+    );
     expect(drink.id).toEqual(expect.any(String));
 
     const asCustomer = await request(app.getHttpServer())
       .post(`/v1/food/orders/${order.id}/changes`)
       .set('Authorization', `Bearer ${customer.token}`)
-      .send({ reasonCode: 'OUT_OF_STOCK', lines: [{ lineId: drink.id, toQuantity: 0 }] });
+      .send({
+        reasonCode: 'OUT_OF_STOCK',
+        lines: [{ lineId: drink.id, toQuantity: 0 }],
+      });
     expect(asCustomer.status).toBe(403);
 
     const proposed = await request(app.getHttpServer())
       .post(`/v1/food/orders/${order.id}/changes`)
       .set('Authorization', `Bearer ${owner.token}`)
-      .send({ reasonCode: 'OUT_OF_STOCK', lines: [{ lineId: drink.id, toQuantity: 0 }] })
+      .send({
+        reasonCode: 'OUT_OF_STOCK',
+        lines: [{ lineId: drink.id, toQuantity: 0 }],
+      })
       .expect(201);
     const change = proposed.body.data.change;
     expect(change).toMatchObject({ status: 'PENDING', newSubtotalVnd: 40_000 });
@@ -1185,7 +1472,10 @@ describe('food order http', () => {
       .get(`/v1/food/orders/${order.id}`)
       .set('Authorization', `Bearer ${customer.token}`)
       .expect(200);
-    expect(seen.body.data.pendingChange).toMatchObject({ id: change.id, status: 'PENDING' });
+    expect(seen.body.data.pendingChange).toMatchObject({
+      id: change.id,
+      status: 'PENDING',
+    });
     const latest = await request(app.getHttpServer())
       .get(`/v1/food/orders/${order.id}/change`)
       .set('Authorization', `Bearer ${owner.token}`)
@@ -1196,7 +1486,10 @@ describe('food order http', () => {
       .post(`/v1/food/orders/${order.id}/changes/${change.id}/accept`)
       .set('Authorization', `Bearer ${customer.token}`)
       .expect(200);
-    expect(accepted.body.data.order).toMatchObject({ status: 'PLACED', subtotalVnd: 40_000 });
+    expect(accepted.body.data.order).toMatchObject({
+      status: 'PLACED',
+      subtotalVnd: 40_000,
+    });
     expect(accepted.body.data.order.lines).toHaveLength(1);
     const after = await request(app.getHttpServer())
       .get(`/v1/food/orders/${order.id}`)
@@ -1228,9 +1521,12 @@ describe('food order http', () => {
     if (!(foods instanceof MemoryFoodRepository)) {
       throw new Error('Expected the in-memory food repository');
     }
-    const store = await createPinnedStore(foods, owner.userId, 'Bánh Mì Pause', [
-      { name: 'Bánh mì thịt', priceVnd: 25_000 },
-    ]);
+    const store = await createPinnedStore(
+      foods,
+      owner.userId,
+      'Bánh Mì Pause',
+      [{ name: 'Bánh mì thịt', priceVnd: 25_000 }],
+    );
     const itemId = store.items[0]!.id;
     const status = (body: object) =>
       request(app.getHttpServer())
@@ -1238,7 +1534,10 @@ describe('food order http', () => {
         .set('Authorization', `Bearer ${owner.token}`)
         .send(body);
 
-    const paused = await status({ mode: 'PAUSED', resumeAfterMinutes: 30 }).expect(200);
+    const paused = await status({
+      mode: 'PAUSED',
+      resumeAfterMinutes: 30,
+    }).expect(200);
     expect(paused.body.data.serviceMode).toBe('PAUSED');
     const until = Date.parse(paused.body.data.serviceModeUntil as string);
     expect(until - Date.now()).toBeGreaterThan(29 * 60_000);
@@ -1250,17 +1549,36 @@ describe('food order http', () => {
       .expect(200);
     expect(seen.body.data.serviceMode).toBe('PAUSED');
 
-    const blocked = await place(customer.token, 'idem-food-paused-1', store.id, [{ itemId, quantity: 1 }]);
+    const blocked = await place(
+      customer.token,
+      'idem-food-paused-1',
+      store.id,
+      [{ itemId, quantity: 1 }],
+    );
     expect(blocked.status).toBe(409);
     expect(blocked.body.errorCode).toBe('FOOD_STORE_PAUSED');
 
     const busy = await status({ mode: 'BUSY' }).expect(200);
-    expect(busy.body.data).toMatchObject({ serviceMode: 'BUSY', serviceModeUntil: null });
-    const accepted = await place(customer.token, 'idem-food-paused-2', store.id, [{ itemId, quantity: 1 }]);
+    expect(busy.body.data).toMatchObject({
+      serviceMode: 'BUSY',
+      serviceModeUntil: null,
+    });
+    const accepted = await place(
+      customer.token,
+      'idem-food-paused-2',
+      store.id,
+      [{ itemId, quantity: 1 }],
+    );
     expect(accepted.status).toBe(200);
 
-    const reopened = await status({ mode: 'OPEN', resumeAfterMinutes: 60 }).expect(200);
-    expect(reopened.body.data).toMatchObject({ serviceMode: 'OPEN', serviceModeUntil: null });
+    const reopened = await status({
+      mode: 'OPEN',
+      resumeAfterMinutes: 60,
+    }).expect(200);
+    expect(reopened.body.data).toMatchObject({
+      serviceMode: 'OPEN',
+      serviceModeUntil: null,
+    });
 
     await status({ mode: 'CLOSED' }).expect(400);
     await status({ mode: 'PAUSED', resumeAfterMinutes: 45 }).expect(400);
@@ -1279,9 +1597,12 @@ describe('food order http', () => {
     if (!(foods instanceof MemoryFoodRepository)) {
       throw new Error('Expected the in-memory food repository');
     }
-    const store = await createPinnedStore(foods, owner.userId, 'Aaa Giờ Mở Cửa', [
-      { name: 'Cơm gà', priceVnd: 35_000 },
-    ]);
+    const store = await createPinnedStore(
+      foods,
+      owner.userId,
+      'Aaa Giờ Mở Cửa',
+      [{ name: 'Cơm gà', priceVnd: 35_000 }],
+    );
     const itemId = store.items[0]!.id;
     const today = vnClock(new Date());
     const hours = (body: object) =>
@@ -1299,7 +1620,10 @@ describe('food order http', () => {
       closures: [{ date: '2027-01-01', note: 'Nghỉ Tết dương lịch' }],
       lastOrderMinutes: 15,
     }).expect(200);
-    expect(closed.body.data).toMatchObject({ openNow: false, closedReason: 'CLOSED' });
+    expect(closed.body.data).toMatchObject({
+      openNow: false,
+      closedReason: 'CLOSED',
+    });
     expect(closed.body.data.schedule).toMatchObject({
       hoursConfigured: true,
       lastOrderMinutes: 15,
@@ -1307,7 +1631,9 @@ describe('food order http', () => {
     });
     expect(closed.body.data.schedule.weekly).toHaveLength(6);
 
-    const blocked = await place(customer.token, 'idem-food-hours-1', store.id, [{ itemId, quantity: 1 }]);
+    const blocked = await place(customer.token, 'idem-food-hours-1', store.id, [
+      { itemId, quantity: 1 },
+    ]);
     expect(blocked.status).toBe(409);
     expect(blocked.body.errorCode).toBe('FOOD_STORE_CLOSED');
 
@@ -1316,9 +1642,16 @@ describe('food order http', () => {
       .query({ sort_by: 'name', limit: 100 })
       .set('Authorization', `Bearer ${customer.token}`)
       .expect(200);
-    const listed = list.body.data.items as { id: string; openNow: boolean; closedReason: string | null }[];
+    const listed = list.body.data.items as {
+      id: string;
+      openNow: boolean;
+      closedReason: string | null;
+    }[];
     const index = listed.findIndex((entry) => entry.id === store.id);
-    expect(listed[index]).toMatchObject({ openNow: false, closedReason: 'CLOSED' });
+    expect(listed[index]).toMatchObject({
+      openNow: false,
+      closedReason: 'CLOSED',
+    });
     // Sorted by name it would be first; closed stores go after every open one.
     expect(listed.slice(0, index).every((entry) => entry.openNow)).toBe(true);
 
@@ -1331,19 +1664,32 @@ describe('food order http', () => {
 
     // A special closed day wins over open hours.
     const holiday = await hours({
-      weekly: allDays.map((weekday) => ({ weekday, opensAt: '00:00', closesAt: '24:00' })),
+      weekly: allDays.map((weekday) => ({
+        weekday,
+        opensAt: '00:00',
+        closesAt: '24:00',
+      })),
       closures: [{ date: today.date }],
       lastOrderMinutes: 0,
     }).expect(200);
     expect(holiday.body.data.openNow).toBe(false);
 
     const open = await hours({
-      weekly: allDays.map((weekday) => ({ weekday, opensAt: '00:00', closesAt: '24:00' })),
+      weekly: allDays.map((weekday) => ({
+        weekday,
+        opensAt: '00:00',
+        closesAt: '24:00',
+      })),
       closures: [],
       lastOrderMinutes: 0,
     }).expect(200);
     expect(open.body.data).toMatchObject({ openNow: true, closedReason: null });
-    const accepted = await place(customer.token, 'idem-food-hours-2', store.id, [{ itemId, quantity: 1 }]);
+    const accepted = await place(
+      customer.token,
+      'idem-food-hours-2',
+      store.id,
+      [{ itemId, quantity: 1 }],
+    );
     expect(accepted.status).toBe(200);
 
     const bad = await hours({
@@ -1354,7 +1700,11 @@ describe('food order http', () => {
     expect(bad.status).toBe(400);
     expect(bad.body.errorCode).toBe('FOOD_HOURS_INVALID');
     await hours({ weekly: [], closures: [], lastOrderMinutes: 20 }).expect(400);
-    await hours({ weekly: [{ weekday: 8, opensAt: '07:00', closesAt: '22:00' }], closures: [], lastOrderMinutes: 0 }).expect(400);
+    await hours({
+      weekly: [{ weekday: 8, opensAt: '07:00', closesAt: '22:00' }],
+      closures: [],
+      lastOrderMinutes: 0,
+    }).expect(400);
   });
 
   it('applies M022 accept settings and BUSY extra prep at placement (DEC-PROD-028)', async () => {
@@ -1364,9 +1714,12 @@ describe('food order http', () => {
     if (!(foods instanceof MemoryFoodRepository)) {
       throw new Error('Expected the in-memory food repository');
     }
-    const store = await createPinnedStore(foods, owner.userId, 'Quán Nhận Đơn', [
-      { name: 'Bún chả', priceVnd: 45_000 },
-    ]);
+    const store = await createPinnedStore(
+      foods,
+      owner.userId,
+      'Quán Nhận Đơn',
+      [{ name: 'Bún chả', priceVnd: 45_000 }],
+    );
     const itemId = store.items[0]!.id;
     const settings = (body: object) =>
       request(app.getHttpServer())
@@ -1381,7 +1734,12 @@ describe('food order http', () => {
       lastOrderMinutes: 15,
     }).expect(200);
     expect(saved.body.data).toMatchObject({
-      acceptSettings: { acceptMode: 'AUTO', maxActiveOrders: 1, defaultPrepMinutes: 20, busyExtraMinutes: 15 },
+      acceptSettings: {
+        acceptMode: 'AUTO',
+        maxActiveOrders: 1,
+        defaultPrepMinutes: 20,
+        busyExtraMinutes: 15,
+      },
       estimatedPrepMinutes: 20,
       schedule: { lastOrderMinutes: 15 },
     });
@@ -1392,7 +1750,10 @@ describe('food order http', () => {
       .set('Authorization', `Bearer ${owner.token}`)
       .send({ mode: 'BUSY', busyExtraMinutes: 30 })
       .expect(200);
-    expect(busy.body.data).toMatchObject({ serviceMode: 'BUSY', estimatedPrepMinutes: 50 });
+    expect(busy.body.data).toMatchObject({
+      serviceMode: 'BUSY',
+      estimatedPrepMinutes: 50,
+    });
 
     const first = await login();
     const detail = await request(app.getHttpServer())
@@ -1403,16 +1764,23 @@ describe('food order http', () => {
     expect(detail.body.data).not.toHaveProperty('acceptSettings');
 
     const before = Date.now();
-    const auto = await place(first.token, 'idem-food-accept-1', store.id, [{ itemId, quantity: 1 }]);
+    const auto = await place(first.token, 'idem-food-accept-1', store.id, [
+      { itemId, quantity: 1 },
+    ]);
     expect(auto.status).toBe(200);
-    expect(auto.body.data).toMatchObject({ status: 'PREPARING', prepMinutes: 50 });
+    expect(auto.body.data).toMatchObject({
+      status: 'PREPARING',
+      prepMinutes: 50,
+    });
     const readyAt = Date.parse(auto.body.data.estimatedReadyAt as string);
     expect(readyAt - before).toBeGreaterThanOrEqual(50 * 60_000 - 1_000);
     expect(readyAt - before).toBeLessThanOrEqual(50 * 60_000 + 5_000);
 
     // Cap of one: the second customer is turned away while the first is cooking.
     const second = await login();
-    const full = await place(second.token, 'idem-food-accept-2', store.id, [{ itemId, quantity: 1 }]);
+    const full = await place(second.token, 'idem-food-accept-2', store.id, [
+      { itemId, quantity: 1 },
+    ]);
     expect(full.status).toBe(409);
     expect(full.body.errorCode).toBe('FOOD_STORE_AT_CAPACITY');
 
@@ -1421,20 +1789,55 @@ describe('food order http', () => {
       .post(`/v1/food/orders/${auto.body.data.id as string}/ready`)
       .set('Authorization', `Bearer ${owner.token}`)
       .expect(200);
-    await settings({ acceptMode: 'MANUAL', maxActiveOrders: null, defaultPrepMinutes: 10, lastOrderMinutes: 0 }).expect(200);
-    const manual = await place(second.token, 'idem-food-accept-3', store.id, [{ itemId, quantity: 1 }]);
+    await settings({
+      acceptMode: 'MANUAL',
+      maxActiveOrders: null,
+      defaultPrepMinutes: 10,
+      lastOrderMinutes: 0,
+    }).expect(200);
+    const manual = await place(second.token, 'idem-food-accept-3', store.id, [
+      { itemId, quantity: 1 },
+    ]);
     expect(manual.status).toBe(200);
-    expect(manual.body.data).toMatchObject({ status: 'PLACED', prepMinutes: 40 });
+    expect(manual.body.data).toMatchObject({
+      status: 'PLACED',
+      prepMinutes: 40,
+    });
 
     expect(await foods.findStoreForOps(store.id)).toMatchObject({
-      acceptSettings: { acceptMode: 'MANUAL', maxActiveOrders: null, defaultPrepMinutes: 10, busyExtraMinutes: 30 },
+      acceptSettings: {
+        acceptMode: 'MANUAL',
+        maxActiveOrders: null,
+        defaultPrepMinutes: 10,
+        busyExtraMinutes: 30,
+      },
       estimatedPrepMinutes: 40,
     });
 
-    await settings({ acceptMode: 'SOMETIMES', maxActiveOrders: null, defaultPrepMinutes: 10, lastOrderMinutes: 0 }).expect(400);
-    await settings({ acceptMode: 'AUTO', maxActiveOrders: 0, defaultPrepMinutes: 10, lastOrderMinutes: 0 }).expect(400);
-    await settings({ acceptMode: 'AUTO', maxActiveOrders: 5, defaultPrepMinutes: 200, lastOrderMinutes: 0 }).expect(400);
-    await settings({ acceptMode: 'AUTO', maxActiveOrders: 5, defaultPrepMinutes: 20, lastOrderMinutes: 7 }).expect(400);
+    await settings({
+      acceptMode: 'SOMETIMES',
+      maxActiveOrders: null,
+      defaultPrepMinutes: 10,
+      lastOrderMinutes: 0,
+    }).expect(400);
+    await settings({
+      acceptMode: 'AUTO',
+      maxActiveOrders: 0,
+      defaultPrepMinutes: 10,
+      lastOrderMinutes: 0,
+    }).expect(400);
+    await settings({
+      acceptMode: 'AUTO',
+      maxActiveOrders: 5,
+      defaultPrepMinutes: 200,
+      lastOrderMinutes: 0,
+    }).expect(400);
+    await settings({
+      acceptMode: 'AUTO',
+      maxActiveOrders: 5,
+      defaultPrepMinutes: 20,
+      lastOrderMinutes: 7,
+    }).expect(400);
     await request(app.getHttpServer())
       .patch('/v1/food/merchant/store/status')
       .set('Authorization', `Bearer ${owner.token}`)
@@ -1442,7 +1845,7 @@ describe('food order http', () => {
       .expect(400);
   });
 
-  it('books only DealGo\'s share of a voucher by campaign sponsor', async () => {
+  it("books only DealGo's share of a voucher by campaign sponsor", async () => {
     const promotions = app.get<PromotionRepository>(PROMOTION_REPOSITORY);
     const ledger = app.get<LedgerRepository>(LEDGER_REPOSITORY);
     const now = Date.now();
@@ -1482,7 +1885,12 @@ describe('food order http', () => {
         .post('/v1/food/orders')
         .set('Authorization', `Bearer ${customer.token}`)
         .set('Idempotency-Key', `sponsor-${code}`)
-        .send({ storeId, items: [{ itemId, quantity: 1 }], dropoff, voucherCode: code })
+        .send({
+          storeId,
+          items: [{ itemId, quantity: 1 }],
+          dropoff,
+          voucherCode: code,
+        })
         .expect(200);
       expect(placed.body.data.discountVnd).toBe(10_000);
       expect(placed.body.data).not.toHaveProperty('voucherSponsor');
@@ -1494,20 +1902,32 @@ describe('food order http', () => {
         [driver, 'pickup'],
         [driver, 'deliver'],
       ] as const) {
-        const body = step === 'deliver' ? { deliveryCode: await deliveryCodeOf(customer.token, orderId) } : {};
+        const body =
+          step === 'deliver'
+            ? { deliveryCode: await deliveryCodeOf(customer.token, orderId) }
+            : {};
         await request(app.getHttpServer())
           .post(`/v1/food/orders/${orderId}/${step}`)
           .set('Authorization', `Bearer ${actor.token}`)
           .send(body)
           .expect(200);
       }
-      const journal = await ledger.findByEntity('FOOD_ORDER', orderId, 'PROMOTION_DISCOUNT_FUNDED');
+      const journal = await ledger.findByEntity(
+        'FOOD_ORDER',
+        orderId,
+        'PROMOTION_DISCOUNT_FUNDED',
+      );
       funded[code] = journal?.amountVnd ?? null;
     }
     expect(funded).toEqual({ SHARE10K: 3000, MERCH10K: null });
     await app
       .get(PlatformSettingsService)
-      .patch('VOUCHER_SHARED_PLATFORM_PERCENT', '100', 'test reset', 'ops-test');
+      .patch(
+        'VOUCHER_SHARED_PLATFORM_PERCENT',
+        '100',
+        'test reset',
+        'ops-test',
+      );
   });
 
   it('prices item options server-side and snapshots them on order lines (DEC-PROD-033)', async () => {
@@ -1581,34 +2001,50 @@ describe('food order http', () => {
       .get(`/v1/food/stores/${storeId}`)
       .set('Authorization', `Bearer ${customer.token}`)
       .expect(200);
-    const listed = (detail.body.data.items as Array<{ id: string; optionGroups: unknown[] }>).find(
-      (item) => item.id === itemId,
-    );
+    const listed = (
+      detail.body.data.items as Array<{ id: string; optionGroups: unknown[] }>
+    ).find((item) => item.id === itemId);
     expect(listed?.optionGroups).toHaveLength(2);
 
-    for (const optionIds of [[], [opt(size, 'M'), opt(topping, 'Trứng')], [opt(size, 'M'), opt(size, 'L')]]) {
-      const rejected = await place(customer.token, `idem-opt-bad-${optionIds.length}-${optionIds[1] ?? ''}`, storeId, [
-        { itemId, quantity: 1, optionIds },
-      ]);
+    for (const optionIds of [
+      [],
+      [opt(size, 'M'), opt(topping, 'Trứng')],
+      [opt(size, 'M'), opt(size, 'L')],
+    ]) {
+      const rejected = await place(
+        customer.token,
+        `idem-opt-bad-${optionIds.length}-${optionIds[1] ?? ''}`,
+        storeId,
+        [{ itemId, quantity: 1, optionIds }],
+      );
       expect(rejected.status).toBe(409);
       expect(rejected.body.errorCode).toBe('FOOD_OPTION_INVALID');
     }
 
     const placed = await place(customer.token, 'idem-opt-ok', storeId, [
-      { itemId, quantity: 2, optionIds: [opt(topping, 'Trân châu'), opt(size, 'L')] },
+      {
+        itemId,
+        quantity: 2,
+        optionIds: [opt(topping, 'Trân châu'), opt(size, 'L')],
+      },
       { itemId, quantity: 1, optionIds: [opt(size, 'M')] },
     ]).expect(200);
     // (30 000 + 8 000 + 5 000) × 2 + 30 000 × 1, computed by the server.
     expect(placed.body.data.subtotalVnd).toBe(116_000);
     const lines = placed.body.data.lines as Array<{
       unitPriceVnd: number;
-      options: Array<{ groupName: string; name: string; priceDeltaVnd: number }>;
+      options: Array<{
+        groupName: string;
+        name: string;
+        priceDeltaVnd: number;
+      }>;
     }>;
     expect(lines[0].unitPriceVnd).toBe(43_000);
-    expect(lines[0].options.map((o) => `${o.groupName}:${o.name}:${o.priceDeltaVnd}`)).toEqual([
-      'Size:L:8000',
-      'Topping:Trân châu:5000',
-    ]);
+    expect(
+      lines[0].options.map(
+        (o) => `${o.groupName}:${o.name}:${o.priceDeltaVnd}`,
+      ),
+    ).toEqual(['Size:L:8000', 'Topping:Trân châu:5000']);
     expect(lines[1].options.map((o) => o.name)).toEqual(['M']);
 
     // Renaming keeps ids; the placed order keeps what the customer chose.
@@ -1631,7 +2067,9 @@ describe('food order http', () => {
       })
       .expect(200);
     expect(renamed.body.data.optionGroups[0].id).toBe(size.id);
-    expect(renamed.body.data.optionGroups[0].options[1].id).toBe(opt(size, 'L'));
+    expect(renamed.body.data.optionGroups[0].options[1].id).toBe(
+      opt(size, 'L'),
+    );
     const reread = await request(server)
       .get(`/v1/food/orders/${placed.body.data.id}`)
       .set('Authorization', `Bearer ${merchant.token}`)
@@ -1645,7 +2083,10 @@ describe('food order http', () => {
   });
 
   /** DEC-PROD-036: the customer reads the delivery code from the order while it is on the way. */
-  async function deliveryCodeOf(customerToken: string, orderId: string): Promise<string> {
+  async function deliveryCodeOf(
+    customerToken: string,
+    orderId: string,
+  ): Promise<string> {
     const order = await request(app.getHttpServer())
       .get(`/v1/food/orders/${orderId}`)
       .set('Authorization', `Bearer ${customerToken}`)
@@ -1661,7 +2102,9 @@ describe('food order http', () => {
     idempotencyKey: string,
   ): Promise<string> {
     const { storeId, itemId } = await oneItem(customer.token);
-    const created = await place(customer.token, idempotencyKey, storeId, [{ itemId, quantity: 1 }]);
+    const created = await place(customer.token, idempotencyKey, storeId, [
+      { itemId, quantity: 1 },
+    ]);
     expect(created.status).toBe(200);
     const orderId = created.body.data.id as string;
     await request(app.getHttpServer())
@@ -1685,7 +2128,9 @@ describe('food order http', () => {
     return loginPhone(`091${String(phoneSerial).padStart(7, '0')}`);
   }
 
-  async function loginPhone(phone: string): Promise<{ token: string; userId: string }> {
+  async function loginPhone(
+    phone: string,
+  ): Promise<{ token: string; userId: string }> {
     const created = await request(app.getHttpServer())
       .post('/v1/auth/phone/challenges')
       .send({ phone })
@@ -1701,15 +2146,17 @@ describe('food order http', () => {
     };
   }
 
-  async function oneItem(token: string): Promise<{ storeId: string; itemId: string }> {
+  async function oneItem(
+    token: string,
+  ): Promise<{ storeId: string; itemId: string }> {
     const catalog = await request(app.getHttpServer())
       .get('/v1/food/stores')
       .query({ search: 'Bún Bò Huế', limit: 20 })
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
-    const store = (catalog.body.data.items as { id: string; name: string }[]).find(
-      (entry) => entry.name === 'Bún Bò Huế',
-    );
+    const store = (
+      catalog.body.data.items as { id: string; name: string }[]
+    ).find((entry) => entry.name === 'Bún Bò Huế');
     expect(store).toBeDefined();
     const storeId = store!.id;
     const detail = await request(app.getHttpServer())

@@ -60,23 +60,36 @@ class DefaultMerchantOrdersClient implements MerchantOrdersClient {
   @override
   Future<FoodStoreDetail> updateStoreProfile({
     required String accessToken,
-    required String name,
-  }) => food.updateStoreProfile(accessToken: accessToken, name: name);
+    String? name,
+    String? category,
+    int? minOrderVnd,
+    String? description,
+  }) => food.updateStoreProfile(
+    accessToken: accessToken,
+    name: name,
+    category: category,
+    minOrderVnd: minOrderVnd,
+    description: description,
+  );
 
   @override
   Future<FoodStoreDetail> uploadStoreLogo({
     required String accessToken,
     required String contentBase64,
     String? contentType,
+    bool cover = false,
   }) => food.uploadStoreLogo(
     accessToken: accessToken,
     contentBase64: contentBase64,
     contentType: contentType,
+    cover: cover,
   );
 
   @override
-  Future<FoodStoreDetail> clearStoreLogo({required String accessToken}) =>
-      food.clearStoreLogo(accessToken: accessToken);
+  Future<FoodStoreDetail> clearStoreLogo({
+    required String accessToken,
+    bool cover = false,
+  }) => food.clearStoreLogo(accessToken: accessToken, cover: cover);
 
   @override
   Future<FoodStoreDetail> updateStoreLocation({
@@ -155,6 +168,8 @@ class DefaultMerchantOrdersClient implements MerchantOrdersClient {
     int? prepMinutes,
     String? imageUrl,
     String? menuCategoryId,
+    int? originalPriceVnd,
+    bool clearOriginalPrice = false,
   }) {
     return food.updateMerchantItem(
       accessToken: accessToken,
@@ -166,6 +181,8 @@ class DefaultMerchantOrdersClient implements MerchantOrdersClient {
       prepMinutes: prepMinutes,
       imageUrl: imageUrl,
       menuCategoryId: menuCategoryId,
+      originalPriceVnd: originalPriceVnd,
+      clearOriginalPrice: clearOriginalPrice,
     );
   }
 

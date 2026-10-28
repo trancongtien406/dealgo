@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import type { SearchSelectOption } from "@/components/ui/search-select";
-import { useCatalogCategoriesQuery } from "@/features/catalog/hooks";
+import { useFoodCategoriesQuery } from "@/features/food-categories/hooks";
 import { useZonesQuery } from "@/features/zones/hooks";
 
 /** Shared Admin list toolbar filter options. */
@@ -284,23 +284,20 @@ export function useLiveRegionFilterOptions(): {
 }
 
 /**
- * Live hook that fetches store catalog categories directly from backend API (/api/ops/catalog/categories)
- * and produces dynamic search filter options.
+ * Food category filter options from the managed list (/api/ops/food-categories):
+ * value is the store category code, label the Vietnamese name.
  */
 export function useLiveCatalogCategoryOptions(): {
   options: SearchSelectOption[];
   isPending: boolean;
 } {
-  const { data, isPending } = useCatalogCategoriesQuery({ page: 1, limit: 50 });
-  const options = useMemo(() => {
-    const items = data?.items ?? [];
-    return [
+  const { data, isPending } = useFoodCategoriesQuery();
+  const options = useMemo(
+    () => [
       { value: "ALL", label: "Tất cả danh mục" },
-      ...items.map((c) => ({
-        value: c.code,
-        label: c.displayName || c.name || c.code,
-      })),
-    ];
-  }, [data]);
+      ...(data ?? []).map((c) => ({ value: c.code, label: c.nameVi })),
+    ],
+    [data],
+  );
   return { options, isPending };
 }

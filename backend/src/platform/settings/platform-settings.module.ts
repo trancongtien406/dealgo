@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../database/prisma.module.js';
+import { IntegrationSettingsModule } from '../integration-settings/integration-settings.module.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { resolvePersistenceRepository } from '../database/resolve-persistence.js';
 import type { AppEnv } from '../config/env.js';
@@ -15,7 +16,7 @@ import { PlatformSettingsService } from './platform-settings.service.js';
 import { OpsPlatformSettingsController } from './platform-settings.controller.js';
 
 @Module({
-  imports: [PrismaModule, forwardRef(() => IdentityModule)],
+  imports: [PrismaModule, IntegrationSettingsModule, forwardRef(() => IdentityModule)],
   controllers: [OpsPlatformSettingsController],
   providers: [
     PlatformSettingsService,

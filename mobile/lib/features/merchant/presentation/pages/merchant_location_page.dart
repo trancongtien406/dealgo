@@ -15,6 +15,7 @@ import '../utils/merchant_routes.dart';
 import '../../domain/usecases/get_merchant_catalog.dart';
 import '../../domain/usecases/update_store_location.dart';
 import '../widgets/merchant_widgets.dart';
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 
 /// Opens the place picker for the store point; tests swap it for a canned place.
 typedef StorePlacePicker = Future<PlaceOption?> Function(BuildContext context);
@@ -169,10 +170,8 @@ class _MerchantLocationPageState extends State<MerchantLocationPage> {
       current = l10n.merchantLocationUnsetValue;
     }
     return ListView(
-      padding: merchantPagePadding,
+      padding: dealGoScrollPadding(context, merchantPagePadding),
       children: [
-        Text(l10n.merchantLocationIntro, style: textTheme.bodySmall),
-        const SizedBox(height: DealGoSpacing.s16),
         if (!store.hasLocation && picked == null) ...[
           DealGoBanner(
             key: const Key('merchant-location-unset'),

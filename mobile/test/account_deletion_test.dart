@@ -1,6 +1,7 @@
 import 'package:dealgo/features/account_deletion/data/account_deletion_remote_datasource.dart';
 import 'package:dealgo/features/account_deletion/domain/account_deletion.dart';
 import 'package:dealgo/features/account_deletion/presentation/delete_account_page.dart';
+import 'package:dealgo/features/identity/domain/passkey_platform.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -9,9 +10,15 @@ import 'support/fake_identity_client.dart';
 
 Future<void> _openDelete(
   WidgetTester tester,
-  FakeAccountDeletionRepository repo,
-) async {
-  await pumpSignedIn(tester, profile: customerProfile, accountDeletion: repo);
+  FakeAccountDeletionRepository repo, {
+  PasskeyPlatform? passkeys,
+}) async {
+  await pumpSignedIn(
+    tester,
+    profile: customerProfile,
+    accountDeletion: repo,
+    passkeyPlatform: passkeys,
+  );
   await tester.tap(navLabel('Tôi'));
   await tester.pumpAndSettle();
   final row = find.byKey(const ValueKey('account-delete-row'));
@@ -103,7 +110,7 @@ void main() {
     (tester) async {
       final repo = FakeAccountDeletionRepository();
       await _openDelete(tester, repo);
-      expect(find.text('Tiếp tục yêu cầu xóa'), findsOneWidget);
+      expect(find.text('Tiếp tục xóa'), findsOneWidget);
       expect(_button(tester, 'delete-continue').onPressed, isNull);
 
       await _fillForm(tester);
@@ -134,7 +141,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('delete-confirm')));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('delete-account-done')), findsOneWidget);
-      expect(find.text('Đã ghi nhận yêu cầu xoá'), findsOneWidget);
+      expect(find.text('Đã gửi yêu cầu xoá'), findsOneWidget);
       expect(find.textContaining('26/10/2026'), findsOneWidget);
       expect(repo.calls, [
         'overview',
@@ -189,10 +196,122 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('delete-confirm')));
       await tester.pumpAndSettle();
     }
-    expect(find.textContaining('Nhập sai quá nhiều lần'), findsOneWidget);
+    expect(find.textContaining('sai quá nhiều lần'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('delete-restart')));
     await tester.pumpAndSettle();
     expect(repo.calls.where((c) => c == 'start').length, 2);
     expect(find.byKey(const ValueKey('delete-confirm')), findsOneWidget);
   });
+
+  testWidgets(
+    'S027 passkey: the native prompt opens on continue and schedules, no text field',
+    (tester) async {
+      final repo = FakeAccountDeletionRepository(
+        method: AccountDeletionMethod.passkey,
+      );
+      final passkeys = FakePasskeyPlatform();
+      await _openDelete(tester, repo, passkeys: passkeys);
+      await _fillForm(tester);
+
+      // Footer actions sit side by side.
+      final keep = tester.getCenter(find.text('Giữ tài khoản'));
+      final next = tester.getCenter(
+        find.byKey(const ValueKey('delete-continue')),
+      );
+      expect(keep.dy, moreOrLessEquals(next.dy, epsilon: 1));
+      expect(keep.dx, lessThan(next.dx));
+
+      await tester.tap(find.byKey(const ValueKey('delete-continue')));
+      await tester.pumpAndSettle();
+
+      expect(passkeys.authenticateCalls, hasLength(1));
+      expect(
+        passkeys.authenticateCalls.single,
+        containsPair('userVerification', 'required'),
+      );
+      expect(passkeys.authenticateCalls.single['allowCredentials'], [
+        {'id': 'fake-passkey-credential', 'type': 'public-key'},
+      ]);
+      expect(find.byKey(const ValueKey('delete-account-done')), findsOneWidget);
+      expect(repo.calls, [
+        'overview',
+        'start',
+        'confirm:fake-passkey-credential',
+      ]);
+    },
+  );
+
+  testWidgets(
+    'S027 passkey: cancelling the prompt stays quiet and can be retried',
+    (tester) async {
+      final repo = FakeAccountDeletionRepository(
+        method: AccountDeletionMethod.passkey,
+      );
+      final passkeys = FakePasskeyPlatform()
+        ..authenticateFailure = PasskeyFailureKind.cancelled;
+      await _openDelete(tester, repo, passkeys: passkeys);
+      await _fillForm(tester);
+      await tester.tap(find.byKey(const ValueKey('delete-continue')));
+      await tester.pumpAndSettle();
+
+      final verify = find.byKey(const ValueKey('delete-account-verify'));
+      expect(verify, findsOneWidget);
+      expect(find.byKey(const ValueKey('delete-secret')), findsNothing);
+      expect(
+        find.descendant(of: verify, matching: find.byType(Text)),
+        findsOneWidget,
+        reason: 'title only: no hint, no error after a cancel',
+      );
+      expect(repo.calls, ['overview', 'start']);
+
+      passkeys.authenticateFailure = null;
+      await tester.tap(find.byKey(const ValueKey('delete-passkey')));
+      await tester.pumpAndSettle();
+      expect(passkeys.authenticateCalls, hasLength(2));
+      expect(find.byKey(const ValueKey('delete-account-done')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    "S027 passkey: a rejected assertion or unsupported device shows calm copy",
+    (tester) async {
+      final repo = FakeAccountDeletionRepository(
+        method: AccountDeletionMethod.passkey,
+      );
+      final passkeys = FakePasskeyPlatform(credentialId: 'someone-else');
+      await _openDelete(tester, repo, passkeys: passkeys);
+      await _fillForm(tester);
+      await tester.tap(find.byKey(const ValueKey('delete-continue')));
+      await tester.pumpAndSettle();
+      expect(find.text('Không xác minh được passkey.'), findsOneWidget);
+      expect(find.byKey(const ValueKey('delete-account-done')), findsNothing);
+
+      passkeys.authenticateFailure = PasskeyFailureKind.unsupported;
+      await tester.tap(find.byKey(const ValueKey('delete-passkey')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Thiết bị hoặc phiên bản app này chưa hỗ trợ passkey.'),
+        findsOneWidget,
+      );
+      expect(repo.calls.where((c) => c.startsWith('confirm')), hasLength(1));
+    },
+  );
+
+  testWidgets(
+    'S027 no usable method: continue stays off with the neutral copy',
+    (tester) async {
+      final repo = FakeAccountDeletionRepository()..method = null;
+      await _openDelete(tester, repo);
+      await _fillForm(tester);
+      expect(_button(tester, 'delete-continue').onPressed, isNull);
+      expect(
+        find.text(
+          'Chưa xác minh lại được tài khoản này trong ứng dụng. Hãy liên hệ hỗ trợ.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('SMS'), findsNothing);
+      expect(repo.calls, ['overview']);
+    },
+  );
 }

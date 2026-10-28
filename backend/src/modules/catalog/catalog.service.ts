@@ -3,14 +3,11 @@ import type { RequestActor } from '../identity/access-auth.guard.js';
 import type {
   CreateFoodItemDto,
   ReplaceFoodItemOptionsDto,
-  OpsCatalogCategoriesQueryDto,
   OpsCatalogModerationQueryDto,
   SetFoodItemAvailabilityDto,
   UpdateFoodItemDto,
 } from '../food-order/food.dto.js';
 import type {
-  OpsCatalogCategoryItem,
-  OpsCatalogCategoryPage,
   OpsCatalogModerationPage,
   StoreDetail,
   StoreItemView,
@@ -52,18 +49,6 @@ export class CatalogService {
     dto: SetFoodItemAvailabilityDto,
   ): Promise<StoreItemView> {
     return this.food.setItemAvailability(actor, itemId, dto);
-  }
-
-  listCategories(query: OpsCatalogCategoriesQueryDto): Promise<OpsCatalogCategoryPage> {
-    return this.food.listStoreCategories(query);
-  }
-
-  getCategory(code: string): Promise<OpsCatalogCategoryItem> {
-    return this.food.getStoreCategory(code);
-  }
-
-  renameCategory(code: string, name: string): Promise<OpsCatalogCategoryItem> {
-    return this.food.renameStoreCategory(code, name);
   }
 
   listModeration(query: OpsCatalogModerationQueryDto): Promise<OpsCatalogModerationPage> {

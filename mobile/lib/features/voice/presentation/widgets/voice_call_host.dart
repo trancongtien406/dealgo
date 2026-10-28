@@ -5,7 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
-import '../../data/media/system_call_ringer.dart';
+import '../../data/media/asset_call_ringer.dart';
 import '../../domain/ports/call_ringer.dart';
 import '../cubit/voice_call_cubit.dart';
 
@@ -14,7 +14,7 @@ import '../cubit/voice_call_cubit.dart';
 class VoiceCallHost extends StatelessWidget {
   const VoiceCallHost({
     required this.child,
-    this.ringer = SystemCallRinger.new,
+    this.ringer = AssetCallRinger.new,
     super.key,
   });
 
@@ -39,7 +39,7 @@ class VoiceCallHost extends StatelessWidget {
 }
 
 class VoiceCallScreen extends StatefulWidget {
-  const VoiceCallScreen({this.ringer = SystemCallRinger.new, super.key});
+  const VoiceCallScreen({this.ringer = AssetCallRinger.new, super.key});
 
   final CallRingerFactory ringer;
 

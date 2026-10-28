@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../core/design_system/components/dealgo_banner.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
@@ -204,11 +203,6 @@ class _VariantsBody extends StatelessWidget {
             icon: const Icon(DealGoIcons.add),
             label: Text(l10n.merchantOptionsAddGroup),
           ),
-        const SizedBox(height: DealGoSpacing.s16),
-        DealGoBanner(
-          tone: DealGoBannerTone.info,
-          message: l10n.merchantOptionsServerHint,
-        ),
       ],
     );
   }

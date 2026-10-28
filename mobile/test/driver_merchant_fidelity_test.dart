@@ -49,7 +49,7 @@ void main() {
     router.push(DriverRoutes.services);
     await tester.pumpAndSettle();
 
-    expect(find.text('Chọn dịch vụ nhận việc'), findsOneWidget);
+    expect(find.text('Dịch vụ'), findsWidgets);
     expect(find.byKey(const Key('driver-services-save')), findsOneWidget);
     expect(find.byKey(const Key('driver-services-ride')), findsOneWidget);
     expect(find.byKey(const Key('driver-services-food')), findsOneWidget);

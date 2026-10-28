@@ -27,7 +27,7 @@ class ServiceRow extends StatelessWidget {
             child: _ServiceCard(
               key: const Key('home-service-ride'),
               title: l10n.serviceRideTitle,
-              subtitle: l10n.serviceRideBlurb,
+              subtitle: l10n.homeServiceRideSub,
               fallbackColor: DealGoColors.subtlePurple,
               iconBackground: DealGoColors.primary,
               icon: DealGoIcons.motorbike,
@@ -77,75 +77,84 @@ class _ServiceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final body = Stack(
-      fit: StackFit.expand,
-      children: [
-        Image.asset(
-          backgroundArt,
-          fit: BoxFit.cover,
-          alignment: Alignment.center,
-          filterQuality: FilterQuality.high,
-          errorBuilder: (context, error, stack) {
-            return ColoredBox(color: fallbackColor);
-          },
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 10, 8),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: FractionallySizedBox(
-              widthFactor: 0.55,
-              heightFactor: 1,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _IconChip(
-                    background: iconBackground,
-                    icon: icon,
-                    foreground: Colors.white,
-                  ),
-                  Expanded(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.bottomLeft,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: textTheme.titleMedium?.copyWith(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: DealGoColors.text,
-                              height: 1.1,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            subtitle,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: textTheme.bodySmall?.copyWith(
-                              height: 1.15,
-                              fontSize: 11,
-                              color: DealGoColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const _ArrowChip(),
-                        ],
+    // On a 320 pt phone each card is ~140 pt wide: the subtitle would shrink
+    // to unreadable size under the art, so keep just the title there.
+    final body = LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 160;
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              backgroundArt,
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+              filterQuality: FilterQuality.high,
+              errorBuilder: (context, error, stack) {
+                return ColoredBox(color: fallbackColor);
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 10, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: FractionallySizedBox(
+                  widthFactor: 0.55,
+                  heightFactor: 1,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _IconChip(
+                        background: iconBackground,
+                        icon: icon,
+                        foreground: Colors.white,
                       ),
-                    ),
+                      Expanded(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.bottomLeft,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: textTheme.titleMedium?.copyWith(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: DealGoColors.text,
+                                  height: 1.1,
+                                ),
+                              ),
+                              if (!compact) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  subtitle,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: textTheme.bodySmall?.copyWith(
+                                    height: 1.15,
+                                    fontSize: 11,
+                                    color: DealGoColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 4),
+                              const _ArrowChip(),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
     return Material(
       color: fallbackColor,

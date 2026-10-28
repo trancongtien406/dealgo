@@ -1,6 +1,5 @@
 import type { OverviewSnapshot } from "@/features/overview/types";
 import { countFormat } from "@/lib/admin-format";
-import { catalogCategoryLabel } from "@/lib/category-labels";
 import { mapOpsActivity, type NestOpsActivityItem } from "@/lib/ops-activity";
 import { apiFetch } from "@/lib/api/client";
 import { ApiError } from "@/lib/api/errors";
@@ -64,12 +63,7 @@ export async function fetchOverview(): Promise<OverviewSnapshot> {
 function mapNestOverview(data: NestOpsOverview): OverviewSnapshot {
   const buckets = data.hourlyTrend?.buckets ?? [];
   const areaRows = mergeShareRows(data.ridesByArea ?? []);
-  const foodRows = mergeShareRows(
-    (data.foodByCategory ?? []).map((row) => ({
-      ...row,
-      name: humanizeCategory(row.name),
-    })),
-  );
+  const foodRows = mergeShareRows(data.foodByCategory ?? []);
   const pipelineRows = buildPipelineRows(data);
   const processingFood =
     typeof data.foodInFlight === "number"
@@ -170,10 +164,6 @@ function mergeShareRows(
     share: total > 0 ? Math.round((row.count / total) * 1000) / 10 : 0,
     id: `${row.name}::${index}`,
   }));
-}
-
-function humanizeCategory(raw: string): string {
-  return catalogCategoryLabel(raw);
 }
 
 function formatHourLabel(hourKey: string): string {

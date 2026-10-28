@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../utils/partner_status_listener.dart';
 import '../../../../core/config/api_base_url.dart';
 import '../../../../core/design_system/components/dealgo_card.dart';
+import '../../../../core/drafts/draft_resume_prompt.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
@@ -19,6 +20,7 @@ import '../document_image_source.dart';
 import '../utils/driver_kyc_routes.dart';
 import '../widgets/onboarding_widgets.dart';
 import '../widgets/partner_kyc_widgets.dart';
+import '../../../../core/design_system/components/dealgo_network_image.dart';
 
 /// Seeds from the profile grant, then loads the server application.
 Future<void> _loadDriverKyc(BuildContext context) async {
@@ -188,11 +190,47 @@ class _DriverKycIntroPageState extends State<DriverKycIntroPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _loadDriverKyc(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _open());
+  }
+
+  Future<void> _open() async {
+    if (!mounted) {
+      return;
+    }
+    try {
+      await _loadDriverKyc(context);
+    } catch (_) {}
+    if (!mounted) {
+      return;
+    }
+    // App killed mid-registration: offer the saved draft once on reopen.
+    if (await context.read<DriverKycCubit>().loadDraft() && mounted) {
+      await _offerDraft();
+    }
+  }
+
+  /// True when a saved draft was offered (the caller should not start fresh).
+  Future<bool> _offerDraft() async {
+    final cubit = context.read<DriverKycCubit>();
+    if (cubit.pendingDraft == null) {
+      return false;
+    }
+    final resume = await askResumeDraft(context);
+    if (!mounted || resume == null) {
+      return true;
+    }
+    if (resume) {
+      cubit.restoreDraft();
+      showDraftRestoredNote(context);
+    } else {
+      await cubit.discardDraft();
+      if (!mounted) {
+        return true;
       }
-    });
+      cubit.startDraft();
+    }
+    context.push(DriverKycRoutes.steps);
+    return true;
   }
 
   @override
@@ -223,7 +261,10 @@ class _DriverKycIntroPageState extends State<DriverKycIntroPage> {
           Expanded(
             child: OnboardingContinueBar(
               label: l10n.kycStartCta,
-              onPressed: () {
+              onPressed: () async {
+                if (await _offerDraft() || !context.mounted) {
+                  return;
+                }
                 context.read<DriverKycCubit>().startDraft();
                 context.push(DriverKycRoutes.steps);
               },
@@ -278,14 +319,6 @@ class _DriverKycIntroPageState extends State<DriverKycIntroPage> {
           ),
           const SizedBox(height: DealGoSpacing.s20),
           Text(l10n.kycIntroHeadline, style: textTheme.titleLarge),
-          const SizedBox(height: DealGoSpacing.s8),
-          Text(
-            l10n.kycIntroBody,
-            style: textTheme.bodyMedium?.copyWith(
-              color: DealGoColors.textSecondary,
-              height: 1.4,
-            ),
-          ),
           const SizedBox(height: DealGoSpacing.s20),
           _IntroFeature(
             icon: DealGoIcons.car,
@@ -610,7 +643,6 @@ class _DriverKycStatusPageState extends State<DriverKycStatusPage>
                 const SizedBox(height: DealGoSpacing.s12),
                 PartnerTimelineRow(
                   title: l10n.kycTimelineActivate,
-                  subtitle: l10n.kycTimelineActivateBody,
                   done: isActive,
                 ),
                 const SizedBox(height: DealGoSpacing.s16),
@@ -805,8 +837,6 @@ class _ServicesStep extends StatelessWidget {
           iconColor: DealGoColors.brandGreen,
           onTap: cubit.toggleFood,
         ),
-        const SizedBox(height: DealGoSpacing.s16),
-        OnboardingInfoBanner(message: l10n.kycServicesNote),
       ],
     );
   }
@@ -828,7 +858,6 @@ class _PersonalStep extends StatelessWidget {
           value: state.fullName,
           required: true,
           fieldKey: const Key('kyc-full-name'),
-          hint: l10n.kycFullNameHint,
           onChanged: cubit.setFullName,
         ),
         if (state.documentsRequired) ...[
@@ -899,8 +928,6 @@ class _ConfirmStep extends StatelessWidget {
           keyboardType: TextInputType.number,
           onChanged: context.read<DriverKycCubit>().setIdNumber,
         ),
-        const SizedBox(height: DealGoSpacing.s12),
-        OnboardingInfoBanner(message: l10n.kycConfirmNote),
       ],
     );
   }
@@ -966,12 +993,12 @@ class _VehicleClassChipLabel extends StatelessWidget {
         if (resolved != null) ...[
           ClipRRect(
             borderRadius: BorderRadius.circular(DealGoRadius.input),
-            child: Image.network(
+            child: DealGoNetworkImage(
               resolved,
               width: 24,
               height: 24,
               fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              fallback: const SizedBox.shrink(),
             ),
           ),
           const SizedBox(width: DealGoSpacing.s8),
@@ -1099,7 +1126,6 @@ class _VehicleStepState extends State<_VehicleStep> {
                 PartnerDocumentKind.vehicleInsurance,
             ],
           ),
-          OnboardingInfoBanner(message: l10n.kycVehicleNote),
           if (PartnerDocumentKind.isCarClass(state.vehicleClassCode ?? ''))
             OnboardingInfoBanner(message: l10n.kycVehicleInsuranceNote),
         ] else

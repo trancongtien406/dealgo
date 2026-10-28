@@ -206,11 +206,6 @@ class _DriverJobFailedPageState extends State<DriverJobFailedPage> {
             const SizedBox(height: DealGoSpacing.s12),
             DealGoBanner(tone: DealGoBannerTone.warning, message: _error!),
           ],
-          const SizedBox(height: DealGoSpacing.s16),
-          DealGoBanner(
-            tone: DealGoBannerTone.warning,
-            message: l10n.driverJobFailedPolicyHint,
-          ),
           if (_submitted) ...[
             const SizedBox(height: DealGoSpacing.s12),
             DealGoBanner(

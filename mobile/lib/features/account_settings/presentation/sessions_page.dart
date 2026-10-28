@@ -153,11 +153,6 @@ class _SessionsPageState extends State<SessionsPage> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          l10n.sessionsSubtitle,
-                          style: textTheme.bodyMedium,
-                        ),
                         const SizedBox(height: 12),
                         DecoratedBox(
                           decoration: BoxDecoration(

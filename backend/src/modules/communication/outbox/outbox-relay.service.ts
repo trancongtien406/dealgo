@@ -423,9 +423,13 @@ export class OutboxRelayService {
     if (allowed.length === 0) {
       return;
     }
-    await this.inbox.createMany(
+    const created = await this.inbox.createMany(
       allowed.map((userId) => ({ userId, category, title, body, data, sourceEventKey: eventKey })),
     );
+    // A retried relay writes nothing new, so it must not bump badges again.
+    if (created > 0) {
+      this.fanout?.emitInbox?.(allowed, { category, at: new Date().toISOString() });
+    }
   }
 
   private campaignDb() {

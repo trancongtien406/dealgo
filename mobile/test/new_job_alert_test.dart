@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:dealgo/core/media/alert_audio.dart';
 import 'package:dealgo/core/push/new_job_alert.dart';
 import 'package:dealgo/core/realtime/fake_snapshot_realtime.dart';
 import 'package:dealgo/features/food/domain/entities/food_models.dart';
@@ -166,6 +167,25 @@ void main() {
         expect(ios.played, isEmpty);
       },
     );
+
+    test('during a voice call it only vibrates', () async {
+      final player = _Player();
+      var calling = true;
+      final alert = NewJobAlert(player: player, inCall: () => calling);
+      expect(await alert.alert(NewJobAlertKind.ride), isTrue);
+      expect(player.played, isEmpty);
+      expect(player.vibrations, 1);
+
+      calling = false;
+      final later = NewJobAlert(player: player, inCall: () => calling);
+      await later.alert(NewJobAlertKind.ride);
+      expect(player.played, ['assets/sounds/dealgo_new_ride.mp3']);
+    });
+
+    test('built-in sounds ship as assets', () {
+      expect(File(AlertAudio.notifyAsset).existsSync(), isTrue);
+      expect(File(AlertAudio.ringAsset).existsSync(), isTrue);
+    });
 
     test('a failing player never throws', () async {
       final alert = NewJobAlert(player: _ThrowingPlayer());

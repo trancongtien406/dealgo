@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMapboxToken } from "@/lib/mapbox-token";
 import {
   applyBoxDrag,
   type BoxHandle,
@@ -119,12 +120,6 @@ export function worldPixelToLatLng(
   ];
 }
 
-/**
- * Mapbox is opt-in: only `NEXT_PUBLIC_MAPBOX_TOKEN` (website/.env.local) enables
- * it for tiles. Without it Admin maps use keyless OSM tiles (map-tile-layers.ts). Road routes
- * always come from Nest (`ROUTING_PROVIDER`, DEC-PROD-045); none → straight line.
- */
-const MAPBOX_DEFAULT_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN?.trim() || "";
 
 // Great-circle Haversine distance in meters
 export function estimateHaversineDistance(coords: MapCoordinate[]): number {
@@ -342,7 +337,12 @@ export function RealMapView({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null);
   const [tileLayer, setTileLayer] = useState<TileLayerChoice>("auto");
-  const hasMapboxToken = Boolean(MAPBOX_DEFAULT_TOKEN);
+  /**
+   * Mapbox tiles use the Admin public token (Cài đặt › Bản đồ), else `NEXT_PUBLIC_MAPBOX_TOKEN`;
+   * without either, keyless OSM tiles (map-tile-layers.ts). Road routes always come from Nest.
+   */
+  const mapboxToken = useMapboxToken();
+  const hasMapboxToken = Boolean(mapboxToken);
 
   // Remember the admin's base-layer choice across map views.
   useEffect(() => {
@@ -827,7 +827,7 @@ export function RealMapView({
         const left = halfW + (tx * 256 - centerPixelTileZ.x) * scale;
         const top = halfH + (ty * 256 - centerPixelTileZ.y) * scale;
 
-        const url = tileUrl(resolvedLayer, tileZoom, wrappedX, ty, MAPBOX_DEFAULT_TOKEN);
+        const url = tileUrl(resolvedLayer, tileZoom, wrappedX, ty, mapboxToken);
 
         list.push({
           x: wrappedX,
@@ -846,7 +846,7 @@ export function RealMapView({
     centerPixelTileZ.y,
     resolvedLayer,
     h,
-    
+    mapboxToken,
     scale,
     tileZoom,
     width,
@@ -1400,7 +1400,7 @@ export function RealMapView({
               tileLayer === "auto"
                 ? `Tự động (${resolvedLayer.label})`
                 : TILE_LAYER_LABELS[tileLayer]
-            }${hasMapboxToken ? "" : " · cần NEXT_PUBLIC_MAPBOX_TOKEN để đổi kiểu"}`}
+            }${hasMapboxToken ? "" : " · cần Mapbox token để đổi kiểu"}`}
             aria-label="Đổi kiểu bản đồ"
             disabled={!hasMapboxToken}
             onClick={cycleTileLayer}

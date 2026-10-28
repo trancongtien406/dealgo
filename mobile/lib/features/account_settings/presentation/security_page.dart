@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -13,8 +15,8 @@ import '../../../l10n/app_localizations.dart';
 import '../../../core/config/app_env.dart';
 import '../../identity/domain/entities/auth_method_policy.dart';
 import '../../identity/domain/entities/auth_state.dart';
-import '../../identity/domain/usecases/get_auth_methods.dart';
 import '../../identity/domain/passkey_platform.dart';
+import '../../identity/presentation/auth_methods_store.dart';
 import '../../identity/presentation/cubit/auth_cubit.dart';
 import '../domain/account_settings.dart';
 import '../../shell/presentation/account_routes.dart';
@@ -30,27 +32,30 @@ class SecurityPage extends StatefulWidget {
 
 class _SecurityPageState extends State<SecurityPage> {
   /// Passkey enrolment follows the admin auth-method switch (DEC-PROD-052).
-  bool _passkeyEnabled = true;
+  late final AuthMethodsStore _methods = context.read<AuthMethodsStore>();
+
+  /// Shown only once the switch is known to be on: never while loading or
+  /// when the lookup failed, so a switched-off method is never advertised.
+  bool get _passkeyEnabled => _methods.isEnabled(AuthMethodPolicy.passkey);
+
+  /// The password is the email sign-in credential; it follows that switch.
+  bool get _emailEnabled => _methods.isEnabled(AuthMethodPolicy.email);
 
   @override
   void initState() {
     super.initState();
-    _loadPolicies();
+    _methods.addListener(_onMethods);
+    unawaited(_methods.load());
   }
 
-  Future<void> _loadPolicies() async {
-    try {
-      final policies = await context.read<GetAuthMethods>()();
-      if (!mounted) return;
-      setState(() {
-        _passkeyEnabled = policies.any(
-          (policy) =>
-              policy.method == AuthMethodPolicy.passkey && policy.enabled,
-        );
-      });
-    } catch (_) {
-      // Keep the row; the endpoint still answers AUTH_METHOD_DISABLED.
-    }
+  void _onMethods() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _methods.removeListener(_onMethods);
+    super.dispose();
   }
 
   String get shellPath => widget.shellPath;
@@ -62,9 +67,6 @@ class _SecurityPageState extends State<SecurityPage> {
     final profile = auth is AuthSignedIn ? auth.profile : null;
     final phone = profile?.phone ?? '';
     final email = profile?.email ?? '';
-    final verified =
-        (profile?.phoneVerifiedAt ?? '').isNotEmpty ||
-        (profile?.emailVerifiedAt ?? '').isNotEmpty;
     final verifiedChip = Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -92,52 +94,51 @@ class _SecurityPageState extends State<SecurityPage> {
                 fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(l10n.securitySubtitle, style: textTheme.bodyMedium),
             const SizedBox(height: 16),
-            _Banner(
-              icon: DealGoIcons.shield,
-              title: l10n.securityProtected,
-              body: l10n.securityProtectedBody,
-            ),
+            _Banner(icon: DealGoIcons.shield, title: l10n.securityProtected),
             const SizedBox(height: 20),
             Text(l10n.securityLoginSection, style: textTheme.titleMedium),
             const SizedBox(height: 8),
-            _Group(
-              children: [
-                if (phone.isNotEmpty || email.isEmpty)
+            AnimatedSize(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: _Group(
+                children: [
+                  if (phone.isNotEmpty)
+                    _Row(
+                      icon: DealGoIcons.phone,
+                      title: l10n.securityPhone,
+                      body: phone,
+                      trailing: (profile?.phoneVerifiedAt ?? '').isNotEmpty
+                          ? verifiedChip
+                          : null,
+                    ),
+                  if (email.isNotEmpty)
+                    _Row(
+                      icon: DealGoIcons.mail,
+                      title: l10n.securityEmail,
+                      body: email,
+                      trailing: (profile?.emailVerifiedAt ?? '').isNotEmpty
+                          ? verifiedChip
+                          : null,
+                    ),
+                  if (_emailEnabled)
+                    _Row(
+                      icon: DealGoIcons.lock,
+                      title: l10n.securityChangePassword,
+                      onTap: () =>
+                          context.push(AccountRoutes.changePassword(shellPath)),
+                    ),
+                  if (_passkeyEnabled) const _PasskeyRow(),
                   _Row(
-                    icon: DealGoIcons.phone,
-                    title: l10n.securityPhone,
-                    body: phone.isEmpty ? '—' : phone,
-                    trailing: (profile?.phoneVerifiedAt ?? '').isNotEmpty
-                        ? verifiedChip
-                        : null,
+                    icon: DealGoIcons.devices,
+                    title: l10n.securitySessions,
+                    onTap: () =>
+                        context.push(AccountRoutes.sessions(shellPath)),
                   ),
-                if (email.isNotEmpty)
-                  _Row(
-                    icon: DealGoIcons.mail,
-                    title: l10n.securityEmail,
-                    body: email,
-                    trailing: (profile?.emailVerifiedAt ?? '').isNotEmpty
-                        ? verifiedChip
-                        : null,
-                  ),
-                _Row(
-                  icon: DealGoIcons.lock,
-                  title: l10n.securityChangePassword,
-                  body: l10n.securityChangePasswordBody,
-                  onTap: () =>
-                      context.push(AccountRoutes.changePassword(shellPath)),
-                ),
-                if (_passkeyEnabled) _PasskeyRow(hasVerifiedLogin: verified),
-                _Row(
-                  icon: DealGoIcons.devices,
-                  title: l10n.securitySessions,
-                  body: l10n.securitySessionsBody,
-                  onTap: () => context.push(AccountRoutes.sessions(shellPath)),
-                ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(height: 20),
             Text(l10n.securityPrivacySection, style: textTheme.titleMedium),
@@ -147,13 +148,11 @@ class _SecurityPageState extends State<SecurityPage> {
                 _Row(
                   icon: DealGoIcons.lock,
                   title: l10n.securityPermissions,
-                  body: l10n.securityPermissionsBody,
                   onTap: () => openAppSettings(),
                 ),
                 _Row(
                   icon: DealGoIcons.document,
                   title: l10n.securityTerms,
-                  body: l10n.securityTermsBody,
                   onTap: () => launchUrl(
                     Uri.parse('https://$appLinkHost/terms'),
                     mode: LaunchMode.externalApplication,
@@ -169,7 +168,6 @@ class _SecurityPageState extends State<SecurityPage> {
                 _Row(
                   icon: DealGoIcons.deleteAccount,
                   title: l10n.securityDelete,
-                  body: l10n.securityDeleteBody,
                   danger: true,
                   onTap: () =>
                       context.push(AccountRoutes.deleteAccount(shellPath)),
@@ -184,10 +182,9 @@ class _SecurityPageState extends State<SecurityPage> {
 }
 
 class _Banner extends StatelessWidget {
-  const _Banner({required this.icon, required this.title, required this.body});
+  const _Banner({required this.icon, required this.title});
   final IconData icon;
   final String title;
-  final String body;
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
@@ -198,7 +195,6 @@ class _Banner extends StatelessWidget {
       child: ListTile(
         leading: Icon(icon, color: DealGoColors.primary),
         title: Text(title),
-        subtitle: Text(body),
       ),
     );
   }
@@ -230,7 +226,7 @@ class _Row extends StatelessWidget {
   const _Row({
     required this.icon,
     required this.title,
-    required this.body,
+    this.body = '',
     this.onTap,
     this.trailing,
     this.danger = false,
@@ -249,7 +245,7 @@ class _Row extends StatelessWidget {
         color: danger ? DealGoColors.danger : DealGoColors.primary,
       ),
       title: Text(title),
-      subtitle: Text(body),
+      subtitle: body.isEmpty ? null : Text(body),
       trailing:
           trailing ??
           (onTap == null ? null : const Icon(DealGoIcons.chevronRight)),
@@ -261,9 +257,7 @@ class _Row extends StatelessWidget {
 /// S025 passkey enrolment (DEC-PROD-045). Wired to the existing registration endpoints;
 /// devices or builds that cannot create passkeys get a calm explanation, never a crash.
 class _PasskeyRow extends StatefulWidget {
-  const _PasskeyRow({required this.hasVerifiedLogin});
-
-  final bool hasVerifiedLogin;
+  const _PasskeyRow();
 
   @override
   State<_PasskeyRow> createState() => _PasskeyRowState();
@@ -282,10 +276,6 @@ class _PasskeyRowState extends State<_PasskeyRow> {
     final l10n = AppLocalizations.of(context);
     final auth = context.read<AuthCubit>().state;
     if (auth is! AuthSignedIn || _busy) return;
-    if (!widget.hasVerifiedLogin) {
-      _say(l10n.securityPasskeyNeedsPhone);
-      return;
-    }
     final settings = context.read<AccountSettingsRepository>();
     final platform = context.read<PasskeyPlatform>();
     final token = auth.tokens.accessToken;
@@ -315,10 +305,9 @@ class _PasskeyRowState extends State<_PasskeyRow> {
     } on ApiException catch (error) {
       if (!mounted) return;
       _say(switch (error.errorCode) {
-        'AUTH_METHOD_DISABLED' => l10n.securityPasskeyDisabled,
         'WEBAUTHN_NOT_CONFIGURED' => l10n.securityPasskeyUnsupported,
         'AUTH_PASSKEY_EXISTS' => l10n.securityPasskeyExists,
-        'FORBIDDEN' => l10n.securityPasskeyNeedsPhone,
+        'FORBIDDEN' => l10n.securityPasskeyNeedsVerifiedLogin,
         'AUTH_PASSKEY_INVALID' => l10n.securityPasskeyFailed,
         _ => apiErrorText(l10n, error),
       });
@@ -334,7 +323,6 @@ class _PasskeyRowState extends State<_PasskeyRow> {
       key: const Key('security-passkey-row'),
       leading: const Icon(DealGoIcons.shieldPlain, color: DealGoColors.primary),
       title: Text(l10n.securityPasskey),
-      subtitle: Text(l10n.securityPasskeyBody),
       trailing: _busy
           ? const SizedBox.square(
               dimension: 20,

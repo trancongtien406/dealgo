@@ -80,12 +80,28 @@ void main() {
     await _push(tester, RideRoutes.matching('ride-1'));
 
     expect(find.text('Đang nhận báo giá'), findsOneWidget);
-    expect(find.text('Đang chờ tài xế chào giá...'), findsOneWidget);
     // Redesigned matching screen shows the sent offer instead of the vehicle label.
     expect(find.text('Đã gửi đề xuất'), findsOneWidget);
     expect(find.text('42.000đ'), findsWidgets);
     expect(find.textContaining('Xe 4 chỗ'), findsNothing);
     expect(find.text('Chưa tìm được tài xế'), findsNothing);
+  });
+
+  testWidgets('the driver search has a back button that keeps the ride', (
+    tester,
+  ) async {
+    final rides = FakeRideClient()..onGet = (_) => _ride();
+    await _pumpCustomer(tester, rides: rides);
+
+    await _push(tester, RideRoutes.matching('ride-1'));
+    expect(find.byKey(const Key('ride-matching-back')), findsOneWidget);
+    // Cancel sits beside, not under, any other action.
+    expect(find.byKey(const Key('ride-cancel-search')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('ride-matching-back')));
+    await tester.pumpAndSettle();
+    expect(find.text('Đã gửi đề xuất'), findsNothing);
+    expect(rides.cancelCalls, isEmpty);
   });
 
   testWidgets('NEGOTIATING tracking waits for offers, not "driver accepted"', (

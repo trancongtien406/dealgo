@@ -194,23 +194,6 @@ class FoodOrderSuccessPage extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(height: DealGoSpacing.s12),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: DealGoColors.greenSurface,
-                      borderRadius: BorderRadius.circular(DealGoRadius.input),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(DealGoSpacing.s12),
-                      child: Text(
-                        AppLocalizations.of(context).foodOrderPlacedNote,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: DealGoColors.brandGreen,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),

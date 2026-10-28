@@ -44,11 +44,16 @@ class LaunchSplash {
 
 /// True once cold start knows where the user goes: the session restore has
 /// finished, post-auth flags are loaded and the router has left `/splash`.
+/// When that first page is the sign-in picker it also waits for the enabled
+/// sign-in methods (device cache or server), so the first frame already shows
+/// the real options; the [LaunchSplash] timeout still bounds the wait.
 bool launchRouteReady({
   required AuthState auth,
   required bool postAuthLoaded,
   required String location,
+  bool authMethodsLoading = false,
 }) {
   if (auth is AuthRestoring || !postAuthLoaded) return false;
+  if (location == AuthRoutes.login && authMethodsLoading) return false;
   return location != AuthRoutes.splash;
 }

@@ -75,7 +75,6 @@ void main() {
       );
 
       expect(find.text('Hoàn thiện hồ sơ'), findsOneWidget);
-      expect(find.textContaining('Chỉ còn một bước'), findsOneWidget);
       expect(find.text('Họ và tên'), findsWidgets);
       expect(find.byKey(const Key('name-field')), findsOneWidget);
       expect(find.text('Email'), findsWidgets);
@@ -87,7 +86,12 @@ void main() {
       expect(find.text('Khác'), findsOneWidget);
       expect(find.text('Bổ sung sau'), findsOneWidget);
       expect(find.text('Hoàn tất'), findsOneWidget);
-      expect(find.text('Ảnh đại diện (tuỳ chọn)'), findsOneWidget);
+      expect(find.bySemanticsLabel('Ảnh đại diện (tuỳ chọn)'), findsOneWidget);
+      // Skip sits in the top bar, not stacked under the primary button.
+      expect(
+        tester.getTopLeft(find.text('Bổ sung sau')).dy,
+        lessThan(tester.getTopLeft(find.text('Hoàn tất')).dy),
+      );
 
       final completeButton = tester.widget<FilledButton>(
         find.ancestor(
@@ -243,7 +247,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.text('Ảnh đại diện (tuỳ chọn)'));
+      await tester.tap(find.byKey(const Key('avatar-picker')));
       await tester.pumpAndSettle();
 
       expect(permissions.requested, contains(Permission.photos));

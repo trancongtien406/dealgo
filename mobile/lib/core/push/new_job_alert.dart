@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../media/alert_audio.dart';
 
 /// Kinds of "new job" alert, mirroring backend `NEW_JOB_SOUNDS` (r26).
 enum NewJobAlertKind {
@@ -51,18 +53,21 @@ abstract interface class NewJobAlertPlayer {
   Future<void> vibrate();
 }
 
-class RingtoneNewJobAlertPlayer implements NewJobAlertPlayer {
-  RingtoneNewJobAlertPlayer({FlutterRingtonePlayer? player})
-    : _player = player ?? FlutterRingtonePlayer();
+/// Plays the bundled clips through audioplayers; [playDefault] is the short
+/// built-in ding used when the spoken sound is off.
+class AudioNewJobAlertPlayer implements NewJobAlertPlayer {
+  AudioNewJobAlertPlayer({AudioPlayer? player}) : _given = player;
 
-  final FlutterRingtonePlayer _player;
+  final AudioPlayer? _given;
+  late final AudioPlayer _player =
+      _given ?? AudioPlayer(playerId: 'dealgo-new-job');
 
   @override
   Future<void> playAsset(String asset) =>
-      _player.play(fromAsset: asset, looping: false, asAlarm: false);
+      _player.play(AlertAudio.source(asset), ctx: AlertAudio.notification);
 
   @override
-  Future<void> playDefault() => _player.playNotification();
+  Future<void> playDefault() => playAsset(AlertAudio.notifyAsset);
 
   @override
   Future<void> vibrate() => HapticFeedback.vibrate();
@@ -75,6 +80,9 @@ class RingtoneNewJobAlertPlayer implements NewJobAlertPlayer {
 /// merchant store socket call [alert]. iOS presents the foreground push with its sound
 /// already, so socket-only triggers are skipped there ([socketTriggersPlay]).
 ///
+/// During a live voice call only the vibration fires ([inCall]): an alert clip
+/// would reconfigure the shared audio session under the call.
+///
 /// Bursts are merged: every trigger within [debounce] of the last sound is dropped
 /// (3 jobs in 2 s → one sound; push + socket for the same order → one sound).
 /// [debounce] is longer than the longest clip (~5 s) so sounds never overlap.
@@ -84,7 +92,9 @@ class NewJobAlert {
     DateTime Function()? clock,
     this.debounce = const Duration(seconds: 6),
     bool? socketTriggersPlay,
-  }) : _player = player ?? RingtoneNewJobAlertPlayer(),
+    bool Function()? inCall,
+  }) : _player = player ?? AudioNewJobAlertPlayer(),
+       inCall = inCall ?? _never,
        _clock = clock ?? DateTime.now,
        socketTriggersPlay =
            socketTriggersPlay ??
@@ -99,6 +109,11 @@ class NewJobAlert {
   final DateTime Function() _clock;
   final Duration debounce;
   final bool socketTriggersPlay;
+
+  /// Whether a voice call is ringing or live (wired to the call cubit at start-up).
+  bool Function() inCall;
+
+  static bool _never() => false;
 
   DateTime? _lastPlayedAt;
   bool _customSound = true;
@@ -138,6 +153,9 @@ class NewJobAlert {
     _lastPlayedAt = now;
     final spoken = customSound ?? _customSound;
     await _guard(_player.vibrate);
+    if (inCall()) {
+      return true;
+    }
     await _guard(
       spoken ? () => _player.playAsset(kind.asset) : _player.playDefault,
     );
