@@ -22,6 +22,10 @@ import { EarningsService } from '../../../src/modules/earnings/earnings.service.
 import { FoodService } from '../../../src/modules/food-order/food.service.js';
 import { EARNINGS_REPOSITORY } from '../../../src/modules/earnings/earnings.constants.js';
 import type { EarningsRepository } from '../../../src/modules/earnings/earnings.repository.js';
+import { LEDGER_REPOSITORY } from '../../../src/modules/ledger/ledger.constants.js';
+import type { MemoryLedgerRepository } from '../../../src/modules/ledger/ledger.repository.js';
+import { CHECKOUT_REPOSITORY } from '../../../src/modules/payment/payment.constants.js';
+import type { MemoryCheckoutRepository } from '../../../src/modules/payment/checkout/checkout.repository.js';
 
 const dropoff = { lat: 16.047079, lng: 108.20623, label: 'Hải Châu' };
 
@@ -407,6 +411,72 @@ describe('food dispatch http', () => {
     } finally {
       await settings().patch('VOUCHER_SHARED_PLATFORM_PERCENT', '100', 'reset', 'ops-test');
     }
+  });
+
+  /** Places, readies, claims and picks up an order the customer prepaid online (MoMo). */
+  async function onlinePaidOrder(key: string, refundedVnd = 0) {
+    const customer = await login();
+    const merchant = await loginPhone(MERCHANT_PHONE);
+    const d = await onlineDriver();
+    const orderId = await placeAccepted(customer, merchant, key);
+    const total = (await http().get(`/v1/food/orders/${orderId}`).set('Authorization', `Bearer ${customer.token}`).expect(200))
+      .body.data.totalVnd as number;
+    const checkout = app.get<MemoryCheckoutRepository>(CHECKOUT_REPOSITORY, { strict: false });
+    await checkout.setSelection('FOOD_ORDER', orderId, 'MOMO');
+    const intent = await checkout.upsertAttempt({
+      entityType: 'FOOD_ORDER', entityId: orderId, method: 'MOMO', methodCode: 'MOMO', provider: 'momo',
+      amountVnd: total, providerRef: `DGF${key}`.slice(0, 20), paymentUrl: null, deeplink: null,
+    });
+    await checkout.update(intent.id, { status: 'CAPTURED', providerTransId: key, refundedVnd });
+    for (const [actor, step] of [
+      [merchant, 'ready'],
+      [d, 'claim'],
+      [d, 'pickup'],
+    ] as const) {
+      await http().post(`/v1/food/orders/${orderId}/${step}`).set('Authorization', `Bearer ${actor.token}`).expect(200);
+    }
+    return { customer, d, orderId, total, intentId: intent.id, checkout };
+  }
+
+  async function deliver(customerToken: string, driverToken: string, orderId: string) {
+    const deliveryCode = await deliveryCodeOf(customerToken, orderId);
+    await http()
+      .post(`/v1/food/orders/${orderId}/deliver`)
+      .set('Authorization', `Bearer ${driverToken}`)
+      .send({ deliveryCode })
+      .expect(200);
+  }
+
+  it('online-paid food order: driver collects nothing, no COD, prepaid applied and paid out to the driver', async () => {
+    const { customer, d, orderId, total, intentId, checkout } = await onlinePaidOrder('food-online-full');
+    const before = await http().get(`/v1/food/orders/${orderId}/collection`).set('Authorization', `Bearer ${d.token}`).expect(200);
+    expect(before.body.data).toMatchObject({ methodCode: 'MOMO', status: 'PAID', paidOnlineVnd: total, cashToCollectVnd: 0 });
+    // Only the assigned driver reads the collection split.
+    await http().get(`/v1/food/orders/${orderId}/collection`).set('Authorization', `Bearer ${customer.token}`).expect(404);
+
+    await deliver(customer.token, d.token, orderId);
+
+    const ledgerRepo = app.get<MemoryLedgerRepository>(LEDGER_REPOSITORY, { strict: false });
+    expect(await ledgerRepo.findByEntity('FOOD_ORDER', orderId, 'COD_OBLIGATION_POSTED')).toBeNull();
+    expect((await ledgerRepo.findByEntity('FOOD_ORDER', orderId, 'PSP_PREPAID_APPLIED'))?.amountVnd).toBe(total);
+    expect((await checkout.findById(intentId))?.settledAt).toBeInstanceOf(Date);
+    const adjustments = await app.get(EarningsService).listAdjustments(d.userId);
+    expect(adjustments).toEqual([
+      expect.objectContaining({ kind: 'ONLINE_PAYMENT_PAYOUT', amountVnd: -total, refId: intentId }),
+    ]);
+  });
+
+  it('partly refunded online payment: driver collects only the remainder in cash', async () => {
+    const refunded = 5_000;
+    const { customer, d, orderId, total } = await onlinePaidOrder('food-online-part', refunded);
+    const before = await http().get(`/v1/food/orders/${orderId}/collection`).set('Authorization', `Bearer ${d.token}`).expect(200);
+    expect(before.body.data).toMatchObject({ paidOnlineVnd: total - refunded, cashToCollectVnd: refunded });
+
+    await deliver(customer.token, d.token, orderId);
+
+    const ledgerRepo = app.get<MemoryLedgerRepository>(LEDGER_REPOSITORY, { strict: false });
+    expect((await ledgerRepo.findByEntity('FOOD_ORDER', orderId, 'COD_OBLIGATION_POSTED'))?.amountVnd).toBe(refunded);
+    expect((await ledgerRepo.findByEntity('FOOD_ORDER', orderId, 'PSP_PREPAID_APPLIED'))?.amountVnd).toBe(total - refunded);
   });
 
   it('merchant-accept and unclaimed-READY timeouts cancel as SYSTEM (worker sweep)', async () => {
