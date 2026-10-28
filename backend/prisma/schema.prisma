@@ -845,6 +845,10 @@ enum LedgerJournalEvent {
   DRIVER_PLATFORM_FEE_ACCRUED
   /// Commission the merchant owes DealGo on a delivered food order (receivable vs revenue).
   MERCHANT_COMMISSION_ACCRUED
+  /// Verified online payment: PSP clearing receivable vs customer prepayment liability.
+  PSP_PAYMENT_CAPTURED
+  /// Online refund accepted by the PSP: reverses PSP_PAYMENT_CAPTURED.
+  PSP_REFUND_RECORDED
 }
 
 enum LedgerJournalStatus {
@@ -989,6 +993,11 @@ enum PaymentMethod {
   COD
   VNPAY
   MOMO
+  ZALOPAY
+  SHOPEEPAY
+  CARD
+  APPLE_PAY
+  DEALGO_WALLET
 }
 
 enum PaymentIntentStatus {
@@ -996,27 +1005,54 @@ enum PaymentIntentStatus {
   CREATED
   PENDING_REDIRECT
   CAPTURED_STUB
+  /// Verified PSP capture (signed IPN/callback).
+  CAPTURED
+  FAILED
+  EXPIRED
+  REFUND_PENDING
+  REFUNDED
 }
 
 model PaymentIntent {
-  id          String              @id @default(uuid()) @db.Uuid
-  entityType  PaymentEntityType
-  entityId    String              @db.Uuid
-  method      PaymentMethod
-  status      PaymentIntentStatus @default(SANDBOX_RECORDED)
-  amountVnd   Int
-  currency    String              @default("VND") @db.VarChar(3)
-  provider    String              @default("sandbox") @db.VarChar(32)
-  providerRef String?             @db.VarChar(120)
-  paymentUrl  String?             @db.VarChar(2000)
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  id              String              @id @default(uuid()) @db.Uuid
+  entityType      PaymentEntityType
+  entityId        String              @db.Uuid
+  method          PaymentMethod
+  status          PaymentIntentStatus @default(SANDBOX_RECORDED)
+  amountVnd       Int
+  currency        String              @default("VND") @db.VarChar(3)
+  provider        String              @default("sandbox") @db.VarChar(32)
+  providerRef     String?             @db.VarChar(120)
+  paymentUrl      String?             @db.VarChar(2000)
+  /// Customer-facing method code from the registry (e.g. VNPAY_ATM); null for legacy rows.
+  methodCode      String?             @db.VarChar(32)
+  /// PSP transaction id needed for refunds (MoMo transId, ZaloPay zp_trans_id, VNPay TransactionNo).
+  providerTransId String?             @db.VarChar(64)
+  /// PSP pay date (VNPay vnp_PayDate yyyyMMddHHmmss) needed for refunds.
+  providerPayDate String?             @db.VarChar(20)
+  deeplink        String?             @db.VarChar(2000)
+  refundedVnd     Int                 @default(0)
+  failureReason   String?             @db.VarChar(255)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
 
   @@unique([entityType, entityId, method])
   @@index([entityType, entityId])
   @@index([providerRef])
   @@index([createdAt])
   @@map("payment_intents")
+}
+
+// Customer's chosen payment method per ride / food order (registry code, e.g. MOMO, CASH).
+model PaymentSelection {
+  entityType PaymentEntityType
+  entityId   String            @db.Uuid
+  methodCode String            @db.VarChar(32)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@id([entityType, entityId])
+  @@map("payment_selections")
 }
 
 // Idempotent PSP webhook receipts (provider event id).

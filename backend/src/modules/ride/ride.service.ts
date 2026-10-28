@@ -27,6 +27,10 @@ import { platformFundedDiscountVnd } from '../promotion/voucher-funding.js';
 import { PAYMENT_PORT } from '../payment/payment.constants.js';
 import type { PaymentPort } from '../payment/payment-port.js';
 import { UnavailablePaymentError } from '../payment/payment-port.js';
+import { PaymentGatewayService, type CheckoutView } from '../payment/checkout/payment-gateway.service.js';
+import { PaymentMethodRegistryService } from '../payment/checkout/payment-method-registry.service.js';
+import { serviceForVehicleClass } from '../payment/checkout/payment-method.catalog.js';
+import type { PaymentMethodCode } from '../../platform/settings/payment-method-registry.js';
 import { RideVehicleClassService } from '../ride-vehicle/ride-vehicle-class.service.js';
 import {
   clampToFareSteps,
@@ -245,7 +249,66 @@ export class RideService {
     @Optional() @Inject(RIDE_CUSTOMER_RATING_STORE)
     private readonly customerRatings?: RideCustomerRatingStore,
     @Optional() private readonly phaseRoutes?: PhaseRouteCache,
+    @Optional() private readonly paymentMethods?: PaymentMethodRegistryService,
+    @Optional() private readonly checkout?: PaymentGatewayService,
   ) {}
+
+  /** Server-side enforcement: only methods enabled for this service (CASH always allowed). */
+  private async resolvePaymentMethod(vehicleClassCode: string, requested?: string): Promise<PaymentMethodCode> {
+    const code = requested ?? 'CASH';
+    if (code === 'CASH' || !this.paymentMethods) {
+      if (code !== 'CASH') {
+        throw rideError(422, 'PAYMENT_METHOD_UNAVAILABLE', 'Online payment is not available');
+      }
+      return 'CASH';
+    }
+    return this.paymentMethods.assertSelectable(serviceForVehicleClass(vehicleClassCode), code);
+  }
+
+  /** Customer picks / starts paying for a ride. Amount = agreed fare − voucher (server side). */
+  async startPayment(
+    actor: RequestActor,
+    rideId: string,
+    methodCode: string,
+    clientIp?: string,
+  ): Promise<CheckoutView> {
+    await this.requireOwnRide(actor, rideId);
+    const ride = await this.get(actor, rideId);
+    if (ride.status === 'CANCELLED' || ride.status === 'EXPIRED') {
+      throw rideError(409, 'RIDE_NOT_PAYABLE', 'This ride can no longer be paid');
+    }
+    if (!this.checkout) {
+      throw rideError(422, 'PAYMENT_METHOD_UNAVAILABLE', 'Online payment is not available');
+    }
+    return this.checkout.start({
+      entityType: 'RIDE',
+      entityId: ride.id,
+      service: serviceForVehicleClass(ride.vehicleClassCode),
+      methodCode,
+      amountVnd: ride.cashDueVnd ?? 0,
+      userId: actor.userId,
+      clientIp,
+    });
+  }
+
+  private async requireOwnRide(actor: RequestActor, rideId: string): Promise<void> {
+    const raw = await this.unwrapNullable(() => this.rides.findById(rideId, this.clock.now()));
+    if (!raw || raw.customerId !== actor.userId) {
+      throw rideError(404, 'RIDE_NOT_FOUND', 'Ride not found');
+    }
+  }
+
+  async paymentStatus(actor: RequestActor, rideId: string): Promise<CheckoutView> {
+    await this.requireOwnRide(actor, rideId);
+    const ride = await this.get(actor, rideId);
+    if (!this.checkout) {
+      return {
+        entityType: 'RIDE', entityId: ride.id, methodCode: 'CASH', status: 'CASH', amountVnd: null,
+        paymentUrl: null, deeplink: null, intentId: null, failureReason: null,
+      };
+    }
+    return this.checkout.status('RIDE', ride.id);
+  }
 
   private notifyOffers(rideId: string, reason: RideOfferChangeReason): void {
     this.offerEvents?.publish({ rideId, reason, at: this.clock.now() });
@@ -269,6 +332,7 @@ export class RideService {
   async create(actor: RequestActor, idempotencyKey: string, dto: CreateRideDto): Promise<RideView> {
     await this.requireActiveCustomer(actor.userId);
     const vehicle = await this.requireEnabledClass(dto.vehicleClassCode);
+    const paymentMethod = await this.resolvePaymentMethod(vehicle.code, dto.paymentMethod);
     const offeredFareVnd = toFareStep(dto.offeredFareVnd);
     await this.assertFare(offeredFareVnd, vehicle.minFareVnd, vehicle.maxFareVnd);
     await this.assertInServiceZone(dto.pickup, dto.dropoff);
@@ -295,6 +359,9 @@ export class RideService {
         repostOfRideId,
       }),
     );
+    if (this.checkout && paymentMethod !== 'CASH') {
+      await this.checkout.recordSelection('RIDE', created.id, paymentMethod);
+    }
     if (created.status === 'NEGOTIATING') {
       this.notifyOffers(created.id, 'CREATED');
     }

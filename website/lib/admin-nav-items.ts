@@ -28,6 +28,7 @@ export type AdminNavHref =
   | "/settings/faqs"
   | "/settings/auth-methods"
   | "/settings/maps"
+  | "/settings/payments"
   | "/settings/email"
   | "/settings/sentry"
   | "/system-errors"
@@ -231,6 +232,7 @@ export const adminNavSections: readonly AdminNavSection[] = [
           { label: "Chính sách OPEN", href: "/settings/faqs" },
           { label: "Đăng nhập", href: "/settings/auth-methods" },
           { label: "Bản đồ", href: "/settings/maps" },
+          { label: "Thanh toán", href: "/settings/payments" },
           { label: "Email", href: "/settings/email" },
           { label: "Sentry", href: "/settings/sentry" },
           { label: "Loại xe", href: "/settings/vehicle-classes" },
@@ -277,6 +279,12 @@ export const adminCommandExtras: readonly AdminNavItem[] = [
     icon: "pin",
     href: "/settings/maps",
     keywords: ["maps", "bản đồ", "google", "mapbox", "địa chỉ"],
+  },
+  {
+    label: "Phương thức thanh toán",
+    icon: "settings",
+    href: "/settings/payments",
+    keywords: ["payment", "thanh toán", "momo", "zalopay", "vnpay", "ví"],
   },
   {
     label: "Email (Gmail / SES)",

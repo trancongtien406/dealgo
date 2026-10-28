@@ -17,6 +17,10 @@ import {
   PLATFORM_SETTINGS_REPOSITORY,
 } from './platform-settings.constants.js';
 import { settingsError } from './platform-settings.error.js';
+import {
+  normalizePaymentMethodRegistry,
+  validatePaymentMethodRegistry,
+} from './payment-method-registry.js';
 import { PLATFORM_SETTING_SEED_DEFAULTS } from './platform-settings.seed.js';
 import type {
   PlatformSettingRecord,
@@ -335,6 +339,8 @@ export class PlatformSettingsService {
         }
         return this.config.get('PAYMENT_METHODS_ENABLED', { infer: true });
 
+      case 'PAYMENT_METHOD_REGISTRY':
+      case 'PAYMENT_WALLET_ENABLED':
       case 'RATING_WINDOW_DAYS':
       case 'RIDE_COMMISSION_BIKE_PERCENT':
       case 'RIDE_COMMISSION_CAR_PERCENT':
@@ -462,6 +468,13 @@ export class PlatformSettingsService {
             'PAYMENT_METHODS_ENABLED must be a JSON array of non-empty strings',
           );
         }
+      }
+      if (key === 'PAYMENT_METHOD_REGISTRY') {
+        const problem = validatePaymentMethodRegistry(parsed);
+        if (problem) {
+          throw settingsError(400, 'PLATFORM_SETTING_INVALID', problem);
+        }
+        return JSON.stringify(normalizePaymentMethodRegistry(parsed));
       }
       if (key === 'UPLOAD_ALLOWED_TYPES') {
         const allowed = UPLOAD_SNIFFABLE_TYPES as readonly string[];

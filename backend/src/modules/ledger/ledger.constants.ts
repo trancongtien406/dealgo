@@ -9,7 +9,9 @@ export type LedgerJournalEventName =
   | 'SANDBOX_REFUND_RECORDED'
   | 'PROMOTION_DISCOUNT_FUNDED'
   | 'DRIVER_PLATFORM_FEE_ACCRUED'
-  | 'MERCHANT_COMMISSION_ACCRUED';
+  | 'MERCHANT_COMMISSION_ACCRUED'
+  | 'PSP_PAYMENT_CAPTURED'
+  | 'PSP_REFUND_RECORDED';
 
 /** DealGo-funded voucher discounts (proposed decision, see decisions-and-assumptions). */
 export const LEDGER_PROMO_EXPENSE_CODE = 'sandbox.promo.discount_expense';
@@ -24,6 +26,10 @@ export const LEDGER_FEE_REVENUE_CODE = 'sandbox.fee.platform_revenue';
 /** Commission a merchant owes DealGo on delivered food orders. */
 export const LEDGER_COMMISSION_MERCHANT_RECEIVABLE_CODE = 'sandbox.commission.merchant_receivable';
 export const LEDGER_COMMISSION_REVENUE_CODE = 'sandbox.commission.revenue';
+
+/** Online payments: money held by the PSP for DealGo vs prepaid by the customer. */
+export const LEDGER_PSP_CLEARING_CODE = 'psp.clearing_receivable';
+export const LEDGER_PSP_CUSTOMER_PREPAID_CODE = 'psp.customer_prepaid';
 
 export const LEDGER_REFUND_PAYABLE_CODE = 'sandbox.refund.payable';
 export const LEDGER_REFUND_CLEARING_CODE = 'sandbox.refund.clearing';

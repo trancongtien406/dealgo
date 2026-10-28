@@ -83,6 +83,7 @@ import '../../features/shell/presentation/payment_history_page.dart';
 import '../../core/auth/post_auth_gate.dart';
 import '../../features/identity/domain/entities/app_role.dart';
 import '../../features/identity/domain/auth_redirect.dart';
+import '../../features/payment/presentation/payment_status_page.dart';
 import '../../features/identity/domain/entities/auth_state.dart';
 import '../../features/identity/domain/passkey_platform.dart';
 import '../../features/identity/domain/repositories/identity_repository.dart';
@@ -419,6 +420,24 @@ GoRouter createAppRouter({
           return dealgoFadeSlidePage(
             key: state.pageKey,
             child: RideMatchingPage(key: ValueKey(rideId), rideId: rideId),
+          );
+        },
+      ),
+      GoRoute(
+        path: PaymentRoutes.returnPath,
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) {
+          final q = state.uri.queryParameters;
+          final entityType = q['entityType'] == 'RIDE' ? 'RIDE' : 'FOOD_ORDER';
+          final entityId = q['entityId'] ?? '';
+          return dealgoFadeSlidePage(
+            key: state.pageKey,
+            child: PaymentStatusPage(
+              key: ValueKey('$entityType:$entityId'),
+              entityType: entityType,
+              entityId: entityId,
+              startMethod: q['start'],
+            ),
           );
         },
       ),

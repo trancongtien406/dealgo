@@ -1,4 +1,5 @@
 import {
+  Ip,
   Body,
   Controller,
   Get,
@@ -11,6 +12,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { StartPaymentDto } from '../payment/checkout/payment-checkout.dto.js';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DriverLocationQueryDto } from '../dispatch/driver-location-query.dto.js';
 import { CurrentActor, CustomerSessionGuard, type RequestActor } from '../identity/access-auth.guard.js';
@@ -115,6 +117,24 @@ export class FoodController {
   @ApiOperation({ summary: 'Get a food order by id' })
   getOrder(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
     return this.food.get(actor, id);
+  }
+
+  @Get('orders/:id/payment')
+  @ApiOperation({ summary: 'Payment method + status for this food order (CASH/PENDING/PAID/FAILED/…)' })
+  paymentStatus(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.food.paymentStatus(actor, id);
+  }
+
+  @Post('orders/:id/payment')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Choose a payment method; online methods return paymentUrl/deeplink' })
+  startPayment(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: StartPaymentDto,
+    @Ip() ip: string,
+  ) {
+    return this.food.startPayment(actor, id, dto.methodCode, ip);
   }
 
   @Get('orders/:id/driver-location')

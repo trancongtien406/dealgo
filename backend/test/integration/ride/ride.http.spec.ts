@@ -37,7 +37,8 @@ import {
 } from '../../../src/modules/ride/ride-customer-rating.js';
 import { PARTNER_REPOSITORY } from '../../../src/modules/partner/partner.constants.js';
 import { MemoryPartnerRepository } from '../../../src/modules/partner/partner.repository.js';
-import { PAYMENT_REPOSITORY } from '../../../src/modules/payment/payment.constants.js';
+import { CHECKOUT_REPOSITORY, PAYMENT_REPOSITORY } from '../../../src/modules/payment/payment.constants.js';
+import { MemoryCheckoutRepository } from '../../../src/modules/payment/checkout/checkout.repository.js';
 import { MemoryPaymentRepository } from '../../../src/modules/payment/payment.repository.js';
 import { haversineKm, quoteReferenceFareVnd } from '../../../src/modules/ride/ride-geo.js';
 import { roundUpToFareStep } from '../../../src/modules/ride-vehicle/ride-vehicle-class.js';
@@ -1209,6 +1210,8 @@ describe('ride negotiation in production', () => {
       .useValue(new MemoryLedgerRepository())
       .overrideProvider(PAYMENT_REPOSITORY)
       .useValue(new MemoryPaymentRepository())
+      .overrideProvider(CHECKOUT_REPOSITORY)
+      .useValue(new MemoryCheckoutRepository())
       .overrideProvider(PARTNER_REPOSITORY)
       .useValue(new MemoryPartnerRepository())
       .overrideProvider(PLATFORM_SETTINGS_REPOSITORY)

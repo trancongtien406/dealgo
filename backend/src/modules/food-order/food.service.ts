@@ -41,6 +41,9 @@ import { PartnerEligibilityService } from '../partner/partner-eligibility.servic
 import { PAYMENT_PORT } from '../payment/payment.constants.js';
 import type { PaymentPort } from '../payment/payment-port.js';
 import { UnavailablePaymentError } from '../payment/payment-port.js';
+import { PaymentGatewayService, type CheckoutView } from '../payment/checkout/payment-gateway.service.js';
+import { PaymentMethodRegistryService } from '../payment/checkout/payment-method-registry.service.js';
+import type { PaymentMethodCode } from '../../platform/settings/payment-method-registry.js';
 import { quoteReferenceFareVnd } from '../ride/ride-geo.js';
 import {
   FIXTURE_MERCHANT_PHONE,
@@ -332,7 +335,65 @@ export class FoodService {
     @Inject(FOOD_ORDER_CODE_STORE) private readonly codes: FoodOrderCodeStore,
     @Optional() private readonly phaseRoutes?: PhaseRouteCache,
     @Optional() private readonly promotions?: PromotionService,
+    @Optional() private readonly paymentMethods?: PaymentMethodRegistryService,
+    @Optional() private readonly checkout?: PaymentGatewayService,
   ) {}
+
+  /** Server-side enforcement of the FOOD payment method registry (CASH always allowed). */
+  private async resolvePaymentMethod(requested?: string): Promise<PaymentMethodCode> {
+    const code = requested ?? 'CASH';
+    if (code === 'CASH') {
+      return 'CASH';
+    }
+    if (!this.paymentMethods) {
+      throw foodError(422, 'PAYMENT_METHOD_UNAVAILABLE', 'Online payment is not available');
+    }
+    return this.paymentMethods.assertSelectable('FOOD', code);
+  }
+
+  private async requireOwnOrder(actor: RequestActor, orderId: string) {
+    const order = await this.unwrapNullable(() => this.food.findOrder(orderId));
+    if (!order || order.customerId !== actor.userId) {
+      throw foodError(404, 'FOOD_ORDER_NOT_FOUND', 'Food order not found');
+    }
+    return order;
+  }
+
+  /** Customer picks / starts paying for an order. Amount = server total (net of voucher). */
+  async startPayment(
+    actor: RequestActor,
+    orderId: string,
+    methodCode: string,
+    clientIp?: string,
+  ): Promise<CheckoutView> {
+    const order = await this.requireOwnOrder(actor, orderId);
+    if (['CANCELLED', 'FAILED', 'DELIVERED'].includes(order.status) && methodCode !== 'CASH') {
+      throw foodError(409, 'FOOD_ORDER_NOT_PAYABLE', 'This order can no longer be paid online');
+    }
+    if (!this.checkout) {
+      throw foodError(422, 'PAYMENT_METHOD_UNAVAILABLE', 'Online payment is not available');
+    }
+    return this.checkout.start({
+      entityType: 'FOOD_ORDER',
+      entityId: order.id,
+      service: 'FOOD',
+      methodCode,
+      amountVnd: order.totalVnd,
+      userId: actor.userId,
+      clientIp,
+    });
+  }
+
+  async paymentStatus(actor: RequestActor, orderId: string): Promise<CheckoutView> {
+    const order = await this.requireOwnOrder(actor, orderId);
+    if (!this.checkout) {
+      return {
+        entityType: 'FOOD_ORDER', entityId: order.id, methodCode: 'CASH', status: 'CASH', amountVnd: null,
+        paymentUrl: null, deeplink: null, intentId: null, failureReason: null,
+      };
+    }
+    return this.checkout.status('FOOD_ORDER', order.id);
+  }
 
   async listStores(
     actor: RequestActor,
@@ -825,6 +886,7 @@ export class FoodService {
     dto: PlaceFoodOrderDto,
   ): Promise<PublicFoodOrder> {
     await this.requireActiveCustomer(actor.userId);
+    const paymentMethod = await this.resolvePaymentMethod(dto.paymentMethod);
     await this.probeDropoffMaps(dto.dropoff.label);
     await this.ensureSandboxFixtureCatalog();
     await this.assertWithinDeliveryRange(dto.storeId, dto.dropoff);
@@ -843,6 +905,9 @@ export class FoodService {
         voucherCode: dto.voucherCode?.trim() || undefined,
       }),
     );
+    if (this.checkout && paymentMethod !== 'CASH') {
+      await this.checkout.recordSelection('FOOD_ORDER', order.id, paymentMethod);
+    }
     return publish(order);
   }
 

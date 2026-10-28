@@ -1,3 +1,4 @@
+import { PAYMENT_METHOD_CODES } from '../../platform/settings/payment-method-registry.js';
 import { Transform, Type } from 'class-transformer';
 import {
   IsDefined,
@@ -198,6 +199,11 @@ export class PlaceFoodOrderDto {
   @MaxLength(40)
   @Matches(/^[A-Za-z0-9_-]+$/)
   voucherCode?: string;
+
+  /** Registry payment method code (default CASH); must be enabled for FOOD. */
+  @IsOptional()
+  @IsIn(PAYMENT_METHOD_CODES as unknown as string[])
+  paymentMethod?: (typeof PAYMENT_METHOD_CODES)[number];
 }
 
 export class CreateFoodItemDto {

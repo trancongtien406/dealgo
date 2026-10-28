@@ -3,6 +3,8 @@ import {
   LEDGER_CASH_IN_TRANSIT_CODE,
   LEDGER_COMMISSION_MERCHANT_RECEIVABLE_CODE,
   LEDGER_COMMISSION_REVENUE_CODE,
+  LEDGER_PSP_CLEARING_CODE,
+  LEDGER_PSP_CUSTOMER_PREPAID_CODE,
   LEDGER_COD_OBLIGATION_CODE,
   LEDGER_FEE_DRIVER_RECEIVABLE_CODE,
   LEDGER_FEE_REVENUE_CODE,
@@ -92,6 +94,8 @@ export interface LedgerRepository {
     event: PostableLedgerEvent,
     input: PostCodObligationInput,
   ): Promise<LedgerJournalView>;
+  /** Standalone (own transaction) post; idempotent per entity + event. */
+  postEvent(event: PostableLedgerEvent, input: PostCodObligationInput): Promise<LedgerJournalView>;
   findByEntity(
     entityType: LedgerEntityTypeName,
     entityId: string,
@@ -125,6 +129,10 @@ export class MemoryLedgerRepository implements LedgerRepository {
     return this.run(() =>
       this.postSync(input, 'DRIVER_PLATFORM_FEE_ACCRUED', buildDriverPlatformFeeLines),
     );
+  }
+
+  postEvent(event: PostableLedgerEvent, input: PostCodObligationInput): Promise<LedgerJournalView> {
+    return this.run(() => this.postSync(input, event, LEDGER_LINE_BUILDERS[event]));
   }
 
   /** Memory mode has no transaction; posting is synchronous so it cannot interleave. */
@@ -286,6 +294,18 @@ export class MemoryLedgerRepository implements LedgerRepository {
         code: LEDGER_COMMISSION_REVENUE_CODE,
         name: 'Sandbox merchant commission revenue',
         kind: 'REVENUE',
+      },
+      {
+        id: randomUUID(),
+        code: LEDGER_PSP_CLEARING_CODE,
+        name: 'Online payments held by PSP (clearing receivable)',
+        kind: 'ASSET',
+      },
+      {
+        id: randomUUID(),
+        code: LEDGER_PSP_CUSTOMER_PREPAID_CODE,
+        name: 'Customer prepayment for online-paid jobs',
+        kind: 'LIABILITY',
       },
     ];
     for (const row of rows) {

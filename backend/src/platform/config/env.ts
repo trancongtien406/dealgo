@@ -213,6 +213,25 @@ const envSchema = z.object({
   MOMO_ACCESS_KEY: optionalString,
   MOMO_SECRET_KEY: optionalString,
   MOMO_ENDPOINT: optionalString,
+  // Multi-method gateway (sandbox placeholders only; real keys live in the secret store).
+  // Public HTTPS base the PSPs call back (IPN) and redirect to, e.g. https://api.dealgo.vn
+  PAYMENT_PUBLIC_BASE_URL: optionalString,
+  // App deeplink the return page bounces to, e.g. dealgo://payment-return
+  PAYMENT_APP_RETURN_URL: optionalString,
+  // VNPay merchant API (refund/querydr), sandbox: https://sandbox.vnpayment.vn/merchant_webapi/api/transaction
+  VNPAY_API_URL: optionalString,
+  ZALOPAY_APP_ID: optionalString,
+  ZALOPAY_KEY1: optionalString,
+  ZALOPAY_KEY2: optionalString,
+  // sandbox: https://sb-openapi.zalopay.vn
+  ZALOPAY_ENDPOINT: optionalString,
+  SHOPEEPAY_CLIENT_ID: optionalString,
+  SHOPEEPAY_SECRET_KEY: optionalString,
+  SHOPEEPAY_MERCHANT_EXT_ID: optionalString,
+  SHOPEEPAY_ENDPOINT: optionalString,
+  CARD_GATEWAY_MERCHANT_ID: optionalString,
+  CARD_GATEWAY_SECRET: optionalString,
+  APPLE_PAY_MERCHANT_ID: optionalString,
   VOICE_PROVIDER: optionalString,
   LIVEKIT_URL: optionalString,
   LIVEKIT_API_KEY: optionalString,

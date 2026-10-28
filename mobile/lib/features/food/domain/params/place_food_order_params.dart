@@ -23,6 +23,7 @@ class PlaceFoodOrderParams {
     required this.dropoff,
     required this.deliveryFareVnd,
     this.voucherCode,
+    this.paymentMethod,
   });
 
   final String accessToken;
@@ -34,6 +35,9 @@ class PlaceFoodOrderParams {
 
   /// Optional voucher; the server re-checks and redeems it with the order.
   final String? voucherCode;
+
+  /// Payment method code (CASH, MOMO, …); the server re-checks availability.
+  final String? paymentMethod;
 }
 
 /// Backward-compatible alias for existing tests and call sites.

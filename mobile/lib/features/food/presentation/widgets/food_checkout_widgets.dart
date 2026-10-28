@@ -673,7 +673,11 @@ class CheckoutHeldAttempt {
     required this.storeName,
   });
 
-  factory CheckoutHeldAttempt.fromCart(FoodCartState cart, String token) {
+  factory CheckoutHeldAttempt.fromCart(
+    FoodCartState cart,
+    String token, {
+    String? paymentMethod,
+  }) {
     final storeId = cart.storeId;
     if (storeId == null ||
         cart.dropoffLat == null ||
@@ -705,6 +709,7 @@ class CheckoutHeldAttempt {
         // Display quote only; the server recomputes the fee at placement.
         deliveryFareVnd: cart.deliveryFareVnd!,
         voucherCode: cart.voucherCode,
+        paymentMethod: paymentMethod,
       ),
     );
   }
