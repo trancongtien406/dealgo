@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
@@ -11,7 +12,9 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/maps/map_controls.dart';
 import '../../../../core/maps/map_lat_lng.dart';
 import '../../../../core/maps/map_port.dart';
+import '../../../../core/maps/route_geometry.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../live_location/domain/map_routing.dart';
 import '../../../address_book/domain/repositories/address_book_repository.dart';
 import '../../../places/domain/place.dart';
 import '../../../places/presentation/current_place.dart';
@@ -19,6 +22,7 @@ import '../../../places/presentation/place_picker_page.dart';
 import '../../domain/entities/ride_models.dart';
 import '../cubit/ride_destination.dart';
 import '../cubit/ride_session.dart';
+import '../utils/ride_distance.dart';
 import '../utils/ride_routes.dart';
 import '../widgets/ride_widgets.dart';
 
@@ -39,6 +43,9 @@ class _RideMapPageState extends State<RideMapPage> {
   PlaceOption? _dropoff;
   var _locating = false;
   var _suggestions = const <PlaceOption>[];
+  var _route = RouteGeometry.unavailable;
+  RideDistance? _distance;
+  var _routeSeq = 0;
   @override
   void initState() {
     super.initState();
@@ -156,6 +163,7 @@ class _RideMapPageState extends State<RideMapPage> {
       _pickup = _dropoff;
       _dropoff = pickup;
     });
+    _tryAutoAdvance();
   }
 
   RidePlaces? get _places {
@@ -187,7 +195,55 @@ class _RideMapPageState extends State<RideMapPage> {
   void _tryAutoAdvance() {
     // inDrive-like: keep map + sheet visible with A/B filled; user taps CTA.
     // (Previously auto-pushed to fare and skipped the confirmation sheet.)
-    return;
+    unawaited(_loadRoute());
+  }
+
+  /// A/B chosen → road route + km from Nest `GET /v1/rides/route` (the
+  /// server's ROUTING_PROVIDER). Without a road route only a `~` straight-line
+  /// km is shown and no line is drawn (never a fake straight polyline).
+  Future<void> _loadRoute() async {
+    final pickup = _pickup;
+    final dropoff = _dropoff;
+    final seq = ++_routeSeq;
+    if (pickup == null || dropoff == null || _samePlace) {
+      if (_distance != null || _route.hasRoadPolyline) {
+        setState(() {
+          _route = RouteGeometry.unavailable;
+          _distance = null;
+        });
+      }
+      return;
+    }
+    final a = MapLatLng(lat: pickup.lat, lng: pickup.lng);
+    final b = MapLatLng(lat: dropoff.lat, lng: dropoff.lng);
+    // Straight-line estimate right away; replaced by the road km when ready.
+    setState(() {
+      _route = RouteGeometry.unavailable;
+      _distance = RideDistance(km: haversineKm(a, b), road: false);
+    });
+    final token = rideAccessToken(context);
+    MapRoutingRepository? routing;
+    try {
+      routing = context.read<MapRoutingRepository>();
+    } on ProviderNotFoundException {
+      routing = null;
+    }
+    if (token == null || routing == null) {
+      return;
+    }
+    RouteGeometry route;
+    try {
+      route = await routing.route(accessToken: token, from: a, to: b);
+    } catch (_) {
+      route = RouteGeometry.unavailable;
+    }
+    if (!mounted || seq != _routeSeq) {
+      return;
+    }
+    setState(() {
+      _route = route;
+      _distance = RideDistance.from(route, a, b);
+    });
   }
 
   void _continue() {
@@ -218,6 +274,9 @@ class _RideMapPageState extends State<RideMapPage> {
     setState(() {
       _pickup = null;
       _dropoff = null;
+      _route = RouteGeometry.unavailable;
+      _distance = null;
+      _routeSeq++;
     });
     unawaited(_locatePickup());
     unawaited(_loadSuggestions());
@@ -281,9 +340,8 @@ class _RideMapPageState extends State<RideMapPage> {
                         if (dropoff != null)
                           MapLatLng(lat: dropoff.lat, lng: dropoff.lng),
                       ],
-                      // Road line is drawn on the overview/fare screens from
-                      // Mapbox coords; never a straight A→B here.
-                      route: const [],
+                      // Road line from Nest routing; never a straight A→B.
+                      route: _route.polylineOr(const []),
                       fitPadding: EdgeInsets.fromLTRB(
                         40,
                         // Status bar + the full stop pin (chip above the tip) + margin.
@@ -365,6 +423,23 @@ class _RideMapPageState extends State<RideMapPage> {
                                 ),
                               ),
                             ),
+                            if (_distance case final distance?
+                                when !_samePlace) ...[
+                              const SizedBox(height: DealGoSpacing.s8),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: DealGoChip(
+                                  key: const Key('ride-map-distance'),
+                                  label: rideDistanceText(l10n, distance),
+                                  tone: DealGoChipTone.brand,
+                                  leading: const Icon(
+                                    DealGoIcons.route,
+                                    size: 14,
+                                    color: DealGoColors.primary,
+                                  ),
+                                ),
+                              ),
+                            ],
                             if (_samePlace) ...[
                               const SizedBox(height: DealGoSpacing.s8),
                               RideNote(message: l10n.rideSamePlaces),
@@ -421,9 +496,6 @@ class _RideMapPageState extends State<RideMapPage> {
                                                 children: [
                                                   Text(
                                                     place.name,
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
                                                     style: textTheme.bodyMedium
                                                         ?.copyWith(
                                                           fontWeight:
@@ -433,9 +505,6 @@ class _RideMapPageState extends State<RideMapPage> {
                                                   if (place.address.isNotEmpty)
                                                     Text(
                                                       place.address,
-                                                      maxLines: 1,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
                                                       style:
                                                           textTheme.bodySmall,
                                                     ),
@@ -462,8 +531,9 @@ class _RideMapPageState extends State<RideMapPage> {
                           DealGoDimensions.pageGutter,
                           DealGoSpacing.s8,
                           DealGoDimensions.pageGutter,
+                          // Shell bar height (or system inset) lives in padding.
                           DealGoSpacing.s12 +
-                              MediaQuery.viewPaddingOf(context).bottom,
+                              MediaQuery.paddingOf(context).bottom,
                         ),
                         child: Row(
                           children: [
@@ -506,4 +576,10 @@ class _RideMapPageState extends State<RideMapPage> {
       ),
     );
   }
+}
+
+/// `3,2 km` from the road route, `~3,2 km` for the straight-line fallback.
+String rideDistanceText(AppLocalizations l10n, RideDistance distance) {
+  final text = l10n.rideDistanceKm(formatRideKm(distance.km));
+  return distance.road ? text : '~$text';
 }

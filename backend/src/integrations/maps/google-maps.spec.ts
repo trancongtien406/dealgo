@@ -139,6 +139,29 @@ describe('GoogleMapsPort', () => {
     expect(calls[0].init.headers['X-Goog-Api-Key']).toBeUndefined();
   });
 
+  it('reverse prefers the street address (with house number) over a bare street', async () => {
+    const { fetcher } = fakeFetch({
+      'https://maps.googleapis.com/maps/api/geocode/json': () => ({
+        status: 'OK',
+        results: [
+          {
+            formatted_address: 'Nguyễn Văn Linh, Hải Châu, Đà Nẵng, Việt Nam',
+            types: ['route'],
+            geometry: { location: { lat: 16.06, lng: 108.21 } },
+          },
+          {
+            formatted_address: '3 Nguyễn Văn Linh, Hải Châu, Đà Nẵng, Việt Nam',
+            types: ['street_address'],
+            geometry: { location: { lat: 16.06, lng: 108.21 } },
+          },
+        ],
+      }),
+    });
+    const place = await new GoogleMapsPort(KEY, fetcher).reverseGeocode(NEAR);
+    expect(place?.name).toBe('3 Nguyễn Văn Linh');
+    expect(place?.kind).toBe('address');
+  });
+
   it('maps Geocoding statuses: ZERO_RESULTS → null, REQUEST_DENIED → unavailable', async () => {
     const zero = new GoogleMapsPort(
       KEY,

@@ -772,18 +772,11 @@ class _PlaceTile extends StatelessWidget {
       ),
       title: Text(
         title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
         style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
       ),
       subtitle: subtitle.isEmpty
           ? null
-          : Text(
-              subtitle,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: textTheme.bodySmall,
-            ),
+          : Text(subtitle, style: textTheme.bodySmall),
       trailing: trailing,
     );
   }

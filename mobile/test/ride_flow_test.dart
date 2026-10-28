@@ -6,6 +6,7 @@ import 'package:dealgo/features/places/domain/place.dart';
 import 'package:dealgo/features/pricing/data/pricing_remote_datasource.dart';
 import 'package:dealgo/core/design_system/components/dealgo_primary_button.dart';
 import 'package:dealgo/core/design_system/icons/dealgo_icons.dart';
+import 'package:dealgo/core/design_system/components/dealgo_tab_bar.dart';
 import 'package:dealgo/features/ride/presentation/widgets/ride_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -395,6 +396,34 @@ void main() {
       await tester.pumpAndSettle();
       expect(inDropoff('Chọn điểm đến'), findsOneWidget);
       expect(find.byKey(const Key('ride-open-pending')), findsNothing);
+    });
+
+    testWidgets('the book tab keeps the app bottom nav and shows km', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(400, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await pumpSignedIn(
+        tester,
+        profile: customerProfile,
+        rideClient: _negotiatingClient(),
+        locationOverride: FakeLocationService(),
+        places: FakePlacesRemoteDataSource(recent: [_airport]),
+      );
+      await tester.tap(navLabel('Đặt'));
+      await tester.pumpAndSettle();
+      // The destination picker opens first (full screen, above the shell).
+      await tester.tap(find.text(_airport.name));
+      await tester.pumpAndSettle();
+      expect(find.byType(DealGoTabBar), findsOneWidget);
+      expect(find.byKey(const Key('ride-map-distance')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('ride-map-distance')),
+          matching: find.textContaining('km'),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('going back from the fare sheet keeps the draft to edit', (

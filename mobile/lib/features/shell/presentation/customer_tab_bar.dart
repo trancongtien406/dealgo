@@ -6,7 +6,7 @@ import '../../../l10n/app_localizations.dart';
 import 'shell_tab.dart';
 
 /// Customer bottom nav: the shared floating [DealGoTabBar] bound to the
-/// customer shell branches. `RoleShell` hides it on “Đặt” (full-screen booking).
+/// customer shell branches. Shown on every tab, “Đặt xe” included.
 class CustomerTabBar extends StatelessWidget {
   const CustomerTabBar({
     required this.navigationShell,

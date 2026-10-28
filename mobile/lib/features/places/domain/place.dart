@@ -44,11 +44,27 @@ class PlaceOption {
   /// Label sent to the backend for a ride stop or drop-off (the API caps
   /// labels at [placeLabelMaxLength] characters).
   String get label {
-    final full = address.isEmpty || address == name ? name : '$name, $address';
+    final full = formatPlaceLabel(name, address);
     return full.length > placeLabelMaxLength
         ? full.substring(0, placeLabelMaxLength)
         : full;
   }
+}
+
+/// One readable line for a place: `name, address`, without repeating the
+/// name when the provider's address already starts with it (Google returns
+/// name `3 Nguyễn Văn Linh` and address `3 Nguyễn Văn Linh, Hải Châu, …`).
+/// The house number therefore survives instead of being duplicated or cut.
+String formatPlaceLabel(String name, String address) {
+  final n = name.trim();
+  final a = address.trim();
+  if (a.isEmpty || a == n) return n;
+  if (n.isEmpty) return a;
+  final fold = a.toLowerCase();
+  if (fold == n.toLowerCase() || fold.startsWith('${n.toLowerCase()},')) {
+    return a;
+  }
+  return '$n, $a';
 }
 
 /// Server limit for stop labels (`label` max 160 on rides and food orders).
