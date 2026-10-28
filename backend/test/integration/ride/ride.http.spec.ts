@@ -470,6 +470,46 @@ describe('ride negotiation http', () => {
     expect(denied.status).toBe(403);
   });
 
+  it('online-paid ride completes without a cash obligation and credits the driver', async () => {
+    const customer = await login();
+    const driver = await login();
+    await repository.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');
+    const rideId = await assignRide(customer, driver, 'idem-online-create', 'idem-online-select');
+    const checkout = app.get<MemoryCheckoutRepository>(CHECKOUT_REPOSITORY, { strict: false });
+    const ledgerRepo = app.get<MemoryLedgerRepository>(LEDGER_REPOSITORY, { strict: false });
+    await checkout.setSelection('RIDE', rideId, 'MOMO');
+    const intent = await checkout.upsertAttempt({
+      entityType: 'RIDE', entityId: rideId, method: 'MOMO', methodCode: 'MOMO', provider: 'momo',
+      amountVnd: 40_000, providerRef: 'DGRTEST0000000000', paymentUrl: null, deeplink: null,
+    });
+    await checkout.update(intent.id, { status: 'CAPTURED', providerTransId: '1' });
+
+    const before = await request(app.getHttpServer())
+      .get(`/v1/rides/${rideId}/collection`)
+      .set('Authorization', `Bearer ${driver.token}`)
+      .expect(200);
+    expect(before.body.data).toMatchObject({ methodCode: 'MOMO', status: 'PAID', paidOnlineVnd: 40_000, cashToCollectVnd: 0 });
+    await request(app.getHttpServer())
+      .get(`/v1/rides/${rideId}/collection`)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(404);
+
+    for (const step of ['en-route', 'arrived']) {
+      await request(app.getHttpServer()).post(`/v1/rides/${rideId}/${step}`).set('Authorization', `Bearer ${driver.token}`).expect(200);
+    }
+    const code = await pickupCodeFor(customer, rideId);
+    await request(app.getHttpServer())
+      .post(`/v1/rides/${rideId}/start`)
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ pickupCode: code })
+      .expect(200);
+    await request(app.getHttpServer()).post(`/v1/rides/${rideId}/complete`).set('Authorization', `Bearer ${driver.token}`).expect(200);
+
+    expect(await ledgerRepo.findByEntity('RIDE', rideId, 'COD_OBLIGATION_POSTED')).toBeNull();
+    expect((await ledgerRepo.findByEntity('RIDE', rideId, 'PSP_PREPAID_APPLIED'))?.amountVnd).toBe(40_000);
+    expect((await checkout.findById(intent.id))?.settledAt).toBeInstanceOf(Date);
+  });
+
   it('runs assigned → en-route → arrived → in-trip → completed and keeps agreedFareVnd', async () => {
     const customer = await login();
     const driver = await login();

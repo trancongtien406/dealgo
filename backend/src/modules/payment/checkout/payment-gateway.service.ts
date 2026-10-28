@@ -8,7 +8,7 @@ import {
 } from '../../../integrations/payment-gateways/providers/index.js';
 import { LedgerService } from '../../ledger/ledger.service.js';
 import { CHECKOUT_REPOSITORY, type PaymentEntityTypeName, type PaymentProviderName } from '../payment.constants.js';
-import type { CheckoutIntent, CheckoutRepository } from './checkout.repository.js';
+import type { CheckoutIntent, CheckoutRefund, CheckoutRepository } from './checkout.repository.js';
 import { PAYMENT_ADAPTERS, type PaymentAdapterMap } from './payment-adapters.js';
 import { PAYMENT_GATEWAY_OPTIONS, type PaymentGatewayOptions } from './payment-gateway.options.js';
 import { catalogEntry } from './payment-method.catalog.js';
@@ -37,7 +37,38 @@ export type CheckoutView = {
   failureReason: string | null;
 };
 
+/** What the assigned driver sees: paid online vs cash to collect at the door. */
+export type CollectionView = CheckoutView & {
+  /** Online amount held by DealGo for this job (captured − refunded). */
+  paidOnlineVnd: number;
+  /** Cash the driver must collect (job amount − paidOnline, never negative). */
+  cashToCollectVnd: number;
+};
+
+/** Online vs cash split of a job's amount at completion. Pure. */
+export function splitCollection(dueVnd: number, prepaidVnd: number): { onlineVnd: number; cashVnd: number } {
+  const due = Math.max(0, Math.trunc(dueVnd));
+  const onlineVnd = Math.min(due, Math.max(0, Math.trunc(prepaidVnd)));
+  return { onlineVnd, cashVnd: due - onlineVnd };
+}
+
+/** Failure reason on an attempt that was abandoned because the job finished in cash. */
+export const SUPERSEDED_BY_CASH = 'SUPERSEDED_BY_CASH';
+/** Set when a PSP confirms payment after the job already settled in cash (ops must refund). */
+export const LATE_CAPTURE_AFTER_CASH = 'LATE_CAPTURE_AFTER_CASH';
+
+const HELD_STATUSES: readonly string[] = ['CAPTURED', 'REFUND_PENDING'];
+
 const PENDING_TTL_MS = 15 * 60 * 1000;
+/** Reconciliation gives up waiting for a provider after this and marks the attempt EXPIRED. */
+const RECONCILE_GIVE_UP_MS = 2 * 60 * 60 * 1000;
+
+/** Attempt creation time from our order ref (DG{R|F}{base36 ms}{10 hex}); VNPay querydr needs it. */
+export function attemptTimeFromRef(ref: string | null, fallback: Date): Date {
+  const m = ref ? /^DG[RF]([0-9A-Z]+)[0-9A-F]{10}$/.exec(ref) : null;
+  const ms = m ? parseInt(m[1]!.toLowerCase(), 36) : NaN;
+  return Number.isFinite(ms) && ms > 1_500_000_000_000 ? new Date(ms) : fallback;
+}
 
 function paymentError(status: number, errorCode: string, message: string) {
   return new HttpException({ message, errorCode }, status);
@@ -203,13 +234,7 @@ export class PaymentGatewayService {
       return adapter.ack(provider === 'vnpay' && !fresh ? 'ALREADY' : 'OK');
     }
     if (cb.success) {
-      await this.repo.update(intent.id, {
-        status: 'CAPTURED',
-        providerTransId: cb.providerTransId,
-        providerPayDate: cb.providerPayDate,
-        failureReason: null,
-      });
-      await this.postLedger('PSP_PAYMENT_CAPTURED', intent, intent.amountVnd);
+      await this.applyCapture(intent, cb.providerTransId, cb.providerPayDate);
     } else {
       await this.repo.update(intent.id, { status: 'FAILED', failureReason: cb.failureReason?.slice(0, 255) ?? 'FAILED' });
     }
@@ -229,9 +254,260 @@ export class PaymentGatewayService {
     };
   }
 
-  async listIntents(limit = 50, status?: CheckoutIntent['status']) {
-    const rows = await this.repo.listIntents({ limit: Math.min(Math.max(limit, 1), 200), status });
-    return rows.map((r) => ({
+  async listIntents(
+    limit = 50,
+    status?: CheckoutIntent['status'],
+    filter: { provider?: PaymentProviderName; entityType?: PaymentEntityTypeName; q?: string } = {},
+  ) {
+    const rows = await this.repo.listIntents({
+      limit: Math.min(Math.max(limit, 1), 200),
+      status,
+      provider: filter.provider,
+      entityType: filter.entityType,
+      q: filter.q?.trim() || undefined,
+    });
+    return rows.map((r) => this.opsRow(r));
+  }
+
+  /** Intent + refund history for the ops detail page. */
+  async intentDetail(id: string) {
+    const intent = await this.repo.findById(id);
+    if (!intent) {
+      throw paymentError(404, 'PAYMENT_INTENT_NOT_FOUND', 'Payment intent not found');
+    }
+    const refunds = await this.repo.listRefunds(id);
+    return {
+      ...this.opsRow(intent),
+      providerTransId: intent.providerTransId,
+      providerPayDate: intent.providerPayDate,
+      createdAt: intent.createdAt.toISOString(),
+      settledAt: intent.settledAt?.toISOString() ?? null,
+      lastReconciledAt: intent.lastReconciledAt?.toISOString() ?? null,
+      reconcileAttempts: intent.reconcileAttempts,
+      refundableVnd: this.refundableVnd(intent),
+      refunds: refunds.map((r) => this.refundRow(r)),
+    };
+  }
+
+  /**
+   * Ops refund of a captured online payment. Supports several partial refunds; the running total
+   * can never exceed the captured amount (atomic reservation). Each refund gets its own journal.
+   */
+  async refund(input: { intentId: string; amountVnd?: number; reason: string; actorUserId: string; clientIp?: string }) {
+    const intent = await this.repo.findById(input.intentId);
+    if (!intent) {
+      throw paymentError(404, 'PAYMENT_INTENT_NOT_FOUND', 'Payment intent not found');
+    }
+    if (!HELD_STATUSES.includes(intent.status)) {
+      throw paymentError(409, 'PAYMENT_NOT_REFUNDABLE', `Intent is ${intent.status}; only a CAPTURED payment can be refunded`);
+    }
+    const remaining = this.refundableVnd(intent);
+    const amount = input.amountVnd ?? remaining;
+    if (!Number.isSafeInteger(amount) || amount <= 0 || amount > remaining) {
+      throw paymentError(400, 'PAYMENT_REFUND_AMOUNT_INVALID', `Refund amount must be 1..${remaining} VND`);
+    }
+    if (!(await this.repo.reserveRefund(intent.id, amount))) {
+      throw paymentError(409, 'PAYMENT_REFUND_EXCEEDS_CAPTURED', 'Refunds would exceed the captured amount');
+    }
+    const adapter = this.adapterFor(intent.provider);
+    const now = new Date();
+    const requestId = `RF${now.getTime().toString(36)}${randomUUID().replace(/-/g, '').slice(0, 10)}`.toUpperCase();
+    const reason = input.reason.slice(0, 200) || 'DealGo refund';
+    const row = await this.repo.createRefund({
+      paymentIntentId: intent.id,
+      amountVnd: amount,
+      status: 'PENDING',
+      requestId,
+      providerRefundRef: null,
+      reason,
+      actorUserId: input.actorUserId,
+      afterSettlement: intent.settledAt !== null,
+    });
+    let result;
+    try {
+      result = await adapter.refund({
+        providerRef: intent.providerRef ?? '',
+        providerTransId: intent.providerTransId,
+        providerPayDate: intent.providerPayDate,
+        amountVnd: amount,
+        capturedAmountVnd: intent.amountVnd,
+        reason,
+        requestId,
+        actorRef: input.actorUserId,
+        clientIp: input.clientIp || '127.0.0.1',
+        now,
+      });
+    } catch (error) {
+      await this.repo.releaseRefund(intent.id, amount);
+      await this.repo.updateRefund(row.id, { status: 'REJECTED' });
+      if (error instanceof PaymentAdapterError) {
+        throw paymentError(502, 'PAYMENT_PROVIDER_ERROR', error.message);
+      }
+      throw error;
+    }
+    if (result.status === 'REJECTED') {
+      await this.repo.releaseRefund(intent.id, amount);
+      await this.repo.updateRefund(row.id, { status: 'REJECTED', providerRefundRef: result.providerRefundRef });
+      throw paymentError(502, 'PAYMENT_REFUND_REJECTED', result.message ?? 'Refund rejected by provider');
+    }
+    const refund = await this.repo.updateRefund(row.id, {
+      status: result.status === 'PENDING' ? 'PENDING' : 'SUCCEEDED',
+      providerRefundRef: result.providerRefundRef,
+    });
+    const after = (await this.repo.findById(intent.id))!;
+    const fully = after.refundedVnd >= after.amountVnd;
+    const updated = await this.repo.update(intent.id, {
+      status: fully ? (refund.status === 'PENDING' ? 'REFUND_PENDING' : 'REFUNDED') : after.status,
+    });
+    await this.postRefundLedger(refund);
+    return {
+      intentId: updated.id,
+      status: updated.status,
+      refundedVnd: updated.refundedVnd,
+      refundableVnd: this.refundableVnd(updated),
+      refund: this.refundRow(refund),
+    };
+  }
+
+  /** Online amount DealGo holds for the job and has not yet applied to a completion. */
+  async prepaidFor(entityType: PaymentEntityTypeName, entityId: string): Promise<{ intentId: string; amountVnd: number } | null> {
+    const latest = await this.repo.latestForEntity(entityType, entityId);
+    if (!latest || !HELD_STATUSES.includes(latest.status) || latest.settledAt) {
+      return null;
+    }
+    const held = latest.amountVnd - latest.refundedVnd;
+    return held > 0 ? { intentId: latest.id, amountVnd: held } : null;
+  }
+
+  /**
+   * After a job completes: marks the applied prepayment settled, or (cash completion) retires
+   * any still-pending online attempt so a late PSP capture is flagged for refund.
+   */
+  async afterCompletion(entityType: PaymentEntityTypeName, entityId: string, appliedIntentId: string | null, at = new Date()) {
+    const rows = await this.repo.listIntents({ limit: 20, q: entityId });
+    for (const row of rows.filter((r) => r.entityType === entityType && r.entityId === entityId)) {
+      if (row.id === appliedIntentId) {
+        await this.repo.update(row.id, { settledAt: at });
+      } else if (row.status === 'PENDING_REDIRECT' || row.status === 'CREATED') {
+        await this.repo.update(row.id, { status: 'EXPIRED', failureReason: SUPERSEDED_BY_CASH });
+      }
+    }
+  }
+
+  /** Driver-facing payment info for an assigned job. */
+  async collection(entityType: PaymentEntityTypeName, entityId: string, dueVnd: number, settledOnlineVnd?: number): Promise<CollectionView> {
+    const view = await this.status(entityType, entityId);
+    const latest = await this.repo.latestForEntity(entityType, entityId);
+    const held =
+      settledOnlineVnd ??
+      (latest && HELD_STATUSES.includes(latest.status) && latest.failureReason !== LATE_CAPTURE_AFTER_CASH
+        ? latest.amountVnd - latest.refundedVnd
+        : 0);
+    const split = splitCollection(dueVnd, held);
+    return { ...view, paidOnlineVnd: split.onlineVnd, cashToCollectVnd: split.cashVnd };
+  }
+
+  /**
+   * Active reconciliation: asks the PSP for the truth on attempts stuck pending (missed IPN).
+   * Idempotent: captures go through the same path as callbacks (event dedupe + ledger unique key).
+   */
+  async reconcilePending(now = new Date(), opts: { olderThanMs?: number; limit?: number; maxAttempts?: number } = {}) {
+    const candidates = await this.repo.pendingForReconcile({
+      olderThan: new Date(now.getTime() - (opts.olderThanMs ?? 2 * 60 * 1000)),
+      limit: opts.limit ?? 50,
+      maxAttempts: opts.maxAttempts ?? 30,
+    });
+    const summary = { checked: 0, captured: 0, failed: 0, expired: 0, pending: 0, skipped: 0 };
+    for (const intent of candidates) {
+      const adapter = this.adapters[intent.provider];
+      if (!adapter || adapter.kind !== 'REAL' || !adapter.isConfigured() || !intent.providerRef) {
+        summary.skipped += 1;
+        continue;
+      }
+      summary.checked += 1;
+      const bump = { lastReconciledAt: now, reconcileAttempts: intent.reconcileAttempts + 1 };
+      let result;
+      try {
+        result = await adapter.query({
+          providerRef: intent.providerRef,
+          attemptedAt: attemptTimeFromRef(intent.providerRef, intent.createdAt),
+          requestId: `RQ${now.getTime().toString(36)}${randomUUID().replace(/-/g, '').slice(0, 10)}`.toUpperCase(),
+          clientIp: '127.0.0.1',
+          now,
+        });
+      } catch (error) {
+        this.logger.warn(`reconcile query failed for ${intent.id}: ${String(error)}`);
+        await this.repo.update(intent.id, bump);
+        summary.pending += 1;
+        continue;
+      }
+      if (result.state === 'CAPTURED') {
+        if (result.amountVnd !== null && result.amountVnd !== intent.amountVnd) {
+          await this.repo.update(intent.id, { ...bump, failureReason: 'RECONCILE_AMOUNT_MISMATCH' });
+          summary.skipped += 1;
+          continue;
+        }
+        const fresh = await this.repo.recordEvent(
+          intent.provider,
+          `reconcile:${intent.providerRef}:${result.providerTransId ?? ''}`,
+          intent.id,
+          'CAPTURED',
+        );
+        const current = await this.repo.findById(intent.id);
+        if (fresh && current && !HELD_STATUSES.includes(current.status) && current.status !== 'REFUNDED') {
+          await this.applyCapture(current, result.providerTransId, result.providerPayDate);
+        }
+        await this.repo.update(intent.id, bump);
+        summary.captured += 1;
+      } else if (result.state === 'FAILED') {
+        await this.repo.update(intent.id, { ...bump, status: 'FAILED', failureReason: result.message ?? 'FAILED' });
+        summary.failed += 1;
+      } else if (now.getTime() - intent.updatedAt.getTime() > RECONCILE_GIVE_UP_MS) {
+        await this.repo.update(intent.id, { ...bump, status: 'EXPIRED', failureReason: 'RECONCILE_TIMEOUT' });
+        summary.expired += 1;
+      } else {
+        await this.repo.update(intent.id, bump);
+        summary.pending += 1;
+      }
+    }
+    return summary;
+  }
+
+  private async applyCapture(intent: CheckoutIntent, providerTransId: string | null, providerPayDate: string | null) {
+    // An attempt retired because the job finished in cash: keep the money trail, flag for refund.
+    const late = intent.status === 'EXPIRED' && intent.failureReason === SUPERSEDED_BY_CASH;
+    await this.repo.update(intent.id, {
+      status: 'CAPTURED',
+      providerTransId,
+      providerPayDate,
+      failureReason: late ? LATE_CAPTURE_AFTER_CASH : null,
+    });
+    await this.postLedger('PSP_PAYMENT_CAPTURED', intent, intent.amountVnd);
+    if (late) {
+      this.logger.warn(`late capture after cash completion: intent ${intent.id} must be refunded`);
+    }
+  }
+
+  private refundableVnd(intent: CheckoutIntent): number {
+    return HELD_STATUSES.includes(intent.status) ? Math.max(0, intent.amountVnd - intent.refundedVnd) : 0;
+  }
+
+  private refundRow(r: CheckoutRefund) {
+    return {
+      id: r.id,
+      amountVnd: r.amountVnd,
+      status: r.status,
+      requestId: r.requestId,
+      providerRefundRef: r.providerRefundRef,
+      reason: r.reason,
+      actorUserId: r.actorUserId,
+      afterSettlement: r.afterSettlement,
+      createdAt: r.createdAt.toISOString(),
+    };
+  }
+
+  private opsRow(r: CheckoutIntent) {
+    return {
       id: r.id,
       entityType: r.entityType,
       entityId: r.entityId,
@@ -242,53 +518,21 @@ export class PaymentGatewayService {
       refundedVnd: r.refundedVnd,
       providerRef: r.providerRef,
       failureReason: r.failureReason,
+      settled: r.settledAt !== null,
       updatedAt: r.updatedAt.toISOString(),
-    }));
+    };
   }
 
-  /** Ops refund of a captured online payment (one refund per intent; full or partial). */
-  async refund(input: { intentId: string; amountVnd?: number; reason: string; actorUserId: string; clientIp?: string }) {
-    const intent = await this.repo.findById(input.intentId);
-    if (!intent) {
-      throw paymentError(404, 'PAYMENT_INTENT_NOT_FOUND', 'Payment intent not found');
+  private async postRefundLedger(refund: CheckoutRefund) {
+    if (!this.ledger) {
+      return;
     }
-    if (intent.status !== 'CAPTURED' || intent.refundedVnd > 0) {
-      throw paymentError(409, 'PAYMENT_NOT_REFUNDABLE', `Intent is ${intent.status}; only an unrefunded CAPTURED payment can be refunded`);
-    }
-    const amount = input.amountVnd ?? intent.amountVnd;
-    if (!Number.isSafeInteger(amount) || amount <= 0 || amount > intent.amountVnd) {
-      throw paymentError(400, 'PAYMENT_REFUND_AMOUNT_INVALID', 'Refund amount must be 1..captured amount');
-    }
-    const adapter = this.adapterFor(intent.provider);
-    let result;
+    const event = refund.afterSettlement ? 'PSP_REFUND_AFTER_SETTLEMENT' : 'PSP_REFUND_RECORDED';
     try {
-      result = await adapter.refund({
-        providerRef: intent.providerRef ?? '',
-        providerTransId: intent.providerTransId,
-        providerPayDate: intent.providerPayDate,
-        amountVnd: amount,
-        capturedAmountVnd: intent.amountVnd,
-        reason: input.reason.slice(0, 200) || 'DealGo refund',
-        requestId: `RF${Date.now().toString(36)}${randomUUID().replace(/-/g, '').slice(0, 10)}`.toUpperCase(),
-        actorRef: input.actorUserId,
-        clientIp: input.clientIp || '127.0.0.1',
-        now: new Date(),
-      });
+      await this.ledger.postEvent(event, { entityType: 'PAYMENT_REFUND', entityId: refund.id, amountVnd: refund.amountVnd });
     } catch (error) {
-      if (error instanceof PaymentAdapterError) {
-        throw paymentError(502, 'PAYMENT_PROVIDER_ERROR', error.message);
-      }
-      throw error;
+      this.logger.error(`ledger ${event} failed for refund ${refund.id}: ${String(error)}`);
     }
-    if (result.status === 'REJECTED') {
-      throw paymentError(502, 'PAYMENT_REFUND_REJECTED', result.message ?? 'Refund rejected by provider');
-    }
-    const updated = await this.repo.update(intent.id, {
-      status: result.status === 'PENDING' ? 'REFUND_PENDING' : 'REFUNDED',
-      refundedVnd: amount,
-    });
-    await this.postLedger('PSP_REFUND_RECORDED', intent, amount);
-    return { intentId: updated.id, status: updated.status, refundedVnd: amount, providerRefundRef: result.providerRefundRef };
   }
 
   private adapterFor(provider: PaymentProviderName): PaymentAdapter {
@@ -300,7 +544,7 @@ export class PaymentGatewayService {
   }
 
   private async postLedger(
-    event: 'PSP_PAYMENT_CAPTURED' | 'PSP_REFUND_RECORDED',
+    event: 'PSP_PAYMENT_CAPTURED',
     intent: CheckoutIntent,
     amountVnd: number,
   ) {

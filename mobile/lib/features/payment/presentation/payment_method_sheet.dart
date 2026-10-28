@@ -9,6 +9,7 @@ import '../../identity/domain/entities/auth_state.dart';
 import '../../identity/presentation/cubit/auth_cubit.dart';
 import '../data/payment_api.dart';
 import '../domain/payment_models.dart';
+import '../../../l10n/app_localizations.dart';
 
 String? paymentAccessToken(BuildContext context) {
   final auth = context.read<AuthCubit>().state;
@@ -35,14 +36,21 @@ Future<String?> showPaymentMethodSheet(
     isScrollControlled: true,
     backgroundColor: DealGoColors.card,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(DealGoRadius.sheet)),
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(DealGoRadius.sheet),
+      ),
     ),
-    builder: (context) => PaymentMethodSheet(options: options, selected: selected),
+    builder: (context) =>
+        PaymentMethodSheet(options: options, selected: selected),
   );
 }
 
 class PaymentMethodSheet extends StatefulWidget {
-  const PaymentMethodSheet({required this.options, required this.selected, super.key});
+  const PaymentMethodSheet({
+    required this.options,
+    required this.selected,
+    super.key,
+  });
 
   final List<PaymentMethodOption> options;
   final String selected;
@@ -59,7 +67,9 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
     final groups = groupPaymentMethods(widget.options);
     return SafeArea(
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.85),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -73,10 +83,10 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
               ),
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Phương thức thanh toán',
-                      style: TextStyle(
+                      AppLocalizations.of(context).paymentSheetTitle,
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
                         color: DealGoColors.text,
@@ -84,7 +94,7 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Đóng',
+                    tooltip: AppLocalizations.of(context).paymentClose,
                     icon: const Icon(DealGoIcons.close),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
@@ -108,7 +118,10 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
                         bottom: DealGoSpacing.s8,
                       ),
                       child: Text(
-                        paymentGroupTitle(entry.key),
+                        paymentGroupTitle(
+                          AppLocalizations.of(context),
+                          entry.key,
+                        ),
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -125,7 +138,11 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
                       child: Column(
                         children: [
                           for (var i = 0; i < entry.value.length; i++) ...[
-                            if (i > 0) const Divider(height: 1, color: DealGoColors.divider),
+                            if (i > 0)
+                              const Divider(
+                                height: 1,
+                                color: DealGoColors.divider,
+                              ),
                             PaymentMethodRow(
                               option: entry.value[i],
                               selected: entry.value[i].code == _selected,
@@ -165,19 +182,23 @@ class PaymentMethodRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final enabled = option.available;
     final fg = enabled ? DealGoColors.text : DealGoColors.textTertiary;
-    final secondary = enabled ? option.subtitle : (option.reason ?? 'Không khả dụng');
+    final secondary = enabled
+        ? paymentOptionSubtitle(AppLocalizations.of(context), option)
+        : (option.reason ?? AppLocalizations.of(context).paymentUnavailable);
     return Semantics(
       inMutuallyExclusiveGroup: true,
       checked: selected,
       enabled: enabled,
       button: true,
-      label: option.label,
+      label: paymentOptionLabel(AppLocalizations.of(context), option),
       child: InkWell(
         key: Key('payment-method-${option.code}'),
         onTap: enabled ? onTap : null,
         borderRadius: BorderRadius.circular(DealGoRadius.card),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: DealGoDimensions.minTapTarget + 8),
+          constraints: const BoxConstraints(
+            minHeight: DealGoDimensions.minTapTarget + 8,
+          ),
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: DealGoSpacing.s12,
@@ -189,12 +210,16 @@ class PaymentMethodRow extends StatelessWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: enabled ? DealGoColors.subtlePurple : DealGoColors.divider,
+                    color: enabled
+                        ? DealGoColors.subtlePurple
+                        : DealGoColors.divider,
                     borderRadius: BorderRadius.circular(DealGoRadius.input),
                   ),
                   child: Icon(
                     paymentMethodIcon(option.code),
-                    color: enabled ? DealGoColors.primary : DealGoColors.textTertiary,
+                    color: enabled
+                        ? DealGoColors.primary
+                        : DealGoColors.textTertiary,
                     size: 20,
                   ),
                 ),
@@ -204,25 +229,37 @@ class PaymentMethodRow extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        option.label,
-                        style: TextStyle(fontWeight: FontWeight.w600, color: fg),
+                        paymentOptionLabel(
+                          AppLocalizations.of(context),
+                          option,
+                        ),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: fg,
+                        ),
                       ),
                       if (secondary != null && secondary.isNotEmpty)
                         Text(
                           secondary,
                           style: TextStyle(
                             fontSize: 12,
-                            color: enabled ? DealGoColors.textSecondary : DealGoColors.warning,
+                            color: enabled
+                                ? DealGoColors.textSecondary
+                                : DealGoColors.warning,
                           ),
                         ),
                     ],
                   ),
                 ),
                 Icon(
-                  selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                  selected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
                   color: selected
                       ? DealGoColors.primary
-                      : (enabled ? DealGoColors.textSecondary : DealGoColors.border),
+                      : (enabled
+                            ? DealGoColors.textSecondary
+                            : DealGoColors.border),
                 ),
               ],
             ),
@@ -320,17 +357,33 @@ class _PaymentMethodTileState extends State<PaymentMethodTile> {
         padding: const EdgeInsets.symmetric(vertical: DealGoSpacing.s4),
         child: Row(
           children: [
-            Icon(paymentMethodIcon(current.code), color: DealGoColors.brandGreen),
+            Icon(
+              paymentMethodIcon(current.code),
+              color: DealGoColors.brandGreen,
+            ),
             const SizedBox(width: DealGoSpacing.s8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(current.label, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  if (current.subtitle != null)
+                  Text(
+                    paymentOptionLabel(AppLocalizations.of(context), current),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  if (paymentOptionSubtitle(
+                        AppLocalizations.of(context),
+                        current,
+                      ) !=
+                      null)
                     Text(
-                      current.subtitle!,
-                      style: const TextStyle(fontSize: 12, color: DealGoColors.textSecondary),
+                      paymentOptionSubtitle(
+                        AppLocalizations.of(context),
+                        current,
+                      )!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: DealGoColors.textSecondary,
+                      ),
                     ),
                 ],
               ),
@@ -342,11 +395,17 @@ class _PaymentMethodTileState extends State<PaymentMethodTile> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
             else
-              const Text(
-                'Đổi',
-                style: TextStyle(color: DealGoColors.primary, fontWeight: FontWeight.w600),
+              Text(
+                AppLocalizations.of(context).paymentChange,
+                style: TextStyle(
+                  color: DealGoColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            const Icon(DealGoIcons.chevronRight, color: DealGoColors.textTertiary),
+            const Icon(
+              DealGoIcons.chevronRight,
+              color: DealGoColors.textTertiary,
+            ),
           ],
         ),
       ),

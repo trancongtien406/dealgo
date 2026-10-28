@@ -8,6 +8,8 @@ import {
   type AdapterCreateRequest,
   type AdapterCreateResult,
   type AdapterRefundRequest,
+  type AdapterQueryRequest,
+  type AdapterQueryResult,
   type AdapterRefundResult,
   type CallbackAck,
   type CallbackAckKind,
@@ -60,6 +62,15 @@ export function momoRefundRawSignature(fields: {
     `&orderId=${fields.orderId}&partnerCode=${fields.partnerCode}` +
     `&requestId=${fields.requestId}&transId=${fields.transId}`
   );
+}
+
+export function momoQueryRawSignature(fields: {
+  accessKey: string;
+  orderId: string;
+  partnerCode: string;
+  requestId: string;
+}): string {
+  return `accessKey=${fields.accessKey}&orderId=${fields.orderId}&partnerCode=${fields.partnerCode}&requestId=${fields.requestId}`;
 }
 
 export class MomoAdapter implements PaymentAdapter {
@@ -190,6 +201,38 @@ export class MomoAdapter implements PaymentAdapter {
       status: code === 0 ? 'ACCEPTED' : code === 1000 || code === 7000 ? 'PENDING' : 'REJECTED',
       providerRefundRef: str(res.transId) || null,
       message: str(res.message) || null,
+    };
+  }
+
+  /** POST /v2/gateway/api/query. resultCode 0 = paid; 1000/7000/7002 = still processing. */
+  async query(request: AdapterQueryRequest): Promise<AdapterQueryResult> {
+    const c = this.creds();
+    const fields = {
+      accessKey: c.accessKey,
+      orderId: request.providerRef,
+      partnerCode: c.partnerCode,
+      requestId: request.requestId,
+    };
+    const res = await this.http(
+      `${c.endpoint.replace(/\/$/, '')}/v2/gateway/api/query`,
+      {
+        partnerCode: c.partnerCode,
+        requestId: fields.requestId,
+        orderId: fields.orderId,
+        lang: 'vi',
+        signature: sign(c.secretKey, momoQueryRawSignature(fields)),
+      },
+      { timeoutMs: 30_000 },
+    );
+    const code = Number(res.resultCode);
+    const state =
+      code === 0 ? 'CAPTURED' : [1000, 7000, 7002].includes(code) ? 'PENDING' : Number.isFinite(code) ? 'FAILED' : 'UNKNOWN';
+    return {
+      state,
+      amountVnd: res.amount === undefined ? null : Number(res.amount),
+      providerTransId: str(res.transId) || null,
+      providerPayDate: str(res.responseTime) || null,
+      message: `MOMO_${str(res.resultCode)}: ${str(res.message)}`.slice(0, 255),
     };
   }
 }

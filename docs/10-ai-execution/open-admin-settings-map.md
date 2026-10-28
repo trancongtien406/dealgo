@@ -39,7 +39,7 @@ Trang Tham số có 5 tab:
 | **Vùng & Thanh toán** | §3.3 |
 | **Hỗ trợ khách hàng** | §3.4 |
 
-Khoá hiện trong tab Dòng tiền & hoa hồng: `FOOD_MIN_DELIVERY_VND`, `FOOD_MAX_DELIVERY_VND`, `PAYMENT_METHODS_ENABLED`, `RIDE_COMMISSION_BIKE_PERCENT`, `RIDE_COMMISSION_CAR_PERCENT`, `FOOD_DRIVER_COMMISSION_PERCENT`, `VOUCHER_SHARED_PLATFORM_PERCENT`, `RIDE_NO_SHOW_WAIT_MINUTES`, `RIDE_FREE_CANCEL_MINUTES`, `RIDE_CANCEL_FEE_BIKE_VND`, `RIDE_CANCEL_FEE_CAR_VND`, `DRIVER_DEBT_LIMIT_VND`, `FOOD_MERCHANT_COMMISSION_PERCENT`, `MERCHANT_SETTLEMENT_CYCLE_DAYS`.
+Khoá hiện trong tab Dòng tiền & hoa hồng: `FOOD_MIN_DELIVERY_VND`, `FOOD_MAX_DELIVERY_VND`, `RIDE_COMMISSION_BIKE_PERCENT`, `RIDE_COMMISSION_CAR_PERCENT`, `FOOD_DRIVER_COMMISSION_PERCENT`, `VOUCHER_SHARED_PLATFORM_PERCENT`, `RIDE_NO_SHOW_WAIT_MINUTES`, `RIDE_FREE_CANCEL_MINUTES`, `RIDE_CANCEL_FEE_BIKE_VND`, `RIDE_CANCEL_FEE_CAR_VND`, `DRIVER_DEBT_LIMIT_VND`, `FOOD_MERCHANT_COMMISSION_PERCENT`, `MERCHANT_SETTLEMENT_CYCLE_DAYS`.
 
 ## 3. Danh mục tham số
 
@@ -106,7 +106,7 @@ Cột "Tham chiếu" trỏ tới quyết định (`DEC-PROD-*`) hoặc vấn đ�
 | Key | Mặc định | Khoảng | Ý nghĩa | Tham chiếu |
 |---|---|---|---|---|
 | `FOOD_DELIVERY_VND_PER_KM` | `3000` (env) | ≥ 1 | Phí giao theo km đường đi từ quán tới điểm giao. | OPEN-003 |
-| `PAYMENT_METHODS_ENABLED` | `["COD","SANDBOX"]` (env) | — | Danh sách kênh thanh toán (JSON). Hiện chỉ lưu và kiểm tra định dạng; luồng đặt chỉ dùng tiền mặt (COD). | OPEN-002 |
+| `PAYMENT_METHOD_REGISTRY` | mặc định chỉ tiền mặt | Admin › Cài đặt › Thanh toán | Bật/tắt từng phương thức theo BIKE/CAR/FOOD, thứ tự, lý do ẩn. Thay thế `PAYMENT_METHODS_ENABLED` (đã gỡ, migration `20261128090200` xoá giá trị cũ). | OPEN-002 |
 | `ONBOARDING_DRIVER_KYC_REQUIRED` | `true` | true/false | Tắt: app bỏ bước nộp giấy tờ, tài xế vẫn chọn hạng xe và chờ Admin duyệt. | DEC-PROD-048 |
 | `ONBOARDING_MERCHANT_KYB_REQUIRED` | `true` | true/false | Tắt: app bỏ bước nộp giấy tờ, cửa hàng vẫn chờ Admin duyệt. | DEC-PROD-048 |
 | `MENU_ITEM_MAX_IMAGES` | `4` | 1–8 | Số ảnh tối đa của một món. | DEC-PROD-042 |
@@ -152,7 +152,7 @@ Mỗi `OPEN-001..021` có một câu hỏi seed ở Chính sách OPEN (`ops-faq.
 | OPEN | Cấu hình hiện có | Chỉ văn bản / chờ quyết định |
 |---|---|---|
 | OPEN-001 | Vùng dịch vụ `/zones`; `SERVICE_ZONE_ENFORCED` | Địa bàn pilot |
-| OPEN-002 | `PAYMENT_METHODS_ENABLED` (lưu và hiển thị; backend chưa áp, luồng đặt chỉ tiền mặt) | PSP, đơn vị thu hộ |
+| OPEN-002 | `PAYMENT_METHOD_REGISTRY` (backend áp khi đặt chuyến/đơn; tiền mặt luôn bật) | PSP, đơn vị thu hộ |
 | OPEN-003 | Giá theo hạng xe; phí giao Food; hoa hồng theo dịch vụ; chiết khấu quán | Mức % và biểu giá chính thức |
 | OPEN-004 | Bán kính, độ mới vị trí, thời gian mở yêu cầu, TTL đề nghị, timeout | Chiến lược điều phối chính thức |
 | OPEN-005 | `MAX_CONCURRENT_JOBS_PER_DRIVER` | Kiêm nhiệm vai trò |

@@ -9,6 +9,8 @@ import {
   type AdapterCreateRequest,
   type AdapterCreateResult,
   type AdapterRefundRequest,
+  type AdapterQueryRequest,
+  type AdapterQueryResult,
   type AdapterRefundResult,
   type CallbackAck,
   type CallbackAckKind,
@@ -163,6 +165,30 @@ export class ZalopayAdapter implements PaymentAdapter {
       status: code === 1 ? 'ACCEPTED' : code === 3 ? 'PENDING' : 'REJECTED',
       providerRefundRef: str(res.refund_id) || mRefundId,
       message: str(res.return_message) || null,
+    };
+  }
+
+  /** POST /v2/query, mac = HMAC(key1, app_id|app_trans_id|key1). return_code 1 paid, 2 failed, 3 pending. */
+  async query(request: AdapterQueryRequest): Promise<AdapterQueryResult> {
+    const c = this.creds();
+    const res = await this.http(
+      `${c.endpoint.replace(/\/$/, '')}/v2/query`,
+      {
+        app_id: c.appId,
+        app_trans_id: request.providerRef,
+        mac: hmac(c.key1, `${c.appId}|${request.providerRef}|${c.key1}`),
+      },
+      { form: true, timeoutMs: 30_000 },
+    );
+    const code = Number(res.return_code);
+    const processing = res.is_processing === true || str(res.is_processing) === 'true';
+    const state = code === 1 ? 'CAPTURED' : code === 3 || processing ? 'PENDING' : code === 2 ? 'FAILED' : 'UNKNOWN';
+    return {
+      state,
+      amountVnd: res.amount === undefined ? null : Number(res.amount),
+      providerTransId: str(res.zp_trans_id) || null,
+      providerPayDate: str(res.server_time) || null,
+      message: `ZALOPAY_${str(res.return_code)}: ${str(res.return_message)}`.slice(0, 255),
     };
   }
 }

@@ -12787,6 +12787,198 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Restored your unsent draft.'**
   String get draftRestoredNote;
+
+  /// No description provided for @paymentGroupWallet.
+  ///
+  /// In en, this message translates to:
+  /// **'E-wallets'**
+  String get paymentGroupWallet;
+
+  /// No description provided for @paymentGroupCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit/debit cards'**
+  String get paymentGroupCard;
+
+  /// No description provided for @paymentGroupRecommended.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended'**
+  String get paymentGroupRecommended;
+
+  /// No description provided for @paymentGroupAddMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More methods'**
+  String get paymentGroupAddMore;
+
+  /// No description provided for @paymentCashLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash'**
+  String get paymentCashLabel;
+
+  /// No description provided for @paymentCashSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay the driver directly'**
+  String get paymentCashSubtitle;
+
+  /// No description provided for @paymentStatusCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash payment'**
+  String get paymentStatusCash;
+
+  /// No description provided for @paymentStatusNotStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Not paid yet'**
+  String get paymentStatusNotStarted;
+
+  /// No description provided for @paymentStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for payment confirmation'**
+  String get paymentStatusPending;
+
+  /// No description provided for @paymentStatusPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment successful'**
+  String get paymentStatusPaid;
+
+  /// No description provided for @paymentStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment failed'**
+  String get paymentStatusFailed;
+
+  /// No description provided for @paymentStatusExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment session expired'**
+  String get paymentStatusExpired;
+
+  /// No description provided for @paymentStatusRefundPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund in progress'**
+  String get paymentStatusRefundPending;
+
+  /// No description provided for @paymentStatusRefunded.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunded'**
+  String get paymentStatusRefunded;
+
+  /// No description provided for @paymentSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment method'**
+  String get paymentSheetTitle;
+
+  /// No description provided for @paymentClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get paymentClose;
+
+  /// No description provided for @paymentUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable'**
+  String get paymentUnavailable;
+
+  /// No description provided for @paymentChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get paymentChange;
+
+  /// No description provided for @paymentSessionExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Your session has expired.'**
+  String get paymentSessionExpired;
+
+  /// No description provided for @paymentStartFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t start the payment. Try again or pay in cash.'**
+  String get paymentStartFailed;
+
+  /// No description provided for @paymentStatusLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the payment status.'**
+  String get paymentStatusLoadFailed;
+
+  /// No description provided for @paymentHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment'**
+  String get paymentHeader;
+
+  /// No description provided for @paymentPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing payment…'**
+  String get paymentPreparing;
+
+  /// No description provided for @paymentPendingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish paying in your wallet/bank app, then come back to DealGo. The status updates automatically.'**
+  String get paymentPendingHint;
+
+  /// No description provided for @paymentReopen.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen payment page'**
+  String get paymentReopen;
+
+  /// No description provided for @paymentRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get paymentRetry;
+
+  /// No description provided for @paymentSwitchToCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to cash'**
+  String get paymentSwitchToCash;
+
+  /// No description provided for @paymentContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get paymentContinue;
+
+  /// No description provided for @driverPaymentMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment method'**
+  String get driverPaymentMethod;
+
+  /// No description provided for @driverPaidOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid online'**
+  String get driverPaidOnline;
+
+  /// No description provided for @driverPaidOnlineAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid online {amount}'**
+  String driverPaidOnlineAmount(String amount);
+
+  /// No description provided for @driverOnlinePaymentPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer\'s online payment not confirmed yet'**
+  String get driverOnlinePaymentPending;
 }
 
 class _AppLocalizationsDelegate

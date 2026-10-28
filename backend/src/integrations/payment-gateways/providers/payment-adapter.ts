@@ -57,6 +57,24 @@ export type AdapterRefundResult = {
   message: string | null;
 };
 
+export type AdapterQueryRequest = {
+  providerRef: string;
+  /** When the attempt was created (VNPay querydr needs the original vnp_CreateDate). */
+  attemptedAt: Date;
+  requestId: string;
+  clientIp: string;
+  now: Date;
+};
+
+/** Provider-side truth for one attempt (active reconciliation). */
+export type AdapterQueryResult = {
+  state: 'CAPTURED' | 'PENDING' | 'FAILED' | 'UNKNOWN';
+  amountVnd: number | null;
+  providerTransId: string | null;
+  providerPayDate: string | null;
+  message: string | null;
+};
+
 export type CallbackAckKind = 'OK' | 'INVALID_SIGNATURE' | 'NOT_FOUND' | 'AMOUNT_MISMATCH' | 'ALREADY' | 'ERROR';
 
 export type CallbackAck = { httpStatus: number; body: unknown };
@@ -72,6 +90,8 @@ export interface PaymentAdapter {
   verifyCallback(payload: Record<string, unknown>): AdapterCallback;
   ack(kind: CallbackAckKind): CallbackAck;
   refund(request: AdapterRefundRequest): Promise<AdapterRefundResult>;
+  /** Status query API (MoMo query, ZaloPay query, VNPay querydr). */
+  query(request: AdapterQueryRequest): Promise<AdapterQueryResult>;
 }
 
 export class PaymentAdapterError extends Error {

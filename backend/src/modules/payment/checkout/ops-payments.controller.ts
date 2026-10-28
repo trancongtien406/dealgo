@@ -39,13 +39,32 @@ export class OpsPaymentsController {
   @RequireOpsPermission('refunds.read')
   @ApiOperation({ summary: 'Recent online payment intents' })
   intents(@Query() query: OpsIntentsQueryDto) {
-    return this.gateway.listIntents(query.limit ?? 50, query.status);
+    return this.gateway.listIntents(query.limit ?? 50, query.status, {
+      provider: query.provider,
+      entityType: query.entityType,
+      q: query.q,
+    });
+  }
+
+  @Get('payment-intents/:id')
+  @RequireOpsPermission('refunds.read')
+  @ApiOperation({ summary: 'Payment intent detail with refund history and refundable amount' })
+  detail(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.gateway.intentDetail(id);
+  }
+
+  @Post('payment-intents/reconcile')
+  @RequireOpsPermission('refunds.write')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Run provider status reconciliation now for pending attempts (idempotent)' })
+  reconcile() {
+    return this.gateway.reconcilePending(new Date(), { olderThanMs: 0 });
   }
 
   @Post('payment-intents/:id/refund')
   @RequireOpsPermission('refunds.write')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Refund a captured online payment through its PSP (posts PSP_REFUND_RECORDED)' })
+  @ApiOperation({ summary: 'Refund (partial or full, repeatable up to the captured amount) through the PSP; one journal per refund' })
   refund(
     @CurrentActor() actor: RequestActor,
     @Param('id', new ParseUUIDPipe()) id: string,

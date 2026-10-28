@@ -67,6 +67,9 @@ void main() {
     String? picked;
     await tester.pumpWidget(
       MaterialApp(
+        locale: const Locale('vi'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(
           builder: (context) => TextButton(
             onPressed: () async {
@@ -106,6 +109,9 @@ void main() {
     String? changed;
     await tester.pumpWidget(
       MaterialApp(
+        locale: const Locale('vi'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: PaymentMethodTile(
             service: 'FOOD',

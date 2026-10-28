@@ -27,7 +27,12 @@ import { platformFundedDiscountVnd } from '../promotion/voucher-funding.js';
 import { PAYMENT_PORT } from '../payment/payment.constants.js';
 import type { PaymentPort } from '../payment/payment-port.js';
 import { UnavailablePaymentError } from '../payment/payment-port.js';
-import { PaymentGatewayService, type CheckoutView } from '../payment/checkout/payment-gateway.service.js';
+import {
+  PaymentGatewayService,
+  splitCollection,
+  type CheckoutView,
+  type CollectionView,
+} from '../payment/checkout/payment-gateway.service.js';
 import { PaymentMethodRegistryService } from '../payment/checkout/payment-method-registry.service.js';
 import { serviceForVehicleClass } from '../payment/checkout/payment-method.catalog.js';
 import type { PaymentMethodCode } from '../../platform/settings/payment-method-registry.js';
@@ -296,6 +301,24 @@ export class RideService {
     if (!raw || raw.customerId !== actor.userId) {
       throw rideError(404, 'RIDE_NOT_FOUND', 'Ride not found');
     }
+  }
+
+  /** Assigned driver: method + paid-online vs cash to collect. */
+  async driverCollection(actor: RequestActor, rideId: string): Promise<CollectionView> {
+    const raw = await this.unwrapNullable(() => this.rides.findById(rideId, this.clock.now()));
+    if (!raw || raw.assignedDriverId !== actor.userId) {
+      throw rideError(404, 'RIDE_NOT_FOUND', 'Ride not found');
+    }
+    const ride = await this.get(actor, rideId);
+    const due = ride.cashDueVnd ?? 0;
+    if (!this.checkout) {
+      return {
+        entityType: 'RIDE', entityId: ride.id, methodCode: 'CASH', status: 'CASH', amountVnd: null,
+        paymentUrl: null, deeplink: null, intentId: null, failureReason: null,
+        paidOnlineVnd: 0, cashToCollectVnd: due,
+      };
+    }
+    return this.checkout.collection('RIDE', ride.id, due);
   }
 
   async paymentStatus(actor: RequestActor, rideId: string): Promise<CheckoutView> {
@@ -1174,6 +1197,10 @@ export class RideService {
     ]);
     const sharedPercent = await this.settings.getNumber('VOUCHER_SHARED_PLATFORM_PERCENT');
     const completedAt = this.clock.now();
+    // Online prepayment (captured − refunded) replaces cash at the door.
+    const prepaid = (await this.checkout?.prepaidFor('RIDE', rideId)) ?? null;
+    let collectedCashVnd = 0;
+    let appliedIntentId: string | null = null;
     // COD obligation, DealGo-funded discount, earnings and fee commit with the completion.
     const ride = await this.unwrap(() =>
       this.rides.complete(
@@ -1184,12 +1211,30 @@ export class RideService {
           }
           // DEC-PROD-024: the customer pays the fare minus the voucher in cash; the driver's
           // fare (earnings) stays whole and DealGo owes the driver its funded share.
-          const cashVnd = cashDue(done);
-          if (cashVnd > 0) {
+          const split = splitCollection(cashDue(done), prepaid?.amountVnd ?? 0);
+          collectedCashVnd = split.cashVnd;
+          if (split.cashVnd > 0) {
             await this.ledger.postWithin(tx, 'COD_OBLIGATION_POSTED', {
               entityType: 'RIDE',
               entityId: done.id,
-              amountVnd: cashVnd,
+              amountVnd: split.cashVnd,
+            });
+          }
+          if (split.onlineVnd > 0 && prepaid) {
+            // Paid online: no cash changes hands; DealGo owes the driver what it collected.
+            appliedIntentId = prepaid.intentId;
+            await this.ledger.postWithin(tx, 'PSP_PREPAID_APPLIED', {
+              entityType: 'RIDE',
+              entityId: done.id,
+              amountVnd: split.onlineVnd,
+            });
+            await this.earnings.adjustWithin(tx, {
+              driverId: actor.userId,
+              amountVnd: -split.onlineVnd,
+              kind: 'ONLINE_PAYMENT_PAYOUT',
+              refType: 'PAYMENT_INTENT',
+              refId: prepaid.intentId,
+              occurredAt: completedAt,
             });
           }
           const fundedVnd = platformFundedDiscountVnd(
@@ -1237,9 +1282,10 @@ export class RideService {
         },
       ),
     );
-    if (ride.cashDueVnd !== null && ride.cashDueVnd > 0) {
-      await this.recordSandboxCodIntent('RIDE', ride.id, ride.cashDueVnd);
+    if (collectedCashVnd > 0) {
+      await this.recordSandboxCodIntent('RIDE', ride.id, collectedCashVnd);
     }
+    await this.checkout?.afterCompletion('RIDE', ride.id, appliedIntentId, completedAt);
     return ride;
   }
 

@@ -95,4 +95,17 @@ export class OpsIntentsQueryDto {
   @IsOptional()
   @IsIn(['CREATED', 'PENDING_REDIRECT', 'CAPTURED', 'FAILED', 'EXPIRED', 'REFUND_PENDING', 'REFUNDED'])
   status?: 'CREATED' | 'PENDING_REDIRECT' | 'CAPTURED' | 'FAILED' | 'EXPIRED' | 'REFUND_PENDING' | 'REFUNDED';
+
+  @IsOptional()
+  @IsIn(['momo', 'zalopay', 'vnpay', 'shopeepay', 'card', 'applepay', 'wallet'])
+  provider?: 'momo' | 'zalopay' | 'vnpay' | 'shopeepay' | 'card' | 'applepay' | 'wallet';
+
+  @IsOptional()
+  @IsIn(['RIDE', 'FOOD_ORDER'])
+  entityType?: 'RIDE' | 'FOOD_ORDER';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  q?: string;
 }

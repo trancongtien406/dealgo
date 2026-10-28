@@ -8,6 +8,8 @@ import {
   type AdapterCreateRequest,
   type AdapterCreateResult,
   type AdapterRefundRequest,
+  type AdapterQueryRequest,
+  type AdapterQueryResult,
   type AdapterRefundResult,
   type CallbackAck,
   type CallbackAckKind,
@@ -37,6 +39,21 @@ export function vnpayRefundHashInput(f: Record<string, string>): string {
     f.vnp_TransactionNo,
     f.vnp_TransactionDate,
     f.vnp_CreateBy,
+    f.vnp_CreateDate,
+    f.vnp_IpAddr,
+    f.vnp_OrderInfo,
+  ].join('|');
+}
+
+/** VNPay querydr checksum input (pipe-joined, HMAC-SHA512). */
+export function vnpayQueryHashInput(f: Record<string, string>): string {
+  return [
+    f.vnp_RequestId,
+    f.vnp_Version,
+    f.vnp_Command,
+    f.vnp_TmnCode,
+    f.vnp_TxnRef,
+    f.vnp_TransactionDate,
     f.vnp_CreateDate,
     f.vnp_IpAddr,
     f.vnp_OrderInfo,
@@ -165,6 +182,43 @@ export class VnpayAdapter implements PaymentAdapter {
       status: code === '00' ? 'ACCEPTED' : code === '94' ? 'PENDING' : 'REJECTED',
       providerRefundRef: str(res.vnp_TransactionNo) || null,
       message: str(res.vnp_Message) || null,
+    };
+  }
+
+  /** Merchant API querydr. vnp_TransactionStatus 00 = paid, 01 = pending, else failed. */
+  async query(request: AdapterQueryRequest): Promise<AdapterQueryResult> {
+    const c = this.creds();
+    if (!c.apiUrl) {
+      throw new PaymentAdapterError('ADAPTER_NOT_CONFIGURED', 'VNPAY_API_URL is not configured');
+    }
+    const fields: Record<string, string> = {
+      vnp_RequestId: request.requestId.slice(0, 32),
+      vnp_Version: '2.1.0',
+      vnp_Command: 'querydr',
+      vnp_TmnCode: c.tmnCode,
+      vnp_TxnRef: request.providerRef,
+      vnp_TransactionDate: formatVnpDate(request.attemptedAt),
+      vnp_CreateDate: formatVnpDate(request.now),
+      vnp_IpAddr: request.clientIp,
+      vnp_OrderInfo: `Query ${request.providerRef}`,
+    };
+    const vnp_SecureHash = createHmac('sha512', c.hashSecret).update(vnpayQueryHashInput(fields)).digest('hex');
+    const res = await this.http(c.apiUrl, { ...fields, vnp_SecureHash }, { timeoutMs: 30_000 });
+    const code = str(res.vnp_ResponseCode);
+    const tx = str(res.vnp_TransactionStatus);
+    let state: AdapterQueryResult['state'] = 'UNKNOWN';
+    if (code === '00') {
+      state = tx === '00' ? 'CAPTURED' : tx === '01' ? 'PENDING' : 'FAILED';
+    } else if (code === '91') {
+      // Transaction not found at VNPay: customer never completed the pay page.
+      state = 'FAILED';
+    }
+    return {
+      state,
+      amountVnd: res.vnp_Amount === undefined ? null : Math.round(Number(res.vnp_Amount) / 100),
+      providerTransId: str(res.vnp_TransactionNo) || null,
+      providerPayDate: str(res.vnp_PayDate) || null,
+      message: `VNPAY_${code}/${tx}: ${str(res.vnp_Message)}`.slice(0, 255),
     };
   }
 }

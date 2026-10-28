@@ -14,6 +14,7 @@ export type AdminNavHref =
   | "/transactions"
   | "/settlements"
   | "/refunds"
+  | "/online-payments"
   | "/disputes"
   | "/support-tickets"
   | "/promotions"
@@ -166,6 +167,7 @@ export const adminNavSections: readonly AdminNavSection[] = [
           { label: "Giao dịch", href: "/transactions" },
           { label: "Đối soát", href: "/settlements" },
           { label: "Hoàn tiền", href: "/refunds" },
+          { label: "Thanh toán online", href: "/online-payments" },
         ],
       },
       {
@@ -279,6 +281,12 @@ export const adminCommandExtras: readonly AdminNavItem[] = [
     icon: "pin",
     href: "/settings/maps",
     keywords: ["maps", "bản đồ", "google", "mapbox", "địa chỉ"],
+  },
+  {
+    label: "Thanh toán online & hoàn tiền",
+    icon: "wallet",
+    href: "/online-payments",
+    keywords: ["payment intent", "thanh toán online", "hoàn tiền", "refund", "momo", "zalopay", "vnpay", "đối soát"],
   },
   {
     label: "Phương thức thanh toán",

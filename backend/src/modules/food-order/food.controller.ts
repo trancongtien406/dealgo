@@ -119,6 +119,12 @@ export class FoodController {
     return this.food.get(actor, id);
   }
 
+  @Get('orders/:id/collection')
+  @ApiOperation({ summary: 'Assigned driver: payment method, paid online vs cash to collect for this food order' })
+  collection(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.food.driverCollection(actor, id);
+  }
+
   @Get('orders/:id/payment')
   @ApiOperation({ summary: 'Payment method + status for this food order (CASH/PENDING/PAID/FAILED/…)' })
   paymentStatus(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {

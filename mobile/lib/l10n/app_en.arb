@@ -3325,5 +3325,44 @@
   "draftResumeBody": "We saved your progress on this device. Continue, or start over?",
   "draftResumeContinue": "Continue",
   "draftResumeDiscard": "Start over",
-  "draftRestoredNote": "Restored your unsent draft."
+  "draftRestoredNote": "Restored your unsent draft.",
+  "paymentGroupWallet": "E-wallets",
+  "paymentGroupCard": "Credit/debit cards",
+  "paymentGroupRecommended": "Recommended",
+  "paymentGroupAddMore": "More methods",
+  "paymentCashLabel": "Cash",
+  "paymentCashSubtitle": "Pay the driver directly",
+  "paymentStatusCash": "Cash payment",
+  "paymentStatusNotStarted": "Not paid yet",
+  "paymentStatusPending": "Waiting for payment confirmation",
+  "paymentStatusPaid": "Payment successful",
+  "paymentStatusFailed": "Payment failed",
+  "paymentStatusExpired": "Payment session expired",
+  "paymentStatusRefundPending": "Refund in progress",
+  "paymentStatusRefunded": "Refunded",
+  "paymentSheetTitle": "Payment method",
+  "paymentClose": "Close",
+  "paymentUnavailable": "Unavailable",
+  "paymentChange": "Change",
+  "paymentSessionExpired": "Your session has expired.",
+  "paymentStartFailed": "Couldn't start the payment. Try again or pay in cash.",
+  "paymentStatusLoadFailed": "Couldn't load the payment status.",
+  "paymentHeader": "Payment",
+  "paymentPreparing": "Preparing payment…",
+  "paymentPendingHint": "Finish paying in your wallet/bank app, then come back to DealGo. The status updates automatically.",
+  "paymentReopen": "Reopen payment page",
+  "paymentRetry": "Try again",
+  "paymentSwitchToCash": "Switch to cash",
+  "paymentContinue": "Continue",
+  "driverPaymentMethod": "Payment method",
+  "driverPaidOnline": "Paid online",
+  "driverPaidOnlineAmount": "Paid online {amount}",
+  "@driverPaidOnlineAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "driverOnlinePaymentPending": "Customer's online payment not confirmed yet"
 }

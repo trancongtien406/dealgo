@@ -27,7 +27,7 @@ Tài liệu này liệt kê mọi biến môi trường mà backend, Admin web v
 
 Các tham số nghiệp vụ (giá cước, điều phối, hoa hồng, phí huỷ, cửa sổ liên lạc, số ngày giữ chat…) là **cài đặt Admin** lưu trong bảng `PlatformSetting`, sửa ở Admin › Cài đặt › Tham số. Khi một khoá chưa có trong DB, server lấy giá trị env cùng tên (nếu có) làm giá trị khởi tạo rồi lưu vào DB; từ đó DB là nguồn duy nhất. Danh sách đầy đủ: [Bản đồ cài đặt Admin](../10-ai-execution/open-admin-settings-map.md).
 
-Các khoá có cả env lẫn cài đặt Admin: `RIDE_OFFER_TTL_SECONDS`, `RIDE_MIN_FARE_VND`, `RIDE_MAX_FARE_VND`, `RIDE_REFERENCE_VND_PER_KM`, `FOOD_MIN_DELIVERY_VND`, `FOOD_MAX_DELIVERY_VND`, `FOOD_DELIVERY_VND_PER_KM`, `DRIVER_SEARCH_RADIUS_KM`, `MAX_CONCURRENT_JOBS_PER_DRIVER`, `PAYMENT_METHODS_ENABLED`, `CONTACT_WINDOW_MINUTES`. Với các khoá này env chỉ là giá trị khởi tạo.
+Các khoá có cả env lẫn cài đặt Admin: `RIDE_OFFER_TTL_SECONDS`, `RIDE_MIN_FARE_VND`, `RIDE_MAX_FARE_VND`, `RIDE_REFERENCE_VND_PER_KM`, `FOOD_MIN_DELIVERY_VND`, `FOOD_MAX_DELIVERY_VND`, `FOOD_DELIVERY_VND_PER_KM`, `DRIVER_SEARCH_RADIUS_KM`, `MAX_CONCURRENT_JOBS_PER_DRIVER`, `CONTACT_WINDOW_MINUTES`. Với các khoá này env chỉ là giá trị khởi tạo.
 
 ## Backend (`backend/.env`)
 

@@ -11,7 +11,6 @@ export type PlatformSettingKey =
   | 'FOOD_DELIVERY_VND_PER_KM'
   | 'CONTACT_WINDOW_MINUTES'
   | 'MAX_CONCURRENT_JOBS_PER_DRIVER'
-  | 'PAYMENT_METHODS_ENABLED'
   | 'PAYMENT_METHOD_REGISTRY'
   | 'PAYMENT_WALLET_ENABLED'
   | 'RATING_WINDOW_DAYS'
@@ -181,11 +180,6 @@ export const PLATFORM_SETTING_SPECS: readonly PlatformSettingSpec[] = [
     openIds: ['OPEN-005'],
     min: 1,
     max: 20,
-  },
-  {
-    key: 'PAYMENT_METHODS_ENABLED',
-    valueType: 'json',
-    openIds: ['OPEN-002'],
   },
   {
     // Multi-method registry: per-method BIKE/CAR/FOOD flags, display order and the reason shown

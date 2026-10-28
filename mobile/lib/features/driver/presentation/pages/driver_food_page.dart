@@ -24,6 +24,7 @@ import '../widgets/driver_navigate_buttons.dart';
 import '../widgets/driver_food_code_sheet.dart';
 import '../../../ride/presentation/widgets/ride_negotiation_ui.dart';
 import '../widgets/driver_widgets.dart';
+import '../widgets/driver_payment_collection.dart';
 import '../../../../core/design_system/components/handover_ref_badge.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/format/short_ref.dart';
@@ -637,6 +638,13 @@ class _FoodLifecycle extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+            const SizedBox(height: DealGoSpacing.s12),
+            DriverPaymentCollection(
+              key: ValueKey('driver-food-collection-${phase.name}'),
+              entityType: 'FOOD_ORDER',
+              entityId: job.id,
+              accessToken: driverAccessToken(context),
             ),
             const SizedBox(height: DealGoSpacing.s12),
             DriverNote(

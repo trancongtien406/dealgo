@@ -23,8 +23,36 @@ export type CheckoutIntent = {
   deeplink: string | null;
   refundedVnd: number;
   failureReason: string | null;
+  settledAt: Date | null;
+  lastReconciledAt: Date | null;
+  reconcileAttempts: number;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type RefundStatusName = 'PENDING' | 'SUCCEEDED' | 'REJECTED';
+
+export type CheckoutRefund = {
+  id: string;
+  paymentIntentId: string;
+  amountVnd: number;
+  status: RefundStatusName;
+  requestId: string;
+  providerRefundRef: string | null;
+  reason: string;
+  actorUserId: string;
+  afterSettlement: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type IntentListQuery = {
+  limit: number;
+  status?: PaymentIntentStatusName;
+  provider?: PaymentProviderName;
+  entityType?: PaymentEntityTypeName;
+  /** Matches intent id, entity id or provider ref (exact). */
+  q?: string;
 };
 
 export type UpsertAttemptInput = {
@@ -42,7 +70,14 @@ export type UpsertAttemptInput = {
 export type IntentPatch = Partial<
   Pick<
     CheckoutIntent,
-    'status' | 'providerTransId' | 'providerPayDate' | 'refundedVnd' | 'failureReason'
+    | 'status'
+    | 'providerTransId'
+    | 'providerPayDate'
+    | 'refundedVnd'
+    | 'failureReason'
+    | 'settledAt'
+    | 'lastReconciledAt'
+    | 'reconcileAttempts'
   >
 >;
 
@@ -63,7 +98,16 @@ export interface CheckoutRepository {
   update(id: string, patch: IntentPatch): Promise<CheckoutIntent>;
   /** Returns false when (provider, eventId) was already recorded (idempotent replay). */
   recordEvent(provider: PaymentProviderName, eventId: string, intentId: string | null, status: string): Promise<boolean>;
-  listIntents(query: { limit: number; status?: PaymentIntentStatusName }): Promise<CheckoutIntent[]>;
+  listIntents(query: IntentListQuery): Promise<CheckoutIntent[]>;
+  /** Atomically adds `amountVnd` to refundedVnd iff the total stays <= amountVnd captured. */
+  reserveRefund(intentId: string, amountVnd: number): Promise<boolean>;
+  /** Reverses a reservation (provider rejected / errored). */
+  releaseRefund(intentId: string, amountVnd: number): Promise<void>;
+  createRefund(input: Omit<CheckoutRefund, 'id' | 'createdAt' | 'updatedAt'>): Promise<CheckoutRefund>;
+  updateRefund(id: string, patch: Partial<Pick<CheckoutRefund, 'status' | 'providerRefundRef'>>): Promise<CheckoutRefund>;
+  listRefunds(intentId: string): Promise<CheckoutRefund[]>;
+  /** Pending online attempts older than `olderThan` (reconciliation candidates). */
+  pendingForReconcile(query: { olderThan: Date; limit: number; maxAttempts: number }): Promise<CheckoutIntent[]>;
 }
 
 export class MemoryCheckoutRepository implements CheckoutRepository {
@@ -123,6 +167,9 @@ export class MemoryCheckoutRepository implements CheckoutRepository {
       deeplink: input.deeplink,
       refundedVnd: 0,
       failureReason: null,
+      settledAt: null,
+      lastReconciledAt: null,
+      reconcileAttempts: 0,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
@@ -148,10 +195,68 @@ export class MemoryCheckoutRepository implements CheckoutRepository {
     return true;
   }
 
-  async listIntents(query: { limit: number; status?: PaymentIntentStatusName }) {
+  async listIntents(query: IntentListQuery) {
     return [...this.intents.values()]
       .filter((r) => !query.status || r.status === query.status)
+      .filter((r) => !query.provider || r.provider === query.provider)
+      .filter((r) => !query.entityType || r.entityType === query.entityType)
+      .filter((r) => !query.q || [r.id, r.entityId, r.providerRef].includes(query.q))
       .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+      .slice(0, query.limit)
+      .map((r) => ({ ...r }));
+  }
+
+  private readonly refunds = new Map<string, CheckoutRefund>();
+
+  async reserveRefund(intentId: string, amountVnd: number) {
+    const row = [...this.intents.values()].find((r) => r.id === intentId);
+    if (!row || row.refundedVnd + amountVnd > row.amountVnd) {
+      return false;
+    }
+    row.refundedVnd += amountVnd;
+    return true;
+  }
+
+  async releaseRefund(intentId: string, amountVnd: number) {
+    const row = [...this.intents.values()].find((r) => r.id === intentId);
+    if (row) {
+      row.refundedVnd = Math.max(0, row.refundedVnd - amountVnd);
+    }
+  }
+
+  async createRefund(input: Omit<CheckoutRefund, 'id' | 'createdAt' | 'updatedAt'>) {
+    const now = new Date();
+    const row: CheckoutRefund = { ...input, id: randomUUID(), createdAt: now, updatedAt: now };
+    this.refunds.set(row.id, row);
+    return { ...row };
+  }
+
+  async updateRefund(id: string, patch: Partial<Pick<CheckoutRefund, 'status' | 'providerRefundRef'>>) {
+    const row = this.refunds.get(id);
+    if (!row) {
+      throw new Error('PAYMENT_REFUND_NOT_FOUND');
+    }
+    Object.assign(row, patch, { updatedAt: new Date() });
+    return { ...row };
+  }
+
+  async listRefunds(intentId: string) {
+    return [...this.refunds.values()]
+      .filter((r) => r.paymentIntentId === intentId)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+      .map((r) => ({ ...r }));
+  }
+
+  async pendingForReconcile(query: { olderThan: Date; limit: number; maxAttempts: number }) {
+    return [...this.intents.values()]
+      .filter(
+        (r) =>
+          (r.status === 'PENDING_REDIRECT' || r.status === 'CREATED') &&
+          r.updatedAt.getTime() <= query.olderThan.getTime() &&
+          r.reconcileAttempts < query.maxAttempts &&
+          r.providerRef !== null,
+      )
+      .sort((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime())
       .slice(0, query.limit)
       .map((r) => ({ ...r }));
   }

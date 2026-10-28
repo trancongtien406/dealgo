@@ -150,7 +150,8 @@ describe('ops platform settings + faqs http', () => {
 
     const keys = (listed.body.data as Array<{ key: string }>).map((r) => r.key);
     expect(keys).toContain('DRIVER_SEARCH_RADIUS_KM');
-    expect(keys).toContain('PAYMENT_METHODS_ENABLED');
+    expect(keys).not.toContain('PAYMENT_METHODS_ENABLED');
+    expect(keys).toContain('PAYMENT_METHOD_REGISTRY');
     expect(keys).not.toContain('PILOT_ZONE_LABEL');
     expect(keys).toContain('MAX_CONCURRENT_JOBS_PER_DRIVER');
     const radius = listed.body.data.find(

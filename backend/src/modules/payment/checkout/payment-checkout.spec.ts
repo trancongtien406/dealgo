@@ -10,7 +10,14 @@ import { LedgerService } from '../../ledger/ledger.service.js';
 import { MemoryLedgerRepository } from '../../ledger/ledger.repository.js';
 import { MemoryCheckoutRepository } from './checkout.repository.js';
 import { buildPaymentAdapters } from './payment-adapters.js';
-import { PaymentGatewayService, toCheckoutStatus } from './payment-gateway.service.js';
+import {
+  LATE_CAPTURE_AFTER_CASH,
+  PaymentGatewayService,
+  SUPERSEDED_BY_CASH,
+  attemptTimeFromRef,
+  splitCollection,
+  toCheckoutStatus,
+} from './payment-gateway.service.js';
 import { PaymentMethodRegistryService } from './payment-method-registry.service.js';
 import { serviceForVehicleClass } from './payment-method.catalog.js';
 
@@ -200,8 +207,8 @@ describe('PaymentGatewayService', () => {
     await gateway.handleCallback('momo', momoIpn(intent.providerRef!, 50000));
     const cap = await ledgerRepo.findByEntity('RIDE', RIDE, 'PSP_PAYMENT_CAPTURED');
     expect(cap?.amountVnd).toBe(50000);
-    await gateway.refund({ intentId: intent.id, amountVnd: 20000, reason: 'partial', actorUserId: 'ops' });
-    expect((await ledgerRepo.findByEntity('RIDE', RIDE, 'PSP_REFUND_RECORDED'))?.amountVnd).toBe(20000);
+    const r = await gateway.refund({ intentId: intent.id, amountVnd: 20000, reason: 'partial', actorUserId: 'ops' });
+    expect((await ledgerRepo.findByEntity('PAYMENT_REFUND', r.refund.id, 'PSP_REFUND_RECORDED'))?.amountVnd).toBe(20000);
   });
 
   it('failed IPN marks FAILED and the customer can retry', async () => {
@@ -259,5 +266,197 @@ describe('PaymentGatewayService', () => {
     const { gateway } = setup();
     const r = await gateway.returnRedirect('RIDE', RIDE);
     expect(r.url).toBe(`dealgo://payment-return?entityType=RIDE&entityId=${RIDE}&status=CASH`);
+  });
+});
+
+async function capturedMomo(ctx: ReturnType<typeof setup>, amount = 50000, entityId = RIDE) {
+  await enable(ctx.registry, 'MOMO');
+  const v = await ctx.gateway.start({ entityType: 'RIDE', entityId, service: 'BIKE', methodCode: 'MOMO', amountVnd: amount, userId: 'u' });
+  const intent = (await ctx.repo.findById(v.intentId!))!;
+  await ctx.gateway.handleCallback('momo', momoIpn(intent.providerRef!, amount));
+  return intent;
+}
+
+describe('online vs cash settlement', () => {
+  it('splits the job amount into online and cash', () => {
+    expect(splitCollection(50000, 50000)).toEqual({ onlineVnd: 50000, cashVnd: 0 });
+    expect(splitCollection(50000, 0)).toEqual({ onlineVnd: 0, cashVnd: 50000 });
+    expect(splitCollection(50000, 30000)).toEqual({ onlineVnd: 30000, cashVnd: 20000 });
+    expect(splitCollection(40000, 60000)).toEqual({ onlineVnd: 40000, cashVnd: 0 });
+    expect(splitCollection(0, 10000)).toEqual({ onlineVnd: 0, cashVnd: 0 });
+  });
+
+  it('driver collection: paid online → nothing to collect; cash → full amount', async () => {
+    const ctx = setup();
+    expect(await ctx.gateway.collection('RIDE', RIDE, 50000)).toMatchObject({ status: 'CASH', paidOnlineVnd: 0, cashToCollectVnd: 50000 });
+    await capturedMomo(ctx);
+    expect(await ctx.gateway.collection('RIDE', RIDE, 50000)).toMatchObject({ status: 'PAID', paidOnlineVnd: 50000, cashToCollectVnd: 0 });
+  });
+
+  it('prepaid is reduced by refunds and consumed once at completion', async () => {
+    const ctx = setup();
+    const intent = await capturedMomo(ctx);
+    expect(await ctx.gateway.prepaidFor('RIDE', RIDE)).toEqual({ intentId: intent.id, amountVnd: 50000 });
+    await ctx.gateway.refund({ intentId: intent.id, amountVnd: 10000, reason: 'partial', actorUserId: 'ops' });
+    expect((await ctx.gateway.prepaidFor('RIDE', RIDE))!.amountVnd).toBe(40000);
+    await ctx.gateway.afterCompletion('RIDE', RIDE, intent.id);
+    expect(await ctx.gateway.prepaidFor('RIDE', RIDE)).toBeNull();
+    // Refund after the driver was credited: DealGo absorbs it as an expense.
+    const r = await ctx.gateway.refund({ intentId: intent.id, amountVnd: 5000, reason: 'goodwill', actorUserId: 'ops' });
+    expect(r.refund.afterSettlement).toBe(true);
+    expect((await ctx.ledgerRepo.findByEntity('PAYMENT_REFUND', r.refund.id, 'PSP_REFUND_AFTER_SETTLEMENT'))?.amountVnd).toBe(5000);
+  });
+
+  it('cash completion retires a pending attempt; a late capture is flagged for refund', async () => {
+    const ctx = setup();
+    await enable(ctx.registry, 'MOMO');
+    const v = await ctx.gateway.start({ entityType: 'RIDE', entityId: RIDE, service: 'BIKE', methodCode: 'MOMO', amountVnd: 50000, userId: 'u' });
+    const pending = (await ctx.repo.findById(v.intentId!))!;
+    expect(await ctx.gateway.prepaidFor('RIDE', RIDE)).toBeNull();
+    await ctx.gateway.afterCompletion('RIDE', RIDE, null);
+    expect(await ctx.repo.findById(pending.id)).toMatchObject({ status: 'EXPIRED', failureReason: SUPERSEDED_BY_CASH });
+    await ctx.gateway.handleCallback('momo', momoIpn(pending.providerRef!, 50000));
+    const late = (await ctx.repo.findById(pending.id))!;
+    expect(late).toMatchObject({ status: 'CAPTURED', failureReason: LATE_CAPTURE_AFTER_CASH, settledAt: null });
+    expect((await ctx.gateway.collection('RIDE', RIDE, 50000)).paidOnlineVnd).toBe(0);
+  });
+});
+
+describe('multiple partial refunds', () => {
+  it('allows several refunds up to the captured amount, one journal each', async () => {
+    const ctx = setup();
+    const intent = await capturedMomo(ctx, 100000);
+    const a = await ctx.gateway.refund({ intentId: intent.id, amountVnd: 30000, reason: 'one', actorUserId: 'ops' });
+    expect(a).toMatchObject({ status: 'CAPTURED', refundedVnd: 30000, refundableVnd: 70000 });
+    await expect(
+      ctx.gateway.refund({ intentId: intent.id, amountVnd: 80000, reason: 'too much', actorUserId: 'ops' }),
+    ).rejects.toMatchObject({ status: 400 });
+    const b = await ctx.gateway.refund({ intentId: intent.id, amountVnd: 20000, reason: 'two', actorUserId: 'ops' });
+    expect(b.refundedVnd).toBe(50000);
+    const c = await ctx.gateway.refund({ intentId: intent.id, reason: 'rest', actorUserId: 'ops' });
+    expect(c).toMatchObject({ status: 'REFUNDED', refundedVnd: 100000, refundableVnd: 0 });
+    await expect(ctx.gateway.refund({ intentId: intent.id, amountVnd: 1, reason: 'x', actorUserId: 'ops' })).rejects.toMatchObject({ status: 409 });
+    const detail = await ctx.gateway.intentDetail(intent.id);
+    expect(detail.refunds.map((r) => r.amountVnd)).toEqual([30000, 20000, 50000]);
+    for (const r of detail.refunds) {
+      expect(await ctx.ledgerRepo.findByEntity('PAYMENT_REFUND', r.id, 'PSP_REFUND_RECORDED')).not.toBeNull();
+    }
+  });
+
+  it('a provider rejection releases the reserved amount', async () => {
+    let refundCode = 0;
+    const ctx = setup({
+      http: async (url) => {
+        if (url.endsWith('/refund')) return { resultCode: refundCode, message: 'no' };
+        return { resultCode: 0, payUrl: 'https://momo/pay' };
+      },
+    });
+    const intent = await capturedMomo(ctx, 50000);
+    refundCode = 1001;
+    await expect(ctx.gateway.refund({ intentId: intent.id, amountVnd: 20000, reason: 'r', actorUserId: 'ops' })).rejects.toMatchObject({ status: 502 });
+    const after = await ctx.gateway.intentDetail(intent.id);
+    expect(after).toMatchObject({ refundedVnd: 0, refundableVnd: 50000 });
+    expect(after.refunds[0]!.status).toBe('REJECTED');
+  });
+
+  it('pending provider refund on the full amount sets REFUND_PENDING', async () => {
+    const ctx = setup({
+      http: async (url) => (url.endsWith('/refund') ? { resultCode: 7000 } : { resultCode: 0, payUrl: 'https://momo/pay' }),
+    });
+    const intent = await capturedMomo(ctx, 50000);
+    const r = await ctx.gateway.refund({ intentId: intent.id, reason: 'full', actorUserId: 'ops' });
+    expect(r.status).toBe('REFUND_PENDING');
+    expect(r.refund.status).toBe('PENDING');
+  });
+
+  it('lists intents with provider/entity/q filters', async () => {
+    const ctx = setup();
+    const intent = await capturedMomo(ctx);
+    expect(await ctx.gateway.listIntents(50, undefined, { provider: 'momo' })).toHaveLength(1);
+    expect(await ctx.gateway.listIntents(50, undefined, { provider: 'vnpay' })).toHaveLength(0);
+    expect(await ctx.gateway.listIntents(50, undefined, { entityType: 'FOOD_ORDER' })).toHaveLength(0);
+    expect((await ctx.gateway.listIntents(50, undefined, { q: intent.providerRef! }))[0]!.id).toBe(intent.id);
+  });
+});
+
+describe('active reconciliation', () => {
+  const later = () => new Date(Date.now() + 5 * 60 * 1000);
+
+  it('recovers a missed MoMo IPN via the query API exactly once', async () => {
+    const queries: Record<string, unknown>[] = [];
+    const ctx = setup({
+      http: async (url, body) => {
+        if (url.endsWith('/query')) {
+          queries.push(body);
+          return { resultCode: 0, amount: 50000, transId: 777, responseTime: 1 };
+        }
+        return { resultCode: 0, payUrl: 'https://momo/pay' };
+      },
+    });
+    await enable(ctx.registry, 'MOMO');
+    const v = await ctx.gateway.start({ entityType: 'RIDE', entityId: RIDE, service: 'BIKE', methodCode: 'MOMO', amountVnd: 50000, userId: 'u' });
+    const s1 = await ctx.gateway.reconcilePending(later());
+    expect(s1).toMatchObject({ checked: 1, captured: 1 });
+    const q = queries[0]!;
+    const raw = `accessKey=ak&orderId=${String(q.orderId)}&partnerCode=MOMOTEST&requestId=${String(q.requestId)}`;
+    expect(q.signature).toBe(createHmac('sha256', 'sk').update(raw).digest('hex'));
+    expect(await ctx.repo.findById(v.intentId!)).toMatchObject({ status: 'CAPTURED', providerTransId: '777', reconcileAttempts: 1 });
+    const s2 = await ctx.gateway.reconcilePending(later());
+    expect(s2.checked).toBe(0);
+    // A late real IPN is a no-op (already captured) and the capture journal stays single.
+    const intent = (await ctx.repo.findById(v.intentId!))!;
+    await ctx.gateway.handleCallback('momo', momoIpn(intent.providerRef!, 50000, 0, 777));
+    expect((await ctx.ledgerRepo.findByEntity('RIDE', RIDE, 'PSP_PAYMENT_CAPTURED'))?.amountVnd).toBe(50000);
+  });
+
+  it('marks ZaloPay failures and keeps polling pending ones; amount mismatch is not captured', async () => {
+    let code = 3;
+    let amount = 120000;
+    const ctx = setup({
+      http: async (url, body) => {
+        if (url.endsWith('/v2/create')) return { return_code: 1, order_url: 'https://zalo/pay' };
+        if (url.endsWith('/v2/query')) {
+          expect(body.mac).toBe(createHmac('sha256', 'k1').update(`2553|${String(body.app_trans_id)}|k1`).digest('hex'));
+          return { return_code: code, amount, zp_trans_id: 9 };
+        }
+        return {};
+      },
+    });
+    await enable(ctx.registry, 'ZALOPAY');
+    const v = await ctx.gateway.start({ entityType: 'FOOD_ORDER', entityId: RIDE, service: 'FOOD', methodCode: 'ZALOPAY', amountVnd: 120000, userId: 'u' });
+    expect((await ctx.gateway.reconcilePending(later())).pending).toBe(1);
+    code = 1;
+    amount = 1;
+    await ctx.gateway.reconcilePending(later());
+    expect(await ctx.repo.findById(v.intentId!)).toMatchObject({ status: 'PENDING_REDIRECT', failureReason: 'RECONCILE_AMOUNT_MISMATCH' });
+    code = 2;
+    await ctx.gateway.reconcilePending(later());
+    expect((await ctx.repo.findById(v.intentId!))!.status).toBe('FAILED');
+  });
+
+  it('VNPay querydr is signed in field order and uses the attempt time', async () => {
+    let sent: Record<string, unknown> = {};
+    const ctx = setup({
+      http: async (_url, body) => {
+        sent = body;
+        return { vnp_ResponseCode: '00', vnp_TransactionStatus: '01' };
+      },
+    });
+    await enable(ctx.registry, 'VNPAY');
+    await ctx.gateway.start({ entityType: 'RIDE', entityId: RIDE, service: 'CAR', methodCode: 'VNPAY', amountVnd: 80000, userId: 'u' });
+    expect((await ctx.gateway.reconcilePending(later())).pending).toBe(1);
+    const f = sent as Record<string, string>;
+    expect(f.vnp_Command).toBe('querydr');
+    const input = [f.vnp_RequestId, f.vnp_Version, f.vnp_Command, f.vnp_TmnCode, f.vnp_TxnRef, f.vnp_TransactionDate, f.vnp_CreateDate, f.vnp_IpAddr, f.vnp_OrderInfo].join('|');
+    expect(f.vnp_SecureHash).toBe(createHmac('sha512', 'hs').update(input).digest('hex'));
+    expect(f.vnp_TransactionDate).toMatch(/^\d{14}$/);
+  });
+
+  it('skips unconfigured providers and recovers order-ref timestamps', async () => {
+    const ref = `DGR${(1_800_000_000_000).toString(36).toUpperCase()}ABCDEF0123`;
+    expect(attemptTimeFromRef(ref, new Date(0)).getTime()).toBe(1_800_000_000_000);
+    expect(attemptTimeFromRef('garbage', new Date(5)).getTime()).toBe(5);
+    const ctx = setup();
+    expect(await ctx.gateway.reconcilePending(later())).toMatchObject({ checked: 0 });
   });
 });

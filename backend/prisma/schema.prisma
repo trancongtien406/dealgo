@@ -833,6 +833,8 @@ enum LedgerEntityType {
   RIDE
   FOOD_ORDER
   DISPUTE
+  /// One journal per online refund (multiple partial refunds per intent).
+  PAYMENT_REFUND
 }
 
 enum LedgerJournalEvent {
@@ -849,6 +851,10 @@ enum LedgerJournalEvent {
   PSP_PAYMENT_CAPTURED
   /// Online refund accepted by the PSP: reverses PSP_PAYMENT_CAPTURED.
   PSP_REFUND_RECORDED
+  /// Job completed and was prepaid online: customer prepayment becomes payable to the driver.
+  PSP_PREPAID_APPLIED
+  /// Refund after the job settled: DealGo absorbs it as an expense (driver keeps the payout).
+  PSP_REFUND_AFTER_SETTLEMENT
 }
 
 enum LedgerJournalStatus {
@@ -1033,14 +1039,40 @@ model PaymentIntent {
   deeplink        String?             @db.VarChar(2000)
   refundedVnd     Int                 @default(0)
   failureReason   String?             @db.VarChar(255)
+  /// Set when the completed job consumed this prepayment (PSP_PREPAID_APPLIED posted).
+  settledAt       DateTime?
+  /// Active reconciliation bookkeeping (provider status query).
+  lastReconciledAt  DateTime?
+  reconcileAttempts Int                 @default(0)
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
+  refunds         PaymentRefund[]
 
   @@unique([entityType, entityId, method])
   @@index([entityType, entityId])
   @@index([providerRef])
   @@index([createdAt])
   @@map("payment_intents")
+}
+
+// One row per (partial) refund of a captured online payment.
+model PaymentRefund {
+  id                String        @id @default(uuid()) @db.Uuid
+  paymentIntentId   String        @db.Uuid
+  paymentIntent     PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Restrict)
+  amountVnd         Int
+  /// PENDING | SUCCEEDED | REJECTED
+  status            String        @db.VarChar(16)
+  requestId         String        @unique @db.VarChar(64)
+  providerRefundRef String?       @db.VarChar(120)
+  reason            String        @db.VarChar(200)
+  actorUserId       String        @db.Uuid
+  afterSettlement   Boolean       @default(false)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([paymentIntentId])
+  @@map("payment_refunds")
 }
 
 // Customer's chosen payment method per ride / food order (registry code, e.g. MOMO, CASH).

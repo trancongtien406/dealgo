@@ -5,6 +5,8 @@ import {
   LEDGER_COMMISSION_REVENUE_CODE,
   LEDGER_PSP_CLEARING_CODE,
   LEDGER_PSP_CUSTOMER_PREPAID_CODE,
+  LEDGER_PSP_PAYOUT_PAYABLE_CODE,
+  LEDGER_PSP_REFUND_EXPENSE_CODE,
   LEDGER_COD_OBLIGATION_CODE,
   LEDGER_FEE_DRIVER_RECEIVABLE_CODE,
   LEDGER_FEE_REVENUE_CODE,
@@ -306,6 +308,18 @@ export class MemoryLedgerRepository implements LedgerRepository {
         code: LEDGER_PSP_CUSTOMER_PREPAID_CODE,
         name: 'Customer prepayment for online-paid jobs',
         kind: 'LIABILITY',
+      },
+      {
+        id: randomUUID(),
+        code: LEDGER_PSP_PAYOUT_PAYABLE_CODE,
+        name: 'Online-paid job payout owed to drivers',
+        kind: 'LIABILITY',
+      },
+      {
+        id: randomUUID(),
+        code: LEDGER_PSP_REFUND_EXPENSE_CODE,
+        name: 'Online refunds absorbed after settlement',
+        kind: 'EXPENSE',
       },
     ];
     for (const row of rows) {

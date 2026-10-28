@@ -11,6 +11,7 @@ import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../data/payment_api.dart';
 import '../domain/payment_models.dart';
+import '../../../l10n/app_localizations.dart';
 import 'payment_method_sheet.dart';
 
 abstract final class PaymentRoutes {
@@ -74,7 +75,8 @@ class PaymentStatusPage extends StatefulWidget {
   State<PaymentStatusPage> createState() => _PaymentStatusPageState();
 }
 
-class _PaymentStatusPageState extends State<PaymentStatusPage> with WidgetsBindingObserver {
+class _PaymentStatusPageState extends State<PaymentStatusPage>
+    with WidgetsBindingObserver {
   PaymentCheckoutView? _view;
   String? _error;
   var _busy = false;
@@ -116,7 +118,9 @@ class _PaymentStatusPageState extends State<PaymentStatusPage> with WidgetsBindi
   void _schedule() {
     _timer?.cancel();
     final view = _view;
-    if (view == null || isTerminalPaymentStatus(view.status) || _polls >= _maxPolls) {
+    if (view == null ||
+        isTerminalPaymentStatus(view.status) ||
+        _polls >= _maxPolls) {
       return;
     }
     _timer = Timer(widget.pollInterval, () {
@@ -128,7 +132,9 @@ class _PaymentStatusPageState extends State<PaymentStatusPage> with WidgetsBindi
   Future<void> _start(String method) async {
     final token = _token;
     if (token == null) {
-      setState(() => _error = 'Phiên đăng nhập đã hết hạn.');
+      setState(
+        () => _error = AppLocalizations.of(context).paymentSessionExpired,
+      );
       return;
     }
     setState(() {
@@ -153,7 +159,7 @@ class _PaymentStatusPageState extends State<PaymentStatusPage> with WidgetsBindi
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = 'Không khởi tạo được thanh toán. Bạn có thể thử lại hoặc trả tiền mặt.';
+        _error = AppLocalizations.of(context).paymentStartFailed;
       });
     }
   }
@@ -175,7 +181,9 @@ class _PaymentStatusPageState extends State<PaymentStatusPage> with WidgetsBindi
       _schedule();
     } catch (_) {
       if (!mounted) return;
-      setState(() => _error ??= 'Không tải được trạng thái thanh toán.');
+      setState(
+        () => _error ??= AppLocalizations.of(context).paymentStatusLoadFailed,
+      );
       _schedule();
     }
   }
@@ -213,10 +221,15 @@ class _PaymentStatusPageState extends State<PaymentStatusPage> with WidgetsBindi
         DealGoColors.info,
         DealGoColors.infoSurface,
       ),
-      _ => (DealGoIcons.clock, DealGoColors.warning, DealGoColors.warningSurface),
+      _ => (
+        DealGoIcons.clock,
+        DealGoColors.warning,
+        DealGoColors.warningSurface,
+      ),
     };
     final retryable =
-        status == PaymentCheckoutStatus.failed || status == PaymentCheckoutStatus.expired;
+        status == PaymentCheckoutStatus.failed ||
+        status == PaymentCheckoutStatus.expired;
     final pending = status == PaymentCheckoutStatus.pending;
     final method = view?.methodCode ?? widget.startMethod;
     return Scaffold(
@@ -224,7 +237,10 @@ class _PaymentStatusPageState extends State<PaymentStatusPage> with WidgetsBindi
       body: SafeArea(
         child: Column(
           children: [
-            DealGoAppHeader(title: 'Thanh toán', onBack: _continue),
+            DealGoAppHeader(
+              title: AppLocalizations.of(context).paymentHeader,
+              onBack: _continue,
+            ),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
@@ -234,7 +250,10 @@ class _PaymentStatusPageState extends State<PaymentStatusPage> with WidgetsBindi
                     child: Container(
                       width: 72,
                       height: 72,
-                      decoration: BoxDecoration(color: surface, shape: BoxShape.circle),
+                      decoration: BoxDecoration(
+                        color: surface,
+                        shape: BoxShape.circle,
+                      ),
                       child: _busy || view == null
                           ? const Padding(
                               padding: EdgeInsets.all(DealGoSpacing.s20),
@@ -246,7 +265,12 @@ class _PaymentStatusPageState extends State<PaymentStatusPage> with WidgetsBindi
                   const SizedBox(height: DealGoSpacing.s16),
                   Text(
                     key: const Key('payment-status-title'),
-                    view == null ? 'Đang chuẩn bị thanh toán…' : paymentStatusTitle(view.status),
+                    view == null
+                        ? AppLocalizations.of(context).paymentPreparing
+                        : paymentStatusTitle(
+                            AppLocalizations.of(context),
+                            view.status,
+                          ),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 20,
@@ -255,11 +279,10 @@ class _PaymentStatusPageState extends State<PaymentStatusPage> with WidgetsBindi
                     ),
                   ),
                   if (pending)
-                    const Padding(
-                      padding: EdgeInsets.only(top: DealGoSpacing.s8),
+                    Padding(
+                      padding: const EdgeInsets.only(top: DealGoSpacing.s8),
                       child: Text(
-                        'Hoàn tất thanh toán trong ứng dụng ví/ngân hàng rồi quay lại DealGo. '
-                        'Trạng thái tự cập nhật.',
+                        AppLocalizations.of(context).paymentPendingHint,
                         textAlign: TextAlign.center,
                         style: TextStyle(color: DealGoColors.textSecondary),
                       ),
@@ -270,7 +293,9 @@ class _PaymentStatusPageState extends State<PaymentStatusPage> with WidgetsBindi
                       child: Text(
                         reason,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: DealGoColors.textSecondary),
+                        style: const TextStyle(
+                          color: DealGoColors.textSecondary,
+                        ),
                       ),
                     ),
                   if (_error != null)
@@ -294,25 +319,26 @@ class _PaymentStatusPageState extends State<PaymentStatusPage> with WidgetsBindi
                 children: [
                   if (pending && view != null) ...[
                     DealGoSecondaryButton(
-                      label: 'Mở lại trang thanh toán',
+                      label: AppLocalizations.of(context).paymentReopen,
                       onPressed: () => _openProvider(view),
                     ),
                     const SizedBox(height: DealGoSpacing.s8),
                   ],
-                  if ((retryable || (_error != null && view == null)) && method != null) ...[
+                  if ((retryable || (_error != null && view == null)) &&
+                      method != null) ...[
                     DealGoSecondaryButton(
-                      label: 'Thử lại',
+                      label: AppLocalizations.of(context).paymentRetry,
                       onPressed: () => _start(method),
                     ),
                     const SizedBox(height: DealGoSpacing.s8),
                     DealGoSecondaryButton(
-                      label: 'Chuyển sang tiền mặt',
+                      label: AppLocalizations.of(context).paymentSwitchToCash,
                       onPressed: () => _start(cashMethodCode),
                     ),
                     const SizedBox(height: DealGoSpacing.s8),
                   ],
                   DealGoPrimaryButton(
-                    label: 'Tiếp tục',
+                    label: AppLocalizations.of(context).paymentContinue,
                     isLoading: _busy,
                     onPressed: _continue,
                   ),

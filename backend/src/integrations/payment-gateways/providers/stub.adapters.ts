@@ -3,6 +3,7 @@ import {
   PaymentAdapterError,
   type AdapterCallback,
   type AdapterCreateResult,
+  type AdapterQueryResult,
   type AdapterRefundResult,
   type CallbackAck,
   type PaymentAdapter,
@@ -52,6 +53,10 @@ export class StubPaymentAdapter implements PaymentAdapter {
   }
 
   async refund(): Promise<AdapterRefundResult> {
+    throw new PaymentAdapterError('ADAPTER_STUB', `${this.label} adapter is a stub (not integrated)`);
+  }
+
+  async query(): Promise<AdapterQueryResult> {
     throw new PaymentAdapterError('ADAPTER_STUB', `${this.label} adapter is a stub (not integrated)`);
   }
 }

@@ -106,6 +106,12 @@ export class RideController {
     return this.rides.get(actor, id);
   }
 
+  @Get(':id/collection')
+  @ApiOperation({ summary: 'Assigned driver: payment method, paid online vs cash to collect for this ride' })
+  collection(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.rides.driverCollection(actor, id);
+  }
+
   @Get(':id/payment')
   @ApiOperation({ summary: 'Payment method + status for this ride (CASH/PENDING/PAID/FAILED/…)' })
   paymentStatus(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {

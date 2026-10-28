@@ -27,7 +27,9 @@ abstract interface class PaymentApi {
 
 String paymentPathFor(String entityType, String entityId) {
   final id = Uri.encodeComponent(entityId);
-  return entityType == 'RIDE' ? '/v1/rides/$id/payment' : '/v1/food/orders/$id/payment';
+  return entityType == 'RIDE'
+      ? '/v1/rides/$id/payment'
+      : '/v1/food/orders/$id/payment';
 }
 
 class DioPaymentApi implements PaymentApi {
@@ -53,7 +55,8 @@ class DioPaymentApi implements PaymentApi {
       final list = payload is List ? payload : const [];
       return [
         for (final item in list)
-          if (asJsonMap(item) case final map?) PaymentMethodOption.fromJson(map),
+          if (asJsonMap(item) case final map?)
+            PaymentMethodOption.fromJson(map),
       ];
     } on DioException catch (e) {
       throw apiExceptionFromDio(e);

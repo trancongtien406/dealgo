@@ -41,7 +41,12 @@ import { PartnerEligibilityService } from '../partner/partner-eligibility.servic
 import { PAYMENT_PORT } from '../payment/payment.constants.js';
 import type { PaymentPort } from '../payment/payment-port.js';
 import { UnavailablePaymentError } from '../payment/payment-port.js';
-import { PaymentGatewayService, type CheckoutView } from '../payment/checkout/payment-gateway.service.js';
+import {
+  PaymentGatewayService,
+  splitCollection,
+  type CheckoutView,
+  type CollectionView,
+} from '../payment/checkout/payment-gateway.service.js';
 import { PaymentMethodRegistryService } from '../payment/checkout/payment-method-registry.service.js';
 import type { PaymentMethodCode } from '../../platform/settings/payment-method-registry.js';
 import { quoteReferenceFareVnd } from '../ride/ride-geo.js';
@@ -382,6 +387,22 @@ export class FoodService {
       userId: actor.userId,
       clientIp,
     });
+  }
+
+  /** Assigned driver: method + paid-online vs cash to collect at the door. */
+  async driverCollection(actor: RequestActor, orderId: string): Promise<CollectionView> {
+    const order = await this.unwrapNullable(() => this.food.findOrder(orderId));
+    if (!order || order.assignedDriverId !== actor.userId) {
+      throw foodError(404, 'FOOD_ORDER_NOT_FOUND', 'Food order not found');
+    }
+    if (!this.checkout) {
+      return {
+        entityType: 'FOOD_ORDER', entityId: order.id, methodCode: 'CASH', status: 'CASH', amountVnd: null,
+        paymentUrl: null, deeplink: null, intentId: null, failureReason: null,
+        paidOnlineVnd: 0, cashToCollectVnd: order.totalVnd,
+      };
+    }
+    return this.checkout.collection('FOOD_ORDER', order.id, order.totalVnd);
   }
 
   async paymentStatus(actor: RequestActor, orderId: string): Promise<CheckoutView> {
@@ -1877,15 +1898,38 @@ export class FoodService {
         ),
       ) * 100,
     );
+    // Online prepayment (captured − refunded) replaces cash at the door.
+    const prepaid = (await this.checkout?.prepaidFor('FOOD_ORDER', orderId)) ?? null;
+    let collectedCashVnd = 0;
+    let appliedIntentId: string | null = null;
     // COD obligation, DealGo-funded discount, earnings and fee commit with the delivery itself.
     const order = await this.unwrap(() =>
       this.food.deliver(orderId, actor.userId, async (tx, delivered) => {
+        const split = splitCollection(delivered.totalVnd, prepaid?.amountVnd ?? 0);
+        collectedCashVnd = split.cashVnd;
         // A fully discounted order has no cash to collect (the journal rejects 0).
-        if (delivered.totalVnd > 0) {
+        if (split.cashVnd > 0) {
           await this.ledger.postWithin(tx, 'COD_OBLIGATION_POSTED', {
             entityType: 'FOOD_ORDER',
             entityId: delivered.id,
-            amountVnd: delivered.totalVnd,
+            amountVnd: split.cashVnd,
+          });
+        }
+        if (split.onlineVnd > 0 && prepaid) {
+          // Paid online: the driver collects nothing; DealGo owes the driver what it collected.
+          appliedIntentId = prepaid.intentId;
+          await this.ledger.postWithin(tx, 'PSP_PREPAID_APPLIED', {
+            entityType: 'FOOD_ORDER',
+            entityId: delivered.id,
+            amountVnd: split.onlineVnd,
+          });
+          await this.earnings.adjustWithin(tx, {
+            driverId: actor.userId,
+            amountVnd: -split.onlineVnd,
+            kind: 'ONLINE_PAYMENT_PAYOUT',
+            refType: 'PAYMENT_INTENT',
+            refId: prepaid.intentId,
+            occurredAt: delivered.updatedAt,
           });
         }
         // DEC-PROD-009/015: DealGo books only its own share of the voucher as an expense; the
@@ -1941,8 +1985,9 @@ export class FoodService {
         });
       }),
     );
-    if (order.totalVnd > 0) {
-      await this.recordSandboxCodIntent(order.id, order.totalVnd);
+    await this.checkout?.afterCompletion('FOOD_ORDER', order.id, appliedIntentId);
+    if (collectedCashVnd > 0) {
+      await this.recordSandboxCodIntent(order.id, collectedCashVnd);
     }
     return publish(order);
   }
