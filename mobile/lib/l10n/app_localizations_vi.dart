@@ -2330,6 +2330,11 @@ class AppLocalizationsVi extends AppLocalizations {
   String get rideSamePlaces => 'Điểm đón và điểm đến đang trùng nhau.';
 
   @override
+  String rideEtaMinutes(int minutes) {
+    return '$minutes phút';
+  }
+
+  @override
   String rideDistanceKm(String km) {
     return '$km km';
   }
@@ -2842,7 +2847,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String foodStorePrepChip(int minutes) {
-    return '~$minutes phút';
+    return 'Khoảng $minutes phút';
   }
 
   @override
@@ -2995,6 +3000,10 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get merchantMarkReady => 'Đã chuẩn bị xong';
+
+  @override
+  String get merchantHandoffAwaitDriver =>
+      'Tài xế chưa xác nhận lấy hàng. Đưa mã bàn giao cho tài xế để hoàn tất.';
 
   @override
   String get merchantMarkHandedOver => 'Đã bàn giao hàng';

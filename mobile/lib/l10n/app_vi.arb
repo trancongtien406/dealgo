@@ -779,6 +779,7 @@
   "rideSuggestionsTitle": "Gợi ý cho bạn",
   "rideOpenPendingOffers": "Xem đề xuất đang chờ",
   "rideSamePlaces": "Điểm đón và điểm đến đang trùng nhau.",
+  "rideEtaMinutes": "{minutes} phút",
   "rideDistanceKm": "{km} km",
   "rideQuoteLoading": "Đang tính giá tham khảo…",
   "rideQuoteError": "Chưa tính được giá. Kiểm tra kết nối và thử lại.",
@@ -948,7 +949,7 @@
   "storeDistance": "{km} km",
   "foodDiscoverySearchHint": "Tìm quán, món ăn, đồ uống",
   "foodStoreBestsellers": "Món bán chạy",
-  "foodStorePrepChip": "~{minutes} phút",
+  "foodStorePrepChip": "Khoảng {minutes} phút",
   "@foodStorePrepChip": {
     "placeholders": {
       "minutes": {
@@ -1004,6 +1005,7 @@
   "merchantOrderTitlePreparing": "Đơn đang chuẩn bị",
   "merchantOrderTitleReady": "Bàn giao cho tài xế",
   "merchantMarkReady": "Đã chuẩn bị xong",
+  "merchantHandoffAwaitDriver": "Tài xế chưa xác nhận lấy hàng. Đưa mã bàn giao cho tài xế để hoàn tất.",
   "merchantMarkHandedOver": "Đã bàn giao hàng",
   "merchantOrderHeadNew": "Đơn chờ xác nhận",
   "merchantOrderHeadPreparing": "Đơn đã nhận",

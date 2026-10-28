@@ -36,14 +36,24 @@ class _MerchantHomePageState extends State<MerchantHomePage> {
     catalog: context.read<GetMerchantCatalog>(),
   );
 
+  // QA M2 — back in the foreground: refetch silently (sockets may have been
+  // suspended while the app was in the background).
+  late final AppLifecycleListener _lifecycle = AppLifecycleListener(
+    onResume: () {
+      if (mounted) unawaited(context.read<MerchantQueueCubit>().refresh());
+    },
+  );
+
   @override
   void initState() {
     super.initState();
+    _lifecycle;
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     _stats.close();
     super.dispose();
   }

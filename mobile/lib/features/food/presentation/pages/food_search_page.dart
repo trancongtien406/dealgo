@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -37,7 +39,7 @@ class FoodSearchPage extends StatelessWidget {
         listFoodStores: context.read<ListFoodStores>(),
         ratings: context.read<RatingRepository>(),
         location: context.read<LocationService>(),
-      )..load(currentAccessToken(context)),
+      )..load(currentAccessToken(context), search: initialQuery.trim()),
       child: _FoodSearchView(initialQuery: initialQuery),
     );
   }
@@ -58,6 +60,29 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
   );
   var _filter = 'all';
   var _history = const <String>[];
+  Timer? _debounce;
+
+  /// Text the server was last asked for; while it matches the box the list
+  /// is the server's answer (name, dish, category), not a local filter.
+  late String _serverQuery = widget.initialQuery.trim().toLowerCase();
+
+  /// QA C3 — search the whole catalog on the server (debounced).
+  void _onQueryChanged() {
+    setState(() {});
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      final q = _query.text.trim();
+      if (q.toLowerCase() == _serverQuery) return;
+      _serverQuery = q.toLowerCase();
+      unawaited(
+        context.read<FoodDiscoveryCubit>().load(
+          currentAccessToken(context),
+          search: q,
+        ),
+      );
+    });
+  }
 
   @override
   void initState() {
@@ -79,6 +104,7 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _query.dispose();
     super.dispose();
   }
@@ -105,6 +131,7 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
     final matches = [
       for (final store in stores)
         if (q.isEmpty ||
+            q == _serverQuery ||
             store.name.toLowerCase().contains(q) ||
             (foodCategoryLabel(
                   context,
@@ -149,14 +176,14 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
                 fieldKey: const Key('food-search-field'),
                 autofocus: true,
                 textInputAction: TextInputAction.search,
-                onChanged: (_) => setState(() {}),
+                onChanged: (_) => _onQueryChanged(),
                 onSubmitted: (_) => _remember(),
                 suffix: _query.text.isEmpty
                     ? null
                     : IconButton(
                         onPressed: () {
                           _query.clear();
-                          setState(() {});
+                          _onQueryChanged();
                         },
                         icon: const Icon(DealGoIcons.close),
                       ),
@@ -268,7 +295,7 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
                       ),
                       onTap: () {
                         _query.text = item;
-                        setState(() {});
+                        _onQueryChanged();
                       },
                     ),
                   const SizedBox(height: DealGoSpacing.s12),

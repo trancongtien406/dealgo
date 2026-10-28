@@ -49,6 +49,9 @@ class FakeFoodClient implements FoodClient {
   final List<PlaceFoodRequest> placeCalls = [];
   final List<String> storeReads = [];
 
+  /// One entry per listStores call: the server search text sent (or null).
+  final List<String?> storeSearches = [];
+
   /// One entry per listStores call: whether a GPS fix was sent.
   final List<bool> storeListGeo = [];
   final List<String> readyCalls = [];
@@ -343,9 +346,16 @@ class FakeFoodClient implements FoodClient {
     String accessToken, {
     double? lat,
     double? lng,
+    String? search,
   }) async {
     storeListGeo.add(lat != null && lng != null);
-    return stores;
+    storeSearches.add(search);
+    final q = search?.trim().toLowerCase() ?? '';
+    if (q.isEmpty) return stores;
+    return [
+      for (final store in stores)
+        if (store.name.toLowerCase().contains(q)) store,
+    ];
   }
 
   @override

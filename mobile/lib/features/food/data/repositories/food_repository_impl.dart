@@ -12,8 +12,9 @@ class FoodRepositoryImpl implements FoodRepository {
     String accessToken, {
     double? lat,
     double? lng,
+    String? search,
   }) {
-    return _remote.listStores(accessToken, lat: lat, lng: lng);
+    return _remote.listStores(accessToken, lat: lat, lng: lng, search: search);
   }
 
   @override

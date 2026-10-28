@@ -2348,6 +2348,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rideSamePlaces => 'Pickup and destination are the same.';
 
   @override
+  String rideEtaMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
   String rideDistanceKm(String km) {
     return '$km km';
   }
@@ -3016,6 +3021,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get merchantMarkReady => 'Ready';
+
+  @override
+  String get merchantHandoffAwaitDriver =>
+      'The driver has not confirmed pickup yet. Give them the handover code to finish.';
 
   @override
   String get merchantMarkHandedOver => 'Handed over';

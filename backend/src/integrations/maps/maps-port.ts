@@ -371,8 +371,37 @@ export class MapboxMapsPort implements MapsPort {
  * (e.g. "Jalan Nguyen Hue" for Nguyễn Huệ, Q.1). Strip it so labels read as Vietnamese.
  */
 export function cleanMapboxVnLabel(label: string): string {
-  return label.replace(/(^|,\s*)Jalan\s+/g, '$1');
+  const parts = label
+    .replace(/(^|,\s*)Jalan\s+/g, '$1')
+    .split(',')
+    .map((part) =>
+      part
+        .trim()
+        // Postal codes ("Đà Nẵng 550000", "550000") are noise on a rider label.
+        .replace(/\s*\b\d{5,6}\b\s*$/, '')
+        .trim(),
+    )
+    .filter((part) => part.length > 0 && !/^(Việt Nam|Vietnam)$/i.test(part))
+    .map((part) => VN_UNACCENTED_AREAS[part.toLowerCase()] ?? part);
+  return parts.join(', ');
 }
+
+/**
+ * Areas Mapbox's VN data sometimes returns without diacritics even with
+ * language=vi (QA C6: "Hai Chau"). Whole comma-separated segments only.
+ */
+const VN_UNACCENTED_AREAS: Record<string, string> = {
+  'hai chau': 'Hải Châu',
+  'son tra': 'Sơn Trà',
+  'thanh khe': 'Thanh Khê',
+  'ngu hanh son': 'Ngũ Hành Sơn',
+  'lien chieu': 'Liên Chiểu',
+  'cam le': 'Cẩm Lệ',
+  'hoa vang': 'Hòa Vang',
+  'da nang': 'Đà Nẵng',
+  'danang': 'Đà Nẵng',
+  'da nang city': 'Đà Nẵng',
+};
 
 function mapboxFeaturesToSuggestions(body: MapboxJson, limit: number): PlaceSuggestion[] {
   const out: PlaceSuggestion[] = [];

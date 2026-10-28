@@ -209,14 +209,18 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
     String accessToken, {
     double? lat,
     double? lng,
+    String? search,
   }) {
     final hasGeo = lat != null && lng != null;
     return _send(
       () => dio.get<Object?>(
         ApiPaths.foodStores,
-        queryParameters: hasGeo
-            ? {'lat': lat, 'lng': lng, 'sort_by': 'distance'}
-            : null,
+        queryParameters: {
+          if (hasGeo) ...{'lat': lat, 'lng': lng, 'sort_by': 'distance'},
+          // QA C3 — name search runs on the server, not on the loaded page.
+          if (search != null && search.trim().isNotEmpty)
+            'search': search.trim(),
+        },
         options: _auth(accessToken),
       ),
       decodeFoodStoreList,

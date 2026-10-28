@@ -10,7 +10,13 @@ class ListFoodStores {
     String accessToken, {
     double? lat,
     double? lng,
+    String? search,
   }) {
-    return _repository.listStores(accessToken, lat: lat, lng: lng);
+    return _repository.listStores(
+      accessToken,
+      lat: lat,
+      lng: lng,
+      search: search,
+    );
   }
 }

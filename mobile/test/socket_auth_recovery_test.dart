@@ -45,6 +45,22 @@ void main() {
     await rt.dispose();
   });
 
+  test(
+    'QA M2: a room shared by two consumers stays joined until both leave',
+    () async {
+      final rt = SocketSnapshotRealtime(baseUrl: dead);
+      await rt.connect(accessToken: jwt('m1'));
+      const store = StoreSnapshotRoom('s1');
+      await rt.subscribe(store); // dashboard queue
+      await rt.subscribe(store); // order detail page
+      await rt.unsubscribe(store); // order page closes
+      expect(rt.rooms, {'store:s1'});
+      await rt.unsubscribe(store);
+      expect(rt.rooms, isEmpty);
+      await rt.dispose();
+    },
+  );
+
   test('token refresh for the same actor keeps the socket and rooms', () async {
     final rt = SocketSnapshotRealtime(baseUrl: dead);
     await rt.connect(accessToken: jwt('u1', n: 1));

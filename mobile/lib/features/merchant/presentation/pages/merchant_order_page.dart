@@ -136,7 +136,7 @@ class _MerchantOrderView extends StatelessWidget {
           note: note,
         ),
         onReady: () => cubit.markReady(merchantAccessToken(context)),
-        onHandoff: cubit.markHandoffDone,
+        onHandoff: () => cubit.confirmHandoff(merchantAccessToken(context)),
       ),
     );
   }
@@ -215,7 +215,8 @@ class _Detail extends StatelessWidget {
       footer = MerchantPrimaryBar(
         label: l10n.merchantMarkHandedOver,
         buttonKey: const Key('merchant-handoff'),
-        enabled: !busy,
+        // QA M1 — nothing to hand over until a driver has claimed the order.
+        enabled: !busy && order.status == 'ASSIGNED',
         loading: busy,
         onPressed: onHandoff,
       );

@@ -941,6 +941,14 @@
   "rideSuggestionsTitle": "Suggested for you",
   "rideOpenPendingOffers": "View pending offers",
   "rideSamePlaces": "Pickup and destination are the same.",
+  "rideEtaMinutes": "{minutes} min",
+  "@rideEtaMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "rideDistanceKm": "{km} km",
   "@rideDistanceKm": {
     "placeholders": {
@@ -1314,6 +1322,7 @@
   "merchantOrderTitlePreparing": "Preparing",
   "merchantOrderTitleReady": "Hand over to driver",
   "merchantMarkReady": "Ready",
+  "merchantHandoffAwaitDriver": "The driver has not confirmed pickup yet. Give them the handover code to finish.",
   "merchantMarkHandedOver": "Handed over",
   "merchantOrderHeadNew": "Waiting for confirmation",
   "merchantOrderHeadPreparing": "Order accepted",

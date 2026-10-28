@@ -340,6 +340,8 @@ class _RideMapPageState extends State<RideMapPage> {
                         if (dropoff != null)
                           MapLatLng(lat: dropoff.lat, lng: dropoff.lng),
                       ],
+                      // Destination-first: B alone must read "Đến", not "Đón".
+                      firstMarkerIsPickup: pickup != null,
                       // Road line from Nest routing; never a straight A→B.
                       route: _route.polylineOr(const []),
                       fitPadding: EdgeInsets.fromLTRB(
@@ -581,5 +583,7 @@ class _RideMapPageState extends State<RideMapPage> {
 /// `3,2 km` from the road route, `~3,2 km` for the straight-line fallback.
 String rideDistanceText(AppLocalizations l10n, RideDistance distance) {
   final text = l10n.rideDistanceKm(formatRideKm(distance.km));
-  return distance.road ? text : '~$text';
+  if (!distance.road) return '~$text';
+  final minutes = distance.minutes;
+  return minutes == null ? text : '$text · ${l10n.rideEtaMinutes(minutes)}';
 }

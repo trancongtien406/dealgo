@@ -44,7 +44,7 @@ class FoodDiscoveryCubit extends Cubit<FoodDiscoveryState> {
   final LocationService? _location;
   var _generation = 0;
 
-  Future<void> load(String? accessToken) async {
+  Future<void> load(String? accessToken, {String? search}) async {
     final generation = ++_generation;
     final token = accessToken?.trim() ?? '';
     if (token.isEmpty) {
@@ -57,7 +57,12 @@ class FoodDiscoveryCubit extends Cubit<FoodDiscoveryState> {
       if (isClosed || generation != _generation) {
         return;
       }
-      final stores = await _listFoodStores(token, lat: fix?.lat, lng: fix?.lng);
+      final stores = await _listFoodStores(
+        token,
+        lat: fix?.lat,
+        lng: fix?.lng,
+        search: search,
+      );
       if (isClosed || generation != _generation) {
         return;
       }

@@ -47,7 +47,12 @@ class SocketSnapshotRealtime implements SnapshotRealtime {
   final _chatMessages = StreamController<ChatMessageHint>.broadcast();
   final _rideUnassigned = StreamController<RideUnassignedHint>.broadcast();
   final _inboxEvents = StreamController<void>.broadcast();
-  final _rooms = <String>{};
+
+  /// Room → number of live consumers. QA M2 root cause: rooms were a plain
+  /// set, so when the merchant order page closed its `store:{id}` binding it
+  /// left the room the dashboard queue was still listening on, and new
+  /// orders stopped arriving until the tab was reopened.
+  final _rooms = <String, int>{};
 
   io.Socket? _socket;
   String? _token;
@@ -96,7 +101,7 @@ class SocketSnapshotRealtime implements SnapshotRealtime {
 
   /// Rooms that will be (re)subscribed on every connect.
   @visibleForTesting
-  Set<String> get rooms => Set.unmodifiable(_rooms);
+  Set<String> get rooms => Set.unmodifiable(_rooms.keys);
 
   /// Token the next handshake sends: the token store wins over the token
   /// handed to [connect], so a refresh done by REST is picked up.
@@ -295,7 +300,7 @@ class SocketSnapshotRealtime implements SnapshotRealtime {
 
   @override
   Future<void> subscribe(SnapshotRoom room) async {
-    _rooms.add(room.name);
+    _rooms.update(room.name, (n) => n + 1, ifAbsent: () => 1);
     final socket = _socket;
     if (socket == null || !socket.connected) {
       return;
@@ -305,6 +310,11 @@ class SocketSnapshotRealtime implements SnapshotRealtime {
 
   @override
   Future<void> unsubscribe(SnapshotRoom room) async {
+    final left = (_rooms[room.name] ?? 0) - 1;
+    if (left > 0) {
+      _rooms[room.name] = left;
+      return;
+    }
     _rooms.remove(room.name);
     final socket = _socket;
     if (socket == null || !socket.connected) {
@@ -318,7 +328,7 @@ class SocketSnapshotRealtime implements SnapshotRealtime {
     if (socket == null || !socket.connected) {
       return;
     }
-    for (final room in _rooms) {
+    for (final room in _rooms.keys) {
       socket.emitWithAck('subscribe', {'room': room}, ack: (_) {});
     }
   }

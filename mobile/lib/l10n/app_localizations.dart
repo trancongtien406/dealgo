@@ -4562,6 +4562,12 @@ abstract class AppLocalizations {
   /// **'Pickup and destination are the same.'**
   String get rideSamePlaces;
 
+  /// No description provided for @rideEtaMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String rideEtaMinutes(int minutes);
+
   /// No description provided for @rideDistanceKm.
   ///
   /// In en, this message translates to:
@@ -5785,6 +5791,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Ready'**
   String get merchantMarkReady;
+
+  /// No description provided for @merchantHandoffAwaitDriver.
+  ///
+  /// In en, this message translates to:
+  /// **'The driver has not confirmed pickup yet. Give them the handover code to finish.'**
+  String get merchantHandoffAwaitDriver;
 
   /// No description provided for @merchantMarkHandedOver.
   ///

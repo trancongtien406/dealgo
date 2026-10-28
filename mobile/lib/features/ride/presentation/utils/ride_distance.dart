@@ -10,15 +10,23 @@ import '../../../../core/maps/route_geometry.dart';
 /// only because no road route was available — the UI marks it with `~` and
 /// never draws a straight polyline for it.
 class RideDistance {
-  const RideDistance({required this.km, required this.road});
+  const RideDistance({required this.km, required this.road, this.minutes});
 
   final double km;
   final bool road;
 
+  /// Drive time from the same route answer (null for the fallback).
+  final int? minutes;
+
   static RideDistance from(RouteGeometry route, MapLatLng a, MapLatLng b) {
     final meters = route.distanceM;
     if (route.available && meters != null && meters > 0) {
-      return RideDistance(km: meters / 1000, road: true);
+      final sec = route.durationSec;
+      return RideDistance(
+        km: meters / 1000,
+        road: true,
+        minutes: sec != null && sec > 0 ? (sec / 60).ceil() : null,
+      );
     }
     return RideDistance(km: haversineKm(a, b), road: false);
   }
