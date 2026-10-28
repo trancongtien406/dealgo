@@ -32,6 +32,8 @@ import '../../../../core/l10n/api_error_text.dart';
 import '../../../promotion/domain/entities/voucher_quote.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
+import '../../../payment/domain/payment_models.dart';
+import '../../../payment/presentation/payment_method_sheet.dart';
 
 class RideOffersPage extends StatelessWidget {
   const RideOffersPage({required this.rideId, this.clock, super.key});
@@ -227,6 +229,24 @@ class _RideOffersPageState extends State<_RideOffersView> {
     return offers.first.id;
   }
 
+  /// True when an online payment method is enabled for this ride's service (else cash-only).
+  Future<bool> _onlinePaymentAvailable(
+    String token,
+    String? vehicleClassCode,
+  ) async {
+    try {
+      final methods = await defaultPaymentApi()
+          .listMethods(
+            accessToken: token,
+            service: paymentServiceForVehicleClass(vehicleClassCode),
+          )
+          .timeout(const Duration(seconds: 4));
+      return methods.any((m) => !m.isCash);
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> _select() async {
     if (_busy) {
       return;
@@ -311,10 +331,19 @@ class _RideOffersPageState extends State<_RideOffersView> {
         _ride = updated;
         _selectKey = null;
       });
-      if (agreed == chosen.amountVnd && updated.discountVnd == 0) {
-        // Price unchanged and no voucher to read back: the separate "confirmed" screen was a dead-end
-        // extra tap before tracking. Go straight to tracking.
+      if (agreed == chosen.amountVnd &&
+          updated.discountVnd == 0 &&
+          !await _onlinePaymentAvailable(token, updated.vehicleClassCode)) {
+        // Price unchanged, no voucher to read back and cash is the only method: the separate
+        // "confirmed" screen was a dead-end extra tap before tracking. Go straight to tracking.
+        // When an online method is enabled the confirm screen hosts the payment picker.
+        if (!mounted) {
+          return;
+        }
         await context.push(RideRoutes.tracking(updated.id));
+        return;
+      }
+      if (!mounted) {
         return;
       }
       await context.push(
