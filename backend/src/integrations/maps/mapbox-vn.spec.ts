@@ -40,4 +40,9 @@ describe('Mapbox VN geocoding', () => {
     await port.reverseGeocode({ lat: 10.77, lng: 106.7 });
     expect(calls[2]!.searchParams.get('country')).toBe('vn');
   });
+  it('drops a leading postal code and restores accents (QA smoke)', () => {
+    expect(
+      cleanMapboxVnLabel('Đường Nguyễn Văn Linh, Bình Hiên, 50200 Hai Chau, Đà Nẵng, Việt Nam'),
+    ).toBe('Đường Nguyễn Văn Linh, Bình Hiên, Hải Châu, Đà Nẵng');
+  });
 });

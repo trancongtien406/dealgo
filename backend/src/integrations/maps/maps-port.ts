@@ -379,6 +379,8 @@ export function cleanMapboxVnLabel(label: string): string {
         .trim()
         // Postal codes ("Đà Nẵng 550000", "550000") are noise on a rider label.
         .replace(/\s*\b\d{5,6}\b\s*$/, '')
+        // Leading postal code too ("50200 Hai Chau").
+        .replace(/^\d{5,6}\s+/, '')
         .trim(),
     )
     .filter((part) => part.length > 0 && !/^(Việt Nam|Vietnam)$/i.test(part))

@@ -8,6 +8,7 @@ import {
   type PlaceSuggestion,
 } from '../../integrations/maps/maps-port.js';
 import type { OsmSearchPort } from '../../integrations/maps/osm-search.js';
+import { cleanMapboxVnLabel } from '../../integrations/maps/maps-port.js';
 import { MapsProviderSettings } from '../../integrations/maps/maps-provider-settings.js';
 import { localBbox, parsePlaceQuery, rankPlaces, textScore, type RankedPlace } from './place-ranking.js';
 
@@ -81,7 +82,12 @@ export class PlacesService {
       return { place, available: true };
     }
     try {
-      const place = await this.maps.reverseGeocode({ lat, lng });
+      const raw = await this.maps.reverseGeocode({ lat, lng });
+      // Same VN cleanup for every provider (Google/Mapbox): no postal codes,
+      // no "Việt Nam", accented district names.
+      const place = raw
+        ? { ...raw, name: cleanMapboxVnLabel(raw.name) || raw.name, address: cleanMapboxVnLabel(raw.address ?? '') }
+        : null;
       this.reverseCache.delete(key);
       this.reverseCache.set(key, {
         place,

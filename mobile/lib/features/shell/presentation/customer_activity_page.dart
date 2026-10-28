@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../../places/domain/place.dart';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -373,8 +376,9 @@ bool historyStatusIsBad(String status) =>
 /// Maps backend ride/food status codes to customer-facing copy.
 /// The server title (destination or store name), or the short reference when it has none.
 String historyTitle(AppLocalizations l10n, HistoryItem item) {
-  if (item.title.isNotEmpty) {
-    return item.title;
+  final title = cleanPlaceText(item.title);
+  if (title.isNotEmpty) {
+    return title;
   }
   return item.kind == HistoryKind.ride
       ? l10n.rideRef(shortRef(item.id))

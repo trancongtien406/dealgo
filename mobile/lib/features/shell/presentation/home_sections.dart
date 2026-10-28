@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../../../core/format/date_time_format.dart';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -491,7 +494,16 @@ class _RecentTripCardState extends State<RecentTripCard> {
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(item.meta, style: textTheme.bodySmall),
+                          Text(
+                            formatRecentTime(
+                                  item.meta,
+                                  today: l10n.inboxSectionToday,
+                                  yesterday: l10n.inboxSectionYesterday,
+                                ) ??
+                                item.meta,
+                            key: const Key('home-recent-time'),
+                            style: textTheme.bodySmall,
+                          ),
                           Text(
                             historyTitle(AppLocalizations.of(context), item),
                             maxLines: 2,

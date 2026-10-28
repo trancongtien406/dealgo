@@ -56,8 +56,8 @@ class PlaceOption {
 /// name `3 Nguyễn Văn Linh` and address `3 Nguyễn Văn Linh, Hải Châu, …`).
 /// The house number therefore survives instead of being duplicated or cut.
 String formatPlaceLabel(String name, String address) {
-  final n = name.trim();
-  final a = address.trim();
+  final n = cleanPlaceText(name);
+  final a = cleanPlaceText(address);
   if (a.isEmpty || a == n) return n;
   if (n.isEmpty) return a;
   final fold = a.toLowerCase();
@@ -65,6 +65,44 @@ String formatPlaceLabel(String name, String address) {
     return a;
   }
   return '$n, $a';
+}
+
+/// Areas some providers return without diacritics (QA C6: "Hai Chau").
+const _unaccentedAreas = <String, String>{
+  'hai chau': 'Hải Châu',
+  'son tra': 'Sơn Trà',
+  'thanh khe': 'Thanh Khê',
+  'ngu hanh son': 'Ngũ Hành Sơn',
+  'lien chieu': 'Liên Chiểu',
+  'cam le': 'Cẩm Lệ',
+  'hoa vang': 'Hòa Vang',
+  'da nang': 'Đà Nẵng',
+  'danang': 'Đà Nẵng',
+};
+
+final _postal = RegExp(r'^\d{5,6}$');
+final _postalEdge = RegExp(r'^\d{5,6}\s+|\s+\d{5,6}$');
+
+/// Readable Vietnamese place text, for labels from any source (server,
+/// device cache, rides saved by older builds): drops postal codes ("50200",
+/// "Đà Nẵng 550000", "50200 Hai Chau"), the trailing "Việt Nam", restores
+/// accents on Đà Nẵng districts, and removes a segment repeated back to back
+/// ("3 Nguyễn Văn Linh, 3 Nguyễn Văn Linh, Hải Châu").
+String cleanPlaceText(String text) {
+  final out = <String>[];
+  for (final raw in text.split(',')) {
+    var part = raw.trim().replaceAll(_postalEdge, '').trim();
+    if (part.isEmpty || _postal.hasMatch(part)) continue;
+    if (RegExp(r'^(việt nam|vietnam)$', caseSensitive: false).hasMatch(part)) {
+      continue;
+    }
+    part = _unaccentedAreas[part.toLowerCase()] ?? part;
+    if (out.isNotEmpty && out.last.toLowerCase() == part.toLowerCase()) {
+      continue;
+    }
+    out.add(part);
+  }
+  return out.join(', ');
 }
 
 /// Server limit for stop labels (`label` max 160 on rides and food orders).
