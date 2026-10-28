@@ -22,6 +22,11 @@ import { MockSmsSender } from '../../src/integrations/sms/sms-sender.js';
 import { PrismaModule } from '../../src/platform/database/prisma.module.js';
 import { RIDE_CLOCK, type RideClock } from '../../src/modules/ride/ride.constants.js';
 import { RideModule } from '../../src/modules/ride/ride.module.js';
+import {
+  clampToFareSteps,
+  RIDE_FARE_ROUNDING_STEP_VND,
+  roundDownToFareStep,
+} from '../../src/modules/ride-vehicle/ride-vehicle-class.js';
 import { EarningsService } from '../../src/modules/earnings/earnings.service.js';
 import { RideService } from '../../src/modules/ride/ride.service.js';
 import { PlatformSettingsService } from '../../src/platform/settings/platform-settings.service.js';
@@ -205,10 +210,18 @@ describePg('ride negotiation & lifecycle (postgres)', () => {
     const customer = await login();
     const quote = await post(customer.token, '/v1/rides/quote', { pickup, dropoff }).expect(200);
     const bike = quote.body.data.options.find((o: { code: string }) => o.code === 'MOTORBIKE');
-    expect(bike.minBidVnd).toBe(Math.max(bike.minFareVnd, Math.ceil(bike.referenceFareVnd * 0.8)));
+    // The floor (80% of reference) is rounded up to the fare step and kept inside the class bounds.
+    expect(bike.minBidVnd).toBe(
+      clampToFareSteps(
+        Math.max(bike.minFareVnd, Math.ceil(bike.referenceFareVnd * 0.8)),
+        bike.minFareVnd,
+        bike.maxFareVnd,
+      ),
+    );
     expect(quote.body.data.pendingFeesVnd).toBe(0);
 
-    const low = await postRide(customer.token, 'floor-low', bike.minBidVnd - 1);
+    // A bid is rounded up to the fare step, so one step below the floor is the first rejected bid.
+    const low = await postRide(customer.token, 'floor-low', bike.minBidVnd - RIDE_FARE_ROUNDING_STEP_VND);
     expect(low.status).toBe(400);
     expect(low.body.errorCode).toBe('RIDE_FARE_OUT_OF_RANGE');
     const ok = await postRide(customer.token, 'floor-ok', bike.minBidVnd).expect(200);
@@ -220,12 +233,14 @@ describePg('ride negotiation & lifecycle (postgres)', () => {
     const customer = await login();
     const d = await driver();
     const rideId = (await postRide(customer.token, 'counter', bid()).expect(200)).body.data.id;
-    const high = await offer(d.token, rideId, Math.floor(bid() * 1.5) + 1);
+    // Counters are rounded up to the fare step; the cap is 150% rounded down to the step.
+    const cap = Math.max(bid(), roundDownToFareStep(bid() * 1.5));
+    const high = await offer(d.token, rideId, cap + RIDE_FARE_ROUNDING_STEP_VND);
     expect(high.status).toBe(400);
     expect(high.body.errorCode).toBe('RIDE_COUNTER_OUT_OF_RANGE');
-    const under = await offer(d.token, rideId, bid() - 1);
+    const under = await offer(d.token, rideId, bid() - RIDE_FARE_ROUNDING_STEP_VND);
     expect(under.status).toBe(400);
-    await offer(d.token, rideId, Math.floor(bid() * 1.5)).expect(200);
+    await offer(d.token, rideId, cap).expect(200);
   });
 
   it('caps offer edits per driver (RIDE_MAX_OFFER_EDITS_PER_DRIVER = 2)', async () => {
