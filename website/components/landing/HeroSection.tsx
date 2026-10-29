@@ -18,8 +18,8 @@ export default function HeroSection() {
           <line x1="12" y1="18" x2="12.01" y2="18" strokeWidth={3} strokeLinecap="round" />
         </svg>
       ),
-      title: "Một ứng dụng, nhiều nhu cầu",
-      desc: "Đặt xe, đồ ăn, mua sắm...",
+      title: "Một ứng dụng, ba vai trò",
+      desc: "Khách hàng, quán ăn và tài xế",
     },
     {
       icon: (
@@ -38,8 +38,8 @@ export default function HeroSection() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
         </svg>
       ),
-      title: "Hỗ trợ nhanh chóng",
-      desc: "Đội ngũ chăm sóc khách hàng luôn sẵn sàng",
+      title: "Chat và gọi trong ứng dụng",
+      desc: "Liên lạc với tài xế, quán theo từng đơn",
     },
   ];
 
@@ -52,7 +52,7 @@ export default function HeroSection() {
       <div className="absolute inset-0 z-0">
         <Image
           src="/landing/danang_bridge.jpg"
-          alt="Đà Nẵng Dragon Bridge panoramic view"
+          alt="Cầu Rồng Đà Nẵng nhìn từ bờ sông Hàn"
           fill
           className="object-cover object-[85%_center] md:object-right"
           priority
@@ -77,35 +77,35 @@ export default function HeroSection() {
                 <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z" />
               </svg>
               <span className="text-xs sm:text-sm font-semibold text-[#6D28D9]">
-                Một ứng dụng, nhiều trải nghiệm
+                Đặt xe · Đồ ăn · Thương lượng giá
               </span>
             </div>
 
             {/* Headline with 4 lines matching exact reference */}
-            <div className="space-y-0.5 font-black tracking-tight leading-[1.08] select-none">
-              <div className="text-4xl sm:text-5xl lg:text-[52px] text-[#0F172A]">
+            <h1 className="space-y-0.5 font-black tracking-tight leading-[1.08] select-none">
+              <span className="block text-4xl sm:text-5xl lg:text-[52px] text-[#0F172A]">
                 Đi muôn nơi,
-              </div>
-              <div className="text-4xl sm:text-5xl lg:text-[52px] text-[#6D28D9]">
+              </span>
+              <span className="block text-4xl sm:text-5xl lg:text-[52px] text-[#6D28D9]">
                 Mua vạn món
-              </div>
-              <div className="text-4xl sm:text-5xl lg:text-[52px] text-[#0F172A]">
+              </span>
+              <span className="block text-4xl sm:text-5xl lg:text-[52px] text-[#0F172A]">
                 Chủ động cùng
-              </div>
-              <div className="text-4xl sm:text-5xl lg:text-[52px] text-[#00D06C]">
+              </span>
+              <span className="block text-4xl sm:text-5xl lg:text-[52px] text-[#00D06C]">
                 DealGo
-              </div>
-            </div>
+              </span>
+            </h1>
 
             {/* Subtitle / Description */}
             <p className="text-sm sm:text-base text-gray-600 leading-relaxed max-w-xl font-normal">
-              Đặt xe với mức giá bạn đề xuất, thưởng thức món ngon từ hàng ngàn quán ăn và cửa hàng gần bạn — tất cả trong một ứng dụng, ngay tại Đà Nẵng và nhiều thành phố khác.
+              Đặt xe máy hoặc ô tô với mức giá bạn đề xuất và thương lượng trực tiếp với tài xế, đặt món từ quán ăn, cửa hàng gần bạn — tất cả trong một ứng dụng, phục vụ tại Đà Nẵng.
             </p>
 
             {/* CTA Buttons: Màu tím DealGo chuẩn #6D28D9 */}
             <div className="flex flex-wrap items-center gap-3.5 pt-1">
               <a
-                href="#download"
+                href="#tai-ung-dung"
                 className="inline-flex items-center gap-2 bg-[#6D28D9] hover:bg-[#581C87] text-white font-semibold text-[14px] sm:text-[15px] px-6 sm:px-7 py-3 sm:py-3.5 rounded-2xl shadow-lg shadow-purple-600/30 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0"
               >
                 <span>Bắt đầu với DealGo</span>
@@ -126,86 +126,10 @@ export default function HeroSection() {
               </a>
             </div>
 
-            {/* QR Code and App Download Badges */}
-            <div className="pt-1 flex items-center gap-4">
-              {/* QR Code Box */}
-              <div className="bg-white p-2 rounded-2xl shadow-md border border-gray-100 flex items-center justify-center flex-shrink-0 w-18 h-18 sm:w-20 sm:h-20">
-                <svg viewBox="0 0 100 100" className="w-full h-full text-gray-900" fill="currentColor">
-                  <rect x="5" y="5" width="28" height="28" rx="4" />
-                  <rect x="9" y="9" width="20" height="20" fill="white" rx="2" />
-                  <rect x="13" y="13" width="12" height="12" rx="2" />
-
-                  <rect x="67" y="5" width="28" height="28" rx="4" />
-                  <rect x="71" y="9" width="20" height="20" fill="white" rx="2" />
-                  <rect x="75" y="13" width="12" height="12" rx="2" />
-
-                  <rect x="5" y="67" width="28" height="28" rx="4" />
-                  <rect x="9" y="71" width="20" height="20" fill="white" rx="2" />
-                  <rect x="13" y="75" width="12" height="12" rx="2" />
-
-                  <rect x="38" y="8" width="6" height="6" rx="1" />
-                  <rect x="48" y="12" width="6" height="6" rx="1" />
-                  <rect x="56" y="8" width="6" height="6" rx="1" />
-                  <rect x="38" y="22" width="6" height="6" rx="1" />
-                  <rect x="48" y="26" width="6" height="6" rx="1" />
-
-                  <rect x="8" y="38" width="6" height="6" rx="1" />
-                  <rect x="18" y="44" width="6" height="6" rx="1" />
-                  <rect x="28" y="38" width="6" height="6" rx="1" />
-
-                  <rect x="38" y="38" width="6" height="6" rx="1" />
-                  <rect x="48" y="44" width="8" height="8" rx="1" />
-                  <rect x="60" y="38" width="6" height="6" rx="1" />
-                  <rect x="70" y="46" width="6" height="6" rx="1" />
-                  <rect x="84" y="40" width="8" height="8" rx="1" />
-
-                  <rect x="38" y="58" width="6" height="6" rx="1" />
-                  <rect x="50" y="60" width="6" height="6" rx="1" />
-                  <rect x="62" y="56" width="6" height="6" rx="1" />
-                  <rect x="40" y="72" width="6" height="6" rx="1" />
-                  <rect x="54" y="78" width="8" height="8" rx="1" />
-                  <rect x="70" y="70" width="8" height="8" rx="1" />
-                  <rect x="84" y="76" width="8" height="8" rx="1" />
-                </svg>
-              </div>
-
-              {/* Download Labels & Badges */}
-              <div className="space-y-1.5">
-                <p className="text-xs text-gray-600 font-medium">
-                  Quét mã QR để tải ứng dụng
-                </p>
-                <div className="flex flex-wrap gap-2.5">
-                  {/* App Store Badge */}
-                  <a
-                    href="#download"
-                    className="flex items-center gap-2 bg-black hover:bg-gray-800 text-white rounded-xl px-3 py-1.5 sm:px-3.5 sm:py-2 shadow-sm transition-colors"
-                  >
-                    <svg className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
-                    </svg>
-                    <div className="text-left">
-                      <div className="text-[8px] sm:text-[9px] leading-tight text-gray-300">Tải về trên</div>
-                      <div className="text-[11px] sm:text-xs font-bold leading-tight tracking-tight">App Store</div>
-                    </div>
-                  </a>
-
-                  {/* Google Play Badge */}
-                  <a
-                    href="#download"
-                    className="flex items-center gap-2 bg-black hover:bg-gray-800 text-white rounded-xl px-3 py-1.5 sm:px-3.5 sm:py-2 shadow-sm transition-colors"
-                  >
-                    <svg className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M3.18 23.76a2 2 0 001.05-.31L15.31 17 12 13.68zM20.9 10.56L17.95 8.9l-3.33 3.33 3.33 3.34 2.98-1.68a1.93 1.93 0 000-3.33zM2.05.24A2 2 0 001.5 1.74v20.52a2 2 0 00.55 1.5L12 13.68z" opacity=".8" />
-                      <path d="M15.31 7L4.23.55A2 2 0 003.18.24L12 9z" opacity=".6" />
-                    </svg>
-                    <div className="text-left">
-                      <div className="text-[7px] sm:text-[8px] leading-tight text-gray-300 tracking-wider uppercase">Tải nội dung trên</div>
-                      <div className="text-[11px] sm:text-xs font-bold leading-tight tracking-tight">Google Play</div>
-                    </div>
-                  </a>
-                </div>
-              </div>
-            </div>
+            {/* OPEN DECISION: App Store / Google Play links and a real QR code are not published yet. */}
+            <p className="pt-1 text-xs text-gray-600 font-medium">
+              Ứng dụng sắp có trên App Store và Google Play
+            </p>
           </div>
 
           {/* Right Column: Realistic iPhone Mockup in 3D (Solid Opaque Screen with Clean Cutout & Accurate Scale) */}
@@ -291,7 +215,7 @@ export default function HeroSection() {
               <div className="relative w-[300px] sm:w-[325px] lg:w-[340px] h-[545px] sm:h-[590px] lg:h-[618px] select-none filter drop-shadow-[-18px_25px_40px_rgba(109,40,217,0.22)] drop-shadow-[0_12px_24px_rgba(0,0,0,0.15)]">
                 <Image
                   src="/landing/phone_mockup_v3.png"
-                  alt="DealGo mobile app demonstration screen"
+                  alt="Màn hình ứng dụng DealGo trên điện thoại"
                   fill
                   sizes="(max-width: 768px) 325px, 340px"
                   className="object-contain pointer-events-none select-none"

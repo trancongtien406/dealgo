@@ -42,7 +42,7 @@ export default function PartnerSection() {
               <ul className="space-y-1.5 text-xs text-gray-600">
                 <li className="flex items-center gap-2">
                   <span className="text-[#00D06C] font-bold text-sm">✓</span>
-                  <span>Gia nhập nhanh, dễ dàng</span>
+                  <span>Đăng ký ngay trong ứng dụng DealGo</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-[#00D06C] font-bold text-sm">✓</span>
@@ -54,17 +54,17 @@ export default function PartnerSection() {
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-[#00D06C] font-bold text-sm">✓</span>
-                  <span>Nhiều chương trình ưu đãi hỗ trợ</span>
+                  <span>Tạo ưu đãi cho quán của bạn</span>
                 </li>
               </ul>
 
               {/* CTA Button */}
               <div className="pt-2">
                 <a
-                  href="#dang-ky-quan"
+                  href="#tai-ung-dung"
                   className="inline-flex items-center gap-2 px-5 py-2 rounded-full border border-[#6D28D9]/40 text-[#6D28D9] bg-white text-xs font-semibold shadow-xs hover:bg-[#6D28D9] hover:text-white transition-all cursor-pointer"
                 >
-                  <span>Đăng ký quán ngay</span>
+                  <span>Đăng ký làm đối tác quán</span>
                   <span>→</span>
                 </a>
               </div>
@@ -77,6 +77,7 @@ export default function PartnerSection() {
                   src="/landing/partner_merchant.jpg"
                   alt="Đối tác quán ăn DealGo"
                   fill
+                  sizes="220px"
                   className="object-cover group-hover:scale-105 transition-transform duration-300"
                 />
               </div>
@@ -123,22 +124,22 @@ export default function PartnerSection() {
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-[#00D06C] font-bold text-sm">✓</span>
-                  <span>Thu nhập minh bạch, thanh toán nhanh</span>
+                  <span>Thu nhập minh bạch theo từng chuyến</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-[#00D06C] font-bold text-sm">✓</span>
-                  <span>Hỗ trợ 24/7 trong suốt hành trình</span>
+                  <span>Chat, gọi với khách trong ứng dụng</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-[#00D06C] font-bold text-sm">✓</span>
-                  <span>Môi trường an toàn, chuyên nghiệp</span>
+                  <span>Xác minh hồ sơ trước khi nhận chuyến</span>
                 </li>
               </ul>
 
               {/* CTA Button */}
               <div className="pt-2">
                 <a
-                  href="#tro-thanh-tai-xe"
+                  href="#tai-ung-dung"
                   className="inline-flex items-center gap-2 px-5 py-2 rounded-full border border-[#6D28D9]/40 text-[#6D28D9] bg-white text-xs font-semibold shadow-xs hover:bg-[#6D28D9] hover:text-white transition-all cursor-pointer"
                 >
                   <span>Trở thành tài xế</span>
@@ -154,6 +155,7 @@ export default function PartnerSection() {
                   src="/landing/partner_driver.jpg"
                   alt="Đối tác tài xế DealGo"
                   fill
+                  sizes="220px"
                   className="object-cover group-hover:scale-105 transition-transform duration-300"
                 />
               </div>

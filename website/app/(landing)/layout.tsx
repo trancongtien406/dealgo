@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Be_Vietnam_Pro, Caveat } from "next/font/google";
 import type { ReactNode } from "react";
+import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo/site";
 import "./landing.css";
 
 const beVietnamPro = Be_Vietnam_Pro({
@@ -16,17 +17,35 @@ const caveat = Caveat({
   variable: "--font-caveat",
 });
 
+const TITLE = "DealGo – Đặt xe thương lượng giá và đặt đồ ăn tại Đà Nẵng";
+
 export const metadata: Metadata = {
-  title: "DealGo – Đi muôn nơi. Mua vạn món. Chủ động cùng DealGo.",
-  description:
-    "DealGo là ứng dụng đặt xe và giao đồ ăn hàng đầu tại Đà Nẵng. Chủ động thương lượng giá, đặt xe an toàn, tiện lợi và đặt đồ ăn từ hàng nghìn nhà hàng, cửa hàng.",
-  keywords: "đặt xe, giao đồ ăn, DealGo, Đà Nẵng, ride hailing, food delivery",
+  title: { absolute: TITLE },
+  description: SITE_DESCRIPTION,
+  keywords: [
+    "DealGo",
+    "đặt xe",
+    "xe máy",
+    "ô tô",
+    "thương lượng giá",
+    "đặt đồ ăn",
+    "giao đồ ăn",
+    "Đà Nẵng",
+  ],
   robots: { index: true, follow: true },
+  alternates: { canonical: "/" },
   openGraph: {
-    title: "DealGo – Nền tảng Ride & Food hàng đầu",
-    description: "Đi muôn nơi. Mua vạn món. Chủ động cùng DealGo.",
     type: "website",
+    url: "/",
+    siteName: SITE_NAME,
+    title: TITLE,
+    description: SITE_DESCRIPTION,
     locale: "vi_VN",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: SITE_DESCRIPTION,
   },
 };
 

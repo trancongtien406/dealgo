@@ -9,10 +9,18 @@ import CitiesSection from "@/components/landing/CitiesSection";
 import FaqSection from "@/components/landing/FaqSection";
 import CtaBanner from "@/components/landing/CtaBanner";
 import Footer from "@/components/landing/Footer";
+import { landingJsonLd } from "@/lib/seo/site";
 
 export default function Home() {
   return (
     <>
+      {/* JSON-LD is a data block, not executed script, so script-src CSP does not apply. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(landingJsonLd()).replace(/</g, "\\u003c"),
+        }}
+      />
       <Navbar />
       <main>
         <HeroSection />
@@ -24,7 +32,10 @@ export default function Home() {
         <CitiesSection />
 
         {/* 2-Column Row: FAQ on Left & App Download Banner on Right */}
-        <section id="faq" className="pt-2 sm:pt-3 pb-8 sm:pb-10 bg-white scroll-mt-24">
+        <section
+          id="faq"
+          className="pt-2 sm:pt-3 pb-8 sm:pb-10 bg-white scroll-mt-24"
+        >
           <div className="max-w-[1500px] mx-auto px-4 sm:px-8 lg:px-12 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
             {/* Left Column: FAQ */}
             <div className="lg:col-span-5 h-full">

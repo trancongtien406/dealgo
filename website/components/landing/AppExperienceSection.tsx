@@ -154,8 +154,9 @@ export default function AppExperienceSection() {
                 <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 border border-gray-100 shadow-xs relative">
                   <Image
                     src="/landing/avatar_driver.jpg"
-                    alt="Driver avatar"
+                    alt=""
                     fill
+                    sizes="40px"
                     className="object-cover"
                   />
                 </div>
@@ -232,7 +233,7 @@ export default function AppExperienceSection() {
                 Thanh toán an toàn
               </h3>
               <p className="text-[11px] sm:text-xs text-gray-500 leading-normal mt-1.5">
-                Nhiều phương thức thanh toán tiện lợi, bảo mật.
+                Tiền mặt hoặc thanh toán trực tuyến (ví điện tử, thẻ) khi được hỗ trợ.
               </p>
             </div>
           </div>
@@ -248,13 +249,13 @@ export default function AppExperienceSection() {
                 <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-100 shadow-xs relative flex-shrink-0">
                   <Image
                     src="/landing/avatar_customer.jpg"
-                    alt="Customer avatar"
+                    alt=""
                     fill
+                    sizes="40px"
                     className="object-cover"
                   />
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-base font-extrabold text-[#0F172A] leading-none">4.8</span>
                   <div className="flex items-center text-[#F59E0B] text-xs gap-0.5">
                     <span>★</span>
                     <span>★</span>
@@ -269,7 +270,7 @@ export default function AppExperienceSection() {
               <div className="bg-white rounded-xl p-2 px-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-gray-100/70 flex items-start gap-1.5">
                 <span className="text-[#F59E0B] text-xs leading-none mt-0.5">★</span>
                 <p className="text-[10px] text-gray-600 leading-snug">
-                  Tài xế thân thiện, đúng giờ và rất nhiệt tình!
+                  Chấm sao và nhận xét sau mỗi chuyến đi, đơn hàng.
                 </p>
               </div>
             </div>
@@ -279,7 +280,7 @@ export default function AppExperienceSection() {
                 Đánh giá hai chiều
               </h3>
               <p className="text-[11px] sm:text-xs text-gray-500 leading-normal mt-1.5">
-                Xem đánh giá từ người dùng khác và chia sẻ trải nghiệm của bạn.
+                Khách hàng và tài xế đánh giá lẫn nhau sau mỗi giao dịch.
               </p>
             </div>
           </div>
@@ -299,8 +300,9 @@ export default function AppExperienceSection() {
                 <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-100 shadow-xs relative flex-shrink-0">
                   <Image
                     src="/landing/avatar_customer.jpg"
-                    alt="Contact avatar"
+                    alt=""
                     fill
+                    sizes="40px"
                     className="object-cover"
                   />
                 </div>
@@ -343,7 +345,7 @@ export default function AppExperienceSection() {
                 Liên lạc dễ dàng
               </h3>
               <p className="text-[11px] sm:text-xs text-gray-500 leading-normal mt-1.5">
-                Nhắn tin hoặc gọi điện trực tiếp ngay trên ứng dụng.
+                Nhắn tin hoặc gọi thoại trong ứng dụng theo từng chuyến, đơn hàng.
               </p>
             </div>
           </div>

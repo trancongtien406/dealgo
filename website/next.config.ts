@@ -79,6 +79,8 @@ const nextConfig: NextConfig = {
   // Re-enable once ops session is moved behind a streaming Suspense boundary
   // that still hydrates feature boards.
   cacheComponents: false,
+  // Never ship browser source maps; Sentry uploads (below) delete them after upload.
+  productionBrowserSourceMaps: false,
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   turbopack: {
     rules: {

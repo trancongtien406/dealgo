@@ -16,8 +16,8 @@ export default function FeaturesStrip() {
           <line x1="12" y1="18" x2="12.01" y2="18" strokeWidth={3} strokeLinecap="round" />
         </svg>
       ),
-      title: "Một ứng dụng, nhiều nhu cầu",
-      desc: "Đặt xe, đồ ăn, mua sắm...",
+      title: "Một ứng dụng, ba vai trò",
+      desc: "Khách hàng, quán ăn và tài xế",
     },
     {
       icon: (
@@ -36,8 +36,8 @@ export default function FeaturesStrip() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z" />
         </svg>
       ),
-      title: "Hỗ trợ nhanh chóng",
-      desc: "Đội ngũ chăm sóc khách hàng luôn sẵn sàng",
+      title: "Chat và gọi trong ứng dụng",
+      desc: "Liên lạc với tài xế, quán theo từng đơn",
     },
   ];
 

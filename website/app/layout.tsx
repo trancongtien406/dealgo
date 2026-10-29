@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import Script from "next/script";
 import type { ReactNode } from "react";
 import { AppProviders } from "@/lib/query/provider";
+import { SITE_NAME, siteUrl } from "@/lib/seo/site";
 import "./globals.css";
 
 const inter = Inter({
@@ -10,9 +11,14 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
+// Default is noindex: admin, login and share pages inherit it. Public pages
+// (landing, support, terms, privacy) opt in to indexing themselves.
 export const metadata: Metadata = {
-  title: "DealGo Quản trị",
+  metadataBase: siteUrl(),
+  title: { default: "DealGo Quản trị", template: "%s | DealGo" },
   description: "Kênh vận hành nội bộ DealGo cho Ride và Food.",
+  applicationName: SITE_NAME,
+  icons: { icon: "/icon.svg", apple: "/apple-icon.png" },
   robots: {
     index: false,
     follow: false,

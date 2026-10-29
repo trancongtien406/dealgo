@@ -3,17 +3,17 @@ export default function HowItWorksSection() {
     {
       num: "1",
       title: "Nhập điểm đi, điểm đến",
-      desc: "Chọn loại xe và đề xuất giá của bạn",
+      desc: "Chọn xe máy hoặc ô tô và đề xuất giá của bạn",
     },
     {
       num: "2",
-      title: "Nhận báo giá",
-      desc: "Tài xế xem và phản hồi mức giá",
+      title: "Thương lượng giá",
+      desc: "Tài xế chấp nhận hoặc trả giá lại",
     },
     {
       num: "3",
       title: "Chọn tài xế",
-      desc: "Xem thông tin, đánh giá và chọn tài xế phù hợp",
+      desc: "Xem thông tin, mức giá và chọn tài xế phù hợp",
     },
     {
       num: "4",
@@ -26,7 +26,7 @@ export default function HowItWorksSection() {
     {
       num: "1",
       title: "Chọn quán và món",
-      desc: "Khám phá hàng ngàn quán ăn, cửa hàng gần bạn",
+      desc: "Khám phá quán ăn, cửa hàng gần bạn",
     },
     {
       num: "2",
@@ -41,7 +41,7 @@ export default function HowItWorksSection() {
     {
       num: "4",
       title: "Nhận hàng",
-      desc: "Nhận món và thưởng thức tại nhà",
+      desc: "Tài xế giao món đến địa chỉ của bạn",
     },
   ];
 

@@ -3,16 +3,16 @@ import Image from "next/image";
 export default function ServicesSection() {
   const rideFeatures = [
     "Chủ động thương lượng giá với tài xế",
-    "Nhiều loại xe: 4 chỗ, 7 chỗ, xe máy...",
+    "Xe máy (Bike), ô tô 4 chỗ và 7 chỗ (Car)",
     "Theo dõi hành trình trực tiếp",
-    "Thanh toán linh hoạt, an toàn",
+    "Tiền mặt hoặc thanh toán trực tuyến",
   ];
 
   const foodFeatures = [
-    "Đa dạng món ăn, đồ uống, siêu thị",
+    "Món ăn, đồ uống từ quán và cửa hàng gần bạn",
     "Giao hàng nhanh, theo dõi trực tiếp",
-    "Nhiều ưu đãi mỗi ngày",
-    "Thanh toán tiện lợi, an toàn",
+    "Ưu đãi từ quán và mã giảm giá",
+    "Chat, gọi với quán và tài xế giao hàng",
   ];
 
   return (
@@ -24,14 +24,14 @@ export default function ServicesSection() {
             Dịch vụ chính của Deal<span className="text-[#00D06C]">Go</span>
           </h2>
           <p className="text-xs sm:text-sm text-gray-500 mt-1 font-normal">
-            Di chuyển dễ dàng, món ngon tận nơi và nhiều tiện ích khác — tất cả trong một ứng dụng.
+            Đặt xe (Bike, Car) và đặt đồ ăn (Food) — tất cả trong một ứng dụng.
           </p>
         </div>
 
         {/* 2 Service Cards Grid */}
         <div className="grid lg:grid-cols-2 gap-6 lg:gap-8">
           {/* Card 1: Đặt xe */}
-          <div className="bg-gradient-to-br from-[#F5F3FF] via-[#EDE9FE]/50 to-[#F5F3FF] border border-purple-100 rounded-[28px] overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 grid sm:grid-cols-12 items-center">
+          <div id="dat-xe" className="scroll-mt-24 bg-gradient-to-br from-[#F5F3FF] via-[#EDE9FE]/50 to-[#F5F3FF] border border-purple-100 rounded-[28px] overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 grid sm:grid-cols-12 items-center">
             {/* Left Content */}
             <div className="sm:col-span-7 p-6 sm:p-7 space-y-4">
               {/* Header */}
@@ -66,10 +66,10 @@ export default function ServicesSection() {
               {/* Button */}
               <div className="pt-2">
                 <a
-                  href="#download"
+                  href="#cach-hoat-dong"
                   className="inline-flex items-center gap-1.5 bg-[#6D28D9] hover:bg-[#581C87] text-white text-xs sm:text-sm font-semibold px-5 py-2.5 rounded-2xl shadow-md shadow-purple-600/25 transition-all duration-200"
                 >
-                  <span>Tìm hiểu về Đặt xe</span>
+                  <span>Xem quy trình đặt xe</span>
                   <span>→</span>
                 </a>
               </div>
@@ -88,7 +88,7 @@ export default function ServicesSection() {
           </div>
 
           {/* Card 2: Đồ ăn */}
-          <div className="bg-gradient-to-br from-[#F0FDF4] via-[#ECFDF5]/60 to-[#F5F3FF]/40 border border-emerald-100 rounded-[28px] overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 grid sm:grid-cols-12 items-center">
+          <div id="do-an" className="scroll-mt-24 bg-gradient-to-br from-[#F0FDF4] via-[#ECFDF5]/60 to-[#F5F3FF]/40 border border-emerald-100 rounded-[28px] overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 grid sm:grid-cols-12 items-center">
             {/* Left Content */}
             <div className="sm:col-span-7 p-6 sm:p-7 space-y-4">
               {/* Header */}
@@ -101,7 +101,7 @@ export default function ServicesSection() {
                 <div>
                   <h3 className="text-xl font-bold text-[#0F172A] leading-tight">Đồ ăn</h3>
                   <p className="text-xs text-gray-500 leading-tight mt-0.5">
-                    Hàng ngàn quán ăn, cửa hàng giao tận nơi.
+                    Quán ăn, cửa hàng gần bạn giao tận nơi.
                   </p>
                 </div>
               </div>
@@ -123,10 +123,10 @@ export default function ServicesSection() {
               {/* Button */}
               <div className="pt-2">
                 <a
-                  href="#download"
+                  href="#cach-hoat-dong"
                   className="inline-flex items-center gap-1.5 bg-white hover:bg-purple-50 text-[#6D28D9] border-2 border-[#6D28D9]/30 text-xs sm:text-sm font-semibold px-5 py-2.5 rounded-2xl shadow-xs transition-all duration-200"
                 >
-                  <span>Tìm hiểu về Đồ ăn</span>
+                  <span>Xem quy trình đặt đồ ăn</span>
                   <span>→</span>
                 </a>
               </div>

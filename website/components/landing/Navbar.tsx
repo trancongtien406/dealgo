@@ -17,7 +17,7 @@ export default function Navbar() {
   const [selectedCity, setSelectedCity] = useState("Đà Nẵng");
   const [cityDropdown, setCityDropdown] = useState(false);
 
-  const cities = ["Đà Nẵng", "Hà Nội", "TP. Hồ Chí Minh", "Hải Phòng", "Cần Thơ", "Nha Trang"];
+  const cities = ["Đà Nẵng"];
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 15);
