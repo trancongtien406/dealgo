@@ -2243,7 +2243,7 @@ abstract class AppLocalizations {
   /// No description provided for @passkeyContinue.
   ///
   /// In en, this message translates to:
-  /// **'Continue with Passkey'**
+  /// **'Continue with passkey'**
   String get passkeyContinue;
 
   /// No description provided for @passkeySignIn.

@@ -2,15 +2,19 @@ import 'package:dealgo/features/payment/data/payment_api.dart';
 import 'package:dealgo/features/payment/domain/payment_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-PaymentMethodOption opt(String code, String group, {bool available = true, int order = 0}) =>
-    PaymentMethodOption.fromJson({
-      'code': code,
-      'label': code,
-      'group': group,
-      'available': available,
-      'sortOrder': order,
-      'reason': available ? null : 'Sắp ra mắt',
-    });
+PaymentMethodOption opt(
+  String code,
+  String group, {
+  bool available = true,
+  int order = 0,
+}) => PaymentMethodOption.fromJson({
+  'code': code,
+  'label': code,
+  'group': group,
+  'available': available,
+  'sortOrder': order,
+  'reason': available ? null : 'Sắp ra mắt',
+});
 
 void main() {
   test('groups in fixed section order and always keeps CASH', () {
@@ -24,7 +28,10 @@ void main() {
       PaymentGroup.recommended,
       PaymentGroup.addMore,
     ]);
-    expect(groups[PaymentGroup.wallet]!.map((o) => o.code), ['APPLE_PAY', 'MOMO']);
+    expect(groups[PaymentGroup.wallet]!.map((o) => o.code), [
+      'APPLE_PAY',
+      'MOMO',
+    ]);
     expect(groups[PaymentGroup.recommended]!.single.code, cashMethodCode);
   });
 

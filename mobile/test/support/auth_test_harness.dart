@@ -82,10 +82,12 @@ Future<MemoryTokenStore> pumpDealGo(
   PostAuthGate? postAuthGate,
   bool completePostAuth = false,
   String initialLocation = AuthRoutes.login,
+  PasskeyPlatform? passkeyPlatform,
 }) async {
   final store = tokenStore ?? MemoryTokenStore();
   await tester.pumpWidget(
     DealGoApp(
+      passkeyPlatform: passkeyPlatform,
       identityClient: client,
       tokenStore: store,
       foodClient: foodClient ?? FakeFoodClient(),

@@ -311,4 +311,71 @@ void main() {
     );
     expect(auth.state, isA<AuthSignedIn>());
   });
+
+  group('continue with passkey (one button)', () {
+    test('existing passkey signs in and never creates an account', () async {
+      await cubit.continueWithPasskey();
+
+      expect(client.passkeyVerifyCalls, hasLength(1));
+      expect(passkeys.registerCalls, isEmpty);
+      expect(client.passkeySignupVerifyCalls, isEmpty);
+      expect(auth.state, isA<AuthSignedIn>());
+    });
+
+    test('no passkey on the device -> creates account + passkey', () async {
+      passkeys.authenticateFailure = PasskeyFailureKind.noCredentials;
+
+      await cubit.continueWithPasskey();
+
+      expect(passkeys.authenticateCalls, hasLength(1));
+      expect(client.passkeyVerifyCalls, isEmpty);
+      expect(passkeys.registerCalls, hasLength(1));
+      // Fresh sign-up ceremony, never the sign-in one.
+      expect(
+        client.passkeySignupVerifyCalls.single['ceremonyId'],
+        '00000000-0000-4000-8000-000000000002',
+      );
+      expect(auth.state, isA<AuthSignedIn>());
+    });
+
+    test(
+      'server does not know the passkey -> falls through to sign-up',
+      () async {
+        client.verifyError = const ApiException(
+          statusCode: 401,
+          errorCode: 'AUTH_PASSKEY_INVALID',
+          message: 'Passkey could not be verified',
+        );
+
+        await cubit.continueWithPasskey();
+
+        expect(client.passkeyVerifyCalls, hasLength(1));
+        expect(client.passkeySignupVerifyCalls, hasLength(1));
+      },
+    );
+
+    test('cancel is quiet and creates nothing', () async {
+      passkeys.authenticateFailure = PasskeyFailureKind.cancelled;
+
+      await cubit.continueWithPasskey();
+
+      expect(passkeys.registerCalls, isEmpty);
+      expect(client.passkeySignupVerifyCalls, isEmpty);
+      expect(cubit.state, isA<PhoneAuthIdle>());
+      expect(auth.state, isNot(isA<AuthSignedIn>()));
+    });
+
+    test('other server errors surface and do not create an account', () async {
+      client.verifyError = const ApiException(
+        statusCode: 429,
+        errorCode: 'RATE_LIMITED',
+        message: 'Too many requests',
+      );
+
+      await cubit.continueWithPasskey();
+
+      expect(client.passkeySignupVerifyCalls, isEmpty);
+      expect(cubit.state, isA<PhoneAuthError>());
+    });
+  });
 }

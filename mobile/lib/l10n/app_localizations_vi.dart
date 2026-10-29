@@ -1107,7 +1107,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get passkeyOr => 'hoặc';
 
   @override
-  String get passkeyContinue => 'Tiếp tục với Passkey';
+  String get passkeyContinue => 'Tiếp tục với passkey';
 
   @override
   String get passkeySignIn => 'Đăng nhập';

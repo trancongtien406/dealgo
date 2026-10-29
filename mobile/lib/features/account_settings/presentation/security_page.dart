@@ -300,6 +300,7 @@ class _PasskeyRowState extends State<_PasskeyRow> {
         case PasskeyFailureKind.alreadyRegistered:
           _say(l10n.securityPasskeyExists);
         case PasskeyFailureKind.failed:
+        case PasskeyFailureKind.noCredentials:
           _say(l10n.securityPasskeyFailed);
       }
     } on ApiException catch (error) {

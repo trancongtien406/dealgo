@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dealgo/core/network/api_exception.dart';
+import 'package:dealgo/features/identity/domain/passkey_platform.dart';
 import 'package:dealgo/features/identity/presentation/pages/phone_input_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -168,7 +169,7 @@ void main() {
     expect(find.byKey(const Key('auth-method-passkey')), findsOneWidget);
     expect(find.byKey(const Key('auth-method-phone')), findsOneWidget);
     expect(find.byKey(const Key('auth-method-email')), findsOneWidget);
-    expect(find.text('Passkey'), findsOneWidget);
+    expect(find.text('Tiếp tục với passkey'), findsOneWidget);
     expect(find.text('Số điện thoại'), findsOneWidget);
     expect(find.text('Email'), findsOneWidget);
     expect(find.byKey(const Key('phone-field')), findsNothing);
@@ -201,9 +202,8 @@ void main() {
     await pumpDealGo(tester, client: client);
 
     await tester.ensureVisible(find.byKey(const Key('auth-method-passkey')));
+    expect(find.text('Tiếp tục với passkey'), findsOneWidget);
     await tester.tap(find.byKey(const Key('auth-method-passkey')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('passkey-signin-action')));
     await tester.pumpAndSettle();
 
     expect(client.passkeyOptionCalls, [true]);
@@ -211,19 +211,20 @@ void main() {
     expect(find.byKey(const Key('phone-field')), findsNothing);
   });
 
-  testWidgets('passkey sign-up creates a session without identifier fields', (
+  testWidgets('one passkey button signs up when the device has no passkey', (
     tester,
   ) async {
     final client = FakeIdentityClient(profile: customerProfile);
-    await pumpDealGo(tester, client: client);
+    final passkeys = FakePasskeyPlatform()
+      ..authenticateFailure = PasskeyFailureKind.noCredentials;
+    await pumpDealGo(tester, client: client, passkeyPlatform: passkeys);
 
     await tester.ensureVisible(find.byKey(const Key('auth-method-passkey')));
     await tester.tap(find.byKey(const Key('auth-method-passkey')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('passkey-signup-action')));
-    await tester.pumpAndSettle();
 
+    expect(client.passkeyVerifyCalls, isEmpty);
+    expect(passkeys.registerCalls, hasLength(1));
     expect(client.passkeySignupVerifyCalls, hasLength(1));
-    expect(find.byKey(const Key('phone-field')), findsNothing);
   });
 }

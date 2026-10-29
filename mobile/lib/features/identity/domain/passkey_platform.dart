@@ -1,5 +1,14 @@
 /// Why a passkey ceremony did not complete (S025 enrolment shows a calm message for each).
-enum PasskeyFailureKind { cancelled, unsupported, alreadyRegistered, failed }
+///
+/// [noCredentials]: the device holds no DealGo passkey (only reported when the
+/// caller asked for immediately available credentials).
+enum PasskeyFailureKind {
+  cancelled,
+  noCredentials,
+  unsupported,
+  alreadyRegistered,
+  failed,
+}
 
 class PasskeyPlatformException implements Exception {
   const PasskeyPlatformException(this.kind, [this.detail]);
@@ -22,7 +31,14 @@ abstract interface class PasskeyPlatform {
   /// [options] is the JSON object from
   /// `POST /v1/auth/passkeys/authentication/options` (`data` payload).
   /// Returns an AuthenticationResponseJSON-compatible map for verify.
-  Future<Map<String, Object?>> authenticate(Map<String, Object?> options);
+  ///
+  /// With [preferImmediatelyAvailable] the OS shows no sheet when the device
+  /// has no matching passkey and throws [PasskeyFailureKind.noCredentials]
+  /// instead, so "continue with passkey" can fall through to sign-up.
+  Future<Map<String, Object?>> authenticate(
+    Map<String, Object?> options, {
+    bool preferImmediatelyAvailable = false,
+  });
 
   /// Creates a passkey from `POST /v1/auth/passkeys/registration/options` and returns a
   /// RegistrationResponseJSON-compatible map for verify. Throws [PasskeyPlatformException].
@@ -65,8 +81,9 @@ class FakePasskeyPlatform implements PasskeyPlatform {
 
   @override
   Future<Map<String, Object?>> authenticate(
-    Map<String, Object?> options,
-  ) async {
+    Map<String, Object?> options, {
+    bool preferImmediatelyAvailable = false,
+  }) async {
     authenticateCalls.add(Map<String, Object?>.from(options));
     final failure = authenticateFailure;
     if (failure != null) {
@@ -92,7 +109,10 @@ class UnsupportedPasskeyPlatform implements PasskeyPlatform {
   const UnsupportedPasskeyPlatform();
 
   @override
-  Future<Map<String, Object?>> authenticate(Map<String, Object?> options) {
+  Future<Map<String, Object?>> authenticate(
+    Map<String, Object?> options, {
+    bool preferImmediatelyAvailable = false,
+  }) {
     throw StateError(
       'Passkey authentication is not available on this platform',
     );

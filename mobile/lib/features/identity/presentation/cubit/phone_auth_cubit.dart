@@ -419,6 +419,124 @@ class PhoneAuthCubit extends Cubit<PhoneAuthState> {
     }
   }
 
+  /// One "Continue with passkey" button (no identifier typed).
+  ///
+  /// 1. Discoverable sign-in with immediately available credentials only.
+  /// 2. Device has no DealGo passkey, or the server does not know the one it
+  ///    offered (same generic 401 as any bad assertion, so no account
+  ///    enumeration) -> contact-less sign-up with a fresh ceremony, then
+  ///    profile completion (name + phone) via `needsProfileSetup`.
+  /// A user cancel never creates an account.
+  Future<void> continueWithPasskey() async {
+    final requestId = ++_requestId;
+    emit(const PhoneAuthPasskeySigningIn());
+    try {
+      final options = await _identityRepository.passkeyAuthenticationOptions();
+      final ceremonyId = options['ceremonyId'];
+      if (ceremonyId is! String) {
+        throw const FormatException('Missing ceremonyId');
+      }
+      final platformOptions = Map<String, Object?>.from(options)
+        ..remove('ceremonyId');
+      Map<String, Object?>? assertion;
+      try {
+        assertion = await _passkeyPlatform.authenticate(
+          platformOptions,
+          preferImmediatelyAvailable: true,
+        );
+      } on PasskeyPlatformException catch (error) {
+        if (error.kind != PasskeyFailureKind.noCredentials) {
+          rethrow;
+        }
+      }
+      if (assertion != null) {
+        assertion['ceremonyId'] = ceremonyId;
+        try {
+          final session = await _identityRepository.passkeyAuthenticationVerify(
+            assertion,
+          );
+          if (isClosed || requestId != _requestId) {
+            return;
+          }
+          await auth.completeSignIn(
+            StoredTokens(
+              accessToken: session.accessToken,
+              refreshToken: session.refreshToken,
+            ),
+          );
+          return;
+        } on ApiException catch (error) {
+          // A stale passkey (account deleted) falls through to sign-up.
+          if (error.errorCode != 'AUTH_PASSKEY_INVALID') {
+            rethrow;
+          }
+        }
+      }
+      if (isClosed || requestId != _requestId) {
+        return;
+      }
+      await _passkeySignUp(requestId);
+    } on PasskeyPlatformException catch (error) {
+      if (isClosed || requestId != _requestId) {
+        return;
+      }
+      if (error.kind == PasskeyFailureKind.cancelled) {
+        emit(const PhoneAuthIdle());
+        return;
+      }
+      emit(
+        PhoneAuthError(
+          error: ApiException(
+            statusCode: 0,
+            errorCode: 'PASSKEY_UNAVAILABLE',
+            message: error.toString(),
+          ),
+          phase: PhoneAuthPhase.passkey,
+        ),
+      );
+    } on ApiException catch (error) {
+      if (!isClosed && requestId == _requestId) {
+        emit(PhoneAuthError(error: error, phase: PhoneAuthPhase.passkey));
+      }
+    } on Object catch (error) {
+      if (!isClosed && requestId == _requestId) {
+        emit(
+          PhoneAuthError(
+            error: ApiException(
+              statusCode: 0,
+              errorCode: 'PASSKEY_UNAVAILABLE',
+              message: error.toString(),
+            ),
+            phase: PhoneAuthPhase.passkey,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _passkeySignUp(int requestId) async {
+    emit(const PhoneAuthPasskeySigningIn(isRegister: true));
+    final options = await _identityRepository.passkeySignupOptions();
+    final ceremonyId = options['ceremonyId'];
+    if (ceremonyId is! String) {
+      throw const FormatException('Missing ceremonyId');
+    }
+    final platformOptions = Map<String, Object?>.from(options)
+      ..remove('ceremonyId');
+    final credential = await _passkeyPlatform.register(platformOptions)
+      ..['ceremonyId'] = ceremonyId;
+    final session = await _identityRepository.passkeySignupVerify(credential);
+    if (isClosed || requestId != _requestId) {
+      return;
+    }
+    await auth.completeSignIn(
+      StoredTokens(
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+      ),
+    );
+  }
+
   /// Identifierless passkey sign-in. The authenticator selects a discoverable credential.
   Future<void> signInWithPasskey() async {
     final requestId = ++_requestId;

@@ -1104,7 +1104,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get passkeyOr => 'or';
 
   @override
-  String get passkeyContinue => 'Continue with Passkey';
+  String get passkeyContinue => 'Continue with passkey';
 
   @override
   String get passkeySignIn => 'Sign in';

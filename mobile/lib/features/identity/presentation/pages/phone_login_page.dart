@@ -7,8 +7,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/config/app_env.dart';
 import '../../../../core/design_system/components/dealgo_icon_badge.dart';
 import '../../../../core/design_system/components/dealgo_pressable.dart';
-import '../../../../core/design_system/components/dealgo_primary_button.dart';
-import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
@@ -53,23 +51,10 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
     unawaited(context.read<PhoneAuthCubit>().enterMockDemo());
   }
 
-  Future<void> _showPasskeyActions(BuildContext context) async {
-    final action = await showModalBottomSheet<_PasskeyAction>(
-      context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (sheetContext) => const _PasskeyActionSheet(),
-    );
-    if (!context.mounted || action == null) {
-      return;
-    }
-    final cubit = context.read<PhoneAuthCubit>();
-    if (action == _PasskeyAction.signIn) {
-      await cubit.signInWithPasskey();
-    } else {
-      await cubit.signUpWithPasskey();
-    }
-  }
+  /// One button: signs in with an existing passkey, or creates the account
+  /// and its passkey when the device has none (then profile completion).
+  Future<void> _continueWithPasskey(BuildContext context) =>
+      context.read<PhoneAuthCubit>().continueWithPasskey();
 
   /// Real options only: a same-height placeholder while nothing is known, a
   /// retry when the first request fails, and a gentle size/fade change if the
@@ -146,8 +131,8 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
         _AuthMethodTile(
           key: const Key('auth-method-passkey'),
           icon: DealGoIcons.fingerprint,
-          label: l10n.authMethodPasskey,
-          onTap: () => unawaited(_showPasskeyActions(context)),
+          label: l10n.passkeyContinue,
+          onTap: () => unawaited(_continueWithPasskey(context)),
         ),
     ];
     if (tiles.isEmpty) {
@@ -298,63 +283,6 @@ class _AuthMethodsPlaceholder extends StatelessWidget {
     return const ExcludeSemantics(
       child: DealGoShimmer(
         child: DealGoSkeletonBox(height: 60, radius: DealGoRadius.button),
-      ),
-    );
-  }
-}
-
-enum _PasskeyAction { signIn, signUp }
-
-class _PasskeyActionSheet extends StatelessWidget {
-  const _PasskeyActionSheet();
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        DealGoSpacing.s20,
-        DealGoSpacing.s4,
-        DealGoSpacing.s20,
-        DealGoSpacing.s24,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Center(
-            child: DealGoIconBadge(DealGoIcons.fingerprint, size: 52),
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          Text(
-            l10n.authMethodPasskey,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: DealGoSpacing.s20),
-          // Side by side (sheet title already says Passkey), never stacked.
-          Row(
-            children: [
-              Expanded(
-                child: DealGoSecondaryButton(
-                  key: const Key('passkey-signup-action'),
-                  label: l10n.passkeySignUp,
-                  onPressed: () =>
-                      Navigator.pop(context, _PasskeyAction.signUp),
-                ),
-              ),
-              const SizedBox(width: DealGoSpacing.s12),
-              Expanded(
-                child: DealGoPrimaryButton(
-                  key: const Key('passkey-signin-action'),
-                  label: l10n.passkeySignIn,
-                  onPressed: () =>
-                      Navigator.pop(context, _PasskeyAction.signIn),
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

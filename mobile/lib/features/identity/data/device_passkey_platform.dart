@@ -14,16 +14,18 @@ class DevicePasskeyPlatform implements PasskeyPlatform {
   final PasskeyAuthenticator _authenticator;
 
   @override
-  Future<Map<String, Object?>> authenticate(Map<String, Object?> options) =>
-      _guard(() async {
-        final request = AuthenticateRequestType.fromJson(
-          _asStringKeyedMap(options),
-          mediation: MediationType.Optional,
-          preferImmediatelyAvailableCredentials: false,
-        );
-        final response = await _authenticator.authenticate(request);
-        return _asObjectMap(response.toJson());
-      });
+  Future<Map<String, Object?>> authenticate(
+    Map<String, Object?> options, {
+    bool preferImmediatelyAvailable = false,
+  }) => _guard(() async {
+    final request = AuthenticateRequestType.fromJson(
+      _asStringKeyedMap(options),
+      mediation: MediationType.Optional,
+      preferImmediatelyAvailableCredentials: preferImmediatelyAvailable,
+    );
+    final response = await _authenticator.authenticate(request);
+    return _asObjectMap(response.toJson());
+  });
 
   @override
   Future<Map<String, Object?>> register(Map<String, Object?> options) => _guard(
@@ -40,6 +42,8 @@ class DevicePasskeyPlatform implements PasskeyPlatform {
   ) async {
     try {
       return await ceremony();
+    } on NoCredentialsAvailableException {
+      throw const PasskeyPlatformException(PasskeyFailureKind.noCredentials);
     } on PasskeyAuthCancelledException {
       throw const PasskeyPlatformException(PasskeyFailureKind.cancelled);
     } on ExcludeCredentialsCanNotBeRegisteredException {

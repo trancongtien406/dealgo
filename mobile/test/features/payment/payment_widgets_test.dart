@@ -14,13 +14,14 @@ class FakePaymentApi implements PaymentApi {
   var statusCalls = 0;
   final started = <String>[];
 
-  PaymentCheckoutView _view(String status, String method) => PaymentCheckoutView.fromJson({
-    'entityType': 'RIDE',
-    'entityId': 'r1',
-    'methodCode': method,
-    'status': status,
-    'paymentUrl': 'https://pay.example.test/x',
-  });
+  PaymentCheckoutView _view(String status, String method) =>
+      PaymentCheckoutView.fromJson({
+        'entityType': 'RIDE',
+        'entityId': 'r1',
+        'methodCode': method,
+        'status': status,
+        'paymentUrl': 'https://pay.example.test/x',
+      });
 
   @override
   Future<List<PaymentMethodOption>> listMethods({
@@ -63,49 +64,63 @@ PaymentMethodOption opt(String code, String group, {bool available = true}) =>
     });
 
 void main() {
-  testWidgets('sheet shows four sections, disabled reason, and returns choice', (tester) async {
-    String? picked;
-    await tester.pumpWidget(
-      MaterialApp(
-        locale: const Locale('vi'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Builder(
-          builder: (context) => TextButton(
-            onPressed: () async {
-              picked = await showPaymentMethodSheet(
-                context,
-                selected: cashMethodCode,
-                options: [
-                  opt('MOMO', 'WALLET'),
-                  opt('VNPAY_ATM', 'CARD'),
-                  opt('CASH', 'RECOMMENDED'),
-                  opt('ZALOPAY', 'ADD_MORE', available: false),
-                ],
-              );
-            },
-            child: const Text('open'),
+  testWidgets(
+    'sheet shows four sections, disabled reason, and returns choice',
+    (tester) async {
+      String? picked;
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('vi'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () async {
+                picked = await showPaymentMethodSheet(
+                  context,
+                  selected: cashMethodCode,
+                  options: [
+                    opt('MOMO', 'WALLET'),
+                    opt('VNPAY_ATM', 'CARD'),
+                    opt('CASH', 'RECOMMENDED'),
+                    opt('ZALOPAY', 'ADD_MORE', available: false),
+                  ],
+                );
+              },
+              child: const Text('open'),
+            ),
           ),
         ),
-      ),
-    );
-    await tester.tap(find.text('open'));
-    await tester.pumpAndSettle();
-    for (final t in ['Ví điện tử', 'Thẻ tín dụng/ghi nợ', 'Phương thức đề xuất', 'Thêm phương thức']) {
-      expect(find.text(t), findsOneWidget);
-    }
-    expect(find.text('Đang chờ giấy phép'), findsOneWidget);
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      for (final t in [
+        'Ví điện tử',
+        'Thẻ tín dụng/ghi nợ',
+        'Phương thức đề xuất',
+        'Thêm phương thức',
+      ]) {
+        expect(find.text(t), findsOneWidget);
+      }
+      expect(find.text('Đang chờ giấy phép'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('payment-method-ZALOPAY')));
-    await tester.pumpAndSettle();
-    expect(find.text('Ví điện tử'), findsOneWidget, reason: 'disabled row ignores taps');
+      await tester.tap(find.byKey(const Key('payment-method-ZALOPAY')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Ví điện tử'),
+        findsOneWidget,
+        reason: 'disabled row ignores taps',
+      );
 
-    await tester.tap(find.byKey(const Key('payment-method-MOMO')));
-    await tester.pumpAndSettle();
-    expect(picked, 'MOMO');
-  });
+      await tester.tap(find.byKey(const Key('payment-method-MOMO')));
+      await tester.pumpAndSettle();
+      expect(picked, 'MOMO');
+    },
+  );
 
-  testWidgets('tile falls back to CASH when selected method is unavailable', (tester) async {
+  testWidgets('tile falls back to CASH when selected method is unavailable', (
+    tester,
+  ) async {
     String? changed;
     await tester.pumpWidget(
       MaterialApp(
@@ -117,7 +132,12 @@ void main() {
             service: 'FOOD',
             selected: 'MOMO',
             accessToken: 't',
-            api: FakePaymentApi(methods: [opt('MOMO', 'WALLET', available: false), opt('CASH', 'RECOMMENDED')]),
+            api: FakePaymentApi(
+              methods: [
+                opt('MOMO', 'WALLET', available: false),
+                opt('CASH', 'RECOMMENDED'),
+              ],
+            ),
             onChanged: (m) => changed = m.code,
           ),
         ),
@@ -127,7 +147,9 @@ void main() {
     expect(changed, cashMethodCode);
   });
 
-  testWidgets('status page starts payment, launches URL and polls to PAID', (tester) async {
+  testWidgets('status page starts payment, launches URL and polls to PAID', (
+    tester,
+  ) async {
     final api = FakePaymentApi(statuses: ['PENDING', 'PAID']);
     final launched = <Uri>[];
     await tester.pumpWidget(
