@@ -183,7 +183,8 @@ class _RideOffersPageState extends State<_RideOffersView> {
         if (!mounted) {
           return;
         }
-        unawaited(context.push(RideRoutes.tracking(ride.id)));
+        // Replace: back from tracking must not land on this stale offers screen.
+        context.pushReplacement(RideRoutes.tracking(ride.id));
         return;
       }
       final selectable = _selectable(ride);
@@ -340,7 +341,7 @@ class _RideOffersPageState extends State<_RideOffersView> {
         if (!mounted) {
           return;
         }
-        await context.push(RideRoutes.tracking(updated.id));
+        context.pushReplacement(RideRoutes.tracking(updated.id));
         return;
       }
       if (!mounted) {
