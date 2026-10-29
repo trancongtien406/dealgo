@@ -14,6 +14,7 @@ class FakeSnapshotRealtime implements SnapshotRealtime {
   final _chatMessages = StreamController<ChatMessageHint>.broadcast();
   final _rideUnassigned = StreamController<RideUnassignedHint>.broadcast();
   final _inboxEvents = StreamController<void>.broadcast();
+  final _jobRequests = StreamController<void>.broadcast();
   final subscribed = <String>{};
   var connectCalls = 0;
   var disconnectCalls = 0;
@@ -49,6 +50,9 @@ class FakeSnapshotRealtime implements SnapshotRealtime {
   Stream<void> get inboxEvents => _inboxEvents.stream;
 
   @override
+  Stream<void> get jobRequests => _jobRequests.stream;
+
+  @override
   Stream<void> get reconnects => _reconnects.stream;
 
   @override
@@ -77,6 +81,8 @@ class FakeSnapshotRealtime implements SnapshotRealtime {
   }
 
   void emitHint(SnapshotHint hint) => _snapshots.add(hint);
+
+  void emitJobRequest() => _jobRequests.add(null);
 
   void emitReconnect() => _reconnects.add(null);
 

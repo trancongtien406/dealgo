@@ -60,6 +60,7 @@ class DriverFeedCubit extends Cubit<DriverFeedState> {
   Future<void> sync({
     required bool online,
     required String? accessToken,
+    bool quiet = false,
   }) async {
     final generation = ++_generation;
     if (!online) {
@@ -71,7 +72,10 @@ class DriverFeedCubit extends Cubit<DriverFeedState> {
       emit(const DriverFeedFailed(null, true));
       return;
     }
-    emit(const DriverFeedLoading());
+    // A background refresh (new-job socket hint) keeps the current list on screen.
+    if (!quiet || state is! DriverFeedReady) {
+      emit(const DriverFeedLoading());
+    }
     var attempt = 0;
     late _Capture<List<OpenRide>> openedResult;
     late _Capture<List<ReadyFoodJob>> readyResult;
@@ -100,6 +104,9 @@ class DriverFeedCubit extends Cubit<DriverFeedState> {
       return;
     }
     final failure = openedResult.error ?? readyResult.error;
+    if (failure != null && quiet && state is DriverFeedReady) {
+      return;
+    }
     if (failure != null) {
       emit(DriverFeedFailed(_failureMessage(failure)));
       return;

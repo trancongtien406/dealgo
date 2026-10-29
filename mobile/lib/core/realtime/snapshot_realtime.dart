@@ -325,6 +325,10 @@ abstract interface class SnapshotRealtime {
   /// The signed-in driver lost an assigned ride (no subscribe needed).
   Stream<RideUnassignedHint> get rideUnassigned;
 
+  /// A new ride request (`rideRequest`) or READY food job (`foodRequest`) near
+  /// the signed-in driver (no subscribe needed). The driver job list re-GETs.
+  Stream<void> get jobRequests;
+
   /// Fires after a successful reconnect (and after re-subscribe of rooms).
   /// Callers must trigger an authoritative REST GET — do not trust the last hint.
   Stream<void> get reconnects;

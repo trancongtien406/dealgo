@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/config/api_base_url.dart';
+import '../../../../core/realtime/snapshot_realtime.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
@@ -43,10 +44,21 @@ class _DriverJobsPageState extends State<DriverJobsPage> {
     onResume: _sync,
   );
 
+  StreamSubscription<void>? _jobHints;
+  StreamSubscription<void>? _reconnects;
+  Timer? _hintDebounce;
+
   @override
   void initState() {
     super.initState();
     _lifecycle;
+    final realtime = _maybeRealtime(context);
+    if (realtime != null) {
+      // A new ride / READY food job nearby: refresh within ~0.3 s instead of
+      // waiting for the driver to pull or reopen the app.
+      _jobHints = realtime.jobRequests.listen((_) => _quietSyncSoon());
+      _reconnects = realtime.reconnects.listen((_) => _quietSyncSoon());
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _sync();
       if (mounted) {
@@ -57,11 +69,14 @@ class _DriverJobsPageState extends State<DriverJobsPage> {
 
   @override
   void dispose() {
+    _hintDebounce?.cancel();
+    unawaited(_jobHints?.cancel());
+    unawaited(_reconnects?.cancel());
     _lifecycle.dispose();
     super.dispose();
   }
 
-  void _sync() {
+  void _sync({bool quiet = false}) {
     if (!mounted) {
       return;
     }
@@ -69,8 +84,19 @@ class _DriverJobsPageState extends State<DriverJobsPage> {
       context.read<DriverFeedCubit>().sync(
         online: context.read<DriverDutyCubit>().state,
         accessToken: driverAccessToken(context),
+        quiet: quiet,
       ),
     );
+  }
+
+  /// Bursts (several requests at once) collapse into one GET.
+  void _quietSyncSoon() {
+    _hintDebounce?.cancel();
+    _hintDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted && context.read<DriverDutyCubit>().state) {
+        _sync(quiet: true);
+      }
+    });
   }
 
   @override
@@ -458,5 +484,13 @@ class _FoodJobCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+SnapshotRealtime? _maybeRealtime(BuildContext context) {
+  try {
+    return context.read<SnapshotRealtime>();
+  } catch (_) {
+    return null;
   }
 }
