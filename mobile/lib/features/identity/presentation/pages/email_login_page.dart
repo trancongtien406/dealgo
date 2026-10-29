@@ -98,7 +98,10 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
     if (email.isEmpty) {
       return _setFieldError(_EmailField.email, l10n.emailErrRequired);
     }
-    if (!email.contains('@') || !email.contains('.')) {
+    // Mail servers reject accented/non-ASCII addresses (SMTP 555), e.g. "ái@gmail.com".
+    if (!email.contains('@') ||
+        !email.contains('.') ||
+        email.runes.any((r) => r > 0x7e || r <= 0x20)) {
       return _setFieldError(_EmailField.email, l10n.emailErrInvalid);
     }
     if (password.isEmpty) {
@@ -150,6 +153,7 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
       'AUTH_EMAIL_NOT_VERIFIED' => l10n.emailErrorNotVerified,
       'AUTH_OTP_RATE_LIMITED' => l10n.emailErrorTooManyAttempts,
       'EMAIL_DELIVERY_FAILED' => l10n.emailErrorDeliveryFailed,
+      'EMAIL_ADDRESS_REJECTED' => l10n.emailErrInvalid,
       _ => apiErrorText(AppLocalizations.of(context), error),
     };
   }

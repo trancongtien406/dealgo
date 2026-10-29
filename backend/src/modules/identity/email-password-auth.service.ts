@@ -30,6 +30,8 @@ import {
   type UserRecord,
 } from './identity.repository.js';
 import { normalizeEmail } from './phone-number.js';
+import { MailDeliveryError } from '../../integrations/email/mail-sender.js';
+import { captureServerError } from '../../platform/observability/sentry.js';
 import { SessionService, type SessionResult } from './session.service.js';
 
 export type EmailPasswordRegisterInput = {
@@ -329,13 +331,27 @@ export class EmailPasswordAuthService {
   }
 
   private async deliver(send: () => Promise<void>): Promise<void> {
-
     try {
       await send();
     } catch (error) {
+      const reason = error instanceof MailDeliveryError ? error.reason : 'unknown';
+      const provider = error instanceof MailDeliveryError ? error.provider : 'unknown';
+      const providerCode = error instanceof MailDeliveryError ? error.providerCode : undefined;
       this.logger.warn(
         `Sign-up email not sent: ${error instanceof Error ? error.message : 'unknown error'}`,
       );
+      // A 5xx "rejected" reply means the mailbox/address itself was refused (e.g. SMTP 555 for a
+      // non-ASCII local part): a client input problem, not an outage, so no Sentry event.
+      if (reason === 'rejected') {
+        throw authError(400, 'EMAIL_ADDRESS_REJECTED', 'This email address cannot receive mail');
+      }
+      // Transient failures were already retried by the sender; report the original cause.
+      captureServerError(error, {
+        component: 'email_signup',
+        mail_provider: provider,
+        mail_reason: reason,
+        mail_code: providerCode,
+      });
       throw authError(503, 'EMAIL_DELIVERY_FAILED', 'Could not send the verification email');
     }
   }

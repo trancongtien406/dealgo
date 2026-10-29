@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppEnv } from '../../platform/config/env.js';
 import { PasswordHasher } from '../../platform/security/password-hasher.js';
-import { MockMailSender, UnavailableMailSender } from '../../integrations/email/mail-sender.js';
+import { MailDeliveryError, MockMailSender, UnavailableMailSender } from '../../integrations/email/mail-sender.js';
 import { AuthMethodPolicyService } from './auth-method-policy.service.js';
 import { MemoryAuthMethodPolicyRepository } from './auth-method.repository.js';
 import { EmailPasswordAuthService } from './email-password-auth.service.js';
@@ -334,6 +334,35 @@ describe('EmailPasswordAuthService', () => {
       'EMAIL_DELIVERY_FAILED',
     );
     expect(await repository.findUserByEmail('nomail@dealgo.vn')).toBeNull();
+  });
+
+  it('maps a recipient rejected by SMTP (e.g. 555 non-ASCII local part) to 400, not 503', async () => {
+    const rejecting = new EmailPasswordAuthService(
+      repository,
+      sessions,
+      passwords,
+      authMethods,
+      Object.assign(new MockMailSender('test'), {
+        sendSignupCode: async () => {
+          throw new MailDeliveryError('rejected', 'smtp', '555');
+        },
+      }),
+      config,
+    );
+
+    expectError(
+      await errorOf(rejecting.register({ email: 'bad@dealgo.vn', password: 'password123' })),
+      400,
+      'EMAIL_ADDRESS_REJECTED',
+    );
+  });
+
+  it('rejects non-ASCII email local parts at validation', async () => {
+    const { validate } = await import('class-validator');
+    const { plainToInstance } = await import('class-transformer');
+    const { EmailVerificationDto } = await import('./auth.dto.js');
+    expect(await validate(plainToInstance(EmailVerificationDto, { email: 'ái@gmail.com' }))).not.toHaveLength(0);
+    expect(await validate(plainToInstance(EmailVerificationDto, { email: 'ai@gmail.com' }))).toHaveLength(0);
   });
 
   async function createLegacyUser(email: string, password = 'password123') {

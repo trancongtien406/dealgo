@@ -22,7 +22,7 @@ export class VerifyCodeDto {
 }
 
 export class EmailVerificationDto {
-  @IsEmail({ require_tld: false })
+  @IsEmail({ require_tld: false, allow_utf8_local_part: false })
   email!: string;
 }
 
@@ -34,7 +34,7 @@ export class ConfirmEmailDto {
 }
 
 export class PasswordResetRequestDto {
-  @IsEmail({ require_tld: false })
+  @IsEmail({ require_tld: false, allow_utf8_local_part: false })
   email!: string;
 }
 
@@ -58,7 +58,7 @@ export class RefreshSessionDto {
 }
 
 export class OpsLoginDto {
-  @IsEmail({ require_tld: false })
+  @IsEmail({ require_tld: false, allow_utf8_local_part: false })
   email!: string;
 
   @IsString()
@@ -68,7 +68,7 @@ export class OpsLoginDto {
 }
 
 export class EmailPasswordRegisterDto {
-  @IsEmail({ require_tld: false })
+  @IsEmail({ require_tld: false, allow_utf8_local_part: false })
   email!: string;
 
   @IsString()
@@ -84,7 +84,7 @@ export class EmailPasswordRegisterDto {
 }
 
 export class EmailPasswordLoginDto {
-  @IsEmail({ require_tld: false })
+  @IsEmail({ require_tld: false, allow_utf8_local_part: false })
   email!: string;
 
   @IsString()

@@ -69,10 +69,16 @@ class DioErrorReporter extends Interceptor {
     ],
   );
 
+  /// 5xx codes the app already explains to the user (with a retry) and the
+  /// backend reports with the real cause: breadcrumb only, no duplicate event.
+  static const handledErrorCodes = {'EMAIL_DELIVERY_FAILED'};
+
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     final report = reportFor(err);
-    if (report != null) {
+    if (report != null && handledErrorCodes.contains(report.errorCode)) {
+      _breadcrumbSink(report);
+    } else if (report != null) {
       _sink(report);
     } else if (isNetworkFailure(err)) {
       _breadcrumbSink(_build(err));
