@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/design_system/components/dealgo_nav_insets.dart';
 import '../../../core/design_system/components/dealgo_bottom_bar.dart';
 import '../../../core/design_system/components/dealgo_card.dart';
 import '../../../core/design_system/components/dealgo_primary_button.dart';
@@ -151,122 +152,128 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
               ),
             ),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(
-                  DealGoDimensions.pageGutter,
-                  DealGoSpacing.s16,
-                  DealGoDimensions.pageGutter,
-                  DealGoSpacing.s24 +
-                      DealGoDimensions.buttonMinHeight +
-                      DealGoSpacing.s48,
-                ),
-                children: [
-                  const _SupportBanner(),
-                  const SizedBox(height: DealGoSpacing.s16),
-                  DealGoTextField(
-                    label: l10n.helpSearchHint,
-                    showLabel: false,
-                    controller: _query,
-                    textInputAction: TextInputAction.search,
-                    onChanged: (_) => setState(() {}),
-                    prefixIcon: DealGoIcons.search,
+              // extendBody hands the real bottom-bar height (2-line labels,
+              // large text, home indicator) down as padding.bottom.
+              // Builder: this context sits under the Scaffold body's MediaQuery.
+              child: Builder(
+                builder: (bodyContext) => ListView(
+                  padding: dealGoScrollPadding(
+                    bodyContext,
+                    const EdgeInsets.fromLTRB(
+                      DealGoDimensions.pageGutter,
+                      DealGoSpacing.s16,
+                      DealGoDimensions.pageGutter,
+                      DealGoSpacing.s24,
+                    ),
                   ),
-                  const SizedBox(height: DealGoSpacing.s20),
-                  Text(l10n.helpTopicsTitle, style: textTheme.titleMedium),
-                  const SizedBox(height: DealGoSpacing.s12),
-                  _TopicGrid(
-                    selected: _topic,
-                    onSelected: (topic) => setState(() {
-                      _topic = _topic == topic ? null : topic;
-                    }),
-                  ),
-                  const SizedBox(height: DealGoSpacing.s20),
-                  AccountSectionHeader(
-                    title: l10n.helpFaqTitle,
-                    action: TextButton(
-                      onPressed: () => setState(() {
-                        _query.clear();
-                        _open.clear();
+                  children: [
+                    const _SupportBanner(),
+                    const SizedBox(height: DealGoSpacing.s16),
+                    DealGoTextField(
+                      label: l10n.helpSearchHint,
+                      showLabel: false,
+                      controller: _query,
+                      textInputAction: TextInputAction.search,
+                      onChanged: (_) => setState(() {}),
+                      prefixIcon: DealGoIcons.search,
+                    ),
+                    const SizedBox(height: DealGoSpacing.s20),
+                    Text(l10n.helpTopicsTitle, style: textTheme.titleMedium),
+                    const SizedBox(height: DealGoSpacing.s12),
+                    _TopicGrid(
+                      selected: _topic,
+                      onSelected: (topic) => setState(() {
+                        _topic = _topic == topic ? null : topic;
                       }),
-                      child: AccountLinkText(l10n.helpSeeAll),
                     ),
-                  ),
-                  const SizedBox(height: DealGoSpacing.s12),
-                  if (faqs == null)
-                    const DealGoSkeletonList(
-                      key: Key('help-faq-loading'),
-                      itemCount: 3,
-                      padding: EdgeInsets.zero,
-                    )
-                  else if (_failure != null)
-                    DealGoStateView.failure(
-                      context,
-                      key: const Key('help-faq-error'),
-                      onRetry: _load,
-                      cause: _failure,
-                      message: l10n.helpFaqLoadFailed,
-                      compact: true,
-                    )
-                  else if (faqs.isEmpty)
-                    DealGoStateView(
-                      key: const Key('help-faq-empty'),
-                      art: DealGoStateArt.noMessages,
-                      title: l10n.helpFaqEmpty,
-                      compact: true,
-                    )
-                  else if (visible.isEmpty)
-                    Text(
-                      AppLocalizations.of(context).helpNoResults,
-                      style: textTheme.bodyMedium,
-                    )
-                  else
-                    for (final faq in visible) ...[
-                      _FaqCard(
-                        key: Key('help-faq-${faq.id}'),
-                        faq: faq,
-                        open: _open.contains(faq.id),
-                        onTap: () => _toggle(faq.id),
+                    const SizedBox(height: DealGoSpacing.s20),
+                    AccountSectionHeader(
+                      title: l10n.helpFaqTitle,
+                      action: TextButton(
+                        onPressed: () => setState(() {
+                          _query.clear();
+                          _open.clear();
+                        }),
+                        child: AccountLinkText(l10n.helpSeeAll),
                       ),
-                      const SizedBox(height: DealGoSpacing.s12),
-                    ],
-                  const SizedBox(height: DealGoSpacing.s8),
-                  DealGoCard(
-                    key: const Key('help-still-need'),
-                    onTap: _openTickets,
-                    child: Row(
-                      children: [
-                        const AccountToneIcon(
-                          icon: DealGoIcons.headset,
-                          background: DealGoColors.subtlePurple,
-                          foreground: DealGoColors.primary,
-                        ),
-                        const SizedBox(width: DealGoSpacing.s12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                l10n.helpStillNeedTitle,
-                                style: textTheme.titleMedium?.copyWith(
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                l10n.helpStillNeedBody,
-                                style: textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Icon(
-                          DealGoIcons.chevronRight,
-                          color: DealGoColors.textSecondary,
-                        ),
-                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: DealGoSpacing.s12),
+                    if (faqs == null)
+                      const DealGoSkeletonList(
+                        key: Key('help-faq-loading'),
+                        itemCount: 3,
+                        padding: EdgeInsets.zero,
+                      )
+                    else if (_failure != null)
+                      DealGoStateView.failure(
+                        context,
+                        key: const Key('help-faq-error'),
+                        onRetry: _load,
+                        cause: _failure,
+                        message: l10n.helpFaqLoadFailed,
+                        compact: true,
+                      )
+                    else if (faqs.isEmpty)
+                      DealGoStateView(
+                        key: const Key('help-faq-empty'),
+                        art: DealGoStateArt.noMessages,
+                        title: l10n.helpFaqEmpty,
+                        compact: true,
+                      )
+                    else if (visible.isEmpty)
+                      Text(
+                        AppLocalizations.of(context).helpNoResults,
+                        style: textTheme.bodyMedium,
+                      )
+                    else
+                      for (final faq in visible) ...[
+                        _FaqCard(
+                          key: Key('help-faq-${faq.id}'),
+                          faq: faq,
+                          open: _open.contains(faq.id),
+                          onTap: () => _toggle(faq.id),
+                        ),
+                        const SizedBox(height: DealGoSpacing.s12),
+                      ],
+                    const SizedBox(height: DealGoSpacing.s8),
+                    DealGoCard(
+                      key: const Key('help-still-need'),
+                      onTap: _openTickets,
+                      child: Row(
+                        children: [
+                          const AccountToneIcon(
+                            icon: DealGoIcons.headset,
+                            background: DealGoColors.subtlePurple,
+                            foreground: DealGoColors.primary,
+                          ),
+                          const SizedBox(width: DealGoSpacing.s12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  l10n.helpStillNeedTitle,
+                                  style: textTheme.titleMedium?.copyWith(
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  l10n.helpStillNeedBody,
+                                  style: textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            DealGoIcons.chevronRight,
+                            color: DealGoColors.textSecondary,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],

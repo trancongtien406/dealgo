@@ -118,7 +118,8 @@ class _FoodItemOptionsPageState extends State<FoodItemOptionsPage> {
                   DealGoDimensions.pageGutter,
                   0,
                   DealGoDimensions.pageGutter,
-                  DealGoSpacing.s24 + DealGoDimensions.buttonMinHeight,
+                  // The bar is a sibling below the list, never on top of it.
+                  DealGoSpacing.s24,
                 ),
                 children: [
                   DealGoHero(
