@@ -13195,6 +13195,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This request was cancelled or taken by another driver.'**
   String get driverJobPushGone;
+
+  /// No description provided for @incomingJobTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New ride request'**
+  String get incomingJobTitle;
+
+  /// No description provided for @incomingJobSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get incomingJobSkip;
+
+  /// No description provided for @incomingJobOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'View & quote'**
+  String get incomingJobOpen;
 }
 
 class _AppLocalizationsDelegate

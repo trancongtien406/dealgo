@@ -7099,4 +7099,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get driverJobPushGone =>
       'This request was cancelled or taken by another driver.';
+
+  @override
+  String get incomingJobTitle => 'New ride request';
+
+  @override
+  String get incomingJobSkip => 'Skip';
+
+  @override
+  String get incomingJobOpen => 'View & quote';
 }

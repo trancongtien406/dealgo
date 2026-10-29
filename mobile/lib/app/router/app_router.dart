@@ -19,6 +19,7 @@ import '../../core/motion/dealgo_page_transitions.dart';
 import '../../features/driver/domain/usecases/list_open_driver_rides.dart';
 import '../../features/driver/domain/usecases/list_ready_driver_orders.dart';
 import '../../features/driver/presentation/cubit/driver_feed_cubit.dart';
+import '../../features/driver/presentation/widgets/incoming_job_alert.dart';
 import '../../features/driver/presentation/pages/driver_active_ride_page.dart';
 import '../../features/driver/presentation/pages/driver_food_page.dart';
 import '../../features/driver/presentation/pages/driver_food_resume_page.dart';
@@ -710,7 +711,7 @@ ShellRoute _driverScopedShell() {
           listOpenDriverRides: context.read<ListOpenDriverRides>(),
           listReadyDriverOrders: context.read<ListReadyDriverOrders>(),
         ),
-        child: child,
+        child: IncomingJobAlertHost(child: child),
       );
     },
     routes: [

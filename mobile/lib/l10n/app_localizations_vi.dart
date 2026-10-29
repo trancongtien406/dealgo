@@ -7061,4 +7061,13 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get driverJobPushGone =>
       'Cuốc này đã bị huỷ hoặc đã có tài xế khác nhận.';
+
+  @override
+  String get incomingJobTitle => 'Cuốc xe mới';
+
+  @override
+  String get incomingJobSkip => 'Bỏ qua';
+
+  @override
+  String get incomingJobOpen => 'Xem & báo giá';
 }
