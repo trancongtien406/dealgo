@@ -25,6 +25,7 @@ import '../cubit/driver_services_cubit.dart';
 import 'driver_home_page.dart';
 import '../utils/driver_routes.dart';
 import '../widgets/driver_widgets.dart';
+import '../widgets/driver_inline_quote.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/format/short_ref.dart';
 import '../../../../core/l10n/api_error_text.dart';
@@ -429,6 +430,11 @@ class _RideJobCard extends StatelessWidget {
               key: Key('driver-open-customer-rating-${ride.id}'),
               label: l10n.driverCustomerRating,
               value: customerRatingText(l10n, ride.customerRating),
+            ),
+            const SizedBox(height: DealGoSpacing.s12),
+            DriverInlineQuote(
+              key: ValueKey('job-quote-${ride.id}'),
+              ride: ride,
             ),
           ],
         ),

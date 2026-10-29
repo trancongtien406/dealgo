@@ -3472,5 +3472,15 @@
   "incomingJobOpen": "View & quote",
   "driverStartTrip": "Start trip",
   "rideOfferAcceptShort": "Accept",
-  "rideOfferDeclineShort": "Decline"
+  "rideOfferDeclineShort": "Decline",
+  "driverSendQuoteAmount": "Offer {amount}",
+  "driverWithdrawOfferShort": "Withdraw",
+  "incomingJobDetails": "Details",
+  "@driverSendQuoteAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  }
 }

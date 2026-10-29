@@ -53,6 +53,11 @@ void main() {
       ),
       findsOneWidget,
     );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('driver-open-customer-rating-ride-b')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(
       find.byKey(const Key('driver-open-customer-rating-ride-b')),
       findsOneWidget,

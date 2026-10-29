@@ -17,6 +17,7 @@ import '../../../ride/domain/entities/ride_money.dart';
 import '../cubit/driver_duty_cubit.dart';
 import '../cubit/driver_feed_cubit.dart';
 import '../utils/driver_routes.dart';
+import 'driver_inline_quote.dart';
 import 'driver_widgets.dart';
 
 /// Loops the new-job sound and vibration while an incoming-job card is up.
@@ -242,6 +243,14 @@ class _IncomingJobAlertHostState extends State<IncomingJobAlertHost> {
     _evaluate(context.read<DriverFeedCubit>().state);
   }
 
+  void _sentInline(int _) {
+    final c = _current;
+    if (c == null) return;
+    _handled.add(c.id);
+    _dismiss();
+    _evaluate(context.read<DriverFeedCubit>().state);
+  }
+
   void _open() {
     final c = _current;
     if (c == null) return;
@@ -265,6 +274,7 @@ class _IncomingJobAlertHostState extends State<IncomingJobAlertHost> {
                 secondsLeft: _secondsLeft(ride),
                 onOpen: _open,
                 onSkip: _skip,
+                onSent: _sentInline,
               ),
             ),
         ],
@@ -286,7 +296,10 @@ class _IncomingJobCard extends StatelessWidget {
     required this.secondsLeft,
     required this.onOpen,
     required this.onSkip,
+    required this.onSent,
   });
+
+  final ValueChanged<int> onSent;
 
   final OpenRide ride;
   final int? secondsLeft;
@@ -355,6 +368,13 @@ class _IncomingJobCard extends StatelessWidget {
                   style: text.bodySmall,
                 ),
                 const SizedBox(height: DealGoSpacing.s16),
+                // Quote right here: −/+, +5k/+10k, one-tap accept, send.
+                DriverInlineQuote(
+                  key: ValueKey('incoming-quote-${ride.id}'),
+                  ride: ride,
+                  onSent: onSent,
+                ),
+                const SizedBox(height: DealGoSpacing.s8),
                 Row(
                   children: [
                     Expanded(
@@ -366,11 +386,10 @@ class _IncomingJobCard extends StatelessWidget {
                     ),
                     const SizedBox(width: DealGoSpacing.s12),
                     Expanded(
-                      flex: 2,
-                      child: FilledButton(
+                      child: TextButton(
                         key: const Key('incoming-job-open'),
                         onPressed: onOpen,
-                        child: Text(l10n.incomingJobOpen),
+                        child: Text(l10n.incomingJobDetails),
                       ),
                     ),
                   ],

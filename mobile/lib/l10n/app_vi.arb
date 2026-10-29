@@ -2314,5 +2314,8 @@
   "incomingJobOpen": "Xem & báo giá",
   "driverStartTrip": "Bắt đầu chuyến",
   "rideOfferAcceptShort": "Chấp nhận",
-  "rideOfferDeclineShort": "Từ chối"
+  "rideOfferDeclineShort": "Từ chối",
+  "driverSendQuoteAmount": "Gửi giá {amount}",
+  "driverWithdrawOfferShort": "Rút giá",
+  "incomingJobDetails": "Chi tiết"
 }

@@ -7117,4 +7117,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get rideOfferDeclineShort => 'Decline';
+
+  @override
+  String driverSendQuoteAmount(String amount) {
+    return 'Offer $amount';
+  }
+
+  @override
+  String get driverWithdrawOfferShort => 'Withdraw';
+
+  @override
+  String get incomingJobDetails => 'Details';
 }

@@ -4,6 +4,8 @@ import 'package:dealgo/features/driver/domain/usecases/list_open_driver_rides.da
 import 'package:dealgo/features/driver/domain/usecases/list_ready_driver_orders.dart';
 import 'package:dealgo/features/driver/presentation/cubit/driver_feed_cubit.dart';
 import 'package:dealgo/features/driver/presentation/widgets/incoming_job_alert.dart';
+import 'package:dealgo/features/driver/presentation/widgets/driver_inline_quote.dart';
+import 'package:dealgo/features/driver/domain/usecases/submit_driver_ride_offer.dart';
 import 'package:dealgo/features/ride/domain/entities/ride_models.dart';
 import 'package:dealgo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -54,18 +56,21 @@ void main() {
   tearDown(() => cubit.close());
 
   Future<void> pump(WidgetTester tester) => tester.pumpWidget(
-    BlocProvider.value(
-      value: cubit,
-      child: MaterialApp(
-        locale: const Locale('vi'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: IncomingJobAlertHost(
-          ringer: ringer,
-          clock: () => now,
-          inCall: () => false,
-          pollEvery: const Duration(hours: 1),
-          child: const Scaffold(body: Text('jobs')),
+    RepositoryProvider(
+      create: (_) => SubmitDriverRideOffer(DriverJobsRepositoryImpl(client)),
+      child: BlocProvider.value(
+        value: cubit,
+        child: MaterialApp(
+          locale: const Locale('vi'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: IncomingJobAlertHost(
+            ringer: ringer,
+            clock: () => now,
+            inCall: () => false,
+            pollEvery: const Duration(hours: 1),
+            child: const Scaffold(body: Text('jobs')),
+          ),
         ),
       ),
     ),
@@ -120,5 +125,47 @@ void main() {
     expect(find.byKey(const Key('incoming-job-alert')), findsOneWidget);
     expect(find.text('0:54'), findsOneWidget);
     expect(ringer.ringing, isTrue);
+  });
+
+  testWidgets('quote inline on the card: +10k then send, card closes', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    DriverInlineQuote.debugAccessToken = 't';
+    addTearDown(() {
+      DriverInlineQuote.debugAccessToken = null;
+      driverSentQuotes.value = const {};
+    });
+    client.onOffer = (r) => RideView(
+      id: r.rideId,
+      status: RideStatus.negotiating,
+      pickup: _ride('r1').pickup,
+      dropoff: _ride('r1').dropoff,
+      offeredFareVnd: 35000,
+      referenceFareVnd: 35000,
+      agreedFareVnd: null,
+      assignedDriverId: null,
+      selectedOfferId: null,
+      expiresAt: _ride('r1').expiresAt,
+      offers: const [],
+    );
+    await pump(tester);
+    await feed(tester, [_ride('r1')]);
+    expect(find.byKey(const Key('incoming-job-alert')), findsOneWidget);
+    expect(find.text('Đồng ý 35.000đ'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('driver-inline-chip-10000-r1')));
+    await tester.pump();
+    expect(find.text('45.000đ'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('driver-inline-minus-r1')));
+    await tester.pump();
+    expect(find.text('44.000đ'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('driver-inline-send-r1')));
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pump();
+    expect(client.offerCalls.single.amountVnd, 44000);
+    await tester.pump();
+    expect(find.byKey(const Key('incoming-job-alert')), findsNothing);
+    expect(driverSentQuotes.value['r1'], 44000);
   });
 }

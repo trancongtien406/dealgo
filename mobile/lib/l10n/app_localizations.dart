@@ -13231,6 +13231,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Decline'**
   String get rideOfferDeclineShort;
+
+  /// No description provided for @driverSendQuoteAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer {amount}'**
+  String driverSendQuoteAmount(String amount);
+
+  /// No description provided for @driverWithdrawOfferShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Withdraw'**
+  String get driverWithdrawOfferShort;
+
+  /// No description provided for @incomingJobDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get incomingJobDetails;
 }
 
 class _AppLocalizationsDelegate

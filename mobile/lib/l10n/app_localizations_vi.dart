@@ -7079,4 +7079,15 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get rideOfferDeclineShort => 'Từ chối';
+
+  @override
+  String driverSendQuoteAmount(String amount) {
+    return 'Gửi giá $amount';
+  }
+
+  @override
+  String get driverWithdrawOfferShort => 'Rút giá';
+
+  @override
+  String get incomingJobDetails => 'Chi tiết';
 }
