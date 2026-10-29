@@ -100,6 +100,10 @@ void main() {
     h.push(call, status: 'ACCEPTED');
     await _settle();
     expect(h.cubit.state.phase, VoiceCallPhase.active);
+    // Accepted on the server, but the callee is not in the room yet.
+    expect(h.cubit.state.connectedAt, isNull);
+    h.media.emit(VoiceMediaEvent.remoteJoined);
+    await _settle();
     expect(h.cubit.state.connectedAt, isNotNull);
 
     await h.cubit.toggleMute();
@@ -115,6 +119,42 @@ void main() {
     expect(h.voice.actions.last, 'end:${call.id}');
     await Future<void>.delayed(const Duration(milliseconds: 20));
     expect(h.cubit.state.phase, VoiceCallPhase.idle);
+    await h.dispose();
+  });
+
+  test('caller clock waits for the callee to be in the room', () async {
+    final h = _Harness();
+    await h.cubit.start(VoiceThreadKind.ride, 'ride-1');
+    h.push(h.cubit.state.call!, status: 'ACCEPTED');
+    await _settle();
+    expect(h.cubit.state.connectedAt, isNull);
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    final before = DateTime.now();
+    h.media.emit(VoiceMediaEvent.remoteJoined);
+    await _settle();
+    final at = h.cubit.state.connectedAt!;
+    expect(at.isBefore(before), isFalse);
+    // Reconnects and duplicate joins (track subscribed) keep the same start.
+    h.media.emit(VoiceMediaEvent.reconnecting);
+    h.media.emit(VoiceMediaEvent.reconnected);
+    h.media.emit(VoiceMediaEvent.remoteJoined);
+    await _settle();
+    expect(h.cubit.state.connectedAt, at);
+    await h.dispose();
+  });
+
+  test('callee clock starts when joined with the caller present', () async {
+    final h = _Harness();
+    final call = h.voice.ring();
+    h.push(call);
+    await _settle();
+    // Caller is already in the room: the engine reports it during join.
+    h.media.emit(VoiceMediaEvent.remoteJoined);
+    await _settle();
+    expect(h.cubit.state.connectedAt, isNull);
+    await h.cubit.accept();
+    expect(h.cubit.state.phase, VoiceCallPhase.active);
+    expect(h.cubit.state.connectedAt, isNotNull);
     await h.dispose();
   });
 
@@ -350,6 +390,13 @@ void main() {
     expect(ringer.log.where((e) => e == 'start'), hasLength(1));
     expect(find.byKey(const Key('voice-mute')), findsOneWidget);
     expect(find.byKey(const Key('voice-hangup')), findsOneWidget);
+    // Clock waits until the other party is actually in the room.
+    expect(find.text('00:00'), findsNothing);
+    await tester.runAsync(() async {
+      h.media.emit(VoiceMediaEvent.remoteJoined);
+      await _settle();
+    });
+    await tester.pump();
     expect(find.text('00:00'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('voice-mute')));

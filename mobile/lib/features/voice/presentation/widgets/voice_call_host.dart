@@ -148,6 +148,8 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
       VoiceCallPhase.active =>
         state.reconnecting
             ? l10n.voiceReconnecting
+            : state.connectedAt == null
+            ? l10n.voiceConnecting
             : _elapsed(state.connectedAt),
       VoiceCallPhase.ended => switch (state.notice) {
         VoiceCallNotice.declined => l10n.voiceEndedDeclined,

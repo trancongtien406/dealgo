@@ -390,9 +390,9 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
         state.copyWith(
           phase: VoiceCallPhase.active,
           call: join.call,
-          connectedAt: DateTime.now(),
         ),
       );
+      _startClockIfLive();
     }
   }
 
@@ -522,9 +522,9 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
             state.copyWith(
               phase: VoiceCallPhase.active,
               call: call,
-              connectedAt: DateTime.now(),
             ),
           );
+          _startClockIfLive();
         }
         return;
       case VoiceCallStatus.declined:
@@ -557,6 +557,7 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
     switch (event) {
       case VoiceMediaEvent.remoteJoined:
         emit(state.copyWith(remoteConnected: true));
+        _startClockIfLive();
       case VoiceMediaEvent.remoteLeft:
         emit(state.copyWith(remoteConnected: false));
         if (state.phase == VoiceCallPhase.active) {
@@ -575,6 +576,24 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
           _finish(VoiceCallNotice.connectionLost);
         }
     }
+  }
+
+  /// Starts the call clock once, at the moment both parties are in the room.
+  ///
+  /// The caller learns "accepted" from the socket as soon as the callee taps
+  /// answer, but the callee only goes live after its own room join finishes
+  /// (seconds later). Starting each clock at its own "active" made the caller
+  /// run ahead. Both phones see the other participant at (almost) the same
+  /// instant, so the clock starts there: active AND remote participant present.
+  /// Kept through reconnects; wall-clock based, so app resume stays correct.
+  void _startClockIfLive() {
+    if (isClosed ||
+        state.connectedAt != null ||
+        state.phase != VoiceCallPhase.active ||
+        !state.remoteConnected) {
+      return;
+    }
+    emit(state.copyWith(connectedAt: DateTime.now()));
   }
 
   /// After a socket reconnect the last event may have been lost: ask the server.
