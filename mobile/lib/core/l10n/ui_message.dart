@@ -10,11 +10,19 @@ class UiMessage {
 
   /// A failed call: known error codes get their own sentence, otherwise [fallback] or a
   /// generic one (see [apiErrorText]).
+  ///
+  /// [reported]: the caller already sent the failure to crash reporting at
+  /// its catch site, so resolving (every rebuild) never reports again.
   UiMessage.error(
     Object this.error, {
     String Function(AppLocalizations l10n)? fallback,
-  }) : _text = ((l10n) =>
-           apiErrorText(l10n, error, fallback: fallback?.call(l10n)));
+    bool reported = false,
+  }) : _text = ((l10n) => apiErrorText(
+         l10n,
+         error,
+         fallback: fallback?.call(l10n),
+         report: !reported,
+       ));
 
   final String Function(AppLocalizations l10n) _text;
 

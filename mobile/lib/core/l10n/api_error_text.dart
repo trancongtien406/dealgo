@@ -10,12 +10,19 @@ import '../observability/crash_reporting.dart';
 /// friendly sentence. Sentry drops repeats of the same error object, so
 /// resolving one message on every rebuild reports it once. 5xx answers are
 /// reported where they happen (`DioErrorReporter`).
-String apiErrorText(AppLocalizations l10n, Object? error, {String? fallback}) {
+String apiErrorText(
+  AppLocalizations l10n,
+  Object? error, {
+  String? fallback,
+  bool report = true,
+}) {
   if (error is! ApiException) {
-    if (error != null) reportHandledError(error);
+    if (report && error != null) reportHandledError(error);
     return fallback ?? l10n.apiErrGeneric;
   }
-  if (_malformed.contains(error.errorCode)) reportHandledError(error);
+  if (report && _malformed.contains(error.errorCode)) {
+    reportHandledError(error);
+  }
   final byCode = _byCode(l10n, error.errorCode);
   if (byCode != null) {
     return byCode;

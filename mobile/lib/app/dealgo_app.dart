@@ -60,6 +60,7 @@ import '../features/ride/presentation/utils/customer_trip_resumer.dart';
 import 'di.dart';
 import 'router/app_router.dart';
 import '../core/realtime/snapshot_realtime.dart';
+import '../core/realtime/socket_snapshot_realtime.dart';
 import '../features/driver/presentation/utils/driver_routes.dart';
 import '../features/driver/presentation/utils/ride_unassigned_copy.dart';
 import '../features/voice/presentation/widgets/voice_call_host.dart';
@@ -274,7 +275,13 @@ class _DealGoAppState extends State<DealGoApp> {
       userNavigationClaimed: () => _deps.notificationRouter.claimsNavigation,
     );
     _lifecycle = AppLifecycleListener(
-      onResume: () => unawaited(_driverResume.recheck()),
+      onResume: () {
+        final realtime = _deps.realtime;
+        if (realtime is SocketSnapshotRealtime) {
+          realtime.resumeIfDisconnected();
+        }
+        unawaited(_driverResume.recheck());
+      },
     );
     _postAuth.addListener(_maybeResumeDriverJob);
     _authSub = _deps.authCubit.stream.listen((state) {

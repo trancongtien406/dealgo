@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../observability/crash_reporting.dart';
 
@@ -37,9 +40,24 @@ typedef ApiFailureSink = void Function(ApiFailureReport report);
 /// (business rules) and offline/timeouts (the user's network) are not bugs
 /// and stay out. Never sends headers, bodies or query strings.
 class DioErrorReporter extends Interceptor {
-  DioErrorReporter({ApiFailureSink? sink}) : _sink = sink ?? _toSentry;
+  DioErrorReporter({ApiFailureSink? sink, ApiFailureSink? breadcrumbSink})
+    : _sink = sink ?? _toSentry,
+      _breadcrumbSink = breadcrumbSink ?? _toBreadcrumb;
 
   final ApiFailureSink _sink;
+  final ApiFailureSink _breadcrumbSink;
+
+  /// Connection drops / unknown socket errors are the user's network (or iOS
+  /// suspending the app), not bugs: kept as context on later events only.
+  static void _toBreadcrumb(ApiFailureReport report) => unawaited(
+    Sentry.addBreadcrumb(
+      Breadcrumb(
+        category: 'api.network',
+        level: SentryLevel.warning,
+        message: '${report.kind} ${report.method} ${report.path}',
+      ),
+    ),
+  );
 
   static void _toSentry(ApiFailureReport report) => reportHandledError(
     report,
@@ -54,7 +72,11 @@ class DioErrorReporter extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     final report = reportFor(err);
-    if (report != null) _sink(report);
+    if (report != null) {
+      _sink(report);
+    } else if (isNetworkFailure(err)) {
+      _breadcrumbSink(_build(err));
+    }
     handler.next(err);
   }
 
@@ -63,10 +85,21 @@ class DioErrorReporter extends Interceptor {
     final status = err.response?.statusCode;
     final reportable = switch (err.type) {
       DioExceptionType.badResponse => status != null && status >= 500,
-      DioExceptionType.unknown || DioExceptionType.badCertificate => true,
+      DioExceptionType.badCertificate => true,
       _ => false,
     };
     if (!reportable) return null;
+    return _build(err);
+  }
+
+  @visibleForTesting
+  static bool isNetworkFailure(DioException err) => switch (err.type) {
+    DioExceptionType.connectionError || DioExceptionType.unknown => true,
+    _ => false,
+  };
+
+  static ApiFailureReport _build(DioException err) {
+    final status = err.response?.statusCode;
     final body = err.response?.data;
     String? field(String key) =>
         body is Map && body[key] is String ? body[key] as String : null;

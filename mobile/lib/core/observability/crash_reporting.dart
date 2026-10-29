@@ -62,7 +62,8 @@ Future<void> runWithCrashReporting(Future<void> Function() appRunner) async {
       options.sendDefaultPii = false;
       // Debug prints carry (redacted) HTTP logs; keep them on the device.
       options.enablePrintBreadcrumbs = false;
-      options.beforeSend = (event, hint) => scrubEvent(event);
+      options.beforeSend = (event, hint) =>
+          isExpectedTransportClose(event) ? null : scrubEvent(event);
     }, appRunner: appRunner),
     _reportZoneError,
   );
@@ -70,6 +71,23 @@ Future<void> runWithCrashReporting(Future<void> Function() appRunner) async {
 
 void _reportZoneError(Object error, StackTrace stack) {
   unawaited(Sentry.captureException(error, stackTrace: stack));
+}
+
+/// The realtime WebSocket closing (app backgrounded, network switch) is
+/// expected: socket.io reconnects and feeds re-GET on resume. Not a bug, so
+/// it is dropped instead of becoming a Sentry issue.
+@visibleForTesting
+bool isExpectedTransportClose(SentryEvent event) {
+  final original = event.throwable;
+  final names = <String>[
+    if (original != null) original.runtimeType.toString(),
+    for (final e in event.exceptions ?? const <SentryException>[]) ...[
+      e.type ?? '',
+      e.value ?? '',
+    ],
+  ].join(' ');
+  return names.contains('WebSocketConnectionClosed') ||
+      names.contains('WebSocketChannelException') && names.contains('closed');
 }
 
 final _urlQuery = RegExp(r'(https?://[^\s?]+)\?[^\s]*');

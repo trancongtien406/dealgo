@@ -11,6 +11,7 @@ import 'api_paths.dart';
 import 'dio_error_reporter.dart';
 import 'dio_log.dart';
 import 'dio_mapper.dart';
+import 'startup_get_retry.dart';
 
 const skipAuthRefreshExtra = 'dealgo.skipAuthRefresh';
 
@@ -77,6 +78,8 @@ Dio createDealGoDio({
   );
   dio.interceptors.add(auth);
   // After auth: a 401 that refresh recovers never reaches the reporter.
+  // Before the reporter: a launch GET that succeeds on retry is not an error.
+  dio.interceptors.add(StartupGetRetryInterceptor(dio));
   dio.interceptors.add(DioErrorReporter());
   sessionRefresher?._impl = auth._refreshSingleFlight;
   return dio;

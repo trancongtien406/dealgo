@@ -241,6 +241,16 @@ class SocketSnapshotRealtime implements SnapshotRealtime {
     created.connect();
   }
 
+  /// Back in the foreground: iOS closes the WebSocket while suspended and
+  /// socket.io's backoff may still be waiting, so reconnect now. The connect
+  /// fires [reconnects], which re-GETs feeds (e.g. the driver job list) quietly.
+  void resumeIfDisconnected() {
+    final socket = _socket;
+    if (socket != null && !socket.connected) {
+      socket.connect();
+    }
+  }
+
   /// Handles a successful (re)connect: resubscribe, then one reconnect hint.
   @visibleForTesting
   void onConnected() {

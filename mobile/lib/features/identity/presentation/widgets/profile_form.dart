@@ -142,7 +142,20 @@ class _ProfileFormState extends State<ProfileForm> {
     }
   }
 
+  bool _pickingAvatar = false;
+
   Future<void> _onAvatarTap() async {
+    // Double tap while the permission prompt / picker is up: ignore.
+    if (_pickingAvatar) return;
+    _pickingAvatar = true;
+    try {
+      await _pickAvatar();
+    } finally {
+      _pickingAvatar = false;
+    }
+  }
+
+  Future<void> _pickAvatar() async {
     final service = widget.permissionService ?? _maybe<AppPermissionService>();
     if (service != null) {
       final photosOk = await service.ensurePhotos();

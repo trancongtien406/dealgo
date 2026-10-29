@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/l10n/ui_message.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/observability/crash_reporting.dart';
 import '../../domain/entities/voice_models.dart';
 import '../../domain/ports/native_call_ui.dart';
 import '../../domain/ports/voice_media_engine.dart';
@@ -386,12 +388,7 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
       return;
     }
     if (state.phase == VoiceCallPhase.connecting) {
-      emit(
-        state.copyWith(
-          phase: VoiceCallPhase.active,
-          call: join.call,
-        ),
-      );
+      emit(state.copyWith(phase: VoiceCallPhase.active, call: join.call));
       _startClockIfLive();
     }
   }
@@ -518,12 +515,7 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
       case VoiceCallStatus.accepted:
         if (state.phase == VoiceCallPhase.outgoing) {
           _ringTimer?.cancel();
-          emit(
-            state.copyWith(
-              phase: VoiceCallPhase.active,
-              call: call,
-            ),
-          );
+          emit(state.copyWith(phase: VoiceCallPhase.active, call: call));
           _startClockIfLive();
         }
         return;
@@ -674,13 +666,17 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
     if (isClosed) {
       return;
     }
+    // Report once here (the catch site), never from the widget's build.
+    if (error != null) {
+      reportVoiceFailure(error);
+    }
     _ringTimer?.cancel();
     emit(
       VoiceCallState(
         phase: VoiceCallPhase.ended,
         call: state.call,
         notice: notice,
-        error: error == null ? null : UiMessage.error(error),
+        error: error == null ? null : UiMessage.error(error, reported: true),
         enabled: state.enabled,
       ),
     );
@@ -707,4 +703,26 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
     await _media.leave();
     return super.close();
   }
+}
+
+/// Sends a call failure to crash reporting once, at the catch site. API
+/// answers (busy, disabled, …) are business rules, not bugs; only malformed
+/// responses and non-API failures (e.g. LiveKit/AVAudioSession) are reported.
+@visibleForTesting
+void Function(Object error) voiceFailureReporter = _reportVoiceFailure;
+
+void reportVoiceFailure(Object error) => voiceFailureReporter(error);
+
+void _reportVoiceFailure(Object error) {
+  if (error is ApiException) {
+    if (error.errorCode == 'INVALID_RESPONSE' ||
+        error.errorCode == 'MALFORMED_RESPONSE') {
+      reportHandledError(error);
+    }
+    return;
+  }
+  reportHandledError(
+    error,
+    fingerprint: ['voice', error.runtimeType.toString()],
+  );
 }

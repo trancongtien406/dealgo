@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -47,6 +48,20 @@ class LiveKitVoiceMediaEngine implements VoiceMediaEngine {
   @override
   Future<void> join({required String url, required String token}) async {
     assertLiveKitUrlAllowed(url, isRelease: kReleaseMode);
+    // AVAudioSession activation from the background fails with -4100
+    // (Sentry). Give the app a moment to come to the foreground first; CallKit
+    // answers from the lock screen still go ahead after the short wait.
+    await waitForForeground(const Duration(seconds: 3));
+    await runWithAudioSessionRetry(
+      () => _joinOnce(url: url, token: token),
+      beforeRetry: () async {
+        await leave();
+        await waitForForeground(const Duration(seconds: 10));
+      },
+    );
+  }
+
+  Future<void> _joinOnce({required String url, required String token}) async {
     await leave();
     _leaving = false;
     final room = Room(
@@ -118,5 +133,48 @@ class LiveKitVoiceMediaEngine implements VoiceMediaEngine {
     if (!_events.isClosed) {
       _events.add(event);
     }
+  }
+}
+
+/// AVAudioSession refused to activate (`-4100` / interruption), typically
+/// because the app was not in the foreground yet.
+@visibleForTesting
+bool isAudioSessionError(Object error) {
+  final text = error.toString();
+  return text.contains('-4100') ||
+      text.contains('AudioSession') ||
+      text.toLowerCase().contains('interruption');
+}
+
+/// Runs [attempt]; on an audio-session failure runs [beforeRetry] (tear down,
+/// wait for resume) and tries exactly once more. Other errors rethrow at once.
+@visibleForTesting
+Future<void> runWithAudioSessionRetry(
+  Future<void> Function() attempt, {
+  required Future<void> Function() beforeRetry,
+}) async {
+  try {
+    await attempt();
+  } catch (error) {
+    if (!isAudioSessionError(error)) rethrow;
+    await beforeRetry();
+    await attempt();
+  }
+}
+
+/// Completes when the app is resumed, or after [timeout] (whichever first).
+Future<void> waitForForeground(Duration timeout) async {
+  final state = WidgetsBinding.instance.lifecycleState;
+  if (state == null || state == AppLifecycleState.resumed) return;
+  final resumed = Completer<void>();
+  final listener = AppLifecycleListener(
+    onResume: () {
+      if (!resumed.isCompleted) resumed.complete();
+    },
+  );
+  try {
+    await resumed.future.timeout(timeout, onTimeout: () {});
+  } finally {
+    listener.dispose();
   }
 }

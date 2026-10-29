@@ -88,6 +88,25 @@ class _FakeRinger implements CallRinger {
 Future<void> _settle() => Future<void>.delayed(const Duration(milliseconds: 1));
 
 void main() {
+  test(
+    'a media failure is reported once at the catch site, not per rebuild',
+    () async {
+      final reported = <Object>[];
+      final previous = voiceFailureReporter;
+      voiceFailureReporter = reported.add;
+      addTearDown(() => voiceFailureReporter = previous);
+      final h = _Harness();
+      addTearDown(h.dispose);
+      h.media.joinError = Exception('AudioSessionException -4100');
+      await h.cubit.start(VoiceThreadKind.ride, 'ride-1');
+      expect(h.cubit.state.phase, VoiceCallPhase.ended);
+      final l10n = await AppLocalizations.delegate.load(const Locale('vi'));
+      h.cubit.state.error!.resolve(l10n);
+      h.cubit.state.error!.resolve(l10n);
+      expect(reported, hasLength(1));
+    },
+  );
+
   test('outgoing call joins the room, goes live on accept, hangs up', () async {
     final h = _Harness();
     await h.cubit.start(VoiceThreadKind.ride, 'ride-1');

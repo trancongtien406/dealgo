@@ -106,12 +106,16 @@ void main() {
       expect(report.toString(), isNot(contains('token')));
     });
 
-    test('reports unexpected failures', () {
+    test('reports a bad certificate; unknown socket errors are network', () {
       final report = DioErrorReporter.reportFor(
-        fail(DioExceptionType.unknown),
+        fail(DioExceptionType.badCertificate),
       )!;
-      expect(report.kind, 'unknown');
+      expect(report.kind, 'badCertificate');
       expect(report.status, isNull);
+      expect(
+        DioErrorReporter.reportFor(fail(DioExceptionType.unknown)),
+        isNull,
+      );
     });
 
     test('skips 4xx answers and the user network', () {

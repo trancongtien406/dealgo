@@ -49,8 +49,21 @@ class AppPermissionService {
     return status.isGranted;
   }
 
-  Future<bool> ensurePhotos() async {
-    final status = await Permission.photos.request();
+  /// One OS photo prompt at a time: a second tap while the first prompt is
+  /// open shares its answer instead of throwing "a request is already running"
+  /// (permission_handler; Sentry).
+  Future<bool> ensurePhotos() => _photosFlight ??= _ensurePhotos().whenComplete(
+    () => _photosFlight = null,
+  );
+
+  Future<bool>? _photosFlight;
+
+  @visibleForTesting
+  Future<PermissionStatus> Function() requestPhotos = () =>
+      Permission.photos.request();
+
+  Future<bool> _ensurePhotos() async {
+    final status = await requestPhotos();
     return status.isGranted || status.isLimited;
   }
 

@@ -73,3 +73,19 @@ flutter test
 - Kiến trúc: `go_router`, `flutter_bloc` (Cubit), `get_it` + `injectable`, một Dio dùng chung; realtime qua Socket.IO; push qua Firebase Cloud Messaging.
 - Hiện trạng và khoảng trống: [`../docs/10-ai-execution/mobile-flutter-gap-matrix.md`](../docs/10-ai-execution/mobile-flutter-gap-matrix.md).
 - Mockup và asset UI ở `../design/`.
+
+## Release iOS + Sentry symbols
+
+`tool/release_ios.sh` builds the IPA with `--obfuscate --split-debug-info=build/debug-info`
+and then runs `dart run sentry_dart_plugin` to upload Dart debug symbols and the iOS
+dSYMs to Sentry (org `tiendev`, project `flutter`, block `sentry:` in `pubspec.yaml`).
+
+```bash
+export SENTRY_AUTH_TOKEN=<token org Sentry, scope project:releases + project:write>  # không commit
+tool/release_ios.sh
+```
+
+Without `SENTRY_AUTH_TOKEN` (or a gitignored `sentry.properties`) the build still
+runs and only the upload is skipped. An archive made from the Xcode UI does not
+obfuscate or split debug info, so Sentry cannot symbolicate Dart frames for it;
+use the script for TestFlight/App Store builds.
