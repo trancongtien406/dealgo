@@ -205,23 +205,27 @@ class _StoreRowState extends State<StoreRow> {
   @override
   Widget build(BuildContext context) {
     if (_stores.isEmpty) return const SizedBox.shrink();
-    // Cover 118 + two-line name + up to three meta lines + padding.
-    return SizedBox(
-      height: 252,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: _stores.length,
-        separatorBuilder: (context, index) =>
-            const SizedBox(width: DealGoSpacing.s12),
-        itemBuilder: (context, index) {
-          final store = _stores[index];
-          return _StoreCard(
-            key: Key('home-store-${store.id}'),
-            store: store,
-            rating: _ratings[store.id],
-            onTap: () => context.push(FoodRoutes.store(store.id)),
-          );
-        },
+    // Cards size to their content and share the tallest one's height: a
+    // fixed strip height left new stores ("Quán mới", one meta line) with a
+    // tall empty block under the text.
+    return SingleChildScrollView(
+      key: const Key('home-store-row'),
+      scrollDirection: Axis.horizontal,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final (index, store) in _stores.indexed) ...[
+              if (index > 0) const SizedBox(width: DealGoSpacing.s12),
+              _StoreCard(
+                key: Key('home-store-${store.id}'),
+                store: store,
+                rating: _ratings[store.id],
+                onTap: () => context.push(FoodRoutes.store(store.id)),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

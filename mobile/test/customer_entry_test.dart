@@ -57,4 +57,30 @@ void main() {
     expect(find.textContaining('50%'), findsNothing);
     expect(navLabel('Trang'), findsOneWidget);
   });
+
+  testWidgets('featured new-store cards hug their content, same height', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await pumpSignedIn(
+      tester,
+      profile: customerProfile,
+      foodClient: FakeFoodClient(
+        stores: const [
+          FoodStoreSummary(id: 's1', name: 'My Store'),
+          FoodStoreSummary(
+            id: 's2',
+            name: 'Quán bún bò có cái tên rất dài để xuống hai dòng',
+          ),
+        ],
+      ),
+    );
+    final a = tester.getSize(find.byKey(const Key('home-store-s1')));
+    final b = tester.getSize(find.byKey(const Key('home-store-s2')));
+    expect(a.height, b.height);
+    // 16:9 cover (99) + name + one meta line + padding — no empty block.
+    expect(a.height, lessThan(200));
+    expect(tester.takeException(), isNull);
+  });
 }
