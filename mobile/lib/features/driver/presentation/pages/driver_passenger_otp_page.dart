@@ -268,7 +268,8 @@ class _DriverPassengerOtpPageState extends State<DriverPassengerOtpPage>
                   value: ride?.pickup.label ?? '—',
                 ),
                 const SizedBox(height: DealGoSpacing.s12),
-                for (final (i, stop) in (ride?.stops ?? const <RidePoint>[]).indexed) ...[
+                for (final (i, stop)
+                    in (ride?.stops ?? const <RidePoint>[]).indexed) ...[
                   DriverStop(
                     key: Key('driver-otp-stop-${i + 1}'),
                     color: DealGoColors.amber,

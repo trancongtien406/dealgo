@@ -64,7 +64,9 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
     if (held == null && !snapshot.canCheckout) {
       return;
     }
-    final attempt = held ?? CheckoutHeldAttempt.fromCart(
+    final attempt =
+        held ??
+        CheckoutHeldAttempt.fromCart(
           snapshot,
           token,
           paymentMethod: _payment.code,

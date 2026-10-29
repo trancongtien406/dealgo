@@ -172,6 +172,7 @@ class DioIdentityRemoteDataSource implements IdentityRemoteDataSource {
     String? email,
     String? dateOfBirth,
     String? gender,
+    String? contactPhone,
   }) {
     final body = <String, Object?>{};
     if (displayName != null) {
@@ -185,6 +186,9 @@ class DioIdentityRemoteDataSource implements IdentityRemoteDataSource {
     }
     if (gender != null) {
       body['gender'] = gender;
+    }
+    if (contactPhone != null) {
+      body['contactPhone'] = contactPhone;
     }
     return _request(
       () => dio.patch<Object?>(

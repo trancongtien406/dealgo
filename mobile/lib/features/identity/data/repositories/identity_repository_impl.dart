@@ -121,6 +121,7 @@ class IdentityRepositoryImpl implements IdentityRepository {
     String? email,
     String? dateOfBirth,
     String? gender,
+    String? contactPhone,
   }) async {
     final model = await _remote.updateMe(
       accessToken: accessToken,
@@ -128,6 +129,7 @@ class IdentityRepositoryImpl implements IdentityRepository {
       email: email,
       dateOfBirth: dateOfBirth,
       gender: gender,
+      contactPhone: contactPhone,
     );
     return model.toEntity();
   }

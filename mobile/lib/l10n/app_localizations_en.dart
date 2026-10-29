@@ -7084,4 +7084,15 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get driverOnlinePaymentPending =>
       'Customer\'s online payment not confirmed yet';
+
+  @override
+  String get profilePhone => 'Phone number';
+
+  @override
+  String get profilePhoneHint =>
+      'So the driver and the shop can reach you about orders. No verification code needed.';
+
+  @override
+  String get profilePhoneInvalid =>
+      'Enter a valid Vietnamese mobile number (e.g. 0901 234 567).';
 }

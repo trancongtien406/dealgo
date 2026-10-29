@@ -2304,5 +2304,8 @@
   "driverPaymentMethod": "Phương thức thanh toán",
   "driverPaidOnline": "Đã thanh toán online",
   "driverPaidOnlineAmount": "Đã thanh toán online {amount}",
-  "driverOnlinePaymentPending": "Khách đang thanh toán online, chưa xác nhận"
+  "driverOnlinePaymentPending": "Khách đang thanh toán online, chưa xác nhận",
+  "profilePhone": "Số điện thoại",
+  "profilePhoneHint": "Để tài xế và quán liên hệ khi giao hàng. Không cần mã xác minh.",
+  "profilePhoneInvalid": "Số di động Việt Nam không hợp lệ (ví dụ 0901 234 567)."
 }

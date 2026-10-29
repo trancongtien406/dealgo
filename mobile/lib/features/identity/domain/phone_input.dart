@@ -35,3 +35,12 @@ String formatDisplayPhone(String e164) {
   }
   return '+84 ${groups.join(' ')}';
 }
+
+final _vnMobile = RegExp(r'^\+84[35789]\d{8}$');
+
+/// Vietnamese mobile number as E.164 (`+84` + 9 digits, prefix 3/5/7/8/9),
+/// or null. Mirrors the backend's `normalizeVnMobile`.
+String? vnMobileFromInput(String raw) {
+  final e164 = e164FromNationalInput(raw);
+  return e164 != null && _vnMobile.hasMatch(e164) ? e164 : null;
+}

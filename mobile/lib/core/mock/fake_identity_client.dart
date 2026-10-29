@@ -323,8 +323,10 @@ class FakeIdentityClient implements IdentityClient {
     String? email,
     String? dateOfBirth,
     String? gender,
+    String? contactPhone,
   }) async {
     updateMeCalls.add({
+      'contactPhone': contactPhone,
       'displayName': displayName,
       'email': email,
       'dateOfBirth': dateOfBirth,
@@ -336,9 +338,13 @@ class FakeIdentityClient implements IdentityClient {
       email: email ?? profile.email,
       dateOfBirth: dateOfBirth ?? profile.dateOfBirth,
       gender: gender ?? profile.gender,
+      contactPhone: contactPhone ?? profile.contactPhone,
+    );
+    profile = profile.copyWith(
       needsProfileSetup:
           nextName.trim().isEmpty ||
-          nextName.trim().toLowerCase() == 'dealgo user',
+          nextName.trim().toLowerCase() == 'dealgo user' ||
+          !profile.hasAnyPhone,
     );
     return UserProfileModel.fromEntity(profile);
   }

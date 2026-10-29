@@ -31,6 +31,7 @@ class UserProfile {
     this.gender,
     this.avatarUrl,
     this.needsProfileSetup = false,
+    this.contactPhone,
   });
 
   final String id;
@@ -43,6 +44,13 @@ class UserProfile {
   final String? phoneVerifiedAt;
   final String? emailVerifiedAt;
   final bool needsProfileSetup;
+
+  /// Unverified phone typed at profile completion (email/passkey accounts).
+  /// Never used to sign in; [phone] stays the OTP-verified login phone.
+  final String? contactPhone;
+
+  bool get hasAnyPhone =>
+      (phone?.isNotEmpty ?? false) || (contactPhone?.isNotEmpty ?? false);
   final List<RoleGrant> grants;
 
   List<AppRole> get activeAppRoles {
@@ -95,6 +103,7 @@ class UserProfile {
     String? emailVerifiedAt,
     bool? needsProfileSetup,
     List<RoleGrant>? grants,
+    String? contactPhone,
   }) {
     return UserProfile(
       id: id ?? this.id,
@@ -108,6 +117,7 @@ class UserProfile {
       emailVerifiedAt: emailVerifiedAt ?? this.emailVerifiedAt,
       needsProfileSetup: needsProfileSetup ?? this.needsProfileSetup,
       grants: grants ?? this.grants,
+      contactPhone: contactPhone ?? this.contactPhone,
     );
   }
 

@@ -53,6 +53,7 @@ abstract interface class IdentityRepository {
     String? email,
     String? dateOfBirth,
     String? gender,
+    String? contactPhone,
   });
 
   Future<String> uploadAvatar({

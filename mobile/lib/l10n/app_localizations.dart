@@ -13171,6 +13171,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Customer\'s online payment not confirmed yet'**
   String get driverOnlinePaymentPending;
+
+  /// No description provided for @profilePhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone number'**
+  String get profilePhone;
+
+  /// No description provided for @profilePhoneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'So the driver and the shop can reach you about orders. No verification code needed.'**
+  String get profilePhoneHint;
+
+  /// No description provided for @profilePhoneInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid Vietnamese mobile number (e.g. 0901 234 567).'**
+  String get profilePhoneInvalid;
 }
 
 class _AppLocalizationsDelegate

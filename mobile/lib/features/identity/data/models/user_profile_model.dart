@@ -39,6 +39,7 @@ class UserProfileModel {
     this.gender,
     this.avatarUrl,
     this.needsProfileSetup = false,
+    this.contactPhone,
   });
 
   final String id;
@@ -51,6 +52,7 @@ class UserProfileModel {
   final String? phoneVerifiedAt;
   final String? emailVerifiedAt;
   final bool needsProfileSetup;
+  final String? contactPhone;
   final List<RoleGrantModel> grants;
 
   factory UserProfileModel.fromJson(Map<String, Object?> json) {
@@ -73,6 +75,7 @@ class UserProfileModel {
       phoneVerifiedAt: _nullableString(json['phoneVerifiedAt']),
       emailVerifiedAt: _nullableString(json['emailVerifiedAt']),
       needsProfileSetup: json['needsProfileSetup'] == true,
+      contactPhone: _nullableString(json['contactPhone']),
       grants: _decodeGrants(json['grants']),
     );
   }
@@ -89,6 +92,7 @@ class UserProfileModel {
       'phoneVerifiedAt': phoneVerifiedAt,
       'emailVerifiedAt': emailVerifiedAt,
       'needsProfileSetup': needsProfileSetup,
+      'contactPhone': contactPhone,
       'grants': [for (final grant in grants) grant.toJson()],
     };
   }
@@ -105,6 +109,7 @@ class UserProfileModel {
       phoneVerifiedAt: entity.phoneVerifiedAt,
       emailVerifiedAt: entity.emailVerifiedAt,
       needsProfileSetup: entity.needsProfileSetup,
+      contactPhone: entity.contactPhone,
       grants: [
         for (final grant in entity.grants)
           RoleGrantModel(role: grant.role, status: grant.status),
@@ -124,6 +129,7 @@ class UserProfileModel {
       phoneVerifiedAt: phoneVerifiedAt,
       emailVerifiedAt: emailVerifiedAt,
       needsProfileSetup: needsProfileSetup,
+      contactPhone: contactPhone,
       grants: List.unmodifiable([for (final grant in grants) grant.toEntity()]),
     );
   }

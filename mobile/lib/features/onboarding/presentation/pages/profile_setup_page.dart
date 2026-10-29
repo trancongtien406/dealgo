@@ -18,10 +18,12 @@ import '../../../identity/domain/entities/app_role.dart';
 import '../../../identity/domain/entities/auth_method_policy.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/domain/entities/user_profile.dart';
+import '../../../identity/domain/phone_input.dart';
 import '../../../identity/domain/repositories/identity_repository.dart';
 import '../../../identity/presentation/auth_methods_store.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
 import '../../../identity/presentation/widgets/auth_widgets.dart';
+import '../../../identity/presentation/widgets/auth_scaffold.dart';
 import '../avatar_image_source.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../l10n/app_localizations.dart';
@@ -47,6 +49,12 @@ class _ProfileSetupPageState extends State<ProfileSetupPage>
     with TextDraftMixin {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  String? _phoneError;
+
+  /// Email/passkey accounts have no login phone: ask for a contact phone
+  /// (saved as typed, no OTP). Phone-OTP accounts already have one.
+  bool _needsPhone = false;
   DateTime? _selectedDob;
   Gender _selectedGender = Gender.male;
   bool _submitting = false;
@@ -62,11 +70,13 @@ class _ProfileSetupPageState extends State<ProfileSetupPage>
     final auth = _maybeAuth()?.state;
     if (auth is AuthSignedIn) {
       _avatarUrl = auth.profile.avatarUrl;
+      _needsPhone = !auth.profile.hasAnyPhone;
     }
     // Name/email typed before an app kill come back on the next launch.
     bindTextDraft('profile.setup', {
       'name': _nameController,
       'email': _emailController,
+      'phone': _phoneController,
     });
   }
 
@@ -74,6 +84,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage>
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -110,7 +121,20 @@ class _ProfileSetupPageState extends State<ProfileSetupPage>
     if (name.isEmpty) {
       return;
     }
-    setState(() => _submitting = true);
+    String? contactPhone;
+    if (_needsPhone) {
+      contactPhone = vnMobileFromInput(_phoneController.text);
+      if (contactPhone == null) {
+        setState(
+          () => _phoneError = AppLocalizations.of(context).profilePhoneInvalid,
+        );
+        return;
+      }
+    }
+    setState(() {
+      _phoneError = null;
+      _submitting = true;
+    });
     try {
       final auth = _maybeAuth();
       final repo = _maybeRepo();
@@ -132,6 +156,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage>
                     '${dob.month.toString().padLeft(2, '0')}-'
                     '${dob.day.toString().padLeft(2, '0')}',
           gender: _genderApiValue,
+          contactPhone: contactPhone,
         );
         await auth.applyUpdatedProfile(updated);
       }
@@ -264,7 +289,10 @@ class _ProfileSetupPageState extends State<ProfileSetupPage>
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final canSubmit = _nameController.text.trim().isNotEmpty && !_submitting;
+    final canSubmit =
+        _nameController.text.trim().isNotEmpty &&
+        (!_needsPhone || _phoneController.text.trim().isNotEmpty) &&
+        !_submitting;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7FC),
@@ -335,6 +363,30 @@ class _ProfileSetupPageState extends State<ProfileSetupPage>
                       prefixIcon: DealGoIcons.user,
                       textCapitalization: TextCapitalization.words,
                     ),
+                    if (_needsPhone) ...[
+                      const SizedBox(height: 12),
+                      _FormField(
+                        label: l10n.profilePhone,
+                        child: AuthPhoneField(
+                          controller: _phoneController,
+                          errorText: _phoneError,
+                          onChanged: (_) => setState(() => _phoneError = null),
+                          onSubmitted: () {
+                            if (canSubmit) {
+                              unawaited(_onSubmit());
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        l10n.profilePhoneHint,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: DealGoColors.textSecondary,
+                        ),
+                      ),
+                    ],
                     if (authMethodEnabled(context, AuthMethodPolicy.email)) ...[
                       const SizedBox(height: 12),
                       DealGoTextField(

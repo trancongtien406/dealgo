@@ -7046,4 +7046,15 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get driverOnlinePaymentPending =>
       'Khách đang thanh toán online, chưa xác nhận';
+
+  @override
+  String get profilePhone => 'Số điện thoại';
+
+  @override
+  String get profilePhoneHint =>
+      'Để tài xế và quán liên hệ khi giao hàng. Không cần mã xác minh.';
+
+  @override
+  String get profilePhoneInvalid =>
+      'Số di động Việt Nam không hợp lệ (ví dụ 0901 234 567).';
 }
