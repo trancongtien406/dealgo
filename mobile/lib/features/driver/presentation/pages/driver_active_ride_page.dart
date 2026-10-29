@@ -1,3 +1,5 @@
+import '../../../../core/network/api_exception.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -368,7 +370,20 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
         title: l10n.driverActiveNavTitle,
         insetBottom: true,
         onBack: () => driverBack(context),
-        body: _loadFailure != null
+        body: _rideGone(_loadFailure)
+            // Reassigned / cancelled / not this driver's (stale notification):
+            // say so instead of a retry that can never succeed.
+            ? Center(
+                key: const Key('driver-active-gone'),
+                child: Padding(
+                  padding: const EdgeInsets.all(DealGoSpacing.s24),
+                  child: Text(
+                    l10n.driverJobPushGone,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              )
+            : _loadFailure != null
             ? DealGoStateView.failure(
                 context,
                 key: const Key('driver-active-retry'),
@@ -828,3 +843,7 @@ OpenRide openRideFromView(RideView view) => OpenRide(
   stops: [for (final s in view.stops) s.point],
   routeVersion: view.routeVersion,
 );
+
+bool _rideGone(Object? failure) =>
+    failure is ApiException &&
+    (failure.statusCode == 403 || failure.statusCode == 404);

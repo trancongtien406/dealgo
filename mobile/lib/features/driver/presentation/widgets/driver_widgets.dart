@@ -30,7 +30,11 @@ void driverBack(BuildContext context) {
   final auth = context.read<AuthCubit>().state;
   if (auth is AuthSignedIn && auth.profile.activeAppRoles.length > 1) {
     context.push(AuthRoutes.roles);
+    return;
   }
+  // Nothing under this page (opened from a push / notification / restored
+  // route): back must still leave, so return to the driver home tab.
+  context.go('/driver');
 }
 
 class DriverPageFrame extends StatelessWidget {

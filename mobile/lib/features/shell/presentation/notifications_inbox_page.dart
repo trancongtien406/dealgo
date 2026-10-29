@@ -21,6 +21,10 @@ import '../../inbox/domain/usecases/inbox_usecases.dart';
 import '../../inbox/presentation/inbox_unread.dart';
 import 'account_widgets.dart';
 import 'inbox_copy.dart';
+import 'shell_tab.dart';
+import '../../driver/presentation/cubit/driver_duty_cubit.dart';
+import '../../driver/presentation/cubit/driver_feed_cubit.dart';
+import '../../driver/presentation/utils/driver_routes.dart';
 import '../../../core/design_system/components/dealgo_app_header.dart';
 import '../../../core/design_system/components/dealgo_nav_insets.dart';
 
@@ -130,9 +134,63 @@ class _NotificationsInboxPageState extends State<NotificationsInboxPage> {
       status: item.status,
       path: item.path,
     );
-    if (target != null) {
-      await context.push(target);
+    if (target == null) {
+      return;
     }
+    if (target == '/driver/jobs' && item.aggregateId != null) {
+      await _openDriverJob(item);
+      return;
+    }
+    // A tab root (e.g. /driver/jobs, /customer) is another shell branch:
+    // `push` stacks a second shell with no back button, so switch tabs.
+    if (_isTabRoot(target)) {
+      context.go(target);
+      return;
+    }
+    await context.push(target);
+  }
+
+  static bool _isTabRoot(String target) => [
+    ...customerShellTabs,
+    ...driverShellTabs,
+    ...merchantShellTabs,
+  ].any((t) => t.path == target);
+
+  /// A "Cuốc xe mới"/food request: open that job's page (back returns here)
+  /// if it is still open, else say it was cancelled/taken and stay put.
+  Future<void> _openDriverJob(InboxNotification item) async {
+    final id = item.aggregateId!;
+    DriverFeedCubit? feed;
+    bool online = false;
+    try {
+      feed = context.read<DriverFeedCubit>();
+      online = context.read<DriverDutyCubit>().state;
+    } catch (_) {
+      feed = null;
+    }
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final gone = AppLocalizations.of(context).driverJobPushGone;
+    if (feed != null && online) {
+      await feed.sync(online: true, accessToken: _token, quiet: true);
+      if (!mounted) return;
+      final ride = openRideFrom(feed.state, id);
+      if (ride != null) {
+        await context.push(DriverRoutes.ride(id), extra: ride);
+        return;
+      }
+      final food = readyFoodFrom(feed.state, id);
+      if (food != null) {
+        await context.push(DriverRoutes.food(id), extra: food);
+        return;
+      }
+    }
+    if (!online) {
+      context.go('/driver/jobs');
+      return;
+    }
+    messenger?.showSnackBar(
+      SnackBar(key: const Key('inbox-job-gone'), content: Text(gone)),
+    );
   }
 
   Future<void> _markAllRead() async {
