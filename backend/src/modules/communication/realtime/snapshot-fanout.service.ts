@@ -7,6 +7,8 @@ import {
   type DriverLocationEventPayload,
   RIDE_OFFERS_EVENT,
   RIDE_REQUEST_EVENT,
+  FOOD_REQUEST_EVENT,
+  type FoodRequestEventPayload,
   RIDE_UNASSIGNED_EVENT_NAME,
   type RideUnassignedEventPayload,
   type RideRequestEventPayload,
@@ -168,6 +170,13 @@ export class SnapshotFanoutService {
       return;
     }
     this.server.to(driverIds.map((id) => roomForUser(id))).emit(RIDE_REQUEST_EVENT, payload);
+  }
+
+  emitFoodRequest(driverIds: readonly string[], payload: FoodRequestEventPayload): void {
+    if (!this.server || driverIds.length === 0) {
+      return;
+    }
+    this.server.to(driverIds.map((id) => roomForUser(id))).emit(FOOD_REQUEST_EVENT, payload);
   }
 
   emitPartnerStatus(payload: PartnerStatusEventPayload): void {

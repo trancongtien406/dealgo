@@ -47,6 +47,7 @@ class SocketSnapshotRealtime implements SnapshotRealtime {
   final _chatMessages = StreamController<ChatMessageHint>.broadcast();
   final _rideUnassigned = StreamController<RideUnassignedHint>.broadcast();
   final _inboxEvents = StreamController<void>.broadcast();
+  final _jobRequests = StreamController<void>.broadcast();
 
   /// Room → number of live consumers. QA M2 root cause: rooms were a plain
   /// set, so when the merchant order page closed its `store:{id}` binding it
@@ -92,6 +93,9 @@ class SocketSnapshotRealtime implements SnapshotRealtime {
 
   @override
   Stream<void> get inboxEvents => _inboxEvents.stream;
+
+  @override
+  Stream<void> get jobRequests => _jobRequests.stream;
 
   @override
   Stream<void> get reconnects => _reconnects.stream;
@@ -218,6 +222,15 @@ class SocketSnapshotRealtime implements SnapshotRealtime {
         _rideUnassigned.add(hint);
       }
     });
+    // New nearby job for a driver: the open job list re-GETs at once instead of
+    // waiting for a manual refresh / app resume.
+    for (final event in const ['rideRequest', 'foodRequest']) {
+      created.on(event, (dynamic _) {
+        if (!_jobRequests.isClosed) {
+          _jobRequests.add(null);
+        }
+      });
+    }
     created.on('partnerStatus', (dynamic raw) {
       final hint = parsePartnerStatusHint(raw);
       if (hint != null && !_partnerStatuses.isClosed) {
@@ -345,6 +358,7 @@ class SocketSnapshotRealtime implements SnapshotRealtime {
     await _chatMessages.close();
     await _rideUnassigned.close();
     await _inboxEvents.close();
+    await _jobRequests.close();
   }
 }
 
