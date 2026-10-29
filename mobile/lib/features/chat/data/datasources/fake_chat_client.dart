@@ -9,6 +9,7 @@ class FakeChatClient implements ChatClient {
   Object? postError;
   final List<ChatMessageView> _ride = [];
   final List<ChatMessageView> _food = [];
+  final List<ChatMessageView> _shop = [];
   var _seq = 0;
 
   @override
@@ -40,24 +41,31 @@ class FakeChatClient implements ChatClient {
   Future<ChatMessagePageModel> listFoodOrderMessages({
     required String accessToken,
     required String orderId,
+    bool shop = false,
     int page = 1,
     int limit = 50,
   }) async {
-    return ChatMessagePageModel.fromEntity(_page(_food, page, limit));
+    return ChatMessagePageModel.fromEntity(
+      _page(shop ? _shop : _food, page, limit),
+    );
   }
 
   @override
   Future<ChatMessageModel> postFoodOrderMessage({
     required String accessToken,
     required String orderId,
+    bool shop = false,
     required String body,
   }) async {
     final error = postError;
     if (error != null) {
       throw error;
     }
-    final message = _next(threadId: 'food-$orderId', body: body);
-    _food.add(message);
+    final message = _next(
+      threadId: '${shop ? 'shop' : 'food'}-$orderId',
+      body: body,
+    );
+    (shop ? _shop : _food).add(message);
     return ChatMessageModel.fromEntity(message);
   }
 
@@ -75,6 +83,8 @@ class FakeChatClient implements ChatClient {
   void seedRide(ChatMessageView message) => _ride.add(message);
 
   void seedFood(ChatMessageView message) => _food.add(message);
+
+  void seedShop(ChatMessageView message) => _shop.add(message);
 
   ChatMessagePage _page(List<ChatMessageView> items, int page, int limit) {
     final start = (page - 1) * limit;

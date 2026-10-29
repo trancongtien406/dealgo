@@ -224,6 +224,12 @@ class AppLocalizationsVi extends AppLocalizations {
   String get chatContact => 'Nhắn tin';
 
   @override
+  String get chatContactShop => 'Nhắn quán';
+
+  @override
+  String get chatContactCustomer => 'Nhắn khách';
+
+  @override
   String get voiceCall => 'Gọi thoại';
 
   @override
@@ -5271,6 +5277,9 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get chatRoleCustomer => 'Khách hàng';
+
+  @override
+  String get chatRoleShop => 'Quán';
 
   @override
   String get chatCallAction => 'Gọi';

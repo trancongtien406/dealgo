@@ -13,14 +13,19 @@ import '../../domain/usecases/send_food_order_chat_message.dart';
 import '../../domain/usecases/send_ride_chat_message.dart';
 import '../model/chat_timeline.dart';
 
-enum ChatThreadKind { ride, foodOrder }
+/// `foodOrder` = customer ↔ driver of a food order; `foodOrderShop` =
+/// customer ↔ shop of the same order. They are separate threads end to end.
+enum ChatThreadKind { ride, foodOrder, foodOrderShop }
 
 extension ChatThreadKindX on ChatThreadKind {
   /// Aggregate name used by the realtime `chatMessage` push.
   String get aggregateType => switch (this) {
     ChatThreadKind.ride => 'Ride',
     ChatThreadKind.foodOrder => 'FoodOrder',
+    ChatThreadKind.foodOrderShop => 'FoodOrderShop',
   };
+
+  bool get isFood => this != ChatThreadKind.ride;
 }
 
 const _unauthorized = ApiException(
@@ -139,10 +144,12 @@ class ChatCubit extends Cubit<ChatState> {
         ChatThreadKind.ride => await _listRideChatMessages(
           ListRideChatMessagesParams(accessToken: token, rideId: resourceId),
         ),
-        ChatThreadKind.foodOrder => await _listFoodOrderChatMessages(
+        ChatThreadKind.foodOrder ||
+        ChatThreadKind.foodOrderShop => await _listFoodOrderChatMessages(
           ListFoodOrderChatMessagesParams(
             accessToken: token,
             orderId: resourceId,
+            shop: kind == ChatThreadKind.foodOrderShop,
           ),
         ),
       };
@@ -263,11 +270,13 @@ class ChatCubit extends Cubit<ChatState> {
             body: line.body,
           ),
         ),
-        ChatThreadKind.foodOrder => await _sendFoodOrderChatMessage(
+        ChatThreadKind.foodOrder ||
+        ChatThreadKind.foodOrderShop => await _sendFoodOrderChatMessage(
           SendFoodOrderChatMessageParams(
             accessToken: token,
             orderId: resourceId,
             body: line.body,
+            shop: kind == ChatThreadKind.foodOrderShop,
           ),
         ),
       };

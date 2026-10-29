@@ -41,12 +41,14 @@ class ChatRepositoryImpl implements ChatRepository {
   Future<ChatMessagePage> listFoodOrderMessages({
     required String accessToken,
     required String orderId,
+    bool shop = false,
     int page = 1,
     int limit = 50,
   }) async {
     final model = await _remote.listFoodOrderMessages(
       accessToken: accessToken,
       orderId: orderId,
+      shop: shop,
       page: page,
       limit: limit,
     );
@@ -57,11 +59,13 @@ class ChatRepositoryImpl implements ChatRepository {
   Future<ChatMessageView> postFoodOrderMessage({
     required String accessToken,
     required String orderId,
+    bool shop = false,
     required String body,
   }) async {
     final model = await _remote.postFoodOrderMessage(
       accessToken: accessToken,
       orderId: orderId,
+      shop: shop,
       body: body,
     );
     return model.toEntity();

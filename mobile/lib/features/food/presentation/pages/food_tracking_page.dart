@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -89,6 +91,26 @@ class _FoodTrackingView extends StatelessWidget {
     );
   }
 
+  /// Customer ↔ shop thread: a separate thread the driver never sees.
+  Future<void> _openShopChat(
+    BuildContext context,
+    String orderId,
+    String? storeName,
+  ) {
+    final auth = context.read<AuthCubit>().state;
+    final userId = auth is AuthSignedIn ? auth.profile.id : null;
+    final name = storeName?.trim() ?? '';
+    return showTransactionChatSheet(
+      context: context,
+      kind: ChatThreadKind.foodOrderShop,
+      resourceId: orderId,
+      accessToken: currentAccessToken(context),
+      currentUserId: userId,
+      viewer: ChatViewer.customer,
+      counterpart: name.isEmpty ? null : ChatCounterpart(name: name),
+    );
+  }
+
   void _openVoice(BuildContext context, String orderId) {
     startVoiceCall(
       context,
@@ -147,17 +169,28 @@ class _FoodTrackingView extends StatelessWidget {
               );
             }
             return OpenChatOnArrival(
-              onOpen: () => _openChat(context, orderId),
-              child: _FoodLive(
-                order: order,
-                busy: busy,
-                onBack: () => _back(context),
-                onRefresh: () => context.read<FoodTrackingCubit>().refresh(),
-                onCancelStub: () => context.push(FoodRoutes.cancel(orderId)),
-                onOpenChat: () => _openChat(context, orderId),
-                onOpenVoice: voiceCallsEnabled(context)
-                    ? () => _openVoice(context, orderId)
-                    : null,
+              shop: true,
+              onOpen: () => _openShopChat(context, orderId, order?.storeName),
+              child: OpenChatOnArrival(
+                // Driver thread only exists once a driver is assigned.
+                onOpen: () {
+                  if (order?.assignedDriverId != null) {
+                    unawaited(_openChat(context, orderId));
+                  }
+                },
+                child: _FoodLive(
+                  order: order,
+                  busy: busy,
+                  onBack: () => _back(context),
+                  onRefresh: () => context.read<FoodTrackingCubit>().refresh(),
+                  onCancelStub: () => context.push(FoodRoutes.cancel(orderId)),
+                  onOpenChat: () => _openChat(context, orderId),
+                  onOpenShopChat: () =>
+                      _openShopChat(context, orderId, order?.storeName),
+                  onOpenVoice: voiceCallsEnabled(context)
+                      ? () => _openVoice(context, orderId)
+                      : null,
+                ),
               ),
             );
           },
@@ -175,6 +208,7 @@ class _FoodLive extends StatelessWidget {
     required this.onRefresh,
     required this.onCancelStub,
     required this.onOpenChat,
+    required this.onOpenShopChat,
     this.onOpenVoice,
   });
 
@@ -184,6 +218,7 @@ class _FoodLive extends StatelessWidget {
   final VoidCallback onRefresh;
   final VoidCallback onCancelStub;
   final VoidCallback onOpenChat;
+  final VoidCallback onOpenShopChat;
   final VoidCallback? onOpenVoice;
 
   static int _stepIndex(String status) => switch (status) {
@@ -235,7 +270,9 @@ class _FoodLive extends StatelessWidget {
           )
         : null;
     final hasDriver = current.assignedDriverId != null;
-    final contact = current.stage == FoodTrackingStage.cancelled
+    // Driver chat/call only reach the assigned driver; before assignment
+    // there is no driver thread (the server answers 409).
+    final contact = current.stage == FoodTrackingStage.cancelled || !hasDriver
         ? null
         : DealGoContactActions(
             children: [
@@ -382,7 +419,17 @@ class _FoodLive extends StatelessWidget {
                       style: textTheme.titleMedium,
                     ),
                   ),
-                  if (!hasDriver) ?contact,
+                  if (current.stage != FoodTrackingStage.cancelled)
+                    DealGoContactButton(
+                      key: const Key('food-open-shop-chat'),
+                      tooltip: l10n.chatContactShop,
+                      onPressed: busy ? null : onOpenShopChat,
+                      icon: ChatUnreadBadge(
+                        aggregateType: 'FoodOrderShop',
+                        aggregateId: current.id,
+                        child: const Icon(DealGoIcons.chat),
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: DealGoSpacing.s8),

@@ -32,6 +32,9 @@ class FakeChatRepository implements ChatRepository {
   final List<ChatMessageView> messages;
   final String senderId;
   int listCalls = 0;
+
+  /// `shop` flag of each food list / post call (thread routing checks).
+  final foodShopFlags = <bool>[];
   final posted = <String>[];
 
   /// Bodies whose POST fails (once each unless [failAlways]).
@@ -79,9 +82,11 @@ class FakeChatRepository implements ChatRepository {
   Future<ChatMessagePage> listFoodOrderMessages({
     required String accessToken,
     required String orderId,
+    bool shop = false,
     int page = 1,
     int limit = 50,
   }) async {
+    foodShopFlags.add(shop);
     listCalls += 1;
     return _page();
   }
@@ -97,8 +102,12 @@ class FakeChatRepository implements ChatRepository {
   Future<ChatMessageView> postFoodOrderMessage({
     required String accessToken,
     required String orderId,
+    bool shop = false,
     required String body,
-  }) => _post(body);
+  }) {
+    foodShopFlags.add(shop);
+    return _post(body);
+  }
 }
 
 class FakeDriverCards implements DriverCardRepository {

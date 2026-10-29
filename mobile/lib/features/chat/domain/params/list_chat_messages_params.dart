@@ -18,10 +18,14 @@ class ListFoodOrderChatMessagesParams {
     required this.orderId,
     this.page = 1,
     this.limit = 50,
+    this.shop = false,
   });
 
   final String accessToken;
   final String orderId;
+
+  /// true = the customer ↔ shop thread; false = customer ↔ driver.
+  final bool shop;
   final int page;
   final int limit;
 }

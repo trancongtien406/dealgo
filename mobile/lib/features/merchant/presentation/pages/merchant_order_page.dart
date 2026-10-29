@@ -21,6 +21,12 @@ import '../cubit/merchant_order_cubit.dart';
 import '../cubit/merchant_queue_cubit.dart';
 import '../cubit/merchant_states.dart';
 import '../widgets/merchant_widgets.dart';
+import '../../../chat/presentation/cubit/chat_cubit.dart';
+import '../../../chat/presentation/widgets/chat_unread_badge.dart';
+import '../../../chat/presentation/widgets/open_chat_on_arrival.dart';
+import '../../../chat/presentation/widgets/transaction_chat_sheet.dart';
+import '../../../identity/domain/entities/auth_state.dart';
+import '../../../identity/presentation/cubit/auth_cubit.dart';
 import '../../../../core/design_system/components/handover_ref_badge.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/format/short_ref.dart';
@@ -223,7 +229,7 @@ class _Detail extends StatelessWidget {
     } else {
       footer = null;
     }
-    return MerchantPageFrame(
+    final page = MerchantPageFrame(
       title: title,
       insetBottom: true,
       onBack: () => merchantBack(context),
@@ -311,6 +317,19 @@ class _Detail extends StatelessWidget {
                           tone: MerchantChipTone.green,
                         ),
                     ],
+                  ),
+                ],
+                if (merchantCanChat(order.status)) ...[
+                  const SizedBox(height: DealGoSpacing.s12),
+                  OutlinedButton.icon(
+                    key: const Key('merchant-open-chat'),
+                    onPressed: () => openMerchantCustomerChat(context, order),
+                    icon: ChatUnreadBadge(
+                      aggregateType: 'FoodOrderShop',
+                      aggregateId: order.id,
+                      child: const Icon(DealGoIcons.chat, size: 18),
+                    ),
+                    label: Text(l10n.chatContactCustomer),
                   ),
                 ],
               ],
@@ -603,6 +622,15 @@ class _Detail extends StatelessWidget {
         ],
       ),
     );
+    // Merchant push links use `?chat=1`; this page only hosts the shop thread.
+    return OpenChatOnArrival(
+      onOpen: () {
+        if (merchantCanChat(order.status)) {
+          openMerchantCustomerChat(context, order);
+        }
+      },
+      child: page,
+    );
   }
 
   Future<void> _confirmReject(BuildContext context) async {
@@ -776,4 +804,31 @@ class _MerchantRejectDialogState extends State<MerchantRejectDialog> {
       ],
     );
   }
+}
+
+/// The shop ↔ customer thread is open while the order is live (not after
+/// delivery / cancellation / rejection).
+bool merchantCanChat(String status) => const {
+  'PLACED',
+  'PREPARING',
+  'READY',
+  'READY_FOR_PICKUP',
+  'ASSIGNED',
+  'PICKED_UP',
+}.contains(status);
+
+/// Merchant side of the food order's customer ↔ shop thread. Never the
+/// customer ↔ driver thread: the server refuses that one for the merchant.
+void openMerchantCustomerChat(BuildContext context, MerchantQueueOrder order) {
+  final auth = context.read<AuthCubit>().state;
+  final name = order.customerName?.trim() ?? '';
+  showTransactionChatSheet(
+    context: context,
+    kind: ChatThreadKind.foodOrderShop,
+    resourceId: order.id,
+    accessToken: merchantAccessToken(context),
+    currentUserId: auth is AuthSignedIn ? auth.profile.id : null,
+    viewer: ChatViewer.merchant,
+    counterpart: name.isEmpty ? null : ChatCounterpart(name: name),
+  );
 }

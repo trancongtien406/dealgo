@@ -220,6 +220,10 @@ abstract final class ApiPaths {
     return '/v1/rides/${Uri.encodeComponent(rideId)}/messages';
   }
 
+  /// Customer ↔ shop thread of a food order (separate from the driver one).
+  static String foodOrderShopMessages(String orderId) =>
+      '/v1/food/orders/${Uri.encodeComponent(orderId)}/shop-messages';
+
   static String foodOrderMessages(String orderId) {
     return '/v1/food/orders/${Uri.encodeComponent(orderId)}/messages';
   }

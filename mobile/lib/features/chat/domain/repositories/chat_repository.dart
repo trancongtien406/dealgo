@@ -17,6 +17,7 @@ abstract interface class ChatRepository {
   Future<ChatMessagePage> listFoodOrderMessages({
     required String accessToken,
     required String orderId,
+    bool shop = false,
     int page,
     int limit,
   });
@@ -24,6 +25,7 @@ abstract interface class ChatRepository {
   Future<ChatMessageView> postFoodOrderMessage({
     required String accessToken,
     required String orderId,
+    bool shop = false,
     required String body,
   });
 }

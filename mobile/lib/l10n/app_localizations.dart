@@ -512,6 +512,18 @@ abstract class AppLocalizations {
   /// **'Message'**
   String get chatContact;
 
+  /// No description provided for @chatContactShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Message the shop'**
+  String get chatContactShop;
+
+  /// No description provided for @chatContactCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer chat'**
+  String get chatContactCustomer;
+
   /// No description provided for @voiceCall.
   ///
   /// In en, this message translates to:
@@ -9937,6 +9949,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Customer'**
   String get chatRoleCustomer;
+
+  /// No description provided for @chatRoleShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop'**
+  String get chatRoleShop;
 
   /// No description provided for @chatCallAction.
   ///

@@ -222,6 +222,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatContact => 'Message';
 
   @override
+  String get chatContactShop => 'Message the shop';
+
+  @override
+  String get chatContactCustomer => 'Customer chat';
+
+  @override
   String get voiceCall => 'Voice call';
 
   @override
@@ -5301,6 +5307,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatRoleCustomer => 'Customer';
+
+  @override
+  String get chatRoleShop => 'Shop';
 
   @override
   String get chatCallAction => 'Call';

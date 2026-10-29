@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 /// Query flag a tapped chat push adds to the job page it opens (`?chat=1`).
 const chatOnArrivalParam = 'chat';
 
+/// `?chat=shop` = open the customer ↔ shop thread of a food order.
+const chatOnArrivalShop = 'shop';
+
 /// Opens the job's chat once when the page was reached from a chat push
 /// (Grab / Uber pattern: a "new message" tap lands in the conversation, the job
 /// page stays underneath for back). Wrap the part of the page that only renders
@@ -13,8 +16,12 @@ class OpenChatOnArrival extends StatefulWidget {
     required this.onOpen,
     required this.child,
     this.requested,
+    this.shop = false,
     super.key,
   });
+
+  /// true: only reacts to `?chat=shop`; false: reacts to any other `?chat=`.
+  final bool shop;
 
   final VoidCallback onOpen;
   final Widget child;
@@ -39,7 +46,11 @@ class _OpenChatOnArrivalState extends State<OpenChatOnArrival> {
     try {
       final uri = GoRouterState.of(context).uri;
       final value = uri.queryParameters[chatOnArrivalParam];
-      final on = value != null && value.isNotEmpty && value != '0';
+      final on =
+          value != null &&
+          value.isNotEmpty &&
+          value != '0' &&
+          (value == chatOnArrivalShop) == widget.shop;
       return on ? uri.toString() : null;
     } catch (_) {
       return null;

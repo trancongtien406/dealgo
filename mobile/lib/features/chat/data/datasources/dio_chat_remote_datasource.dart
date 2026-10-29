@@ -44,11 +44,14 @@ class DioChatRemoteDataSource implements ChatRemoteDataSource {
   Future<ChatMessagePageModel> listFoodOrderMessages({
     required String accessToken,
     required String orderId,
+    bool shop = false,
     int page = 1,
     int limit = 50,
   }) {
     return _list(
-      path: ApiPaths.foodOrderMessages(orderId),
+      path: shop
+          ? ApiPaths.foodOrderShopMessages(orderId)
+          : ApiPaths.foodOrderMessages(orderId),
       accessToken: accessToken,
       page: page,
       limit: limit,
@@ -59,10 +62,13 @@ class DioChatRemoteDataSource implements ChatRemoteDataSource {
   Future<ChatMessageModel> postFoodOrderMessage({
     required String accessToken,
     required String orderId,
+    bool shop = false,
     required String body,
   }) {
     return _post(
-      path: ApiPaths.foodOrderMessages(orderId),
+      path: shop
+          ? ApiPaths.foodOrderShopMessages(orderId)
+          : ApiPaths.foodOrderMessages(orderId),
       accessToken: accessToken,
       body: body,
     );

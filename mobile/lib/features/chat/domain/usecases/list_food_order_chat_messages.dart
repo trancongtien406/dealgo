@@ -11,6 +11,7 @@ class ListFoodOrderChatMessages {
     return _repository.listFoodOrderMessages(
       accessToken: params.accessToken,
       orderId: params.orderId,
+      shop: params.shop,
       page: params.page,
       limit: params.limit,
     );

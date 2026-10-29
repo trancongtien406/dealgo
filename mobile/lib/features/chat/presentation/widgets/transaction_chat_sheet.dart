@@ -19,7 +19,21 @@ import '../model/chat_timeline.dart';
 import '../model/chat_unread.dart';
 
 /// Who is looking at the thread (header + quick replies).
-enum ChatViewer { customer, driver }
+enum ChatViewer { customer, driver, merchant }
+
+/// Role label of the other party, from who is looking and which thread.
+/// Customer → driver thread: "Tài xế"; customer → shop thread: "Quán";
+/// driver or merchant: "Khách hàng".
+String chatCounterpartRole(
+  AppLocalizations l10n,
+  ChatViewer viewer,
+  ChatThreadKind kind,
+) {
+  if (viewer != ChatViewer.customer) return l10n.chatRoleCustomer;
+  return kind == ChatThreadKind.foodOrderShop
+      ? l10n.chatRoleShop
+      : l10n.chatRoleDriver;
+}
 
 /// The other party shown in the sheet header.
 class ChatCounterpart {
@@ -49,6 +63,7 @@ Future<void> showTransactionChatSheet({
   required String? accessToken,
   String? currentUserId,
   ChatViewer viewer = ChatViewer.customer,
+  ChatCounterpart? counterpart,
   VoidCallback? onCall,
 }) {
   final realtime = _tryRead<SnapshotRealtime>(context);
@@ -88,6 +103,7 @@ Future<void> showTransactionChatSheet({
           accessToken: accessToken,
           currentUserId: currentUserId,
           viewer: viewer,
+          counterpart: counterpart,
           onCall: onCall == null
               ? null
               : () {
@@ -161,6 +177,12 @@ class _TransactionChatSheetState extends State<TransactionChatSheet> {
     final cards = widget.cards;
     final token = widget.accessToken ?? '';
     if (cards == null || token.isEmpty) return;
+    // Shop threads: the opener passes the store / customer name; the driver
+    // card endpoints would show the wrong person here.
+    if (widget.kind == ChatThreadKind.foodOrderShop ||
+        widget.viewer == ChatViewer.merchant) {
+      return;
+    }
     try {
       final ChatCounterpart value;
       if (widget.viewer == ChatViewer.customer) {
@@ -180,7 +202,7 @@ class _TransactionChatSheetState extends State<TransactionChatSheet> {
         final name = await cards.fetchCustomerName(
           accessToken: token,
           jobId: widget.resourceId,
-          isFood: widget.kind == ChatThreadKind.foodOrder,
+          isFood: widget.kind.isFood,
         );
         value = ChatCounterpart(name: name);
       }
@@ -224,6 +246,7 @@ class _TransactionChatSheetState extends State<TransactionChatSheet> {
   }
 
   List<String> _quickReplies(AppLocalizations l10n) {
+    if (widget.kind == ChatThreadKind.foodOrderShop) return const [];
     final food = widget.kind == ChatThreadKind.foodOrder;
     return widget.viewer == ChatViewer.driver
         ? [
@@ -259,6 +282,7 @@ class _TransactionChatSheetState extends State<TransactionChatSheet> {
             const _Handle(),
             _Header(
               viewer: widget.viewer,
+              kind: widget.kind,
               counterpart: _counterpart,
               onCall: widget.onCall,
             ),
@@ -292,10 +316,11 @@ class _TransactionChatSheetState extends State<TransactionChatSheet> {
                 ),
               ),
             ),
-            _QuickReplies(
-              replies: _quickReplies(l10n),
-              onTap: (text) => unawaited(_send(text)),
-            ),
+            if (_quickReplies(l10n).isNotEmpty)
+              _QuickReplies(
+                replies: _quickReplies(l10n),
+                onTap: (text) => unawaited(_send(text)),
+              ),
             _Composer(
               controller: _controller,
               focus: _focus,
@@ -329,9 +354,15 @@ class _Handle extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.viewer, this.counterpart, this.onCall});
+  const _Header({
+    required this.viewer,
+    required this.kind,
+    this.counterpart,
+    this.onCall,
+  });
 
   final ChatViewer viewer;
+  final ChatThreadKind kind;
   final ChatCounterpart? counterpart;
   final VoidCallback? onCall;
 
@@ -339,9 +370,7 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
-    final role = viewer == ChatViewer.customer
-        ? l10n.chatRoleDriver
-        : l10n.chatRoleCustomer;
+    final role = chatCounterpartRole(l10n, viewer, kind);
     final name = counterpart?.name ?? role;
     final detail = counterpart == null
         ? null
@@ -362,7 +391,8 @@ class _Header extends StatelessWidget {
             foregroundImage: avatar == null ? null : NetworkImage(avatar),
             child: counterpart == null
                 ? Icon(
-                    viewer == ChatViewer.customer
+                    viewer == ChatViewer.customer &&
+                            kind != ChatThreadKind.foodOrderShop
                         ? DealGoIcons.car
                         : DealGoIcons.userRound,
                     size: 20,

@@ -11,6 +11,7 @@ class SendFoodOrderChatMessage {
     return _repository.postFoodOrderMessage(
       accessToken: params.accessToken,
       orderId: params.orderId,
+      shop: params.shop,
       body: params.body,
     );
   }

@@ -15,9 +15,13 @@ class SendFoodOrderChatMessageParams {
     required this.accessToken,
     required this.orderId,
     required this.body,
+    this.shop = false,
   });
 
   final String accessToken;
   final String orderId;
   final String body;
+
+  /// true = the customer ↔ shop thread; false = customer ↔ driver.
+  final bool shop;
 }
