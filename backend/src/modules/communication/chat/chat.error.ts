@@ -5,13 +5,18 @@ export type ChatErrorCode =
   | 'CHAT_NOT_FOUND'
   | 'CHAT_BODY_INVALID'
   | 'CHAT_UNAVAILABLE'
-  | 'CHAT_WINDOW_CLOSED';
+  | 'CHAT_WINDOW_CLOSED'
+  | 'CHAT_NO_COUNTERPART';
 
 const MESSAGES: Record<ChatErrorCode, { status: number; message: string }> = {
   CHAT_FORBIDDEN: { status: 403, message: 'Not a participant of this conversation' },
   CHAT_NOT_FOUND: { status: 404, message: 'Conversation not found' },
   CHAT_BODY_INVALID: { status: 400, message: 'Message body is invalid' },
   CHAT_UNAVAILABLE: { status: 503, message: 'Chat persistence is unavailable' },
+  CHAT_NO_COUNTERPART: {
+    status: 409,
+    message: 'No driver is assigned to this order yet',
+  },
   CHAT_WINDOW_CLOSED: {
     status: 403,
     message: 'Contact window is closed for this transaction',

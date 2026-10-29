@@ -59,7 +59,7 @@ export class FoodChatController {
 
   @Get(':orderId/messages')
   @ApiOperation({
-    summary: 'List transaction chat messages for a food order (participants only; text only)',
+    summary: 'List the customer ↔ driver chat of a food order (customer + assigned driver only)',
   })
   list(
     @CurrentActor() actor: RequestActor,
@@ -71,12 +71,35 @@ export class FoodChatController {
 
   @Post(':orderId/messages')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Post a text chat message on a food order (participants only)' })
+  @ApiOperation({ summary: 'Post on the customer ↔ driver chat of a food order (after a driver is assigned)' })
   post(
     @CurrentActor() actor: RequestActor,
     @Param('orderId', ParseUUIDPipe) orderId: string,
     @Body() dto: PostChatMessageDto,
   ) {
     return this.chat.postForFood(actor, orderId, dto.body);
+  }
+
+  @Get(':orderId/shop-messages')
+  @ApiOperation({
+    summary: 'List the customer ↔ shop chat of a food order (customer + store owner only)',
+  })
+  listShop(
+    @CurrentActor() actor: RequestActor,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Query() query: ChatPageQueryDto,
+  ) {
+    return this.chat.listForFood(actor, orderId, query.page, query.limit, 'MERCHANT');
+  }
+
+  @Post(':orderId/shop-messages')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Post on the customer ↔ shop chat of a food order' })
+  postShop(
+    @CurrentActor() actor: RequestActor,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Body() dto: PostChatMessageDto,
+  ) {
+    return this.chat.postForFood(actor, orderId, dto.body, 'MERCHANT');
   }
 }

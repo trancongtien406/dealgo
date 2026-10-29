@@ -11,6 +11,12 @@ function make() {
   };
   const food = {
     canSubscribe: vi.fn().mockResolvedValue(true),
+    chatAccess: vi.fn(async (userId: string, _orderId: string, channel: 'DRIVER' | 'MERCHANT') => {
+      if (userId === 'cust-1') return { role: 'CUSTOMER', counterpartId: channel === 'DRIVER' ? 'drv-1' : 'm-1' };
+      if (userId === 'drv-1' && channel === 'DRIVER') return { role: 'DRIVER', counterpartId: 'cust-1' };
+      if (userId === 'm-1' && channel === 'MERCHANT') return { role: 'MERCHANT', counterpartId: 'cust-1' };
+      return null;
+    }),
     contactMeta: vi.fn().mockResolvedValue({ status: 'PICKED_UP', updatedAt: new Date() }),
     participantRoles: vi.fn().mockResolvedValue({ customerId: 'cust-1', driverId: 'drv-1', merchantId: 'm-1' }),
   };
@@ -29,6 +35,27 @@ describe('chat realtime + paging', () => {
     const [userIds, payload] = fanout.emitChatMessage.mock.calls[0];
     expect([...userIds].sort((a, b) => a.localeCompare(b))).toEqual(['cust-1', 'drv-1']);
     expect(payload).toMatchObject({ aggregateType: 'FoodOrder', aggregateId: 'o1', message: { id: sent.id, body: 'tới rồi' } });
+  });
+
+  it('shop messages go to customer + merchant only, as FoodOrderShop (never the driver)', async () => {
+    const { svc, fanout } = make();
+    const shop = await svc.postForFood({ userId: 'm-1' } as never, 'o1', 'hết bún, đổi phở?', 'MERCHANT');
+    const drv = await svc.postForFood({ userId: 'cust-1' } as never, 'o1', 'alo', 'DRIVER');
+    const [shopUsers, shopPayload] = fanout.emitChatMessage.mock.calls[0];
+    expect([...shopUsers].sort((a, b) => a.localeCompare(b))).toEqual(['cust-1', 'm-1']);
+    expect(shopPayload).toMatchObject({ aggregateType: 'FoodOrderShop', aggregateId: 'o1' });
+    const [drvUsers, drvPayload] = fanout.emitChatMessage.mock.calls[1];
+    expect([...drvUsers].sort((a, b) => a.localeCompare(b))).toEqual(['cust-1', 'drv-1']);
+    expect(drvPayload.aggregateType).toBe('FoodOrder');
+    expect(shop.threadId).not.toBe(drv.threadId);
+  });
+
+  it('rejects the wrong side of each food thread', async () => {
+    const { svc } = make();
+    await expect(svc.listForFood({ userId: 'm-1' } as never, 'o1')).rejects.toMatchObject({ response: { errorCode: 'CHAT_FORBIDDEN' } });
+    await expect(svc.postForFood({ userId: 'drv-1' } as never, 'o1', 'x', 'MERCHANT')).rejects.toMatchObject({
+      response: { errorCode: 'CHAT_FORBIDDEN' },
+    });
   });
 
   it('call notes are announced too (missed-call row appears live)', async () => {

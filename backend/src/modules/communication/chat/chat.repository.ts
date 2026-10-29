@@ -1,8 +1,11 @@
 import { randomUUID } from 'node:crypto';
 
+/** Food orders keep two separate threads: customer↔driver and customer↔shop. */
+export type FoodChatChannel = 'DRIVER' | 'MERCHANT';
+
 export type ChatContext =
   | { kind: 'ride'; rideId: string }
-  | { kind: 'food'; foodOrderId: string };
+  | { kind: 'food'; foodOrderId: string; channel: FoodChatChannel };
 
 export type ChatMessageView = {
   id: string;
@@ -30,6 +33,7 @@ type MemoryThread = {
   id: string;
   rideId: string | null;
   foodOrderId: string | null;
+  channel: FoodChatChannel;
   messages: ChatMessageView[];
 };
 
@@ -68,6 +72,7 @@ export class MemoryChatRepository implements ChatRepository {
         id: randomUUID(),
         rideId: context.kind === 'ride' ? context.rideId : null,
         foodOrderId: context.kind === 'food' ? context.foodOrderId : null,
+        channel: context.kind === 'food' ? context.channel : 'DRIVER',
         messages: [],
       };
       this.threads.set(thread.id, thread);
@@ -88,7 +93,11 @@ export class MemoryChatRepository implements ChatRepository {
       if (context.kind === 'ride' && thread.rideId === context.rideId) {
         return thread;
       }
-      if (context.kind === 'food' && thread.foodOrderId === context.foodOrderId) {
+      if (
+        context.kind === 'food' &&
+        thread.foodOrderId === context.foodOrderId &&
+        thread.channel === context.channel
+      ) {
         return thread;
       }
     }

@@ -8,6 +8,7 @@ import { createValidationPipe } from '../../../src/platform/http/create-validati
 import { HttpExceptionFilter } from '../../../src/platform/http/http-exception.filter.js';
 import { ResponseInterceptor } from '../../../src/platform/http/response.interceptor.js';
 import { loadEnv } from '../../../src/platform/config/env.js';
+import { CatalogModule } from '../../../src/modules/catalog/catalog.module.js';
 import { FoodModule } from '../../../src/modules/food-order/food.module.js';
 import { FOOD_REPOSITORY } from '../../../src/modules/food-order/food.constants.js';
 import { MemoryFoodRepository } from '../../../src/modules/food-order/food.repository.js';
@@ -63,11 +64,15 @@ describe('transaction chat http', () => {
               PARTNER_ELIGIBILITY_BYPASS: 'true',
               OTP_THROTTLE_LIMIT: '1000',
               OTP_PHONE_LIMIT: '1000',
+              FOOD_MIN_DELIVERY_VND: '5000',
+              FOOD_MAX_DELIVERY_VND: '100000',
+              FOOD_DELIVERY_VND_PER_KM: '3000',
             }),
         }),
         ThrottlerModule.forRoot([{ ttl: 60_000, limit: 1000 }]),
         RideModule,
         FoodModule,
+        CatalogModule,
         ChatModule,
       ],
     })
@@ -153,5 +158,91 @@ describe('transaction chat http', () => {
       .send({ body: 'hello' });
     expect(denied.status).toBe(403);
     expect(denied.body.errorCode).toBe('CHAT_FORBIDDEN');
+  });
+
+  const http = () => request(app.getHttpServer());
+  const foodDropoff = { lat: 16.047079, lng: 108.20623, label: 'Hải Châu' };
+
+  async function loginPhone(phone: string): Promise<{ token: string; userId: string }> {
+    const created = await http().post('/v1/auth/phone/challenges').send({ phone }).expect(200);
+    const code = sms.sent.at(-1)?.code;
+    const verified = await http()
+      .post(`/v1/auth/phone/challenges/${created.body.data.challengeId}/verify`)
+      .send({ code })
+      .expect(200);
+    return { token: verified.body.data.accessToken as string, userId: verified.body.data.user.id as string };
+  }
+
+  async function onlineDriver(): Promise<{ token: string; userId: string }> {
+    const d = await login();
+    await identity.insertGrant(d.userId, 'DRIVER', 'ACTIVE');
+    await http()
+      .post('/v1/me/presence')
+      .set('Authorization', `Bearer ${d.token}`)
+      .send({ online: true, lat: foodDropoff.lat + 0.002, lng: foodDropoff.lng + 0.002 })
+      .expect(200);
+    return d;
+  }
+
+  async function readyOrder(customer: { token: string }, merchant: { token: string }, key: string) {
+    const catalog = await http()
+      .get('/v1/food/stores')
+      .query({ search: 'Bún Bò Huế', limit: 20 })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    const storeId = (catalog.body.data.items as { id: string; name: string }[]).find((s) => s.name === 'Bún Bò Huế')!.id;
+    const detail = await http().get(`/v1/food/stores/${storeId}`).set('Authorization', `Bearer ${customer.token}`).expect(200);
+    const placed = await http()
+      .post('/v1/food/orders')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .set('Idempotency-Key', key)
+      .send({ storeId, items: [{ itemId: detail.body.data.items[0].id, quantity: 1 }], dropoff: foodDropoff, deliveryFareVnd: 15_000 })
+      .expect(200);
+    const orderId = placed.body.data.id as string;
+    await http().post(`/v1/food/orders/${orderId}/accept`).set('Authorization', `Bearer ${merchant.token}`).expect(200);
+    await http().post(`/v1/food/orders/${orderId}/ready`).set('Authorization', `Bearer ${merchant.token}`).expect(200);
+    return orderId;
+  }
+
+  const say = (token: string, path: string, body: string) =>
+    http().post(path).set('Authorization', `Bearer ${token}`).send({ body });
+  const read = (token: string, path: string) => http().get(path).set('Authorization', `Bearer ${token}`);
+
+  it('food: customer↔shop and customer↔driver are separate threads, each reaching only its counterpart', async () => {
+    const customer = await login();
+    const merchant = await loginPhone('0901110001');
+    const otherDriver = await onlineDriver();
+    const driver = await onlineDriver();
+    const orderId = await readyOrder(customer, merchant, 'chat-food-1');
+    const driverPath = `/v1/food/orders/${orderId}/messages`;
+    const shopPath = `/v1/food/orders/${orderId}/shop-messages`;
+
+    // Shop thread works before any driver; the driver thread waits for assignment.
+    expect((await say(customer.token, shopPath, 'Cho ít cay nhé')).status).toBe(200);
+    expect((await say(merchant.token, shopPath, 'Dạ quán nhận')).status).toBe(200);
+    const early = await say(customer.token, driverPath, 'alo tài xế');
+    expect(early.status).toBe(409);
+    expect(early.body.errorCode).toBe('CHAT_NO_COUNTERPART');
+    // A READY order is visible to every nearby driver; that is not chat access.
+    expect((await read(otherDriver.token, driverPath)).status).toBe(403);
+
+    await http().post(`/v1/food/orders/${orderId}/claim`).set('Authorization', `Bearer ${driver.token}`).expect(200);
+    expect((await say(customer.token, driverPath, 'Giao cổng sau giúp em')).status).toBe(200);
+    expect((await say(driver.token, driverPath, 'Ok anh')).status).toBe(200);
+
+    const shopForCustomer = await read(customer.token, shopPath).expect(200);
+    expect(shopForCustomer.body.data.items.map((m: { body: string }) => m.body)).toEqual(['Cho ít cay nhé', 'Dạ quán nhận']);
+    const driverForCustomer = await read(customer.token, driverPath).expect(200);
+    expect(driverForCustomer.body.data.items.map((m: { body: string }) => m.body)).toEqual(['Giao cổng sau giúp em', 'Ok anh']);
+    expect(shopForCustomer.body.data.items[0].threadId).not.toBe(driverForCustomer.body.data.items[0].threadId);
+
+    // Merchant never reads/writes the driver thread; the driver never touches the shop thread.
+    expect((await read(merchant.token, driverPath)).status).toBe(403);
+    expect((await say(merchant.token, driverPath, 'x')).status).toBe(403);
+    expect((await read(driver.token, shopPath)).status).toBe(403);
+    expect((await say(driver.token, shopPath, 'x')).status).toBe(403);
+    expect((await read(otherDriver.token, driverPath)).status).toBe(403);
+    const merchantView = await read(merchant.token, shopPath).expect(200);
+    expect(merchantView.body.data.items).toHaveLength(2);
   });
 });

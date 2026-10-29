@@ -21,7 +21,7 @@ function build(opts: { ride?: boolean; thread?: boolean } = {}) {
   const db = {
     ride: { findUnique: vi.fn(async () => (opts.ride === false ? null : { customerId: 'cust' })) },
     foodOrder: { findUnique: vi.fn(async () => ({ customerId: 'cust' })) },
-    chatThread: { findUnique: vi.fn(async () => (opts.thread === false ? null : { id: 't1' })) },
+    chatThread: { findMany: vi.fn(async () => (opts.thread === false ? [] : [{ id: 't1', channel: 'DRIVER' }])) },
     opsAuditLog: { create: auditCreate },
     chatMessage: {
       findMany: vi.fn(async () => {
@@ -49,7 +49,7 @@ describe('ChatReviewService (DEC-PROD-056)', () => {
         entityType: 'CHAT_THREAD',
         entityId: 't1',
         reason: 'Khiếu nại hành vi tài xế',
-        metadata: { kind: 'ride', targetId: 'ride-1', ticketId: 'tk-1' },
+        metadata: { kind: 'ride', targetId: 'ride-1', ticketId: 'tk-1', threadIds: ['t1'] },
       }),
     });
     expect(result.retentionDays).toBe(90);

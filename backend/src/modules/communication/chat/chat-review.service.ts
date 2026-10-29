@@ -12,6 +12,8 @@ export type ChatReviewMessage = {
   senderUserId: string;
   senderName: string;
   senderRole: 'CUSTOMER' | 'PARTNER';
+  /** Food: DRIVER (customer↔driver) or MERCHANT (customer↔shop) thread. */
+  channel: string;
   body: string;
   createdAt: string;
 };
@@ -69,10 +71,14 @@ export class ChatReviewService {
     if (!owner) {
       throw chatError('CHAT_NOT_FOUND');
     }
-    const thread = await db.chatThread.findUnique({
+    // A food order has a driver thread and a shop thread; ops reviews both, in time order.
+    const threads = await db.chatThread.findMany({
       where: input.kind === 'ride' ? { rideId: input.id } : { foodOrderId: input.id },
-      select: { id: true },
+      select: { id: true, channel: true },
+      orderBy: { createdAt: 'asc' },
     });
+    const thread = threads[0] ?? null;
+    const channelOf = new Map(threads.map((t) => [t.id, t.channel]));
 
     await db.opsAuditLog.create({
       data: {
@@ -81,7 +87,12 @@ export class ChatReviewService {
         entityType: 'CHAT_THREAD',
         entityId: thread?.id ?? input.id,
         reason: input.reason.trim(),
-        metadata: { kind: input.kind, targetId: input.id, ticketId: input.ticketId ?? null },
+        metadata: {
+          kind: input.kind,
+          targetId: input.id,
+          ticketId: input.ticketId ?? null,
+          threadIds: threads.map((t) => t.id),
+        },
       },
     });
     this.logger.warn({ msg: 'chat.review', actorUserId, kind: input.kind, targetId: input.id });
@@ -91,7 +102,7 @@ export class ChatReviewService {
       return { threadId: null, kind: input.kind, id: input.id, retentionDays, messages: [] };
     }
     const rows = await db.chatMessage.findMany({
-      where: { threadId: thread.id },
+      where: { threadId: { in: threads.map((t) => t.id) } },
       orderBy: { createdAt: 'asc' },
       take: CHAT_REVIEW_MAX_MESSAGES,
       include: { sender: { select: { displayName: true } } },
@@ -109,6 +120,7 @@ export class ChatReviewService {
           senderUserId: view.senderUserId,
           senderName: row.sender.displayName,
           senderRole: view.senderUserId === owner.customerId ? 'CUSTOMER' : 'PARTNER',
+          channel: channelOf.get(view.threadId) ?? 'DRIVER',
           body: view.body,
           createdAt: view.createdAt.toISOString(),
         };

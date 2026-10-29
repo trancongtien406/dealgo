@@ -222,7 +222,8 @@ export type InboxEventPayload = {
 };
 
 export type ChatMessageEventPayload = {
-  aggregateType: 'Ride' | 'FoodOrder';
+  /** FoodOrder = customer↔driver thread; FoodOrderShop = customer↔shop thread. */
+  aggregateType: 'Ride' | 'FoodOrder' | 'FoodOrderShop';
   aggregateId: string;
   message: {
     id: string;

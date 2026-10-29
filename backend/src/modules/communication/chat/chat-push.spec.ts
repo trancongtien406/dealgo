@@ -11,6 +11,12 @@ function make(prefs?: { filterRecipients: ReturnType<typeof vi.fn> }) {
   };
   const food = {
     canSubscribe: vi.fn().mockResolvedValue(true),
+    chatAccess: vi.fn(async (userId: string, _orderId: string, channel: 'DRIVER' | 'MERCHANT') => {
+      if (userId === 'cust-1') return { role: 'CUSTOMER', counterpartId: channel === 'DRIVER' ? 'drv-1' : 'm-1' };
+      if (userId === 'drv-1' && channel === 'DRIVER') return { role: 'DRIVER', counterpartId: 'cust-1' };
+      if (userId === 'm-1' && channel === 'MERCHANT') return { role: 'MERCHANT', counterpartId: 'cust-1' };
+      return null;
+    }),
     contactMeta: vi.fn().mockResolvedValue({ status: 'PICKED_UP', updatedAt: new Date() }),
     participantRoles: vi.fn().mockResolvedValue({ customerId: 'cust-1', driverId: 'drv-1', merchantId: 'm-1' }),
   };
@@ -45,6 +51,36 @@ describe('chat push', () => {
     expect(push.send.mock.calls[0][0]).toMatchObject({
       userId: 'cust-1',
       data: { role: 'CUSTOMER', path: '/customer/food/orders/o1?chat=1' },
+    });
+  });
+
+  it('shop thread: customer → merchant push opens the merchant order; merchant → customer opens chat=shop', async () => {
+    const { svc, push } = make();
+    await svc.postForFood({ userId: 'cust-1' } as never, 'o2', 'ít cay', 'MERCHANT');
+    expect(push.send.mock.calls[0][0]).toMatchObject({
+      userId: 'm-1',
+      title: 'Tin nhắn mới từ khách',
+      data: { role: 'MERCHANT', channel: 'MERCHANT', path: '/merchant/orders/o2?chat=1' },
+      collapseKey: 'chat-shop-o2',
+    });
+    await svc.postForFood({ userId: 'm-1' } as never, 'o2', 'dạ', 'MERCHANT');
+    expect(push.send.mock.calls[1][0]).toMatchObject({
+      userId: 'cust-1',
+      title: 'Tin nhắn mới từ quán',
+      data: { role: 'CUSTOMER', channel: 'MERCHANT', path: '/customer/food/orders/o2?chat=shop' },
+    });
+    // Never the driver.
+    expect(push.send.mock.calls.map((c) => c[0].userId)).not.toContain('drv-1');
+  });
+
+  it('driver thread: customer → driver only, titled from the customer', async () => {
+    const { svc, push } = make();
+    await svc.postForFood({ userId: 'cust-1' } as never, 'o3', 'cổng sau');
+    expect(push.send).toHaveBeenCalledTimes(1);
+    expect(push.send.mock.calls[0][0]).toMatchObject({
+      userId: 'drv-1',
+      title: 'Tin nhắn mới từ khách',
+      data: { role: 'DRIVER', channel: 'DRIVER', path: '/driver/food/o3?chat=1' },
     });
   });
 

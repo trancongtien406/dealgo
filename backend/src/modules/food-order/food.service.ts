@@ -1539,6 +1539,51 @@ export class FoodService {
     return this.hasActiveGrant(userId, 'MERCHANT');
   }
 
+  /**
+   * Who may use one food-order chat thread, and as which side:
+   * - DRIVER thread: the customer and the driver currently assigned (no merchant,
+   *   no other driver — a READY order visible to every driver is not enough);
+   * - MERCHANT thread: the customer and the store owner (no driver).
+   * `null` = not a participant. `counterpartId` is null while nobody holds the other
+   * side yet (DRIVER thread before assignment).
+   */
+  async chatAccess(
+    userId: string,
+    orderId: string,
+    channel: 'DRIVER' | 'MERCHANT',
+  ): Promise<{
+    role: 'CUSTOMER' | 'DRIVER' | 'MERCHANT';
+    counterpartId: string | null;
+  } | null> {
+    const order = await this.unwrapNullable(() => this.food.findOrder(orderId));
+    if (!order) {
+      return null;
+    }
+    const counterpartId =
+      channel === 'DRIVER' ? (order.assignedDriverId ?? null) : order.ownerId;
+    if (
+      order.customerId === userId &&
+      (await this.hasActiveGrant(userId, 'CUSTOMER'))
+    ) {
+      return { role: 'CUSTOMER', counterpartId };
+    }
+    if (
+      channel === 'MERCHANT' &&
+      order.ownerId === userId &&
+      (await this.hasActiveGrant(userId, 'MERCHANT'))
+    ) {
+      return { role: 'MERCHANT', counterpartId: order.customerId };
+    }
+    if (
+      channel === 'DRIVER' &&
+      order.assignedDriverId === userId &&
+      (await this.hasActiveGrant(userId, 'DRIVER'))
+    ) {
+      return { role: 'DRIVER', counterpartId: order.customerId };
+    }
+    return null;
+  }
+
   /** Status + updatedAt for contact-window checks (chat/voice). */
   async contactMeta(
     orderId: string,

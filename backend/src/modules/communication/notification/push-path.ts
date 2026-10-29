@@ -58,6 +58,7 @@ const CHAT_PAGES = [
   /^\/driver\/rides\/[^/?]+\/active$/,
   /^\/customer\/food\/orders\/[^/?]+$/,
   /^\/driver\/food\/[^/?]+$/,
+  /^\/merchant\/orders\/[^/?]+$/,
 ];
 
 /**
@@ -65,10 +66,15 @@ const CHAT_PAGES = [
  * the chat sheet straight away (Grab / Uber: tapping a message lands in the conversation).
  * Pages without a chat (e.g. a cancelled job's list) are returned unchanged.
  */
-export function chatPushPathFor(input: Omit<PushPathInput, 'kind'>): string | null {
-  const path = pushPathFor({ ...input, kind: 'chat' });
+export function chatPushPathFor(
+  input: Omit<PushPathInput, 'kind'> & { channel?: 'DRIVER' | 'MERCHANT' },
+): string | null {
+  const { channel, ...rest } = input;
+  const path = pushPathFor({ ...rest, kind: 'chat' });
   if (path && CHAT_PAGES.some((page) => page.test(path))) {
-    return `${path}?chat=1`;
+    // The customer's order page hosts both threads; `chat=shop` opens the shop one.
+    const which = channel === 'MERCHANT' && input.role === 'CUSTOMER' ? 'shop' : '1';
+    return `${path}?chat=${which}`;
   }
   return path;
 }

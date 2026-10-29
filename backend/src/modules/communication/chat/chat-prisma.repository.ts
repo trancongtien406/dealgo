@@ -68,7 +68,11 @@ export class PrismaChatRepository implements ChatRepository {
     if (context.kind === 'ride') {
       return this.db.chatThread.findUnique({ where: { rideId: context.rideId } });
     }
-    return this.db.chatThread.findUnique({ where: { foodOrderId: context.foodOrderId } });
+    return this.db.chatThread.findUnique({
+      where: {
+        foodOrderId_channel: { foodOrderId: context.foodOrderId, channel: context.channel },
+      },
+    });
   }
 
   private async ensureThread(context: ChatContext) {
@@ -80,7 +84,7 @@ export class PrismaChatRepository implements ChatRepository {
       data:
         context.kind === 'ride'
           ? { rideId: context.rideId }
-          : { foodOrderId: context.foodOrderId },
+          : { foodOrderId: context.foodOrderId, channel: context.channel },
     });
   }
 }

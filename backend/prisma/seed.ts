@@ -793,7 +793,9 @@ async function ensureChatThread(
     ? await db.chatThread.findUnique({ where: { rideId: input.rideId } })
     : input.foodOrderId
       ? await db.chatThread.findUnique({
-          where: { foodOrderId: input.foodOrderId },
+          where: {
+            foodOrderId_channel: { foodOrderId: input.foodOrderId, channel: 'DRIVER' },
+          },
         })
       : null;
 

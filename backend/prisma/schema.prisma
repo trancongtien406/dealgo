@@ -790,7 +790,7 @@ model FoodOrder {
   updatedAt             DateTime          @updatedAt
   lines                 FoodOrderLine[]
   changes               FoodOrderChange[]
-  chatThread            ChatThread?
+  chatThreads           ChatThread[]
 
   @@unique([customerId, idempotencyKey])
   @@index([storeId, status])
@@ -933,15 +933,19 @@ model LedgerEntry {
 }
 
 // Transaction-scoped text chat (DEC-PROD-007 stub). Exactly one of rideId/foodOrderId.
+// A food order has two separate threads: customer↔driver (DRIVER) and customer↔shop
+// (MERCHANT). Rides only use DRIVER.
 model ChatThread {
   id          String        @id @default(uuid()) @db.Uuid
   rideId      String?       @unique @db.Uuid
   ride        Ride?         @relation(fields: [rideId], references: [id], onDelete: Cascade)
-  foodOrderId String?       @unique @db.Uuid
+  foodOrderId String?       @db.Uuid
   foodOrder   FoodOrder?    @relation(fields: [foodOrderId], references: [id], onDelete: Cascade)
+  channel     String        @default("DRIVER") @db.VarChar(16)
   createdAt   DateTime      @default(now())
   messages    ChatMessage[]
 
+  @@unique([foodOrderId, channel])
   @@map("chat_threads")
 }
 

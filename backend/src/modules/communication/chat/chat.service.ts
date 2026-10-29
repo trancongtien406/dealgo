@@ -17,7 +17,13 @@ import { RideService } from '../../ride/ride.service.js';
 import { SnapshotFanoutService } from '../realtime/snapshot-fanout.service.js';
 import { CHAT_BODY_MAX_LENGTH, CHAT_REPOSITORY } from './chat.constants.js';
 import { chatError } from './chat.error.js';
-import type { ChatContext, ChatMessageView, ChatRepository } from './chat.repository.js';
+import type {
+  ChatContext,
+  ChatMessageView,
+  ChatRepository,
+  FoodChatChannel,
+} from './chat.repository.js';
+import type { ChatMessageEventPayload } from '../realtime/realtime.constants.js';
 
 export type PublicChatMessage = {
   id: string;
@@ -72,20 +78,29 @@ export class ChatService {
     orderId: string,
     page?: number,
     limit?: number,
+    channel: FoodChatChannel = 'DRIVER',
   ): Promise<PageResult<PublicChatMessage>> {
-    await this.assertFoodParticipant(actor.userId, orderId);
-    return this.list({ kind: 'food', foodOrderId: orderId }, page, limit);
+    await this.assertFoodParticipant(actor.userId, orderId, channel);
+    return this.list({ kind: 'food', foodOrderId: orderId, channel }, page, limit);
   }
 
+  /**
+   * Food order chat. `DRIVER` = customer ↔ assigned driver (the default, legacy route);
+   * `MERCHANT` = customer ↔ shop. The two threads never share messages, realtime copies
+   * or pushes, and each side only reaches its own counterpart.
+   */
   async postForFood(
     actor: RequestActor,
     orderId: string,
     body: string,
+    channel: FoodChatChannel = 'DRIVER',
   ): Promise<PublicChatMessage> {
-    await this.assertFoodParticipant(actor.userId, orderId);
-    const message = await this.post({ kind: 'food', foodOrderId: orderId }, actor.userId, body);
-    await this.announce('FoodOrder', orderId, message);
-    await this.pushChat('FoodOrder', orderId, actor.userId);
+    const access = await this.assertFoodParticipant(actor.userId, orderId, channel);
+    const message = await this.post({ kind: 'food', foodOrderId: orderId, channel }, actor.userId, body);
+    const counterpartId = access.counterpartId!;
+    this.emit(foodRealtimeType(channel), orderId, [actor.userId, counterpartId], message);
+    const recipientRole: PushRole = access.role === 'CUSTOMER' ? channel : 'CUSTOMER';
+    await this.sendChatPush('FoodOrder', orderId, [[counterpartId, recipientRole, access.role]], channel);
     return message;
   }
 
@@ -103,7 +118,7 @@ export class ChatService {
     const context: ChatContext =
       aggregateType === 'Ride'
         ? { kind: 'ride', rideId: aggregateId }
-        : { kind: 'food', foodOrderId: aggregateId };
+        : { kind: 'food', foodOrderId: aggregateId, channel: 'DRIVER' };
     const message = await this.chat.postMessage(context, senderUserId, body);
     await this.announce(aggregateType, aggregateId, publish(message));
   }
@@ -126,11 +141,24 @@ export class ChatService {
       const userIds = [roles?.customerId, roles?.driverId].filter(
         (userId): userId is string => typeof userId === 'string' && userId.length > 0,
       );
-      this.fanout.emitChatMessage([...new Set([...userIds, message.senderUserId])], {
-        aggregateType,
-        aggregateId: id,
-        message,
-      });
+      this.emit(aggregateType, id, [...userIds, message.senderUserId], message);
+    } catch (error) {
+      this.logger.warn(`chat realtime failed for ${aggregateType} ${shortOrderCode(id)}: ${String(error)}`);
+    }
+  }
+
+  /** Realtime copy to exactly these users' private rooms. Best effort. */
+  private emit(
+    aggregateType: ChatMessageEventPayload['aggregateType'],
+    id: string,
+    userIds: string[],
+    message: PublicChatMessage,
+  ): void {
+    if (!this.fanout) {
+      return;
+    }
+    try {
+      this.fanout.emitChatMessage([...new Set(userIds)], { aggregateType, aggregateId: id, message });
     } catch (error) {
       this.logger.warn(`chat realtime failed for ${aggregateType} ${shortOrderCode(id)}: ${String(error)}`);
     }
@@ -162,39 +190,56 @@ export class ChatService {
     return publish(message);
   }
 
-  /**
-   * Tells the other party (customer ↔ driver) a message arrived, Grab-style. Recipients are
-   * filtered by their `chat` notification preference (not the ride/food toggle). The text stays
-   * out of the push (chat is encrypted at rest); the tap opens the ride / order page that hosts
-   * the chat sheet. Best effort: a push failure never fails the send.
-   */
-  private async pushChat(aggregateType: 'Ride' | 'FoodOrder', id: string, senderUserId: string): Promise<void> {
+  /** Ride chat push: the other of customer ↔ driver. */
+  private async pushChat(aggregateType: 'Ride', id: string, senderUserId: string): Promise<void> {
     if (!this.push) {
       return;
     }
     try {
-      const roles = aggregateType === 'Ride' ? await this.rides.participantRoles(id) : await this.food.participantRoles(id);
+      const roles = await this.rides.participantRoles(id);
       if (!roles) {
         return;
       }
-      const targets: Array<[string, PushRole]> = [];
+      const targets: Array<[string, PushRole, PushRole]> = [];
       if (roles.customerId && roles.customerId !== senderUserId) {
-        targets.push([roles.customerId, 'CUSTOMER']);
+        targets.push([roles.customerId, 'CUSTOMER', 'DRIVER']);
       }
       if (roles.driverId && roles.driverId !== senderUserId) {
-        targets.push([roles.driverId, 'DRIVER']);
+        targets.push([roles.driverId, 'DRIVER', 'CUSTOMER']);
       }
+      await this.sendChatPush(aggregateType, id, targets);
+    } catch (error) {
+      this.logger.warn(`chat push failed for ${aggregateType} ${shortOrderCode(id)}: ${String(error)}`);
+    }
+  }
+
+  /**
+   * Tells the other party a message arrived, Grab-style. Recipients are filtered by their
+   * `chat` notification preference (not the ride/food toggle). The text stays out of the push
+   * (chat is encrypted at rest); the tap opens the page that hosts the chat sheet. Best
+   * effort: a push failure never fails the send. Targets are [userId, recipientRole, senderRole].
+   */
+  private async sendChatPush(
+    aggregateType: 'Ride' | 'FoodOrder',
+    id: string,
+    targets: Array<[string, PushRole, PushRole]>,
+    channel: FoodChatChannel = 'DRIVER',
+  ): Promise<void> {
+    if (!this.push || targets.length === 0) {
+      return;
+    }
+    try {
       const allowed = this.prefs
         ? new Set(await this.prefs.filterRecipients(targets.map(([u]) => u), 'CHAT'))
         : new Set(targets.map(([u]) => u));
       const now = Date.now();
-      for (const [userId, role] of targets) {
-        const key = `${aggregateType}:${id}:${userId}`;
+      for (const [userId, role, senderRole] of targets) {
+        const key = `${aggregateType}:${channel}:${id}:${userId}`;
         if (!allowed.has(userId) || now - (this.lastChatPush.get(key) ?? 0) < CHAT_PUSH_THROTTLE_MS) {
           continue;
         }
         this.lastChatPush.set(key, now);
-        const from = role === 'CUSTOMER' ? 'tài xế' : 'khách';
+        const from = senderRole === 'DRIVER' ? 'tài xế' : senderRole === 'MERCHANT' ? 'quán' : 'khách';
         await this.push.send({
           userId,
           title: `Tin nhắn mới từ ${from}`,
@@ -204,9 +249,10 @@ export class ChatService {
             aggregateId: id,
             eventType: 'Chat.message',
             role,
-            path: chatPushPathFor({ aggregateType, aggregateId: id, role }) ?? '',
+            ...(aggregateType === 'FoodOrder' ? { channel } : {}),
+            path: chatPushPathFor({ aggregateType, aggregateId: id, role, channel }) ?? '',
           },
-          collapseKey: `chat-${id}`,
+          collapseKey: `chat-${channel === 'MERCHANT' ? 'shop-' : ''}${id}`,
         });
       }
       if (this.lastChatPush.size > 5_000) {
@@ -229,14 +275,24 @@ export class ChatService {
     }
   }
 
-  private async assertFoodParticipant(userId: string, orderId: string): Promise<void> {
-    if (!(await this.food.canSubscribe(userId, orderId))) {
+  private async assertFoodParticipant(
+    userId: string,
+    orderId: string,
+    channel: FoodChatChannel,
+  ): Promise<{ role: PushRole; counterpartId: string | null }> {
+    const access = await this.food.chatAccess(userId, orderId, channel);
+    if (!access) {
       throw chatError('CHAT_FORBIDDEN');
+    }
+    if (!access.counterpartId) {
+      // The driver thread opens only once a driver is assigned.
+      throw chatError('CHAT_NO_COUNTERPART');
     }
     const meta = await this.food.contactMeta(orderId);
     if (!meta || !(await this.allowContact('food', meta.status, meta.updatedAt))) {
       throw chatError('CHAT_WINDOW_CLOSED');
     }
+    return access;
   }
 
   private async allowContact(
@@ -271,4 +327,9 @@ function publish(message: ChatMessageView): PublicChatMessage {
     body: message.body,
     createdAt: message.createdAt.toISOString(),
   };
+}
+
+/** Realtime aggregate name: the shop thread is its own conversation on the client. */
+export function foodRealtimeType(channel: FoodChatChannel): 'FoodOrder' | 'FoodOrderShop' {
+  return channel === 'MERCHANT' ? 'FoodOrderShop' : 'FoodOrder';
 }
