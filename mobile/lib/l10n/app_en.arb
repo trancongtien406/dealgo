@@ -3470,5 +3470,7 @@
   "incomingJobTitle": "New ride request",
   "incomingJobSkip": "Skip",
   "incomingJobOpen": "View & quote",
-  "driverStartTrip": "Start trip"
+  "driverStartTrip": "Start trip",
+  "rideOfferAcceptShort": "Accept",
+  "rideOfferDeclineShort": "Decline"
 }

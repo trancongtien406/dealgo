@@ -27,6 +27,13 @@ import '../../../../core/maps/map_controls.dart';
 import '../../../../core/maps/map_lat_lng.dart';
 import '../../../../core/maps/map_port.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
+import '../../../../core/design_system/components/dealgo_haptics.dart';
+import '../../../driver_card/domain/driver_card.dart';
+import '../../../driver_card/presentation/driver_card_tile.dart';
+import '../../domain/params/select_ride_offer_params.dart';
+import '../../domain/ride_idempotency.dart';
+import '../../domain/usecases/select_ride_offer.dart';
+import '../widgets/ride_negotiation_ui.dart';
 
 class RideMatchingPage extends StatelessWidget {
   const RideMatchingPage({required this.rideId, this.clock, super.key});
@@ -187,9 +194,10 @@ class _RideMatchingPageState extends State<_RideMatchingView> {
           ride.selectedOfferId == null &&
           ride.liveOffers.isNotEmpty &&
           !rideNegotiationExpired(ride, _now);
+      // 2026-10-29: offers are answered inline on this sheet (no page push).
       if (canChoose && !_openedOffers) {
         _openedOffers = true;
-        unawaited(context.push(RideRoutes.offers(ride.id)));
+        DealGoHaptics.success();
       }
     } catch (error) {
       _refreshing = false;
@@ -203,6 +211,91 @@ class _RideMatchingPageState extends State<_RideMatchingView> {
         _offline = requestFailureIsOffline(error);
       });
     }
+  }
+
+  String? _actingOn;
+  String? _inlineError;
+
+  /// One tap: take this driver's price (inDrive style) and go to tracking.
+  Future<void> _accept(RideView ride, RideOffer offer) async {
+    final token = rideAccessToken(context);
+    if (_actingOn != null || token == null) return;
+    setState(() {
+      _actingOn = offer.id;
+      _inlineError = null;
+    });
+    try {
+      final updated = await context.read<SelectRideOffer>()(
+        SelectRideOfferRequest(
+          accessToken: token,
+          idempotencyKey: createRideIdempotencyKey(),
+          rideId: ride.id,
+          offerId: offer.id,
+        ),
+      );
+      if (!mounted) return;
+      context.read<RideSessionCubit>().clear();
+      DealGoHaptics.success();
+      setState(() {
+        _actingOn = null;
+        _ride = updated;
+      });
+      if (updated.status.hasDriver && !_openedTracking) {
+        _openedTracking = true;
+        context.pushReplacement(RideRoutes.tracking(updated.id));
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _actingOn = null;
+        _inlineError = negotiationErrorText(context, error);
+      });
+      await _load(silent: true);
+    }
+  }
+
+  Future<void> _decline(RideView ride, RideOffer offer) async {
+    final client = maybeRideNegotiation(context);
+    final token = rideAccessToken(context);
+    if (_actingOn != null || client == null || token == null) return;
+    setState(() {
+      _actingOn = offer.id;
+      _inlineError = null;
+    });
+    try {
+      await client.declineOffer(
+        accessToken: token,
+        rideId: ride.id,
+        offerId: offer.id,
+      );
+    } catch (error) {
+      if (mounted) _inlineError = negotiationErrorText(context, error);
+    }
+    if (!mounted) return;
+    setState(() => _actingOn = null);
+    await _load(silent: true);
+  }
+
+  Future<void> _raise(RideView ride, int amountVnd) async {
+    final client = maybeRideNegotiation(context);
+    final token = rideAccessToken(context);
+    if (_actingOn != null || client == null || token == null) return;
+    setState(() {
+      _actingOn = 'raise';
+      _inlineError = null;
+    });
+    try {
+      await client.raiseFare(
+        accessToken: token,
+        rideId: ride.id,
+        amountVnd: amountVnd,
+      );
+    } catch (error) {
+      if (mounted) _inlineError = negotiationErrorText(context, error);
+    }
+    if (!mounted) return;
+    setState(() => _actingOn = null);
+    await _load(silent: true);
   }
 
   void _editTrip(RideView ride) {
@@ -303,6 +396,19 @@ class _RideMatchingPageState extends State<_RideMatchingView> {
       onOpenOffers: ride.liveOffers.isEmpty
           ? null
           : () => context.push(RideRoutes.offers(ride.id)),
+      offers: [
+        for (final o in ride.liveOffers)
+          if (rideOfferSelectable(o, _now)) o,
+      ],
+      actingOn: _actingOn,
+      inlineError: _inlineError,
+      onAccept: (o) => _accept(ride, o),
+      onDecline: maybeRideNegotiation(context) == null
+          ? null
+          : (o) => _decline(ride, o),
+      onRaise: maybeRideNegotiation(context) == null
+          ? null
+          : (amount) => _raise(ride, amount),
     );
   }
 }
@@ -315,7 +421,20 @@ class _MatchingWait extends StatelessWidget {
     required this.onBack,
     required this.onCancel,
     required this.onOpenOffers,
+    this.offers = const [],
+    this.actingOn,
+    this.inlineError,
+    this.onAccept,
+    this.onDecline,
+    this.onRaise,
   });
+
+  final List<RideOffer> offers;
+  final String? actingOn;
+  final String? inlineError;
+  final ValueChanged<RideOffer>? onAccept;
+  final ValueChanged<RideOffer>? onDecline;
+  final ValueChanged<int>? onRaise;
 
   final RideView ride;
   final bool busy;
@@ -331,7 +450,7 @@ class _MatchingWait extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final l10n = AppLocalizations.of(context);
-    final offers = onOpenOffers;
+    final openOffers = onOpenOffers;
     final route = ride.route.polylineOr([
       MapLatLng(lat: ride.pickup.lat, lng: ride.pickup.lng),
       MapLatLng(lat: ride.dropoff.lat, lng: ride.dropoff.lng),
@@ -444,17 +563,66 @@ class _MatchingWait extends StatelessWidget {
                           ],
                         ),
                       ),
-                      if (ride.liveOffers.isNotEmpty) ...[
+                      if (onRaise case final raise?) ...[
+                        const SizedBox(height: DealGoSpacing.s8),
+                        Wrap(
+                          key: const Key('ride-inline-raise'),
+                          spacing: DealGoSpacing.s8,
+                          runSpacing: DealGoSpacing.s4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
+                              l10n.rideRaiseFare,
+                              style: textTheme.labelLarge?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+
+                            for (final step in rideRaiseFareSteps)
+                              ActionChip(
+                                key: Key('ride-inline-raise-$step'),
+                                label: Text(
+                                  l10n.rideRaiseFareStep(formatRideVnd(step)),
+                                ),
+                                onPressed: actingOn != null
+                                    ? null
+                                    : () => raise(ride.offeredFareVnd + step),
+                              ),
+                          ],
+                        ),
+                      ],
+                      if (inlineError case final err?) ...[
+                        const SizedBox(height: DealGoSpacing.s8),
+                        Text(
+                          err,
+                          key: const Key('ride-inline-error'),
+                          style: textTheme.bodySmall?.copyWith(
+                            color: DealGoColors.danger,
+                          ),
+                        ),
+                      ],
+                      if (offers.isNotEmpty) ...[
                         const SizedBox(height: DealGoSpacing.s12),
                         Text(
-                          l10n.rideOffersCount(ride.liveOffers.length),
+                          l10n.rideOffersCount(offers.length),
                           style: textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                         const SizedBox(height: DealGoSpacing.s8),
-                        for (final offer in ride.liveOffers.take(3)) ...[
-                          _WaitingOfferCard(offer: offer),
+                        for (final offer in offers) ...[
+                          _InlineOfferCard(
+                            rideId: ride.id,
+                            offer: offer,
+                            busy: actingOn == offer.id,
+                            enabled: actingOn == null,
+                            onAccept: onAccept == null
+                                ? null
+                                : () => onAccept!(offer),
+                            onDecline: onDecline == null
+                                ? null
+                                : () => onDecline!(offer),
+                          ),
                           const SizedBox(height: DealGoSpacing.s8),
                         ],
                       ] else ...[
@@ -515,14 +683,16 @@ class _MatchingWait extends StatelessWidget {
                             onPressed: onCancel,
                           ),
                         ),
-                        if (offers != null) ...[
+                        if (openOffers != null) ...[
                           const SizedBox(width: DealGoSpacing.s8),
                           Expanded(
-                            child: DealGoPrimaryButton(
+                            // Voucher / offer details stay one tap away;
+                            // accepting no longer needs it.
+                            child: DealGoSecondaryButton(
                               key: const Key('ride-open-offers-from-wait'),
                               label: l10n.rideViewOffers,
                               compact: true,
-                              onPressed: offers,
+                              onPressed: openOffers,
                             ),
                           ),
                         ],
@@ -544,53 +714,90 @@ class _MatchingWait extends StatelessWidget {
   }
 }
 
-class _WaitingOfferCard extends StatelessWidget {
-  const _WaitingOfferCard({required this.offer});
+/// inDrive-style quote: driver, price, and Từ chối / Chấp nhận on the card.
+class _InlineOfferCard extends StatelessWidget {
+  const _InlineOfferCard({
+    required this.rideId,
+    required this.offer,
+    required this.busy,
+    required this.enabled,
+    required this.onAccept,
+    required this.onDecline,
+  });
 
+  final String rideId;
   final RideOffer offer;
+  final bool busy;
+  final bool enabled;
+  final VoidCallback? onAccept;
+  final VoidCallback? onDecline;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
     return RidePanel(
-      child: Row(
+      key: Key('ride-inline-offer-${offer.id}'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              color: DealGoColors.subtlePurple,
-              shape: BoxShape.circle,
-            ),
-            child: SizedBox(
-              width: 40,
-              height: 40,
-              child: Icon(
-                DealGoIcons.user,
-                color: DealGoColors.primary,
-                size: 20,
+          Row(
+            children: [
+              Expanded(
+                child: DriverCardTile(
+                  job: DriverCardJob.rideOffer,
+                  jobId: rideId,
+                  offerId: offer.id,
+                  accessToken: rideAccessToken(context) ?? '',
+                ),
               ),
-            ),
+              const SizedBox(width: DealGoSpacing.s8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    formatRideVnd(offer.amountVnd),
+                    style: textTheme.titleMedium?.copyWith(
+                      color: DealGoColors.primary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    rideOfferKindLabel(l10n, offer.kind),
+                    style: textTheme.labelSmall?.copyWith(
+                      color: DealGoColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          const SizedBox(width: DealGoSpacing.s12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  rideOfferKindLabel(l10n, offer.kind),
-                  style: textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
+          const SizedBox(height: DealGoSpacing.s12),
+          Row(
+            children: [
+              if (onDecline != null) ...[
+                Expanded(
+                  child: DealGoSecondaryButton(
+                    key: Key('ride-inline-decline-${offer.id}'),
+                    label: l10n.rideOfferDeclineShort,
+                    compact: true,
+                    enabled: enabled,
+                    onPressed: onDecline!,
                   ),
                 ),
+                const SizedBox(width: DealGoSpacing.s8),
               ],
-            ),
-          ),
-          Text(
-            formatRideVnd(offer.amountVnd),
-            style: textTheme.titleSmall?.copyWith(
-              color: DealGoColors.primary,
-              fontWeight: FontWeight.w800,
-            ),
+              Expanded(
+                child: DealGoPrimaryButton(
+                  key: Key('ride-inline-accept-${offer.id}'),
+                  label: l10n.rideOfferAcceptShort,
+                  compact: true,
+                  isLoading: busy,
+                  enabled: enabled && onAccept != null,
+                  onPressed: onAccept ?? () {},
+                ),
+              ),
+            ],
           ),
         ],
       ),

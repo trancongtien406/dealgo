@@ -83,10 +83,17 @@ void main() {
       await tester.pumpAndSettle();
       expect(rides.getCalls.length, greaterThan(baseline + 1));
       expect(
-        find.byType(RideOffersPage),
+        find.text('Chấp nhận'),
         findsOneWidget,
-        reason: 'first offer surfaces the offers list',
+        reason: 'first offer surfaces inline on the waiting sheet',
       );
+      await tester.ensureVisible(
+        find.byKey(const Key('ride-open-offers-from-wait')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('ride-open-offers-from-wait')));
+      await tester.pumpAndSettle();
+      expect(find.byType(RideOffersPage), findsOneWidget);
       // Offers page joins the same customer-only rooms; 60s more silence → no polling there either.
       final onOffers = rides.getCalls.length;
       await tester.pump(const Duration(seconds: 60));

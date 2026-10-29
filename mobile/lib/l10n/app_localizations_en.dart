@@ -7111,4 +7111,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get driverStartTrip => 'Start trip';
+
+  @override
+  String get rideOfferAcceptShort => 'Accept';
+
+  @override
+  String get rideOfferDeclineShort => 'Decline';
 }

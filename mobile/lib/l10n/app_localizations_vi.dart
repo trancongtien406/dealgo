@@ -7073,4 +7073,10 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get driverStartTrip => 'Bắt đầu chuyến';
+
+  @override
+  String get rideOfferAcceptShort => 'Chấp nhận';
+
+  @override
+  String get rideOfferDeclineShort => 'Từ chối';
 }

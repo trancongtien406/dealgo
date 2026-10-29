@@ -708,7 +708,7 @@ class _RideMapPageState extends State<RideMapPage> {
                                     label: l10n.rideOpenPendingOffers,
                                     compact: true,
                                     onPressed: () => context.push(
-                                      RideRoutes.offers(pendingRideId),
+                                      RideRoutes.matching(pendingRideId),
                                     ),
                                   ),
                                 ),

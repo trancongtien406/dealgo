@@ -340,23 +340,12 @@ class _RideFarePageState extends State<_RideFareView> {
   }
 
   Future<void> _openCreatedRide(RideView ride) async {
-    final expired =
-        ride.status == RideStatus.expired ||
-        rideNegotiationExpired(ride, DateTime.now());
-    final waiting =
-        ride.status == RideStatus.negotiating &&
-        ride.selectedOfferId == null &&
-        ride.offers.isEmpty &&
-        !expired;
     if (ride.status.hasDriver) {
       await context.push(RideRoutes.tracking(ride.id));
       return;
     }
-    if (waiting || expired) {
-      await context.push(RideRoutes.matching(ride.id));
-      return;
-    }
-    await context.push(RideRoutes.offers(ride.id));
+    // Quotes are answered inline on the waiting sheet.
+    await context.push(RideRoutes.matching(ride.id));
   }
 
   @override

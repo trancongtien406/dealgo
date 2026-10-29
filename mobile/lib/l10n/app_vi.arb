@@ -2312,5 +2312,7 @@
   "incomingJobTitle": "Cuốc xe mới",
   "incomingJobSkip": "Bỏ qua",
   "incomingJobOpen": "Xem & báo giá",
-  "driverStartTrip": "Bắt đầu chuyến"
+  "driverStartTrip": "Bắt đầu chuyến",
+  "rideOfferAcceptShort": "Chấp nhận",
+  "rideOfferDeclineShort": "Từ chối"
 }

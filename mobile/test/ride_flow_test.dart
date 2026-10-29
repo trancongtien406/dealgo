@@ -181,6 +181,12 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('ride-submit-fare')));
     await tester.tap(find.byKey(const Key('ride-submit-fare')));
     await tester.pumpAndSettle();
+    // The full list (vouchers, details) stays one tap away.
+    await tester.ensureVisible(
+      find.byKey(const Key('ride-open-offers-from-wait')),
+    );
+    await tester.tap(find.byKey(const Key('ride-open-offers-from-wait')));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('ride-select-offer')));
     await tester.pumpAndSettle();
@@ -198,6 +204,34 @@ void main() {
     expect(find.text('Giá đã thay đổi'), findsOneWidget);
     expect(find.text('45.000đ'), findsWidgets);
     expect(find.text('42.000đ'), findsWidgets);
+  });
+
+  testWidgets('quotes are answered inline on the waiting sheet', (
+    tester,
+  ) async {
+    final offer = _offer(amountVnd: 45000);
+    final rides = _negotiatingClient(offers: [offer]);
+    rides.onSelect = (request) => _view(
+      status: RideStatus.assigned,
+      agreedFareVnd: 45000,
+      selectedOfferId: request.offerId,
+      assignedDriverId: _driverId,
+      offers: [offer],
+    );
+    await _openFare(tester, rides);
+    await tester.ensureVisible(find.byKey(const Key('ride-submit-fare')));
+    await tester.tap(find.byKey(const Key('ride-submit-fare')));
+    await tester.pumpAndSettle();
+
+    final accept = find.byKey(const Key('ride-inline-accept-$_offerId'));
+    expect(accept, findsOneWidget);
+    expect(find.text('Chấp nhận'), findsOneWidget);
+    expect(find.byKey(const Key('ride-inline-raise-5000')), findsOneWidget);
+    await tester.ensureVisible(accept);
+    await tester.pumpAndSettle();
+    await tester.tap(accept);
+    await tester.pumpAndSettle();
+    expect(rides.selectCalls.single.offerId, _offerId);
   });
 
   test(
@@ -259,6 +293,12 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('ride-submit-fare')));
     await tester.tap(find.byKey(const Key('ride-submit-fare')));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('ride-open-offers-from-wait')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('ride-open-offers-from-wait')));
+    await tester.pumpAndSettle();
 
     final field = find.byKey(const Key('voucher-field'));
     await tester.ensureVisible(field);
@@ -301,6 +341,12 @@ void main() {
     await _openFare(tester, rides);
     await tester.ensureVisible(find.byKey(const Key('ride-submit-fare')));
     await tester.tap(find.byKey(const Key('ride-submit-fare')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('ride-open-offers-from-wait')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('ride-open-offers-from-wait')));
     await tester.pumpAndSettle();
     final field = find.byKey(const Key('voucher-field'));
     await tester.ensureVisible(field);

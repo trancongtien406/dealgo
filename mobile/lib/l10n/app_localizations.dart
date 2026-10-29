@@ -13219,6 +13219,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Start trip'**
   String get driverStartTrip;
+
+  /// No description provided for @rideOfferAcceptShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept'**
+  String get rideOfferAcceptShort;
+
+  /// No description provided for @rideOfferDeclineShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline'**
+  String get rideOfferDeclineShort;
 }
 
 class _AppLocalizationsDelegate
