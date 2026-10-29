@@ -18,6 +18,14 @@ export const RIDE_OFFERS_EVENT = 'rideOffers';
  */
 export const RIDE_REQUEST_EVENT = 'rideRequest';
 
+/** To nearby online food drivers' private rooms: a READY food order needs a driver (refresh the feed). */
+export const FOOD_REQUEST_EVENT = 'foodRequest';
+
+export type FoodRequestEventPayload = {
+  orderId: string;
+  at: string;
+};
+
 /**
  * To the dropped driver's private room: they lost an assigned ride (start/approach timeout,
  * own drop or ops reassign). The driver app clears the active job and shows `reasonCode`.

@@ -115,3 +115,48 @@ describe('food request push (READY → nearby drivers)', () => {
     expect(food.readyAudience).toHaveBeenCalledWith('o1');
   });
 });
+
+describe('food request socket hint (open driver apps refresh at once)', () => {
+  function withFanout(enabled: boolean) {
+    const fanout = { emitFoodRequest: vi.fn(), emitSnapshot: vi.fn() };
+    const push = { send: vi.fn().mockResolvedValue(undefined) };
+    const food = { readyAudience: vi.fn().mockResolvedValue(audience) };
+    const settings = {
+      getBoolean: vi.fn().mockResolvedValue(enabled),
+      getNumber: vi.fn().mockResolvedValue(30),
+    };
+    const svc = new OutboxRelayService(
+      new MemoryOutboxRepository(),
+      fanout as never,
+      push as never,
+      undefined,
+      food as never,
+      undefined,
+      undefined,
+      undefined,
+      settings as never,
+    );
+    return { svc, fanout, push };
+  }
+
+  it('emits foodRequest to every nearby driver room alongside the push', async () => {
+    const { svc, fanout } = withFanout(true);
+    await svc.pushFoodRequest(row('READY'));
+    expect(fanout.emitFoodRequest).toHaveBeenCalledTimes(1);
+    expect(fanout.emitFoodRequest.mock.calls[0][0]).toEqual(['near', 'mid', 'far']);
+    expect(fanout.emitFoodRequest.mock.calls[0][1]).toMatchObject({ orderId: 'o1' });
+  });
+
+  it('still emits the socket hint when the admin turned request pushes off', async () => {
+    const { svc, fanout, push } = withFanout(false);
+    await expect(svc.pushFoodRequest(row('READY'))).resolves.toBe(0);
+    expect(fanout.emitFoodRequest).toHaveBeenCalledTimes(1);
+    expect(push.send).not.toHaveBeenCalled();
+  });
+
+  it('does not emit for non-READY statuses', async () => {
+    const { svc, fanout } = withFanout(true);
+    await svc.pushFoodRequest(row('PREPARING'));
+    expect(fanout.emitFoodRequest).not.toHaveBeenCalled();
+  });
+});

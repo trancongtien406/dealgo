@@ -258,13 +258,16 @@ export class OutboxRelayService {
       return 0;
     }
     try {
+      const audience = await this.food.readyAudience(row.aggregateId);
+      if (!audience || audience.driverIds.length === 0) {
+        return 0;
+      }
+      // Open driver apps refresh their job list right away (socket); the push below is for
+      // backgrounded/killed apps and follows the admin push switches.
+      this.fanout?.emitFoodRequest?.(audience.driverIds, { orderId: row.aggregateId, at: new Date().toISOString() });
       const enabled = this.settings ? await this.settings.getBoolean('RIDE_REQUEST_PUSH_ENABLED') : true;
       const maxDrivers = this.settings ? await this.settings.getNumber('RIDE_REQUEST_PUSH_MAX_DRIVERS') : 30;
       if (!enabled || maxDrivers <= 0) {
-        return 0;
-      }
-      const audience = await this.food.readyAudience(row.aggregateId);
-      if (!audience || audience.driverIds.length === 0) {
         return 0;
       }
       const nearest = audience.driverIds.slice(0, maxDrivers);
