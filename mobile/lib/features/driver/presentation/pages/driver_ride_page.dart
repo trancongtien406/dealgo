@@ -203,6 +203,34 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
     if (_withdrawing || client == null || token == null || token.isEmpty) {
       return;
     }
+    // The withdraw button takes the submit button's place, so a double tap on
+    // "send" used to pull the offer back a second later. Ask first.
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final l10n = AppLocalizations.of(dialogContext);
+        return AlertDialog(
+          title: Text(l10n.driverWithdrawOffer),
+          actions: [
+            TextButton(
+              key: const Key('driver-withdraw-cancel'),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(
+                MaterialLocalizations.of(dialogContext).cancelButtonLabel,
+              ),
+            ),
+            TextButton(
+              key: const Key('driver-withdraw-confirm'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(l10n.driverWithdrawOffer),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
     setState(() {
       _withdrawing = true;
       _error = null;

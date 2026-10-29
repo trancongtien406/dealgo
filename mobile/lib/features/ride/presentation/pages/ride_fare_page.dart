@@ -308,6 +308,20 @@ class _RideFarePageState extends State<_RideFareView> {
       }
       final alreadyOpen =
           error is ApiException && error.errorCode == 'RIDE_ALREADY_OPEN';
+      // The customer still has a live request (e.g. left the waiting screen):
+      // reopen it instead of a dead-end message, so its driver offers are seen.
+      final openId = alreadyOpen
+          ? context.read<RideSessionCubit>().state
+          : null;
+      if (openId != null) {
+        setState(() {
+          _busy = false;
+          _offline = false;
+          _message = null;
+        });
+        await context.push(RideRoutes.matching(openId));
+        return;
+      }
       setState(() {
         _busy = false;
         if (rideFailureIsOffline(error)) {

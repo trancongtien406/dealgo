@@ -231,6 +231,17 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('driver-withdraw-offer')));
     await tester.tap(find.byKey(const Key('driver-withdraw-offer')));
     await tester.pumpAndSettle();
+    // A stray second tap on "send" must not pull the offer back: confirm first.
+    await tester.tap(find.byKey(const Key('driver-withdraw-cancel')));
+    await tester.pumpAndSettle();
+    expect(
+      _negotiation(tester).calls,
+      isNot(contains('withdrawOffer:ride-open-1')),
+    );
+    await tester.tap(find.byKey(const Key('driver-withdraw-offer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('driver-withdraw-confirm')));
+    await tester.pumpAndSettle();
     expect(_negotiation(tester).calls, contains('withdrawOffer:ride-open-1'));
     expect(_location(tester), '/driver/jobs');
   });

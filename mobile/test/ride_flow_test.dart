@@ -126,6 +126,32 @@ void main() {
     expect(find.textContaining('Xe 4 chỗ'), findsNothing);
   });
 
+  testWidgets('a still-open request reopens it instead of a dead end', (
+    tester,
+  ) async {
+    final rides = FakeRideClient();
+    final open = _view();
+    rides.onGet = (_) => open;
+    rides.onCreate = (_) => throw const ApiException(
+      statusCode: 409,
+      message: 'A negotiating ride is already open',
+      errorCode: 'RIDE_ALREADY_OPEN',
+    );
+    await _openFare(tester, rides);
+    tester
+        .element(find.byKey(const Key('ride-submit-fare')))
+        .read<RideSessionCubit>()
+        .remember('ride-1');
+
+    await tester.ensureVisible(find.byKey(const Key('ride-submit-fare')));
+    await tester.tap(find.byKey(const Key('ride-submit-fare')));
+    await tester.pumpAndSettle();
+
+    expect(rides.createCalls, hasLength(1));
+    expect(rides.getCalls, isNotEmpty);
+    expect(find.text('Đang thương lượng'), findsWidgets);
+  });
+
   testWidgets('an empty offer list shows the empty state', (tester) async {
     await _openFare(tester, _negotiatingClient());
     await tester.ensureVisible(find.byKey(const Key('ride-submit-fare')));
