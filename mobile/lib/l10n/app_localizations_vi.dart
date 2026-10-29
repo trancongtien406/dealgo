@@ -7070,4 +7070,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get incomingJobOpen => 'Xem & báo giá';
+
+  @override
+  String get driverStartTrip => 'Bắt đầu chuyến';
 }

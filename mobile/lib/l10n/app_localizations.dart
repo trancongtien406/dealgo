@@ -13213,6 +13213,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'View & quote'**
   String get incomingJobOpen;
+
+  /// No description provided for @driverStartTrip.
+  ///
+  /// In en, this message translates to:
+  /// **'Start trip'**
+  String get driverStartTrip;
 }
 
 class _AppLocalizationsDelegate

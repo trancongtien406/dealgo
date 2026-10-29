@@ -7108,4 +7108,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get incomingJobOpen => 'View & quote';
+
+  @override
+  String get driverStartTrip => 'Start trip';
 }

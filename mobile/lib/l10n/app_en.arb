@@ -3469,5 +3469,6 @@
   "driverJobPushGone": "This request was cancelled or taken by another driver.",
   "incomingJobTitle": "New ride request",
   "incomingJobSkip": "Skip",
-  "incomingJobOpen": "View & quote"
+  "incomingJobOpen": "View & quote",
+  "driverStartTrip": "Start trip"
 }

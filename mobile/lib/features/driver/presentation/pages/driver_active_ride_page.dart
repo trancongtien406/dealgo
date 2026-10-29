@@ -213,6 +213,39 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
     }
   }
 
+  /// Start without a code; only when the server still requires one
+  /// (RIDE_PICKUP_CODE_REQUIRED on, or an older server answering 400) open
+  /// the code pad.
+  Future<void> _startTrip() async {
+    final advance = context.read<AdvanceDriverRide>();
+    var needsCode = false;
+    final ok = await runDriverAction((token) async {
+      try {
+        await advance(
+          accessToken: token,
+          rideId: widget.rideId,
+          action: RideDriverAction.start,
+        );
+      } on ApiException catch (error) {
+        if (error.errorCode == 'RIDE_PICKUP_CODE_REQUIRED' ||
+            error.statusCode == 400) {
+          needsCode = true;
+          return;
+        }
+        rethrow;
+      }
+    });
+    if (!mounted) return;
+    if (needsCode) {
+      context.push(
+        DriverRoutes.passengerOtp(widget.rideId),
+        extra: _loaded ?? widget.ride,
+      );
+      return;
+    }
+    if (ok) setState(() => _phase = DriverRidePhase.onTrip);
+  }
+
   Future<void> _advance(
     List<RideDriverAction> actions,
     DriverRidePhase next,
@@ -232,12 +265,9 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
     });
     if (ok && mounted) {
       setState(() => _phase = next);
-      // Fewer taps: "Đã đến" opens the pickup-OTP pad straight away, and
-      // "Hoàn thành" lands on the summary (the OTP itself is still required).
-      final ride = _loaded ?? widget.ride;
-      if (next == DriverRidePhase.arrived) {
-        context.push(DriverRoutes.passengerOtp(widget.rideId), extra: ride);
-      } else if (next == DriverRidePhase.complete) {
+      // "Hoàn thành" lands on the summary. Arrival no longer opens a code
+      // pad: the pickup code is an admin toggle (default off), see _startTrip.
+      if (next == DriverRidePhase.complete) {
         context.pushReplacement(DriverRoutes.completed(widget.rideId));
       }
     }
@@ -423,13 +453,12 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
             ? l10n.driverCancelRide
             : l10n.driverActiveReportIssue,
         secondaryKey: canCancel ? const Key('driver-cancel-ride') : null,
-        primaryLabel: l10n.driverActiveOpenOtp,
+        primaryLabel: l10n.driverStartTrip,
         primaryKey: const Key('driver-active-open-otp'),
         onSecondary: canCancel
             ? _driverCancel
             : () => context.push(DriverRoutes.failed(widget.rideId)),
-        onPrimary: () =>
-            context.push(DriverRoutes.passengerOtp(widget.rideId), extra: ride),
+        onPrimary: _startTrip,
       ),
       DriverRidePhase.onTrip when _currentStop != null => DriverFooter(
         secondaryLabel: l10n.driverActiveReportIssue,
