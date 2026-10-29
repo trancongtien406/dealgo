@@ -312,7 +312,7 @@ void main() {
     expect(find.text('47.000đ'), findsWidgets);
   });
 
-  testWidgets('active ride load failure offers a retry', (tester) async {
+  testWidgets('active ride that is not this driver's (404) says it is gone', (tester) async {
     final rides = FakeRideClient();
     await pumpSignedIn(
       tester,
@@ -323,7 +323,7 @@ void main() {
     GoRouter.of(tester.element(find.text('Tổng quan tài xế')))
         .push('/driver/rides/ride-open-1/active');
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('driver-active-retry')), findsOneWidget);
+    expect(find.byKey(const Key('driver-active-gone')), findsOneWidget);
   });
 }
 
