@@ -54,6 +54,8 @@ model User {
   gender                      UserGender?
   avatarUrl                   String?
   phoneVerifiedAt             DateTime?
+  /// Contact number typed at profile completion (not OTP-verified, not a sign-in identifier).
+  contactPhone                String?                     @db.VarChar(16)
   emailVerifiedAt             DateTime?
   /// S027 (DEC-PROD-037): soft-deleted at confirm; sign-in is refused from here on.
   deletedAt                   DateTime?

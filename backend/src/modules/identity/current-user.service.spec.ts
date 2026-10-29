@@ -54,6 +54,7 @@ describe('CurrentUserService', () => {
       avatarUrl: null,
       phoneVerifiedAt: '2026-10-01T00:00:00.000Z',
       emailVerifiedAt: null,
+      contactPhone: null,
       needsProfileSetup: true,
       grants: [{ role: 'CUSTOMER', status: 'ACTIVE' }],
     });
@@ -104,5 +105,43 @@ describe('CurrentUserService', () => {
     const stored = await repository.findUserById(user.id);
     expect(stored?.email).toBeNull();
     expect(stored?.displayName).toBe('Tran Van B');
+  });
+
+  describe('contact phone at profile completion (no OTP)', () => {
+    const make = () => {
+      const repository = new MemoryIdentityRepository();
+      const config = { get: vi.fn(() => undefined) };
+      const service = new CurrentUserService(repository, { request: vi.fn() } as any, config as any);
+      return { repository, service };
+    };
+
+    it('an email account with a name still needs setup until it has a phone', async () => {
+      const { repository, service } = make();
+      const user = await repository.createUser({ phone: null, email: 'a@x.vn', displayName: 'Lan' });
+      expect((await service.getProfile(user.id)).needsProfileSetup).toBe(true);
+
+      const saved = await service.updateProfile(user.id, { contactPhone: '0912 345 678' });
+      expect(saved.contactPhone).toBe('+84912345678');
+      expect(saved.needsProfileSetup).toBe(false);
+      // A typed contact number is never a verified sign-in phone.
+      expect(saved.phone).toBeNull();
+      expect(saved.phoneVerifiedAt).toBeNull();
+    });
+
+    it('rejects a non-Vietnamese or malformed number', async () => {
+      const { repository, service } = make();
+      const user = await repository.createUser({ phone: null, email: 'b@x.vn', displayName: 'B' });
+      for (const bad of ['12345', '+14155550100', '0212345678', '091234567']) {
+        await expect(service.updateProfile(user.id, { contactPhone: bad })).rejects.toMatchObject({
+          response: expect.objectContaining({ errorCode: 'VALIDATION_ERROR' }),
+        });
+      }
+    });
+
+    it('a phone-OTP account does not need a contact number', async () => {
+      const { repository, service } = make();
+      const user = await repository.createUser({ phone: '+84901111112', email: null, displayName: 'C' });
+      expect((await service.getProfile(user.id)).needsProfileSetup).toBe(false);
+    });
   });
 });

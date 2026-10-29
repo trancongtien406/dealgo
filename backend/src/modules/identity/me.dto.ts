@@ -24,6 +24,13 @@ export class UpdateMeDto {
   @IsEmail({ require_tld: false })
   email?: string;
 
+  /** Contact number (VN mobile), saved as typed — no OTP (profile completion). */
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MaxLength(20)
+  contactPhone?: string | null;
+
   @IsOptional()
   @ValidateIf((_, value) => value !== null)
   @IsISO8601({ strict: true })

@@ -10,7 +10,7 @@ import type {
   UserGenderName,
   UserRecord,
 } from './identity.repository.js';
-import { normalizeEmail } from './phone-number.js';
+import { normalizeEmail, normalizeVnMobile } from './phone-number.js';
 
 /** Placeholder assigned at phone signup; treated as missing meaningful name. */
 const DEFAULT_DISPLAY_NAMES = new Set(['dealgo user']);
@@ -25,6 +25,8 @@ export type CurrentUserResult = {
   avatarUrl: string | null;
   phoneVerifiedAt: string | null;
   emailVerifiedAt: string | null;
+  /** Unverified contact number (accounts without a verified phone). */
+  contactPhone: string | null;
   needsProfileSetup: boolean;
   grants: Array<{ role: string; status: 'ACTIVE' }>;
 };
@@ -32,6 +34,7 @@ export type CurrentUserResult = {
 export type UpdateMeInput = {
   displayName?: string;
   email?: string;
+  contactPhone?: string | null;
   dateOfBirth?: string | null;
   gender?: UserGenderName | null;
 };
@@ -72,7 +75,20 @@ export class CurrentUserService {
       displayName?: string;
       dateOfBirth?: Date | null;
       gender?: UserGenderName | null;
+      contactPhone?: string | null;
     } = {};
+
+    if (input.contactPhone !== undefined) {
+      if (input.contactPhone === null) {
+        profilePatch.contactPhone = null;
+      } else {
+        const phone = normalizeVnMobile(input.contactPhone);
+        if (!phone) {
+          throw authError(400, 'VALIDATION_ERROR', 'contactPhone must be a Vietnamese mobile number');
+        }
+        profilePatch.contactPhone = phone;
+      }
+    }
 
     if (input.displayName !== undefined) {
       const displayName = input.displayName.trim();
@@ -136,12 +152,21 @@ export class CurrentUserService {
       avatarUrl: user.avatarUrl,
       phoneVerifiedAt: user.phoneVerifiedAt?.toISOString() ?? null,
       emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
-      needsProfileSetup: needsProfileSetup(user.displayName),
+      contactPhone: user.contactPhone ?? null,
+      needsProfileSetup: needsProfileSetup(user.displayName) || !hasPhone(user),
       grants: grants
         .filter((grant) => grant.status === 'ACTIVE')
         .map((grant) => ({ role: grant.role, status: 'ACTIVE' as const })),
     };
   }
+}
+
+/**
+ * Profile completion also asks for a phone number when the account has none
+ * (email / passkey sign-up). A typed contact number is enough — no OTP.
+ */
+export function hasPhone(user: Pick<UserRecord, 'phone' | 'contactPhone'>): boolean {
+  return Boolean(user.phone || user.contactPhone);
 }
 
 export function needsProfileSetup(displayName: string): boolean {

@@ -41,6 +41,7 @@ export class MeController {
     return this.currentUser.updateProfile(actor.userId, {
       displayName: dto.displayName,
       email: dto.email,
+      contactPhone: dto.contactPhone,
       dateOfBirth: dto.dateOfBirth,
       gender: dto.gender,
     });

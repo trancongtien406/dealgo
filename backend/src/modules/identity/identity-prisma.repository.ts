@@ -42,6 +42,7 @@ type DbUser = {
   avatarUrl: string | null;
   phoneVerifiedAt: Date | null;
   emailVerifiedAt: Date | null;
+  contactPhone?: string | null;
   createdAt: Date;
   deletedAt: Date | null;
   purgeAfter: Date | null;
@@ -111,7 +112,11 @@ export class PrismaIdentityRepository implements IdentityRepository {
       dateOfBirth?: Date | null;
       gender?: UserGenderName | null;
       avatarUrl?: string | null;
+      contactPhone?: string | null;
     } = {};
+    if (patch.contactPhone !== undefined) {
+      data.contactPhone = patch.contactPhone;
+    }
     if (patch.displayName !== undefined) {
       data.displayName = patch.displayName;
     }
@@ -1161,6 +1166,7 @@ function mapUser(user: DbUser): UserRecord {
     avatarUrl: user.avatarUrl,
     phoneVerifiedAt: user.phoneVerifiedAt,
     emailVerifiedAt: user.emailVerifiedAt,
+    contactPhone: user.contactPhone ?? null,
     createdAt: user.createdAt,
     deletedAt: user.deletedAt,
     purgeAfter: user.purgeAfter,

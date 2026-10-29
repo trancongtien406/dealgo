@@ -17,6 +17,12 @@ export function normalizePhone(input: string): string | null {
   return null;
 }
 
+/** Vietnamese mobile (03/05/07/08/09 + 8 digits) as +84…, else null. */
+export function normalizeVnMobile(input: string): string | null {
+  const phone = normalizePhone(input);
+  return phone && /^\+84[35789]\d{8}$/.test(phone) ? phone : null;
+}
+
 export function redactPhone(phone: string): string {
   if (phone.length <= 6) {
     return '***';

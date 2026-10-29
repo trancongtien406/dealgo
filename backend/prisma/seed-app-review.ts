@@ -38,6 +38,8 @@ export const APP_REVIEW_STORE_NAME = 'DealGo Demo Đà Nẵng';
 export const APP_REVIEW_REGION_CODE = 'DN';
 
 /** Bạch Đằng riverside, Hải Châu, Đà Nẵng. */
+/** Demo contact number (not a real subscriber, no SMS is sent). */
+const APP_REVIEW_CONTACT_PHONE = '+84901234567';
 const STORE_PIN = { lat: 16.071, lng: 108.2246, label: 'Đường Bạch Đằng, Hải Châu 1, Hải Châu, Đà Nẵng' };
 
 const STORE_COVER = 'food_store_cover.jpg';
@@ -193,10 +195,15 @@ async function main(): Promise<void> {
     const user = existing
       ? await db.user.update({
           where: { id: existing.id },
-          data: { displayName: APP_REVIEW_DISPLAY_NAME, emailVerifiedAt: existing.emailVerifiedAt ?? now },
+          data: {
+            displayName: APP_REVIEW_DISPLAY_NAME,
+            emailVerifiedAt: existing.emailVerifiedAt ?? now,
+            // Profile completion asks email accounts for a phone; reviewers skip it.
+            contactPhone: existing.contactPhone ?? APP_REVIEW_CONTACT_PHONE,
+          },
         })
       : await db.user.create({
-          data: { id: appReviewId('user'), email: APP_REVIEW_DEMO_EMAIL, displayName: APP_REVIEW_DISPLAY_NAME, emailVerifiedAt: now },
+          data: { id: appReviewId('user'), email: APP_REVIEW_DEMO_EMAIL, displayName: APP_REVIEW_DISPLAY_NAME, emailVerifiedAt: now, contactPhone: APP_REVIEW_CONTACT_PHONE },
         });
     const credential = await db.customerCredential.findUnique({ where: { userId: user.id } });
     if (password) {

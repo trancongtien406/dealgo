@@ -177,6 +177,7 @@ export class PrismaAccountDeletionRepository implements AccountDeletionRepositor
         data: {
           email: null,
           phone: null,
+          contactPhone: null,
           displayName: DELETED_USER_DISPLAY_NAME,
           dateOfBirth: null,
           gender: null,

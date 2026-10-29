@@ -26,6 +26,8 @@ export type UserRecord = {
   avatarUrl: string | null;
   phoneVerifiedAt: Date | null;
   emailVerifiedAt: Date | null;
+  /** Unverified contact number from profile completion; never used to sign in. */
+  contactPhone?: string | null;
   createdAt: Date;
   /** S027 (DEC-PROD-037): soft-deleted at confirm; sessions cannot be issued. */
   deletedAt: Date | null;
@@ -38,6 +40,7 @@ export type UserProfilePatch = {
   dateOfBirth?: Date | null;
   gender?: UserGenderName | null;
   avatarUrl?: string | null;
+  contactPhone?: string | null;
 };
 
 export type RoleGrantRecord = {
@@ -521,6 +524,9 @@ export class MemoryIdentityRepository implements IdentityRepository {
     }
     if (patch.gender !== undefined) {
       user.gender = patch.gender;
+    }
+    if (patch.contactPhone !== undefined) {
+      user.contactPhone = patch.contactPhone;
     }
     if (patch.avatarUrl !== undefined) {
       user.avatarUrl = patch.avatarUrl;
