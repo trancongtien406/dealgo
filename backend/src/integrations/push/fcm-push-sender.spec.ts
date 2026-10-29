@@ -267,7 +267,7 @@ describe('fcmMessage', () => {
         apns: { payload: unknown };
         data: Record<string, string>;
       };
-      expect(msg.apns.payload).toEqual({ aps: { sound: `${name}.caf` } });
+      expect(msg.apns.payload).toEqual({ aps: { sound: `${name}.caf`, 'interruption-level': 'time-sensitive' } });
       expect(msg.android.notification).toEqual({
         tag: 'ride-request-1',
         channel_id: channel,
@@ -286,7 +286,7 @@ describe('fcmMessage', () => {
       apns: { payload: unknown };
       data: Record<string, string>;
     };
-    expect(msg.apns.payload).toEqual({ aps: { sound: 'default' } });
+    expect(msg.apns.payload).toEqual({ aps: { sound: 'default', 'interruption-level': 'time-sensitive' } });
     expect(msg.android).toEqual({
       notification: {
         channel_id: 'dealgo_new_job_default_v1',

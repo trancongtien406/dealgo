@@ -42,6 +42,8 @@ export const CAMPAIGN_BATCH_SIZE = 500;
 @Injectable()
 export class OutboxRelayService {
   private readonly logger = new Logger(OutboxRelayService.name);
+  /** READY food orders announced to nearby drivers → who to tell when it is no longer open. */
+  private readonly openFoodRequests = new Map<string, Set<string>>();
 
   constructor(
     @Inject(OUTBOX_REPOSITORY) private readonly outbox: OutboxRepository,
@@ -72,6 +74,7 @@ export class OutboxRelayService {
         this.emitFanout(row, now);
         await this.emitDriverJob(row, now);
         await this.pushNotifications(row);
+        this.closeFoodRequest(row);
         await this.pushFoodRequest(row);
         const ok = await this.outbox.markProcessed(row.id, now);
         if (ok) {
@@ -247,6 +250,18 @@ export class OutboxRelayService {
    * enough). Same admin switches as the ride request push (RIDE_REQUEST_PUSH_ENABLED /
    * RIDE_REQUEST_PUSH_MAX_DRIVERS); honours the driver's `food` notification toggle. No inbox row.
    */
+  /**
+   * The READY order was claimed, cancelled or failed: drivers we announced it to get a
+   * `foodRequest` hint so their job list and full-screen incoming-job card drop it now.
+   */
+  closeFoodRequest(row: OutboxPendingRow): void {
+    if (row.aggregateType !== 'FoodOrder') return;
+    const drivers = this.openFoodRequests.get(row.aggregateId);
+    if (!drivers || statusFromPayload(row.payload) === 'READY') return;
+    this.openFoodRequests.delete(row.aggregateId);
+    this.fanout?.emitFoodRequest?.([...drivers], { orderId: row.aggregateId, at: new Date().toISOString() });
+  }
+
   async pushFoodRequest(row: OutboxPendingRow): Promise<number> {
     if (
       !this.push ||
@@ -265,6 +280,7 @@ export class OutboxRelayService {
       // Open driver apps refresh their job list right away (socket); the push below is for
       // backgrounded/killed apps and follows the admin push switches.
       this.fanout?.emitFoodRequest?.(audience.driverIds, { orderId: row.aggregateId, at: new Date().toISOString() });
+      this.openFoodRequests.set(row.aggregateId, new Set(audience.driverIds));
       const enabled = this.settings ? await this.settings.getBoolean('RIDE_REQUEST_PUSH_ENABLED') : true;
       const maxDrivers = this.settings ? await this.settings.getNumber('RIDE_REQUEST_PUSH_MAX_DRIVERS') : 30;
       if (!enabled || maxDrivers <= 0) {

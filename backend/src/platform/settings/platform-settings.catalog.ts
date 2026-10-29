@@ -69,6 +69,8 @@ export type PlatformSettingKey =
   | 'RIDE_REQUEST_PUSH_ENABLED'
   | 'NEW_JOB_CUSTOM_SOUND_ENABLED'
   | 'RIDE_REQUEST_PUSH_MAX_DRIVERS'
+  | 'RIDE_REQUEST_REPUSH_INTERVAL_SEC'
+  | 'RIDE_REQUEST_REPUSH_MAX'
   | 'FOOD_FAIL_MIN_WAIT_MINUTES'
   | 'FOOD_MERCHANT_COMMISSION_PERCENT'
   | 'FOOD_ORDER_CHANGE_RESPONSE_MINUTES'
@@ -698,6 +700,24 @@ export const PLATFORM_SETTING_SPECS: readonly PlatformSettingSpec[] = [
     openIds: ['DEC-PROD-061'],
     min: 0,
     max: 200,
+    seeded: true,
+  },
+  {
+    // 30 — nhắc lại push cuốc còn mở mỗi N giây cho tài xế gần (0 = tắt, 15–300)
+    key: 'RIDE_REQUEST_REPUSH_INTERVAL_SEC',
+    valueType: 'number',
+    openIds: ['DEC-PROD-061'],
+    min: 0,
+    max: 300,
+    seeded: true,
+  },
+  {
+    // 3 — số lần nhắc lại tối đa mỗi cuốc (0–10)
+    key: 'RIDE_REQUEST_REPUSH_MAX',
+    valueType: 'number',
+    openIds: ['DEC-PROD-061'],
+    min: 0,
+    max: 10,
     seeded: true,
   },
   {

@@ -21,6 +21,11 @@ import { resolveNewJobAlert } from '../notification/new-job-alert.js';
 /** One push per driver per ride within this window (fare raises re-notify after it). */
 export const RIDE_REQUEST_PUSH_DEDUPE_MS = 60_000;
 
+/** How often the re-push loop looks at open requests (the admin interval is the real throttle). */
+export const RIDE_REQUEST_REPUSH_TICK_MS = 5_000;
+
+type OpenRequest = { driverIds: Set<string>; lastPushMs: number; repushes: number };
+
 /**
  * Bid/offer realtime (DEC-PROD-031 rev 2026-10-24): pushes the full offer list to the
  * customer-only `ride-offers:{id}` room on offer / counter / selection / cancel / expiry.
@@ -33,6 +38,9 @@ export class RideOfferFanoutService implements OnModuleInit, OnModuleDestroy {
   private subscription: Subscription | null = null;
   /** `${rideId}:${driverId}` → last push (ms). In-memory; the device collapse key covers multi-node. */
   private readonly lastRequestPush = new Map<string, number>();
+  /** Requests this node announced and that may still be open → re-push + close hint. */
+  private readonly openRequests = new Map<string, OpenRequest>();
+  private repushTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private readonly events: RideOfferEvents,
@@ -47,11 +55,79 @@ export class RideOfferFanoutService implements OnModuleInit, OnModuleDestroy {
     this.subscription = this.events.changes.subscribe((change) => {
       void this.handle(change);
     });
+    if (process.env.NODE_ENV !== 'test') {
+      this.repushTimer = setInterval(() => void this.repushOpenRequests(), RIDE_REQUEST_REPUSH_TICK_MS);
+      this.repushTimer.unref?.();
+    }
   }
 
   onModuleDestroy(): void {
     this.subscription?.unsubscribe();
     this.subscription = null;
+    if (this.repushTimer) clearInterval(this.repushTimer);
+    this.repushTimer = null;
+  }
+
+  private track(rideId: string, driverIds: readonly string[], nowMs: number, repush: boolean): void {
+    const open = this.openRequests.get(rideId) ?? { driverIds: new Set<string>(), lastPushMs: nowMs, repushes: 0 };
+    for (const id of driverIds) open.driverIds.add(id);
+    open.lastPushMs = nowMs;
+    open.repushes = repush ? open.repushes + 1 : 0;
+    this.openRequests.set(rideId, open);
+  }
+
+  /**
+   * The request left NEGOTIATING (customer cancelled, picked a driver, expired): every driver
+   * we alerted gets a `rideRequest` hint so their app re-syncs the feed and drops the
+   * full-screen incoming-job card right away.
+   */
+  private closeRequest(rideId: string, reason: string, at: Date): void {
+    const open = this.openRequests.get(rideId);
+    if (!open) return;
+    this.openRequests.delete(rideId);
+    for (const key of this.lastRequestPush.keys()) {
+      if (key.startsWith(`${rideId}:`)) this.lastRequestPush.delete(key);
+    }
+    this.fanout.emitRideRequest([...open.driverIds], {
+      reason: `CLOSED_${reason}`,
+      ride: { id: rideId, status: 'CLOSED' },
+      at: at.toISOString(),
+    });
+  }
+
+  /**
+   * Grab/inDrive-style persistence: while a request stays open, nearby drivers are re-pushed
+   * every RIDE_REQUEST_REPUSH_INTERVAL_SEC (0 = off), at most RIDE_REQUEST_REPUSH_MAX times.
+   */
+  async repushOpenRequests(now: Date = new Date()): Promise<number> {
+    if (this.openRequests.size === 0) return 0;
+    const setting = async (key: 'RIDE_REQUEST_REPUSH_INTERVAL_SEC' | 'RIDE_REQUEST_REPUSH_MAX', fallback: number) =>
+      (await this.settings?.getOptionalNumber(key).catch(() => undefined)) ?? fallback;
+    const intervalSec = await setting('RIDE_REQUEST_REPUSH_INTERVAL_SEC', 30);
+    const max = await setting('RIDE_REQUEST_REPUSH_MAX', 3);
+    const nowMs = now.getTime();
+    let sent = 0;
+    for (const [rideId, open] of [...this.openRequests]) {
+      try {
+        const due = intervalSec > 0 && open.repushes < max && nowMs - open.lastPushMs >= intervalSec * 1000;
+        if (!due && open.repushes < max && intervalSec > 0) continue;
+        const audience = await this.rides.requestAudience(rideId);
+        if (!audience) {
+          this.closeRequest(rideId, 'GONE', now);
+          continue;
+        }
+        if (!due) continue; // Budget used: keep tracking only to send the close hint.
+        const targets = audience.pushDriverIds ?? audience.driverIds;
+        sent += await this.pushRequest(targets, audience.ride, now, { throttleMs: intervalSec * 1000 });
+        if (audience.driverIds.length > 0) {
+          this.fanout.emitRideRequest(audience.driverIds, { reason: 'REPEAT', ride: audience.ride, at: now.toISOString() });
+        }
+        this.track(rideId, targets, nowMs, true);
+      } catch (error) {
+        this.logger.warn({ msg: 'push.ride_request_repush_failed', rideId, error: String(error) });
+      }
+    }
+    return sent;
   }
 
   /**
@@ -105,7 +181,9 @@ export class RideOfferFanoutService implements OnModuleInit, OnModuleDestroy {
         });
       }
       // Push list also covers online drivers whose app is backgrounded/killed (older fix).
-      await this.pushRequest(audience.pushDriverIds ?? audience.driverIds, audience.ride, change.at);
+      const targets = audience.pushDriverIds ?? audience.driverIds;
+      await this.pushRequest(targets, audience.ride, change.at);
+      this.track(change.rideId, [...targets, ...audience.driverIds], change.at.getTime(), false);
     } catch (error) {
       this.logger.warn({ msg: 'realtime.ride_request_fanout_failed', error: String(error) });
     }
@@ -120,6 +198,7 @@ export class RideOfferFanoutService implements OnModuleInit, OnModuleDestroy {
     driverIds: readonly string[],
     ride: { id: string; offeredFareVnd: number; expiresAt: string; pickup: { label: string }; dropoff: { label: string } },
     at: Date,
+    opts: { throttleMs?: number } = {},
   ): Promise<number> {
     if (!this.push || driverIds.length === 0) {
       return 0;
@@ -134,8 +213,12 @@ export class RideOfferFanoutService implements OnModuleInit, OnModuleDestroy {
     for (const [key, sentMs] of this.lastRequestPush) {
       if (nowMs - sentMs >= RIDE_REQUEST_PUSH_DEDUPE_MS) this.lastRequestPush.delete(key);
     }
+    const windowMs = Math.min(opts.throttleMs ?? RIDE_REQUEST_PUSH_DEDUPE_MS, RIDE_REQUEST_PUSH_DEDUPE_MS);
     const fresh = driverIds
-      .filter((id) => !this.lastRequestPush.has(`${ride.id}:${id}`))
+      .filter((id) => {
+        const last = this.lastRequestPush.get(`${ride.id}:${id}`);
+        return last === undefined || nowMs - last >= windowMs;
+      })
       .slice(0, maxDrivers);
     const allowed = this.prefs ? await this.prefs.filterRecipients([...fresh], 'RIDE') : fresh;
     const expiresMs = Date.parse(ride.expiresAt);
@@ -175,6 +258,11 @@ export class RideOfferFanoutService implements OnModuleInit, OnModuleDestroy {
     void this.broadcastRequest(change);
     try {
       const snapshot = await this.rides.customerOffersSnapshot(change.rideId);
+      if (snapshot && snapshot.status !== 'NEGOTIATING') {
+        // Drivers who quoted are told too, even if this node did not announce the ride.
+        this.track(change.rideId, snapshot.offers.map((o) => o.driverId), change.at.getTime(), false);
+        this.closeRequest(change.rideId, change.reason, change.at);
+      }
       if (!snapshot) {
         return;
       }

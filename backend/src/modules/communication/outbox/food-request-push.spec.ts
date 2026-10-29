@@ -160,3 +160,20 @@ describe('food request socket hint (open driver apps refresh at once)', () => {
     expect(fanout.emitFoodRequest).not.toHaveBeenCalled();
   });
 });
+
+describe('food request close hint', () => {
+  it('claimed/cancelled READY order tells every announced driver once', async () => {
+    const push = { send: vi.fn().mockResolvedValue(undefined) };
+    const fanout = { emitFoodRequest: vi.fn() };
+    const food = { readyAudience: vi.fn().mockResolvedValue(audience) };
+    const svc = new OutboxRelayService(new MemoryOutboxRepository(), fanout as never, push as never, undefined, food as never);
+    await svc.pushFoodRequest(row('READY'));
+    fanout.emitFoodRequest.mockClear();
+    svc.closeFoodRequest(row('READY'));
+    expect(fanout.emitFoodRequest).not.toHaveBeenCalled();
+    svc.closeFoodRequest(row('CANCELLED'));
+    expect(fanout.emitFoodRequest).toHaveBeenCalledWith(['near', 'mid', 'far'], expect.objectContaining({ orderId: 'o1' }));
+    svc.closeFoodRequest(row('PICKED_UP'));
+    expect(fanout.emitFoodRequest).toHaveBeenCalledTimes(1);
+  });
+});

@@ -197,7 +197,14 @@ export function fcmMessage(
       ? { ...notification.data, alertSound: sound.name }
       : notification.data,
   };
-  const apnsPayload = { aps: { sound: sound ? sound.iosSound : 'default' } };
+  // New-job alerts break through Focus / scheduled summary (needs the
+  // com.apple.developer.usernotifications.time-sensitive entitlement in the app).
+  const apnsPayload = {
+    aps: {
+      sound: sound ? sound.iosSound : 'default',
+      ...(alert ? { 'interruption-level': 'time-sensitive' } : {}),
+    },
+  };
   if (
     collapseKey === undefined &&
     ttlSeconds === undefined &&
