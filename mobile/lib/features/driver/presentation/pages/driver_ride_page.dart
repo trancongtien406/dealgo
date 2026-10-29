@@ -30,6 +30,7 @@ import '../../../../features/food/domain/entities/food_money.dart';
 import '../../../../core/format/short_ref.dart';
 import '../../../../core/l10n/api_error_text.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
+import '../cubit/driver_feed_cubit.dart';
 
 class DriverRideDetailPage extends StatelessWidget {
   const DriverRideDetailPage({required this.ride, super.key});
@@ -38,6 +39,25 @@ class DriverRideDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    DriverFeedCubit? feed;
+    try {
+      feed = context.read<DriverFeedCubit>();
+    } catch (_) {}
+    if (feed == null) return _page(context, ride);
+    // Follow the live feed so a customer fare raise shows (and quick-accept
+    // sends the current price, not the one we were opened with).
+    return BlocBuilder<DriverFeedCubit, DriverFeedState>(
+      bloc: feed,
+      builder: (context, state) => _page(
+        context,
+        state is DriverFeedReady
+            ? state.rides.firstWhere((r) => r.id == ride.id, orElse: () => ride)
+            : ride,
+      ),
+    );
+  }
+
+  Widget _page(BuildContext context, OpenRide ride) {
     final l10n = AppLocalizations.of(context);
     final classPhoto = resolveMediaUrl(ride.imageUrl);
     return Scaffold(
@@ -188,9 +208,11 @@ class _DriverOfferView extends StatefulWidget {
 }
 
 class _DriverOfferPageState extends State<_DriverOfferView> {
+  late OpenRide _ride = widget.ride;
   late final TextEditingController _amount = TextEditingController(
     text: '${widget.ride.offeredFareVnd}',
   );
+  StreamSubscription<DriverFeedState>? _feedSub;
   var _submitting = false;
   var _withdrawing = false;
   String? _error;
@@ -236,7 +258,7 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
       _error = null;
     });
     try {
-      await client.withdrawOffer(accessToken: token, rideId: widget.ride.id);
+      await client.withdrawOffer(accessToken: token, rideId: _ride.id);
       if (!mounted) {
         return;
       }
@@ -259,6 +281,11 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
   @override
   void initState() {
     super.initState();
+    // The customer can raise the fare while we wait: the feed (re-synced on
+    // the socket hint) carries the new price, and an ACCEPT offer follows it.
+    try {
+      _feedSub = context.read<DriverFeedCubit>().stream.listen(_onFeed);
+    } catch (_) {}
     if (widget.quickAccept) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -270,8 +297,27 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
 
   @override
   void dispose() {
+    unawaited(_feedSub?.cancel());
     _amount.dispose();
     super.dispose();
+  }
+
+  void _onFeed(DriverFeedState feed) {
+    if (!mounted || feed is! DriverFeedReady) return;
+    for (final r in feed.rides) {
+      if (r.id != _ride.id || r.offeredFareVnd == _ride.offeredFareVnd) {
+        continue;
+      }
+      setState(() {
+        if (_sentAmount == _ride.offeredFareVnd) _sentAmount = r.offeredFareVnd;
+        if (_sentAmount == null &&
+            parseRideFareInput(_amount.text) == _ride.offeredFareVnd) {
+          _amount.text = '${r.offeredFareVnd}';
+        }
+        _ride = r;
+      });
+      return;
+    }
   }
 
   /// After the offer is sent, follow the ride until the customer picks a driver.
@@ -283,7 +329,7 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
     }
     context
         .read<DriverOfferCubit>()
-        .watchSelection(accessToken: token, rideId: widget.ride.id)
+        .watchSelection(accessToken: token, rideId: _ride.id)
         .catchError((Object _) {});
   }
 
@@ -311,10 +357,10 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
       await context.read<DriverOfferCubit>().submit(
         SubmitRideOfferRequest(
           accessToken: token,
-          rideId: widget.ride.id,
+          rideId: _ride.id,
           amountVnd: amount,
           // Multi-stop: the server rejects an offer made on an older route.
-          routeVersion: widget.ride.routeVersion,
+          routeVersion: _ride.routeVersion,
         ),
       );
       if (!mounted) {
@@ -349,7 +395,7 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
     final selection = context.watch<DriverOfferCubit>().state;
     final textTheme = Theme.of(context).textTheme;
     final l10n = AppLocalizations.of(context);
-    final ride = widget.ride;
+    final ride = _ride;
     final amount = parseRideFareInput(_amount.text);
     final sent = _sentAmount;
     final classPhoto = resolveMediaUrl(ride.imageUrl);
