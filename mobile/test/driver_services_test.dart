@@ -312,7 +312,7 @@ void main() {
     expect(find.text('47.000đ'), findsWidgets);
   });
 
-  testWidgets('active ride that is not this driver's (404) says it is gone', (tester) async {
+  testWidgets('active ride that is not this assigned to this driver (404) says it is gone', (tester) async {
     final rides = FakeRideClient();
     await pumpSignedIn(
       tester,
