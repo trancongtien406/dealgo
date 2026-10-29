@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/config/api_base_url.dart';
+import '../../../../core/notifications/notification_router.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
@@ -46,6 +47,7 @@ class _DriverJobsPageState extends State<DriverJobsPage> {
 
   StreamSubscription<void>? _jobHints;
   StreamSubscription<void>? _reconnects;
+  StreamSubscription<DriverJobPushTap>? _pushTaps;
   Timer? _hintDebounce;
 
   @override
@@ -59,6 +61,7 @@ class _DriverJobsPageState extends State<DriverJobsPage> {
       _jobHints = realtime.jobRequests.listen((_) => _quietSyncSoon());
       _reconnects = realtime.reconnects.listen((_) => _quietSyncSoon());
     }
+    _pushTaps = driverJobPushTaps.listen(_onPushTap);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _sync();
       if (mounted) {
@@ -72,6 +75,7 @@ class _DriverJobsPageState extends State<DriverJobsPage> {
     _hintDebounce?.cancel();
     unawaited(_jobHints?.cancel());
     unawaited(_reconnects?.cancel());
+    unawaited(_pushTaps?.cancel());
     _lifecycle.dispose();
     super.dispose();
   }
@@ -87,6 +91,35 @@ class _DriverJobsPageState extends State<DriverJobsPage> {
         quiet: quiet,
       ),
     );
+  }
+
+  /// Tapped "Cuốc xe mới": read the list again (keeping what is on screen) and,
+  /// when that job is no longer open (customer cancelled / another driver got
+  /// it), say so instead of leaving the driver at an unexplained empty list.
+  Future<void> _onPushTap(DriverJobPushTap tap) async {
+    if (!mounted) {
+      return;
+    }
+    final feed = context.read<DriverFeedCubit>();
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final gone = AppLocalizations.of(context).driverJobPushGone;
+    await feed.sync(
+      online: context.read<DriverDutyCubit>().state,
+      accessToken: driverAccessToken(context),
+      quiet: true,
+    );
+    final id = tap.jobId;
+    if (!mounted || id == null || feed.state is! DriverFeedReady) {
+      return;
+    }
+    if (openRideFrom(feed.state, id) == null &&
+        readyFoodFrom(feed.state, id) == null) {
+      messenger
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(key: const Key('driver-job-push-gone'), content: Text(gone)),
+        );
+    }
   }
 
   /// Bursts (several requests at once) collapse into one GET.

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../features/identity/domain/entities/app_role.dart';
@@ -16,6 +18,20 @@ String? notificationTapPath(Map<String, Object?> data) {
   }
   return trimmed;
 }
+
+/// A "new job nearby" push the driver tapped (`aggregateId` = ride / order id).
+class DriverJobPushTap {
+  const DriverJobPushTap(this.jobId);
+
+  final String? jobId;
+}
+
+final _driverJobPushTaps = StreamController<DriverJobPushTap>.broadcast();
+
+/// Taps on driver job pushes. go_router ignores `go('/driver/jobs')` while the
+/// list is already open (foreground banner) and a background tap may land
+/// before the first location fix, so the jobs page re-reads the feed on each.
+Stream<DriverJobPushTap> get driverJobPushTaps => _driverJobPushTaps.stream;
 
 /// Bridges push / in-app inbox taps to go_router locations.
 ///
@@ -124,7 +140,17 @@ class NotificationRouter {
       return;
     }
     _pending = null;
-    openPath(resolve(data, roles));
+    _open(data, roles);
+  }
+
+  void _open(Map<String, Object?> data, List<AppRole> roles) {
+    final location = resolve(data, roles);
+    openPath(location);
+    if (location == '/driver/jobs' &&
+        '${data['eventType'] ?? ''}'.endsWith('.request.nearby')) {
+      final id = data['aggregateId'];
+      _driverJobPushTaps.add(DriverJobPushTap(id is String ? id : null));
+    }
   }
 
   /// Call when auth / profile state changes.
@@ -143,7 +169,7 @@ class NotificationRouter {
       return;
     }
     _pending = null;
-    openPath(resolve(data, roles));
+    _open(data, roles);
   }
 
   /// Inbox / FCM payload may carry a path like `/customer/ride/tracking/...`.

@@ -3465,5 +3465,6 @@
   "driverOnlinePaymentPending": "Customer's online payment not confirmed yet",
   "profilePhone": "Phone number",
   "profilePhoneHint": "So the driver and the shop can reach you about orders. No verification code needed.",
-  "profilePhoneInvalid": "Enter a valid Vietnamese mobile number (e.g. 0901 234 567)."
+  "profilePhoneInvalid": "Enter a valid Vietnamese mobile number (e.g. 0901 234 567).",
+  "driverJobPushGone": "This request was cancelled or taken by another driver."
 }

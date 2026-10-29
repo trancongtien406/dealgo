@@ -13189,6 +13189,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter a valid Vietnamese mobile number (e.g. 0901 234 567).'**
   String get profilePhoneInvalid;
+
+  /// No description provided for @driverJobPushGone.
+  ///
+  /// In en, this message translates to:
+  /// **'This request was cancelled or taken by another driver.'**
+  String get driverJobPushGone;
 }
 
 class _AppLocalizationsDelegate

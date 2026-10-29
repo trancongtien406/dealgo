@@ -7095,4 +7095,8 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get profilePhoneInvalid =>
       'Enter a valid Vietnamese mobile number (e.g. 0901 234 567).';
+
+  @override
+  String get driverJobPushGone =>
+      'This request was cancelled or taken by another driver.';
 }

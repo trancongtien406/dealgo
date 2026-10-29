@@ -7057,4 +7057,8 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get profilePhoneInvalid =>
       'Số di động Việt Nam không hợp lệ (ví dụ 0901 234 567).';
+
+  @override
+  String get driverJobPushGone =>
+      'Cuốc này đã bị huỷ hoặc đã có tài xế khác nhận.';
 }

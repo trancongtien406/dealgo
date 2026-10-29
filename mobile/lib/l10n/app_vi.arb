@@ -2307,5 +2307,6 @@
   "driverOnlinePaymentPending": "Khách đang thanh toán online, chưa xác nhận",
   "profilePhone": "Số điện thoại",
   "profilePhoneHint": "Để tài xế và quán liên hệ khi giao hàng. Không cần mã xác minh.",
-  "profilePhoneInvalid": "Số di động Việt Nam không hợp lệ (ví dụ 0901 234 567)."
+  "profilePhoneInvalid": "Số di động Việt Nam không hợp lệ (ví dụ 0901 234 567).",
+  "driverJobPushGone": "Cuốc này đã bị huỷ hoặc đã có tài xế khác nhận."
 }

@@ -12,6 +12,11 @@ export interface OsmSearchPort {
     near?: GeoPoint,
     bbox?: readonly [number, number, number, number],
   ): Promise<PlaceSuggestion[]>;
+  /**
+   * OSM features around [point] (house numbers first-class), nearest first.
+   * Optional so search-only fakes stay valid; failures answer [].
+   */
+  reverse?(point: GeoPoint, limit?: number): Promise<PlaceSuggestion[]>;
 }
 
 type PhotonJson = {
@@ -73,6 +78,29 @@ export class PhotonSearchPort implements OsmSearchPort {
       return photonToSuggestions((await response.json()) as PhotonJson);
     } catch (error) {
       this.logger.warn(`Photon request failed: ${error instanceof Error ? error.message : 'unknown'}`);
+      return [];
+    }
+  }
+
+  async reverse(point: GeoPoint, limit = 5): Promise<PlaceSuggestion[]> {
+    const url = new URL('/reverse', this.baseUrl);
+    url.searchParams.set('lat', String(point.lat));
+    url.searchParams.set('lon', String(point.lng));
+    url.searchParams.set('limit', String(Math.min(Math.max(limit, 1), 10)));
+    // km: house numbers further than ~80 m are not "here".
+    url.searchParams.set('radius', '0.08');
+    try {
+      const response = await fetch(url, {
+        headers: { 'User-Agent': 'DealGo/1.0 (reverse)' },
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+      if (!response.ok) {
+        this.logger.warn(`Photon reverse HTTP ${response.status}`);
+        return [];
+      }
+      return photonToSuggestions((await response.json()) as PhotonJson);
+    } catch (error) {
+      this.logger.warn(`Photon reverse failed: ${error instanceof Error ? error.message : 'unknown'}`);
       return [];
     }
   }

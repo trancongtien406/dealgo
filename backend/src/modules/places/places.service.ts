@@ -82,12 +82,16 @@ export class PlacesService {
       return { place, available: true };
     }
     try {
-      const raw = await this.maps.reverseGeocode({ lat, lng });
+      const [raw, osmNear] = await Promise.all([
+        this.maps.reverseGeocode({ lat, lng }),
+        this.osmReverse({ lat, lng }),
+      ]);
       // Same VN cleanup for every provider (Google/Mapbox): no postal codes,
       // no "Việt Nam", accented district names.
-      const place = raw
+      const primary = raw
         ? { ...raw, name: cleanMapboxVnLabel(raw.name) || raw.name, address: cleanMapboxVnLabel(raw.address ?? '') }
         : null;
+      const place = mergeReverse({ lat, lng }, primary, osmNear);
       this.reverseCache.delete(key);
       this.reverseCache.set(key, {
         place,
@@ -105,6 +109,16 @@ export class PlacesService {
         return { place: null, available: false };
       }
       throw error;
+    }
+  }
+
+  /** OSM (self-hosted Photon) neighbours of a fix; [] when not configured or failing. */
+  private async osmReverse(point: GeoPoint): Promise<PlaceSuggestion[]> {
+    if (!this.osm?.reverse) return [];
+    try {
+      return await this.osm.reverse(point, 5);
+    } catch {
+      return [];
     }
   }
 
@@ -179,4 +193,63 @@ export class PlacesService {
     }
     return osm.search(street, 10, near);
   }
+}
+
+/** A house number this close to the pin names the pin ("34 Mỹ Đa Đông 7"). */
+export const REVERSE_HOUSE_MAX_M = 40;
+
+function distanceM(a: GeoPoint, b: GeoPoint): number {
+  const r = 6_371_000;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return 2 * r * Math.asin(Math.sqrt(h));
+}
+
+/**
+ * Mapbox's VN data has streets but almost no house numbers, so a pin only got
+ * "Đường X, Phường, Quận". OSM (Photon) often knows the nearest house: use it
+ * as the primary line ("34 Đường X") and keep the provider's ward/district/city
+ * tail. Without a nearby house number, the provider's street answer stays; with
+ * no provider answer, OSM's nearest street/place is the fallback. The pin's
+ * own coordinates are kept — only the label is borrowed.
+ */
+export function mergeReverse(
+  fix: GeoPoint,
+  primary: PlaceSuggestion | null,
+  osmNear: readonly PlaceSuggestion[],
+): PlaceSuggestion | null {
+  const house = osmNear
+    .filter((p) => p.kind === 'address' && /^\S*\d/.test(p.name))
+    .map((p) => ({ p, d: distanceM(fix, p) }))
+    .filter((x) => x.d <= REVERSE_HOUSE_MAX_M)
+    .sort((a, b) => a.d - b.d)[0]?.p;
+  const primaryHasNumber = primary != null && /^\d/.test(primary.name.trim());
+  if (house && !primaryHasNumber) {
+    const name = cleanMapboxVnLabel(house.name) || house.name;
+    const tail = primary
+      ? cleanMapboxVnLabel(primary.address ?? '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0 && s !== primary.name && !foldVietnamese(name).includes(foldVietnamese(s)))
+      : cleanMapboxVnLabel(house.address ?? '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0 && s !== name);
+    return {
+      lat: fix.lat,
+      lng: fix.lng,
+      name,
+      address: [name, ...tail].join(', '),
+      provider: primary?.provider ?? house.provider,
+      kind: 'address',
+    };
+  }
+  if (primary) return primary;
+  const street = osmNear.find((p) => p.kind === 'street' || p.kind === 'address' || p.kind === 'poi');
+  return street
+    ? { ...street, lat: fix.lat, lng: fix.lng, name: cleanMapboxVnLabel(street.name) || street.name, address: cleanMapboxVnLabel(street.address ?? '') }
+    : null;
 }

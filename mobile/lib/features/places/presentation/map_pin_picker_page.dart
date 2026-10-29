@@ -597,14 +597,23 @@ class _MapPinPickerPageState extends State<MapPinPickerPage> {
                             children: [
                               Text(
                                 named?.name ?? l10n.mapPickerPinned,
+                                key: const Key('map-picker-address-primary'),
                                 style: textTheme.titleSmall,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                named?.address.isNotEmpty == true
-                                    ? named!.address
-                                    : _coords(_center),
+                                named == null
+                                    ? _coords(_center)
+                                    : pinAddressSecondary(
+                                        named.name,
+                                        named.address,
+                                      ),
+                                key: const Key('map-picker-address-secondary'),
                                 style: textTheme.bodySmall,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
@@ -646,4 +655,23 @@ class _MapPinPickerPageState extends State<MapPinPickerPage> {
       ),
     );
   }
+}
+
+/// Second line under the pin: phường/quận/thành phố only, since the first line
+/// already shows "số nhà + đường" (address repeats it as its first segment).
+@visibleForTesting
+String pinAddressSecondary(String name, String address) {
+  final full = address.trim();
+  if (full.isEmpty) {
+    return '';
+  }
+  final parts = full
+      .split(',')
+      .map((p) => p.trim())
+      .where((p) => p.isNotEmpty)
+      .toList();
+  if (parts.length > 1 && parts.first == name.trim()) {
+    return parts.skip(1).join(', ');
+  }
+  return full;
 }

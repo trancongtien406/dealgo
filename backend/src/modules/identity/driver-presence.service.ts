@@ -127,6 +127,18 @@ export class DriverPresenceService {
     return { lat: row.lat, lng: row.lng, at: row.locationAt };
   }
 
+  /** Last position when reported within [maxAgeMs] (online drivers only). */
+  private async recentLocation(driverId: string, now: Date, maxAgeMs: number): Promise<DriverLocation | null> {
+    const row = await this.presence.findByUserId(driverId);
+    if (!row || !row.online || row.lat === null || row.lng === null || !row.locationAt) {
+      return null;
+    }
+    if (now.getTime() - row.locationAt.getTime() > maxAgeMs) {
+      return null;
+    }
+    return { lat: row.lat, lng: row.lng, at: row.locationAt };
+  }
+
   /**
    * Where to measure the dispatch radius from. Query coordinates win; otherwise the
    * driver's fresh reported position. With `requireFresh`, a driver with no presence row or no
@@ -149,6 +161,14 @@ export class DriverPresenceService {
     const fix = await this.freshLocation(userId, now);
     if (fix) {
       return { lat: fix.lat, lng: fix.lng };
+    }
+    // Same window as the job push audience (onlineNearForPush): a driver whose
+    // app was backgrounded (iOS pauses location 1–30 min) still gets
+    // "Cuốc xe mới" pushes, so tapping one must list that job instead of an
+    // empty / DRIVER_LOCATION_STALE feed. Taking a job still needs a live fix.
+    const recent = await this.recentLocation(userId, now, DRIVER_PUSH_LOCATION_MAX_AGE_MS);
+    if (recent) {
+      return { lat: recent.lat, lng: recent.lng };
     }
     if (requireFresh) {
       throw new HttpException(
