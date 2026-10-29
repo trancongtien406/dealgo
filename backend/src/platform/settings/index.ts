@@ -7,3 +7,4 @@ export * from './platform-settings.dto.js';
 export * from './platform-settings.controller.js';
 export * from './platform-settings.module.js';
 export * from './payment-method-registry.js';
+export * from './public-site-config.js';

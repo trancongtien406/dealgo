@@ -9,27 +9,41 @@ import CitiesSection from "@/components/landing/CitiesSection";
 import FaqSection from "@/components/landing/FaqSection";
 import CtaBanner from "@/components/landing/CtaBanner";
 import Footer from "@/components/landing/Footer";
+import { getPublicSiteConfig } from "@/features/site-config/fetch-public";
+import { qrSvg } from "@/features/site-config/qr";
 import { landingJsonLd } from "@/lib/seo/site";
 
-export default function Home() {
+/** Admin-managed links (store, socials) refresh via ISR. */
+export const revalidate = 60;
+
+export default async function Home() {
+  const siteConfig = await getPublicSiteConfig();
+  const qr = await Promise.all(
+    [
+      siteConfig.appStoreUrl ? { label: "App Store", url: siteConfig.appStoreUrl } : null,
+      siteConfig.googlePlayUrl ? { label: "Google Play", url: siteConfig.googlePlayUrl } : null,
+    ]
+      .filter((x): x is { label: string; url: string } => x !== null)
+      .map(async (x) => ({ label: x.label, svg: await qrSvg(x.url) })),
+  );
   return (
     <>
       {/* JSON-LD is a data block, not executed script, so script-src CSP does not apply. */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(landingJsonLd()).replace(/</g, "\\u003c"),
+          __html: JSON.stringify(landingJsonLd(siteConfig)).replace(/</g, "\\u003c"),
         }}
       />
       <Navbar />
       <main>
-        <HeroSection />
+        <HeroSection siteConfig={siteConfig} />
         <ServicesSection />
         <HowItWorksSection />
         <AppExperienceSection />
         <TrustSection />
         <PartnerSection />
-        <CitiesSection />
+        <CitiesSection comingSoon={siteConfig.comingSoonCities} />
 
         {/* 2-Column Row: FAQ on Left & App Download Banner on Right */}
         <section
@@ -44,12 +58,12 @@ export default function Home() {
 
             {/* Right Column: CTA Banner */}
             <div className="lg:col-span-7 h-full">
-              <CtaBanner />
+              <CtaBanner siteConfig={siteConfig} qr={qr} />
             </div>
           </div>
         </section>
       </main>
-      <Footer />
+      <Footer siteConfig={siteConfig} />
     </>
   );
 }

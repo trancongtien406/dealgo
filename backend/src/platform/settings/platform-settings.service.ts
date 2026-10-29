@@ -1,3 +1,4 @@
+import { normalizePublicSiteConfig } from './public-site-config.js';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { AppEnv } from '../config/env.js';
@@ -407,6 +408,7 @@ export class PlatformSettingsService {
       case 'MAPS_SEARCH_PROVIDER':
       case 'MAPS_REVERSE_PROVIDER':
       case 'MAPS_ROUTE_PROVIDER':
+      case 'PUBLIC_SITE_CONFIG':
       case 'RIDE_MULTI_STOP_BIKE_ENABLED':
       case 'RIDE_MULTI_STOP_CAR_ENABLED':
       case 'RIDE_MAX_STOPS_BIKE':
@@ -475,6 +477,13 @@ export class PlatformSettingsService {
           throw settingsError(400, 'PLATFORM_SETTING_INVALID', problem);
         }
         return JSON.stringify(normalizePaymentMethodRegistry(parsed));
+      }
+      if (key === 'PUBLIC_SITE_CONFIG') {
+        try {
+          return JSON.stringify(normalizePublicSiteConfig(parsed));
+        } catch (e) {
+          throw settingsError(400, 'PLATFORM_SETTING_INVALID', (e as Error).message);
+        }
       }
       if (key === 'UPLOAD_ALLOWED_TYPES') {
         const allowed = UPLOAD_SNIFFABLE_TYPES as readonly string[];

@@ -1,6 +1,8 @@
 import Image from "next/image";
+import type { PublicSiteConfig } from "@/features/site-config/types";
+import StoreBadges from "./StoreBadges";
 
-export default function HeroSection() {
+export default function HeroSection({ siteConfig = {} }: { siteConfig?: PublicSiteConfig }) {
   const features = [
     {
       icon: (
@@ -126,10 +128,8 @@ export default function HeroSection() {
               </a>
             </div>
 
-            {/* OPEN DECISION: App Store / Google Play links and a real QR code are not published yet. */}
-            <p className="pt-1 text-xs text-gray-600 font-medium">
-              Ứng dụng sắp có trên App Store và Google Play
-            </p>
+            {/* Store links come from admin Website settings; hidden until set. */}
+            <StoreBadges config={siteConfig} />
           </div>
 
           {/* Right Column: Realistic iPhone Mockup in 3D (Solid Opaque Screen with Clean Cutout & Accurate Scale) */}

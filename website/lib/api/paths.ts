@@ -85,6 +85,7 @@ export const apiPaths = {
     `/api/ops/ride-vehicle-classes/${encodeURIComponent(code)}/image`,
   opsMapsProviders: () => "/api/ops/maps-providers",
   opsPaymentMethods: () => "/api/ops/payment-methods",
+  opsSiteConfig: () => "/api/ops/site-config",
   opsPaymentIntents: () => "/api/ops/payment-intents",
   opsPaymentIntent: (id: string) => `/api/ops/payment-intents/${encodeURIComponent(id)}`,
   opsPaymentIntentRefund: (id: string) => `/api/ops/payment-intents/${encodeURIComponent(id)}/refund`,

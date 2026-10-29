@@ -1,6 +1,15 @@
 import Image from "next/image";
+import type { PublicSiteConfig } from "@/features/site-config/types";
+import StoreBadges from "./StoreBadges";
 
-export default function CtaBanner() {
+export default function CtaBanner({
+  siteConfig = {},
+  qr = [],
+}: {
+  siteConfig?: PublicSiteConfig;
+  /** Locally generated SVG QR codes for the configured store links. */
+  qr?: { label: string; svg: string }[];
+}) {
   return (
     <div id="tai-ung-dung" className="relative bg-gradient-to-br from-[#6D28D9] via-[#7C3AED] to-[#4F46E5] rounded-[24px] p-6 sm:p-7 text-white overflow-hidden shadow-[0_8px_30px_rgba(109,40,217,0.18)] flex flex-col md:flex-row items-center justify-between gap-6 min-h-[300px]">
       {/* Background Subtle Gradient Blobs & Da Nang Coast Artwork */}
@@ -28,10 +37,22 @@ export default function CtaBanner() {
           Đặt xe, thương lượng giá và đặt đồ ăn trong một ứng dụng.
         </h2>
 
-        {/* OPEN DECISION: App Store / Google Play links and a real QR code are not published yet. */}
-        <p className="pt-2 text-sm font-semibold text-white/95">
-          Ứng dụng sắp có trên App Store và Google Play
-        </p>
+        <StoreBadges config={siteConfig} tone="dark" />
+        {qr.length > 0 ? (
+          <div className="flex flex-wrap gap-3 pt-1">
+            {qr.map((q) => (
+              <figure key={q.label} className="text-center">
+                <div
+                  className="w-20 h-20 rounded-lg bg-white p-1 [&>svg]:w-full [&>svg]:h-full"
+                  role="img"
+                  aria-label={`Mã QR tải DealGo trên ${q.label}`}
+                  dangerouslySetInnerHTML={{ __html: q.svg }}
+                />
+                <figcaption className="mt-1 text-[10px] text-white/85">{q.label}</figcaption>
+              </figure>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {/* Right Phone Mockup with Floating Badges */}

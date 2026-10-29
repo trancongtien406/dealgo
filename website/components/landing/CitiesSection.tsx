@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-export default function CitiesSection() {
+export default function CitiesSection({ comingSoon = [] }: { comingSoon?: string[] }) {
   return (
     <section id="khu-vuc" className="pt-2.5 sm:pt-3 pb-2.5 sm:pb-3 bg-white scroll-mt-24">
       <div className="max-w-[1500px] mx-auto px-4 sm:px-8 lg:px-12">
@@ -37,6 +37,16 @@ export default function CitiesSection() {
               </div>
             </div>
 
+            {comingSoon.map((city) => (
+              <div key={city} className="bg-white rounded-xl p-2 sm:px-3 flex items-center gap-2.5 shadow-xs border border-gray-100">
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-[#0F172A] leading-tight">{city}</div>
+                  <span className="inline-block mt-0.5 text-[9px] font-semibold text-[#6D28D9] bg-[#EDE9FE] px-1.5 py-0.5 rounded-full leading-none">
+                    Sắp có
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Right: Expand Notification Callout */}

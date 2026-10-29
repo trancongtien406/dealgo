@@ -1,3 +1,5 @@
+import type { PublicSiteConfig } from "@/features/site-config/types";
+
 /**
  * Public site identity for SEO. NEXT_PUBLIC_SITE_URL is the canonical origin
  * (e.g. https://dealgo.vn — OPEN DECISION: production domain not confirmed);
@@ -21,10 +23,18 @@ export function siteUrl(): URL {
 }
 
 /** Public, indexable routes. Admin, auth, API and share-token pages stay out. */
-export const PUBLIC_ROUTES = ["/", "/support", "/terms", "/privacy"] as const;
+export const PUBLIC_ROUTES = [
+  "/",
+  "/support",
+  "/terms",
+  "/privacy",
+  "/partner-policy",
+] as const;
 
-/** Schema.org graph for the landing page. No ratings, prices or store links until real. */
-export function landingJsonLd(): Record<string, unknown> {
+/** Schema.org graph for the landing page. No ratings or prices; store links and sameAs only when the admin set them. */
+export function landingJsonLd(config: PublicSiteConfig = {}): Record<string, unknown> {
+  const sameAs = Object.values(config.socials ?? {}).filter((v): v is string => Boolean(v));
+  const installUrl = [config.appStoreUrl, config.googlePlayUrl].filter((v): v is string => Boolean(v));
   const origin = siteUrl().origin;
   const org = `${origin}/#organization`;
   return {
@@ -37,6 +47,17 @@ export function landingJsonLd(): Record<string, unknown> {
         url: `${origin}/`,
         logo: `${origin}/dealgo-logo.svg`,
         areaServed: { "@type": "City", name: "Đà Nẵng" },
+        ...(sameAs.length > 0 ? { sameAs } : {}),
+        ...(config.contactEmail || config.hotline
+          ? {
+              contactPoint: {
+                "@type": "ContactPoint",
+                contactType: "customer support",
+                ...(config.contactEmail ? { email: config.contactEmail } : {}),
+                ...(config.hotline ? { telephone: config.hotline } : {}),
+              },
+            }
+          : {}),
       },
       {
         "@type": "WebSite",
@@ -54,6 +75,7 @@ export function landingJsonLd(): Record<string, unknown> {
         description: SITE_DESCRIPTION,
         inLanguage: "vi-VN",
         publisher: { "@id": org },
+        ...(installUrl.length > 0 ? { installUrl, downloadUrl: installUrl } : {}),
       },
     ],
   };

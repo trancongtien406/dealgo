@@ -78,6 +78,7 @@ export type PlatformSettingKey =
   | 'MAPS_SEARCH_PROVIDER'
   | 'MAPS_REVERSE_PROVIDER'
   | 'MAPS_ROUTE_PROVIDER'
+  | 'PUBLIC_SITE_CONFIG'
   | 'RIDE_MULTI_STOP_BIKE_ENABLED'
   | 'RIDE_MULTI_STOP_CAR_ENABLED'
   | 'RIDE_MAX_STOPS_BIKE'
@@ -837,6 +838,13 @@ export const PLATFORM_SETTING_SPECS: readonly PlatformSettingSpec[] = [
     openIds: ['DEC-PROD-MULTISTOP'],
     min: 0,
     max: 50000,
+    seeded: true,
+  },
+  {
+    // Website store links, social accounts, contact and coming-soon cities (Cài đặt › Website).
+    key: 'PUBLIC_SITE_CONFIG',
+    valueType: 'json',
+    openIds: ['DEC-WEB-SITE-CONFIG'],
     seeded: true,
   },
 ] as const;

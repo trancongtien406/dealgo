@@ -39,6 +39,8 @@ export const PLATFORM_SETTING_SEED_DEFAULTS: Readonly<Partial<Record<PlatformSet
     FOOD_DELIVERY_CODE_REQUIRED: 'true',
     PAYMENT_METHOD_REGISTRY: '{"methods":{}}',
     PAYMENT_WALLET_ENABLED: 'false',
+    // Website links: all empty until an admin sets real ones (no placeholder links).
+    PUBLIC_SITE_CONFIG: '{}',
     FOOD_DELIVERY_CODE_MAX_ATTEMPTS: '5',
     FOOD_HANDOVER_CODE_REQUIRED: 'false',
     // DEC-PROD-048 (DRAFT): KYC/KYB documents required by default (fail closed).
