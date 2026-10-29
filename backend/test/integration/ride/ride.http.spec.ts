@@ -1,3 +1,4 @@
+import { PlatformSettingsService } from '../../../src/platform/settings/platform-settings.service.js';
 import { PROD_ENV_OK } from '../../fixtures/prod-env.js';
 import { seedVehicleClassOnDriverGrant } from '../../support/driver-class-fixture.js';
 import { MemoryRidePickupCodeStore, RIDE_PICKUP_CODE_STORE } from '../../../src/modules/ride/ride-pickup-code.js';
@@ -737,7 +738,8 @@ describe('ride negotiation http', () => {
       .post(`/v1/rides/${rideId}/start`)
       .set('Authorization', `Bearer ${driver.token}`)
       .send({});
-    expect(missing.status).toBe(400);
+    expect(missing.status).toBe(422);
+    expect(missing.body.errorCode).toBe('RIDE_PICKUP_CODE_REQUIRED');
 
     const wrongCode = code === '0000' ? '1111' : '0000';
     const wrong = await request(app.getHttpServer())
@@ -760,6 +762,36 @@ describe('ride negotiation http', () => {
       .set('Authorization', `Bearer ${customer.token}`)
       .expect(200);
     expect(afterStart.body.data.pickupCode).toBeUndefined();
+  });
+
+  it('starts without a code and shows none when RIDE_PICKUP_CODE_REQUIRED is off', async () => {
+    const settings = app.get(PlatformSettingsService);
+    await settings.patch('RIDE_PICKUP_CODE_REQUIRED', 'false', 'test off', 'ops-test');
+    try {
+      const customer = await login();
+      const driver = await login();
+      await repository.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');
+      const rideId = await assignRide(customer, driver, 'idem-nocode-create', 'idem-nocode-select');
+      const customerView = await request(app.getHttpServer())
+        .get(`/v1/rides/${rideId}`)
+        .set('Authorization', `Bearer ${customer.token}`)
+        .expect(200);
+      expect(customerView.body.data.pickupCode).toBeUndefined();
+      for (const step of ['en-route', 'arrived']) {
+        await request(app.getHttpServer())
+          .post(`/v1/rides/${rideId}/${step}`)
+          .set('Authorization', `Bearer ${driver.token}`)
+          .expect(200);
+      }
+      const started = await request(app.getHttpServer())
+        .post(`/v1/rides/${rideId}/start`)
+        .set('Authorization', `Bearer ${driver.token}`)
+        .send({})
+        .expect(200);
+      expect(started.body.data.status).toBe('IN_TRIP');
+    } finally {
+      await settings.patch('RIDE_PICKUP_CODE_REQUIRED', 'true', 'test on', 'ops-test');
+    }
   });
 
   it('locks the pickup code after the configured number of wrong attempts', async () => {

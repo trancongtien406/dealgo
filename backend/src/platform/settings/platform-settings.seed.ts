@@ -35,8 +35,10 @@ export const PLATFORM_SETTING_SEED_DEFAULTS: Readonly<Partial<Record<PlatformSet
     SUPPORT_TICKET_MAX_OPEN_PER_USER: '5',
     // DEC-PROD-017: wrong pickup codes a driver may enter before the ride's code locks.
     RIDE_PICKUP_CODE_MAX_ATTEMPTS: '5',
-    // DEC-PROD-036: delivery proof on by default; merchant↔driver handover code opt-in.
-    FOOD_DELIVERY_CODE_REQUIRED: 'true',
+    // Code confirmation is off by default (2026-10-29); admins can turn it back on.
+    RIDE_PICKUP_CODE_REQUIRED: 'false',
+    // DEC-PROD-036 rev 2026-10-29: delivery and handover codes are both opt-in.
+    FOOD_DELIVERY_CODE_REQUIRED: 'false',
     PAYMENT_METHOD_REGISTRY: '{"methods":{}}',
     PAYMENT_WALLET_ENABLED: 'false',
     // Website links: all empty until an admin sets real ones (no placeholder links).

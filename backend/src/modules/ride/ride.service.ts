@@ -763,7 +763,7 @@ export class RideService {
     const imageUrl = await this.imageUrlForClass(ride.vehicleClassCode);
     if (ride.customerId === actor.userId) {
       await this.requireActiveCustomer(actor.userId);
-      if (PICKUP_CODE_STATUSES.has(ride.status)) {
+      if (PICKUP_CODE_STATUSES.has(ride.status) && (await this.pickupCodeRequired())) {
         const { code } = await this.pickupCodes.ensure(ride.id, generatePickupCode());
         return this.withPhaseRoute(
           await this.withRoute({ ...toView(ride, imageUrl), pickupCode: code }, ride.pickup, ride.dropoff),
@@ -1356,12 +1356,20 @@ export class RideService {
     );
   }
 
-  async startTrip(actor: RequestActor, rideId: string, pickupCode: string): Promise<RideView> {
+  async startTrip(actor: RequestActor, rideId: string, pickupCode?: string): Promise<RideView> {
     await this.requireActiveDriver(actor.userId);
     const ride = await this.unwrapNullable(() => this.rides.findById(rideId, this.clock.now()));
     // Only the assigned driver at pickup may spend attempts; anything else gets the repository's
     // usual not-found / wrong-state error below without touching the code.
-    if (ride && ride.assignedDriverId === actor.userId && ride.status === 'DRIVER_ARRIVED') {
+    if (
+      ride &&
+      ride.assignedDriverId === actor.userId &&
+      ride.status === 'DRIVER_ARRIVED' &&
+      (await this.pickupCodeRequired())
+    ) {
+      if (!pickupCode) {
+        throw rideError(422, 'RIDE_PICKUP_CODE_REQUIRED', 'Pickup code required');
+      }
       await this.verifyPickupCode(rideId, pickupCode);
     }
     return this.unwrap(() =>
@@ -1669,6 +1677,15 @@ export class RideService {
         'RIDE_OUTSIDE_SERVICE_ZONE',
         'DealGo does not serve this pickup or drop-off area yet',
       );
+    }
+  }
+
+  /** Admin toggle, default off; a missing/unreadable setting means off. */
+  private async pickupCodeRequired(): Promise<boolean> {
+    try {
+      return await this.settings.getBoolean('RIDE_PICKUP_CODE_REQUIRED');
+    } catch {
+      return false;
     }
   }
 

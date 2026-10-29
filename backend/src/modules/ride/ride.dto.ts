@@ -148,10 +148,11 @@ export class UpdateStopsDto {
 }
 
 export class StartTripDto {
-  /** DEC-PROD-017: the 4-digit code the customer reads out at pickup. */
+  /** DEC-PROD-017: the 4-digit code the customer reads out; only when RIDE_PICKUP_CODE_REQUIRED. */
+  @IsOptional()
   @IsString()
   @Matches(/^\d{4}$/, { message: 'pickupCode must be 4 digits' })
-  pickupCode!: string;
+  pickupCode?: string;
 }
 
 export class SelectOfferDto {

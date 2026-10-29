@@ -79,6 +79,10 @@ describe('food dispatch http', () => {
     app.useGlobalFilters(new HttpExceptionFilter());
     app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
     await app.init();
+    // These suites exercise the delivery-code flow; the shipped default is off.
+    await app
+      .get(PlatformSettingsService)
+      .patch('FOOD_DELIVERY_CODE_REQUIRED', 'true', 'code suites', 'ops-test');
   });
 
   afterAll(async () => {

@@ -24,5 +24,6 @@ export async function settingsWith(
  * ~9 km trip) switch the bid floor off; the floor has its own tests.
  */
 export function negotiationMechanicsSettings(): Promise<MemoryPlatformSettingsRepository> {
-  return settingsWith({ RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE: 0 });
+  // Existing suites cover the pickup-code flow; the shipped default is off.
+  return settingsWith({ RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE: 0, RIDE_PICKUP_CODE_REQUIRED: true });
 }

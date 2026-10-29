@@ -19,6 +19,7 @@ export type PlatformSettingKey =
   | 'FOOD_DRIVER_COMMISSION_PERCENT'
   | 'VOUCHER_SHARED_PLATFORM_PERCENT'
   | 'RIDE_PICKUP_CODE_MAX_ATTEMPTS'
+  | 'RIDE_PICKUP_CODE_REQUIRED'
   | 'FOOD_DELIVERY_CODE_REQUIRED'
   | 'FOOD_DELIVERY_CODE_MAX_ATTEMPTS'
   | 'FOOD_HANDOVER_CODE_REQUIRED'
@@ -263,6 +264,15 @@ export const PLATFORM_SETTING_SPECS: readonly PlatformSettingSpec[] = [
     openIds: ['DEC-PROD-017'],
     min: 1,
     max: 20,
+    seeded: true,
+  },
+  {
+    // JSON boolean, default false (2026-10-29): the driver must enter the customer's 4-digit
+    // code to start a ride. Off = the driver starts without a code and none is shown.
+    key: 'RIDE_PICKUP_CODE_REQUIRED',
+    valueType: 'json',
+    openIds: ['DEC-PROD-017'],
+    boolean: true,
     seeded: true,
   },
   {
