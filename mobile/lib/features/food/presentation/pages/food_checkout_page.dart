@@ -56,6 +56,7 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
       setState(() {
         _phase = CheckoutRejected(sessionExpiredMessage(context));
       });
+      _announceRejection();
       return;
     }
     final cart = context.read<FoodCartCubit>();
@@ -138,7 +139,25 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
           AppLocalizations.of(context),
         );
       });
+      _announceRejection();
     }
+  }
+
+  /// The rejection banner sits at the top of a scrolled receipt, so the user
+  /// tapping "Đặt hàng" at the bottom never saw it and thought the button was
+  /// dead. Surface it as a snackbar above the bottom bar as well.
+  void _announceRejection() {
+    final phase = _phase;
+    if (!mounted || phase is! CheckoutRejected) return;
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: const Key('food-checkout-rejected-snack'),
+          content: Text(phase.message),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
   }
 
   Future<void> _openSuccess(
@@ -204,11 +223,13 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
               : l10n.checkoutMenuChangedEmpty,
         );
       });
+      _announceRejection();
       return;
     }
     final token = currentAccessToken(context);
     if (token == null) {
       setState(() => _phase = CheckoutRejected(sessionExpiredMessage(context)));
+      _announceRejection();
       return;
     }
     _attempt = CheckoutHeldAttempt.fromCart(
@@ -227,7 +248,8 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
       canPop: !submitting,
       child: Scaffold(
         backgroundColor: DealGoColors.canvas,
-        extendBody: true,
+        // Not extendBody: the payment tile is the last body child and was
+        // painted under the bottom bar, so taps hit the bar instead.
         body: SafeArea(
           bottom: false,
           child: Column(

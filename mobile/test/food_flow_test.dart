@@ -6,6 +6,7 @@ import 'package:dealgo/features/food/domain/params/place_food_order_params.dart'
 import 'package:dealgo/features/food/domain/entities/food_models.dart';
 import 'package:dealgo/features/food/presentation/cubit/food_cart_cubit.dart';
 import 'package:dealgo/core/network/api_exception.dart';
+import 'package:dealgo/features/food/presentation/widgets/food_checkout_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -250,15 +251,13 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(400, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await _openCheckout(tester, _catalogClient());
-    final list = tester.widget<ListView>(
-      find.byKey(const Key('food-checkout-scroll')),
-    );
-    final bottomPad = (list.padding! as EdgeInsets).bottom;
-    final ctaTop = tester
-        .getRect(find.byKey(const Key('food-place-order')))
-        .top;
-    // Reserved space under the last card covers the whole sticky bar.
-    expect(bottomPad, greaterThanOrEqualTo(800 - ctaTop));
+    // The body no longer extends under the bar (extendBody hid the payment
+    // tile and swallowed its taps): the scroll view ends above the bar.
+    final scrollBottom = tester
+        .getRect(find.byKey(const Key('food-checkout-scroll')))
+        .bottom;
+    final barTop = tester.getRect(find.byType(CheckoutActions)).top;
+    expect(scrollBottom, lessThanOrEqualTo(barTop + 0.5));
   });
 
   testWidgets(

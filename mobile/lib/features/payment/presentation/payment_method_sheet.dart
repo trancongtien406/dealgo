@@ -65,7 +65,10 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
   @override
   Widget build(BuildContext context) {
     final groups = groupPaymentMethods(widget.options);
+    // top: false — isScrollControlled sheets keep the status-bar inset, so a
+    // plain SafeArea pushed the title down by ~60pt of empty space.
     return SafeArea(
+      top: false,
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.sizeOf(context).height * 0.85,
@@ -75,9 +78,11 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
+              // The theme's drag handle (showDragHandle) already reserves the
+              // top spacing; extra top padding here doubled the empty band.
               padding: const EdgeInsets.fromLTRB(
                 DealGoDimensions.pageGutter,
-                DealGoSpacing.s16,
+                0,
                 DealGoSpacing.s8,
                 DealGoSpacing.s8,
               ),
