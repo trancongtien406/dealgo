@@ -7,6 +7,7 @@ import '../features/onboarding/data/datasources/partner_requirements_client.dart
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -597,8 +598,14 @@ class _DealGoAppState extends State<DealGoApp> {
           routerConfig: _router,
           scaffoldMessengerKey: _messengerKey,
           scrollBehavior: const DealGoScrollBehavior(),
-          builder: (context, child) => KeyboardDismissOnTapOutside(
-            child: VoiceCallHost(child: child ?? const SizedBox.shrink()),
+          // App-wide default: dark status bar icons on our light canvas.
+          // Screens with dark/brand headers override with their own
+          // AnnotatedRegion (e.g. splash), which wins over this one.
+          builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+            value: DealGoTheme.lightCanvasOverlay,
+            child: KeyboardDismissOnTapOutside(
+              child: VoiceCallHost(child: child ?? const SizedBox.shrink()),
+            ),
           ),
         ),
       ),

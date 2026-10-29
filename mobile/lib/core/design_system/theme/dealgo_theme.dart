@@ -1,10 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../motion/dealgo_page_transitions.dart';
 import '../tokens/dealgo_tokens.dart';
 
 abstract final class DealGoTheme {
   static final ThemeData light = _light();
+
+  /// Status bar for our light canvas: dark icons (time, battery) on a
+  /// transparent bar. iOS otherwise follows the device appearance and shows
+  /// white icons in Dark Mode, which vanish on light screens.
+  static const SystemUiOverlayStyle lightCanvasOverlay = SystemUiOverlayStyle(
+    statusBarColor: Color(0x00000000),
+    statusBarIconBrightness: Brightness.dark, // Android
+    statusBarBrightness: Brightness.light, // iOS: light bg -> dark icons
+  );
+
+  /// Status bar over dark / brand-colored headers: light icons.
+  static const SystemUiOverlayStyle darkHeaderOverlay = SystemUiOverlayStyle(
+    statusBarColor: Color(0x00000000),
+    statusBarIconBrightness: Brightness.light,
+    statusBarBrightness: Brightness.dark,
+  );
 
   static ThemeData _light() {
     const text = DealGoColors.text;
@@ -170,6 +187,7 @@ abstract final class DealGoTheme {
         centerTitle: true,
         titleTextStyle: textTheme.titleMedium,
         iconTheme: const IconThemeData(color: text, size: 22),
+        systemOverlayStyle: DealGoTheme.lightCanvasOverlay,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,

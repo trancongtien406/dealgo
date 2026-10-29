@@ -33,51 +33,49 @@ class AuthScaffold extends StatelessWidget {
       onDoubleTap: onLogoDoubleTap,
       child: const DealGoLogo.wordmark(size: 24),
     );
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.dark,
-      child: Scaffold(
-        backgroundColor: DealGoColors.card,
-        body: Stack(
-          children: [
-            const Positioned.fill(child: _AuthBackdrop()),
-            SafeArea(
-              child: Column(
-                children: [
-                  SizedBox(
-                    height: DealGoDimensions.headerHeight,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: DealGoSpacing.s4,
-                      ),
-                      child: Row(
-                        children: [
-                          if (onBack != null)
-                            AuthBackButton(key: backKey, onPressed: onBack!)
-                          else
-                            const SizedBox(width: DealGoSpacing.s12),
-                          if (centerLogo) const Spacer(),
-                          logo,
-                          const Spacer(),
-                          const AuthHelpButton(),
-                        ],
-                      ),
+    // Status bar style comes from the app-wide default (DealGoApp builder).
+    return Scaffold(
+      backgroundColor: DealGoColors.card,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: _AuthBackdrop()),
+          SafeArea(
+            child: Column(
+              children: [
+                SizedBox(
+                  height: DealGoDimensions.headerHeight,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: DealGoSpacing.s4,
+                    ),
+                    child: Row(
+                      children: [
+                        if (onBack != null)
+                          AuthBackButton(key: backKey, onPressed: onBack!)
+                        else
+                          const SizedBox(width: DealGoSpacing.s12),
+                        if (centerLogo) const Spacer(),
+                        logo,
+                        const Spacer(),
+                        const AuthHelpButton(),
+                      ],
                     ),
                   ),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: padBody
-                          ? const EdgeInsets.symmetric(
-                              horizontal: DealGoSpacing.s20,
-                            )
-                          : EdgeInsets.zero,
-                      child: body,
-                    ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: padBody
+                        ? const EdgeInsets.symmetric(
+                            horizontal: DealGoSpacing.s20,
+                          )
+                        : EdgeInsets.zero,
+                    child: body,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

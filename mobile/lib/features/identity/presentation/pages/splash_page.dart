@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:dealgo/core/design_system/theme/dealgo_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -110,8 +111,7 @@ class _DealGoSplashScreenState extends State<DealGoSplashScreen> {
       MediaQuery.platformBrightnessOf(context),
     );
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light.copyWith(
-        statusBarColor: Colors.transparent,
+      value: DealGoTheme.darkHeaderOverlay.copyWith(
         systemNavigationBarColor: background,
       ),
       child: Semantics(
