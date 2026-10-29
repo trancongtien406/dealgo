@@ -665,27 +665,30 @@ class RideDualActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: DealGoSecondaryButton(
-            label: secondaryLabel,
-            compact: compact,
-            enabled: enabled,
-            onPressed: onSecondary,
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: DealGoSecondaryButton(
+              label: secondaryLabel,
+              compact: compact,
+              enabled: enabled,
+              onPressed: onSecondary,
+            ),
           ),
-        ),
-        const SizedBox(width: DealGoSpacing.s12),
-        Expanded(
-          child: DealGoPrimaryButton(
-            key: primaryKey,
-            label: primaryLabel,
-            compact: compact,
-            enabled: enabled,
-            onPressed: onPrimary,
+          const SizedBox(width: DealGoSpacing.s12),
+          Expanded(
+            child: DealGoPrimaryButton(
+              key: primaryKey,
+              label: primaryLabel,
+              compact: compact,
+              enabled: enabled,
+              onPressed: onPrimary,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

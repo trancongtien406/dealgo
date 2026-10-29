@@ -250,35 +250,38 @@ class _OfferCard extends StatelessWidget {
         ),
         if (live) ...[
           const SizedBox(height: DealGoSpacing.s12),
-          Row(
-            children: [
-              Expanded(
-                child: DealGoSecondaryButton(
-                  key: Key('merchant-offer-toggle-${offer.id}'),
-                  compact: true,
-                  label: offer.status == MerchantOfferStatus.paused
-                      ? l10n.merchantOfferResume
-                      : l10n.merchantOfferPause,
-                  enabled: !busy,
-                  onPressed: () => onStatus(
-                    offer.status == MerchantOfferStatus.paused
-                        ? MerchantOfferStatus.active
-                        : MerchantOfferStatus.paused,
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: DealGoSecondaryButton(
+                    key: Key('merchant-offer-toggle-${offer.id}'),
+                    compact: true,
+                    label: offer.status == MerchantOfferStatus.paused
+                        ? l10n.merchantOfferResume
+                        : l10n.merchantOfferPause,
+                    enabled: !busy,
+                    onPressed: () => onStatus(
+                      offer.status == MerchantOfferStatus.paused
+                          ? MerchantOfferStatus.active
+                          : MerchantOfferStatus.paused,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: DealGoSpacing.s12),
-              Expanded(
-                child: DealGoSecondaryButton(
-                  key: Key('merchant-offer-end-${offer.id}'),
-                  compact: true,
-                  tone: DealGoSecondaryTone.danger,
-                  label: l10n.merchantOfferEnd,
-                  enabled: !busy,
-                  onPressed: () => onStatus(MerchantOfferStatus.ended),
+                const SizedBox(width: DealGoSpacing.s12),
+                Expanded(
+                  child: DealGoSecondaryButton(
+                    key: Key('merchant-offer-end-${offer.id}'),
+                    compact: true,
+                    tone: DealGoSecondaryTone.danger,
+                    label: l10n.merchantOfferEnd,
+                    enabled: !busy,
+                    onPressed: () => onStatus(MerchantOfferStatus.ended),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ],

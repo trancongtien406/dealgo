@@ -134,13 +134,13 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
               ),
             ),
             const SizedBox(height: DealGoSpacing.s12),
-            SizedBox(
-              height: 40,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: DealGoDimensions.pageGutter,
-                ),
+            // Sized by the chips (no fixed 40pt strip) so large text never clips.
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(
+                horizontal: DealGoDimensions.pageGutter,
+              ),
+              child: Row(
                 children: [
                   for (final entry in [
                     ('near', l10n.foodCategorySortNear),

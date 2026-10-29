@@ -904,10 +904,10 @@ class _QuickReplies extends StatelessWidget {
       color: DealGoColors.primaryDeep,
       fontWeight: FontWeight.w600,
     );
-    return Container(
+    // Sized by its pills (no fixed 44pt strip) so large text never clips.
+    return ColoredBox(
       color: DealGoColors.card,
-      height: 44,
-      child: ListView.separated(
+      child: SingleChildScrollView(
         key: const Key('chat-quick-replies'),
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(
@@ -916,26 +916,34 @@ class _QuickReplies extends StatelessWidget {
           DealGoSpacing.s12,
           0,
         ),
-        itemCount: replies.length,
-        separatorBuilder: (_, _) => const SizedBox(width: DealGoSpacing.s8),
-        itemBuilder: (context, i) => Material(
-          color: DealGoColors.subtlePurple,
-          borderRadius: BorderRadius.circular(DealGoRadius.pill),
-          child: InkWell(
-            key: Key('chat-quick-$i'),
-            borderRadius: BorderRadius.circular(DealGoRadius.pill),
-            onTap: () => onTap(replies[i]),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: DealGoSpacing.s12,
-              ),
-              child: Center(child: Text(replies[i], style: style)),
-            ),
-          ),
+        child: Row(
+          children: [
+            for (var i = 0; i < replies.length; i++) ...[
+              if (i > 0) const SizedBox(width: DealGoSpacing.s8),
+              _quickReply(i, style),
+            ],
+          ],
         ),
       ),
     );
   }
+
+  Widget _quickReply(int i, TextStyle? style) => Material(
+    color: DealGoColors.subtlePurple,
+    borderRadius: BorderRadius.circular(DealGoRadius.pill),
+    child: InkWell(
+      key: Key('chat-quick-$i'),
+      borderRadius: BorderRadius.circular(DealGoRadius.pill),
+      onTap: () => onTap(replies[i]),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: DealGoSpacing.s12,
+          vertical: DealGoSpacing.s8,
+        ),
+        child: Text(replies[i], style: style),
+      ),
+    ),
+  );
 }
 
 class _Composer extends StatelessWidget {

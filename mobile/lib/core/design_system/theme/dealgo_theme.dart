@@ -197,9 +197,18 @@ abstract final class DealGoTheme {
         errorBorder: inputBorder(DealGoColors.danger),
         focusedErrorBorder: inputBorder(DealGoColors.danger, 1.6),
       ),
+      // Buttons never get a fixed height: a min height for the tap target plus
+      // balanced padding, so a wrapped 2-line label grows evenly.
+      filledButtonTheme: FilledButtonThemeData(style: _ctaStyle(textTheme)),
+      elevatedButtonTheme: ElevatedButtonThemeData(style: _ctaStyle(textTheme)),
+      outlinedButtonTheme: OutlinedButtonThemeData(style: _ctaStyle(textTheme)),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: DealGoColors.primary,
+          padding: const EdgeInsets.symmetric(
+            horizontal: DealGoSpacing.s12,
+            vertical: DealGoSpacing.s8,
+          ),
           minimumSize: const Size(
             DealGoDimensions.minTapTarget,
             DealGoDimensions.minTapTarget,
@@ -323,3 +332,15 @@ abstract final class DealGoTheme {
     );
   }
 }
+
+ButtonStyle _ctaStyle(TextTheme textTheme) => const ButtonStyle(
+  minimumSize: WidgetStatePropertyAll(
+    Size(DealGoDimensions.minTapTarget, DealGoDimensions.minTapTarget),
+  ),
+  padding: WidgetStatePropertyAll(
+    EdgeInsets.symmetric(
+      horizontal: DealGoSpacing.s16,
+      vertical: DealGoSpacing.s12,
+    ),
+  ),
+);

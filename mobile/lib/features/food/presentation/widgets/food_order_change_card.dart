@@ -156,28 +156,31 @@ class _FoodOrderChangeCardState extends State<FoodOrderChangeCard> {
             DealGoBanner(tone: DealGoBannerTone.warning, message: error),
           ],
           const SizedBox(height: DealGoSpacing.s12),
-          Row(
-            children: [
-              Expanded(
-                child: DealGoSecondaryButton(
-                  key: const Key('food-change-reject'),
-                  label: l10n.foodChangeReject,
-                  tone: DealGoSecondaryTone.danger,
-                  enabled: _sending == null,
-                  onPressed: () => _answer(false),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: DealGoSecondaryButton(
+                    key: const Key('food-change-reject'),
+                    label: l10n.foodChangeReject,
+                    tone: DealGoSecondaryTone.danger,
+                    enabled: _sending == null,
+                    onPressed: () => _answer(false),
+                  ),
                 ),
-              ),
-              const SizedBox(width: DealGoSpacing.s8),
-              Expanded(
-                child: DealGoPrimaryButton(
-                  key: const Key('food-change-accept'),
-                  label: l10n.foodChangeAccept,
-                  isLoading: _sending == true,
-                  enabled: _sending == null,
-                  onPressed: () => _answer(true),
+                const SizedBox(width: DealGoSpacing.s8),
+                Expanded(
+                  child: DealGoPrimaryButton(
+                    key: const Key('food-change-accept'),
+                    label: l10n.foodChangeAccept,
+                    isLoading: _sending == true,
+                    enabled: _sending == null,
+                    onPressed: () => _answer(true),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

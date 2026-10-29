@@ -502,29 +502,32 @@ class _MatchingWait extends StatelessWidget {
                     DealGoSpacing.s12 +
                         MediaQuery.viewPaddingOf(context).bottom,
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: DealGoSecondaryButton(
-                          key: const Key('ride-cancel-search'),
-                          label: l10n.rideCancelSearch,
-                          compact: true,
-                          enabled: !busy,
-                          onPressed: onCancel,
-                        ),
-                      ),
-                      if (offers != null) ...[
-                        const SizedBox(width: DealGoSpacing.s8),
+                  child: IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                         Expanded(
-                          child: DealGoPrimaryButton(
-                            key: const Key('ride-open-offers-from-wait'),
-                            label: l10n.rideViewOffers,
+                          child: DealGoSecondaryButton(
+                            key: const Key('ride-cancel-search'),
+                            label: l10n.rideCancelSearch,
                             compact: true,
-                            onPressed: offers,
+                            enabled: !busy,
+                            onPressed: onCancel,
                           ),
                         ),
+                        if (offers != null) ...[
+                          const SizedBox(width: DealGoSpacing.s8),
+                          Expanded(
+                            child: DealGoPrimaryButton(
+                              key: const Key('ride-open-offers-from-wait'),
+                              label: l10n.rideViewOffers,
+                              compact: true,
+                              onPressed: offers,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ],

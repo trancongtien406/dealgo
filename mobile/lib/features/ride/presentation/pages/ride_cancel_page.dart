@@ -217,27 +217,30 @@ class _RideCancelViewState extends State<_RideCancelView> {
                       label: l10n.rideCancelBookAgain,
                       onPressed: () => context.go('/customer/book'),
                     )
-                  : Row(
-                      children: [
-                        Expanded(
-                          child: DealGoSecondaryButton(
-                            key: const Key('ride-cancel-keep'),
-                            label: l10n.rideCancelKeep,
-                            enabled: !_busy,
-                            onPressed: _back,
+                  : IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: DealGoSecondaryButton(
+                              key: const Key('ride-cancel-keep'),
+                              label: l10n.rideCancelKeep,
+                              enabled: !_busy,
+                              onPressed: _back,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: DealGoSpacing.s8),
-                        Expanded(
-                          child: DealGoPrimaryButton(
-                            key: const Key('ride-cancel-confirm'),
-                            label: l10n.rideCancelConfirm,
-                            isLoading: _busy,
-                            enabled: !_reasonRequired || _reasonId != null,
-                            onPressed: _confirm,
+                          const SizedBox(width: DealGoSpacing.s8),
+                          Expanded(
+                            child: DealGoPrimaryButton(
+                              key: const Key('ride-cancel-confirm'),
+                              label: l10n.rideCancelConfirm,
+                              isLoading: _busy,
+                              enabled: !_reasonRequired || _reasonId != null,
+                              onPressed: _confirm,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
             ),
           ],

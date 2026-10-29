@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../tokens/dealgo_tokens.dart';
 import 'dealgo_haptics.dart';
+import 'dealgo_primary_button.dart' show DealGoButtonText;
 
 /// Outlined purple secondary action (mockup footers: "Quay lại", "Hủy").
 class DealGoSecondaryButton extends StatelessWidget {
@@ -27,12 +28,7 @@ class DealGoSecondaryButton extends StatelessWidget {
     final color = tone == DealGoSecondaryTone.danger
         ? DealGoColors.danger
         : DealGoColors.primary;
-    final text = Text(
-      label,
-      textAlign: TextAlign.center,
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
-    );
+    final text = DealGoButtonText(label);
     return OutlinedButton(
       onPressed: enabled
           ? () {
@@ -52,8 +48,10 @@ class DealGoSecondaryButton extends StatelessWidget {
         padding: WidgetStatePropertyAll(
           EdgeInsets.symmetric(
             horizontal: compact ? DealGoSpacing.s12 : DealGoSpacing.s16,
+            vertical: compact ? DealGoSpacing.s8 : DealGoSpacing.s12,
           ),
         ),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         foregroundColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.disabled)
               ? color.withValues(alpha: 0.4)
@@ -90,6 +88,7 @@ class DealGoSecondaryButton extends StatelessWidget {
           ? text
           : Row(
               mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(leadingIcon, size: 18),
                 const SizedBox(width: DealGoSpacing.s8),

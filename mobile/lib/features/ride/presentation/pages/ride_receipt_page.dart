@@ -129,40 +129,43 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
                   DealGoDimensions.pageGutter,
                   DealGoSpacing.s12,
                 ),
-                child: Row(
-                  children: [
-                    if (ride.agreedFareVnd != null) ...[
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (ride.agreedFareVnd != null) ...[
+                        Expanded(
+                          child: DealGoSecondaryButton(
+                            key: const Key('ride-receipt-help'),
+                            label: l10n.rideReceiptHelp,
+                            onPressed: () => context.push(
+                              AccountRoutes.help('/customer/account'),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: DealGoSpacing.s8),
+                      ],
+                      // "Đặt lại": same A→B and class; the fare page asks the
+                      // server for a fresh quote (no old price is reused).
                       Expanded(
-                        child: DealGoSecondaryButton(
-                          key: const Key('ride-receipt-help'),
-                          label: l10n.rideReceiptHelp,
+                        child: DealGoPrimaryButton(
+                          key: const Key('ride-receipt-reorder'),
+                          label: l10n.rideRebookAction,
                           onPressed: () => context.push(
-                            AccountRoutes.help('/customer/account'),
+                            RideRoutes.fare,
+                            extra: RidePlaces(
+                              pickup: ride.pickup,
+                              dropoff: ride.dropoff,
+                              stops: [for (final s in ride.stops) s.point],
+                              vehicleClassCode: ride.vehicleClassCode.isEmpty
+                                  ? null
+                                  : ride.vehicleClassCode,
+                            ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: DealGoSpacing.s8),
                     ],
-                    // "Đặt lại": same A→B and class; the fare page asks the
-                    // server for a fresh quote (no old price is reused).
-                    Expanded(
-                      child: DealGoPrimaryButton(
-                        key: const Key('ride-receipt-reorder'),
-                        label: l10n.rideRebookAction,
-                        onPressed: () => context.push(
-                          RideRoutes.fare,
-                          extra: RidePlaces(
-                            pickup: ride.pickup,
-                            dropoff: ride.dropoff,
-                            stops: [for (final s in ride.stops) s.point],
-                            vehicleClassCode: ride.vehicleClassCode.isEmpty
-                                ? null
-                                : ride.vehicleClassCode,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
           ],

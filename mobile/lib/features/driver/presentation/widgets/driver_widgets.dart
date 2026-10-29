@@ -378,26 +378,29 @@ class DriverFooter extends StatelessWidget {
         DealGoDimensions.pageGutter,
         DealGoSpacing.s16,
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: DealGoSecondaryButton(
-              key: secondaryKey,
-              label: secondaryLabel,
-              onPressed: onSecondary,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: DealGoSecondaryButton(
+                key: secondaryKey,
+                label: secondaryLabel,
+                onPressed: onSecondary,
+              ),
             ),
-          ),
-          const SizedBox(width: DealGoSpacing.s12),
-          Expanded(
-            child: DealGoPrimaryButton(
-              key: primaryKey,
-              label: primaryLabel,
-              enabled: primaryEnabled,
-              isLoading: primaryLoading,
-              onPressed: onPrimary,
+            const SizedBox(width: DealGoSpacing.s12),
+            Expanded(
+              child: DealGoPrimaryButton(
+                key: primaryKey,
+                label: primaryLabel,
+                enabled: primaryEnabled,
+                isLoading: primaryLoading,
+                onPressed: onPrimary,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

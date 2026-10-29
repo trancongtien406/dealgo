@@ -71,11 +71,15 @@ class _DealGoPrimaryButtonState extends State<DealGoPrimaryButton> {
             widget.compact ? 48 : DealGoDimensions.buttonMinHeight,
           ),
         ),
+        // No fixed height: min height keeps the tap target, vertical padding
+        // keeps a 2-line label balanced instead of squashed.
         padding: WidgetStatePropertyAll(
           EdgeInsets.symmetric(
             horizontal: widget.compact ? DealGoSpacing.s16 : DealGoSpacing.s20,
+            vertical: widget.compact ? DealGoSpacing.s8 : DealGoSpacing.s12,
           ),
         ),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         foregroundColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.disabled) && !widget.isLoading
               ? Colors.white.withValues(alpha: 0.9)
@@ -112,13 +116,7 @@ class _DealGoPrimaryButtonState extends State<DealGoPrimaryButton> {
                   ),
                 ),
                 const SizedBox(width: DealGoSpacing.s12),
-                Flexible(
-                  child: Text(
-                    widget.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
+                Flexible(child: DealGoButtonText(widget.label)),
               ],
             )
           : _ButtonLabel(
@@ -168,14 +166,9 @@ class _ButtonLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labelText = Text(
-      label,
-      maxLines: 1,
-      softWrap: false,
-      overflow: TextOverflow.fade,
-    );
+    final labelText = DealGoButtonText(label);
     if (leadingIcon == null && trailingIcon == null) {
-      return FittedBox(fit: BoxFit.scaleDown, child: labelText);
+      return labelText;
     }
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -185,14 +178,32 @@ class _ButtonLabel extends StatelessWidget {
           Icon(leadingIcon, size: 18),
           const SizedBox(width: DealGoSpacing.s8),
         ],
-        Flexible(
-          child: FittedBox(fit: BoxFit.scaleDown, child: labelText),
-        ),
+        Flexible(child: labelText),
         if (trailingIcon != null) ...[
           const SizedBox(width: DealGoSpacing.s8),
           Icon(trailingIcon, size: 18),
         ],
       ],
+    );
+  }
+}
+
+/// Button label that wraps (centered, up to 3 lines) instead of shrinking or
+/// clipping when the copy is long or the user's text size is large.
+class DealGoButtonText extends StatelessWidget {
+  const DealGoButtonText(this.label, {this.maxLines = 3, super.key});
+
+  final String label;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      textAlign: TextAlign.center,
+      softWrap: true,
+      maxLines: maxLines,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }

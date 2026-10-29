@@ -188,27 +188,30 @@ class _FoodCancelPageState extends State<FoodCancelPage> {
                       label: l10n.actionBack,
                       onPressed: _back,
                     )
-                  : Row(
-                      children: [
-                        Expanded(
-                          child: DealGoSecondaryButton(
-                            key: const Key('food-cancel-keep'),
-                            label: l10n.foodCancelKeep,
-                            enabled: !_busy,
-                            onPressed: _back,
+                  : IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: DealGoSecondaryButton(
+                              key: const Key('food-cancel-keep'),
+                              label: l10n.foodCancelKeep,
+                              enabled: !_busy,
+                              onPressed: _back,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: DealGoSpacing.s8),
-                        Expanded(
-                          child: DealGoPrimaryButton(
-                            key: const Key('food-cancel-confirm'),
-                            label: l10n.foodCancelConfirm,
-                            enabled: _reasonId != null && !_busy,
-                            isLoading: _busy,
-                            onPressed: _confirm,
+                          const SizedBox(width: DealGoSpacing.s8),
+                          Expanded(
+                            child: DealGoPrimaryButton(
+                              key: const Key('food-cancel-confirm'),
+                              label: l10n.foodCancelConfirm,
+                              enabled: _reasonId != null && !_busy,
+                              isLoading: _busy,
+                              onPressed: _confirm,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
             ),
           ],

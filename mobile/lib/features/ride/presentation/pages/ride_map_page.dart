@@ -697,35 +697,38 @@ class _RideMapPageState extends State<RideMapPage> {
                           DealGoSpacing.s12 +
                               MediaQuery.paddingOf(context).bottom,
                         ),
-                        child: Row(
-                          children: [
-                            if (pendingRideId != null) ...[
-                              Expanded(
-                                child: DealGoSecondaryButton(
-                                  key: const Key('ride-open-pending'),
-                                  label: l10n.rideOpenPendingOffers,
-                                  compact: true,
-                                  onPressed: () => context.push(
-                                    RideRoutes.offers(pendingRideId),
+                        child: IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (pendingRideId != null) ...[
+                                Expanded(
+                                  child: DealGoSecondaryButton(
+                                    key: const Key('ride-open-pending'),
+                                    label: l10n.rideOpenPendingOffers,
+                                    compact: true,
+                                    onPressed: () => context.push(
+                                      RideRoutes.offers(pendingRideId),
+                                    ),
                                   ),
                                 ),
+                                const SizedBox(width: DealGoSpacing.s8),
+                              ],
+                              Expanded(
+                                child: DealGoPrimaryButton(
+                                  key: const Key('ride-open-route-overview'),
+                                  label: l10n.rideRouteContinueBooking,
+                                  trailingIcon: pendingRideId == null
+                                      ? DealGoIcons.arrowRight
+                                      : null,
+                                  compact: true,
+                                  enabled: _places != null && !_samePlace,
+                                  isLoading: _locating && _dropoff != null,
+                                  onPressed: _continue,
+                                ),
                               ),
-                              const SizedBox(width: DealGoSpacing.s8),
                             ],
-                            Expanded(
-                              child: DealGoPrimaryButton(
-                                key: const Key('ride-open-route-overview'),
-                                label: l10n.rideRouteContinueBooking,
-                                trailingIcon: pendingRideId == null
-                                    ? DealGoIcons.arrowRight
-                                    : null,
-                                compact: true,
-                                enabled: _places != null && !_samePlace,
-                                isLoading: _locating && _dropoff != null,
-                                onPressed: _continue,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ],

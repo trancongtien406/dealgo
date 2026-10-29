@@ -64,35 +64,38 @@ class DealGoDialog extends StatelessWidget {
             if (primaryLabel != null || secondaryLabel != null) ...[
               const SizedBox(height: DealGoSpacing.s20),
               if (secondaryLabel != null && primaryLabel != null)
-                Row(
-                  children: [
-                    Expanded(
-                      child: DealGoSecondaryButton(
-                        label: secondaryLabel!,
-                        onPressed:
-                            onSecondary ?? () => Navigator.of(context).pop(),
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: DealGoSecondaryButton(
+                          label: secondaryLabel!,
+                          onPressed:
+                              onSecondary ?? () => Navigator.of(context).pop(),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: DealGoSpacing.s12),
-                    Expanded(
-                      child: primaryTone == DealGoDialogPrimaryTone.danger
-                          ? DealGoSecondaryButton(
-                              key: primaryKey,
-                              label: primaryLabel!,
-                              tone: DealGoSecondaryTone.danger,
-                              onPressed:
-                                  onPrimary ??
-                                  () => Navigator.of(context).pop(true),
-                            )
-                          : DealGoPrimaryButton(
-                              key: primaryKey,
-                              label: primaryLabel!,
-                              onPressed:
-                                  onPrimary ??
-                                  () => Navigator.of(context).pop(true),
-                            ),
-                    ),
-                  ],
+                      const SizedBox(width: DealGoSpacing.s12),
+                      Expanded(
+                        child: primaryTone == DealGoDialogPrimaryTone.danger
+                            ? DealGoSecondaryButton(
+                                key: primaryKey,
+                                label: primaryLabel!,
+                                tone: DealGoSecondaryTone.danger,
+                                onPressed:
+                                    onPrimary ??
+                                    () => Navigator.of(context).pop(true),
+                              )
+                            : DealGoPrimaryButton(
+                                key: primaryKey,
+                                label: primaryLabel!,
+                                onPressed:
+                                    onPrimary ??
+                                    () => Navigator.of(context).pop(true),
+                              ),
+                      ),
+                    ],
+                  ),
                 )
               else if (primaryLabel != null)
                 DealGoPrimaryButton(

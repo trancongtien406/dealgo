@@ -590,7 +590,8 @@ class _GenderPill extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        height: 48,
+        constraints: const BoxConstraints(minHeight: 48),
+        padding: const EdgeInsets.symmetric(vertical: DealGoSpacing.s8),
         decoration: BoxDecoration(
           color: selected ? color.withValues(alpha: 0.08) : Colors.white,
           borderRadius: BorderRadius.circular(16),

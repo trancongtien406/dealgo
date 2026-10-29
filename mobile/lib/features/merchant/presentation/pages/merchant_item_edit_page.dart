@@ -483,28 +483,31 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage>
                   if (_error != null)
                     Text(_error!, style: TextStyle(color: DealGoColors.danger)),
                   const SizedBox(height: DealGoSpacing.s16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DealGoSecondaryButton(
-                          key: const Key('merchant-edit-continue-variants'),
-                          label: l10n.merchantItemContinue,
-                          compact: true,
-                          enabled: !_busy,
-                          onPressed: () => _save(continueToVariants: true),
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: DealGoSecondaryButton(
+                            key: const Key('merchant-edit-continue-variants'),
+                            label: l10n.merchantItemContinue,
+                            compact: true,
+                            enabled: !_busy,
+                            onPressed: () => _save(continueToVariants: true),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: DealGoSpacing.s8),
-                      Expanded(
-                        child: DealGoPrimaryButton(
-                          key: const Key('merchant-edit-save'),
-                          label: l10n.actionSave,
-                          compact: true,
-                          isLoading: _busy,
-                          onPressed: () => _save(continueToVariants: false),
+                        const SizedBox(width: DealGoSpacing.s8),
+                        Expanded(
+                          child: DealGoPrimaryButton(
+                            key: const Key('merchant-edit-save'),
+                            label: l10n.actionSave,
+                            compact: true,
+                            isLoading: _busy,
+                            onPressed: () => _save(continueToVariants: false),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),

@@ -306,8 +306,11 @@ class _AuthMethodTile extends StatelessWidget {
       onTap: onTap,
       semanticLabel: label,
       child: Container(
-        height: 60,
-        padding: const EdgeInsets.symmetric(horizontal: DealGoSpacing.s12),
+        constraints: const BoxConstraints(minHeight: 60),
+        padding: const EdgeInsets.symmetric(
+          horizontal: DealGoSpacing.s12,
+          vertical: DealGoSpacing.s8,
+        ),
         decoration: BoxDecoration(
           color: DealGoColors.card,
           borderRadius: BorderRadius.circular(DealGoRadius.button),

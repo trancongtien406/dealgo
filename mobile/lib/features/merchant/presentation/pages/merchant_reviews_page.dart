@@ -365,33 +365,36 @@ class _ReplySheetState extends State<_ReplySheet> {
               errorText: _error,
             ),
             const SizedBox(height: DealGoSpacing.s12),
-            Row(
-              children: [
-                if (hasReply) ...[
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (hasReply) ...[
+                    Expanded(
+                      child: DealGoSecondaryButton(
+                        key: const Key('merchant-review-reply-remove'),
+                        tone: DealGoSecondaryTone.danger,
+                        label: l10n.merchantReviewReplyRemove,
+                        enabled: !_saving,
+                        onPressed: () => _send(''),
+                      ),
+                    ),
+                    const SizedBox(width: DealGoSpacing.s12),
+                  ],
                   Expanded(
-                    child: DealGoSecondaryButton(
-                      key: const Key('merchant-review-reply-remove'),
-                      tone: DealGoSecondaryTone.danger,
-                      label: l10n.merchantReviewReplyRemove,
-                      enabled: !_saving,
-                      onPressed: () => _send(''),
+                    child: ValueListenableBuilder(
+                      valueListenable: _text,
+                      builder: (context, value, _) => DealGoPrimaryButton(
+                        key: const Key('merchant-review-reply-send'),
+                        label: l10n.merchantReviewReplySend,
+                        isLoading: _saving,
+                        enabled: !_saving && value.text.trim().isNotEmpty,
+                        onPressed: () => _send(_text.text),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: DealGoSpacing.s12),
                 ],
-                Expanded(
-                  child: ValueListenableBuilder(
-                    valueListenable: _text,
-                    builder: (context, value, _) => DealGoPrimaryButton(
-                      key: const Key('merchant-review-reply-send'),
-                      label: l10n.merchantReviewReplySend,
-                      isLoading: _saving,
-                      enabled: !_saving && value.text.trim().isNotEmpty,
-                      onPressed: () => _send(_text.text),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
         ),

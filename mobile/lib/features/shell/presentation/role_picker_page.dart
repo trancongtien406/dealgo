@@ -162,23 +162,26 @@ class _RolePickerPageState extends State<RolePickerPage> {
                     DealGoDimensions.pageGutter,
                     DealGoSpacing.s16,
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: DealGoSecondaryButton(
-                          label: l10n.rolePickerLearnMore,
-                          onPressed: () => _showLearnMore(context),
+                  child: IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: DealGoSecondaryButton(
+                            label: l10n.rolePickerLearnMore,
+                            onPressed: () => _showLearnMore(context),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: DealGoSpacing.s12),
-                      Expanded(
-                        child: DealGoPrimaryButton(
-                          label: l10n.actionContinue,
-                          trailingIcon: DealGoIcons.arrowRight,
-                          onPressed: () => context.go(_selected.homePath),
+                        const SizedBox(width: DealGoSpacing.s12),
+                        Expanded(
+                          child: DealGoPrimaryButton(
+                            label: l10n.actionContinue,
+                            trailingIcon: DealGoIcons.arrowRight,
+                            onPressed: () => context.go(_selected.homePath),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],

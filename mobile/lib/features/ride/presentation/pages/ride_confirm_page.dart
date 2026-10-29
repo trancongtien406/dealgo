@@ -181,24 +181,27 @@ class _FareChanged extends StatelessWidget {
                 DealGoDimensions.pageGutter,
                 DealGoSpacing.s12,
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: DealGoSecondaryButton(
-                      label: AppLocalizations.of(context).actionBack,
-                      onPressed: onBack,
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: DealGoSecondaryButton(
+                        label: AppLocalizations.of(context).actionBack,
+                        onPressed: onBack,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: DealGoSpacing.s12),
-                  Expanded(
-                    child: DealGoPrimaryButton(
-                      key: const Key('ride-ack-fare'),
-                      label: AppLocalizations.of(context)
-                          .rideAcceptAmount(formatRideVnd(agreedFareVnd)),
-                      onPressed: onAccept,
+                    const SizedBox(width: DealGoSpacing.s12),
+                    Expanded(
+                      child: DealGoPrimaryButton(
+                        key: const Key('ride-ack-fare'),
+                        label: AppLocalizations.of(context)
+                            .rideAcceptAmount(formatRideVnd(agreedFareVnd)),
+                        onPressed: onAccept,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],

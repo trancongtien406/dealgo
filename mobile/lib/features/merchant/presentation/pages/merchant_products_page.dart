@@ -291,24 +291,27 @@ class _CatalogBodyState extends State<_CatalogBody> {
           ),
         ),
         const SizedBox(height: DealGoSpacing.s12),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                key: const Key('merchant-open-categories'),
-                onPressed: () => context.push(MerchantRoutes.categories),
-                child: Text(l10n.merchantProductsCategories),
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  key: const Key('merchant-open-categories'),
+                  onPressed: () => context.push(MerchantRoutes.categories),
+                  child: Text(l10n.merchantProductsCategories),
+                ),
               ),
-            ),
-            const SizedBox(width: DealGoSpacing.s8),
-            Expanded(
-              child: OutlinedButton(
-                key: const Key('merchant-open-history'),
-                onPressed: () => context.push(MerchantRoutes.history),
-                child: Text(l10n.merchantProductsHistory),
+              const SizedBox(width: DealGoSpacing.s8),
+              Expanded(
+                child: OutlinedButton(
+                  key: const Key('merchant-open-history'),
+                  onPressed: () => context.push(MerchantRoutes.history),
+                  child: Text(l10n.merchantProductsHistory),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: DealGoSpacing.s12),
         DealGoTextField(

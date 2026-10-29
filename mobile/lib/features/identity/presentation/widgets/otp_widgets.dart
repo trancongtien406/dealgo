@@ -458,26 +458,29 @@ class OtpInvalidPane extends StatelessWidget {
             DealGoDimensions.pageGutter,
             DealGoSpacing.s16,
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: DealGoSecondaryButton(
-                  label: isEmail
-                      ? l10n.actionChangeEmail
-                      : l10n.actionChangePhone,
-                  onPressed: onChangePhone,
-                ),
-              ),
-              if (!emailLocked) ...[
-                const SizedBox(width: DealGoSpacing.s12),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                 Expanded(
-                  child: DealGoPrimaryButton(
-                    label: AppLocalizations.of(context).actionRetry,
-                    onPressed: onRetry,
+                  child: DealGoSecondaryButton(
+                    label: isEmail
+                        ? l10n.actionChangeEmail
+                        : l10n.actionChangePhone,
+                    onPressed: onChangePhone,
                   ),
                 ),
+                if (!emailLocked) ...[
+                  const SizedBox(width: DealGoSpacing.s12),
+                  Expanded(
+                    child: DealGoPrimaryButton(
+                      label: AppLocalizations.of(context).actionRetry,
+                      onPressed: onRetry,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ],
@@ -615,22 +618,25 @@ class OtpCooldownPane extends StatelessWidget {
             DealGoDimensions.pageGutter,
             DealGoSpacing.s16,
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: DealGoSecondaryButton(
-                  label: l10n.actionBack,
-                  onPressed: onLeave,
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: DealGoSecondaryButton(
+                    label: l10n.actionBack,
+                    onPressed: onLeave,
+                  ),
                 ),
-              ),
-              const SizedBox(width: DealGoSpacing.s12),
-              Expanded(
-                child: DealGoPrimaryButton(
-                  label: l10n.actionKeepEnteringCode,
-                  onPressed: onContinue,
+                const SizedBox(width: DealGoSpacing.s12),
+                Expanded(
+                  child: DealGoPrimaryButton(
+                    label: l10n.actionKeepEnteringCode,
+                    onPressed: onContinue,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],

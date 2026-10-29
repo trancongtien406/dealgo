@@ -248,8 +248,11 @@ class _VoucherFieldState extends State<VoucherField> {
           ),
         ),
         const SizedBox(width: DealGoSpacing.s8),
-        SizedBox(
-          height: DealGoDimensions.inputHeight,
+        // Matches the field's height without pinning it (large text grows).
+        ConstrainedBox(
+          constraints: const BoxConstraints(
+            minHeight: DealGoDimensions.inputHeight,
+          ),
           child: FilledButton.tonal(
             key: const Key('voucher-apply'),
             onPressed: _busy ? null : _apply,

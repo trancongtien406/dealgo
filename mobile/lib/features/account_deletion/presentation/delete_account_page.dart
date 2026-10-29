@@ -800,8 +800,10 @@ class _DangerButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: DealGoDimensions.buttonMinHeight,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(
+        minHeight: DealGoDimensions.buttonMinHeight,
+      ),
       child: FilledButton(
         style: FilledButton.styleFrom(
           backgroundColor: DealGoColors.danger,

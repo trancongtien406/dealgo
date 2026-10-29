@@ -144,23 +144,26 @@ class _OfflineButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: DealGoSecondaryButton(
-            label: AppLocalizations.of(context).checkoutBackToCart,
-            onPressed: () => _leave(context),
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: DealGoSecondaryButton(
+              label: AppLocalizations.of(context).checkoutBackToCart,
+              onPressed: () => _leave(context),
+            ),
           ),
-        ),
-        const SizedBox(width: DealGoSpacing.s12),
-        Expanded(
-          child: DealGoPrimaryButton(
-            key: const Key('food-retry-order'),
-            label: AppLocalizations.of(context).checkoutRetry,
-            onPressed: onRetry,
+          const SizedBox(width: DealGoSpacing.s12),
+          Expanded(
+            child: DealGoPrimaryButton(
+              key: const Key('food-retry-order'),
+              label: AppLocalizations.of(context).checkoutRetry,
+              onPressed: onRetry,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -173,19 +176,22 @@ class _RepriceButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: DealGoSecondaryButton(
-            label: AppLocalizations.of(context).checkoutBackToCartShort,
-            onPressed: () => _leave(context),
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: DealGoSecondaryButton(
+              label: AppLocalizations.of(context).checkoutBackToCartShort,
+              onPressed: () => _leave(context),
+            ),
           ),
-        ),
-        const SizedBox(width: DealGoSpacing.s12),
-        Expanded(
-          child: DealGoPrimaryButton(label: label, onPressed: onAccept),
-        ),
-      ],
+          const SizedBox(width: DealGoSpacing.s12),
+          Expanded(
+            child: DealGoPrimaryButton(label: label, onPressed: onAccept),
+          ),
+        ],
+      ),
     );
   }
 }
