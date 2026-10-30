@@ -1,3 +1,4 @@
+import { PaymentStatusBus } from './payment-status-bus.js';
 import { randomUUID } from 'node:crypto';
 import { HttpException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type { PaymentMethodCode, PaymentServiceCode } from '../../../platform/settings/payment-method-registry.js';
@@ -107,7 +108,30 @@ export class PaymentGatewayService {
     @Inject(PAYMENT_GATEWAY_OPTIONS) private readonly options: PaymentGatewayOptions,
     private readonly registry: PaymentMethodRegistryService,
     @Optional() private readonly ledger?: LedgerService,
+    @Optional() private readonly statusBus?: PaymentStatusBus,
   ) {}
+
+  /** Push a `paymentStatus` hint after an intent changed state (no client polling). */
+  private async notifyStatus(intentId: string): Promise<void> {
+    if (!this.statusBus) {
+      return;
+    }
+    try {
+      const fresh = await this.repo.findById(intentId);
+      if (!fresh) {
+        return;
+      }
+      this.statusBus.publish({
+        entityType: fresh.entityType,
+        entityId: fresh.entityId,
+        intentId: fresh.id,
+        status: toCheckoutStatus(fresh),
+        occurredAt: new Date().toISOString(),
+      });
+    } catch {
+      // A failed hint never affects the payment; the app re-GETs on reconnect/resume.
+    }
+  }
 
   /** Records the customer's chosen method (already validated by the caller's service). */
   async recordSelection(entityType: PaymentEntityTypeName, entityId: string, code: PaymentMethodCode) {
@@ -238,6 +262,7 @@ export class PaymentGatewayService {
     } else {
       await this.repo.update(intent.id, { status: 'FAILED', failureReason: cb.failureReason?.slice(0, 255) ?? 'FAILED' });
     }
+    await this.notifyStatus(intent.id);
     return adapter.ack('OK');
   }
 
@@ -360,6 +385,7 @@ export class PaymentGatewayService {
       status: fully ? (refund.status === 'PENDING' ? 'REFUND_PENDING' : 'REFUNDED') : after.status,
     });
     await this.postRefundLedger(refund);
+    await this.notifyStatus(updated.id);
     return {
       intentId: updated.id,
       status: updated.status,
@@ -458,12 +484,15 @@ export class PaymentGatewayService {
           await this.applyCapture(current, result.providerTransId, result.providerPayDate);
         }
         await this.repo.update(intent.id, bump);
+        await this.notifyStatus(intent.id);
         summary.captured += 1;
       } else if (result.state === 'FAILED') {
         await this.repo.update(intent.id, { ...bump, status: 'FAILED', failureReason: result.message ?? 'FAILED' });
+        await this.notifyStatus(intent.id);
         summary.failed += 1;
       } else if (now.getTime() - intent.updatedAt.getTime() > RECONCILE_GIVE_UP_MS) {
         await this.repo.update(intent.id, { ...bump, status: 'EXPIRED', failureReason: 'RECONCILE_TIMEOUT' });
+        await this.notifyStatus(intent.id);
         summary.expired += 1;
       } else {
         await this.repo.update(intent.id, bump);

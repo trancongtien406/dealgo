@@ -4,6 +4,7 @@ import {
   defaultRideVehicleClasses,
   isCarVehicleClassCode,
   quoteVehicleClassFare,
+  rideBidCeilingVnd,
   rideBidFloorVnd,
   roundDownToFareStep,
   roundUpToFareStep,
@@ -11,58 +12,53 @@ import {
 } from './ride-vehicle-class.js';
 
 describe('quoteVehicleClassFare', () => {
-  const classes = defaultRideVehicleClasses({
-    minFareVnd: 10_000,
-    maxFareVnd: 500_000,
-    perKmVnd: 8_000,
+  const classes = defaultRideVehicleClasses({ maxFareVnd: 500_000 });
+
+  it('seeds the owner tariff (per-km + minimum per class)', () => {
+    expect(classes.map((c) => [c.code, c.baseFareVnd, c.perKmVnd, c.perMinuteVnd, c.minFareVnd])).toEqual([
+      ['MOTORBIKE', 0, 5_000, 0, 10_000],
+      ['CAR_4', 0, 9_000, 0, 20_000],
+      ['CAR_7', 0, 13_000, 0, 25_000],
+    ]);
   });
 
   it('keeps the motorbike reference as distance times the per-km rate', () => {
-    const bike = classes[0]!;
-    const quote = quoteVehicleClassFare({ distanceKm: 8, vehicle: bike });
-    expect(quote.referenceFareVnd).toBe(64_000);
+    const quote = quoteVehicleClassFare({ distanceKm: 8, vehicle: classes[0]! });
+    expect(quote.referenceFareVnd).toBe(40_000);
     expect(quote.timeComponentVnd).toBe(0);
   });
 
   it('uses the class minimum when the distance component is smaller', () => {
-    const bike = classes[0]!;
-    const quote = quoteVehicleClassFare({ distanceKm: 0.2, vehicle: bike });
-    expect(quote.referenceFareVnd).toBe(10_000);
+    expect(quoteVehicleClassFare({ distanceKm: 1, vehicle: classes[0]! }).referenceFareVnd).toBe(10_000);
+    expect(quoteVehicleClassFare({ distanceKm: 1, vehicle: classes[1]! }).referenceFareVnd).toBe(20_000);
+    expect(quoteVehicleClassFare({ distanceKm: 1, vehicle: classes[2]! }).referenceFareVnd).toBe(25_000);
   });
 
-  it('quotes CAR_4 with DRAFT/ADMIN_EDITABLE seeds (not OPEN-003 law)', () => {
-    const car = classes[1]!;
-    expect(car.code).toBe('CAR_4');
-    expect(car.seats).toBe(4);
-    expect(car.baseFareVnd).toBe(15_000);
-    expect(car.perKmVnd).toBe(12_000);
-    expect(car.perMinuteVnd).toBe(300);
-    expect(car.minFareVnd).toBe(25_000);
-    expect(car.maxFareVnd).toBe(800_000);
-    const quote = quoteVehicleClassFare({ distanceKm: 8, vehicle: car });
-    // durationMin = round(8/22*60) = 22; 15000 + 8*12000 + 22*300 = 117600 → 118000
-    expect(quote.durationMin).toBe(22);
-    expect(quote.referenceFareVnd).toBe(118_000);
+  it('quotes CAR_4 at 9.000đ/km', () => {
+    const quote = quoteVehicleClassFare({ distanceKm: 8, vehicle: classes[1]! });
+    expect(quote.referenceFareVnd).toBe(72_000);
   });
 
-  it('quotes CAR_7 with DRAFT/ADMIN_EDITABLE seeds (not OPEN-003 law)', () => {
-    const car = classes[2]!;
-    expect(car.code).toBe('CAR_7');
-    expect(car.baseFareVnd).toBe(20_000);
-    expect(car.perKmVnd).toBe(14_000);
-    const quote = quoteVehicleClassFare({ distanceKm: 8, vehicle: car });
-    // durationMin = round(8/20*60) = 24; 20000 + 8*14000 + 24*400 = 141600 → 142000
-    expect(quote.durationMin).toBe(24);
-    expect(quote.referenceFareVnd).toBe(142_000);
+  it('quotes CAR_7 at 13.000đ/km', () => {
+    const quote = quoteVehicleClassFare({ distanceKm: 8, vehicle: classes[2]! });
+    expect(quote.referenceFareVnd).toBe(104_000);
+  });
+});
+
+describe('rideBidCeilingVnd', () => {
+  it('rounds the +30% ceiling down to the step', () => {
+    // 130% of 59.000 = 76.700 → 76.000
+    expect(rideBidCeilingVnd(59_000, 130)).toBe(76_000);
+    expect(rideBidCeilingVnd(10_000, 130)).toBe(13_000);
+    expect(rideBidCeilingVnd(59_000, 0)).toBe(Number.POSITIVE_INFINITY);
   });
 });
 
 describe('ride fare rounding step', () => {
-  const bike = defaultRideVehicleClasses({
-    minFareVnd: 10_000,
-    maxFareVnd: 500_000,
+  const bike = {
+    ...defaultRideVehicleClasses({ maxFareVnd: 500_000 })[0]!,
     perKmVnd: 12_000,
-  })[0]!;
+  };
 
   it('rounds an odd suggested fare up to the next 1.000đ', () => {
     // 4.8363 km × 12.000đ = 58.035,6 → 58.036 before rounding.

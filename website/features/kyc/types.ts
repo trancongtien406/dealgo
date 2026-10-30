@@ -1,5 +1,6 @@
 export const KYC_STATUSES = [
   "UNDER_REVIEW",
+  "IN_REVIEW",
   "NEEDS_MORE_INFO",
   "APPROVED",
   "REJECTED",
@@ -32,4 +33,12 @@ export type KycCase = {
   reason: string | null;
   issues: import("@/features/kyc/partner-review").PartnerIssue[];
   reviewedAt: string | null;
+  /** t52u: device capture checks + server AI pre-check — advisory only, never a decision. */
+  checks: import("@/features/kyc/review-checks").KycReviewChecks;
+  /** t61u: fields read on-device (OCR) and confirmed/edited by the applicant. */
+  ocrFields: import("@/features/kyc/ocr-fields").OcrField[];
+  /** t61u: approved by the system (KYC_AUTO_APPROVE_* on). */
+  autoApproved: boolean;
+  /** t61u: why auto-approve did not apply (manual queue). */
+  autoApproveSkipped: string[];
 };

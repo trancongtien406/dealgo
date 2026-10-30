@@ -73,15 +73,14 @@ class MerchantQueueCubit extends Cubit<MerchantQueueState> {
     this.markMerchantOrderReady,
     this.resolveStoreId,
     this.onNewOrders,
-    this.pollInterval = const Duration(seconds: 20),
-  }) : super(const MerchantQueueLoading());
+    String? Function()? tokenSource,
+  }) : super(const MerchantQueueLoading()) {
+    _tokenSource = tokenSource;
+  }
 
-  /// QA M2 fallback: a silent REST refetch on this cadence while a token
-  /// source is bound, so a missed socket hint (store room joined after the
-  /// order, socket down, worker restart) never leaves a new order invisible.
-  /// `Duration.zero` disables it (tests).
-  final Duration pollInterval;
-  Timer? _poll;
+  // t50u: no periodic poll. The queue reloads over REST only on load,
+  // foreground resume, a store:{id} socket hint and socket reconnect
+  // (SnapshotBinding re-fetches on every reconnect).
 
   final ListMerchantOrderQueue _listMerchantOrderQueue;
   final AcceptMerchantOrder? acceptMerchantOrder;
@@ -104,17 +103,16 @@ class MerchantQueueCubit extends Cubit<MerchantQueueState> {
 
   void setTokenSource(String? Function() tokenSource) {
     _tokenSource = tokenSource;
-    if (_poll == null && pollInterval > Duration.zero && !isClosed) {
-      _poll = Timer.periodic(pollInterval, (_) => unawaited(refresh()));
-    }
   }
 
-  /// Silent refetch (foreground resume, poll, socket hint): keeps the list on
+  /// Silent refetch (foreground resume, socket hint, reconnect): keeps the list on
   /// screen instead of flashing the loading view.
   Future<void> refresh() async {
     final source = _tokenSource;
     if (source == null || isClosed) return;
-    await load(source(), silent: true);
+    final token = source();
+    if (token == null || token.isEmpty) return;
+    await load(token, silent: true);
   }
 
   /// Subscribe to store:{id} for new/status events; REST reload on each hint.
@@ -289,8 +287,6 @@ class MerchantQueueCubit extends Cubit<MerchantQueueState> {
 
   @override
   Future<void> close() async {
-    _poll?.cancel();
-    _poll = null;
     await _storeBinding?.stop();
     _storeBinding = null;
     return super.close();

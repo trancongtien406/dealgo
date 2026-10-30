@@ -1,14 +1,14 @@
 ---
 doc_id: DG-GOV-004
 title: "DealGo — Decisions, Assumptions & Open Issues / Sổ quyết định và giả định"
-version: "0.4.10"
+version: "0.4.16"
 status: "DRAFT"
 owner: "Product Owner / Tech Lead"
 reviewers:
   - "Business / Operations"
   - "Finance"
   - "Security / Legal / Compliance (đối với nội dung liên quan)"
-last_updated: "2026-10-28"
+last_updated: "2026-10-30"
 classification: "Internal"
 related_requirements: []
 related_decisions:
@@ -81,6 +81,9 @@ related_decisions:
   - DEC-PROD-066
   - DEC-PROD-067
   - DEC-PROD-068
+  - DEC-PROD-069
+  - DEC-PROD-070
+  - DEC-PROD-071
   - OPEN-001
   - OPEN-002
   - OPEN-003
@@ -461,6 +464,69 @@ Status: `DRAFT` (2026-10-27, owner yêu cầu đánh giá, khoảng cách, tìm 
 | Giỏ hàng nổi | `DRAFT` | Trang quán, tuỳ chọn món, Đồ ăn, tìm kiếm và danh mục có thanh giỏ hàng nổi, chỉ hiện khi giỏ có món: số món, tổng tiền món trừ ưu đãi đã chọn (chưa gồm phí giao), dòng phụ "Còn thiếu …" khi chưa đủ đơn tối thiểu, ngược lại "Tiết kiệm …" khi có ưu đãi; "Xem giỏ hàng" mở thanh toán. |
 | Thẻ ưu đãi | `DRAFT` | Ưu đãi hiện dạng vé (khía, vạch đứt): mức giảm ("Giảm 20%", "Giảm 15K") và mã ở cuống, điều kiện đầy đủ (đơn từ, tối đa, HSD, còn N lượt từ `remainingUses`) không cắt chữ, nút "Dùng" / "Đã dùng". Cùng kiểu ở trang quán (dải + "Xem tất cả"), "Ưu đãi của tôi" khi thanh toán và "Ưu đãi của quán" phía cửa hàng. |
 | Nhãn & thông tin hiển thị | `DRAFT` | "Bán chạy" = tối đa 3 món có `soldCount` cao nhất (> 0) trong quán; "Mới" = món thêm trong 14 ngày. "Miễn phí giao" khi phí giao từ = 0 (không có cờ freeship riêng). "Khách khen" gom từ thẻ của các đánh giá đã tải. ETA trong giỏ = thời gian chuẩn bị lớn nhất của các món + 3 phút/km. Số tiền tiết kiệm trong danh sách ưu đãi là ước tính phía app; máy chủ tính lại khi đặt. |
+
+#### `DEC-PROD-069` — Khoảng trả giá ±% là setting Admin, giá theo khu vực, không polling
+
+Status: mục (1) `OWNER_CONFIRMED` (t50u, 2026-10-29); mục (2)–(4) `DRAFT`.
+
+Lời chủ dự án (t50u): "Đúng là +_30% giúp tôi cấu hình trong setting luoon để sau này cod thể thay đổi. Cũng như chỉnh lại socket ko xài polling và tôi nghĩ đoạn này ở phần báo giá rồi thì đã lấy mặc định thông số rồi chứ k thể thay đổi liên tục nên ko cần xài socket chứ nhỉ. Và nghiên cứu giúp tôi tuỳ vào từng khu vực đã có mà số tiền trên km cũng thay đổi theo"
+
+| Mục | Status | Quy tắc |
+|---|---|---|
+| (1) Khoảng trả giá | `OWNER_CONFIRMED` | Giá khách đề xuất, giá nâng và giá tài xế trả lại nằm trong [sàn %, trần %] của giá tham khảo. Sàn = `RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE` (0–100), trần = `RIDE_BID_CEILING_PERCENT_OF_REFERENCE` (100–300); mục tiêu ±30% (70/130). Admin sửa ở Cài đặt (có kiểm tra min/max, có nhật ký). Máy chủ đọc setting khi tạo chuyến và **chốt** sàn/trần vào `ride_pricing_snapshots`; sửa setting sau đó không ảnh hưởng chuyến đang thương lượng. Lưu ý: DB DEV hiện vẫn sàn 80% vì migration WIP `20261201090000_owner_ride_tariff_bid_band` chưa áp dụng. |
+| (2) Báo giá là ảnh chụp REST | `DRAFT` | `POST /v1/rides/quote` trả `options[].tariff` (khu vực, nguồn DEFAULT/ZONE, phiên bản, giá/km, giá tối thiểu, sàn/trần). Không có sự kiện socket cho giá; app không tự tính lại. |
+| (3) Giá theo khu vực | `DRAFT` | Bảng `ride_zone_tariffs` (khu vực × hạng xe → giá/km, giá tối thiểu; mặc định **rỗng**). Khu vực lấy từ toạ độ điểm đón ở máy chủ (`inferRegionCodeFromCoords`). Không có ghi đè → dùng giá hạng xe toàn quốc (DRAFT: MOTORBIKE 5.000đ/km, tối thiểu 10.000đ; CAR_4 9.000đ/km, 20.000đ; CAR_7 13.000đ/km, 25.000đ). Admin: Cài đặt › Giá theo khu vực (`/settings/zone-tariffs`), quyền `settings.write`, bắt buộc kiểm tra, ghi `ops_audit_logs` (RIDE_ZONE_TARIFF_UPSERT/DELETE). Mức giá từng tỉnh chờ chủ dự án duyệt; giá đối thủ trong `docs/research/zone-tariff-research.md` chỉ để tham khảo, **không** được nạp làm giá DealGo. |
+| (4) Không polling | `DRAFT` | App bỏ hẹn giờ gọi REST định kỳ (hàng đợi quán 20 s, đơn quán 10 s, tài xế tìm việc 15 s, thẻ cuốc mới 10 s). Tải lại khi mở màn, khi có gợi ý socket (`snapshot`, `rideRequest` gồm `CLOSED_*`), khi kết nối lại và khi app quay lại. Giữ: đếm ngược OTP/cuốc, chuông/rung, banner, gửi vị trí tài xế, xem trước GPS cục bộ. Chờ quyết định: trang trạng thái thanh toán (3 s, có giới hạn) và bảng Admin (monitor 30 s, lỗi hệ thống 120 s) vì chưa có sự kiện socket. |
+
+#### `DEC-PROD-070` — KYC/KYB tự xây: duyệt tay là quyết định cuối, AI chỉ hỗ trợ chụp trên máy
+
+Status: `DRAFT` (t52u/t53u/t54u/t56u, 2026-10-30). Yêu cầu chủ dự án (t52u): tự xây lại KYC/KYB, không qua bên thứ ba; admin duyệt tay là quyết định cuối; chụp CCCD mặt trước/sau; chụp khuôn mặt thông minh. (t53u): chụp **tự động**, không nút chụp; CCCD tự chụp khi thẻ nằm trọn khung, nét, không lóa, rồi tự chuyển trước → sau; khuôn mặt vào oval thì tự quay video ngắn kèm hướng dẫn và tự dừng. (t54u): "Bạn đưa ra và chạy luôn giúp tôi, còn pháp lý đã có rồi cứ code đi". **(t56u, phạm vi cuối):** AI **chỉ** là hỗ trợ chụp trên máy (tự chụp khi đúng khung/nét/đủ sáng/không lóa, video liveness có hướng dẫn); **không OCR, không so khớp khuôn mặt, không kết luận AI, không nhà cung cấp AI phía máy chủ**; nhân viên duyệt hoàn toàn thủ công. Các mục `AGENT_PROPOSED` dưới đây là đề xuất của agent theo t54u, chủ dự án có thể đổi.
+
+| Mục | Status | Quy tắc |
+|---|---|---|
+| Hiện trạng | `DRAFT` | Trước t52u KYC đã chạy nội bộ (`DEC-PROD-020/048`); không có mã nhà cung cấp eKYC trong repo. |
+| Trạng thái | `DRAFT` | `SUBMITTED → IN_REVIEW` (ops bấm "Nhận hồ sơ", `POST /v1/ops/partner-applications/:id/claim`, quyền `kyc.review`, 409 nếu đã nhận) `→ APPROVED / REJECTED` (lý do + mục cần sửa). Từ chối → đối tác nộp lại (`SUBMITTED`); đang `IN_REVIEW` thì không nộp lại được (409). Duyệt/từ chối chỉ một người thắng (khoá hàng). Mỗi bước ghi `ops_audit_logs` (`KYC_CLAIM/KYC_APPROVE/KYC_REJECT`) và phát `partnerStatus` vào phòng `user:`. |
+| Không AI phía máy chủ | `OWNER_STATED` (t56u) | Đã gỡ cổng `KycVisionPrecheck`, adapter, biến `KYC_VISION_*` và khối "AI vision" trên Admin. Máy chủ **xoá** `metadata.aiPrecheck` nếu client gửi. Admin chỉ hiện hàng "Thiết bị báo" (cờ `capture*` do app gửi: đã phát hiện mặt, liveness đạt, có video, chất lượng ảnh) — chỉ là dữ liệu chụp để tham khảo. Không face match, không model embedding khuôn mặt. OCR chỉ chạy **trên máy** từ t61u (dòng "OCR trên máy" bên dưới); máy chủ không đọc ảnh. |
+| Chụp CCCD (app) | `DRAFT` | Camera sau, luồng khung hình: thẻ trọn khung (cạnh viền), đủ sáng, không lóa, nét, đứng yên; 4 khung liên tiếp đạt → tự chụp → kiểm tra lại (Laplacian/lóa/độ sáng) → tự sang mặt sau. Không nút chụp; chọn từ thư viện vẫn có (dự phòng, kể cả máy không có camera). |
+| Khuôn mặt (app) | `DRAFT` | Camera trước + ML Kit Face Detection **trên máy** (chỉ dùng để hướng dẫn: vị trí, góc quay, mắt). Mặt giữa oval → chụp SELFIE và quay video; quay trái, quay phải, chớp mắt; xong tự dừng. Tối đa 15 s quay, 45 s cả phiên. |
+| Ngưỡng chụp | `AGENT_PROPOSED` | Gom một chỗ: `mobile/lib/features/onboarding/presentation/capture/capture_config.dart` (`CaptureConfig`: ảnh nét ≥ 60, lóa ≤ 8 %, sáng ≥ 55; khung live nét ≥ 40, chuyển động ≤ 12, phủ cạnh ≥ 50 %; 4 khung ổn định; yaw giữa ≤ 10°, quay ≥ 25°, mắt mở ≥ 0.7 / nhắm ≤ 0.25). Giá trị ban đầu — chỉnh trên máy thật (`OPEN`). |
+| Video liveness | `AGENT_PROPOSED` | `SELFIE_VIDEO` **bắt buộc với tài xế** (`PARTNER_REQUIRED_DOCUMENTS.DRIVER`; thiếu → 400 `missing`). `video/mp4`/`video/quicktime`, xác minh byte `ftyp`, tối đa `PARTNER_VIDEO_MAX_KB` = 5120 KB. App quay ở `ResolutionPreset.low`; video thiếu/quá lớn → báo và làm lại, không bao giờ nộp selfie thiếu video. Mục "SELFIE" bị từ chối → phải quay lại cả ảnh và video. Merchant/KYB không có bước khuôn mặt nên không đổi. |
+| Lưu trữ video | `AGENT_PROPOSED` | Setting Admin `KYC_VIDEO_RETENTION_DAYS` (mặc định 90, 7–3650). Job `kyc-media-retention` (mỗi `KYC_MEDIA_RETENTION_INTERVAL_MS`, mặc định 1 giờ) xoá **chỉ** `SELFIE_VIDEO` của hồ sơ `APPROVED/REJECTED` có `reviewedAt` quá hạn: gỡ khỏi `documents`, ghi `metadata.mediaPurgedAt`, nhật ký `KYC_MEDIA_PURGE` (`actor: SYSTEM_RETENTION`), rồi xoá file. Ảnh CCCD/selfie giữ làm bằng chứng. Hồ sơ bị từ chối đã quá hạn thì phải quay lại video khi nộp lại. |
+| Bộ lọc "Tất cả" | `AGENT_PROPOSED` | `status=ALL` = mọi trạng thái trừ nháp (`SUBMITTED/IN_REVIEW/APPROVED/REJECTED`). BFF trước đây chặn `IN_REVIEW` — đã sửa. |
+| Video trên Safari | `DRAFT` | BFF tài liệu KYC trả `Accept-Ranges: bytes`, hỗ trợ `Range` (206 + `Content-Range`, 416 khi ngoài phạm vi) và cho phép `video/mp4`/`video/quicktime` (trước đó BFF trả 502 cho video). |
+| Pháp lý eKYC Việt Nam | `OWNER_STATED` (t54u) | Chủ dự án cho biết phần pháp lý đã có. Tài liệu này không trích dẫn văn bản nào. |
+| Giấy tờ cửa hàng (t60u) | `AGENT_PROPOSED` | `PARTNER_REQUIRED_DOCUMENTS.MERCHANT` = `BUSINESS_LICENSE`, **`FOOD_SAFETY_CERT`** (giấy chứng nhận cơ sở đủ điều kiện ATTP), `REP_ID_FRONT`, `REP_ID_BACK`; thiếu → 400 `PARTNER_DOCUMENTS_REQUIRED`. `OPEN`: hộ nhỏ được miễn giấy ATTP (nộp bản cam kết) — chưa hỗ trợ, cần chủ dự án quyết. → t61u: đã hỗ trợ, xem dòng "Cam kết ATTP hộ nhỏ". |
+| Hạng bằng lái theo xe (t60u) | `AGENT_PROPOSED` | `metadata.licenseClass` phải phủ hạng xe: `MOTORBIKE` ← A1/A/A2; `CAR_4`/`CAR_7` ← B/B1/B2/C1/C/D1/D2/D/E. Khi bật KYC: nộp sai → 400 `PARTNER_LICENSE_CLASS_MISMATCH`; ops duyệt với hạng xe bằng lái không phủ → cùng mã. App: chip A1/A/B/C1/C/D (trước chỉ A1/A — lỗi với tài xế ô tô) + cảnh báo không khớp. |
+| Kiểm thử E2E thật (t60u) | `DRAFT` | DEV 2026-10-30: xe máy + ô tô 4 chỗ + cửa hàng nộp qua API, ops duyệt trên web (Playwright): nhận → xem đủ giấy tờ/video → duyệt; ô tô bị từ chối "bằng lái mờ" → nộp lại → duyệt. Có `partnerStatus` socket và `KYC_CLAIM/APPROVE/REJECT`. Lưu ý: local bật `PARTNER_ELIGIBILITY_BYPASS` nên hồ sơ chưa duyệt vẫn qua cổng trạng thái. |
+| OCR trên máy (t61u) | `OWNER_STATED` + `AGENT_PROPOSED` | Chủ dự án: "hệ thống mobile tự động OCR rồi trích xuất … mà k cần chạy AI". App dùng `google_mlkit_text_recognition` (Latin, **trên máy**, không gửi ảnh đi đâu). Bộ phân tích thuần Dart `mobile/lib/features/onboarding/domain/ocr/`: CCCD mặt trước (số 12 chữ số, họ tên, ngày sinh, giới tính, quê quán, nơi thường trú), mặt sau (ngày cấp + MRZ ICAO TD1 có kiểm tra số kiểm), GPLX (số, hạng — hạng cũ A2→A, B1/B2→B —, giá trị đến/"Không thời hạn"), cà vẹt (biển số), GPKD (mã số, tên hộ/doanh nghiệp), CCCD người đại diện (họ tên). Chỉ điền **ô đang trống** (không ghi đè chữ người dùng gõ); người dùng sửa được. Gửi thêm `gender`, `hometown`, `idIssueDate`, `licenseExpiry`, `businessLicenseNumber`, `businessName`, `representativeIdNumber` và `ocrPrefilled`/`ocrEdited` (danh sách key, cách nhau dấu phẩy). Admin hiện bảng "Thông tin đọc từ giấy tờ" với nhãn Đọc từ ảnh / Đã sửa tay / Nhập tay. Kích thước app: Android +~4 MB mỗi ABI (model gói sẵn), iOS `GoogleMLKit/TextRecognition` (iOS ≥ 15.5). |
+| Tự động duyệt (t61u) | `OWNER_STATED` + `AGENT_PROPOSED` | Chủ dự án: "nhớ có nút tự động duyệt kyc kyb". Setting Admin `KYC_AUTO_APPROVE_DRIVER` / `KYC_AUTO_APPROVE_MERCHANT` (mặc định **tắt**). Bật: hồ sơ nộp đủ điều kiện → `APPROVED` ngay, nhật ký `KYC_AUTO_APPROVE` (`metadata.actor = SYSTEM`), phát `partnerStatus`. Không đủ (giấy tờ chưa lưu, thiếu trường, CCCD không đủ 12 số, thiếu/không khớp hạng xe, thiếu ghim quán, thiết bị báo chụp lỗi) → giữ `SUBMITTED` cho ops, lý do ghi `metadata.autoApproveSkipped` và hiện trên Admin. Cập nhật có điều kiện: ops nhận cùng lúc → 409. |
+| Cam kết ATTP hộ nhỏ (t61u) | `AGENT_PROPOSED` | Theo thị trường (hộ kinh doanh nhỏ lẻ ký bản cam kết thay giấy chứng nhận): `registrationSubject = HOUSEHOLD` được nộp `FOOD_SAFETY_COMMITMENT` thay `FOOD_SAFETY_CERT` (`documentAlternatives`, `GET …/requirements?registrationSubject=`). App: công tắc "Dùng bản cam kết ATTP" ở bước giấy tờ khi chọn hộ kinh doanh. Công ty vẫn bắt buộc giấy chứng nhận. |
+| Lý do từ chối qua socket (t61u) | `AGENT_PROPOSED` | Sự kiện `partnerStatus` khi `REJECTED` mang `reason` (≤ 500 ký tự) và `sections`; app vẫn đọc lại REST làm nguồn chính. |
+| Ghi chú theo mục khi từ chối (t61u) | `AGENT_PROPOSED` | Web: quyết định "Từ chối" cũng cho chọn mục cần sửa (`issues` theo section + ghi chú), như "Yêu cầu bổ sung". |
+| Bỏ qua cổng đủ điều kiện (t61u) | `AGENT_PROPOSED` | `PARTNER_ELIGIBILITY_BYPASS` mặc định **false** ở mọi môi trường (trước: true ở local khi không đặt). Local muốn bỏ qua phải đặt `PARTNER_ELIGIBILITY_BYPASS=true` trong `.env`. |
+| Tài khoản thử (t61u) | `OWNER_STATED` | Giữ nguyên các tài khoản thử tạo ở t60u; chủ dự án sẽ tự sửa sau. |
+| Dữ liệu nhân sự mẫu (t61u) | `DRAFT` | DEV: `cd backend && npx tsx scripts/seed-staff-sample.ts` (9 người `[MẪU]`, email `sample.staff.*@sample.dealgo.local`, quyền OPS: 6 hoạt động, 2 chờ, 1 tạm khoá; không có mật khẩu nên không đăng nhập được; từ chối chạy với DB không phải local). Gỡ: `--remove`. |
+
+#### `DEC-PROD-071` — Giao hàng (chở hàng) dùng chung đường trả giá của Ride
+
+Status: `DRAFT` (t58u, 2026-10-30). Yêu cầu chủ dự án (t58u): "thêm tính năng chở hàng, tức là họ cần chở hàng chứ k phải chở người … cả mobile backend và website". Nghiên cứu: `docs/research/parcel-delivery-research.md`. Các mục `AGENT_PROPOSED` là đề xuất của agent, chủ dự án có thể đổi.
+
+| Mục | Status | Quy tắc |
+|---|---|---|
+| Kiến trúc | `AGENT_PROPOSED` | Một đơn giao hàng **là một Ride** (`serviceKind: PARCEL`) + một hàng `ride_parcels` (1–1 theo `rideId`). Dùng lại toàn bộ: báo giá theo `RideZoneTariff`, snapshot giá, khoảng trả giá ±% (`DEC-PROD-069`), đề nghị/chấp nhận của tài xế, Socket.IO (phòng `ride:`/`driver:`), huỷ, mã đón. Không có stack điều phối song song. |
+| Hạng kích thước | `AGENT_PROPOSED` | Setting Admin `PARCEL_SIZE_CLASSES` (JSON): S ≤5 kg 30×30×30 (phụ phí 0), M ≤30 kg 50×40×50 (0), L ≤50 kg 60×70×60 (+10.000đ), XL ≤100 kg 100×80×80 (+30.000đ, chỉ ô tô). Phụ phí cộng vào giá tham chiếu **trước** khi tính khoảng trả giá. |
+| Loại xe | `AGENT_PROPOSED` | Cờ `parcelEnabled` trên `ride_vehicle_classes`; báo giá chỉ trả loại xe vừa bật cờ vừa nằm trong `vehicleClassCodes` của hạng; không có → 400 `PARCEL_NO_VEHICLE`. |
+| Tài xế nhận hàng | `AGENT_PROPOSED` | Bật riêng `parcelEnabled` trên presence (độc lập với nhận khách). Đơn hàng chỉ hiện/đẩy cho tài xế đã bật; đề nghị khi chưa bật → `DRIVER_OFFLINE`. |
+| Thông tin đơn | `DRAFT` | Người gửi/nhận (tên, SĐT VN), hạng, cân nặng, ghi chú, ảnh hàng (tuỳ chọn), người trả (`SENDER`/`RECIPIENT`; người nhận trả → chỉ tiền mặt). SĐT bị ẩn với tài xế khi còn đang trả giá. |
+| Trạng thái | `AGENT_PROPOSED` | Ride `ACCEPTED → IN_TRIP → COMPLETED`; parcel `PENDING` (lấy hàng ghi `pickedUpAt`) `→ DELIVERED`, hoặc `PENDING → RETURNING` (giao thất bại, có lý do) `→ RETURNED` (ảnh trả lại, rồi hoàn tất chuyến). |
+| Bằng chứng | `AGENT_PROPOSED` | Ảnh lúc lấy hàng bắt buộc trước `startTrip`, ảnh giao bắt buộc trước `complete` (409 `PARCEL_PROOF_REQUIRED`). Mã người nhận 4 số: setting `PARCEL_RECIPIENT_CODE_REQUIRED` (mặc định `false`); sai tối đa 5 lần → `PARCEL_CODE_LOCKED`. |
+| API | `DRAFT` | `v1/parcels` (size-classes, quote, create, :id, pickup, deliver, fail, returned, photos/:kind) và ops `v1/ops/parcels` (quyền `rides.read`). Migration `20261220090000_ride_parcels` — đã áp dụng DEV DB (chủ dự án chạy, 2026-10-30); chưa áp prod. |
+| Thanh toán | `DRAFT` (t59u) | Như checkout: dùng lại các phương thức thanh toán hiện có; Admin bật/tắt từng phương thức cho dịch vụ `PARCEL` (cờ `services.PARCEL`). Người trả `SENDER` hoặc `RECIPIENT`; `RECIPIENT` → chỉ tiền mặt. |
+| Phí (Admin sửa, có lý do + nhật ký) | `DRAFT` (t59u) | `PARCEL_SERVICE_FEE_VND` (mặc định 0, 0–200.000) cộng vào giá tham chiếu cùng phụ phí S/M/L/XL (`PARCEL_SIZE_CLASSES`) **trước** khoảng trả giá; máy chủ tính trong quote và snapshot vào `ride_parcels.serviceFeeVnd`. Phí dịch vụ đi vào giá chuyến nên chịu hoa hồng như cước. `PARCEL_RETURN_FEE_VND` (mặc định 10.000, 0–500.000) snapshot vào `returnFeeVnd`, **chỉ** tính khi `FAILED/RETURNING → RETURNED`: ghi `customer_fee_charges` loại `PARCEL_RETURN` cùng giao dịch hoàn tất chuyến (trả cho tài xế, thu ở chuyến tiền mặt kế tiếp của người gửi). Giao thành công không tính. Migration `20261221090000_parcel_fees` — đã áp dụng DEV DB (2026-10-30); chưa áp prod. |
+| Loại xe | `DRAFT` (t59u) | Không có hạng xe tải/van. |
+| FOOD chỉ xe máy | `DRAFT` (t59u) | Đơn đồ ăn chỉ chào/cho nhận bởi tài xế `MOTORBIKE` đã duyệt; fail closed (thiếu hồ sơ, chưa duyệt, không có hạng, `CAR_4`/`CAR_7` → chặn). `PartnerEligibilityService.canDeliverFood` dùng ở danh sách READY (trả `[]`), claim (403 `FOOD_VEHICLE_NOT_ALLOWED`), push/socket fan-out (`readyAudience`), phòng `food:{id}` khi READY (`canRead`). |
+| COD tiền hàng | `OPEN` | Checkout hiện chỉ có `CASH` (intent `COD`) = trả **cước** bằng tiền mặt; không có thu hộ giá trị hàng → chưa làm. |
+| Xe tải/van, nhiều điểm, hẹn giờ, bảo hiểm | `OPEN` | Ngoài phạm vi bản này. |
 
 ### 5.2. Quyết định đã bị thay thế
 
@@ -881,6 +947,13 @@ Phân cấp này **tương thích** `BLOCKER-L0..L2` trong `scope-release-plan.m
 
 | Date | Version | Status | Changes |
 |---|---|---|---|
+| 2026-10-30 | 0.4.17 | `DRAFT` | `DEC-PROD-070` (t61u): OCR trên máy (ML Kit) điền sẵn form + `ocrPrefilled/ocrEdited` trên Admin; tự động duyệt KYC/KYB (`KYC_AUTO_APPROVE_DRIVER/MERCHANT`, tắt mặc định, audit `KYC_AUTO_APPROVE`); hộ nhỏ nộp cam kết ATTP; lý do + mục từ chối trong socket; ghi chú theo mục khi từ chối; bypass mặc định false; seed nhân sự mẫu DEV. |
+| 2026-10-30 | 0.4.16 | `DRAFT` | `DEC-PROD-070` (t60u): cửa hàng bắt buộc giấy ATTP (`FOOD_SAFETY_CERT`); hạng bằng lái phải phủ hạng xe (`PARTNER_LICENSE_CLASS_MISMATCH`); kết quả kiểm thử duyệt tay trên web. |
+| 2026-10-30 | 0.4.15 | `DRAFT` | `DEC-PROD-071` (t59u): thanh toán giao hàng như checkout (bật/tắt theo `PARCEL`, người nhận trả → tiền mặt), phí dịch vụ + phí hoàn hàng Admin sửa, không xe tải/van, FOOD chỉ xe máy (fail closed); COD tiền hàng vẫn `OPEN`. |
+| 2026-10-30 | 0.4.14 | `DRAFT` | Thêm `DEC-PROD-071` (t58u): giao hàng dùng chung Ride (hạng kích thước, ảnh bằng chứng, mã người nhận, hoàn hàng); COD/phí hoàn/xe tải `OPEN`. |
+| 2026-10-30 | 0.4.13 | `DRAFT` | `DEC-PROD-070` (t54u/t56u): bỏ toàn bộ AI phía máy chủ (chỉ hỗ trợ chụp trên máy); `SELFIE_VIDEO` bắt buộc với tài xế; lưu trữ video 90 ngày + job xoá; bộ lọc "Tất cả"; video Safari (Range); ngưỡng chụp gom một chỗ; pháp lý `OWNER_STATED`. |
+| 2026-10-30 | 0.4.12 | `DRAFT` | Thêm `DEC-PROD-070` (t52u/t53u): KYC/KYB nội bộ, `IN_REVIEW` + nhận hồ sơ, nhật ký ops, AI vision tắt mặc định và không tự quyết, chụp CCCD tự động, video liveness `SELFIE_VIDEO` tuỳ chọn. |
+| 2026-10-29 | 0.4.11 | `DRAFT` | Thêm `DEC-PROD-069` (t50u): khoảng trả giá ±% là setting Admin, chốt theo chuyến (`OWNER_CONFIRMED`); báo giá REST có `tariff`; giá theo khu vực (`ride_zone_tariffs`, mặc định rỗng); bỏ polling ở app. |
 | 2026-10-28 | 0.4.10 | `DRAFT` | `DEC-PROD-068`: ảnh bìa và giới thiệu quán do quán cài, giỏ hàng nổi trên các trang mua, thẻ ưu đãi dạng vé (`remainingUses`). |
 | 2026-10-27 | 0.4.9 | `DRAFT` | `DEC-PROD-068`: thêm giá gốc gạch ngang, đơn tối thiểu (`FOOD_MIN_ORDER_NOT_MET`), nhãn Bán chạy/Mới, Miễn phí giao, Khách khen, ETA giỏ hàng và ước tính tiết kiệm của ưu đãi. |
 | 2026-10-27 | 0.4.8 | `DRAFT` | Thêm `DEC-PROD-068`: ưu đãi do quán tạo (khách thấy trên thẻ/trang quán, dùng ngay), đánh giá quán có phân bố sao, lọc, quán trả lời, Ops ẩn; khoảng cách/ETA/phí trên thẻ, lọc bán kính, xếp theo điểm; tìm món trong quán. |

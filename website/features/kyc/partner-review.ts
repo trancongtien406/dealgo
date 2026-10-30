@@ -12,9 +12,13 @@ export const PARTNER_DOCUMENT_LABELS: Record<string, string> = {
   LICENSE: "Giấy phép lái xe",
   VEHICLE_REG: "Đăng ký xe",
   BUSINESS_LICENSE: "Giấy phép kinh doanh",
+  FOOD_SAFETY_CERT: "Giấy chứng nhận an toàn thực phẩm",
+  FOOD_SAFETY_COMMITMENT: "Bản cam kết bảo đảm ATTP (hộ kinh doanh)",
   REP_ID_FRONT: "CCCD người đại diện — mặt trước",
   REP_ID_BACK: "CCCD người đại diện — mặt sau",
   STOREFRONT: "Ảnh mặt tiền cửa hàng",
+  SELFIE_VIDEO: "Video khuôn mặt (liveness)",
+  VEHICLE_INSURANCE: "Bảo hiểm xe",
 };
 
 /** Sections ops can ask the applicant to fix (backend PARTNER_ISSUE_SECTIONS). */
@@ -50,13 +54,18 @@ export type PartnerDocument = {
   uploadedAt: string;
   hasFile: boolean;
   isImage: boolean;
+  /** t53u: the app's auto-recorded liveness clip. */
+  isVideo: boolean;
   /** Same-origin BFF URL; null when the ref has no stored bytes. */
   url: string | null;
 };
 
 export type PartnerIssue = { section: string; note: string };
 
-export function issueSectionLabel(role: NestPartnerRole, section: string): string {
+export function issueSectionLabel(
+  role: NestPartnerRole,
+  section: string,
+): string {
   return (
     PARTNER_ISSUE_SECTIONS[role].find((row) => row.value === section)?.label ??
     section
@@ -73,12 +82,15 @@ export function mapPartnerDocuments(
       index,
       kind: doc.kind ?? null,
       label:
-        (doc.kind && PARTNER_DOCUMENT_LABELS[doc.kind]) || doc.label || "Giấy tờ",
+        (doc.kind && PARTNER_DOCUMENT_LABELS[doc.kind]) ||
+        doc.label ||
+        "Giấy tờ",
       contentType: doc.contentType,
       sizeLabel: formatBytes(doc.sizeBytes),
       uploadedAt: formatOpsDate(doc.uploadedAt),
       hasFile,
       isImage: doc.contentType.startsWith("image/"),
+      isVideo: doc.contentType.startsWith("video/"),
       url: hasFile
         ? `/api/ops/partner-applications/${app.id}/documents/${index}`
         : null,
@@ -86,7 +98,9 @@ export function mapPartnerDocuments(
   });
 }
 
-export function mapPartnerIssues(app: NestPartnerApplicationView): PartnerIssue[] {
+export function mapPartnerIssues(
+  app: NestPartnerApplicationView,
+): PartnerIssue[] {
   return Array.isArray(app.issues)
     ? app.issues.filter(
         (issue): issue is PartnerIssue =>

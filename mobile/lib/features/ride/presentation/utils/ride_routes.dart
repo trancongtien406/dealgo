@@ -3,6 +3,8 @@ abstract final class RideRoutes {
   static const vehicle = '/customer/ride/vehicle';
   static const fareBreakdown = '/customer/ride/fare-detail';
   static const fare = '/customer/ride/fare';
+  static const parcel = '/customer/parcel';
+  static const parcelDetails = '/customer/parcel/details';
 
   static String offers(String rideId) {
     return '/customer/ride/offers/${Uri.encodeComponent(rideId)}';

@@ -20,6 +20,7 @@ export class PrismaDriverPresenceRepository implements DriverPresenceRepository 
       online: input.online,
       ...(input.rideEnabled !== undefined ? { rideEnabled: input.rideEnabled } : {}),
       ...(input.foodEnabled !== undefined ? { foodEnabled: input.foodEnabled } : {}),
+      ...(input.parcelEnabled !== undefined ? { parcelEnabled: input.parcelEnabled } : {}),
       ...(input.lat !== undefined ? { lat: input.lat } : {}),
       ...(input.lng !== undefined ? { lng: input.lng } : {}),
       ...(input.lat !== undefined && input.lng !== undefined ? { locationAt: new Date() } : {}),
@@ -32,6 +33,7 @@ export class PrismaDriverPresenceRepository implements DriverPresenceRepository 
         online: input.online,
         rideEnabled: input.rideEnabled ?? true,
         foodEnabled: input.foodEnabled ?? true,
+        parcelEnabled: input.parcelEnabled ?? false,
         lat: input.lat ?? null,
         lng: input.lng ?? null,
         locationAt: input.lat !== undefined && input.lng !== undefined ? new Date() : null,
@@ -81,7 +83,11 @@ export class PrismaDriverPresenceRepository implements DriverPresenceRepository 
     const rows = await this.db.driverPresence.findMany({
       where: {
         online: true,
-        ...(input.service === 'RIDE' ? { rideEnabled: true } : { foodEnabled: true }),
+        ...(input.service === 'RIDE'
+          ? { rideEnabled: true }
+          : input.service === 'FOOD'
+            ? { foodEnabled: true }
+            : { parcelEnabled: true }),
         locationAt: { gte: input.freshSince },
         lat: { gte: box.minLat, lte: box.maxLat },
         lng: { gte: box.minLng, lte: box.maxLng },
@@ -98,6 +104,7 @@ function toView(row: {
   online: boolean;
   rideEnabled: boolean;
   foodEnabled: boolean;
+  parcelEnabled?: boolean;
   lat: number | null;
   lng: number | null;
   locationAt: Date | null;
@@ -109,6 +116,7 @@ function toView(row: {
     online: row.online,
     rideEnabled: row.rideEnabled,
     foodEnabled: row.foodEnabled,
+    parcelEnabled: row.parcelEnabled ?? false,
     lat: row.lat,
     lng: row.lng,
     locationAt: row.locationAt,

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { OpsIcon } from "@/components/ui/ops-icons";
 import { useSystemErrorsCountQuery } from "@/features/system-errors/hooks";
+import { useOpsEventStream } from "@/features/ops-events/hooks";
 import { navBadgeLabel } from "@/features/system-errors/mappers";
 import { adminNavSections, isAdminNavCurrent, type AdminNavItem } from "@/lib/admin-nav-items";
 
@@ -21,6 +22,7 @@ export function AdminNav({
 }) {
   const pathname = usePathname();
   const systemErrors = useSystemErrorsCountQuery();
+  useOpsEventStream();
   /** Static badge, or the live unresolved Sentry count (hidden at 0). */
   const badgeOf = (item: Pick<AdminNavItem, "href" | "badge">) =>
     item.href === "/system-errors" ? navBadgeLabel(systemErrors.data?.count) : item.badge;

@@ -22,6 +22,10 @@ export function sniffUploadType(body: Buffer): string | null {
   if (body.length >= 5 && body.subarray(0, 5).toString('latin1') === '%PDF-') {
     return 'application/pdf';
   }
+  // ISO-BMFF: [size]['ftyp'][brand]. t52u liveness clips (iOS .mov / Android .mp4).
+  if (body.length >= 12 && body.subarray(4, 8).toString('latin1') === 'ftyp') {
+    return body.subarray(8, 12).toString('latin1') === 'qt  ' ? 'video/quicktime' : 'video/mp4';
+  }
   return null;
 }
 
@@ -30,4 +34,6 @@ export const UPLOAD_EXTENSIONS: Readonly<Record<string, string>> = {
   'image/png': 'png',
   'image/webp': 'webp',
   'application/pdf': 'pdf',
+  'video/mp4': 'mp4',
+  'video/quicktime': 'mov',
 };

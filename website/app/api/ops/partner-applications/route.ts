@@ -1,7 +1,14 @@
 import { fetchOpsUpstream } from "@/lib/api/ops-upstream";
 import { jsonFromOpsUpstream } from "@/lib/api/ops-bff-response";
 
-const ALLOWED_STATUS = new Set(["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"]);
+const ALLOWED_STATUS = new Set([
+  "DRAFT",
+  "SUBMITTED",
+  "IN_REVIEW",
+  "APPROVED",
+  "REJECTED",
+  "ALL",
+]);
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

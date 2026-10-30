@@ -14,6 +14,7 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_money.dart';
 import '../../../food/domain/entities/food_models.dart';
+import '../../../parcel/presentation/widgets/parcel_labels.dart';
 import '../../../ride/domain/entities/ride_models.dart';
 import '../../../ride/presentation/utils/ride_vehicle_label.dart';
 import '../../../ride/presentation/widgets/ride_negotiation_ui.dart'
@@ -398,10 +399,21 @@ class _RideJobCard extends StatelessWidget {
                   label: rideVehicleClassLabel(l10n, ride.vehicleClassCode),
                   tone: DriverChipTone.neutral,
                 ),
-                DriverChip(
-                  label: AppLocalizations.of(context).driverRideChip,
-                  tone: DriverChipTone.green,
-                ),
+                if (ride.isParcel)
+                  DriverChip(
+                    key: Key('driver-job-parcel-${ride.id}'),
+                    label: parcelBadgeText(
+                      l10n,
+                      ride.parcelSizeClass,
+                      ride.parcelWeightKg,
+                    ),
+                    tone: DriverChipTone.warning,
+                  )
+                else
+                  DriverChip(
+                    label: AppLocalizations.of(context).driverRideChip,
+                    tone: DriverChipTone.green,
+                  ),
               ],
             ),
             const SizedBox(height: DealGoSpacing.s12),

@@ -6,3 +6,4 @@ export * from './payment-gateway.options.js';
 export * from './payment-method-registry.service.js';
 export * from './payment-gateway.service.js';
 export * from './payment-checkout.dto.js';
+export * from './payment-status-bus.js';

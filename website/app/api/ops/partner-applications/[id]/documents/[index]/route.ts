@@ -6,7 +6,7 @@ import { fetchOpsUpstreamBinary } from "@/lib/api/ops-upstream";
 type RouteContext = { params: Promise<{ id: string; index: string }> };
 
 /** Streams one stored KYC/KYB document for review (ops session only). */
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   const { id, index } = await context.params;
   if (!isUuid(id) || !/^\d{1,2}$/.test(index)) {
     return NextResponse.json(
@@ -16,5 +16,7 @@ export async function GET(_request: Request, context: RouteContext) {
   }
   return binaryFromOpsUpstream(
     await fetchOpsUpstreamBinary(`/v1/ops/partner-applications/${id}/documents/${index}`),
+    // t54u: honour Range so Safari can play the liveness clip.
+    request.headers.get("range"),
   );
 }

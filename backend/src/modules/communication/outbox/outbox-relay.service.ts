@@ -136,7 +136,13 @@ export class OutboxRelayService {
   }
 
   private emitPartnerStatus(row: OutboxPendingRow, now: Date): void {
-    const payload = row.payload as { status?: unknown; userId?: unknown; role?: unknown };
+    const payload = row.payload as {
+      status?: unknown;
+      userId?: unknown;
+      role?: unknown;
+      reason?: unknown;
+      sections?: unknown;
+    };
     if (typeof payload?.userId !== 'string' || typeof payload.status !== 'string') {
       this.logger.warn({ msg: 'outbox.partner_status_invalid', eventKey: row.eventKey });
       return;
@@ -151,6 +157,10 @@ export class OutboxRelayService {
       userId: payload.userId,
       role: typeof payload.role === 'string' ? payload.role : '',
       status: payload.status,
+      ...(typeof payload.reason === 'string' ? { reason: payload.reason } : {}),
+      ...(Array.isArray(payload.sections)
+        ? { sections: payload.sections.filter((s): s is string => typeof s === 'string') }
+        : {}),
       occurredAt: now.toISOString(),
     });
   }

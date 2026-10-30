@@ -216,15 +216,15 @@ class _RideFarePageState extends State<_RideFareView> {
       return;
     }
     final current = _amount ?? _quote.referenceFareVnd;
-    final next = (current + delta).clamp(_quote.minFareVnd, _quote.maxFareVnd);
+    final next = (current + delta).clamp(_quote.minBidVnd, _quote.maxBidVnd);
     _fare.text = '$next';
     setState(() => _message = null);
   }
 
   String _rangeLabel(BuildContext context) => AppLocalizations.of(context)
       .rideFareRange(
-        formatRideVnd(_quote.minFareVnd),
-        formatRideVnd(_quote.maxFareVnd),
+        formatRideVnd(_quote.minBidVnd),
+        formatRideVnd(_quote.maxBidVnd),
       );
 
   Future<void> _submit() async {

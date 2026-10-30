@@ -185,6 +185,9 @@ export type PartnerStatusEventPayload = {
   userId: string;
   role: string;
   status: string;
+  /** t61u: REJECTED only — the reviewer's reason and flagged sections. */
+  reason?: string;
+  sections?: string[];
   occurredAt: string;
 };
 
@@ -240,4 +243,19 @@ export type ChatMessageEventPayload = {
     body: string;
     createdAt: string;
   };
+};
+
+/**
+ * `paymentStatus` hint on the job customer's private `user:` room when a checkout intent
+ * changes state (IPN, reconcile, refund). The payment page re-GETs
+ * `GET /v1/payments/checkout/...` status; REST stays the source of truth (t50u, no polling).
+ */
+export const PAYMENT_STATUS_EVENT = 'paymentStatus';
+
+export type PaymentStatusEventPayload = {
+  entityType: 'RIDE' | 'FOOD_ORDER';
+  entityId: string;
+  intentId: string;
+  status: string;
+  occurredAt: string;
 };

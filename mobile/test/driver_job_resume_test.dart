@@ -182,7 +182,7 @@ void main() {
     },
   );
   test(
-    'open app picks up a job ASSIGNED later (watch + foreground recheck)',
+    'open app picks up a job ASSIGNED later on foreground recheck (no timer)',
     () {
       fakeAsync((async) {
         final source = FakeDriverActiveJobSource();
@@ -196,7 +196,6 @@ void main() {
             location = r;
           },
           currentLocation: () => location,
-          watchInterval: const Duration(seconds: 15),
         );
         resumer.onSignedIn(
           userId: 'd1',
@@ -207,7 +206,10 @@ void main() {
         expect(routes, isEmpty);
 
         source.job = const DriverActiveJob(kind: 'FOOD_ORDER', id: 'o9');
-        async.elapse(const Duration(seconds: 16));
+        async.elapse(const Duration(seconds: 60));
+        expect(routes, isEmpty, reason: 't50u: no watch timer');
+        unawaited(resumer.recheck());
+        async.flushMicrotasks();
         expect(routes, [DriverRoutes.food('o9')]);
 
         // Already on a job screen: no re-navigation.

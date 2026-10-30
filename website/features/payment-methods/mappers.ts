@@ -5,7 +5,7 @@ import {
   type PaymentMethodPatch,
 } from "@/features/payment-methods/types";
 
-export const SERVICE_LABELS = { BIKE: "Xe máy", CAR: "Ô tô", FOOD: "Đồ ăn" } as const;
+export const SERVICE_LABELS = { BIKE: "Xe máy", CAR: "Ô tô", FOOD: "Đồ ăn", PARCEL: "Giao hàng" } as const;
 
 export const GROUP_LABELS: Record<OpsPaymentMethod["group"], string> = {
   WALLET: "Ví điện tử",

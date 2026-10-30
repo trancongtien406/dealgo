@@ -11,15 +11,23 @@ import '../../ride/presentation/cubit/ride_destination.dart';
 /// C001 service tiles: one Ride entry (class chosen in booking flow) + Food.
 /// DG-DEC-VEH-001: MOTORBIKE + CAR live under the same Ride booking path.
 class ServiceRow extends StatelessWidget {
-  const ServiceRow({required this.onRide, required this.onFood, super.key});
+  const ServiceRow({
+    required this.onRide,
+    required this.onFood,
+    this.onParcel,
+    super.key,
+  });
 
   final VoidCallback onRide;
   final VoidCallback onFood;
 
+  /// DEC-PROD-071 goods delivery ("Giao hàng"); hidden when null.
+  final VoidCallback? onParcel;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return IntrinsicHeight(
+    final row = IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -49,6 +57,73 @@ class ServiceRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+    final parcel = onParcel;
+    if (parcel == null) return row;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        row,
+        const SizedBox(height: DealGoSpacing.s12),
+        _ParcelStrip(onTap: parcel),
+      ],
+    );
+  }
+}
+
+class _ParcelStrip extends StatelessWidget {
+  const _ParcelStrip({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    return Material(
+      key: const Key('home-service-parcel'),
+      color: DealGoColors.lavender,
+      borderRadius: BorderRadius.circular(DealGoRadius.card),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(DealGoSpacing.s12),
+          child: Row(
+            children: [
+              const _IconChip(
+                background: DealGoColors.primary,
+                icon: DealGoIcons.package,
+                foreground: Colors.white,
+              ),
+              const SizedBox(width: DealGoSpacing.s12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.homeServiceParcel,
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+                    Text(
+                      l10n.homeServiceParcelSub,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: DealGoColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const _ArrowChip(),
+            ],
+          ),
+        ),
       ),
     );
   }

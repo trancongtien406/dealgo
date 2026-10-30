@@ -1,4 +1,5 @@
 import type { PlatformSettingKey } from './platform-settings.catalog.js';
+import { PARCEL_SIZE_CLASSES_DEFAULT } from './parcel-size-classes.js';
 
 /**
  * Seed values for settings that have no env bootstrap. They are inserted once (insert-if-absent)
@@ -37,6 +38,11 @@ export const PLATFORM_SETTING_SEED_DEFAULTS: Readonly<Partial<Record<PlatformSet
     RIDE_PICKUP_CODE_MAX_ATTEMPTS: '5',
     // Code confirmation is off by default (2026-10-29); admins can turn it back on.
     RIDE_PICKUP_CODE_REQUIRED: 'false',
+    // DEC-PROD-071 (DRAFT): parcel size classes and the optional recipient code.
+    PARCEL_SIZE_CLASSES: JSON.stringify(PARCEL_SIZE_CLASSES_DEFAULT),
+    PARCEL_RECIPIENT_CODE_REQUIRED: 'false',
+    PARCEL_SERVICE_FEE_VND: '0',
+    PARCEL_RETURN_FEE_VND: '10000',
     // DEC-PROD-036 rev 2026-10-29: delivery and handover codes are both opt-in.
     FOOD_DELIVERY_CODE_REQUIRED: 'false',
     PAYMENT_METHOD_REGISTRY: '{"methods":{}}',
@@ -56,12 +62,17 @@ export const PLATFORM_SETTING_SEED_DEFAULTS: Readonly<Partial<Record<PlatformSet
     AUTH_PASSWORD_RESET_MAX_PER_HOUR: '5',
     // DEC-PROD-056 (ASSUMED): 90 days covers the dispute/refund window; admin-editable.
     CHAT_RETENTION_DAYS: '90',
+    KYC_VIDEO_RETENTION_DAYS: '90',
+    // DEC-PROD-070 (t61u): system auto-approval of complete KYC/KYB — off = manual review.
+    KYC_AUTO_APPROVE_DRIVER: 'false',
+    KYC_AUTO_APPROVE_MERCHANT: 'false',
     // DEC-PROD-052: review login stays off until an admin enables it for a review cycle.
     APP_REVIEW_LOGIN_ENABLED: 'false',
     // (DEC-PROD-059) Dispatch lifecycle, fees, zones, debt.
     RIDE_REQUEST_WINDOW_SECONDS: '300',
-    RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE: '80',
+    RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE: '70',
     RIDE_COUNTER_MAX_PERCENT_OF_OFFER: '150',
+    RIDE_BID_CEILING_PERCENT_OF_REFERENCE: '130',
     RIDE_MAX_OFFER_EDITS_PER_DRIVER: '2',
     RIDE_ASSIGNED_START_TIMEOUT_MINUTES: '5',
     RIDE_EN_ROUTE_TIMEOUT_MINUTES: '30',

@@ -109,6 +109,8 @@ Cột "Tham chiếu" trỏ tới quyết định (`DEC-PROD-*`) hoặc vấn đ�
 | `PAYMENT_METHOD_REGISTRY` | mặc định chỉ tiền mặt | Admin › Cài đặt › Thanh toán | Bật/tắt từng phương thức theo BIKE/CAR/FOOD, thứ tự, lý do ẩn. Thay thế `PAYMENT_METHODS_ENABLED` (đã gỡ, migration `20261128090200` xoá giá trị cũ). | OPEN-002 |
 | `ONBOARDING_DRIVER_KYC_REQUIRED` | `true` | true/false | Tắt: app bỏ bước nộp giấy tờ, tài xế vẫn chọn hạng xe và chờ Admin duyệt. | DEC-PROD-048 |
 | `ONBOARDING_MERCHANT_KYB_REQUIRED` | `true` | true/false | Tắt: app bỏ bước nộp giấy tờ, cửa hàng vẫn chờ Admin duyệt. | DEC-PROD-048 |
+| `KYC_AUTO_APPROVE_DRIVER` | `false` | true/false | Bật: hồ sơ tài xế nộp đủ điều kiện được duyệt ngay (audit `KYC_AUTO_APPROVE`, actor SYSTEM); không đủ → chờ ops, lý do trong `autoApproveSkipped`. | DEC-PROD-070 (t61u) |
+| `KYC_AUTO_APPROVE_MERCHANT` | `false` | true/false | Như trên cho hồ sơ cửa hàng (KYB). | DEC-PROD-070 (t61u) |
 | `MENU_ITEM_MAX_IMAGES` | `4` | 1–8 | Số ảnh tối đa của một món. | DEC-PROD-042 |
 | `AUTH_PASSWORD_RESET_MAX_PER_HOUR` | `5` | 1–20 | Số yêu cầu đặt lại mật khẩu mỗi email mỗi giờ (ngoài giới hạn theo IP). | DEC-PROD-045, OPEN-020 |
 | `CHAT_RETENTION_DAYS` | `90` | 7–3650 | Worker xoá tin nhắn chat cũ hơn số ngày này. | DEC-PROD-056 |
@@ -123,6 +125,8 @@ Cột "Tham chiếu" trỏ tới quyết định (`DEC-PROD-*`) hoặc vấn đ�
 | `RIDE_REQUEST_PUSH_ENABLED` | `true` | true/false | Gửi push chuyến mới cho tài xế gần đó (để app ở nền/tắt vẫn nhận được). | DEC-PROD-061 |
 | `NEW_JOB_CUSTOM_SOUND_ENABLED` | `true` | true/false | Âm báo giọng nói khi có cuốc/đơn mới (tài xế, quán). Tắt = âm mặc định của máy. | DEC-PROD-061 |
 | `RIDE_REQUEST_PUSH_MAX_DRIVERS` | `30` | 0–200 | Số tài xế gần nhất nhận push mỗi chuyến; 0 = không gửi. | DEC-PROD-061 |
+| `PARCEL_SERVICE_FEE_VND` | `0` | 0–200000 | Giao hàng: phí dịch vụ cộng vào giá tham chiếu (cùng phụ phí S/M/L/XL trong `PARCEL_SIZE_CLASSES`) trước khoảng trả giá; snapshot vào đơn. | DEC-PROD-071 |
+| `PARCEL_RETURN_FEE_VND` | `10000` | 0–500000 | Giao hàng: phí hoàn hàng, chỉ tính khi đơn giao thất bại → `RETURNED` (phí khách `PARCEL_RETURN`). | DEC-PROD-071 |
 | `RIDE_REPOST_RAISE_HINT_PERCENT` | `10` | 0–50 | Mức tăng giá app gợi ý khi khách đăng lại chuyến hết hạn. | DEC-PROD-061 |
 
 ### Tab "Hỗ trợ khách hàng" (11)

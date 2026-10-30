@@ -79,12 +79,11 @@ export function useSystemErrorQuery(id: string) {
   });
 }
 
-/** Unresolved count for the nav badge; silent (no retry) when forbidden or unconfigured. */
+/** Unresolved count for the nav badge (live via the ops SSE stream, no polling); silent (no retry) when forbidden or unconfigured. */
 export function useSystemErrorsCountQuery() {
   return useQuery({
     queryKey: systemErrorsQueryKeys.count,
     queryFn: fetchUnresolvedCount,
-    refetchInterval: 120_000,
     staleTime: 60_000,
     retry: false,
   });

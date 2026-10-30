@@ -222,8 +222,11 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
   }
 
   Future<void> _finish() async {
+    if (_busy) return;
+    setState(() => _busy = true);
     final router = GoRouter.of(context);
-    await context.read<AuthCubit>().signOut();
+    await context.read<AuthCubit>().signOut(revokeRemote: false);
+    if (!mounted) return;
     router.go(AuthRoutes.login);
   }
 
@@ -232,6 +235,11 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
     final l10n = AppLocalizations.of(context);
     return PopScope(
       canPop: _phase != _Phase.done,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _phase == _Phase.done) {
+          _finish();
+        }
+      },
       child: Scaffold(
         backgroundColor: DealGoColors.card,
         appBar: DealGoAppHeader(

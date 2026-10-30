@@ -4,17 +4,20 @@ import { MemoryPartnerRepository } from './partner.repository.js';
 import { MemoryIdentityRepository } from '../identity/identity.repository.js';
 import {
   TINY_JPEG_BASE64,
+  TINY_MP4_BASE64,
   TINY_PDF_BASE64,
   createTestDocumentStore,
 } from '../../platform/storage/testing.js';
 
 const jpeg = (kind: string) => ({ kind, contentType: 'image/jpeg', contentBase64: TINY_JPEG_BASE64 });
 
-const DRIVER_DOCS = ['ID_FRONT', 'ID_BACK', 'SELFIE', 'LICENSE', 'VEHICLE_REG'].map((kind) =>
-  jpeg(kind),
-) as never[];
+const DRIVER_DOCS = [
+  ...['ID_FRONT', 'ID_BACK', 'SELFIE', 'LICENSE', 'VEHICLE_REG'].map((kind) => jpeg(kind)),
+  { kind: 'SELFIE_VIDEO', contentType: 'video/mp4', contentBase64: TINY_MP4_BASE64 },
+] as never[];
 const MERCHANT_DOCS = [
   { kind: 'BUSINESS_LICENSE', contentType: 'application/pdf', contentBase64: TINY_PDF_BASE64 },
+  jpeg('FOOD_SAFETY_CERT'),
   jpeg('REP_ID_FRONT'),
   jpeg('REP_ID_BACK'),
 ] as never[];
@@ -39,7 +42,7 @@ describe('partner status push', () => {
     const { partners, user, service } = await setup();
     const driver = await service.submit(user.id, {
       role: 'DRIVER',
-      metadata: { vehicleClassCode: 'MOTORBIKE', vehiclePlate: '51F-12345' },
+      metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1', vehiclePlate: '51F-12345' },
       documents: DRIVER_DOCS,
     });
     await service.approve(driver.id, 'ops');

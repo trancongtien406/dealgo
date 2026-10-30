@@ -5,6 +5,7 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/partner_application.dart';
 import '../../domain/entities/partner_documents.dart';
+import '../capture/smart_capture.dart';
 import '../cubit/partner_document_draft.dart';
 import '../document_image_source.dart';
 import 'onboarding_widgets.dart';
@@ -18,9 +19,13 @@ String partnerDocumentLabel(AppLocalizations l10n, String kind) {
     PartnerDocumentKind.vehicleReg => l10n.partnerKindVehicleReg,
     PartnerDocumentKind.vehicleInsurance => l10n.partnerKindVehicleInsurance,
     PartnerDocumentKind.businessLicense => l10n.partnerKindBusinessLicense,
+    PartnerDocumentKind.foodSafetyCert => l10n.partnerKindFoodSafetyCert,
+    PartnerDocumentKind.foodSafetyCommitment =>
+      l10n.partnerKindFoodSafetyCommitment,
     PartnerDocumentKind.repIdFront => l10n.partnerKindRepIdFront,
     PartnerDocumentKind.repIdBack => l10n.partnerKindRepIdBack,
     PartnerDocumentKind.storefront => l10n.partnerKindStorefront,
+    PartnerDocumentKind.selfieVideo => l10n.partnerDocSelfieVideo,
     _ => kind,
   };
 }
@@ -75,6 +80,7 @@ class PartnerDocumentSlot extends StatelessWidget {
     required this.onRemove,
     this.optional = false,
     this.frontCamera = false,
+    this.onPickedOther,
     super.key,
   });
 
@@ -86,10 +92,25 @@ class PartnerDocumentSlot extends StatelessWidget {
   final bool optional;
   final bool frontCamera;
 
+  /// t53u: extra kinds one auto-capture produced (ID back, face clip).
+  final void Function(String kind, PickedDocumentImage image)? onPickedOther;
+
   Future<void> _pick(BuildContext context, {required bool camera}) async {
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.maybeOf(context);
     try {
+      final smart = camera ? maybeSmartCaptureLauncher(context) : null;
+      if (smart != null && smart.supports(kind)) {
+        final images = await smart.capture(context, kind: kind) ?? const {};
+        for (final MapEntry(key: other, value: image) in images.entries) {
+          if (other == kind) {
+            onPicked(image);
+          } else {
+            onPickedOther?.call(other, image);
+          }
+        }
+        return;
+      }
       final image = await source.pick(camera: camera, front: frontCamera);
       if (image != null) {
         onPicked(image);

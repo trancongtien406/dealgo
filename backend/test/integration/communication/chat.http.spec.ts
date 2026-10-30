@@ -1,3 +1,4 @@
+import { seedMotorbikeOnDriverGrant } from '../food-order/motorbike-drivers.js';
 import { INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
@@ -101,6 +102,7 @@ describe('transaction chat http', () => {
     app.useGlobalFilters(new HttpExceptionFilter());
     app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
     await app.init();
+    seedMotorbikeOnDriverGrant(identity, app);
   });
 
   afterAll(async () => {

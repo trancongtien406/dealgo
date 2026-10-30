@@ -325,4 +325,15 @@ void main() {
     await tester.tap(find.byKey(const Key('fix-LICENSE')));
     expect(fixed, 'LICENSE');
   });
+
+  test('t54u: the liveness clip is required and re-taken with the selfie', () {
+    expect(
+      PartnerDocumentKind.driverRequired,
+      contains(PartnerDocumentKind.selfieVideo),
+    );
+    expect(flaggedDocumentKinds(['SELFIE']), {
+      PartnerDocumentKind.selfie,
+      PartnerDocumentKind.selfieVideo,
+    });
+  });
 }

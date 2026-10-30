@@ -475,6 +475,9 @@ const RELAYED_BINARY_TYPES = new Set([
   "image/png",
   "image/webp",
   "application/pdf",
+  // t54u: KYC liveness clip (SELFIE_VIDEO); without these the admin <video> got a 502.
+  "video/mp4",
+  "video/quicktime",
 ]);
 
 /**
@@ -530,6 +533,69 @@ export async function fetchOpsUpstreamBinary(path: string): Promise<OpsBinaryRes
       contentType,
       disposition: upstream.headers.get("content-disposition"),
     };
+  } catch {
+    return { ok: false, status: 502, message: "Không thể kết nối máy chủ. Thử lại." };
+  }
+}
+
+export type OpsStreamResult =
+  | { ok: true; upstream: Response }
+  | { ok: false; status: number; message: string };
+
+/**
+ * Server-only long-lived GET (SSE) of a Nest `/v1/ops/*` stream. Same cookie bearer and
+ * single refresh as fetchOpsUpstream, but no timeout: the stream lives until `signal`
+ * aborts (browser closed the EventSource) or Nest ends it.
+ */
+export async function openOpsUpstreamStream(
+  path: string,
+  signal: AbortSignal,
+): Promise<OpsStreamResult> {
+  const baseUrl = nestApiBaseUrl();
+  if (!baseUrl) {
+    return { ok: false, status: 500, message: "Cấu hình API không hợp lệ." };
+  }
+  const jar = await cookies();
+  const url = new URL(path.replace(/^\//, ""), `${baseUrl}/`);
+  const send = (accessToken: string) =>
+    fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "text/event-stream",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+      redirect: "error",
+      signal,
+    });
+  try {
+    let token = jar.get(OPS_ACCESS_COOKIE)?.value;
+    if (!token) {
+      token = (await refreshFromCookie(baseUrl, jar))?.accessToken;
+    }
+    if (!token) {
+      return { ok: false, status: 401, message: "Chưa đăng nhập." };
+    }
+    let upstream = await send(token);
+    if (upstream.status === 401) {
+      await upstream.body?.cancel().catch(() => undefined);
+      const refreshed = await refreshFromCookie(baseUrl, jar);
+      if (refreshed) {
+        upstream = await send(refreshed.accessToken);
+      }
+    }
+    const contentType = upstream.headers.get("content-type") ?? "";
+    if (!upstream.ok || !contentType.startsWith("text/event-stream") || !upstream.body) {
+      const payload: unknown = await upstream.json().catch(() => null);
+      return {
+        ok: false,
+        status: upstream.ok ? 502 : upstream.status,
+        message: upstream.ok
+          ? "Phản hồi máy chủ không hợp lệ."
+          : publicUpstreamMessage(upstream.status, payload),
+      };
+    }
+    return { ok: true, upstream };
   } catch {
     return { ok: false, status: 502, message: "Không thể kết nối máy chủ. Thử lại." };
   }

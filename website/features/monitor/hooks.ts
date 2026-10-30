@@ -13,7 +13,6 @@ export function useMonitorQuery() {
     queryKey: monitorQueryKeys.snapshot(),
     queryFn: () => fetchMonitorSnapshot(),
     retry: 1,
-    refetchInterval: 30_000,
     refetchOnMount: "always",
     staleTime: 0,
   });

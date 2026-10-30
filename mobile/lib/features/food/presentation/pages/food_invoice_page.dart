@@ -131,21 +131,11 @@ class _FoodInvoiceView extends StatelessWidget {
                               style: textTheme.titleMedium,
                             ),
                             const SizedBox(height: DealGoSpacing.s8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    '${l10n.foodInvoiceOrderId} #$orderId',
-                                    style: textTheme.bodyMedium?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                                DealGoChip(
-                                  label: l10n.foodInvoiceSyncChip,
-                                  tone: DealGoChipTone.neutral,
-                                ),
-                              ],
+                            Text(
+                              '${l10n.foodInvoiceOrderId} #$orderId',
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                             const SizedBox(height: DealGoSpacing.s8),
                             DealGoChip(

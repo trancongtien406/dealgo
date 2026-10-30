@@ -18,6 +18,7 @@ class DioPresenceRemoteDataSource implements PresenceRemoteDataSource {
     double? lng,
     bool? rideEnabled,
     bool? foodEnabled,
+    bool? parcelEnabled,
   }) async {
     try {
       await _dio.post<Object?>(
@@ -28,6 +29,7 @@ class DioPresenceRemoteDataSource implements PresenceRemoteDataSource {
           'lng': ?lng,
           'rideEnabled': ?rideEnabled,
           'foodEnabled': ?foodEnabled,
+          'parcelEnabled': ?parcelEnabled,
         },
         options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       );

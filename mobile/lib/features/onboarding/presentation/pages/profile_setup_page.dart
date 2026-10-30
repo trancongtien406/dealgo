@@ -110,9 +110,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage>
     } catch (error) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(apiErrorText(l10n, error))),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(apiErrorText(l10n, error))));
     }
   }
 

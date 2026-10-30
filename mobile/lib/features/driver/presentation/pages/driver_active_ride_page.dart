@@ -11,6 +11,7 @@ import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/network/request_failure.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../parcel/presentation/widgets/parcel_trip_panel.dart';
 import '../../../ride/domain/entities/ride_models.dart';
 import '../../../ride/domain/stops/ride_stops_client.dart';
 import '../../../ride/presentation/widgets/ride_widgets.dart' show RideStopList;
@@ -430,70 +431,80 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
       DriverRidePhase.onTrip => l10n.driverActiveOnTripTitle,
       DriverRidePhase.complete => l10n.driverActiveCompleteTitle,
     };
-    final footer = switch (_phase) {
-      DriverRidePhase.navigatePickup => DriverFooter(
-        secondaryLabel: canCancel
-            ? l10n.driverCancelRide
-            : l10n.driverActiveReportIssue,
-        secondaryKey: canCancel ? const Key('driver-cancel-ride') : null,
-        primaryLabel: l10n.driverActiveArrivedCta,
-        primaryKey: const Key('driver-active-arrived'),
-        primaryLoading: actionBusy,
-        primaryEnabled: !actionBusy,
-        onSecondary: canCancel
-            ? _driverCancel
-            : () => context.push(DriverRoutes.failed(widget.rideId)),
-        onPrimary: () => _advance([
-          if (!_enRoute) RideDriverAction.enRoute,
-          RideDriverAction.arrived,
-        ], DriverRidePhase.arrived),
-      ),
-      DriverRidePhase.arrived => DriverFooter(
-        secondaryLabel: canCancel
-            ? l10n.driverCancelRide
-            : l10n.driverActiveReportIssue,
-        secondaryKey: canCancel ? const Key('driver-cancel-ride') : null,
-        primaryLabel: l10n.driverStartTrip,
-        primaryKey: const Key('driver-active-open-otp'),
-        onSecondary: canCancel
-            ? _driverCancel
-            : () => context.push(DriverRoutes.failed(widget.rideId)),
-        onPrimary: _startTrip,
-      ),
-      DriverRidePhase.onTrip when _currentStop != null => DriverFooter(
-        secondaryLabel: l10n.driverActiveReportIssue,
-        primaryLabel: _currentStop!.state == RideStopState.pending
-            ? l10n.driverStopArrive(_currentStop!.seq)
-            : l10n.driverStopDepart(_currentStop!.seq),
-        primaryKey: Key(
-          _currentStop!.state == RideStopState.pending
-              ? 'driver-stop-arrive-${_currentStop!.seq}'
-              : 'driver-stop-depart-${_currentStop!.seq}',
-        ),
-        primaryLoading: actionBusy,
-        primaryEnabled: !actionBusy,
-        onSecondary: () => context.push(DriverRoutes.failed(widget.rideId)),
-        onPrimary: () => _stopAction(_currentStop!),
-      ),
-      DriverRidePhase.onTrip => DriverFooter(
-        secondaryLabel: l10n.driverActiveReportIssue,
-        primaryLabel: l10n.driverActiveCompleteCta,
-        primaryKey: const Key('driver-active-complete'),
-        primaryLoading: actionBusy,
-        primaryEnabled: !actionBusy,
-        onSecondary: () => context.push(DriverRoutes.failed(widget.rideId)),
-        onPrimary: () => _advance(const [
-          RideDriverAction.complete,
-        ], DriverRidePhase.complete),
-      ),
-      DriverRidePhase.complete => DriverFooter(
-        secondaryLabel: l10n.driverBackToJobs,
-        primaryLabel: l10n.driverOpenCompletedSample,
-        primaryKey: const Key('driver-active-done'),
-        onSecondary: () => context.go('/driver/jobs'),
-        onPrimary: () => context.push(DriverRoutes.completed(widget.rideId)),
-      ),
-    };
+    // DEC-PROD-071: parcel pickup/deliver/fail live in ParcelTripPanel
+    // (photo + recipient code), not the ride OTP / complete footer.
+    final parcelPanel =
+        ride.isParcel &&
+        (_phase == DriverRidePhase.arrived || _phase == DriverRidePhase.onTrip);
+    final Widget? footer = parcelPanel
+        ? null
+        : switch (_phase) {
+            DriverRidePhase.navigatePickup => DriverFooter(
+              secondaryLabel: canCancel
+                  ? l10n.driverCancelRide
+                  : l10n.driverActiveReportIssue,
+              secondaryKey: canCancel ? const Key('driver-cancel-ride') : null,
+              primaryLabel: l10n.driverActiveArrivedCta,
+              primaryKey: const Key('driver-active-arrived'),
+              primaryLoading: actionBusy,
+              primaryEnabled: !actionBusy,
+              onSecondary: canCancel
+                  ? _driverCancel
+                  : () => context.push(DriverRoutes.failed(widget.rideId)),
+              onPrimary: () => _advance([
+                if (!_enRoute) RideDriverAction.enRoute,
+                RideDriverAction.arrived,
+              ], DriverRidePhase.arrived),
+            ),
+            DriverRidePhase.arrived => DriverFooter(
+              secondaryLabel: canCancel
+                  ? l10n.driverCancelRide
+                  : l10n.driverActiveReportIssue,
+              secondaryKey: canCancel ? const Key('driver-cancel-ride') : null,
+              primaryLabel: l10n.driverStartTrip,
+              primaryKey: const Key('driver-active-open-otp'),
+              onSecondary: canCancel
+                  ? _driverCancel
+                  : () => context.push(DriverRoutes.failed(widget.rideId)),
+              onPrimary: _startTrip,
+            ),
+            DriverRidePhase.onTrip when _currentStop != null => DriverFooter(
+              secondaryLabel: l10n.driverActiveReportIssue,
+              primaryLabel: _currentStop!.state == RideStopState.pending
+                  ? l10n.driverStopArrive(_currentStop!.seq)
+                  : l10n.driverStopDepart(_currentStop!.seq),
+              primaryKey: Key(
+                _currentStop!.state == RideStopState.pending
+                    ? 'driver-stop-arrive-${_currentStop!.seq}'
+                    : 'driver-stop-depart-${_currentStop!.seq}',
+              ),
+              primaryLoading: actionBusy,
+              primaryEnabled: !actionBusy,
+              onSecondary: () =>
+                  context.push(DriverRoutes.failed(widget.rideId)),
+              onPrimary: () => _stopAction(_currentStop!),
+            ),
+            DriverRidePhase.onTrip => DriverFooter(
+              secondaryLabel: l10n.driverActiveReportIssue,
+              primaryLabel: l10n.driverActiveCompleteCta,
+              primaryKey: const Key('driver-active-complete'),
+              primaryLoading: actionBusy,
+              primaryEnabled: !actionBusy,
+              onSecondary: () =>
+                  context.push(DriverRoutes.failed(widget.rideId)),
+              onPrimary: () => _advance(const [
+                RideDriverAction.complete,
+              ], DriverRidePhase.complete),
+            ),
+            DriverRidePhase.complete => DriverFooter(
+              secondaryLabel: l10n.driverBackToJobs,
+              primaryLabel: l10n.driverOpenCompletedSample,
+              primaryKey: const Key('driver-active-done'),
+              onSecondary: () => context.go('/driver/jobs'),
+              onPrimary: () =>
+                  context.push(DriverRoutes.completed(widget.rideId)),
+            ),
+          };
 
     final classPhoto = resolveMediaUrl(ride.imageUrl);
     return DriverPageFrame(
@@ -773,6 +784,17 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
               ],
             ),
           ),
+          if (parcelPanel) ...[
+            const SizedBox(height: DealGoSpacing.s12),
+            ParcelTripPanel(
+              rideId: widget.rideId,
+              accessToken: () => driverAccessToken(context),
+              driver: true,
+              onPickedUp: () => setState(() => _phase = DriverRidePhase.onTrip),
+              onFinished: () =>
+                  setState(() => _phase = DriverRidePhase.complete),
+            ),
+          ],
           const SizedBox(height: DealGoSpacing.s12),
           DriverPaymentCollection(
             key: ValueKey('driver-collection-${_phase.name}'),
@@ -871,6 +893,7 @@ OpenRide openRideFromView(RideView view) => OpenRide(
   customerRating: view.customerRating,
   stops: [for (final s in view.stops) s.point],
   routeVersion: view.routeVersion,
+  serviceKind: view.serviceKind,
 );
 
 bool _rideGone(Object? failure) =>

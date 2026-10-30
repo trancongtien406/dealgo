@@ -1,13 +1,27 @@
 import { randomUUID } from 'node:crypto';
 import type { StoredDocumentRef } from '../../platform/storage/document-store.service.js';
 
+/** t54u: the ops "All" filter — every reviewable status (drafts are only listed explicitly). */
+export const OPS_ALL_STATUSES = ['SUBMITTED', 'IN_REVIEW', 'APPROVED', 'REJECTED'] as const;
+
 /** A stored upload tagged with its document kind (ID_FRONT, LICENSE, ...). */
 export type PartnerDocumentRef = StoredDocumentRef & { kind?: string };
 
 export type PartnerReviewIssue = { section: string; note: string };
 
 export type PartnerRoleName = 'DRIVER' | 'MERCHANT';
-export type PartnerStatusName = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
+export type PartnerStatusName = 'DRAFT' | 'SUBMITTED' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED';
+
+/** Statuses a reviewer may still decide on (t52u: SUBMITTED or claimed IN_REVIEW). */
+export const PARTNER_REVIEWABLE_STATUSES: readonly PartnerStatusName[] = ['SUBMITTED', 'IN_REVIEW'];
+
+/** Append-only OpsAuditLog row written in the same transaction as the decision. */
+export type PartnerReviewAudit = {
+  actorUserId: string;
+  action: 'KYC_CLAIM' | 'KYC_APPROVE' | 'KYC_REJECT' | 'KYC_AUTO_APPROVE';
+  reason: string;
+  metadata: Record<string, unknown>;
+};
 
 export type PartnerApplicationRecord = {
   id: string;
@@ -35,7 +49,7 @@ export type PartnerRepository = {
   listByUser(userId: string): Promise<PartnerApplicationRecord[]>;
   listByStatus(status: PartnerStatusName): Promise<PartnerApplicationRecord[]>;
   listForOps(input: {
-    status: PartnerStatusName;
+    status: PartnerStatusName | 'ALL';
     page: number;
     limit: number;
     q?: string;
@@ -55,10 +69,18 @@ export type PartnerRepository = {
     status: Extract<PartnerStatusName, 'APPROVED' | 'REJECTED'>;
     reason: string | null;
     reviewIssues: PartnerReviewIssue[];
-    reviewedBy: string;
+    reviewedBy: string | null;
     now: Date;
     /** Approval only: replaces metadata (e.g. ops-confirmed vehicleClassCode). */
     metadata?: Record<string, unknown>;
+    audit?: PartnerReviewAudit;
+  }): Promise<PartnerApplicationRecord | null>;
+  /** SUBMITTED → IN_REVIEW, conditional; null when the case is not SUBMITTED. */
+  claim(input: {
+    id: string;
+    reviewerId: string;
+    now: Date;
+    audit?: PartnerReviewAudit;
   }): Promise<PartnerApplicationRecord | null>;
   /** Queues the decision event for the applicant's realtime `user:` room (outbox). */
   recordStatusEvent(input: PartnerStatusEventInput): Promise<void>;
@@ -68,7 +90,10 @@ export type PartnerStatusEventInput = {
   applicationId: string;
   userId: string;
   role: PartnerRoleName;
-  status: 'APPROVED' | 'REJECTED';
+  status: 'IN_REVIEW' | 'APPROVED' | 'REJECTED';
+  /** t61u: rejection reason + flagged sections ride on the realtime event. */
+  reason?: string | null;
+  sections?: string[];
   reviewedAt: Date;
 };
 
@@ -78,6 +103,31 @@ export class MemoryPartnerRepository implements PartnerRepository {
   private readonly byId = new Map<string, Stored>();
   /** Decision events (tests read this; the Prisma repository writes outbox rows). */
   readonly statusEvents: PartnerStatusEventInput[] = [];
+  /** Ops audit rows (the Prisma repository writes OpsAuditLog). */
+  readonly auditLogs: (PartnerReviewAudit & { applicationId: string })[] = [];
+
+  async claim(input: {
+    id: string;
+    reviewerId: string;
+    now: Date;
+    audit?: PartnerReviewAudit;
+  }): Promise<PartnerApplicationRecord | null> {
+    const existing = this.byId.get(input.id);
+    if (!existing || existing.status !== 'SUBMITTED') {
+      return null;
+    }
+    const updated: Stored = {
+      ...existing,
+      status: 'IN_REVIEW',
+      reviewedBy: input.reviewerId,
+      updatedAt: input.now,
+    };
+    this.byId.set(updated.id, updated);
+    if (input.audit) {
+      this.auditLogs.push({ ...input.audit, applicationId: input.id });
+    }
+    return copy(updated);
+  }
 
   async recordStatusEvent(input: PartnerStatusEventInput): Promise<void> {
     this.statusEvents.push({ ...input });
@@ -115,13 +165,17 @@ export class MemoryPartnerRepository implements PartnerRepository {
   }
 
   async listForOps(input: {
-    status: PartnerStatusName;
+    status: PartnerStatusName | 'ALL';
     page: number;
     limit: number;
     q?: string;
     role?: PartnerRoleName;
   }): Promise<OpsPartnerPage> {
-    let rows = [...this.byId.values()].filter((row) => row.status === input.status);
+    let rows = [...this.byId.values()].filter((row) =>
+      input.status === 'ALL'
+        ? (OPS_ALL_STATUSES as readonly string[]).includes(row.status)
+        : row.status === input.status,
+    );
     if (input.role) {
       rows = rows.filter((row) => row.role === input.role);
     }
@@ -202,14 +256,18 @@ export class MemoryPartnerRepository implements PartnerRepository {
     status: Extract<PartnerStatusName, 'APPROVED' | 'REJECTED'>;
     reason: string | null;
     reviewIssues: PartnerReviewIssue[];
-    reviewedBy: string;
+    reviewedBy: string | null;
     now: Date;
     metadata?: Record<string, unknown>;
+    audit?: PartnerReviewAudit;
   }): Promise<PartnerApplicationRecord | null> {
     const existing = this.byId.get(input.id);
-    // Conditional like the Prisma updateMany: only a SUBMITTED row can be reviewed once.
-    if (!existing || existing.status !== 'SUBMITTED') {
+    // Conditional like the Prisma updateMany: only a pending row can be reviewed once.
+    if (!existing || !PARTNER_REVIEWABLE_STATUSES.includes(existing.status)) {
       return null;
+    }
+    if (input.audit) {
+      this.auditLogs.push({ ...input.audit, applicationId: input.id });
     }
     const updated: Stored = {
       ...existing,

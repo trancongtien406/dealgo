@@ -10,6 +10,7 @@ class FakeSnapshotRealtime implements SnapshotRealtime {
   final _rideOffers = StreamController<RideOffersHint>.broadcast();
   final _routeUpdates = StreamController<RouteUpdateHint>.broadcast();
   final _partnerStatuses = StreamController<PartnerStatusHint>.broadcast();
+  final _paymentStatuses = StreamController<PaymentStatusHint>.broadcast();
   final _callEvents = StreamController<Map<String, Object?>>.broadcast();
   final _chatMessages = StreamController<ChatMessageHint>.broadcast();
   final _rideUnassigned = StreamController<RideUnassignedHint>.broadcast();
@@ -36,6 +37,9 @@ class FakeSnapshotRealtime implements SnapshotRealtime {
 
   @override
   Stream<PartnerStatusHint> get partnerStatuses => _partnerStatuses.stream;
+
+  @override
+  Stream<PaymentStatusHint> get paymentStatuses => _paymentStatuses.stream;
 
   @override
   Stream<RideUnassignedHint> get rideUnassigned => _rideUnassigned.stream;
@@ -95,6 +99,8 @@ class FakeSnapshotRealtime implements SnapshotRealtime {
 
   void emitPartnerStatus(PartnerStatusHint hint) => _partnerStatuses.add(hint);
 
+  void emitPaymentStatus(PaymentStatusHint hint) => _paymentStatuses.add(hint);
+
   void emitCall(Map<String, Object?> payload) => _callEvents.add(payload);
 
   void emitChatMessage(ChatMessageHint hint) => _chatMessages.add(hint);
@@ -106,6 +112,7 @@ class FakeSnapshotRealtime implements SnapshotRealtime {
   Future<void> dispose() async {
     await _routeUpdates.close();
     await _partnerStatuses.close();
+    await _paymentStatuses.close();
     await _callEvents.close();
     await _chatMessages.close();
     await _rideUnassigned.close();

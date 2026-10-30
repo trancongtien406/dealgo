@@ -30,6 +30,8 @@ export const apiPaths = {
     `/api/ops/partner-applications/${encodeURIComponent(id)}`,
   opsPartnerApplicationApprove: (id: string) =>
     `/api/ops/partner-applications/${encodeURIComponent(id)}/approve`,
+  opsPartnerApplicationClaim: (id: string) =>
+    `/api/ops/partner-applications/${encodeURIComponent(id)}/claim`,
   opsPartnerApplicationReject: (id: string) =>
     `/api/ops/partner-applications/${encodeURIComponent(id)}/reject`,
   opsCustomers: () => "/api/ops/customers",
@@ -83,6 +85,9 @@ export const apiPaths = {
     `/api/ops/ride-vehicle-classes/${encodeURIComponent(code)}`,
   opsRideVehicleClassImage: (code: string) =>
     `/api/ops/ride-vehicle-classes/${encodeURIComponent(code)}/image`,
+  opsRideZoneTariffs: () => "/api/ops/ride-zone-tariffs",
+  opsRideZoneTariff: (regionCode: string, vehicleClassCode: string) =>
+    `/api/ops/ride-zone-tariffs/${encodeURIComponent(regionCode)}/${encodeURIComponent(vehicleClassCode)}`,
   opsMapsProviders: () => "/api/ops/maps-providers",
   opsPaymentMethods: () => "/api/ops/payment-methods",
   opsSiteConfig: () => "/api/ops/site-config",

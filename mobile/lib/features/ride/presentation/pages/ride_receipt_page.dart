@@ -15,6 +15,8 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../../core/format/date_time_format.dart';
 import '../../../shell/presentation/account_routes.dart';
 import '../../domain/entities/ride_money.dart';
+import '../../../parcel/domain/parcel_client.dart';
+import '../../../parcel/domain/parcel_models.dart';
 import '../../domain/entities/ride_models.dart';
 import '../../domain/entities/ride_vehicle.dart';
 import '../../domain/usecases/get_ride.dart';
@@ -49,6 +51,7 @@ class _RideReceiptView extends StatefulWidget {
 
 class _RideReceiptPageState extends State<_RideReceiptView> {
   RideView? _ride;
+  ParcelInfo? _parcel;
   var _loading = true;
   Object? _failure;
 
@@ -72,11 +75,13 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
         accessToken: token,
         rideId: widget.rideId,
       );
+      final parcel = ride.isParcel ? await _loadParcel(token) : null;
       if (!mounted) {
         return;
       }
       setState(() {
         _ride = ride;
+        _parcel = parcel;
         _loading = false;
         _failure = null;
       });
@@ -88,6 +93,24 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
         _loading = false;
         _failure = error;
       });
+    }
+  }
+
+  /// Parcel fee breakdown; the receipt still renders if it can't load.
+  Future<ParcelInfo?> _loadParcel(String token) async {
+    ParcelClient client;
+    try {
+      client = context.read<ParcelClient>();
+    } catch (_) {
+      return null;
+    }
+    try {
+      return (await client.get(
+        accessToken: token,
+        rideId: widget.rideId,
+      )).parcel;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -325,6 +348,19 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
                     label: l10n.rideWaitFeeLine,
                     amount: formatRideVnd(ride.waitFeeVnd),
                   ),
+                if ((_parcel?.serviceFeeVnd ?? 0) > 0)
+                  RideMoneyLine(
+                    key: const Key('ride-receipt-parcel-service-fee'),
+                    label: l10n.parcelReceiptServiceFee,
+                    amount: formatRideVnd(_parcel!.serviceFeeVnd),
+                  ),
+                if (_parcel?.outcome == ParcelOutcome.returned &&
+                    _parcel!.returnFeeVnd > 0)
+                  RideMoneyLine(
+                    key: const Key('ride-receipt-parcel-return-fee'),
+                    label: l10n.parcelReceiptReturnFee,
+                    amount: formatRideVnd(_parcel!.returnFeeVnd),
+                  ),
                 if (ride.discountVnd > 0)
                   RideMoneyLine(
                     label: l10n.rideVoucherLine(ride.voucherCode ?? ''),
@@ -335,9 +371,12 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
                   label: l10n.checkoutTotalSection,
                   amount: formatRideVnd(
                     rideCashAfterVoucher(
-                      agreed + ride.waitFeeVnd,
-                      ride.discountVnd,
-                    ),
+                          agreed + ride.waitFeeVnd,
+                          ride.discountVnd,
+                        ) +
+                        (_parcel?.outcome == ParcelOutcome.returned
+                            ? _parcel!.returnFeeVnd
+                            : 0),
                   ),
                   emphasize: true,
                 ),

@@ -26,7 +26,8 @@ export function buildKycQueueSearch(params: FetchKycParams): URLSearchParams {
   if (nestStatus) {
     search.set("status", nestStatus);
   } else if (!params.status || params.status === "ALL") {
-    search.set("status", "SUBMITTED");
+    // t54u: "All" means every status, not just the pending queue.
+    search.set("status", "ALL");
   }
   if (params.role) {
     search.set("role", params.role);
@@ -75,6 +76,15 @@ export async function approveKycApplication(
     method: "POST",
     body: vehicleClassCode ? { vehicleClassCode } : {},
   });
+  return mapNestPartnerApplicationToKycCase(envelope.data);
+}
+
+/** t52u: ops takes the case (SUBMITTED → IN_REVIEW); 409 when someone already did. */
+export async function claimKycApplication(id: string): Promise<KycCase> {
+  const envelope = await apiFetch<{
+    success: boolean;
+    data: NestPartnerApplicationView;
+  }>(apiPaths.opsPartnerApplicationClaim(id), { method: "POST", body: {} });
   return mapNestPartnerApplicationToKycCase(envelope.data);
 }
 

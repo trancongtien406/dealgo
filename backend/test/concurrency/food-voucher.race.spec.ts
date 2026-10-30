@@ -1,3 +1,4 @@
+import { seedDriverClass } from './driver-class.js';
 /**
  * Concurrent voucher redemption on food checkout against Postgres.
  * Skips when DATABASE_URL is unset (default unit suite uses memory repos).
@@ -232,6 +233,7 @@ describePg('food voucher race (postgres)', () => {
     const customer = await login();
     const driver = await login();
     await ensureGrant(app.get(IDENTITY_REPOSITORY), driver.userId, 'DRIVER');
+    await seedDriverClass(app, driver.userId);
     const placed = await place(customer.token, `f1-${code}`, store, code).expect(200);
     const orderId = placed.body.data.id as string;
     const call = (token: string, action: string) =>

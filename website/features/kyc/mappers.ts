@@ -12,10 +12,13 @@ import {
   mapPartnerIssues,
   registrationSubjectLabel,
 } from "@/features/kyc/partner-review";
+import { readKycReviewChecks } from "@/features/kyc/review-checks";
+import { autoApproveSkipLabels, readOcrFields } from "@/features/kyc/ocr-fields";
 
 const nestPartnerStatusMap: Record<NestPartnerStatus, KycStatus> = {
   DRAFT: "UNDER_REVIEW",
   SUBMITTED: "UNDER_REVIEW",
+  IN_REVIEW: "IN_REVIEW",
   APPROVED: "APPROVED",
   REJECTED: "REJECTED",
 };
@@ -32,6 +35,9 @@ export function kycFilterToNestPartnerStatus(
   }
   if (status === "REJECTED") {
     return "REJECTED";
+  }
+  if (status === "IN_REVIEW") {
+    return "IN_REVIEW";
   }
   if (
     status === "UNDER_REVIEW" ||
@@ -105,7 +111,10 @@ export function mapNestPartnerApplicationToKycCase(
           "Tài xế"
         : "Cửa hàng",
     vehicle:
-      [readString(app.metadata, "vehicleBrand"), readString(app.metadata, "vehicleModel")]
+      [
+        readString(app.metadata, "vehicleBrand"),
+        readString(app.metadata, "vehicleModel"),
+      ]
         .filter(Boolean)
         .join(" ") ||
       readString(app.metadata, "vehicle") ||
@@ -125,7 +134,9 @@ export function mapNestPartnerApplicationToKycCase(
           ? "Merchant · Đã duyệt"
           : "Merchant · Chờ xử lý",
     vehicleClassCode:
-      app.role === "DRIVER" ? readString(app.metadata, "vehicleClassCode") || null : null,
+      app.role === "DRIVER"
+        ? readString(app.metadata, "vehicleClassCode") || null
+        : null,
     documentsWaived: app.metadata?.documentsWaived === true,
     activated: app.status === "APPROVED",
     details,
@@ -133,6 +144,10 @@ export function mapNestPartnerApplicationToKycCase(
     reason: app.reason,
     issues: mapPartnerIssues(app),
     reviewedAt: app.reviewedAt ? formatOpsDate(app.reviewedAt) : null,
+    checks: readKycReviewChecks(app.metadata ?? {}),
+    ocrFields: readOcrFields(app.metadata ?? {}),
+    autoApproved: app.metadata?.autoApproved === true,
+    autoApproveSkipped: autoApproveSkipLabels(app.metadata?.autoApproveSkipped),
   };
 }
 
@@ -167,6 +182,7 @@ function shortId(id: string): string {
 
 const labels: Record<KycStatus, string> = {
   UNDER_REVIEW: "Đang xét duyệt",
+  IN_REVIEW: "Đang được duyệt",
   NEEDS_MORE_INFO: "Chờ bổ sung",
   APPROVED: "Đã duyệt",
   REJECTED: "Từ chối",
@@ -174,6 +190,7 @@ const labels: Record<KycStatus, string> = {
 };
 const tones: Record<KycStatus, StatusTone> = {
   UNDER_REVIEW: "delivery",
+  IN_REVIEW: "brand",
   NEEDS_MORE_INFO: "food",
   APPROVED: "success",
   REJECTED: "danger",
@@ -188,6 +205,7 @@ export function kycStatusTone(status: KycStatus) {
 export const kycStatusFilterOptions = [
   { value: "ALL" as const, label: "Tất cả trạng thái" },
   { value: "UNDER_REVIEW" as const, label: labels.UNDER_REVIEW },
+  { value: "IN_REVIEW" as const, label: labels.IN_REVIEW },
   { value: "NEEDS_MORE_INFO" as const, label: labels.NEEDS_MORE_INFO },
   { value: "PRIORITY" as const, label: labels.PRIORITY },
   { value: "APPROVED" as const, label: labels.APPROVED },

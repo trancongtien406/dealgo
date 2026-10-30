@@ -117,7 +117,7 @@ describe('ride multi-stop http', () => {
     app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
     await app.init();
     seedVehicleClassOnDriverGrant(app, repository);
-    reference = roundUpToFareStep(quoteReferenceFareVnd(haversineKm(pickup, dropoff), 8000, 10_000));
+    reference = roundUpToFareStep(quoteReferenceFareVnd(haversineKm(pickup, dropoff), 5000, 10_000));
   });
 
   afterAll(async () => {
@@ -129,7 +129,7 @@ describe('ride multi-stop http', () => {
   });
 
   const http = () => request(app.getHttpServer());
-  const bid = () => rideBidFloorVnd(reference, 80) + 1000;
+  const bid = () => rideBidFloorVnd(reference, 70) + 1000;
 
   async function login(): Promise<Actor> {
     phoneSerial += 1;

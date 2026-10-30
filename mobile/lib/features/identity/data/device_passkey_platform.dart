@@ -80,6 +80,11 @@ class DevicePasskeyPlatform implements PasskeyPlatform {
       throw PasskeyPlatformException(PasskeyFailureKind.failed, error.code);
     } on FormatException catch (error) {
       throw PasskeyPlatformException(PasskeyFailureKind.failed, error.message);
+    } catch (error) {
+      throw PasskeyPlatformException(
+        PasskeyFailureKind.failed,
+        error.toString(),
+      );
     }
   }
 

@@ -8,6 +8,7 @@ abstract interface class PresenceRepository {
     double? lng,
     bool? rideEnabled,
     bool? foodEnabled,
+    bool? parcelEnabled,
   });
 
   Future<DriverServicePrefs> getServicePrefs({required String accessToken});

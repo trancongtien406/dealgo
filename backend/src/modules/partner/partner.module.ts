@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { resolvePersistenceRepository, PrismaModule, PrismaService } from '../../platform/database/index.js';
 import type { AppEnv } from '../../platform/config/index.js';
 import { IdentityModule } from '../identity/index.js';
+import { FOOD_ELIGIBILITY } from '../identity/identity.constants.js';
 import { PARTNER_REPOSITORY } from './partner.constants.js';
 import { MePartnerApplicationsController } from './me-partner-applications.controller.js';
 import { OpsPartnerApplicationsController } from './ops-partner-applications.controller.js';
@@ -45,6 +46,7 @@ import { StorageModule } from '../../platform/storage/storage.module.js';
     },
     PartnerService,
     PartnerEligibilityService,
+    { provide: FOOD_ELIGIBILITY, useExisting: PartnerEligibilityService },
   ],
   exports: [PartnerEligibilityService, PARTNER_REPOSITORY, PartnerService],
 })

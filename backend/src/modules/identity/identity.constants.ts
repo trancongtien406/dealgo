@@ -14,6 +14,8 @@ export const IDENTITY_REPOSITORY = Symbol('IDENTITY_REPOSITORY');
 export const SMS_SENDER = Symbol('SMS_SENDER');
 export const MAIL_SENDER = Symbol('MAIL_SENDER');
 export const DRIVER_PRESENCE_REPOSITORY = Symbol('DRIVER_PRESENCE_REPOSITORY');
+/** DEC-PROD-071: `{ canDeliverFood(userId) }`, provided by PartnerModule (resolved lazily, no import cycle). */
+export const FOOD_ELIGIBILITY = Symbol('FOOD_ELIGIBILITY');
 
 export {
   AUTH_METHOD_POLICY_REPOSITORY,

@@ -37,6 +37,22 @@ const LABELS: Record<string, { label: string; hint: string }> = {
     label: "Phí giao Food tối đa (VND)",
     hint: "OPEN-003 — TEST_ONLY",
   },
+  PARCEL_SIZE_CLASSES: {
+    label: "Hạng kích thước giao hàng (JSON)",
+    hint: "DEC-PROD-071 DRAFT — S/M/L/XL: cân tối đa, kích thước, phụ phí, loại xe",
+  },
+  PARCEL_SERVICE_FEE_VND: {
+    label: "Phí dịch vụ giao hàng (VND / đơn)",
+    hint: "DEC-PROD-071 DRAFT — cộng vào cước tham chiếu mỗi đơn, chốt lúc đặt (0 = tắt)",
+  },
+  PARCEL_RETURN_FEE_VND: {
+    label: "Phí hoàn hàng khi giao thất bại (VND)",
+    hint: "DEC-PROD-071 DRAFT — mặc định 10.000; tính khi tài xế trả hàng về người gửi, trả cho tài xế, cộng vào chuyến tiền mặt kế tiếp",
+  },
+  PARCEL_RECIPIENT_CODE_REQUIRED: {
+    label: "Bắt buộc mã người nhận khi giao hàng",
+    hint: "DEC-PROD-071 DRAFT — mặc định tắt",
+  },
   DRIVER_SEARCH_RADIUS_KM: {
     label: "Bán kính tìm tài xế (km)",
     hint: "OPEN-004 — TEST_ONLY dispatch",
@@ -143,7 +159,11 @@ const LABELS: Record<string, { label: string; hint: string }> = {
   },
   RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE: {
     label: "Giá khách đặt tối thiểu (% giá tham khảo)",
-    hint: "Mặc định 80 — 0 = chỉ dùng giá sàn của hạng xe (0–100)",
+    hint: "Mặc định 70 (= −30%) — 0 = chỉ dùng giá sàn của hạng xe (0–100)",
+  },
+  RIDE_BID_CEILING_PERCENT_OF_REFERENCE: {
+    label: "Giá khách đặt / tài xế trả giá tối đa (% giá app)",
+    hint: "Mặc định 130 (= +30%) — áp dụng cho cả khách và tài xế (100–300)",
   },
   RIDE_COUNTER_MAX_PERCENT_OF_OFFER: {
     label: "Giá tài xế trả giá tối đa (% giá khách đưa)",
@@ -265,6 +285,14 @@ const LABELS: Record<string, { label: string; hint: string }> = {
     label: "Bắt buộc hồ sơ KYB khi đăng ký cửa hàng",
     hint: "DEC-PROD-048 (DRAFT) — Tắt: app bỏ bước giấy tờ, cửa hàng vẫn chờ admin duyệt (mặc định Bật)",
   },
+  KYC_AUTO_APPROVE_DRIVER: {
+    label: "Tự động duyệt KYC tài xế",
+    hint: "DEC-PROD-070 (t61u) — Bật: hồ sơ đủ giấy tờ hợp lệ, đủ thông tin và hạng bằng khớp xe được hệ thống duyệt ngay (audit SYSTEM); thiếu/sai vào hàng chờ duyệt tay (mặc định Tắt)",
+  },
+  KYC_AUTO_APPROVE_MERCHANT: {
+    label: "Tự động duyệt KYB cửa hàng",
+    hint: "DEC-PROD-070 (t61u) — Bật: hồ sơ đủ giấy tờ hợp lệ, đủ thông tin và có ghim vị trí quán được hệ thống duyệt ngay; thiếu/sai vào hàng chờ duyệt tay (mặc định Tắt)",
+  },
   RATING_STORE_MIN_COUNT: {
     label: "Số đánh giá tối thiểu để hiện điểm quán",
     hint: "DEC-PROD-019 — dưới số này app chỉ hiện \"Quán mới\"/số lượt, không lộ số sao của từng khách (1–50)",
@@ -340,6 +368,7 @@ const INTEGER_RANGES: Record<string, [number, number, string]> = {
   RIDE_REQUEST_WINDOW_SECONDS: [60, 1800, "Giá trị phải là số nguyên từ 60 đến 1800 giây."],
   RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE: [0, 100, "Giá trị phải là số nguyên từ 0 đến 100."],
   RIDE_COUNTER_MAX_PERCENT_OF_OFFER: [100, 300, "Giá trị phải là số nguyên từ 100 đến 300."],
+  RIDE_BID_CEILING_PERCENT_OF_REFERENCE: [100, 300, "Giá trị phải là số nguyên từ 100 đến 300."],
   RIDE_MAX_OFFER_EDITS_PER_DRIVER: [0, 10, "Giá trị phải là số nguyên từ 0 đến 10."],
   RIDE_ASSIGNED_START_TIMEOUT_MINUTES: [0, 60, "Giá trị phải là số nguyên từ 0 đến 60 phút."],
   RIDE_EN_ROUTE_TIMEOUT_MINUTES: [0, 180, "Giá trị phải là số nguyên từ 0 đến 180 phút."],
@@ -348,6 +377,8 @@ const INTEGER_RANGES: Record<string, [number, number, string]> = {
   RIDE_NO_SHOW_WAIT_MINUTES: [1, 30, "Giá trị phải là số nguyên từ 1 đến 30 phút."],
   RIDE_FREE_CANCEL_MINUTES: [0, 30, "Giá trị phải là số nguyên từ 0 đến 30 phút."],
   RIDE_CANCEL_FEE_BIKE_VND: [0, 200000, "Giá trị phải là số nguyên từ 0 đến 200000."],
+  PARCEL_SERVICE_FEE_VND: [0, 200000, "Giá trị phải là số nguyên từ 0 đến 200000."],
+  PARCEL_RETURN_FEE_VND: [0, 500000, "Giá trị phải là số nguyên từ 0 đến 500000."],
   RIDE_CANCEL_FEE_CAR_VND: [0, 500000, "Giá trị phải là số nguyên từ 0 đến 500000."],
   FOOD_MERCHANT_ACCEPT_TIMEOUT_MINUTES: [0, 60, "Giá trị phải là số nguyên từ 0 đến 60 phút."],
   FOOD_UNCLAIMED_READY_TIMEOUT_MINUTES: [0, 240, "Giá trị phải là số nguyên từ 0 đến 240 phút."],
@@ -381,6 +412,8 @@ export const BOOLEAN_SETTING_KEYS: ReadonlySet<string> = new Set([
   "FOOD_HANDOVER_CODE_REQUIRED",
   "ONBOARDING_DRIVER_KYC_REQUIRED",
   "ONBOARDING_MERCHANT_KYB_REQUIRED",
+  "KYC_AUTO_APPROVE_DRIVER",
+  "KYC_AUTO_APPROVE_MERCHANT",
   "SERVICE_ZONE_ENFORCED",
   "DISPATCH_REQUIRE_FRESH_PRESENCE",
   "RIDE_REQUEST_PUSH_ENABLED",
@@ -473,7 +506,8 @@ export function categorizeSetting(key: string): CategoryKey {
     key.startsWith("RIDE_CANCEL_FEE") ||
     key === "RIDE_FREE_CANCEL_MINUTES" ||
     key === "RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE" ||
-    key === "RIDE_COUNTER_MAX_PERCENT_OF_OFFER"
+    key === "RIDE_COUNTER_MAX_PERCENT_OF_OFFER" ||
+    key === "RIDE_BID_CEILING_PERCENT_OF_REFERENCE"
   ) {
     return "FARE";
   }

@@ -330,7 +330,7 @@ export class RideController {
   }
 }
 
-function readIdempotencyKey(header: string | string[] | undefined): string {
+export function readIdempotencyKey(header: string | string[] | undefined): string {
   const value = Array.isArray(header) ? header[0] : header;
   const key = value?.trim() ?? '';
   if (key.length < 8 || key.length > 200) {

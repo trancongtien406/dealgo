@@ -35,7 +35,7 @@ export class OpsPartnerApplicationsController {
   constructor(private readonly partners: PartnerService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List partner applications (default status=SUBMITTED)' })
+  @ApiOperation({ summary: 'List partner applications (default status=SUBMITTED; ALL = every non-draft status)' })
   list(@Query() query: OpsPartnerApplicationQueryDto) {
     return this.partners.listForOps(query);
   }
@@ -57,6 +57,14 @@ export class OpsPartnerApplicationsController {
       length: file.body.byteLength,
       disposition: `inline; filename="${file.filename}"`,
     });
+  }
+
+  @RequireOpsPermission('kyc.review')
+  @Post(':id/claim')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 't52u: claim a SUBMITTED KYC/KYB case (→ IN_REVIEW, audit-logged, realtime push)' })
+  claim(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.partners.claim(id, actor.userId);
   }
 
   @RequireOpsPermission('kyc.review')

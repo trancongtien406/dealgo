@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import { InboxModule } from '../../../src/modules/communication/inbox/inbox.module.js';
 import { OpsAuthService } from '../../../src/modules/identity/ops-auth.service.js';
 import { SupportTicketModule } from '../../../src/modules/support-ticket/support-ticket.module.js';
+import { bidBandOffSettings } from '../../support/settings-fixture.js';
 import { createTestApp, type TestUser } from '../../support/app-harness.js';
 import { TINY_JPEG_BASE64, TINY_PDF_BASE64 } from '../../../src/platform/storage/testing.js';
 
@@ -22,7 +23,7 @@ describe('support tickets http', () => {
   let opsToken: string;
 
   beforeAll(async () => {
-    harness = await createTestApp([SupportTicketModule, InboxModule]);
+    harness = await createTestApp([SupportTicketModule, InboxModule], { settings: await bidBandOffSettings() });
     app = harness.app;
     await app.get(OpsAuthService).ensureOperator(OPS_EMAIL, OPS_PASSWORD, 'test');
     const login = await harness

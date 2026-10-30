@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/design_system/components/dealgo_app_header.dart';
@@ -9,6 +10,7 @@ import '../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../core/realtime/snapshot_realtime.dart';
 import '../data/payment_api.dart';
 import '../domain/payment_models.dart';
 import '../../../l10n/app_localizations.dart';
@@ -49,8 +51,10 @@ String paymentContinueLocation(String entityType, String entityId) =>
     ? '/customer/ride/tracking/${Uri.encodeComponent(entityId)}'
     : '/customer/food/orders/${Uri.encodeComponent(entityId)}';
 
-/// Starts (optionally) and tracks an online payment. Polls the server; the
-/// PSP IPN is the source of truth, never the redirect query string.
+/// Starts (optionally) and tracks an online payment. No polling (t50u): it
+/// GETs the status on open, on app resume, on socket reconnect and whenever the
+/// server pushes a `paymentStatus` hint for this job. The PSP IPN is the source
+/// of truth, never the redirect query string.
 class PaymentStatusPage extends StatefulWidget {
   const PaymentStatusPage({
     required this.entityType,
@@ -59,7 +63,7 @@ class PaymentStatusPage extends StatefulWidget {
     this.api,
     this.accessToken,
     this.launcher = defaultPaymentLauncher,
-    this.pollInterval = const Duration(seconds: 3),
+    this.realtime,
     super.key,
   });
 
@@ -69,7 +73,9 @@ class PaymentStatusPage extends StatefulWidget {
   final PaymentApi? api;
   final String? accessToken;
   final PaymentUrlLauncher launcher;
-  final Duration pollInterval;
+
+  /// Defaults to the app's [SnapshotRealtime] provider when available.
+  final SnapshotRealtime? realtime;
 
   @override
   State<PaymentStatusPage> createState() => _PaymentStatusPageState();
@@ -80,9 +86,7 @@ class _PaymentStatusPageState extends State<PaymentStatusPage>
   PaymentCheckoutView? _view;
   String? _error;
   var _busy = false;
-  Timer? _timer;
-  var _polls = 0;
-  static const _maxPolls = 300;
+  final _subs = <StreamSubscription<Object?>>[];
 
   PaymentApi get _api => widget.api ?? defaultPaymentApi();
   String? get _token => widget.accessToken ?? paymentAccessToken(context);
@@ -91,6 +95,7 @@ class _PaymentStatusPageState extends State<PaymentStatusPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _listen();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final method = widget.startMethod;
       if (method != null && method != cashMethodCode) {
@@ -104,7 +109,9 @@ class _PaymentStatusPageState extends State<PaymentStatusPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _timer?.cancel();
+    for (final sub in _subs) {
+      sub.cancel();
+    }
     super.dispose();
   }
 
@@ -115,18 +122,32 @@ class _PaymentStatusPageState extends State<PaymentStatusPage>
     }
   }
 
-  void _schedule() {
-    _timer?.cancel();
-    final view = _view;
-    if (view == null ||
-        isTerminalPaymentStatus(view.status) ||
-        _polls >= _maxPolls) {
-      return;
+  void _listen() {
+    SnapshotRealtime? realtime = widget.realtime;
+    if (realtime == null) {
+      try {
+        realtime = context.read<SnapshotRealtime>();
+      } catch (_) {
+        realtime = null; // No socket in this tree: open/resume GETs only.
+      }
     }
-    _timer = Timer(widget.pollInterval, () {
-      _polls++;
-      _refresh();
-    });
+    if (realtime == null) return;
+    _subs.add(
+      realtime.paymentStatuses.listen((hint) {
+        if (hint.entityType == widget.entityType &&
+            hint.entityId == widget.entityId) {
+          _refresh();
+        }
+      }),
+    );
+    _subs.add(
+      realtime.reconnects.listen((_) {
+        final view = _view;
+        if (view == null || !isTerminalPaymentStatus(view.status)) {
+          _refresh();
+        }
+      }),
+    );
   }
 
   Future<void> _start(String method) async {
@@ -154,7 +175,6 @@ class _PaymentStatusPageState extends State<PaymentStatusPage>
         _busy = false;
       });
       await _openProvider(view);
-      _schedule();
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -178,13 +198,11 @@ class _PaymentStatusPageState extends State<PaymentStatusPage>
         _view = view;
         _error = null;
       });
-      _schedule();
     } catch (_) {
       if (!mounted) return;
       setState(
         () => _error ??= AppLocalizations.of(context).paymentStatusLoadFailed,
       );
-      _schedule();
     }
   }
 

@@ -22,6 +22,11 @@ export type UploadInput = {
   label: string;
   contentType?: string;
   contentBase64?: string;
+  /**
+   * Per-file policy override set by server code only (never from a client DTO), e.g. the
+   * t52u liveness clip: video types + the hard ceiling instead of the admin image policy.
+   */
+  policyOverride?: UploadPolicy;
 };
 
 export type UploadPolicy = {
@@ -72,7 +77,7 @@ export class DocumentStoreService {
       throw storageError(503, 'STORAGE_UNAVAILABLE', 'File storage is not configured');
     }
     const policy = await this.policy();
-    const decoded = files.map((file) => this.decode(file, policy));
+    const decoded = files.map((file) => this.decode(file, file.policyOverride ?? policy));
     const uploadedAt = new Date().toISOString();
     const refs: StoredDocumentRef[] = [];
     for (const file of decoded) {

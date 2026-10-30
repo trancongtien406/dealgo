@@ -6134,6 +6134,18 @@ abstract class AppLocalizations {
   /// **'Business licence'**
   String get partnerKindBusinessLicense;
 
+  /// No description provided for @partnerKindFoodSafetyCert.
+  ///
+  /// In en, this message translates to:
+  /// **'Food safety certificate'**
+  String get partnerKindFoodSafetyCert;
+
+  /// No description provided for @kycLicenseClassMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Licence class {licenseClass} does not cover this vehicle. Go back and pick the class printed on your licence.'**
+  String kycLicenseClassMismatch(String licenseClass);
+
   /// No description provided for @partnerKindRepIdFront.
   ///
   /// In en, this message translates to:
@@ -8779,6 +8791,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Something went wrong. Please try again.'**
   String get apiErrGeneric;
+
+  /// No description provided for @apiErrPasskeyUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This device or app version does not support passkeys yet.'**
+  String get apiErrPasskeyUnavailable;
+
+  /// No description provided for @apiErrPasskeyInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Passkey verification failed. Please try again or use another sign-in method.'**
+  String get apiErrPasskeyInvalid;
 
   /// No description provided for @apiErrNetwork.
   ///
@@ -13249,6 +13273,618 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Details'**
   String get incomingJobDetails;
+
+  /// No description provided for @kycCaptureFrontTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Capture ID front'**
+  String get kycCaptureFrontTitle;
+
+  /// No description provided for @kycCaptureBackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Capture ID back'**
+  String get kycCaptureBackTitle;
+
+  /// No description provided for @kycCaptureAlignHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit the card in the frame, well lit, no glare'**
+  String get kycCaptureAlignHint;
+
+  /// No description provided for @kycCaptureChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking photo…'**
+  String get kycCaptureChecking;
+
+  /// No description provided for @kycCaptureBlurry.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo is blurry'**
+  String get kycCaptureBlurry;
+
+  /// No description provided for @kycCaptureGlare.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo has glare'**
+  String get kycCaptureGlare;
+
+  /// No description provided for @kycCaptureDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo is too dark'**
+  String get kycCaptureDark;
+
+  /// No description provided for @kycCaptureRetake.
+  ///
+  /// In en, this message translates to:
+  /// **'Retake'**
+  String get kycCaptureRetake;
+
+  /// No description provided for @kycCaptureCameraError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the camera.'**
+  String get kycCaptureCameraError;
+
+  /// No description provided for @kycLivenessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Face check'**
+  String get kycLivenessTitle;
+
+  /// No description provided for @kycLivenessCenter.
+  ///
+  /// In en, this message translates to:
+  /// **'Look straight at the frame'**
+  String get kycLivenessCenter;
+
+  /// No description provided for @kycLivenessTurnLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn your face left'**
+  String get kycLivenessTurnLeft;
+
+  /// No description provided for @kycLivenessTurnRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn your face right'**
+  String get kycLivenessTurnRight;
+
+  /// No description provided for @kycLivenessBlink.
+  ///
+  /// In en, this message translates to:
+  /// **'Blink your eyes'**
+  String get kycLivenessBlink;
+
+  /// No description provided for @kycLivenessNoFace.
+  ///
+  /// In en, this message translates to:
+  /// **'No face in the frame'**
+  String get kycLivenessNoFace;
+
+  /// No description provided for @kycLivenessManyFaces.
+  ///
+  /// In en, this message translates to:
+  /// **'Only one person in the frame'**
+  String get kycLivenessManyFaces;
+
+  /// No description provided for @kycLivenessDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get kycLivenessDone;
+
+  /// No description provided for @kycLivenessTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Time is up, try again'**
+  String get kycLivenessTimeout;
+
+  /// No description provided for @kycHintFindCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit the card in the frame'**
+  String get kycHintFindCard;
+
+  /// No description provided for @kycHintCloser.
+  ///
+  /// In en, this message translates to:
+  /// **'Closer'**
+  String get kycHintCloser;
+
+  /// No description provided for @kycHintMoreLight.
+  ///
+  /// In en, this message translates to:
+  /// **'More light'**
+  String get kycHintMoreLight;
+
+  /// No description provided for @kycHintNoGlare.
+  ///
+  /// In en, this message translates to:
+  /// **'Avoid glare'**
+  String get kycHintNoGlare;
+
+  /// No description provided for @kycHintHoldStill.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold still'**
+  String get kycHintHoldStill;
+
+  /// No description provided for @kycHintCaptured.
+  ///
+  /// In en, this message translates to:
+  /// **'Captured'**
+  String get kycHintCaptured;
+
+  /// No description provided for @kycHintFaceInOval.
+  ///
+  /// In en, this message translates to:
+  /// **'Face in the oval'**
+  String get kycHintFaceInOval;
+
+  /// No description provided for @kycLivenessRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording'**
+  String get kycLivenessRecording;
+
+  /// No description provided for @partnerDocSelfieVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'Face video'**
+  String get partnerDocSelfieVideo;
+
+  /// No description provided for @livenessClipRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'The face video didn\'t save (missing or too large). Let\'s try again.'**
+  String get livenessClipRetry;
+
+  /// No description provided for @parcelWhereTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Where is the package going?'**
+  String get parcelWhereTo;
+
+  /// No description provided for @driverServiceParcel.
+  ///
+  /// In en, this message translates to:
+  /// **'Goods delivery'**
+  String get driverServiceParcel;
+
+  /// No description provided for @driverServiceParcelHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive parcel delivery requests'**
+  String get driverServiceParcelHint;
+
+  /// No description provided for @homeServiceParcel.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery'**
+  String get homeServiceParcel;
+
+  /// No description provided for @homeServiceParcelSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a package across town, fast'**
+  String get homeServiceParcelSub;
+
+  /// No description provided for @parcelDetailsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Package details'**
+  String get parcelDetailsTitle;
+
+  /// No description provided for @parcelSizeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Package size'**
+  String get parcelSizeTitle;
+
+  /// No description provided for @parcelSizeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Max size {dims}'**
+  String parcelSizeHint(String dims);
+
+  /// No description provided for @parcelSizeS.
+  ///
+  /// In en, this message translates to:
+  /// **'Small'**
+  String get parcelSizeS;
+
+  /// No description provided for @parcelSizeM.
+  ///
+  /// In en, this message translates to:
+  /// **'Medium'**
+  String get parcelSizeM;
+
+  /// No description provided for @parcelSizeL.
+  ///
+  /// In en, this message translates to:
+  /// **'Large'**
+  String get parcelSizeL;
+
+  /// No description provided for @parcelSizeXL.
+  ///
+  /// In en, this message translates to:
+  /// **'Extra large'**
+  String get parcelSizeXL;
+
+  /// No description provided for @parcelWeightLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight (optional)'**
+  String get parcelWeightLabel;
+
+  /// No description provided for @parcelWeightInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid weight'**
+  String get parcelWeightInvalid;
+
+  /// No description provided for @parcelWeightOver.
+  ///
+  /// In en, this message translates to:
+  /// **'Over {limit} kg for this size'**
+  String parcelWeightOver(String limit);
+
+  /// No description provided for @parcelNoteLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Note for the driver (optional)'**
+  String get parcelNoteLabel;
+
+  /// No description provided for @parcelSenderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sender'**
+  String get parcelSenderTitle;
+
+  /// No description provided for @parcelRecipientTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient'**
+  String get parcelRecipientTitle;
+
+  /// No description provided for @parcelNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Full name'**
+  String get parcelNameLabel;
+
+  /// No description provided for @parcelPhoneLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone number'**
+  String get parcelPhoneLabel;
+
+  /// No description provided for @parcelFieldRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get parcelFieldRequired;
+
+  /// No description provided for @parcelPhoneInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid phone number'**
+  String get parcelPhoneInvalid;
+
+  /// No description provided for @parcelPayerSender.
+  ///
+  /// In en, this message translates to:
+  /// **'Sender pays'**
+  String get parcelPayerSender;
+
+  /// No description provided for @parcelPayerRecipient.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient pays (cash)'**
+  String get parcelPayerRecipient;
+
+  /// No description provided for @parcelItemPhotoAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add package photo'**
+  String get parcelItemPhotoAdd;
+
+  /// No description provided for @parcelItemPhotoAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Package photo added'**
+  String get parcelItemPhotoAdded;
+
+  /// No description provided for @parcelVehicleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle'**
+  String get parcelVehicleTitle;
+
+  /// No description provided for @parcelOptionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer {min} – {max}'**
+  String parcelOptionHint(String min, String max);
+
+  /// No description provided for @parcelQuoteCta.
+  ///
+  /// In en, this message translates to:
+  /// **'See price'**
+  String get parcelQuoteCta;
+
+  /// No description provided for @parcelSubmitCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Book delivery'**
+  String get parcelSubmitCta;
+
+  /// No description provided for @parcelDriverBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Package'**
+  String get parcelDriverBadge;
+
+  /// No description provided for @parcelOutcomeDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get parcelOutcomeDelivered;
+
+  /// No description provided for @parcelOutcomeReturning.
+  ///
+  /// In en, this message translates to:
+  /// **'Returning to sender'**
+  String get parcelOutcomeReturning;
+
+  /// No description provided for @parcelOutcomeReturned.
+  ///
+  /// In en, this message translates to:
+  /// **'Returned to sender'**
+  String get parcelOutcomeReturned;
+
+  /// No description provided for @parcelOutcomeInTransit.
+  ///
+  /// In en, this message translates to:
+  /// **'On the way'**
+  String get parcelOutcomeInTransit;
+
+  /// No description provided for @parcelOutcomeWaitingPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for pickup'**
+  String get parcelOutcomeWaitingPickup;
+
+  /// No description provided for @parcelFailUnreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient unreachable'**
+  String get parcelFailUnreachable;
+
+  /// No description provided for @parcelFailRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient refused'**
+  String get parcelFailRefused;
+
+  /// No description provided for @parcelFailAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong address'**
+  String get parcelFailAddress;
+
+  /// No description provided for @parcelFailDamaged.
+  ///
+  /// In en, this message translates to:
+  /// **'Package damaged'**
+  String get parcelFailDamaged;
+
+  /// No description provided for @parcelFailOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other reason'**
+  String get parcelFailOther;
+
+  /// No description provided for @parcelFailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Why can\'t it be delivered?'**
+  String get parcelFailTitle;
+
+  /// No description provided for @parcelErrorNoVehicle.
+  ///
+  /// In en, this message translates to:
+  /// **'No vehicle can carry this package size'**
+  String get parcelErrorNoVehicle;
+
+  /// No description provided for @parcelErrorTooHeavy.
+  ///
+  /// In en, this message translates to:
+  /// **'Package is too heavy for this size'**
+  String get parcelErrorTooHeavy;
+
+  /// No description provided for @parcelErrorRecipientCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient code is wrong'**
+  String get parcelErrorRecipientCode;
+
+  /// No description provided for @parcelErrorCodeLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many wrong codes. Try again later'**
+  String get parcelErrorCodeLocked;
+
+  /// No description provided for @parcelErrorSizeUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This size isn\'t available right now'**
+  String get parcelErrorSizeUnavailable;
+
+  /// No description provided for @parcelErrorPayerMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient-pays only works with cash'**
+  String get parcelErrorPayerMethod;
+
+  /// No description provided for @parcelErrorPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'A photo is required'**
+  String get parcelErrorPhoto;
+
+  /// No description provided for @parcelErrorState.
+  ///
+  /// In en, this message translates to:
+  /// **'The delivery has changed. Refresh'**
+  String get parcelErrorState;
+
+  /// No description provided for @parcelErrorNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection problem. Try again'**
+  String get parcelErrorNetwork;
+
+  /// No description provided for @parcelErrorGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong'**
+  String get parcelErrorGeneric;
+
+  /// No description provided for @parcelRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get parcelRetry;
+
+  /// No description provided for @parcelSenderLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Sender: {name} · {phone}'**
+  String parcelSenderLine(String name, String phone);
+
+  /// No description provided for @parcelRecipientLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient: {name} · {phone}'**
+  String parcelRecipientLine(String name, String phone);
+
+  /// No description provided for @parcelRecipientCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient code: {code}'**
+  String parcelRecipientCode(String code);
+
+  /// No description provided for @parcelRecipientCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Share this code with the recipient. The driver needs it to complete the delivery.'**
+  String get parcelRecipientCodeHint;
+
+  /// No description provided for @parcelPickupCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Picked up (take photo)'**
+  String get parcelPickupCta;
+
+  /// No description provided for @parcelReturningHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Bring the package back to the sender'**
+  String get parcelReturningHint;
+
+  /// No description provided for @parcelReturnedCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Returned to sender (photo)'**
+  String get parcelReturnedCta;
+
+  /// No description provided for @parcelRecipientCodeInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient code'**
+  String get parcelRecipientCodeInput;
+
+  /// No description provided for @parcelDeliverCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered (photo)'**
+  String get parcelDeliverCta;
+
+  /// No description provided for @parcelFailCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t deliver'**
+  String get parcelFailCta;
+
+  /// No description provided for @parcelServiceFeeLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Service fee {amount} (included in fare)'**
+  String parcelServiceFeeLine(String amount);
+
+  /// No description provided for @parcelReturnFeeLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Return fee if delivery fails: {amount}'**
+  String parcelReturnFeeLine(String amount);
+
+  /// No description provided for @parcelReturnFeeCharged.
+  ///
+  /// In en, this message translates to:
+  /// **'Return fee {amount}'**
+  String parcelReturnFeeCharged(String amount);
+
+  /// No description provided for @parcelReceiptServiceFee.
+  ///
+  /// In en, this message translates to:
+  /// **'Parcel service fee (included)'**
+  String get parcelReceiptServiceFee;
+
+  /// No description provided for @parcelReceiptReturnFee.
+  ///
+  /// In en, this message translates to:
+  /// **'Return fee'**
+  String get parcelReceiptReturnFee;
+
+  /// No description provided for @driverServicesFoodMotorbikeOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Food orders are for motorbike drivers only.'**
+  String get driverServicesFoodMotorbikeOnly;
+
+  /// No description provided for @partnerKindFoodSafetyCommitment.
+  ///
+  /// In en, this message translates to:
+  /// **'Food safety commitment'**
+  String get partnerKindFoodSafetyCommitment;
+
+  /// No description provided for @partnerFoodSafetyUseCommitment.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the food safety commitment'**
+  String get partnerFoodSafetyUseCommitment;
+
+  /// No description provided for @partnerFoodSafetyUseCommitmentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Small household shops may sign the food safety commitment instead of the certificate.'**
+  String get partnerFoodSafetyUseCommitmentHint;
+
+  /// No description provided for @kycOcrPrefilledNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Some fields were filled from your document photos. Please check and correct them.'**
+  String get kycOcrPrefilledNote;
+
+  /// No description provided for @kycOcrReading.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading your document…'**
+  String get kycOcrReading;
 }
 
 class _AppLocalizationsDelegate

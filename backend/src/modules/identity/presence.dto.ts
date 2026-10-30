@@ -58,6 +58,11 @@ export class UpsertPresenceDto {
   @IsBoolean()
   foodEnabled?: boolean;
 
+  /** DEC-PROD-071: take parcel (goods) delivery jobs while online. Omitted keeps the stored choice (off for a new row). */
+  @IsOptional()
+  @IsBoolean()
+  parcelEnabled?: boolean;
+
   @IsOptional()
   @Type(() => Number)
   @IsNumber({ allowInfinity: false, allowNaN: false })

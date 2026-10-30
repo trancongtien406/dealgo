@@ -29,8 +29,12 @@ export class MePartnerApplicationsController {
     summary:
       'DEC-PROD-048: whether KYC/KYB documents are required for a role and which kinds',
   })
-  requirements(@Param('role') role: string, @Query('vehicleClassCode') vehicleClassCode?: string) {
-    return this.partners.requirements(parseRole(role), vehicleClassCode);
+  requirements(
+    @Param('role') role: string,
+    @Query('vehicleClassCode') vehicleClassCode?: string,
+    @Query('registrationSubject') registrationSubject?: string,
+  ) {
+    return this.partners.requirements(parseRole(role), vehicleClassCode, registrationSubject);
   }
 
   @Get(':role')

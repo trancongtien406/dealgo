@@ -1,5 +1,6 @@
 /** Nest PartnerApplicationView subset used by Admin BFF (envelope.data). */
-export type NestPartnerStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+export type NestPartnerStatus =
+  "DRAFT" | "SUBMITTED" | "IN_REVIEW" | "APPROVED" | "REJECTED";
 
 export type NestPartnerRole = "DRIVER" | "MERCHANT";
 

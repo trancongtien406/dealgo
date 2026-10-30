@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { IntegrationSettingsModule } from '../../platform/integration-settings/integration-settings.module.js';
 import { IdentityModule } from '../identity/index.js';
+import { SystemErrorsWatcherService } from './system-errors-watcher.service.js';
 import {
   OpsSentrySettingsController,
   OpsSystemErrorsController,
@@ -16,6 +17,7 @@ import {
   controllers: [OpsSentrySettingsController, OpsSystemErrorsController],
   providers: [
     SystemErrorsService,
+    SystemErrorsWatcherService,
     {
       provide: SENTRY_FETCH,
       useValue: ((url, init) => fetch(url, init)) satisfies SentryFetch,

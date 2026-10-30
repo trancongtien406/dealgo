@@ -52,9 +52,10 @@ class _MerchantOrdersPageState extends State<MerchantOrdersPage> {
       return;
     }
     final queue = context.read<MerchantQueueCubit>();
-    queue.setTokenSource(
-      () => context.mounted ? merchantAccessToken(context) : null,
-    );
+    queue.setTokenSource(() {
+      if (!mounted) return null;
+      return merchantAccessToken(context);
+    });
     unawaited(queue.load(merchantAccessToken(context)));
   }
 

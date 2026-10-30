@@ -3,6 +3,8 @@ import { seedVehicleClassOnDriverGrant } from '../../support/driver-class-fixtur
  * DEC-PROD-024 ride vouchers over HTTP (memory repositories): reserve on offer selection,
  * release on cancel/reassign, cash = fare - discount, DealGo-funded share owed to the driver.
  */
+import { PLATFORM_SETTINGS_REPOSITORY } from '../../../src/platform/settings/platform-settings.constants.js';
+import { bidBandOffSettings } from '../../support/settings-fixture.js';
 import { INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
@@ -105,6 +107,8 @@ describe('ride vouchers http (DEC-PROD-024)', () => {
       .useValue(promotions)
       .overrideProvider(LEDGER_REPOSITORY)
       .useValue(ledger)
+      .overrideProvider(PLATFORM_SETTINGS_REPOSITORY)
+      .useValue(await bidBandOffSettings())
       .compile();
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(createValidationPipe());

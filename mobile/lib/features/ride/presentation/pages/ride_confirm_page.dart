@@ -431,7 +431,10 @@ class _RidePaymentSectionState extends State<RidePaymentSection> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         PaymentMethodTile(
-          service: paymentServiceForVehicleClass(widget.ride.vehicleClassCode),
+          service: paymentServiceForRide(
+            widget.ride.vehicleClassCode,
+            parcel: widget.ride.isParcel,
+          ),
           selected: _method.code,
           onChanged: (m) => setState(() => _method = m),
         ),

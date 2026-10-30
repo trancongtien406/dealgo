@@ -42,8 +42,38 @@ export function parsePositiveInt(
 }
 
 /** Relays a binary upstream result with no-store caching and no MIME sniffing. */
+/**
+ * t54u: single `bytes=` range → [start, end] inclusive; null = serve the whole body;
+ * "unsatisfiable" = 416. Safari needs 206 range replies to play <video>.
+ */
+export function parseByteRange(
+  header: string | null | undefined,
+  size: number,
+): [number, number] | null | "unsatisfiable" {
+  const match = /^bytes=(\d*)-(\d*)$/.exec(header?.trim() ?? "");
+  if (!match || (match[1] === "" && match[2] === "")) {
+    return null;
+  }
+  let start: number;
+  let end: number;
+  if (match[1] === "") {
+    const suffix = Number(match[2]);
+    if (suffix === 0) return "unsatisfiable";
+    start = Math.max(0, size - suffix);
+    end = size - 1;
+  } else {
+    start = Number(match[1]);
+    end = match[2] === "" ? size - 1 : Math.min(Number(match[2]), size - 1);
+  }
+  if (start >= size || start > end) {
+    return "unsatisfiable";
+  }
+  return [start, end];
+}
+
 export function binaryFromOpsUpstream(
   result: import("@/lib/api/ops-upstream").OpsBinaryResult,
+  rangeHeader?: string | null,
 ): Response {
   if (!result.ok) {
     return NextResponse.json(
@@ -51,14 +81,35 @@ export function binaryFromOpsUpstream(
       { status: result.status },
     );
   }
+  const size = result.body.byteLength;
+  const headers: Record<string, string> = {
+    "Content-Type": result.contentType,
+    "Accept-Ranges": "bytes",
+    "Cache-Control": "private, no-store",
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",
+    ...(result.disposition ? { "Content-Disposition": result.disposition } : {}),
+  };
+  const range = parseByteRange(rangeHeader, size);
+  if (range === "unsatisfiable") {
+    return new Response(null, {
+      status: 416,
+      headers: { ...headers, "Content-Range": `bytes */${size}` },
+    });
+  }
+  if (range) {
+    const [start, end] = range;
+    return new Response(result.body.slice(start, end + 1), {
+      status: 206,
+      headers: {
+        ...headers,
+        "Content-Range": `bytes ${start}-${end}/${size}`,
+        "Content-Length": String(end - start + 1),
+      },
+    });
+  }
   return new Response(result.body, {
     status: 200,
-    headers: {
-      "Content-Type": result.contentType,
-      "Cache-Control": "private, no-store",
-      "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",
-      ...(result.disposition ? { "Content-Disposition": result.disposition } : {}),
-    },
+    headers: { ...headers, "Content-Length": String(size) },
   });
 }

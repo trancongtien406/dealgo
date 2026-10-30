@@ -35,6 +35,7 @@ export type RideVehicleClassView = {
   assumedSpeedKmh: number;
   sortOrder: number;
   imageUrl: string | null;
+  parcelEnabled: boolean;
 };
 
 export type RideQuoteOptionView = RideVehicleClassView & {
@@ -56,6 +57,7 @@ function toView(row: RideVehicleClass): RideVehicleClassView {
     assumedSpeedKmh: row.assumedSpeedKmh,
     sortOrder: row.sortOrder,
     imageUrl: row.imageUrl,
+    parcelEnabled: row.parcelEnabled,
   };
 }
 
@@ -88,6 +90,12 @@ export class RideVehicleClassService {
   async listAll(): Promise<RideVehicleClassView[]> {
     const rows = await this.load();
     return rows.map(toView);
+  }
+
+  /** DEC-PROD-071: enabled classes ops opened for parcel delivery. */
+  async listParcelEnabled(): Promise<RideVehicleClass[]> {
+    const rows = await this.load();
+    return rows.filter((row) => row.enabled && row.parcelEnabled);
   }
 
   async listEnabled(): Promise<RideVehicleClass[]> {
@@ -132,6 +140,7 @@ export class RideVehicleClassService {
       minFareVnd: patch.minFareVnd ?? current.minFareVnd,
       maxFareVnd: patch.maxFareVnd ?? current.maxFareVnd,
       assumedSpeedKmh: patch.assumedSpeedKmh ?? current.assumedSpeedKmh,
+      parcelEnabled: patch.parcelEnabled ?? current.parcelEnabled,
     };
     const changed =
       next.name !== current.name ||
@@ -142,7 +151,8 @@ export class RideVehicleClassService {
       next.perMinuteVnd !== current.perMinuteVnd ||
       next.minFareVnd !== current.minFareVnd ||
       next.maxFareVnd !== current.maxFareVnd ||
-      next.assumedSpeedKmh !== current.assumedSpeedKmh;
+      next.assumedSpeedKmh !== current.assumedSpeedKmh ||
+      next.parcelEnabled !== current.parcelEnabled;
     if (!changed) {
       throw new HttpException(
         { message: 'No vehicle class field to update', errorCode: 'VALIDATION_ERROR' },

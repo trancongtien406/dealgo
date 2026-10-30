@@ -133,7 +133,9 @@ function areaHint(label: string): string {
     .map((part) => part.trim())
     .filter(Boolean);
   if (parts.length >= 2) {
-    return parts[parts.length - 1] ?? "—";
+    // When multiple segments exist (e.g. "Đoàn Nguyễn Thục, Hòa Phát, An Khê, Đà Nẵng"),
+    // show the district/ward context instead of only the last element "Đà Nẵng".
+    return parts.slice(1).join(", ");
   }
   return "—";
 }

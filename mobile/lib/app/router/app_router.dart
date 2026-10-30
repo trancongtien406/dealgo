@@ -62,6 +62,7 @@ import '../../features/food/presentation/utils/food_routes.dart';
 import '../../features/food/presentation/pages/food_store_page.dart';
 import '../../features/food/presentation/pages/food_tracking_page.dart';
 import '../../features/places/presentation/place_picker_page.dart';
+import '../../features/parcel/presentation/pages/parcel_details_page.dart';
 import '../../features/ride/presentation/pages/ride_map_page.dart';
 import '../../features/ride/domain/entities/ride_models.dart';
 import '../../features/ride/domain/entities/ride_vehicle.dart';
@@ -391,6 +392,27 @@ GoRouter createAppRouter({
             child: draft == null
                 ? const RideMapPage()
                 : RideFareBreakdownPage(draft: draft),
+          );
+        },
+      ),
+      GoRoute(
+        path: RideRoutes.parcel,
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) => dealgoFadeSlidePage(
+          key: state.pageKey,
+          child: const RideMapPage(parcel: true),
+        ),
+      ),
+      GoRoute(
+        path: RideRoutes.parcelDetails,
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) {
+          final extra = state.extra;
+          return dealgoFadeSlidePage(
+            key: state.pageKey,
+            child: extra is RidePlaces
+                ? ParcelDetailsPage(places: extra)
+                : const RideMapPage(parcel: true),
           );
         },
       ),
@@ -821,12 +843,17 @@ ShellRoute _driverScopedShell() {
 ShellRoute _merchantScopedShell() {
   return ShellRoute(
     builder: (context, state, child) {
+      final auth = context.read<AuthCubit>();
       return BlocProvider(
         create: (context) => MerchantQueueCubit(
           listMerchantOrderQueue: context.read<ListMerchantOrderQueue>(),
           realtime: context.read<SnapshotRealtime>(),
           acceptMerchantOrder: context.read<AcceptMerchantOrder>(),
           markMerchantOrderReady: context.read<MarkMerchantOrderReady>(),
+          tokenSource: () {
+            final s = auth.state;
+            return s is AuthSignedIn ? s.tokens.accessToken : null;
+          },
           resolveStoreId: (token) async =>
               (await context.read<GetMerchantCatalog>()(token)).id,
           onNewOrders: () => unawaited(

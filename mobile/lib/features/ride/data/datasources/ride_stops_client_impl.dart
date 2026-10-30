@@ -132,6 +132,7 @@ class FakeRideStopsClient implements RideStopsClient {
     currentStopSeq: _firstOpen(stops),
     stopFeeVnd: r.stopFeeVnd,
     waitFeeVnd: r.waitFeeVnd,
+    serviceKind: r.serviceKind,
   );
 
   static int? _firstOpen(List<RideStop> stops) {

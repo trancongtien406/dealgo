@@ -68,7 +68,6 @@ void main() {
             ringer: ringer,
             clock: () => now,
             inCall: () => false,
-            pollEvery: const Duration(hours: 1),
             child: const Scaffold(body: Text('jobs')),
           ),
         ),

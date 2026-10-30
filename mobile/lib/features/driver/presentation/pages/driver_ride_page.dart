@@ -12,6 +12,7 @@ import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../parcel/presentation/widgets/parcel_labels.dart';
 import '../../../ride/domain/entities/ride_models.dart';
 import '../../../ride/presentation/utils/ride_vehicle_label.dart';
 import '../../../ride/presentation/widgets/ride_negotiation_ui.dart';
@@ -459,6 +460,17 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
                     label: l10n.driverVehicle,
                     value: rideVehicleClassLabel(l10n, ride.vehicleClassCode),
                   ),
+                  if (ride.isParcel)
+                    DriverMoneyRow(
+                      key: const Key('driver-ride-parcel'),
+                      label: l10n.parcelDriverBadge,
+                      value: [
+                        if (ride.parcelSizeClass != null)
+                          parcelSizeLabel(l10n, ride.parcelSizeClass!),
+                        if (ride.parcelWeightKg != null)
+                          '${ride.parcelWeightKg!.toStringAsFixed(1)} kg',
+                      ].join(' · '),
+                    ),
                 ],
               ),
             ),

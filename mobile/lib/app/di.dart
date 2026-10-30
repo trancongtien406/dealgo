@@ -1,3 +1,4 @@
+import '../core/mock/fake_ride_client.dart';
 import '../core/drafts/draft_store.dart';
 import '../core/drafts/text_draft.dart';
 
@@ -27,6 +28,9 @@ import '../features/driver/data/datasources/driver_active_job_client.dart';
 import '../features/ride/data/datasources/customer_active_trip_client.dart';
 import '../features/ride/data/datasources/ride_negotiation_clients.dart';
 import '../features/ride/domain/negotiation/ride_negotiation_client.dart';
+import '../features/parcel/data/dio_parcel_client.dart';
+import '../features/parcel/data/fake_parcel_client.dart';
+import '../features/parcel/domain/parcel_client.dart';
 import '../features/ride/data/datasources/ride_stops_client_impl.dart';
 import '../features/ride/domain/stops/ride_stops_client.dart';
 import '../core/notifications/notification_router.dart';
@@ -151,6 +155,7 @@ import '../features/merchant/domain/usecases/replace_merchant_item_options.dart'
 import '../features/merchant/domain/usecases/set_merchant_item_availability.dart';
 import '../features/onboarding/data/datasources/dio_partner_applications_remote_datasource.dart';
 import '../features/onboarding/data/datasources/fake_partner_applications_client.dart';
+import '../features/onboarding/data/ocr/mlkit_document_text_reader.dart';
 import '../features/onboarding/data/datasources/partner_requirements_client.dart';
 import '../features/onboarding/data/datasources/partner_applications_remote_datasource.dart';
 import '../features/onboarding/data/repositories/partner_applications_repository_impl.dart';
@@ -161,6 +166,7 @@ import '../features/onboarding/domain/usecases/submit_partner_application.dart';
 import '../features/onboarding/presentation/cubit/driver_kyc_cubit.dart';
 import '../features/onboarding/presentation/cubit/merchant_kyb_cubit.dart';
 import '../features/onboarding/presentation/document_image_source.dart';
+import '../features/onboarding/presentation/capture/smart_capture.dart';
 import '../features/merchant/data/datasources/dio_merchant_stats_remote_datasource.dart';
 import '../features/merchant/data/datasources/fake_merchant_stats_remote_datasource.dart';
 import '../features/merchant/data/datasources/merchant_offers_remote_datasource.dart';
@@ -268,6 +274,7 @@ class DealGoDependencies {
   RideNegotiationClient get rideNegotiation =>
       _locator<RideNegotiationClient>();
   RideStopsClient get rideStops => _locator<RideStopsClient>();
+  ParcelClient get parcel => _locator<ParcelClient>();
   AnalyticsPort get analytics => _locator<AnalyticsPort>();
   NotificationRouter get notificationRouter => _locator<NotificationRouter>();
   AuthCubit get authCubit => _locator<AuthCubit>();
@@ -497,7 +504,7 @@ class DealGoDependencies {
       tokenStore: tokens,
       sessionRefresher: sessionRefresher,
       onSessionRefreshed: (next) => auth.applyRefreshedTokens(next),
-      onUnauthorized: () => auth.signOut(),
+      onUnauthorized: () => auth.signOut(revokeRemote: false),
     );
 
     final useOverrides =
@@ -580,8 +587,10 @@ class DealGoDependencies {
               : SocketSnapshotRealtime(
                   readAccessToken: () async =>
                       (await tokens.read())?.accessToken,
-                  refreshAccessToken: () =>
-                      refreshRealtimeToken(sessionRefresher, auth.signOut),
+                  refreshAccessToken: () => refreshRealtimeToken(
+                    sessionRefresher,
+                    () => auth.signOut(revokeRemote: false),
+                  ),
                 ));
       analyticsPort =
           analytics ??
@@ -696,6 +705,13 @@ class DealGoDependencies {
         (useOverrides || useMockData
             ? FakeRideStopsClient()
             : DioRideStopsClient(dio: dio));
+    // DEC-PROD-071 goods delivery: same Dio + auth stack as Ride.
+    final ParcelClient parcel = useOverrides || useMockData
+        ? FakeParcelClient()
+        : DioParcelClient(dio: dio);
+    if (parcel is FakeParcelClient && rides is FakeRideClient) {
+      parcel.bridgeInto(rides);
+    }
     final inboxRepository = InboxRepositoryImpl(
       inboxRemote ??
           (useOverrides
@@ -805,6 +821,7 @@ class DealGoDependencies {
     put<AccountSettingsRepository>(accountSettingsRepository);
     put<RideNegotiationClient>(rideNegotiation);
     put<RideStopsClient>(rideStops);
+    put<ParcelClient>(parcel);
     put<HelpFaqRepository>(helpFaqRepository);
     put<RideShareRepository>(rideShareRepository);
     put<ListInboxNotifications>(ListInboxNotifications(inboxRepository));
@@ -873,6 +890,11 @@ class DealGoDependencies {
     put<DocumentImageSource>(
       documentImageSource ?? ImagePickerDocumentSource(),
     );
+    // t52u: guided camera + on-device ML only in the real app; tests that
+    // inject a fake source keep the plain picker path.
+    if (documentImageSource == null) {
+      put<SmartCaptureLauncher>(const CameraSmartCaptureLauncher());
+    }
     put<PartnerRequirementsSource>(
       partnerRequirements ??
           (useMockData
@@ -1148,6 +1170,10 @@ class DealGoDependencies {
         RepositoryProvider<DocumentImageSource>.value(
           value: _locator<DocumentImageSource>(),
         ),
+        if (_locator.isRegistered<SmartCaptureLauncher>())
+          RepositoryProvider<SmartCaptureLauncher>.value(
+            value: _locator<SmartCaptureLauncher>(),
+          ),
         RepositoryProvider<ChatClient>.value(value: chatClient),
         RepositoryProvider<ChatRepository>.value(value: chatRepository),
         RepositoryProvider<ListRideChatMessages>.value(
@@ -1180,6 +1206,7 @@ class DealGoDependencies {
         RepositoryProvider<SnapshotRealtime>.value(value: realtime),
         RepositoryProvider<RideNegotiationClient>.value(value: rideNegotiation),
         RepositoryProvider<RideStopsClient>.value(value: rideStops),
+        RepositoryProvider<ParcelClient>.value(value: parcel),
         RepositoryProvider<AnalyticsPort>.value(value: analytics),
         RepositoryProvider<NotificationRouter>.value(value: notificationRouter),
         RepositoryProvider<ConnectivityService>.value(value: connectivity),
@@ -1230,6 +1257,7 @@ class DealGoDependencies {
           ),
           BlocProvider(
             create: (_) => DriverKycCubit(
+              textReader: useMockData ? null : MlKitDocumentTextReader(),
               submitPartnerApplication: _locator<SubmitPartnerApplication>(),
               getMyPartnerApplication: _locator<GetMyPartnerApplication>(),
               accessToken: _accessToken,
@@ -1242,6 +1270,7 @@ class DealGoDependencies {
           ),
           BlocProvider(
             create: (_) => MerchantKybCubit(
+              textReader: useMockData ? null : MlKitDocumentTextReader(),
               submitPartnerApplication: _locator<SubmitPartnerApplication>(),
               getMyPartnerApplication: _locator<GetMyPartnerApplication>(),
               accessToken: _accessToken,

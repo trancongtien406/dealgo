@@ -1,3 +1,6 @@
+import { PARTNER_REPOSITORY } from '../../../src/modules/partner/partner.constants.js';
+import type { PartnerRepository } from '../../../src/modules/partner/partner.repository.js';
+import { seedMotorbikeOnDriverGrant } from './motorbike-drivers.js';
 import { INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
@@ -76,6 +79,7 @@ describe('food order http', () => {
     app.useGlobalFilters(new HttpExceptionFilter());
     app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
     await app.init();
+    seedMotorbikeOnDriverGrant(repository, app);
     // These suites exercise the delivery-code flow; the shipped default is off.
     await app
       .get(PlatformSettingsService)
@@ -305,6 +309,66 @@ describe('food order http', () => {
       winner.status === 200 ? firstDriver.userId : secondDriver.userId,
     );
     expect(rejected.body.errorCode).toBe('FOOD_ALREADY_ASSIGNED');
+  });
+
+  it('FOOD is motorbike-only: a CAR_4 or class-less driver never sees nor claims a READY order', async () => {
+    const customer = await login();
+    const merchant = await loginPhone('0901110001');
+    const partners = app.get<PartnerRepository>(PARTNER_REPOSITORY);
+    const car = await login();
+    await partners.upsertSubmit({
+      id: `app-car-${car.userId}`, userId: car.userId, role: 'DRIVER',
+      metadata: { vehicleClassCode: 'CAR_4' }, documents: [], now: new Date(),
+    });
+    await repository.insertGrant(car.userId, 'DRIVER', 'ACTIVE');
+    const noClass = await login();
+    await partners.upsertSubmit({
+      id: `app-none-${noClass.userId}`, userId: noClass.userId, role: 'DRIVER',
+      metadata: {}, documents: [], now: new Date(),
+    });
+    await repository.insertGrant(noClass.userId, 'DRIVER', 'ACTIVE');
+    const bike = await login();
+    await repository.insertGrant(bike.userId, 'DRIVER', 'ACTIVE');
+
+    const catalog = await oneItem(customer.token);
+    const created = await place(customer.token, 'idem-food-bike-only', catalog.storeId, [
+      { itemId: catalog.itemId, quantity: 1 },
+    ]);
+    const orderId = created.body.data.id as string;
+    for (const step of ['accept', 'ready']) {
+      await request(app.getHttpServer())
+        .post(`/v1/food/orders/${orderId}/${step}`)
+        .set('Authorization', `Bearer ${merchant.token}`)
+        .expect(200);
+    }
+    for (const d of [car, noClass, bike]) {
+      await request(app.getHttpServer())
+        .post('/v1/me/presence')
+        .set('Authorization', `Bearer ${d.token}`)
+        .send({ online: true, lat: dropoff.lat, lng: dropoff.lng })
+        .expect(200);
+    }
+    for (const d of [car, noClass]) {
+      const listed = await request(app.getHttpServer())
+        .get('/v1/food/orders/ready')
+        .set('Authorization', `Bearer ${d.token}`)
+        .expect(200);
+      expect(listed.body.data).toEqual([]);
+      const claim = await request(app.getHttpServer())
+        .post(`/v1/food/orders/${orderId}/claim`)
+        .set('Authorization', `Bearer ${d.token}`)
+        .expect(403);
+      expect(claim.body.errorCode).toBe('FOOD_VEHICLE_NOT_ALLOWED');
+      await request(app.getHttpServer())
+        .get(`/v1/food/orders/${orderId}`)
+        .set('Authorization', `Bearer ${d.token}`)
+        .expect(404);
+    }
+    const ok = await request(app.getHttpServer())
+      .post(`/v1/food/orders/${orderId}/claim`)
+      .set('Authorization', `Bearer ${bike.token}`)
+      .expect(200);
+    expect(ok.body.data.assignedDriverId).toBe(bike.userId);
   });
 
   it('lists a ready order to an active driver and omits a placed order', async () => {

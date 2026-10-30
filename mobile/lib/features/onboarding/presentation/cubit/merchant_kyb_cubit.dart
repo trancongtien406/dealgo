@@ -10,6 +10,9 @@ import '../../../identity/domain/entities/user_profile.dart';
 import '../../domain/entities/partner_application.dart';
 import '../../domain/entities/partner_documents.dart';
 import '../../domain/entities/partner_onboarding.dart';
+import '../../domain/ocr/document_ocr_parser.dart';
+import '../../domain/ocr/document_text_reader.dart';
+import '../../domain/ocr/ocr_prefill.dart';
 import '../../domain/usecases/get_my_partner_application.dart';
 import '../../domain/usecases/submit_partner_application.dart';
 import '../document_image_source.dart';
@@ -49,6 +52,9 @@ class MerchantKybState {
     this.submitting = false,
     this.submitError,
     this.documentsRequired = true,
+    this.foodSafetyCommitment = false,
+    this.ocr = const OcrPrefill(),
+    this.ocrReading = false,
   });
 
   factory MerchantKybState.initial() {
@@ -106,6 +112,28 @@ class MerchantKybState {
   /// no documents or bank; ops still approves.
   final bool documentsRequired;
 
+  /// t61u: household shop files the ATTP commitment instead of the certificate.
+  final bool foodSafetyCommitment;
+
+  /// t61u: values read from document photos on the device.
+  final OcrPrefill ocr;
+  final bool ocrReading;
+
+  bool get canUseFoodSafetyCommitment =>
+      registrationSubject == MerchantRegistrationSubject.household;
+
+  bool get usesFoodSafetyCommitment =>
+      canUseFoodSafetyCommitment && foodSafetyCommitment;
+
+  List<String> get requiredDocumentKinds =>
+      PartnerDocumentKind.merchantRequiredFor(
+        useCommitment: usesFoodSafetyCommitment,
+      );
+
+  List<String> get documentKinds => PartnerDocumentKind.merchantAllFor(
+    useCommitment: usesFoodSafetyCommitment,
+  );
+
   List<MerchantKybStep> get steps => documentsRequired
       ? MerchantKybStep.values
       : const [
@@ -133,7 +161,7 @@ class MerchantKybState {
       bankAccountHolder.trim().length >= 2;
 
   bool get canContinueDocuments =>
-      documents.hasAll(PartnerDocumentKind.merchantRequired) &&
+      documents.hasAll(requiredDocumentKinds) &&
       !documents.isFlagged(PartnerDocumentKind.storefront);
 
   bool get canSubmit => documentsRequired
@@ -164,8 +192,14 @@ class MerchantKybState {
     String? submitError,
     bool clearSubmitError = false,
     bool? documentsRequired,
+    bool? foodSafetyCommitment,
+    OcrPrefill? ocr,
+    bool? ocrReading,
   }) {
     return MerchantKybState(
+      foodSafetyCommitment: foodSafetyCommitment ?? this.foodSafetyCommitment,
+      ocr: ocr ?? this.ocr,
+      ocrReading: ocrReading ?? this.ocrReading,
       documentsRequired: documentsRequired ?? this.documentsRequired,
       status: status ?? this.status,
       step: step ?? this.step,
@@ -200,8 +234,11 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
     this._draftStore,
     this._draftOwner,
     bool? useMock,
+    this._textReader,
   }) : _useMock = useMock ?? useMockData,
        super(MerchantKybState.initial());
+
+  final DocumentTextReader? _textReader;
 
   static const role = 'MERCHANT';
 
@@ -334,6 +371,7 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
   }
 
   Map<String, Object?> _metadataOf(MerchantKybState state) => {
+    ...state.documents.captureMetadata(),
     'businessType': state.businessType,
     'registrationSubject': state.registrationSubject,
     'shopName': state.shopName.trim(),
@@ -345,6 +383,8 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
     'bankName': state.bankName.trim(),
     'bankAccountNumber': state.bankAccountNumber,
     'bankAccountHolder': state.bankAccountHolder.trim(),
+    if (state.usesFoodSafetyCommitment) 'foodSafetyCommitment': true,
+    ...state.ocr.toMetadata(extraKeys: ocrExtraKeys),
   };
 
   @override
@@ -493,8 +533,58 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
     );
   }
 
-  void setRepresentativeName(String value) =>
-      emit(state.copyWith(representativeName: value));
+  void setRepresentativeName(String value) => emit(
+    state.copyWith(
+      representativeName: value,
+      ocr: state.ocr.onEdit('representativeName', value),
+    ),
+  );
+
+  void setFoodSafetyCommitment(bool value) =>
+      emit(state.copyWith(foodSafetyCommitment: value));
+
+  static const ocrExtraKeys = [
+    OcrKeys.businessLicenseNumber,
+    OcrKeys.businessName,
+    'representativeIdNumber',
+  ];
+
+  /// t61u: reads the photo on the device and prefills empty fields.
+  Future<void> readDocumentText(String kind, PickedDocumentImage image) async {
+    final reader = _textReader;
+    if (reader == null || !state.documentsRequired) return;
+    emit(state.copyWith(ocrReading: true));
+    final text = await reader.read(image.bytes);
+    if (isClosed) return;
+    var parsed = text == null
+        ? const <String, String>{}
+        : parseDocumentText(kind, text);
+    if (kind == PartnerDocumentKind.repIdFront) {
+      parsed = {
+        if (parsed[OcrKeys.fullName] != null)
+          'representativeName': parsed[OcrKeys.fullName]!,
+        if (parsed[OcrKeys.idNumber] != null)
+          'representativeIdNumber': parsed[OcrKeys.idNumber]!,
+      };
+    } else if (kind != PartnerDocumentKind.businessLicense) {
+      parsed = const {};
+    }
+    applyOcr(parsed);
+  }
+
+  void applyOcr(Map<String, String> parsed) {
+    final merged = state.ocr.merge(parsed, {
+      'representativeName': state.representativeName,
+      for (final key in ocrExtraKeys) key: state.ocr.values[key] ?? '',
+    });
+    emit(
+      state.copyWith(
+        ocrReading: false,
+        ocr: merged.prefill,
+        representativeName: merged.apply['representativeName'],
+      ),
+    );
+  }
 
   void setBankName(String value) => emit(state.copyWith(bankName: value));
 
@@ -511,6 +601,7 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
     if (keeper != null) {
       unawaited(keeper.store.writeBlob(keeper.key, kind, image.bytes));
     }
+    unawaited(readDocumentText(kind, image));
   }
 
   void removeDocument(String kind) {
@@ -623,7 +714,7 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
           role: role,
           metadata: _metadataOf(state),
           documents: state.documentsRequired
-              ? state.documents.uploads(PartnerDocumentKind.merchantAll)
+              ? state.documents.uploads(state.documentKinds)
               : const [],
         ),
       );

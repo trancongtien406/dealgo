@@ -37,10 +37,17 @@ import { PaymentMethodRegistryService } from '../payment/checkout/payment-method
 import { serviceForVehicleClass } from '../payment/checkout/payment-method.catalog.js';
 import type { PaymentMethodCode } from '../../platform/settings/payment-method-registry.js';
 import { RideVehicleClassService } from '../ride-vehicle/ride-vehicle-class.service.js';
+import type { RideVehicleClass } from '../ride-vehicle/ride-vehicle-class.js';
+import type { RidePricingSnapshot } from '../ride-vehicle/ride-zone-tariff.repository.js';
+import { applyZoneTariff, type ResolvedTariff, RideZoneTariffService } from '../ride-vehicle/ride-zone-tariff.service.js';
+
+/** Bid band locked onto a ride (percent of the reference fare). */
+type BidBand = { floorPercent: number; ceilingPercent: number };
 import {
   clampToFareSteps,
   isBikeClass,
   MOTORBIKE_CLASS_CODE,
+  rideBidCeilingVnd,
   rideBidFloorVnd,
   roundDownToFareStep,
   roundUpToFareStep,
@@ -96,6 +103,19 @@ import {
   type MultiStopConfig,
 } from './ride-multi-stop.js';
 import type { OpsInterveneResult, RideRepository } from './ride.repository.js';
+import { RIDE_PARCEL_STORE, type NewParcel, type ParcelRecord, type RideParcelStore } from './ride-parcel.store.js';
+
+/** DEC-PROD-071: what a ride carries. PARCEL = goods (Giao hàng), RIDE = people. */
+export type RideServiceKind = 'RIDE' | 'PARCEL';
+
+/** Parcel extras handed to create() by ParcelService (server-priced surcharge + package row). */
+export type ParcelBooking = {
+  surchargeVnd: number;
+  record: Omit<NewParcel, 'rideId' | 'surchargeVnd'>;
+};
+
+/** Package facts a driver sees before bidding (no names/phones until assigned). */
+export type OpenParcelSummary = { sizeClass: string; weightKg: number | null; note: string | null };
 
 export type RideOfferView = {
   id: string;
@@ -128,6 +148,9 @@ export type OpenRideView = {
   stops: Array<{ lat: number; lng: number; label: string }>;
   /** Offers must quote this version; a stop edit bumps it. */
   routeVersion: number;
+  /** DEC-PROD-071: goods job vs passenger ride. */
+  serviceKind?: RideServiceKind;
+  parcel?: OpenParcelSummary | null;
 };
 
 export type RideStopView = {
@@ -141,6 +164,8 @@ export type RideStopView = {
 
 export type RideView = {
   id: string;
+  /** DEC-PROD-071: goods job vs passenger ride. */
+  serviceKind?: RideServiceKind;
   status:
     | 'NEGOTIATING'
     | 'ASSIGNED'
@@ -240,6 +265,10 @@ export interface RideQuoteOptionView {
    * ceil(reference × RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE / 100)). The slider starts here.
    */
   minBidVnd: number;
+  /** Highest bid the server accepts = reference × RIDE_BID_CEILING_PERCENT_OF_REFERENCE / 100 (never below the class min). */
+  maxBidVnd: number;
+  /** Tariff that priced this option (zone override or global default) + band; locked onto the ride at booking. */
+  tariff: ResolvedTariff & { bidFloorPercent: number; bidCeilingPercent: number };
   /** Multi-stop service for this class (BIKE / CAR). */
   multiStopService: 'BIKE' | 'CAR';
   /** false when the quoted stops are not allowed for this class (flag off / too many). */
@@ -254,6 +283,8 @@ export interface RideQuoteView {
   maxFareVnd: number;
   /** Effective lowest bid for the primary option. */
   minBidVnd: number;
+  /** Effective highest bid for the primary option. */
+  maxBidVnd: number;
   /** Unpaid fees that will be added to the next completed ride. */
   pendingFeesVnd: number;
   options: RideQuoteOptionView[];
@@ -298,10 +329,61 @@ export class RideService {
     @Optional() private readonly phaseRoutes?: PhaseRouteCache,
     @Optional() private readonly paymentMethods?: PaymentMethodRegistryService,
     @Optional() private readonly checkout?: PaymentGatewayService,
+    @Optional() private readonly zoneTariffs?: RideZoneTariffService,
+    @Optional() @Inject(RIDE_PARCEL_STORE) private readonly parcels?: RideParcelStore,
   ) {}
 
+  /** DEC-PROD-071: parcel row of a ride (null for passenger rides). */
+  async parcelOf(rideId: string): Promise<ParcelRecord | null> {
+    return (await this.parcels?.find(rideId)) ?? null;
+  }
+
+  private async withKind<T extends { id: string; serviceKind?: RideServiceKind }>(views: T[]): Promise<T[]> {
+    if (!this.parcels || views.length === 0) return views.map((v) => ({ ...v, serviceKind: 'RIDE' as const }));
+    const parcels = await this.parcels.findMany(views.map((v) => v.id));
+    return views.map((v) => ({ ...v, serviceKind: parcels.has(v.id) ? ('PARCEL' as const) : ('RIDE' as const) }));
+  }
+
+  /** Class with the pickup zone's override applied (server-side; global default when none / outside zones). */
+  private async priceVehicle(
+    vehicle: RideVehicleClass,
+    pickup: { lat: number; lng: number },
+  ): Promise<{ vehicle: RideVehicleClass; tariff: ResolvedTariff }> {
+    if (!this.zoneTariffs) return applyZoneTariff(vehicle, null, undefined);
+    return this.zoneTariffs.resolve(vehicle, pickup);
+  }
+
+  /** DEC-PROD-071: a parcel job only moves through the parcel endpoints, which take the photos. */
+  private async assertParcelProof(rideId: string, proof?: boolean): Promise<void> {
+    if (!proof && (await this.parcelOf(rideId))) {
+      throw rideError(409, 'PARCEL_PROOF_REQUIRED', 'Use the parcel pickup/delivery endpoint with a photo');
+    }
+  }
+
+  async currentBand(): Promise<BidBand> {
+    return {
+      floorPercent: await this.settings.getNumber('RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE'),
+      ceilingPercent: await this.settings.getNumber('RIDE_BID_CEILING_PERCENT_OF_REFERENCE'),
+    };
+  }
+
+  private async rideSnapshot(rideId: string): Promise<RidePricingSnapshot | null> {
+    return (await this.zoneTariffs?.findSnapshot(rideId)) ?? null;
+  }
+
+  /** Band locked at booking; legacy rides without a snapshot use the current settings. */
+  private async bandFor(snapshot: RidePricingSnapshot | null): Promise<BidBand> {
+    return snapshot
+      ? { floorPercent: snapshot.bidFloorPercent, ceilingPercent: snapshot.bidCeilingPercent }
+      : this.currentBand();
+  }
+
   /** Server-side enforcement: only methods enabled for this service (CASH always allowed). */
-  private async resolvePaymentMethod(vehicleClassCode: string, requested?: string): Promise<PaymentMethodCode> {
+  private async resolvePaymentMethod(
+    vehicleClassCode: string,
+    requested?: string,
+    parcel = false,
+  ): Promise<PaymentMethodCode> {
     const code = requested ?? 'CASH';
     if (code === 'CASH' || !this.paymentMethods) {
       if (code !== 'CASH') {
@@ -309,7 +391,8 @@ export class RideService {
       }
       return 'CASH';
     }
-    return this.paymentMethods.assertSelectable(serviceForVehicleClass(vehicleClassCode), code);
+    // DEC-PROD-071: parcels have their own admin on/off column (PARCEL scope).
+    return this.paymentMethods.assertSelectable(parcel ? 'PARCEL' : serviceForVehicleClass(vehicleClassCode), code);
   }
 
   /** Customer picks / starts paying for a ride. Amount = agreed fare − voucher (server side). */
@@ -330,7 +413,7 @@ export class RideService {
     return this.checkout.start({
       entityType: 'RIDE',
       entityId: ride.id,
-      service: serviceForVehicleClass(ride.vehicleClassCode),
+      service: ride.serviceKind === 'PARCEL' ? 'PARCEL' : serviceForVehicleClass(ride.vehicleClassCode),
       methodCode,
       amountVnd: ride.cashDueVnd ?? 0,
       userId: actor.userId,
@@ -394,10 +477,18 @@ export class RideService {
     return { status: view.status, offers: view.offers, updatedAt: view.updatedAt };
   }
 
-  async create(actor: RequestActor, idempotencyKey: string, dto: CreateRideDto): Promise<RideView> {
+  async create(
+    actor: RequestActor,
+    idempotencyKey: string,
+    dto: CreateRideDto,
+    parcel?: ParcelBooking,
+  ): Promise<RideView> {
     await this.requireActiveCustomer(actor.userId);
-    const vehicle = await this.requireEnabledClass(dto.vehicleClassCode);
-    const paymentMethod = await this.resolvePaymentMethod(vehicle.code, dto.paymentMethod);
+    const catalogVehicle = await this.requireEnabledClass(dto.vehicleClassCode);
+    // Server re-prices from the pickup zone; the client's quote is never trusted (owner t50u).
+    const { vehicle, tariff } = await this.priceVehicle(catalogVehicle, dto.pickup);
+    const band = await this.currentBand();
+    const paymentMethod = await this.resolvePaymentMethod(vehicle.code, dto.paymentMethod, Boolean(parcel));
     const offeredFareVnd = toFareStep(dto.offeredFareVnd);
     await this.assertFare(offeredFareVnd, vehicle.minFareVnd, vehicle.maxFareVnd);
     const stops = dto.stops ?? [];
@@ -411,12 +502,18 @@ export class RideService {
     const distanceQuote = this.vehicleClasses.quote(distanceKm, vehicle);
     const quoted = {
       ...distanceQuote,
-      referenceFareVnd: referenceWithStopsVnd(distanceQuote.referenceFareVnd, stops.length, multiStop.stopFeeVnd, vehicle),
+      referenceFareVnd:
+        referenceWithStopsVnd(distanceQuote.referenceFareVnd, stops.length, multiStop.stopFeeVnd, vehicle) +
+        (parcel ? parcel.surchargeVnd + parcel.record.serviceFeeVnd : 0),
     };
     // The customer's bid may not undercut the server reference by more than
     // RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE (inDrive shows a "recommended" floor the same way).
-    await this.assertBidFloor(offeredFareVnd, quoted.referenceFareVnd);
+    await this.assertBidFloor(offeredFareVnd, quoted.referenceFareVnd, band);
     const expiresAt = await this.requestWindowEnd(now);
+    const parcels = this.parcels;
+    if (parcel && !parcels) {
+      throw rideError(503, 'PARCEL_UNAVAILABLE', 'Parcel delivery is not available');
+    }
     const created = await this.unwrap(() =>
       this.rides.create({
         customerId: actor.userId,
@@ -430,15 +527,32 @@ export class RideService {
         expiresAt,
         now,
         repostOfRideId,
-      }),
+      }, parcel && parcels
+        ? async ({ tx, rideId }) => {
+            // Same transaction as the ride: drivers never see it without its package row.
+            await parcels.create({ ...parcel.record, surchargeVnd: parcel.surchargeVnd, rideId }, tx);
+          }
+        : undefined),
     );
+    // Lock tariff + band; an idempotent replay keeps the first snapshot.
+    await this.zoneTariffs?.saveSnapshot({
+      rideId: created.id,
+      regionCode: tariff.regionCode,
+      tariffSource: tariff.source,
+      zoneTariffId: tariff.zoneTariffId,
+      tariffVersion: tariff.version,
+      perKmVnd: tariff.perKmVnd,
+      minFareVnd: tariff.minFareVnd,
+      bidFloorPercent: band.floorPercent,
+      bidCeilingPercent: band.ceilingPercent,
+    });
     if (this.checkout && paymentMethod !== 'CASH') {
       await this.checkout.recordSelection('RIDE', created.id, paymentMethod);
     }
     if (created.status === 'NEGOTIATING') {
       this.notifyOffers(created.id, 'CREATED');
     }
-    return created;
+    return { ...created, serviceKind: parcel ? 'PARCEL' : 'RIDE' };
   }
 
   /**
@@ -506,8 +620,9 @@ export class RideService {
     await this.assertInServiceZone(dto.pickup, dto.dropoff, stops);
     const multiStop = await this.multiStopConfig();
     const distanceKm = await this.routeDistanceKm(dto.pickup, stops, dto.dropoff);
-    const floorPercent = await this.settings.getNumber('RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE');
-    const options = enabled.map((vehicle) => {
+    const { floorPercent, ceilingPercent } = await this.currentBand();
+    const priced = await Promise.all(enabled.map((vehicle) => this.priceVehicle(vehicle, dto.pickup)));
+    const options = priced.map(({ vehicle, tariff }) => {
       const service = multiStopService(vehicle.code);
       const config = multiStop[service];
       const unavailableReason = stopsRuleError(stops.length, config) as RideQuoteOptionView['unavailableReason'];
@@ -517,11 +632,19 @@ export class RideService {
         referenceFareVnd: referenceWithStopsVnd(distanceQuote.referenceFareVnd, stops.length, config.stopFeeVnd, vehicle),
       };
       const floor = rideBidFloorVnd(quoted.referenceFareVnd, floorPercent);
+      const ceiling = rideBidCeilingVnd(quoted.referenceFareVnd, ceilingPercent);
+      const minBidVnd = clampToFareSteps(floor, vehicle.minFareVnd, vehicle.maxFareVnd);
+      const maxBidVnd = Math.max(
+        minBidVnd,
+        clampToFareSteps(Number.isFinite(ceiling) ? ceiling : vehicle.maxFareVnd, vehicle.minFareVnd, vehicle.maxFareVnd),
+      );
       return {
         multiStopService: service,
         available: unavailableReason === null,
         unavailableReason,
-        minBidVnd: clampToFareSteps(floor, vehicle.minFareVnd, vehicle.maxFareVnd),
+        minBidVnd,
+        maxBidVnd,
+        tariff: { ...tariff, bidFloorPercent: floorPercent, bidCeilingPercent: ceilingPercent },
         code: vehicle.code,
         name: vehicle.name,
         seats: vehicle.seats,
@@ -548,6 +671,7 @@ export class RideService {
       minFareVnd: primary.minFareVnd,
       maxFareVnd: primary.maxFareVnd,
       minBidVnd: primary.minBidVnd,
+      maxBidVnd: primary.maxBidVnd,
       pendingFeesVnd: await this.rides.pendingFeeTotal(actor.userId),
       options,
       route,
@@ -585,10 +709,14 @@ export class RideService {
     const multiStop = await loadMultiStopConfig(this.settings, multiStopService(existing.vehicleClassCode));
     this.assertStopsAllowed(stops.length, multiStop);
     await this.assertInServiceZone(existing.pickup, dropoff, stops);
-    const bounds = await this.vehicleClasses.findAny(existing.vehicleClassCode);
-    if (!bounds) {
+    const catalogBounds = await this.vehicleClasses.findAny(existing.vehicleClassCode);
+    if (!catalogBounds) {
       throw rideError(400, 'RIDE_VEHICLE_CLASS_UNKNOWN', 'Vehicle class is not available');
     }
+    // Re-quote with the tariff + band locked at booking, not today's admin values.
+    const snapshot = await this.rideSnapshot(rideId);
+    const bounds = snapshot && this.zoneTariffs ? this.zoneTariffs.applySnapshot(catalogBounds, snapshot) : catalogBounds;
+    const band = await this.bandFor(snapshot);
     const distanceKm = await this.routeDistanceKm(existing.pickup, stops, dropoff);
     const referenceFareVnd = referenceWithStopsVnd(
       this.vehicleClasses.quote(distanceKm, bounds).referenceFareVnd,
@@ -598,7 +726,7 @@ export class RideService {
     );
     const offeredFareVnd = toFareStep(dto.offeredFareVnd ?? existing.offeredFareVnd);
     await this.assertFare(offeredFareVnd, bounds.minFareVnd, bounds.maxFareVnd);
-    await this.assertBidFloor(offeredFareVnd, referenceFareVnd);
+    await this.assertBidFloor(offeredFareVnd, referenceFareVnd, band);
     const windowExpiresAt = await this.requestWindowEnd(now);
     const updated = await this.unwrap(() =>
       this.rides.updateStops({
@@ -693,7 +821,7 @@ export class RideService {
     );
     const images = await this.enabledClassImageUrls(result.items);
     return {
-      items: result.items.map((ride) => toView(ride, images.get(ride.vehicleClassCode) ?? null)),
+      items: await this.withKind(result.items.map((ride) => toView(ride, images.get(ride.vehicleClassCode) ?? null))),
       page: safePage,
       limit: safeLimit,
       total: result.total,
@@ -703,7 +831,12 @@ export class RideService {
   async listOpen(actor: RequestActor, query: DispatchQuery = {}): Promise<OpenRideView[]> {
     await this.eligibility.requireEligibleDriver(actor.userId);
     const requirePresence = await this.settings.getBoolean('DISPATCH_REQUIRE_FRESH_PRESENCE');
-    if (!(await this.presence.isDispatchEligible(actor.userId, 'RIDE', requirePresence))) {
+    // DEC-PROD-071: passenger rides need rideEnabled, parcel jobs need the opt-in parcelEnabled.
+    const rideOn = await this.presence.isDispatchEligible(actor.userId, 'RIDE', requirePresence);
+    const parcelOn = this.parcels
+      ? await this.presence.isDispatchEligible(actor.userId, 'PARCEL', requirePresence)
+      : false;
+    if (!rideOn && !parcelOn) {
       return [];
     }
     // Drivers over DRIVER_DEBT_LIMIT_VND cannot take new cash jobs.
@@ -720,12 +853,14 @@ export class RideService {
     if (!driverClass) {
       return [];
     }
-    const rides = await this.rides.listOpen(
+    const listed = await this.rides.listOpen(
       now,
       fetchLimit,
       driverClass,
       origin ? boundingBox(origin, radiusKm) : undefined,
     );
+    const parcelRows = (await this.parcels?.findMany(listed.map((ride) => ride.id))) ?? new Map<string, ParcelRecord>();
+    const rides = listed.filter((ride) => (parcelRows.has(ride.id) ? parcelOn : rideOn));
     const filtered = filterByDispatchRadius(
       rides,
       origin ?? {},
@@ -739,11 +874,14 @@ export class RideService {
     const images = await this.enabledClassImageUrls(nearestFirst);
     const ratings = await this.customerSummaries(nearestFirst.map((ride) => ride.customerId));
     return nearestFirst.map((ride) =>
-      toOpenView(
-        ride,
-        images.get(ride.vehicleClassCode) ?? null,
-        ratings.get(ride.customerId) ?? EMPTY_CUSTOMER_RATING,
-        origin ? Math.round(haversineKm(origin, ride.pickup) * 10) / 10 : null,
+      withParcelSummary(
+        toOpenView(
+          ride,
+          images.get(ride.vehicleClassCode) ?? null,
+          ratings.get(ride.customerId) ?? EMPTY_CUSTOMER_RATING,
+          origin ? Math.round(haversineKm(origin, ride.pickup) * 10) / 10 : null,
+        ),
+        parcelRows.get(ride.id) ?? null,
       ),
     );
   }
@@ -756,6 +894,11 @@ export class RideService {
   }
 
   async get(actor: RequestActor, rideId: string): Promise<RideView> {
+    const [view] = await this.withKind([await this.getInner(actor, rideId)]);
+    return view!;
+  }
+
+  private async getInner(actor: RequestActor, rideId: string): Promise<RideView> {
     const ride = await this.unwrapNullable(() => this.rides.findById(rideId, this.clock.now()));
     if (!ride || !(await this.canRead(actor.userId, ride))) {
       throw rideError(404, 'RIDE_NOT_FOUND', 'Ride not found');
@@ -946,9 +1089,16 @@ export class RideService {
   async offer(actor: RequestActor, rideId: string, dto: CreateOfferDto): Promise<RideView> {
     await this.requireActiveDriver(actor.userId);
     await this.earnings.assertUnderDebtLimit(actor.userId);
-    // A driver who is explicitly offline or has ride requests off cannot bid.
-    if (!(await this.presence.isDispatchEligible(actor.userId, 'RIDE'))) {
-      throw rideError(409, 'DRIVER_OFFLINE', 'Go online for rides to send an offer');
+    // A driver who is explicitly offline or has that service off cannot bid (parcel = opt-in).
+    const offerService = (await this.parcelOf(rideId)) ? 'PARCEL' : 'RIDE';
+    if (!(await this.presence.isDispatchEligible(actor.userId, offerService))) {
+      throw rideError(
+        409,
+        'DRIVER_OFFLINE',
+        offerService === 'PARCEL'
+          ? 'Turn on parcel delivery to send an offer'
+          : 'Go online for rides to send an offer',
+      );
     }
     const now = this.clock.now();
     const existing = await this.unwrapNullable(() => this.rides.findById(rideId, now));
@@ -966,7 +1116,12 @@ export class RideService {
     // Taking the customer's own price stays exact; any other amount goes up to the fare step.
     const amountVnd =
       dto.amountVnd === existing.offeredFareVnd ? dto.amountVnd : toFareStep(dto.amountVnd);
-    const bounds = await this.vehicleClasses.findAny(existing.vehicleClassCode);
+    const offerSnapshot = await this.rideSnapshot(existing.id);
+    const catalogBounds = await this.vehicleClasses.findAny(existing.vehicleClassCode);
+    const bounds =
+      catalogBounds && offerSnapshot && this.zoneTariffs
+        ? this.zoneTariffs.applySnapshot(catalogBounds, offerSnapshot)
+        : catalogBounds;
     if (bounds) {
       await this.assertFare(amountVnd, bounds.minFareVnd, bounds.maxFareVnd);
     } else {
@@ -975,15 +1130,24 @@ export class RideService {
     // A counter can only go up from the customer's bid and at most
     // RIDE_COUNTER_MAX_PERCENT_OF_OFFER of it (the ledger enforces the lower bound too).
     const counterPercent = await this.settings.getNumber('RIDE_COUNTER_MAX_PERCENT_OF_OFFER');
+    // ...and never above RIDE_BID_CEILING_PERCENT_OF_REFERENCE of the app (reference) fare.
+    // Band locked at booking (owner t50u): a later admin change never moves an open negotiation.
+    const { ceilingPercent } = await this.bandFor(offerSnapshot);
+    const referenceCeilingVnd = rideBidCeilingVnd(existing.referenceFareVnd, ceilingPercent);
     const counterCapVnd = Math.max(
       existing.offeredFareVnd,
-      roundDownToFareStep((existing.offeredFareVnd * counterPercent) / 100),
+      Math.min(
+        counterPercent > 0
+          ? roundDownToFareStep((existing.offeredFareVnd * counterPercent) / 100)
+          : Number.POSITIVE_INFINITY,
+        referenceCeilingVnd,
+      ),
     );
-    if (counterPercent > 0 && amountVnd > counterCapVnd) {
+    if (amountVnd > counterCapVnd) {
       throw rideError(
         400,
         'RIDE_COUNTER_OUT_OF_RANGE',
-        `A counter may be at most ${counterPercent}% of the customer's price`,
+        `A counter may be at most ${counterCapVnd} VND (${ceilingPercent}% of the suggested fare)`,
       );
     }
     const expiresAt = await this.expiresAt(now);
@@ -1077,11 +1241,16 @@ export class RideService {
       throw rideError(404, 'RIDE_NOT_FOUND', 'Ride not found');
     }
     const amountVnd = toFareStep(dto.amountVnd);
-    const bounds = await this.vehicleClasses.findAny(existing.vehicleClassCode);
+    const raiseSnapshot = await this.rideSnapshot(existing.id);
+    const catalogBounds = await this.vehicleClasses.findAny(existing.vehicleClassCode);
+    const bounds =
+      catalogBounds && raiseSnapshot && this.zoneTariffs
+        ? this.zoneTariffs.applySnapshot(catalogBounds, raiseSnapshot)
+        : catalogBounds;
     await this.assertFare(amountVnd, bounds?.minFareVnd, bounds?.maxFareVnd);
     // The raised price must still respect the floor (it only goes up, but the reference may
     // have been recomputed since create).
-    await this.assertBidFloor(amountVnd, existing.referenceFareVnd);
+    await this.assertBidFloor(amountVnd, existing.referenceFareVnd, await this.bandFor(raiseSnapshot));
     const windowExpiresAt = await this.requestWindowEnd(now);
     const maxRaises = await this.settings.getNumber('RIDE_MAX_FARE_RAISES_PER_RIDE');
     const raised = await this.unwrap(() =>
@@ -1271,7 +1440,8 @@ export class RideService {
       return null;
     }
     const radiusKm = await this.settings.getNumber('DRIVER_SEARCH_RADIUS_KM');
-    const nearby = await this.presence.onlineNearForPush('RIDE', ride.pickup, radiusKm, now);
+    const parcel = await this.parcelOf(ride.id);
+    const nearby = await this.presence.onlineNearForPush(parcel ? 'PARCEL' : 'RIDE', ride.pickup, radiusKm, now);
     const drivers: string[] = [];
     const inRange: Array<{ id: string; km: number }> = [];
     for (const row of nearby) {
@@ -1289,7 +1459,7 @@ export class RideService {
     return {
       driverIds: drivers,
       pushDriverIds,
-      ride: toOpenView(
+      ride: withParcelSummary(toOpenView(
         {
           id: ride.id,
           customerId: ride.customerId,
@@ -1307,7 +1477,7 @@ export class RideService {
         await this.imageUrlForClass(ride.vehicleClassCode),
         ratings.get(ride.customerId) ?? EMPTY_CUSTOMER_RATING,
         null,
-      ),
+      ), parcel),
     };
   }
 
@@ -1356,8 +1526,14 @@ export class RideService {
     );
   }
 
-  async startTrip(actor: RequestActor, rideId: string, pickupCode?: string): Promise<RideView> {
+  async startTrip(
+    actor: RequestActor,
+    rideId: string,
+    pickupCode?: string,
+    opts: { parcelProof?: boolean } = {},
+  ): Promise<RideView> {
     await this.requireActiveDriver(actor.userId);
+    await this.assertParcelProof(rideId, opts.parcelProof);
     const ride = await this.unwrapNullable(() => this.rides.findById(rideId, this.clock.now()));
     // Only the assigned driver at pickup may spend attempts; anything else gets the repository's
     // usual not-found / wrong-state error below without touching the code.
@@ -1377,8 +1553,13 @@ export class RideService {
     );
   }
 
-  async complete(actor: RequestActor, rideId: string): Promise<RideView> {
+  async complete(
+    actor: RequestActor,
+    rideId: string,
+    opts: { parcelProof?: boolean; returnFeeVnd?: number } = {},
+  ): Promise<RideView> {
     await this.requireActiveDriver(actor.userId);
+    await this.assertParcelProof(rideId, opts.parcelProof);
     // Commission differs per vehicle class; read both before the transaction and pick the
     // one matching the completed ride's class inside it.
     const [bikeFeeBps, carFeeBps] = await Promise.all([
@@ -1394,7 +1575,14 @@ export class RideService {
     // COD obligation, DealGo-funded discount, earnings and fee commit with the completion.
     const ride = await this.unwrap(() =>
       this.rides.complete(
-        { rideId, driverId: actor.userId, now: completedAt },
+        {
+          rideId,
+          driverId: actor.userId,
+          now: completedAt,
+          ...(opts.returnFeeVnd && opts.returnFeeVnd > 0
+            ? { customerFee: { kind: 'PARCEL_RETURN' as const, amountVnd: opts.returnFeeVnd } }
+            : {}),
+        },
         async (tx, done) => {
           if (done.agreedFareVnd === null) {
             throw new RideRuleError('RIDE_STATUS_CONFLICT');
@@ -1650,14 +1838,27 @@ export class RideService {
     return new Date(now.getTime() + seconds * 1000);
   }
 
-  private async assertBidFloor(amountVnd: number, referenceFareVnd: number): Promise<void> {
-    const percent = await this.settings.getNumber('RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE');
+  /**
+   * The customer's bid must stay inside the band around the server reference fare:
+   * RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE (down) .. RIDE_BID_CEILING_PERCENT_OF_REFERENCE (up).
+   * The class minimum fare always wins over a lower floor / ceiling.
+   */
+  private async assertBidFloor(amountVnd: number, referenceFareVnd: number, band?: BidBand): Promise<void> {
+    const { floorPercent: percent, ceilingPercent } = band ?? (await this.currentBand());
     const floor = rideBidFloorVnd(referenceFareVnd, percent);
     if (floor > 0 && amountVnd < floor) {
       throw rideError(
         400,
         'RIDE_FARE_OUT_OF_RANGE',
         `Your price must be at least ${floor} VND (${percent}% of the suggested fare)`,
+      );
+    }
+    const ceiling = rideBidCeilingVnd(referenceFareVnd, ceilingPercent);
+    if (amountVnd > ceiling) {
+      throw rideError(
+        400,
+        'RIDE_FARE_OUT_OF_RANGE',
+        `Your price may be at most ${ceiling} VND (${ceilingPercent}% of the suggested fare)`,
       );
     }
   }
@@ -1820,6 +2021,14 @@ const PICKUP_CODE_STATUSES: ReadonlySet<RideSnapshot['status']> = new Set([
 ]);
 
 const EMPTY_CUSTOMER_RATING: CustomerRatingSummary = { average: null, count: 0 };
+
+function withParcelSummary(view: OpenRideView, parcel: ParcelRecord | null): OpenRideView {
+  return {
+    ...view,
+    serviceKind: parcel ? 'PARCEL' : 'RIDE',
+    parcel: parcel ? { sizeClass: parcel.sizeClass, weightKg: parcel.weightKg, note: parcel.note } : null,
+  };
+}
 
 function toOpenView(
   ride: OpenRideListing,

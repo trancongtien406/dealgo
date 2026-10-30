@@ -60,6 +60,15 @@ export class SessionService {
       userAgent: device?.userAgent ?? null,
       ipAddress: device?.ipAddress ?? null,
     });
+    // Single-device policy for drivers: when a driver signs in on a new device,
+    // all older active sessions for this account are revoked so only 1 device stays active.
+    const grants = await this.repository.listGrants(user.id);
+    const isDriver = grants.some(
+      (grant) => grant.role === 'DRIVER' && (grant.status === 'ACTIVE' || grant.status === 'PENDING'),
+    );
+    if (isDriver) {
+      await this.repository.revokeOtherSessions(user.id, session.id, now);
+    }
     return this.toResult(user, session.id, channel, refreshToken, now);
   }
 

@@ -51,13 +51,14 @@ export class MeController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Upsert driver presence (online/offline, optional rideEnabled/foodEnabled, lat/lng). Dispatch lists are empty while offline or for a service switched off.',
+      'Upsert driver presence (online/offline, optional rideEnabled/foodEnabled/parcelEnabled, lat/lng). Dispatch lists are empty while offline or for a service switched off.',
   })
   setPresence(@CurrentActor() actor: RequestActor, @Body() dto: UpsertPresenceDto) {
     return this.presence.upsert(actor.userId, {
       online: dto.online,
       rideEnabled: dto.rideEnabled,
       foodEnabled: dto.foodEnabled,
+      parcelEnabled: dto.parcelEnabled,
       lat: dto.lat,
       lng: dto.lng,
     });

@@ -10,6 +10,9 @@ import '../../../identity/domain/entities/user_profile.dart';
 import '../../domain/entities/partner_application.dart';
 import '../../domain/entities/partner_documents.dart';
 import '../../domain/entities/partner_onboarding.dart';
+import '../../domain/ocr/document_ocr_parser.dart';
+import '../../domain/ocr/document_text_reader.dart';
+import '../../domain/ocr/ocr_prefill.dart';
 import '../../domain/usecases/get_my_partner_application.dart';
 import '../../domain/usecases/submit_partner_application.dart';
 import '../document_image_source.dart';
@@ -62,6 +65,8 @@ class DriverKycState {
     this.submitting = false,
     this.submitError,
     this.documentsRequired = true,
+    this.ocr = const OcrPrefill(),
+    this.ocrReading = false,
   });
 
   factory DriverKycState.initial() {
@@ -128,6 +133,10 @@ class DriverKycState {
   /// only services, name and vehicle class; ops still approves.
   final bool documentsRequired;
 
+  /// t61u: values read from document photos on the device.
+  final OcrPrefill ocr;
+  final bool ocrReading;
+
   /// Steps for the current mode (full KYC or the quick registration).
   List<DriverKycStep> get steps => documentsRequired
       ? DriverKycStep.values
@@ -159,7 +168,9 @@ class DriverKycState {
 
   bool get canContinueIdNumber => RegExp(r'^\d{9,12}$').hasMatch(idNumber);
 
-  bool get canContinueSelfie => documents.has(PartnerDocumentKind.selfie);
+  bool get canContinueSelfie =>
+      documents.has(PartnerDocumentKind.selfie) &&
+      documents.has(PartnerDocumentKind.selfieVideo);
 
   bool get canContinueLicense =>
       documents.has(PartnerDocumentKind.license) &&
@@ -172,6 +183,11 @@ class DriverKycState {
     return code == 'MOTORBIKE' || code == 'CAR_4' || code == 'CAR_7';
   }
 
+  /// t60u: false when e.g. an A1 (motorbike) licence is paired with CAR_4.
+  bool get licenseMatchesVehicle =>
+      !hasSelectedVehicleClass ||
+      PartnerDocumentKind.licenseCoversVehicle(licenseClass, vehicleClassCode!);
+
   bool get canContinueVehicleStep {
     if (!documentsRequired) {
       // Quick registration: plate + an explicit class (fail closed), no photos.
@@ -182,6 +198,10 @@ class DriverKycState {
     }
     // Fail closed: must explicitly choose a catalog class before continue/submit.
     if (!hasSelectedVehicleClass) {
+      return false;
+    }
+    // t60u: the declared licence class must cover the chosen vehicle class.
+    if (!licenseMatchesVehicle) {
       return false;
     }
     // OPEN-006 Car scaffold: require insurance photo for Car classes (fail closed in UI).
@@ -244,9 +264,13 @@ class DriverKycState {
     String? submitError,
     bool clearSubmitError = false,
     bool? documentsRequired,
+    OcrPrefill? ocr,
+    bool? ocrReading,
   }) {
     return DriverKycState(
       documentsRequired: documentsRequired ?? this.documentsRequired,
+      ocr: ocr ?? this.ocr,
+      ocrReading: ocrReading ?? this.ocrReading,
       status: status ?? this.status,
       step: step ?? this.step,
       rideService: rideService ?? this.rideService,
@@ -287,8 +311,11 @@ class DriverKycCubit extends Cubit<DriverKycState> {
     this._draftStore,
     this._draftOwner,
     bool? useMock,
+    this._textReader,
   }) : _useMock = useMock ?? useMockData,
        super(DriverKycState.initial());
+
+  final DocumentTextReader? _textReader;
 
   static const role = 'DRIVER';
 
@@ -543,23 +570,107 @@ class DriverKycCubit extends Cubit<DriverKycState> {
     );
   }
 
-  void setFullName(String value) => emit(state.copyWith(fullName: value));
+  void setFullName(String value) => emit(
+    state.copyWith(fullName: value, ocr: state.ocr.onEdit('fullName', value)),
+  );
 
-  void setBirthDate(String value) => emit(state.copyWith(birthDate: value));
+  void setBirthDate(String value) => emit(
+    state.copyWith(birthDate: value, ocr: state.ocr.onEdit('birthDate', value)),
+  );
 
-  void setAddress(String value) => emit(state.copyWith(address: value));
+  void setAddress(String value) => emit(
+    state.copyWith(address: value, ocr: state.ocr.onEdit('address', value)),
+  );
 
-  void setIdNumber(String value) =>
-      emit(state.copyWith(idNumber: value.replaceAll(RegExp(r'\D'), '')));
+  void setIdNumber(String value) {
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    emit(
+      state.copyWith(
+        idNumber: digits,
+        ocr: state.ocr.onEdit('idNumber', digits),
+      ),
+    );
+  }
 
-  void setLicenseClass(String value) =>
-      emit(state.copyWith(licenseClass: value));
+  void setLicenseClass(String value) => emit(
+    state.copyWith(
+      licenseClass: value,
+      ocr: state.ocr.onEdit('licenseClass', value),
+    ),
+  );
 
-  void setLicenseNumber(String value) =>
-      emit(state.copyWith(licenseNumber: value.trim()));
+  void setLicenseNumber(String value) => emit(
+    state.copyWith(
+      licenseNumber: value.trim(),
+      ocr: state.ocr.onEdit('licenseNumber', value.trim()),
+    ),
+  );
 
-  void setVehiclePlate(String value) =>
-      emit(state.copyWith(vehiclePlate: value.toUpperCase()));
+  void setVehiclePlate(String value) => emit(
+    state.copyWith(
+      vehiclePlate: value.toUpperCase(),
+      ocr: state.ocr.onEdit('vehiclePlate', value.toUpperCase()),
+    ),
+  );
+
+  /// Extra keys OCR may fill that have no own form field (sent as metadata).
+  static const ocrExtraKeys = [
+    OcrKeys.gender,
+    OcrKeys.hometown,
+    OcrKeys.idIssueDate,
+    OcrKeys.licenseExpiry,
+  ];
+
+  /// t61u: reads the photo on the device and prefills empty fields.
+  Future<void> readDocumentText(String kind, PickedDocumentImage image) async {
+    final reader = _textReader;
+    if (reader == null || !state.documentsRequired) return;
+    emit(state.copyWith(ocrReading: true));
+    final text = await reader.read(image.bytes);
+    if (isClosed) return;
+    final parsed = text == null
+        ? const <String, String>{}
+        : parseDocumentText(kind, text);
+    applyOcr(parsed);
+  }
+
+  /// Applies parsed OCR values (public for tests).
+  void applyOcr(Map<String, String> parsed) {
+    final usable = {
+      for (final e in parsed.entries)
+        if (e.key != 'mrzName' &&
+            (e.key != OcrKeys.licenseClass ||
+                PartnerDocumentKind.licenseClasses.contains(e.value)))
+          e.key: e.value,
+    };
+    final merged = state.ocr.merge(usable, {
+      'fullName': state.fullName,
+      'birthDate': state.birthDate,
+      'address': state.address,
+      'idNumber': state.idNumber,
+      // The class chip always has a value; only an OCR'd class may move it.
+      'licenseClass': state.ocr.prefilled.contains('licenseClass')
+          ? state.licenseClass
+          : '',
+      'licenseNumber': state.licenseNumber,
+      'vehiclePlate': state.vehiclePlate,
+      for (final key in ocrExtraKeys) key: state.ocr.values[key] ?? '',
+    });
+    final a = merged.apply;
+    emit(
+      state.copyWith(
+        ocrReading: false,
+        ocr: merged.prefill,
+        fullName: a['fullName'],
+        birthDate: a['birthDate'],
+        address: a['address'],
+        idNumber: a['idNumber'],
+        licenseClass: a['licenseClass'],
+        licenseNumber: a['licenseNumber'],
+        vehiclePlate: a['vehiclePlate'],
+      ),
+    );
+  }
 
   void setVehicleClass({required String code, required String name}) =>
       emit(state.copyWith(vehicleClassCode: code, vehicleType: name));
@@ -585,6 +696,7 @@ class DriverKycCubit extends Cubit<DriverKycState> {
     if (keeper != null) {
       unawaited(keeper.store.writeBlob(keeper.key, kind, image.bytes));
     }
+    unawaited(readDocumentText(kind, image));
   }
 
   void removeDocument(String kind) {
@@ -671,6 +783,7 @@ class DriverKycCubit extends Cubit<DriverKycState> {
   Map<String, Object?> _metadata() => _metadataOf(state);
 
   Map<String, Object?> _metadataOf(DriverKycState state) => {
+    ...state.documents.captureMetadata(),
     'rideService': state.rideService,
     'foodService': state.foodService,
     'fullName': state.fullName.trim(),
@@ -690,6 +803,7 @@ class DriverKycCubit extends Cubit<DriverKycState> {
     'bankName': state.bankName.trim(),
     'bankAccountNumber': state.bankAccountNumber,
     'bankAccountHolder': state.bankAccountHolder.trim(),
+    ...state.ocr.toMetadata(extraKeys: ocrExtraKeys),
   };
 
   Future<void> _submitApplication() async {

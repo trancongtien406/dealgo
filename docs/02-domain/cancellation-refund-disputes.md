@@ -294,6 +294,12 @@ Các tên phase là **mô hình ngữ nghĩa**; state chính thức sẽ đượ
 6. Incident an toàn (đe dọa, tai nạn, khẩn cấp) ưu tiên hỗ trợ/định vị trạng thái, không ép flow thanh toán thông thường; bảo toàn chứng cứ theo quyền và retention policy.
 7. Khi mất liên lạc hoàn toàn, tùy mức độ có thể `OPS_REVIEW_REQUIRED`; không tuyên bố lỗi thuộc về một bên khi thiếu chứng cứ.
 
+### 14.1. Giao hàng (Ride `PARCEL`, `DEC-PROD-071` DRAFT)
+
+- Khách huỷ đơn giao hàng như huỷ chuyến (màn chờ tài xế có nút huỷ); quy tắc phí huỷ Ride áp dụng.
+- Giao thất bại (có lý do) → `RETURNING` → `RETURNED`: tính phí hoàn hàng `PARCEL_RETURN_FEE_VND` (snapshot lúc tạo đơn) cho người gửi, ghi cùng giao dịch hoàn tất chuyến, trả tài xế, thu ở chuyến tiền mặt kế tiếp. Giao thành công không tính phí này.
+- COD tiền hàng: `OPEN` (chưa hỗ trợ).
+
 ## 15. Ma trận Food — trạng thái, trách nhiệm và các loại hủy
 
 | Food phase | Ý định khách | Merchant | DeliveryTask/Driver | Điều bắt buộc trước phân bổ tiền |

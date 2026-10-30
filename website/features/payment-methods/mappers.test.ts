@@ -10,10 +10,10 @@ const base: OpsPaymentMethod = {
   adapterKind: "REAL",
   requiredEnv: ["MOMO_PARTNER_CODE"],
   configured: true,
-  services: { BIKE: false, CAR: false, FOOD: false },
+  services: { BIKE: false, CAR: false, FOOD: false, PARCEL: false },
   sortOrder: 10,
   unsupportedReason: null,
-  availableFor: { BIKE: false, CAR: false, FOOD: false },
+  availableFor: { BIKE: false, CAR: false, FOOD: false, PARCEL: false },
   locked: false,
 };
 

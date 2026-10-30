@@ -1,3 +1,4 @@
+import { seedDriverClass } from './driver-class.js';
 /**
  * food dispatch against Postgres (Prisma repositories + migrated DRAFT settings rows):
  * early claim, driver release + driver_job_cancellations, merchant-accept /
@@ -112,6 +113,7 @@ describePg('food dispatch (postgres)', () => {
   async function onlineDriver(): Promise<Actor> {
     const d = await login();
     await grant(d.userId, 'DRIVER');
+    await seedDriverClass(app, d.userId);
     await post(d.token, '/v1/me/presence', { online: true, lat: dropoff.lat + 0.002, lng: dropoff.lng + 0.002 }).expect(200);
     return d;
   }

@@ -1,0 +1,6 @@
+-- t52u (DRAFT): in-house KYC/KYB manual review — claim status + ops audit actions.
+ALTER TYPE "PartnerApplicationStatus" ADD VALUE IF NOT EXISTS 'IN_REVIEW';
+ALTER TYPE "OpsAuditEntityType" ADD VALUE IF NOT EXISTS 'PARTNER_APPLICATION';
+ALTER TYPE "OpsAuditAction" ADD VALUE IF NOT EXISTS 'KYC_CLAIM';
+ALTER TYPE "OpsAuditAction" ADD VALUE IF NOT EXISTS 'KYC_APPROVE';
+ALTER TYPE "OpsAuditAction" ADD VALUE IF NOT EXISTS 'KYC_REJECT';

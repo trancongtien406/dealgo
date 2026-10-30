@@ -130,6 +130,8 @@ enum PartnerApplicationRole {
 enum PartnerApplicationStatus {
   DRAFT
   SUBMITTED
+  /// t52u (DRAFT): a reviewer claimed the case; still awaiting a manual decision.
+  IN_REVIEW
   APPROVED
   REJECTED
 }
@@ -436,6 +438,8 @@ model Ride {
   pickupCode              RidePickupCode?
   shareLinks              RideShareLink[]
   stops                   RideStop[]
+  /// DEC-PROD-071: present when the ride carries goods (Giao hang), not people.
+  parcel                  RideParcel?
 
   @@unique([customerId, idempotencyKey])
   @@index([customerId, status])
@@ -483,11 +487,49 @@ model RideVehicleClass {
   sortOrder       Int      @default(0)
   /// Public path such as /v1/public/ride-vehicle-classes/MOTORBIKE/<file>.
   imageUrl        String?  @db.VarChar(200)
+  /// DEC-PROD-071: class can be booked for parcel delivery (off until ops enables it).
+  parcelEnabled   Boolean  @default(false)
   updatedByUserId String?  @db.Uuid
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   @@map("ride_vehicle_classes")
+}
+
+/// Per-zone (service region) tariff override for one vehicle class. No row = global class tariff.
+/// Only perKm and minFare are overridable; base/perMinute/max stay on the class (owner t50u).
+/// `version` bumps on every edit; rides snapshot it (ride_pricing_snapshots).
+model RideZoneTariff {
+  id               String   @id @default(uuid()) @db.Uuid
+  regionCode       String   @db.VarChar(8)
+  vehicleClassCode String   @db.VarChar(32)
+  perKmVnd         Int
+  minFareVnd       Int
+  version          Int      @default(1)
+  updatedByUserId  String?  @db.Uuid
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([regionCode, vehicleClassCode])
+  @@map("ride_zone_tariffs")
+}
+
+/// Pricing locked onto a ride at booking: which tariff priced it and the bid band then in force.
+/// Admin changes to tariffs / band never touch rides that already exist.
+model RidePricingSnapshot {
+  rideId            String   @id @db.Uuid
+  regionCode        String?  @db.VarChar(8)
+  /// ZONE = ride_zone_tariffs row, DEFAULT = global class tariff.
+  tariffSource      String   @db.VarChar(8)
+  zoneTariffId      String?  @db.Uuid
+  tariffVersion     Int      @default(0)
+  perKmVnd          Int
+  minFareVnd        Int
+  bidFloorPercent   Int
+  bidCeilingPercent Int
+  createdAt         DateTime @default(now())
+
+  @@map("ride_pricing_snapshots")
 }
 
 /// DEC-PROD-017: server-issued pickup code. Shown only to the ride's customer; the assigned
@@ -502,6 +544,67 @@ model RidePickupCode {
   verifiedAt     DateTime?
 
   @@map("ride_pickup_codes")
+}
+
+enum ParcelSizeClass {
+  S
+  M
+  L
+  XL
+}
+
+enum ParcelPayer {
+  SENDER
+  RECIPIENT
+}
+
+/// RETURNING = delivery failed, driver brings the goods back; RETURNED = handed back to the sender.
+enum ParcelOutcome {
+  PENDING
+  DELIVERED
+  RETURNING
+  RETURNED
+}
+
+/// DEC-PROD-071 (DRAFT): goods carried by a ride. 1:1 with the ride; lifecycle stays on Ride
+/// (NEGOTIATING..IN_TRIP = in transit..COMPLETED) and `outcome` says how it ended.
+model RideParcel {
+  rideId             String          @id @db.Uuid
+  ride               Ride            @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  senderName         String          @db.VarChar(80)
+  senderPhone        String          @db.VarChar(20)
+  recipientName      String          @db.VarChar(80)
+  recipientPhone     String          @db.VarChar(20)
+  sizeClass          ParcelSizeClass
+  weightKg           Float?
+  note               String?         @db.VarChar(300)
+  payer              ParcelPayer     @default(SENDER)
+  /// Size surcharge folded into the reference fare at booking (DRAFT admin setting).
+  surchargeVnd       Int             @default(0)
+  /// PARCEL_SERVICE_FEE_VND snapshot at booking (folded into the reference fare).
+  serviceFeeVnd      Int             @default(0)
+  /// PARCEL_RETURN_FEE_VND snapshot at booking; charged as a customer fee on RETURNED.
+  returnFeeVnd       Int             @default(0)
+  /// StoredDocumentRef jsonb of the optional package photo.
+  itemPhoto          Json?
+  /// 4-digit code the recipient reads to the driver (only when PARCEL_RECIPIENT_CODE_REQUIRED).
+  recipientCode      String?         @db.VarChar(8)
+  recipientCodeFails Int             @default(0)
+  pickupPhoto        Json?
+  pickedUpAt         DateTime?
+  deliveryPhoto      Json?
+  deliveredAt        DateTime?
+  outcome            ParcelOutcome   @default(PENDING)
+  failReason         String?         @db.VarChar(40)
+  failNote           String?         @db.VarChar(300)
+  failedAt           DateTime?
+  returnPhoto        Json?
+  returnedAt         DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([outcome, createdAt])
+  @@map("ride_parcels")
 }
 
 model RideOffer {
@@ -1055,33 +1158,33 @@ enum PaymentIntentStatus {
 }
 
 model PaymentIntent {
-  id              String              @id @default(uuid()) @db.Uuid
-  entityType      PaymentEntityType
-  entityId        String              @db.Uuid
-  method          PaymentMethod
-  status          PaymentIntentStatus @default(SANDBOX_RECORDED)
-  amountVnd       Int
-  currency        String              @default("VND") @db.VarChar(3)
-  provider        String              @default("sandbox") @db.VarChar(32)
-  providerRef     String?             @db.VarChar(120)
-  paymentUrl      String?             @db.VarChar(2000)
+  id                String              @id @default(uuid()) @db.Uuid
+  entityType        PaymentEntityType
+  entityId          String              @db.Uuid
+  method            PaymentMethod
+  status            PaymentIntentStatus @default(SANDBOX_RECORDED)
+  amountVnd         Int
+  currency          String              @default("VND") @db.VarChar(3)
+  provider          String              @default("sandbox") @db.VarChar(32)
+  providerRef       String?             @db.VarChar(120)
+  paymentUrl        String?             @db.VarChar(2000)
   /// Customer-facing method code from the registry (e.g. VNPAY_ATM); null for legacy rows.
-  methodCode      String?             @db.VarChar(32)
+  methodCode        String?             @db.VarChar(32)
   /// PSP transaction id needed for refunds (MoMo transId, ZaloPay zp_trans_id, VNPay TransactionNo).
-  providerTransId String?             @db.VarChar(64)
+  providerTransId   String?             @db.VarChar(64)
   /// PSP pay date (VNPay vnp_PayDate yyyyMMddHHmmss) needed for refunds.
-  providerPayDate String?             @db.VarChar(20)
-  deeplink        String?             @db.VarChar(2000)
-  refundedVnd     Int                 @default(0)
-  failureReason   String?             @db.VarChar(255)
+  providerPayDate   String?             @db.VarChar(20)
+  deeplink          String?             @db.VarChar(2000)
+  refundedVnd       Int                 @default(0)
+  failureReason     String?             @db.VarChar(255)
   /// Set when the completed job consumed this prepayment (PSP_PREPAID_APPLIED posted).
-  settledAt       DateTime?
+  settledAt         DateTime?
   /// Active reconciliation bookkeeping (provider status query).
   lastReconciledAt  DateTime?
   reconcileAttempts Int                 @default(0)
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  refunds         PaymentRefund[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  refunds           PaymentRefund[]
 
   @@unique([entityType, entityId, method])
   @@index([entityType, entityId])
@@ -1187,6 +1290,8 @@ model DriverPresence {
   /// DEC-PROD-023: services the driver takes while online (both on by default).
   rideEnabled       Boolean   @default(true)
   foodEnabled       Boolean   @default(true)
+  /// DEC-PROD-071: parcel delivery is opt-in (off by default).
+  parcelEnabled     Boolean   @default(false)
   lat               Float?
   lng               Float?
   /// DEC-PROD-031: when lat/lng were last reported (live tracking freshness).
@@ -1217,11 +1322,15 @@ enum OpsAuditEntityType {
   STORE
   /// entityId = rideVehicleClassAuditId(code) (UUID v5); metadata.code holds the class code.
   RIDE_VEHICLE_CLASS
+  /// entityId = ride_zone_tariffs.id; metadata has regionCode + vehicleClassCode.
+  RIDE_ZONE_TARIFF
   HOME_BANNER
   INTEGRATION_SETTING
   FOOD_CATEGORY
   PROMOTION
   SERVICE_RATING
+  /// entityId = partner_applications.id (KYC/KYB manual review, t52u).
+  PARTNER_APPLICATION
 }
 
 enum OpsAuditAction {
@@ -1247,6 +1356,8 @@ enum OpsAuditAction {
   DRIVER_BALANCE_PAYMENT
   MERCHANT_PAYOUT_RECORD
   RIDE_VEHICLE_CLASS_UPDATE
+  RIDE_ZONE_TARIFF_UPSERT
+  RIDE_ZONE_TARIFF_DELETE
   HOME_BANNER_CREATE
   HOME_BANNER_UPDATE
   HOME_BANNER_DELETE
@@ -1261,6 +1372,11 @@ enum OpsAuditAction {
   PROMOTION_STATUS_UPDATE
   REVIEW_HIDE
   REVIEW_UNHIDE
+  KYC_CLAIM
+  KYC_APPROVE
+  KYC_MEDIA_PURGE
+  KYC_AUTO_APPROVE
+  KYC_REJECT
 }
 
 enum ServiceRegionStatus {
@@ -2083,6 +2199,8 @@ model DriverJobCancellation {
 enum CustomerFeeKind {
   LATE_CANCEL
   NO_SHOW
+  /// DEC-PROD-071: parcel handed back to the sender after a failed delivery.
+  PARCEL_RETURN
 }
 
 enum CustomerFeeStatus {

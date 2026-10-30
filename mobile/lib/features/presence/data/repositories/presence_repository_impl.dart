@@ -15,6 +15,7 @@ class PresenceRepositoryImpl implements PresenceRepository {
     double? lng,
     bool? rideEnabled,
     bool? foodEnabled,
+    bool? parcelEnabled,
   }) {
     return _remote.setPresence(
       accessToken: accessToken,
@@ -23,6 +24,7 @@ class PresenceRepositoryImpl implements PresenceRepository {
       lng: lng,
       rideEnabled: rideEnabled,
       foodEnabled: foodEnabled,
+      parcelEnabled: parcelEnabled,
     );
   }
 

@@ -18,14 +18,18 @@ import { MemoryPartnerRepository } from '../../../src/modules/partner/partner.re
 import { OBJECT_STORAGE } from '../../../src/platform/storage/storage.constants.js';
 import { MemoryObjectStorage } from '../../../src/integrations/object-storage/memory-object-storage.js';
 import {
-  TINY_JPEG_BASE64,
+  TINY_JPEG_BASE64, TINY_MP4_BASE64,
   TINY_PDF_BASE64,
 } from '../../../src/platform/storage/testing.js';
 
 const jpeg = (kind: string) => ({ kind, contentType: 'image/jpeg', contentBase64: TINY_JPEG_BASE64 });
-const DRIVER_DOCS = ['ID_FRONT', 'ID_BACK', 'SELFIE', 'LICENSE', 'VEHICLE_REG'].map(jpeg);
+const DRIVER_DOCS = [
+  ...['ID_FRONT', 'ID_BACK', 'SELFIE', 'LICENSE', 'VEHICLE_REG'].map(jpeg),
+  { kind: 'SELFIE_VIDEO', contentType: 'video/mp4', contentBase64: TINY_MP4_BASE64 },
+];
 const MERCHANT_DOCS = [
   { kind: 'BUSINESS_LICENSE', contentType: 'application/pdf', contentBase64: TINY_PDF_BASE64 },
+  jpeg('FOOD_SAFETY_CERT'),
   jpeg('REP_ID_FRONT'),
   jpeg('REP_ID_BACK'),
 ];
@@ -96,7 +100,7 @@ describe('partner application http', () => {
       .set('Authorization', `Bearer ${driver.token}`)
       .send({
         role: 'DRIVER',
-        metadata: { fullName: 'Nguyen Van A', licenseNumber: 'B2-123', vehicleClassCode: 'MOTORBIKE' },
+        metadata: { fullName: 'Nguyen Van A', licenseNumber: 'B2-123', vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1' },
         documents: DRIVER_DOCS,
       })
       .expect(200);
@@ -106,14 +110,14 @@ describe('partner application http', () => {
       status: 'SUBMITTED',
       metadata: { fullName: 'Nguyen Van A', licenseNumber: 'B2-123' },
     });
-    expect(submitted.body.data.documents).toHaveLength(5);
+    expect(submitted.body.data.documents).toHaveLength(6);
     expect(submitted.body.data.documents[0]).toMatchObject({
       index: 0,
       kind: 'ID_FRONT',
       contentType: 'image/jpeg',
       hasFile: true,
     });
-    expect(storage.size).toBe(5);
+    expect(storage.size).toBe(6);
 
     const mine = await request(app.getHttpServer())
       .get('/v1/me/partner-applications')
@@ -202,6 +206,7 @@ describe('partner application http', () => {
       .expect(200);
     expect(resubmitted.body.data.documents.map((doc: { kind: string }) => doc.kind)).toEqual([
       'BUSINESS_LICENSE',
+      'FOOD_SAFETY_CERT',
       'REP_ID_FRONT',
       'REP_ID_BACK',
       'STOREFRONT',
@@ -210,26 +215,80 @@ describe('partner application http', () => {
     expect(merchantGrants.find((grant) => grant.role === 'MERCHANT')?.status).toBe('SUSPENDED');
   });
 
+  it('t52u: ops claims (IN_REVIEW), applicant cannot claim/resubmit, decision from IN_REVIEW is audited', async () => {
+    const driver = await login('+84907' + String(phoneSerial++).padStart(5, '0'));
+    const submitted = await request(app.getHttpServer())
+      .post('/v1/me/partner-applications')
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ role: 'DRIVER', metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1', aiPrecheck: 'PASSED' }, documents: DRIVER_DOCS })
+      .expect(200);
+    const id = submitted.body.data.id as string;
+    expect(submitted.body.data.metadata.aiPrecheck).toBeUndefined();
+
+    await request(app.getHttpServer())
+      .post(`/v1/ops/partner-applications/${id}/claim`)
+      .set('Authorization', `Bearer ${driver.token}`)
+      .expect((res) => expect([401, 403]).toContain(res.status));
+
+    const ops = await opsLogin();
+    const claimed = await request(app.getHttpServer())
+      .post(`/v1/ops/partner-applications/${id}/claim`)
+      .set('Authorization', `Bearer ${ops.token}`)
+      .expect(200);
+    expect(claimed.body.data.status).toBe('IN_REVIEW');
+    await request(app.getHttpServer())
+      .post(`/v1/ops/partner-applications/${id}/claim`)
+      .set('Authorization', `Bearer ${ops.token}`)
+      .expect(409);
+
+    const inReview = await request(app.getHttpServer())
+      .get('/v1/ops/partner-applications?status=IN_REVIEW')
+      .set('Authorization', `Bearer ${ops.token}`)
+      .expect(200);
+    expect(inReview.body.data.applications.map((row: { id: string }) => row.id)).toContain(id);
+
+    await request(app.getHttpServer())
+      .post('/v1/me/partner-applications')
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ role: 'DRIVER', metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1' }, documents: DRIVER_DOCS })
+      .expect(409);
+
+    const rejected = await request(app.getHttpServer())
+      .post(`/v1/ops/partner-applications/${id}/reject`)
+      .set('Authorization', `Bearer ${ops.token}`)
+      .send({ reason: 'Ảnh CCCD bị lóa', issues: [{ section: 'ID_CARD', note: 'Chụp lại mặt trước' }] })
+      .expect(200);
+    expect(rejected.body.data.status).toBe('REJECTED');
+    expect(partners.auditLogs.filter((row) => row.applicationId === id).map((row) => row.action)).toEqual([
+      'KYC_CLAIM',
+      'KYC_REJECT',
+    ]);
+    expect(partners.statusEvents.filter((e) => e.applicationId === id).map((e) => e.status)).toEqual([
+      'IN_REVIEW',
+      'REJECTED',
+    ]);
+  });
+
   it('validates documents on submit', async () => {
     const user = await login('+84907' + String(phoneSerial++).padStart(5, '0'));
     const missing = await request(app.getHttpServer())
       .post('/v1/me/partner-applications')
       .set('Authorization', `Bearer ${user.token}`)
-      .send({ role: 'DRIVER', metadata: { vehicleClassCode: 'MOTORBIKE' }, documents: DRIVER_DOCS.slice(0, 2) })
+      .send({ role: 'DRIVER', metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1' }, documents: DRIVER_DOCS.slice(0, 2) })
       .expect(400);
     expect(missing.body.errorCode).toBe('PARTNER_DOCUMENTS_REQUIRED');
-    expect(missing.body.details.missing).toEqual(['SELFIE', 'LICENSE', 'VEHICLE_REG']);
+    expect(missing.body.details.missing).toEqual(['SELFIE', 'SELFIE_VIDEO', 'LICENSE', 'VEHICLE_REG']);
     await request(app.getHttpServer())
       .post('/v1/me/partner-applications')
       .set('Authorization', `Bearer ${user.token}`)
-      .send({ role: 'DRIVER', metadata: { vehicleClassCode: 'MOTORBIKE' }, documents: [{ kind: 'PASSPORT', contentBase64: TINY_JPEG_BASE64 }] })
+      .send({ role: 'DRIVER', metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1' }, documents: [{ kind: 'PASSPORT', contentBase64: TINY_JPEG_BASE64 }] })
       .expect(400);
     const wrongBytes = await request(app.getHttpServer())
       .post('/v1/me/partner-applications')
       .set('Authorization', `Bearer ${user.token}`)
       .send({
         role: 'DRIVER',
-        metadata: { vehicleClassCode: 'MOTORBIKE' },
+        metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1' },
         documents: DRIVER_DOCS.map((doc, i) =>
           i === 0 ? { ...doc, contentBase64: Buffer.from('<svg></svg>').toString('base64') } : doc,
         ),

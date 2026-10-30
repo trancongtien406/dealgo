@@ -25,5 +25,17 @@ export async function settingsWith(
  */
 export function negotiationMechanicsSettings(): Promise<MemoryPlatformSettingsRepository> {
   // Existing suites cover the pickup-code flow; the shipped default is off.
-  return settingsWith({ RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE: 0, RIDE_PICKUP_CODE_REQUIRED: true });
+  return settingsWith({
+    RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE: 0,
+    RIDE_BID_CEILING_PERCENT_OF_REFERENCE: 0,
+    RIDE_PICKUP_CODE_REQUIRED: true,
+  });
+}
+
+/** Fixed small fares on short trips: bid floor and ceiling both off. */
+export function bidBandOffSettings(): Promise<MemoryPlatformSettingsRepository> {
+  return settingsWith({
+    RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE: 0,
+    RIDE_BID_CEILING_PERCENT_OF_REFERENCE: 0,
+  });
 }

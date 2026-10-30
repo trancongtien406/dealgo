@@ -18,6 +18,7 @@ import {
   splitCollection,
   toCheckoutStatus,
 } from './payment-gateway.service.js';
+import { PaymentStatusBus, type PaymentStatusChange } from './payment-status-bus.js';
 import { PaymentMethodRegistryService } from './payment-method-registry.service.js';
 import { serviceForVehicleClass } from './payment-method.catalog.js';
 
@@ -68,8 +69,9 @@ function setup(opts: { env?: Partial<typeof ENV>; publicBaseUrl?: string | null;
   const repo = new MemoryCheckoutRepository();
   const ledgerRepo = new MemoryLedgerRepository();
   const ledger = new LedgerService(ledgerRepo);
-  const gateway = new PaymentGatewayService(repo, adapters, options, registry, ledger);
-  return { settings, registry, repo, ledger, ledgerRepo, gateway, calls };
+  const bus = new PaymentStatusBus();
+  const gateway = new PaymentGatewayService(repo, adapters, options, registry, ledger, bus);
+  return { bus, settings, registry, repo, ledger, ledgerRepo, gateway, calls };
 }
 
 async function enable(registry: PaymentMethodRegistryService, code: string, services = { BIKE: true, CAR: true, FOOD: true }) {
@@ -93,7 +95,7 @@ describe('registry validation', () => {
     expect(validatePaymentMethodRegistry([])).toMatch(/object/);
     expect(validatePaymentMethodRegistry({ methods: { MOMO: { sortOrder: 5 } } })).toBeNull();
     const n = normalizePaymentMethodRegistry({ methods: { CASH: { services: { BIKE: false } } } });
-    expect(n.methods.CASH!.services).toEqual({ BIKE: true, CAR: true, FOOD: true });
+    expect(n.methods.CASH!.services).toEqual({ BIKE: true, CAR: true, FOOD: true, PARCEL: true });
   });
 
   it('maps vehicle classes to services', () => {
@@ -458,5 +460,52 @@ describe('active reconciliation', () => {
     expect(attemptTimeFromRef('garbage', new Date(5)).getTime()).toBe(5);
     const ctx = setup();
     expect(await ctx.gateway.reconcilePending(later())).toMatchObject({ checked: 0 });
+  });
+});
+
+describe('payment status push (t50u, replaces the app poll)', () => {
+  it('publishes PAID, refund and FAILED changes once per transition, never on replay or bad IPN', async () => {
+    const { gateway, registry, repo, bus } = setup();
+    const seen: PaymentStatusChange[] = [];
+    bus.onChange((c) => {
+      seen.push(c);
+    });
+    await enable(registry, 'MOMO');
+    const v = await gateway.start({ entityType: 'RIDE', entityId: RIDE, service: 'BIKE', methodCode: 'MOMO', amountVnd: 50000, userId: 'u' });
+    const intent = (await repo.findById(v.intentId!))!;
+    await gateway.handleCallback('momo', { ...momoIpn(intent.providerRef!, 50000), signature: 'bad' });
+    await gateway.handleCallback('momo', momoIpn(intent.providerRef!, 1));
+    expect(seen).toHaveLength(0);
+    await gateway.handleCallback('momo', momoIpn(intent.providerRef!, 50000));
+    await gateway.handleCallback('momo', momoIpn(intent.providerRef!, 50000));
+    expect(seen.map((c) => c.status)).toEqual(['PAID']);
+    expect(seen[0]).toMatchObject({ entityType: 'RIDE', entityId: RIDE, intentId: intent.id });
+    await gateway.refund({ intentId: intent.id, reason: 'Khach huy', actorUserId: 'ops' });
+    expect(seen.map((c) => c.status)).toEqual(['PAID', 'REFUNDED']);
+  });
+
+  it('a throwing listener never breaks the IPN ack', async () => {
+    const { gateway, registry, repo, bus } = setup();
+    bus.onChange(() => {
+      throw new Error('boom');
+    });
+    await enable(registry, 'MOMO');
+    const v = await gateway.start({ entityType: 'RIDE', entityId: RIDE, service: 'BIKE', methodCode: 'MOMO', amountVnd: 50000, userId: 'u' });
+    const intent = (await repo.findById(v.intentId!))!;
+    expect((await gateway.handleCallback('momo', momoIpn(intent.providerRef!, 50000, 1006))).httpStatus).toBe(204);
+    expect((await gateway.status('RIDE', RIDE)).status).toBe('FAILED');
+  });
+
+  it('unsubscribe stops delivery', () => {
+    const bus = new PaymentStatusBus();
+    const seen: string[] = [];
+    const off = bus.onChange((c) => {
+      seen.push(c.status);
+    });
+    const change = { entityType: 'FOOD_ORDER' as const, entityId: 'f', intentId: 'i', status: 'PAID' as const, occurredAt: 'now' };
+    bus.publish(change);
+    off();
+    bus.publish(change);
+    expect(seen).toEqual(['PAID']);
   });
 });

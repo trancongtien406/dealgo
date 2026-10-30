@@ -3,6 +3,8 @@ export type DriverPresenceView = {
   online: boolean;
   rideEnabled: boolean;
   foodEnabled: boolean;
+  /** DEC-PROD-071: opt-in to parcel (goods) delivery jobs; false by default. */
+  parcelEnabled: boolean;
   lat: number | null;
   lng: number | null;
   /** When lat/lng were last reported; null when never. */
@@ -30,13 +32,24 @@ export const DRIVER_LOCATION_FRESH_MS = 2 * 60 * 1000;
  */
 export const DRIVER_PUSH_LOCATION_MAX_AGE_MS = 30 * 60 * 1000;
 
-export type DispatchService = 'RIDE' | 'FOOD';
+export type DispatchService = 'RIDE' | 'FOOD' | 'PARCEL';
+
+export function presenceServiceOn(
+  row: Pick<DriverPresenceView, 'rideEnabled' | 'foodEnabled' | 'parcelEnabled'>,
+  service: DispatchService,
+): boolean {
+  if (service === 'RIDE') return row.rideEnabled;
+  if (service === 'FOOD') return row.foodEnabled;
+  return row.parcelEnabled;
+}
 
 export type UpsertPresenceInput = {
   online: boolean;
   /** Omitted keeps the stored choice (true for a new row). */
   rideEnabled?: boolean;
   foodEnabled?: boolean;
+  /** Omitted keeps the stored choice (false for a new row). */
+  parcelEnabled?: boolean;
   lat?: number;
   lng?: number;
 };
@@ -77,6 +90,7 @@ export class MemoryDriverPresenceRepository implements DriverPresenceRepository 
       online: input.online,
       rideEnabled: input.rideEnabled ?? existing?.rideEnabled ?? true,
       foodEnabled: input.foodEnabled ?? existing?.foodEnabled ?? true,
+      parcelEnabled: input.parcelEnabled ?? existing?.parcelEnabled ?? false,
       lat: input.lat !== undefined ? input.lat : (existing?.lat ?? null),
       lng: input.lng !== undefined ? input.lng : (existing?.lng ?? null),
       locationAt:
@@ -96,6 +110,7 @@ export class MemoryDriverPresenceRepository implements DriverPresenceRepository 
       online: existing?.online ?? true,
       rideEnabled: existing?.rideEnabled ?? true,
       foodEnabled: existing?.foodEnabled ?? true,
+      parcelEnabled: existing?.parcelEnabled ?? false,
       lat: location.lat,
       lng: location.lng,
       locationAt: location.at,
@@ -123,7 +138,7 @@ export class MemoryDriverPresenceRepository implements DriverPresenceRepository 
       .filter(
         (row) =>
           row.online &&
-          (input.service === 'RIDE' ? row.rideEnabled : row.foodEnabled) &&
+          presenceServiceOn(row, input.service) &&
           row.lat !== null &&
           row.lng !== null &&
           row.locationAt !== null &&

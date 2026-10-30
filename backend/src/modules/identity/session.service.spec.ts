@@ -123,4 +123,32 @@ describe('SessionService', () => {
       }),
     });
   });
+
+  it('revokes older sessions when a driver signs in on a new device (single device login)', async () => {
+    const { service, repository } = createService();
+    const user = await repository.createUser({
+      email: 'driver@dealgo.vn',
+      phone: '+84909999999',
+      displayName: 'Driver Nguyen',
+    });
+    await repository.insertGrant(user.id, 'DRIVER', 'ACTIVE');
+
+    // Device A signs in
+    const sessionA = await service.issue(user, 'customer', { deviceLabel: 'Device A' });
+
+    // Device B signs in with same account
+    const sessionB = await service.issue(user, 'customer', { deviceLabel: 'Device B' });
+
+    // Session B is valid and can refresh
+    const refreshedB = await service.refresh(sessionB.refreshToken);
+    expect(refreshedB.accessToken).toBeDefined();
+
+    // Session A is revoked: refresh fails with 401
+    await expect(service.refresh(sessionA.refreshToken)).rejects.toMatchObject({
+      status: 401,
+      response: expect.objectContaining({
+        errorCode: 'AUTH_REFRESH_INVALID',
+      }),
+    });
+  });
 });

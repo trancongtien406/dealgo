@@ -64,9 +64,20 @@ class PartnerDocumentDraft {
     return PartnerDocumentDraft(stored: serverKinds);
   }
 
+  /// t52u: flat `capture*` flags from this session's smart captures, sent as
+  /// application metadata. A re-pick from the gallery drops its kind's flags.
+  Map<String, Object?> captureMetadata() => {
+    for (final image in picked.values) ...image.checks,
+  };
+
   List<PartnerDocumentInput> uploads(List<String> order) {
     return [
-      for (final kind in order)
+      for (final kind in [
+        ...order,
+        if (!order.contains(PartnerDocumentKind.selfieVideo) &&
+            order.contains(PartnerDocumentKind.selfie))
+          PartnerDocumentKind.selfieVideo,
+      ])
         if (picked[kind] case final image?)
           PartnerDocumentInput(
             kind: kind,

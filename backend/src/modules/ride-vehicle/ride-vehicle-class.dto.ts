@@ -22,6 +22,11 @@ export class PatchRideVehicleClassDto {
   @IsBoolean()
   enabled?: boolean;
 
+  /** DEC-PROD-071: class can be booked for parcel delivery. */
+  @IsOptional()
+  @IsBoolean()
+  parcelEnabled?: boolean;
+
   @IsOptional()
   @IsString()
   @MinLength(1)
@@ -90,4 +95,22 @@ export class UploadRideVehicleClassImageDto {
   @MinLength(20)
   @MaxLength(2_700_000)
   dataUrl?: string;
+}
+
+export class PutRideZoneTariffDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100_000)
+  perKmVnd!: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minFareVnd!: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
 }

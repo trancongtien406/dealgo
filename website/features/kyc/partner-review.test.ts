@@ -11,7 +11,9 @@ import { mapNestToStoreApproval } from "@/features/store-approvals/api";
 
 const ID = "6f1c2b8e-3a1d-4c2e-9f7a-1b2c3d4e5f60";
 
-function app(over: Partial<NestPartnerApplicationView> = {}): NestPartnerApplicationView {
+function app(
+  over: Partial<NestPartnerApplicationView> = {},
+): NestPartnerApplicationView {
   return {
     id: ID,
     role: "DRIVER",
@@ -34,8 +36,24 @@ describe("partner review helpers", () => {
     const docs = mapPartnerDocuments(
       app({
         documents: [
-          { index: 0, kind: "ID_FRONT", label: "x", contentType: "image/jpeg", sizeBytes: 2048, uploadedAt: "2026-10-19T03:00:00.000Z", hasFile: true },
-          { index: 1, kind: "LICENSE", label: "y", contentType: "application/pdf", sizeBytes: 0, uploadedAt: "2026-10-19T03:00:00.000Z", hasFile: false },
+          {
+            index: 0,
+            kind: "ID_FRONT",
+            label: "x",
+            contentType: "image/jpeg",
+            sizeBytes: 2048,
+            uploadedAt: "2026-10-19T03:00:00.000Z",
+            hasFile: true,
+          },
+          {
+            index: 1,
+            kind: "LICENSE",
+            label: "y",
+            contentType: "application/pdf",
+            sizeBytes: 0,
+            uploadedAt: "2026-10-19T03:00:00.000Z",
+            hasFile: false,
+          },
         ],
       }),
     );
@@ -45,7 +63,11 @@ describe("partner review helpers", () => {
       url: `/api/ops/partner-applications/${ID}/documents/0`,
       sizeLabel: "2 KB",
     });
-    expect(docs[1]).toMatchObject({ label: "Giấy phép lái xe", url: null, hasFile: false });
+    expect(docs[1]).toMatchObject({
+      label: "Giấy phép lái xe",
+      url: null,
+      hasFile: false,
+    });
   });
 
   it("formats sizes, masks account numbers and validates issues", () => {

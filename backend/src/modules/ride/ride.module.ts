@@ -11,6 +11,16 @@ import { PaymentModule } from '../payment/index.js';
 import { PlatformSettingsModule } from '../../platform/settings/index.js';
 import { PROMOTION_REPOSITORY, PromotionModule, type PromotionRepository } from '../promotion/index.js';
 import { RideOpsController } from './ride-ops.controller.js';
+import { StorageModule } from '../../platform/storage/storage.module.js';
+import { ParcelController } from './parcel.controller.js';
+import { ParcelOpsController } from './parcel-ops.controller.js';
+import { ParcelService } from './parcel.service.js';
+import {
+  MemoryRideParcelStore,
+  PrismaRideParcelStore,
+  RIDE_PARCEL_STORE,
+  type RideParcelStore,
+} from './ride-parcel.store.js';
 import {
   MemoryRidePickupCodeStore,
   PrismaRidePickupCodeStore,
@@ -45,11 +55,25 @@ import { RideOfferEvents } from './ride-offer-events.js';
     PromotionModule,
     RideVehicleClassModule,
     RoutingModule,
+    StorageModule,
   ],
-  controllers: [RideController, RideOpsController],
+  controllers: [RideController, RideOpsController, ParcelController, ParcelOpsController],
   providers: [
     RideService,
+    ParcelService,
     RideOfferEvents,
+    {
+      provide: RIDE_PARCEL_STORE,
+      inject: [PrismaService, ConfigService],
+      useFactory: (prisma: PrismaService, config: ConfigService<AppEnv, true>): RideParcelStore =>
+        resolvePersistenceRepository<NonNullable<ReturnType<PrismaService['db']>>, RideParcelStore>({
+          nodeEnv: config.get('NODE_ENV', { infer: true }),
+          databaseUrl: config.get('DATABASE_URL', { infer: true }),
+          client: prisma.db(),
+          createMemory: () => new MemoryRideParcelStore(),
+          createPrisma: (client) => new PrismaRideParcelStore(client),
+        }),
+    },
     SystemRideClock,
     { provide: RIDE_CLOCK, useExisting: SystemRideClock },
     {

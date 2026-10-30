@@ -48,7 +48,7 @@ import {
   type UpdateStopsInput,
   type WithdrawOfferInput,
 } from './ride-ledger.js';
-import type { OpsInterveneResult, OpsRidePage, RideRepository } from './ride.repository.js';
+import type { OpsInterveneResult, OpsRidePage, RideCreateHook, RideRepository } from './ride.repository.js';
 
 type RideTx = Prisma.TransactionClient;
 export { lockDriverAssignment };
@@ -63,13 +63,15 @@ class RideAssignmentConflict extends Error {
 export class PrismaRideRepository implements RideRepository {
   constructor(private readonly db: PrismaClient) {}
 
-  async create(input: CreateRideInput): Promise<RideSnapshot> {
+  async create(input: CreateRideInput, withinCreate?: RideCreateHook): Promise<RideSnapshot> {
     let outcome: Awaited<ReturnType<RideLedger['create']>>;
     try {
       outcome = await this.db.$transaction(async (tx) => {
         const ledger = await this.hydrateCustomer(tx, input.customerId, input.idempotencyKey);
         const created = ledger.create(input);
         await this.persist(tx, ledger);
+        // DEC-PROD-071: parcel row commits with the ride (no window without it).
+        if (withinCreate && created.ride) await withinCreate({ tx, rideId: created.ride.id });
         return created;
       });
     } catch (error) {

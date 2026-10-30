@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { parseAsStringLiteral, useQueryStates } from "nuqs";
 import {
   approveKycApplication,
+  claimKycApplication,
   fetchKycByCode,
   fetchKycQueue,
   rejectKycApplication,
@@ -13,6 +14,7 @@ import { listSearchParams } from "@/lib/list-search-params";
 const kycStatusFilterValues = [
   "ALL",
   "UNDER_REVIEW",
+  "IN_REVIEW",
   "NEEDS_MORE_INFO",
   "APPROVED",
   "REJECTED",
@@ -74,10 +76,25 @@ export function useApproveKycMutation(code: string) {
   });
 }
 
+export function useClaimKycMutation(code: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => claimKycApplication(code),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(kycQueryKeys.detail(code), updated);
+      void queryClient.invalidateQueries({ queryKey: kycQueryKeys.all });
+    },
+  });
+}
+
 export function useRejectKycMutation(code: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: string | { reason: string; issues: Array<{ section: string; note: string }> }) =>
+    mutationFn: (
+      input:
+        | string
+        | { reason: string; issues: Array<{ section: string; note: string }> },
+    ) =>
       typeof input === "string"
         ? rejectKycApplication(code, input)
         : rejectKycApplication(code, input.reason, input.issues),

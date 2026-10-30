@@ -10,11 +10,15 @@ describe("settings feature flags tab", () => {
     const rows = [
       { key: "ONBOARDING_DRIVER_KYC_REQUIRED", value: "false" },
       { key: "ONBOARDING_MERCHANT_KYB_REQUIRED", value: "true" },
+      { key: "KYC_AUTO_APPROVE_DRIVER", value: "false" },
+      { key: "KYC_AUTO_APPROVE_MERCHANT", value: "false" },
       { key: "RIDE_MIN_FARE_VND", value: "15000" },
     ];
     expect(featureFlagRows(rows).map((r) => r.key)).toEqual([
       "ONBOARDING_DRIVER_KYC_REQUIRED",
       "ONBOARDING_MERCHANT_KYB_REQUIRED",
+      "KYC_AUTO_APPROVE_DRIVER",
+      "KYC_AUTO_APPROVE_MERCHANT",
     ]);
   });
 

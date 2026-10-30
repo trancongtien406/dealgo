@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { OPS_HINT_SERVER_EVENT, OpsEventBus, isOpsEvent, type OpsEvent } from '../../../platform/ops-events/ops-event-bus.js';
 import type { Server } from 'socket.io';
 import {
   DRIVER_LOCATION_EVENT,
@@ -19,6 +20,8 @@ import {
   roomForStore,
   roomForUser,
   PARTNER_STATUS_EVENT,
+  PAYMENT_STATUS_EVENT,
+  type PaymentStatusEventPayload,
   CALL_EVENT,
   type CallEventPayload,
   CHAT_MESSAGE_EVENT,
@@ -46,8 +49,27 @@ export class SnapshotFanoutService {
   /** Per-room chain so pruning never reorders snapshots of one aggregate. */
   private readonly roomQueues = new Map<string, Promise<void>>();
 
+  constructor(@Optional() private readonly opsBus?: OpsEventBus) {}
+
   bindServer(server: Server): void {
     this.server = server;
+    // Admin SSE hints from the worker arrive via the Redis adapter's serverSideEmit.
+    server.on?.(OPS_HINT_SERVER_EVENT, (raw: unknown) => {
+      if (isOpsEvent(raw)) this.opsBus?.publish(raw);
+    });
+  }
+
+  /**
+   * Admin live hint: publish to local SSE subscribers and, when bound to the Redis adapter,
+   * to the other nodes (the worker runs the outbox relay; the API holds the SSE streams).
+   */
+  signalOps(event: OpsEvent): void {
+    this.opsBus?.publish(event);
+    try {
+      this.server?.serverSideEmit(OPS_HINT_SERVER_EVENT, event);
+    } catch {
+      // In-memory adapter: single process, the local publish above is enough.
+    }
   }
 
   /**
@@ -60,6 +82,7 @@ export class SnapshotFanoutService {
   }
 
   emitSnapshot(payload: SnapshotEventPayload): void {
+    this.signalOps({ type: 'monitor', reason: 'snapshot', aggregateType: payload.aggregateType, at: new Date().toISOString() });
     const room = roomForAggregate(payload.aggregateType, payload.aggregateId);
     if (!room) {
       this.logger.warn({
@@ -179,7 +202,15 @@ export class SnapshotFanoutService {
     this.server.to(driverIds.map((id) => roomForUser(id))).emit(FOOD_REQUEST_EVENT, payload);
   }
 
+  emitPaymentStatus(userId: string, payload: PaymentStatusEventPayload): void {
+    if (!this.server) {
+      return;
+    }
+    this.server.to(roomForUser(userId)).emit(PAYMENT_STATUS_EVENT, payload);
+  }
+
   emitPartnerStatus(payload: PartnerStatusEventPayload): void {
+    this.signalOps({ type: 'monitor', reason: 'partnerStatus', at: new Date().toISOString() });
     if (!this.server) {
       return;
     }

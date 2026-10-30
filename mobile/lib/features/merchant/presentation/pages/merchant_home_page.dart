@@ -64,9 +64,10 @@ class _MerchantHomePageState extends State<MerchantHomePage> {
       return;
     }
     final queue = context.read<MerchantQueueCubit>();
-    queue.setTokenSource(
-      () => context.mounted ? merchantAccessToken(context) : null,
-    );
+    queue.setTokenSource(() {
+      if (!mounted) return null;
+      return merchantAccessToken(context);
+    });
     final token = merchantAccessToken(context);
     unawaited(queue.load(token));
     unawaited(_stats.load(token, days: 1));
@@ -82,8 +83,10 @@ class _MerchantHomePageState extends State<MerchantHomePage> {
       if (!mounted) return;
       await context.read<MerchantQueueCubit>().listenStore(
         storeId: store.id,
-        tokenSource: () =>
-            context.mounted ? merchantAccessToken(context) : null,
+        tokenSource: () {
+          if (!mounted) return null;
+          return merchantAccessToken(context);
+        },
       );
     } catch (_) {
       // Catalog may 403 when ineligible; queue load surfaces that state.

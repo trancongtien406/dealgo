@@ -57,8 +57,8 @@ Dio createDealGoDio({
   final resolvedBase = normalizeBaseUrl(baseUrl ?? apiBaseUrl);
   assertSecureApiBaseUrl(resolvedBase, isRelease: kReleaseMode);
   final dio = Dio(_dealGoBaseOptions(resolvedBase));
-  // Refresh/retry must not share the auth QueuedInterceptor: while onError is
-  // awaiting, another request's onError is queued behind it and deadlocks.
+  // Refresh/retry uses a clean client without the auth interceptor so refresh
+  // and retried requests never re-enter onError.
   final refreshDio = Dio(_dealGoBaseOptions(resolvedBase));
 
   final logInterceptor = createDealGoLogInterceptor(enabled: enableLogging);
@@ -85,7 +85,7 @@ Dio createDealGoDio({
   return dio;
 }
 
-class _DealGoAuthInterceptor extends QueuedInterceptor {
+class _DealGoAuthInterceptor extends Interceptor {
   _DealGoAuthInterceptor({
     required this.dio,
     required this.refreshDio,
@@ -105,6 +105,20 @@ class _DealGoAuthInterceptor extends QueuedInterceptor {
   void _syncRefreshClient() {
     refreshDio.options.baseUrl = dio.options.baseUrl;
     refreshDio.httpClientAdapter = dio.httpClientAdapter;
+  }
+
+  /// True when a 401 indicates an expired/revoked access token rather than a
+  /// step-up re-authentication failure (`AUTH_CODE_INVALID`,
+  /// `AUTH_PASSWORD_INVALID`, `AUTH_PASSKEY_INVALID`, `AUTH_CODE_EXPIRED`).
+  bool _isSessionUnauthorized(DioException err) {
+    final data = err.response?.data;
+    if (data is Map) {
+      final code = data['errorCode'];
+      if (code is String && code.isNotEmpty && code != 'UNAUTHORIZED') {
+        return false;
+      }
+    }
+    return true;
   }
 
   @override
@@ -134,7 +148,10 @@ class _DealGoAuthInterceptor extends QueuedInterceptor {
     final skip = err.requestOptions.extra[skipAuthRefreshExtra] == true;
     final alreadyRetried =
         err.requestOptions.extra['dealgo.authRetried'] == true;
-    if (status != 401 || skip || alreadyRetried) {
+    if (status != 401 ||
+        skip ||
+        alreadyRetried ||
+        !_isSessionUnauthorized(err)) {
       handler.next(err);
       return;
     }
@@ -170,9 +187,10 @@ class _DealGoAuthInterceptor extends QueuedInterceptor {
       handler.resolve(response);
     } on DioException catch (retryError) {
       // The retried request failing for its own reasons (409, 404, 5xx,
-      // timeout) says nothing about the session; only a second 401 with a
-      // freshly refreshed token does.
-      if (retryError.response?.statusCode == 401) {
+      // timeout, or step-up re-auth failure) says nothing about the session;
+      // only a second session 401 with a freshly refreshed token does.
+      if (retryError.response?.statusCode == 401 &&
+          _isSessionUnauthorized(retryError)) {
         await onUnauthorized();
       }
       handler.next(retryError);

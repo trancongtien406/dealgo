@@ -1,4 +1,5 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { OpsEventBus } from '../../platform/ops-events/ops-event-bus.js';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import {
   INTEGRATION_FIELDS,
   integrationError,
@@ -137,6 +138,7 @@ export class SystemErrorsService {
   constructor(
     private readonly settings: IntegrationSettingsService,
     @Inject(SENTRY_FETCH) private readonly fetcher: SentryFetch,
+    @Optional() private readonly opsBus?: OpsEventBus,
   ) {}
 
   // ── Settings ─────────────────────────────────────────────────────────────
@@ -424,6 +426,8 @@ export class SystemErrorsService {
       reason,
     );
     this.cache.clear();
+    // Admin SSE hint: the list and nav badge re-GET (t50u follow-up).
+    this.opsBus?.publish({ type: 'systemErrors', reason: 'statusChanged', at: new Date().toISOString() });
     return this.issueDetail(id);
   }
 

@@ -150,16 +150,45 @@ export class RoutingService {
   ): Promise<RouteOption[]> {
     const pair = points.map((point) => `${point.lng},${point.lat}`).join(';');
     const mapboxToken = provider === 'mapbox' ? await this.mapboxToken() : '';
-    const url =
-      provider === 'osrm'
-        ? `${this.osrmBase()}/route/v1/driving/${pair}?overview=full&geometries=geojson&alternatives=${alternatives}`
-        : `https://api.mapbox.com/directions/v5/mapbox/driving/${pair}?geometries=geojson&overview=full&alternatives=${alternatives}&access_token=${encodeURIComponent(mapboxToken)}`;
     const timeout = this.config.get('ROUTING_TIMEOUT_MS', { infer: true }) ?? 4000;
-    const res = await this.fetcher(url, { signal: AbortSignal.timeout(timeout) });
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
+
+    if (provider === 'osrm') {
+      const url = `${this.osrmBase()}/route/v1/driving/${pair}?overview=full&geometries=geojson&alternatives=${alternatives}`;
+      const res = await this.fetcher(url, { signal: AbortSignal.timeout(timeout) });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      return parseDirections(await res.json());
     }
-    return parseDirections(await res.json());
+
+    const drivingUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${pair}?geometries=geojson&overview=full&alternatives=${alternatives}&access_token=${encodeURIComponent(mapboxToken)}`;
+
+    if (!alternatives || points.length > 2) {
+      const res = await this.fetcher(drivingUrl, { signal: AbortSignal.timeout(timeout) });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      return parseDirections(await res.json());
+    }
+
+    // Mapbox single leg: query driving and cycling to find the optimal urban road geometry (matching Google Maps)
+    const cyclingUrl = `https://api.mapbox.com/directions/v5/mapbox/cycling/${pair}?geometries=geojson&overview=full&alternatives=true&access_token=${encodeURIComponent(mapboxToken)}`;
+
+    const [drivingRes, cyclingRes] = await Promise.all([
+      this.fetcher(drivingUrl, { signal: AbortSignal.timeout(timeout) })
+        .then(async (res) => (res.ok ? parseDirections(await res.json()) : []))
+        .catch(() => [] as RouteOption[]),
+      this.fetcher(cyclingUrl, { signal: AbortSignal.timeout(timeout) })
+        .then(async (res) => (res.ok ? parseDirections(await res.json()) : []))
+        .catch(() => [] as RouteOption[]),
+    ]);
+
+    const all = [...drivingRes, ...cyclingRes];
+    if (all.length === 0) {
+      throw new Error('Mapbox routing returned no routes');
+    }
+    all.sort((a, b) => a.distanceM - b.distanceM);
+    return all;
   }
 
   private osrmBase(): string {

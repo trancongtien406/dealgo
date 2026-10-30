@@ -7,6 +7,7 @@ type RouteContext = { params: Promise<{ code: string }> };
 
 const PATCH_KEYS = [
   "enabled",
+  "parcelEnabled",
   "name",
   "seats",
   "baseFareVnd",

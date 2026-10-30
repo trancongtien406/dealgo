@@ -8,6 +8,7 @@ abstract interface class PresenceRemoteDataSource {
     double? lng,
     bool? rideEnabled,
     bool? foodEnabled,
+    bool? parcelEnabled,
   });
 
   /// The driver's service toggles; defaults when no presence was ever stored.

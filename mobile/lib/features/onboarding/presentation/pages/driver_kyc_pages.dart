@@ -796,6 +796,7 @@ class _DocSlots extends StatelessWidget {
             source: source,
             frontCamera: frontCamera,
             onPicked: (image) => cubit.attachDocument(kind, image),
+            onPickedOther: cubit.attachDocument,
             onRemove: () => cubit.removeDocument(kind),
           ),
           const SizedBox(height: DealGoSpacing.s12),
@@ -913,6 +914,14 @@ class _ConfirmStep extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (state.ocrReading || state.ocr.prefilled.isNotEmpty) ...[
+          Text(
+            state.ocrReading ? l10n.kycOcrReading : l10n.kycOcrPrefilledNote,
+            key: const Key('kyc-ocr-note'),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: DealGoSpacing.s12),
+        ],
         OnboardingMockField(label: l10n.kycFullName, value: state.fullName),
         const SizedBox(height: DealGoSpacing.s12),
         OnboardingMockField(label: l10n.kycBirthDate, value: state.birthDate),
@@ -938,7 +947,7 @@ class _LicenseStep extends StatelessWidget {
 
   final DriverKycState state;
 
-  static const classes = ['A1', 'A'];
+  static const classes = PartnerDocumentKind.licenseClasses;
 
   @override
   Widget build(BuildContext context) {
@@ -1128,6 +1137,11 @@ class _VehicleStepState extends State<_VehicleStep> {
           ),
           if (PartnerDocumentKind.isCarClass(state.vehicleClassCode ?? ''))
             OnboardingInfoBanner(message: l10n.kycVehicleInsuranceNote),
+          if (!state.licenseMatchesVehicle)
+            OnboardingInfoBanner(
+              key: const Key('kyc-license-class-mismatch'),
+              message: l10n.kycLicenseClassMismatch(state.licenseClass),
+            ),
         ] else
           OnboardingInfoBanner(
             message: l10n.kycQuickModeBanner,

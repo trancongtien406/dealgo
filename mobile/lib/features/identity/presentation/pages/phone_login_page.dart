@@ -59,7 +59,11 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
   /// Real options only: a same-height placeholder while nothing is known, a
   /// retry when the first request fails, and a gentle size/fade change if the
   /// server answer differs from the cached one.
-  Widget _methodSection(BuildContext context, AppLocalizations l10n) {
+  Widget _methodSection(
+    BuildContext context,
+    AppLocalizations l10n, {
+    bool isPasskeyLoading = false,
+  }) {
     return ListenableBuilder(
       listenable: _methods,
       builder: (context, _) {
@@ -76,7 +80,11 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
           ),
           AuthMethodsStatus.ready => Column(
             key: const Key('auth-methods-ready'),
-            children: _methodTiles(context, l10n),
+            children: _methodTiles(
+              context,
+              l10n,
+              isPasskeyLoading: isPasskeyLoading,
+            ),
           ),
         };
         return AnimatedSize(
@@ -111,28 +119,39 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
     AuthMethodPolicy.passkey,
   ].where(_methods.isEnabled).join(',');
 
-  List<Widget> _methodTiles(BuildContext context, AppLocalizations l10n) {
+  List<Widget> _methodTiles(
+    BuildContext context,
+    AppLocalizations l10n, {
+    bool isPasskeyLoading = false,
+  }) {
     final tiles = <Widget>[
       if (_methods.isEnabled(AuthMethodPolicy.phoneSms))
         _AuthMethodTile(
           key: const Key('auth-method-phone'),
           icon: DealGoIcons.phone,
           label: l10n.authPhoneLabel,
-          onTap: () => context.push(AuthRoutes.phoneLogin),
+          onTap: isPasskeyLoading
+              ? null
+              : () => context.push(AuthRoutes.phoneLogin),
         ),
       if (_methods.isEnabled(AuthMethodPolicy.email))
         _AuthMethodTile(
           key: const Key('auth-method-email'),
           icon: DealGoIcons.mail,
           label: l10n.authEmailLabel,
-          onTap: () => context.push(AuthRoutes.emailLogin),
+          onTap: isPasskeyLoading
+              ? null
+              : () => context.push(AuthRoutes.emailLogin),
         ),
       if (_methods.isEnabled(AuthMethodPolicy.passkey))
         _AuthMethodTile(
           key: const Key('auth-method-passkey'),
           icon: DealGoIcons.fingerprint,
           label: l10n.passkeyContinue,
-          onTap: () => unawaited(_continueWithPasskey(context)),
+          isLoading: isPasskeyLoading,
+          onTap: isPasskeyLoading
+              ? null
+              : () => unawaited(_continueWithPasskey(context)),
         ),
     ];
     if (tiles.isEmpty) {
@@ -168,13 +187,16 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
           current is PhoneAuthError && current.phase == PhoneAuthPhase.passkey,
       listener: (context, state) {
         if (state is PhoneAuthError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                apiErrorText(AppLocalizations.of(context), state.error),
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(
+                content: Text(
+                  apiErrorText(AppLocalizations.of(context), state.error),
+                ),
+                behavior: SnackBarBehavior.floating,
               ),
-            ),
-          );
+            );
           context.read<PhoneAuthCubit>().clearError();
         }
       },
@@ -260,7 +282,11 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: DealGoSpacing.s24),
-                    _methodSection(context, l10n),
+                    _methodSection(
+                      context,
+                      l10n,
+                      isPasskeyLoading: authState is PhoneAuthPasskeySigningIn,
+                    ),
                     const AuthLegalFooter(),
                   ],
                 ),
@@ -293,12 +319,14 @@ class _AuthMethodTile extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.isLoading = false,
     super.key,
   });
 
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -329,11 +357,20 @@ class _AuthMethodTile extends StatelessWidget {
                 ),
               ),
             ),
-            const Icon(
-              DealGoIcons.chevronRight,
-              color: DealGoColors.textTertiary,
-              size: 20,
-            ),
+            if (isLoading)
+              const SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: DealGoColors.primary,
+                ),
+              )
+            else
+              const Icon(
+                DealGoIcons.chevronRight,
+                color: DealGoColors.textTertiary,
+                size: 20,
+              ),
           ],
         ),
       ),

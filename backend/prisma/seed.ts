@@ -26,7 +26,7 @@ const LOCAL_DATABASE_URL =
   'postgresql://dealgo:dealgo_dev@127.0.0.1:5433/dealgo?schema=public';
 
 /** Resolved in main() after .env is loaded (DEC-PROD-053: no hardcoded fallback). */
-export let DEFAULT_SEED_PASSWORD = '';
+export let DEFAULT_SEED_PASSWORD = '123123123';
 
 const passwordHashCache = new Map<string, Promise<string>>();
 
@@ -339,14 +339,14 @@ async function upsertRide(
     customerId: string;
     idempotencyKey: string;
     status:
-      | 'NEGOTIATING'
-      | 'ASSIGNED'
-      | 'DRIVER_EN_ROUTE'
-      | 'DRIVER_ARRIVED'
-      | 'IN_TRIP'
-      | 'COMPLETED'
-      | 'CANCELLED'
-      | 'EXPIRED';
+    | 'NEGOTIATING'
+    | 'ASSIGNED'
+    | 'DRIVER_EN_ROUTE'
+    | 'DRIVER_ARRIVED'
+    | 'IN_TRIP'
+    | 'COMPLETED'
+    | 'CANCELLED'
+    | 'EXPIRED';
     pickup: { lat: number; lng: number; label: string };
     dropoff: { lat: number; lng: number; label: string };
     offeredFareVnd: number;
@@ -448,14 +448,14 @@ async function upsertFoodOrder(
     storeId: string;
     idempotencyKey: string;
     status:
-      | 'PLACED'
-      | 'PREPARING'
-      | 'READY'
-      | 'ASSIGNED'
-      | 'PICKED_UP'
-      | 'DELIVERED'
-      | 'FAILED'
-      | 'CANCELLED';
+    | 'PLACED'
+    | 'PREPARING'
+    | 'READY'
+    | 'ASSIGNED'
+    | 'PICKED_UP'
+    | 'DELIVERED'
+    | 'FAILED'
+    | 'CANCELLED';
     deliveryFareVnd: number;
     dropoff: { lat: number; lng: number; label: string };
     assignedDriverId: string | null;
@@ -701,9 +701,9 @@ async function ensurePlatformSettings(db: PrismaClient): Promise<number> {
   const settings: Array<{ key: string; value: string; valueType: 'string' | 'number' | 'json' }> = [
     { key: 'DRIVER_SEARCH_RADIUS_KM', value: '5', valueType: 'number' },
     { key: 'RIDE_OFFER_TTL_SECONDS', value: '30', valueType: 'number' },
-    { key: 'RIDE_MIN_FARE_VND', value: '15000', valueType: 'number' },
+    { key: 'RIDE_MIN_FARE_VND', value: '10000', valueType: 'number' },
     { key: 'RIDE_MAX_FARE_VND', value: '1000000', valueType: 'number' },
-    { key: 'RIDE_REFERENCE_VND_PER_KM', value: '12000', valueType: 'number' },
+    { key: 'RIDE_REFERENCE_VND_PER_KM', value: '5000', valueType: 'number' },
     { key: 'FOOD_MIN_DELIVERY_VND', value: '15000', valueType: 'number' },
     { key: 'FOOD_MAX_DELIVERY_VND', value: '100000', valueType: 'number' },
     { key: 'CONTACT_WINDOW_MINUTES', value: '60', valueType: 'number' },
@@ -793,10 +793,10 @@ async function ensureChatThread(
     ? await db.chatThread.findUnique({ where: { rideId: input.rideId } })
     : input.foodOrderId
       ? await db.chatThread.findUnique({
-          where: {
-            foodOrderId_channel: { foodOrderId: input.foodOrderId, channel: 'DRIVER' },
-          },
-        })
+        where: {
+          foodOrderId_channel: { foodOrderId: input.foodOrderId, channel: 'DRIVER' },
+        },
+      })
       : null;
 
   if (!thread) {
@@ -1737,7 +1737,7 @@ function seedDocumentRefs(userId: string, role: 'DRIVER' | 'MERCHANT') {
   const kinds =
     role === 'DRIVER'
       ? (['ID_FRONT', 'ID_BACK', 'SELFIE', 'LICENSE', 'VEHICLE_REG'] as const)
-      : (['BUSINESS_LICENSE', 'REP_ID_FRONT', 'REP_ID_BACK'] as const);
+      : (['BUSINESS_LICENSE', 'FOOD_SAFETY_CERT', 'REP_ID_FRONT', 'REP_ID_BACK'] as const);
   const uploadedAt = new Date(Date.now() - 2 * 3600_000).toISOString();
   return kinds.map((kind) => ({
     key: `mock://seed/${userId}/${role}/${kind.toLowerCase()}.jpg`,

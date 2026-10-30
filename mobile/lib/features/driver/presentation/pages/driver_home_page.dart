@@ -214,10 +214,11 @@ class _DriverOnlineViewState extends State<DriverOnlineView> {
   }
 
   /// Home switches save straight away; the job list then follows the new choice.
-  Future<void> _toggle({bool? ride, bool? food}) async {
+  Future<void> _toggle({bool? ride, bool? food, bool? parcel}) async {
     final cubit = context.read<DriverServicesCubit>();
     if (ride != null) cubit.setRide(ride);
     if (food != null) cubit.setFood(food);
+    if (parcel != null) cubit.setParcel(parcel);
     final ok = await cubit.save();
     if (!mounted || ok) {
       return;
@@ -399,15 +400,29 @@ class _DriverOnlineViewState extends State<DriverOnlineView> {
                       ? null
                       : (value) => _toggle(ride: value),
                 ),
+                // DEC-PROD-071: FOOD is motorbike-only; cars never see the switch.
+                if (vehicleClass == null || vehicleClass == 'MOTORBIKE') ...[
+                  const Divider(height: 1),
+                  _ServiceSwitch(
+                    key: const Key('driver-home-food-switch'),
+                    icon: DealGoIcons.package,
+                    title: l10n.driverServicesFoodTitle,
+                    value: services.prefs.foodEnabled,
+                    onChanged: services.busy
+                        ? null
+                        : (value) => _toggle(food: value),
+                  ),
+                ],
                 const Divider(height: 1),
                 _ServiceSwitch(
-                  key: const Key('driver-home-food-switch'),
+                  key: const Key('driver-home-parcel-switch'),
                   icon: DealGoIcons.package,
-                  title: l10n.driverServicesFoodTitle,
-                  value: services.prefs.foodEnabled,
+                  title: l10n.driverServiceParcel,
+                  subtitle: l10n.driverServiceParcelHint,
+                  value: services.prefs.parcelEnabled,
                   onChanged: services.busy
                       ? null
-                      : (value) => _toggle(food: value),
+                      : (value) => _toggle(parcel: value),
                 ),
               ],
             ),
@@ -556,6 +571,7 @@ String driverServicesSummary(AppLocalizations l10n, DriverServicePrefs prefs) {
   final parts = [
     if (prefs.rideEnabled) l10n.driverServicePassenger,
     if (prefs.foodEnabled) l10n.driverServicesFoodTitle,
+    if (prefs.parcelEnabled) l10n.driverServiceParcel,
   ];
   return parts.isEmpty ? l10n.driverNoServiceOn : parts.join(', ');
 }

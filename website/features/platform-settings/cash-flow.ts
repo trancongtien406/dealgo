@@ -61,6 +61,12 @@ export const CASH_FLOW_GROUPS: ReadonlyArray<{
     ],
   },
   {
+    // DEC-PROD-071: size surcharges live in PARCEL_SIZE_CLASSES (JSON, general list).
+    id: "parcel",
+    title: "Giao hàng — phí dịch vụ & phí hoàn hàng",
+    keys: ["PARCEL_SERVICE_FEE_VND", "PARCEL_RETURN_FEE_VND"],
+  },
+  {
     id: "bounds",
     title: "Giới hạn cước & thanh toán",
     keys: [

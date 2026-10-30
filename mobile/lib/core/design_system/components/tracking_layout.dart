@@ -80,11 +80,14 @@ class TrackingScaffold extends StatelessWidget {
                 Expanded(
                   child: ListView(
                     controller: controller,
-                    padding: const EdgeInsets.fromLTRB(
+                    padding: EdgeInsets.fromLTRB(
                       DealGoDimensions.pageGutter,
                       DealGoSpacing.s8,
                       DealGoDimensions.pageGutter,
-                      DealGoSpacing.s16,
+                      DealGoSpacing.s16 +
+                          (footer == null
+                              ? MediaQuery.paddingOf(context).bottom
+                              : 0),
                     ),
                     children: [
                       Center(

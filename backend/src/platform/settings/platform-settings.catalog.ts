@@ -20,6 +20,10 @@ export type PlatformSettingKey =
   | 'VOUCHER_SHARED_PLATFORM_PERCENT'
   | 'RIDE_PICKUP_CODE_MAX_ATTEMPTS'
   | 'RIDE_PICKUP_CODE_REQUIRED'
+  | 'PARCEL_SIZE_CLASSES'
+  | 'PARCEL_RECIPIENT_CODE_REQUIRED'
+  | 'PARCEL_SERVICE_FEE_VND'
+  | 'PARCEL_RETURN_FEE_VND'
   | 'FOOD_DELIVERY_CODE_REQUIRED'
   | 'FOOD_DELIVERY_CODE_MAX_ATTEMPTS'
   | 'FOOD_HANDOVER_CODE_REQUIRED'
@@ -38,12 +42,16 @@ export type PlatformSettingKey =
   | 'AUTH_PASSWORD_RESET_MAX_ATTEMPTS'
   | 'AUTH_PASSWORD_RESET_MAX_PER_HOUR'
   | 'CHAT_RETENTION_DAYS'
+  | 'KYC_VIDEO_RETENTION_DAYS'
+  | 'KYC_AUTO_APPROVE_DRIVER'
+  | 'KYC_AUTO_APPROVE_MERCHANT'
   | 'APP_REVIEW_LOGIN_ENABLED'
   | 'APP_REVIEW_PHONE'
   | 'APP_REVIEW_EMAIL'
   | 'RIDE_REQUEST_WINDOW_SECONDS'
   | 'RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE'
   | 'RIDE_COUNTER_MAX_PERCENT_OF_OFFER'
+  | 'RIDE_BID_CEILING_PERCENT_OF_REFERENCE'
   | 'RIDE_MAX_OFFER_EDITS_PER_DRIVER'
   | 'RIDE_ASSIGNED_START_TIMEOUT_MINUTES'
   | 'RIDE_EN_ROUTE_TIMEOUT_MINUTES'
@@ -276,6 +284,39 @@ export const PLATFORM_SETTING_SPECS: readonly PlatformSettingSpec[] = [
     seeded: true,
   },
   {
+    // DEC-PROD-071 (DRAFT): parcel size classes (weight/dims/surcharge/allowed vehicle classes).
+    key: 'PARCEL_SIZE_CLASSES',
+    valueType: 'json',
+    openIds: ['DEC-PROD-071'],
+    seeded: true,
+  },
+  {
+    // DEC-PROD-071: JSON boolean, default false; the driver must enter the recipient's code to deliver.
+    key: 'PARCEL_RECIPIENT_CODE_REQUIRED',
+    valueType: 'json',
+    openIds: ['DEC-PROD-071'],
+    boolean: true,
+    seeded: true,
+  },
+  {
+    // DEC-PROD-071: flat parcel service fee folded into the server reference fare (0 = off).
+    key: 'PARCEL_SERVICE_FEE_VND',
+    valueType: 'number',
+    openIds: ['DEC-PROD-071'],
+    min: 0,
+    max: 200000,
+    seeded: true,
+  },
+  {
+    // DEC-PROD-071: fee for handing a failed parcel back to the sender (0 = off), paid to the driver.
+    key: 'PARCEL_RETURN_FEE_VND',
+    valueType: 'number',
+    openIds: ['DEC-PROD-071'],
+    min: 0,
+    max: 500000,
+    seeded: true,
+  },
+  {
     // DEC-PROD-036: JSON boolean; the driver must enter the customer's code to deliver.
     key: 'FOOD_DELIVERY_CODE_REQUIRED',
     valueType: 'json',
@@ -431,6 +472,31 @@ export const PLATFORM_SETTING_SPECS: readonly PlatformSettingSpec[] = [
     seeded: true,
   },
   {
+    // DEC-PROD-070 (t54u): KYC liveness clips are purged this many days after the decision.
+    key: 'KYC_VIDEO_RETENTION_DAYS',
+    valueType: 'number',
+    openIds: ['DEC-PROD-070'],
+    min: 7,
+    max: 3650,
+    seeded: true,
+  },
+  {
+    // DEC-PROD-070 (t61u, AGENT_PROPOSED): true = the system approves a complete, valid driver KYC.
+    key: 'KYC_AUTO_APPROVE_DRIVER',
+    valueType: 'json',
+    openIds: ['DEC-PROD-070'],
+    boolean: true,
+    seeded: true,
+  },
+  {
+    // DEC-PROD-070 (t61u, AGENT_PROPOSED): true = the system approves a complete, valid merchant KYB.
+    key: 'KYC_AUTO_APPROVE_MERCHANT',
+    valueType: 'json',
+    openIds: ['DEC-PROD-070'],
+    boolean: true,
+    seeded: true,
+  },
+  {
     // DEC-PROD-052: App Store / Play review sign-in. Off by default; turn on only during review.
     key: 'APP_REVIEW_LOGIN_ENABLED',
     valueType: 'json',
@@ -471,6 +537,15 @@ export const PLATFORM_SETTING_SPECS: readonly PlatformSettingSpec[] = [
     openIds: ['DEC-PROD-059'],
     min: 0,
     max: 100,
+    seeded: true,
+  },
+  {
+    // Customer bid and driver counter may not exceed this % of the reference (app) fare.
+    key: 'RIDE_BID_CEILING_PERCENT_OF_REFERENCE',
+    valueType: 'number',
+    openIds: ['DEC-PROD-059'],
+    min: 100,
+    max: 300,
     seeded: true,
   },
   {

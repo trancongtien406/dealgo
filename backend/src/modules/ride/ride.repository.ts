@@ -35,8 +35,15 @@ export type OpsInterveneResult = {
   auditId: string;
 };
 
+/**
+ * Extra rows written atomically with a new ride (DEC-PROD-071 parcel row). `tx` is the
+ * repository's transaction handle (Prisma tx; undefined in memory). Runs on idempotent
+ * replays too, so it must be idempotent; a throw rolls the ride back.
+ */
+export type RideCreateHook = (ctx: { tx: unknown; rideId: string }) => Promise<void>;
+
 export interface RideRepository {
-  create(input: CreateRideInput): Promise<RideSnapshot>;
+  create(input: CreateRideInput, withinCreate?: RideCreateHook): Promise<RideSnapshot>;
   findById(id: string, now: Date): Promise<RideSnapshot | null>;
   /** `area`: only rides whose pickup is inside this box (DB-side pre-filter). */
   listOpen(
@@ -121,8 +128,19 @@ export class MemoryRideRepository implements RideRepository {
 
   constructor(private readonly vouchers?: VoucherRedeemer) {}
 
-  create(input: CreateRideInput): Promise<RideSnapshot> {
-    return this.run(() => finish(this.ledger.create(input)));
+  create(input: CreateRideInput, withinCreate?: RideCreateHook): Promise<RideSnapshot> {
+    return this.run(async () => {
+      const ride = finish(this.ledger.create(input));
+      if (withinCreate) {
+        try {
+          await withinCreate({ tx: undefined, rideId: ride.id });
+        } catch (error) {
+          this.ledger.discardNew(ride.id); // same all-or-nothing as the Prisma transaction
+          throw error;
+        }
+      }
+      return ride;
+    });
   }
 
   findById(id: string, now: Date): Promise<RideSnapshot | null> {

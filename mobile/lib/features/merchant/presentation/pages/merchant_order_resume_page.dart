@@ -53,9 +53,10 @@ class _MerchantOrderResumePageState extends State<MerchantOrderResumePage> {
       return;
     }
     _requested = true;
-    queue.setTokenSource(
-      () => context.mounted ? widget.accessToken(context) : null,
-    );
+    queue.setTokenSource(() {
+      if (!mounted) return null;
+      return widget.accessToken(context);
+    });
     unawaited(queue.load(widget.accessToken(context)));
   }
 

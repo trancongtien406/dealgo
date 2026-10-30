@@ -246,6 +246,13 @@ export function SettingsBoard() {
                   <OpsIcon name="car" className="size-4" />
                   Quản lý
                 </Link>
+                <Link
+                  href="/settings/zone-tariffs"
+                  className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-brand/30 bg-white px-3 text-sm font-medium text-brand hover:bg-brand/5 cursor-pointer ${focusRing}`}
+                >
+                  <OpsIcon name="car" className="size-4" />
+                  Giá theo khu vực
+                </Link>
               </div>
             </div>
           )}

@@ -1,3 +1,5 @@
+import 'package:dealgo/core/realtime/fake_snapshot_realtime.dart';
+import 'package:dealgo/core/realtime/snapshot_realtime.dart';
 import 'package:dealgo/features/payment/data/payment_api.dart';
 import 'package:dealgo/features/payment/domain/payment_models.dart';
 import 'package:dealgo/features/payment/presentation/payment_method_sheet.dart';
@@ -147,11 +149,76 @@ void main() {
     expect(changed, cashMethodCode);
   });
 
-  testWidgets('status page starts payment, launches URL and polls to PAID', (
+  testWidgets(
+    'status page starts payment, launches URL and refreshes on push',
+    (tester) async {
+      final api = FakePaymentApi(statuses: ['PAID']);
+      final realtime = FakeSnapshotRealtime();
+      addTearDown(realtime.dispose);
+      final launched = <Uri>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('vi'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: PaymentStatusPage(
+            entityType: 'RIDE',
+            entityId: 'r1',
+            startMethod: 'MOMO',
+            accessToken: 't',
+            api: api,
+            realtime: realtime,
+            launcher: (uri) async {
+              launched.add(uri);
+              return true;
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(api.started, ['MOMO']);
+      expect(launched.single.host, 'pay.example.test');
+      expect(find.text('Đang chờ xác nhận thanh toán'), findsOneWidget);
+      // No timer: time passing alone must not change the status.
+      await tester.pump(const Duration(seconds: 10));
+      expect(api.statusCalls, 0);
+      expect(find.text('Đang chờ xác nhận thanh toán'), findsOneWidget);
+      // A push for another job is ignored.
+      realtime.emitPaymentStatus(
+        const PaymentStatusHint(
+          entityType: 'RIDE',
+          entityId: 'other',
+          status: 'PAID',
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(api.statusCalls, 0);
+      realtime.emitPaymentStatus(
+        const PaymentStatusHint(
+          entityType: 'RIDE',
+          entityId: 'r1',
+          status: 'PAID',
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Thanh toán thành công'), findsOneWidget);
+      expect(api.statusCalls, 1);
+      // Terminal: a reconnect no longer re-GETs.
+      realtime.emitReconnect();
+      await tester.pump();
+      expect(api.statusCalls, 1);
+    },
+  );
+
+  testWidgets('status page re-GETs on socket reconnect while pending', (
     tester,
   ) async {
     final api = FakePaymentApi(statuses: ['PENDING', 'PAID']);
-    final launched = <Uri>[];
+    final realtime = FakeSnapshotRealtime();
+    addTearDown(realtime.dispose);
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('vi'),
@@ -160,26 +227,20 @@ void main() {
         home: PaymentStatusPage(
           entityType: 'RIDE',
           entityId: 'r1',
-          startMethod: 'MOMO',
           accessToken: 't',
           api: api,
-          pollInterval: const Duration(milliseconds: 10),
-          launcher: (uri) async {
-            launched.add(uri);
-            return true;
-          },
+          realtime: realtime,
+          launcher: (_) async => true,
         ),
       ),
     );
     await tester.pump();
     await tester.pump();
-    expect(api.started, ['MOMO']);
-    expect(launched.single.host, 'pay.example.test');
-    expect(find.text('Đang chờ xác nhận thanh toán'), findsOneWidget);
-    await tester.pump(const Duration(milliseconds: 20));
+    expect(api.statusCalls, 1);
+    realtime.emitReconnect();
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 20));
     await tester.pump();
+    expect(api.statusCalls, 2);
     expect(find.text('Thanh toán thành công'), findsOneWidget);
   });
 

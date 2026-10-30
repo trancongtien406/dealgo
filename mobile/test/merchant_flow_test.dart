@@ -142,7 +142,7 @@ void main() {
   );
 
   testWidgets(
-    'a READY order refreshes to ASSIGNED without leaving the screen',
+    'a READY order never polls: the timer alone reads nothing (t50u)',
     (tester) async {
       const dropoff = FoodDropoff(
         lat: 16.1,
@@ -182,27 +182,14 @@ void main() {
       expect(find.text('Đơn đã sẵn sàng'), findsOneWidget);
       final readsBefore = food.orderReads.length;
 
-      // Still READY on the next poll: nothing changes.
-      await tester.pump(const Duration(seconds: 10));
-      await tester.pumpAndSettle();
-      expect(food.orderReads.length, readsBefore + 1);
-      expect(find.text('Đơn đã sẵn sàng'), findsOneWidget);
-
-      // A driver accepts: the next poll flips the screen to ASSIGNED.
+      // t50u removed the 10 s poll fallback: a driver accepting changes nothing
+      // until a store-room hint or reconnect arrives (covered by the
+      // 'store socket hint refreshes READY to ASSIGNED without poll' test).
       food.orderDetail = detail('ASSIGNED', code: '4417');
-      await tester.pump(const Duration(seconds: 10));
-      await tester.pumpAndSettle();
-      expect(find.text('Đơn đã sẵn sàng'), findsNothing);
-      expect(find.text('Đã có tài xế'), findsWidgets);
-      final code = find.byKey(const Key('merchant-handover-code'));
-      await tester.ensureVisible(code);
-      expect(tester.widget<Text>(code).data, '4417');
-
-      // ASSIGNED is terminal for the poll: no more reads.
-      final readsAfter = food.orderReads.length;
       await tester.pump(const Duration(seconds: 30));
       await tester.pumpAndSettle();
-      expect(food.orderReads.length, readsAfter);
+      expect(food.orderReads.length, readsBefore);
+      expect(find.text('Đơn đã sẵn sàng'), findsOneWidget);
     },
   );
 

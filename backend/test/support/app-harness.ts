@@ -10,6 +10,8 @@ import { ResponseInterceptor } from '../../src/platform/http/response.intercepto
 import { loadEnv } from '../../src/platform/config/env.js';
 import { IDENTITY_REPOSITORY, SMS_SENDER } from '../../src/modules/identity/identity.constants.js';
 import { MemoryIdentityRepository } from '../../src/modules/identity/identity.repository.js';
+import { PLATFORM_SETTINGS_REPOSITORY } from '../../src/platform/settings/platform-settings.constants.js';
+import type { MemoryPlatformSettingsRepository } from '../../src/platform/settings/platform-settings.repository.js';
 import { MockSmsSender } from '../../src/integrations/sms/sms-sender.js';
 
 export type TestUser = { token: string; userId: string };
@@ -17,10 +19,13 @@ export type TestUser = { token: string; userId: string };
 /**
  * Memory-backed Nest app for HTTP specs of app-session endpoints, plus a phone-OTP login helper.
  */
-export async function createTestApp(imports: NonNullable<ModuleMetadata['imports']>) {
+export async function createTestApp(
+  imports: NonNullable<ModuleMetadata['imports']>,
+  options: { settings?: MemoryPlatformSettingsRepository } = {},
+) {
   const identity = new MemoryIdentityRepository();
   const sms = new MockSmsSender('test');
-  const moduleRef = await Test.createTestingModule({
+  const builder = Test.createTestingModule({
     imports: [
       ConfigModule.forRoot({
         isGlobal: true,
@@ -42,8 +47,11 @@ export async function createTestApp(imports: NonNullable<ModuleMetadata['imports
     .overrideProvider(SMS_SENDER)
     .useValue(sms)
     .overrideProvider(IDENTITY_REPOSITORY)
-    .useValue(identity)
-    .compile();
+    .useValue(identity);
+  if (options.settings) {
+    builder.overrideProvider(PLATFORM_SETTINGS_REPOSITORY).useValue(options.settings);
+  }
+  const moduleRef = await builder.compile();
   const app: INestApplication = moduleRef.createNestApplication();
   app.useGlobalPipes(createValidationPipe());
   app.useGlobalFilters(new HttpExceptionFilter());

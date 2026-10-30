@@ -43,6 +43,7 @@ class SocketSnapshotRealtime implements SnapshotRealtime {
   final _rideOffers = StreamController<RideOffersHint>.broadcast();
   final _routeUpdates = StreamController<RouteUpdateHint>.broadcast();
   final _partnerStatuses = StreamController<PartnerStatusHint>.broadcast();
+  final _paymentStatuses = StreamController<PaymentStatusHint>.broadcast();
   final _callEvents = StreamController<Map<String, Object?>>.broadcast();
   final _chatMessages = StreamController<ChatMessageHint>.broadcast();
   final _rideUnassigned = StreamController<RideUnassignedHint>.broadcast();
@@ -81,6 +82,9 @@ class SocketSnapshotRealtime implements SnapshotRealtime {
 
   @override
   Stream<PartnerStatusHint> get partnerStatuses => _partnerStatuses.stream;
+
+  @override
+  Stream<PaymentStatusHint> get paymentStatuses => _paymentStatuses.stream;
 
   @override
   Stream<RideUnassignedHint> get rideUnassigned => _rideUnassigned.stream;
@@ -231,6 +235,12 @@ class SocketSnapshotRealtime implements SnapshotRealtime {
         }
       });
     }
+    created.on('paymentStatus', (dynamic raw) {
+      final hint = parsePaymentStatusHint(raw);
+      if (hint != null && !_paymentStatuses.isClosed) {
+        _paymentStatuses.add(hint);
+      }
+    });
     created.on('partnerStatus', (dynamic raw) {
       final hint = parsePartnerStatusHint(raw);
       if (hint != null && !_partnerStatuses.isClosed) {
@@ -364,6 +374,7 @@ class SocketSnapshotRealtime implements SnapshotRealtime {
     await _rideOffers.close();
     await _routeUpdates.close();
     await _partnerStatuses.close();
+    await _paymentStatuses.close();
     await _callEvents.close();
     await _chatMessages.close();
     await _rideUnassigned.close();

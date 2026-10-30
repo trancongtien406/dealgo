@@ -377,5 +377,29 @@ void main() {
       expect(client.passkeySignupVerifyCalls, isEmpty);
       expect(cubit.state, isA<PhoneAuthError>());
     });
+
+    test('unsupported device surfaces PASSKEY_UNAVAILABLE error', () async {
+      passkeys.authenticateFailure = PasskeyFailureKind.unsupported;
+
+      await cubit.continueWithPasskey();
+
+      final state = cubit.state;
+      expect(state, isA<PhoneAuthError>());
+      final err = (state as PhoneAuthError).error;
+      expect(err.errorCode, 'PASSKEY_UNAVAILABLE');
+      expect(err.statusCode, 400);
+    });
+
+    test('failed passkey surfaces AUTH_PASSKEY_INVALID error', () async {
+      passkeys.authenticateFailure = PasskeyFailureKind.failed;
+
+      await cubit.continueWithPasskey();
+
+      final state = cubit.state;
+      expect(state, isA<PhoneAuthError>());
+      final err = (state as PhoneAuthError).error;
+      expect(err.errorCode, 'AUTH_PASSKEY_INVALID');
+      expect(err.statusCode, 400);
+    });
   });
 }

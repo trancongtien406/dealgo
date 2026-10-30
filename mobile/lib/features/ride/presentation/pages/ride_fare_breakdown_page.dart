@@ -151,7 +151,7 @@ class RideFareBreakdownPage extends StatelessWidget {
                         RideMoneyLine(
                           label: l10n.rideFareAllowedRange,
                           amount:
-                              '${formatRideVnd(quote.minFareVnd)} – ${formatRideVnd(quote.maxFareVnd)}',
+                              '${formatRideVnd(quote.minBidVnd)} – ${formatRideVnd(quote.maxBidVnd)}',
                         ),
                         const Divider(height: DealGoSpacing.s24),
                         RideMoneyLine(

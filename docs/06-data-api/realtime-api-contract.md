@@ -57,7 +57,7 @@ Ack:
 | `food:{orderId}` | The customer (active CUSTOMER grant). The store owner (active MERCHANT grant). Any active driver while the order is `READY`. The assigned driver while `ASSIGNED`, `PICKED_UP`, `DELIVERED` or `FAILED`. | `snapshot`, `routeUpdated` |
 | `food-location:{orderId}` | The order's customer only | `driverLocation` |
 | `store:{storeId}` | The store owner with an active MERCHANT grant (kitchen board) | `snapshot` for every order of the store |
-| `user:{userId}` | Joined automatically at connect | `snapshot` (driver job assigned), `rideRequest`, `partnerStatus`, `call`, `chatMessage` |
+| `user:{userId}` | Joined automatically at connect | `snapshot` (driver job assigned), `rideRequest`, `partnerStatus`, `paymentStatus`, `call`, `chatMessage` |
 
 Room ids must be UUIDs. Anything else gets `INVALID_ROOM`. When a ride leaves `NEGOTIATING`, the server first removes from `ride:{id}` every socket that may no longer read it (losing bidders), then emits the snapshot.
 
@@ -107,6 +107,7 @@ Room ids must be UUIDs. Anything else gets `INVALID_ROOM`. When a ride leaves `N
 ```
 
 - Emitted on `CREATED`, `RAISED`, `REASSIGNED`, `DRIVER_CANCELLED` and `TIMEOUT`.
+- When the request leaves NEGOTIATING (customer cancelled, picked a driver, expired) every alerted driver gets `{ reason: "CLOSED_<reason>", ride: { id, status: "CLOSED" } }` so the app re-syncs the feed and drops the incoming-job card. Clients re-fetch `GET /v1/rides/open`; they never poll.
 - It goes to every online driver whose approved class matches the ride and whose fresh fix is within `DRIVER_SEARCH_RADIUS_KM` of pickup. The admin settings `DISPATCH_REQUIRE_FRESH_PRESENCE` and `DRIVER_DEBT_LIMIT_VND` decide eligibility.
 - `ride` is the same `OpenRideView` as `GET /v1/rides/open`: pickup and drop-off labels, offered and reference fare, class, expiry, offer count, the customer's rating summary and the pickup distance. It never carries the customer id.
 - The same change also sends a high-priority FCM push to drivers whose app may be in the background. The push is only sent while `RIDE_REQUEST_PUSH_ENABLED` is on and goes to at most `RIDE_REQUEST_PUSH_MAX_DRIVERS` drivers, nearest first. Each driver gets at most one push per ride per minute. The push collapses per ride, expires with the request and respects the driver's RIDE notification preference. It plays the spoken "DealGo, có cuốc mới" sound (see [push notifications › New job sounds](../09-operations/push/push-notifications.md#new-job-sounds)).
@@ -170,6 +171,15 @@ Sent when a ride or food-order chat message is stored, including the server's mi
 
 Sent when Ops approves or rejects a KYC/KYB application. A push plus an inbox row ("Hồ sơ đã được duyệt / bị từ chối") go out at the same time.
 
+### `paymentStatus` (room `user:{customerId}`, since t50u)
+
+```json
+{ "entityType": "RIDE" | "FOOD_ORDER", "entityId": "<uuid>", "intentId": "<uuid>",
+  "status": "PAID" | "FAILED" | "EXPIRED" | "REFUND_PENDING" | "REFUNDED" | "PENDING", "occurredAt": "…" }
+```
+
+Sent to the job's customer when a checkout intent changes state: a verified PSP IPN (captured or failed), API-process reconcile (captured, failed, expired) or a refund. Replays, bad signatures and amount mismatches emit nothing. It is a hint only: the payment page re-GETs `GET /v1/payments/checkout` status, which stays the source of truth. Source: `PaymentStatusBus` (payment module) → `PaymentStatusBridgeService` (realtime module). Limitation: if reconcile runs in the worker process, which has no bound socket server, no hint is sent; the app still re-GETs on open, on socket reconnect and on app resume.
+
 ### `call` (rooms `user:{callerUserId}` and `user:{calleeUserId}`)
 
 ```json
@@ -197,5 +207,35 @@ In-app voice call between the customer and the assigned driver (`DEC-PROD-064`).
 
 | Client | Events used |
 |---|---|
-| Mobile (`mobile/lib/core/realtime/socket_snapshot_realtime.dart`) | `snapshot`, `driverLocation`, `rideOffers`, `routeUpdated`, `partnerStatus`, `call` (global `VoiceCallCubit`), `chatMessage` (chat sheet and unread badge). The driver job board loads `GET /v1/rides/open` and `GET /v1/food/orders/ready` when it opens and when duty or services change. It does not listen to `rideRequest`; background drivers are reached by the request push. The merchant order board also refreshes every 10 s. |
-| Admin web | Uses no socket. The live board and lists poll REST (`/v1/ops/monitor/snapshot`). |
+| Mobile (`mobile/lib/core/realtime/socket_snapshot_realtime.dart`) | `snapshot`, `driverLocation`, `rideOffers`, `routeUpdated`, `partnerStatus`, `paymentStatus`, `call` (global `VoiceCallCubit`), `chatMessage` (chat sheet and unread badge). The driver job board loads `GET /v1/rides/open` and `GET /v1/food/orders/ready` when it opens and when duty or services change. It does not listen to `rideRequest`; background drivers are reached by the request push. `rideRequest`/`foodRequest` drive the full-screen incoming-job card and feed re-sync. Since t50u the app has **no periodic REST polling** for realtime data: merchant queue/order, driver job resumer and incoming-job card reload only on open, a socket hint, socket reconnect or app resume. Remaining UI timers are local only (countdowns, ring/vibrate, banner carousel, GPS reporter, local GPS preview). The payment status page also no longer polls: it re-GETs on open, resume, reconnect (while not terminal) and on a `paymentStatus` hint for its job. |
+| Admin web | No socket client (the gateway is bearer-only). Live via **SSE** instead (owner, 2026-10-30: "Làm luôn realtime cho admin bằng SSE"): `AdminNav` opens one `EventSource('/api/ops/events')`; the BFF relays Nest `GET /v1/ops/events` with the ops cookie session. `monitor` / `systemErrors` hints invalidate the React Query REST snapshots; after a reconnect both are refetched. The 30 s monitor and 120 s system-errors polling are removed. See "Admin SSE (ops events)" below. |
+
+## Admin SSE (ops events)
+
+- **Endpoint:** `GET /v1/ops/events` (`text/event-stream`), `OpsSessionGuard` like `/v1/ops/monitor/snapshot`. Browser path: `/api/ops/events` (Next BFF, cookie session, bearer added server-side; the Nest JWT never reaches the browser).
+- **Events** (payload `{type, reason, at, aggregateType?, count?}`; hints only, REST is the source of truth):
+  - `ready`: `{systemErrors: boolean}` sent first.
+  - `monitor`: a ride/food snapshot or partner status was emitted; coalesced to at most one per 2 s per stream.
+  - `systemErrors`: an issue status changed (`statusChanged`) or the unresolved count changed (`countChanged`). Only sent to actors with `errors.read` (same rule as `OpsPermissionGuard`).
+- **Heartbeat:** comment `: ping <ms>` every 25 s; `retry: 5000`. The server clears the heartbeat, the coalesce timer and the bus subscription on close.
+- **Sources:** `OpsEventBus` (in-process). The worker's outbox relay emits through `SnapshotFanoutService.signalOps`, which also calls Socket.IO `serverSideEmit` on the existing Redis adapter so API nodes receive worker hints. Without `REDIS_URL` the worker cannot reach the API (same limit as socket snapshots).
+- **Sentry:** no webhook (it would need a Sentry integration client secret). While at least one stream is open, the API checks `unresolvedCount()` every 120 s and emits only on change; the browser no longer polls.
+- **Client:** first open does nothing (initial data comes from REST); a reopen after an error refetches monitor + system errors. If the browser gives up (non-2xx, e.g. 401) the client recreates the stream with backoff 5 s → 60 s. Unmount closes the stream and clears any retry timer.
+
+## Pricing is not realtime (t50u)
+
+The ride quote (`POST /v1/rides/quote`) is a server REST snapshot: zone resolved from pickup, per-zone tariff or global class default, and the bid band (`RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE` / `RIDE_BID_CEILING_PERCENT_OF_REFERENCE`). There is no tariff socket event. On create the tariff and band are written once to `ride_pricing_snapshots`; raises, counters and stop edits use that snapshot.
+
+## KYC/KYB manual review (t52u)
+
+- **Event:** `partnerStatus` on room `user:{userId}` (same payload as above). `status` can now also be `IN_REVIEW`, sent when an ops reviewer claims the case (`POST /v1/ops/partner-applications/:id/claim`). `APPROVED` / `REJECTED` still come only from a human reviewer; the optional AI pre-check never emits a status.
+- **Source:** the transactional outbox (`PartnerApplication.status.<STATUS>`) written with the status change and the `ops_audit_logs` row, relayed by the worker. Push/inbox copy is sent only for `APPROVED` / `REJECTED`.
+- **Client:** hint only. The app re-GETs `GET /v1/me/partner-applications`; `IN_REVIEW` shows as "pending". Resubmitting while `IN_REVIEW` returns 409.
+
+## Parcel delivery (t58u, DEC-PROD-071 DRAFT)
+
+A parcel job is a Ride with `serviceKind: "PARCEL"`, so it uses the **same rooms and events**; there are no new events.
+
+- `rideRequest` / `GET /v1/rides/open`: the `OpenRideView` gains `serviceKind` (`RIDE` | `PARCEL`) and `parcel` (`{ sizeClass, weightKg, note, payer, surchargeVnd }` or `null`). Parcel jobs only reach drivers whose presence has `parcelEnabled: true`; ride jobs keep the existing eligibility. Sender/recipient phones are never in the feed.
+- `rideOffers`, `driverLocation`, `routeUpdated`, `chatMessage`: unchanged.
+- Status changes reuse the ride status events: `IN_TRIP` after `POST /v1/parcels/:id/pickup`, `COMPLETED` after `deliver` or `returned`. A failed delivery emits the ride status `IN_TRIP` with the outbox hint suffix `parcel:RETURNING`; clients re-fetch `GET /v1/parcels/:id` for the parcel outcome (`PENDING | DELIVERED | RETURNING | RETURNED`; pickup sets `pickedUpAt`). Clients never poll.

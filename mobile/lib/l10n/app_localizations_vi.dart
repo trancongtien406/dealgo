@@ -3188,6 +3188,14 @@ class AppLocalizationsVi extends AppLocalizations {
   String get partnerKindBusinessLicense => 'Giấy phép kinh doanh';
 
   @override
+  String get partnerKindFoodSafetyCert => 'Giấy chứng nhận an toàn thực phẩm';
+
+  @override
+  String kycLicenseClassMismatch(String licenseClass) {
+    return 'Hạng $licenseClass không được lái loại xe này. Quay lại chọn đúng hạng in trên giấy phép.';
+  }
+
+  @override
   String get partnerKindRepIdFront => 'CCCD người đại diện — mặt trước';
 
   @override
@@ -4621,6 +4629,14 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get apiErrGeneric => 'Đã có lỗi xảy ra. Vui lòng thử lại.';
+
+  @override
+  String get apiErrPasskeyUnavailable =>
+      'Thiết bị hoặc phiên bản app này chưa hỗ trợ passkey.';
+
+  @override
+  String get apiErrPasskeyInvalid =>
+      'Xác minh passkey không thành công. Vui lòng thử lại hoặc chọn cách đăng nhập khác.';
 
   @override
   String get apiErrNetwork =>
@@ -7090,4 +7106,334 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get incomingJobDetails => 'Chi tiết';
+
+  @override
+  String get kycCaptureFrontTitle => 'Chụp mặt trước CCCD';
+
+  @override
+  String get kycCaptureBackTitle => 'Chụp mặt sau CCCD';
+
+  @override
+  String get kycCaptureAlignHint => 'Đặt thẻ vừa khung, đủ sáng, không lóa';
+
+  @override
+  String get kycCaptureChecking => 'Đang kiểm tra ảnh…';
+
+  @override
+  String get kycCaptureBlurry => 'Ảnh bị mờ';
+
+  @override
+  String get kycCaptureGlare => 'Ảnh bị lóa sáng';
+
+  @override
+  String get kycCaptureDark => 'Ảnh quá tối';
+
+  @override
+  String get kycCaptureRetake => 'Chụp lại';
+
+  @override
+  String get kycCaptureCameraError => 'Không mở được máy ảnh.';
+
+  @override
+  String get kycLivenessTitle => 'Xác thực khuôn mặt';
+
+  @override
+  String get kycLivenessCenter => 'Nhìn thẳng vào khung';
+
+  @override
+  String get kycLivenessTurnLeft => 'Quay mặt sang trái';
+
+  @override
+  String get kycLivenessTurnRight => 'Quay mặt sang phải';
+
+  @override
+  String get kycLivenessBlink => 'Chớp mắt';
+
+  @override
+  String get kycLivenessNoFace => 'Không thấy khuôn mặt';
+
+  @override
+  String get kycLivenessManyFaces => 'Chỉ một người trong khung';
+
+  @override
+  String get kycLivenessDone => 'Hoàn tất';
+
+  @override
+  String get kycLivenessTimeout => 'Hết thời gian, thử lại';
+
+  @override
+  String get kycHintFindCard => 'Đặt thẻ vào khung';
+
+  @override
+  String get kycHintCloser => 'Lại gần hơn';
+
+  @override
+  String get kycHintMoreLight => 'Thêm ánh sáng';
+
+  @override
+  String get kycHintNoGlare => 'Tránh lóa';
+
+  @override
+  String get kycHintHoldStill => 'Giữ yên';
+
+  @override
+  String get kycHintCaptured => 'Đã chụp';
+
+  @override
+  String get kycHintFaceInOval => 'Đưa mặt vào khung';
+
+  @override
+  String get kycLivenessRecording => 'Đang quay';
+
+  @override
+  String get partnerDocSelfieVideo => 'Video khuôn mặt';
+
+  @override
+  String get livenessClipRetry =>
+      'Video khuôn mặt chưa lưu được (thiếu hoặc quá lớn). Thử lại nhé.';
+
+  @override
+  String get parcelWhereTo => 'Gửi hàng đến đâu?';
+
+  @override
+  String get driverServiceParcel => 'Giao hàng';
+
+  @override
+  String get driverServiceParcelHint => 'Nhận đơn chở hàng, giao bưu kiện';
+
+  @override
+  String get homeServiceParcel => 'Giao hàng';
+
+  @override
+  String get homeServiceParcelSub => 'Gửi hàng nội thành, nhanh chóng';
+
+  @override
+  String get parcelDetailsTitle => 'Thông tin gói hàng';
+
+  @override
+  String get parcelSizeTitle => 'Kích thước gói hàng';
+
+  @override
+  String parcelSizeHint(String dims) {
+    return 'Tối đa $dims';
+  }
+
+  @override
+  String get parcelSizeS => 'Nhỏ';
+
+  @override
+  String get parcelSizeM => 'Vừa';
+
+  @override
+  String get parcelSizeL => 'Lớn';
+
+  @override
+  String get parcelSizeXL => 'Rất lớn';
+
+  @override
+  String get parcelWeightLabel => 'Khối lượng (không bắt buộc)';
+
+  @override
+  String get parcelWeightInvalid => 'Nhập khối lượng hợp lệ';
+
+  @override
+  String parcelWeightOver(String limit) {
+    return 'Vượt $limit kg cho kích thước này';
+  }
+
+  @override
+  String get parcelNoteLabel => 'Ghi chú cho tài xế (không bắt buộc)';
+
+  @override
+  String get parcelSenderTitle => 'Người gửi';
+
+  @override
+  String get parcelRecipientTitle => 'Người nhận';
+
+  @override
+  String get parcelNameLabel => 'Họ tên';
+
+  @override
+  String get parcelPhoneLabel => 'Số điện thoại';
+
+  @override
+  String get parcelFieldRequired => 'Bắt buộc';
+
+  @override
+  String get parcelPhoneInvalid => 'Số điện thoại không hợp lệ';
+
+  @override
+  String get parcelPayerSender => 'Người gửi trả';
+
+  @override
+  String get parcelPayerRecipient => 'Người nhận trả (tiền mặt)';
+
+  @override
+  String get parcelItemPhotoAdd => 'Thêm ảnh gói hàng';
+
+  @override
+  String get parcelItemPhotoAdded => 'Đã thêm ảnh gói hàng';
+
+  @override
+  String get parcelVehicleTitle => 'Phương tiện';
+
+  @override
+  String parcelOptionHint(String min, String max) {
+    return 'Trả giá $min – $max';
+  }
+
+  @override
+  String get parcelQuoteCta => 'Xem giá';
+
+  @override
+  String get parcelSubmitCta => 'Đặt giao hàng';
+
+  @override
+  String get parcelDriverBadge => 'Gói hàng';
+
+  @override
+  String get parcelOutcomeDelivered => 'Đã giao';
+
+  @override
+  String get parcelOutcomeReturning => 'Đang hoàn về người gửi';
+
+  @override
+  String get parcelOutcomeReturned => 'Đã hoàn về người gửi';
+
+  @override
+  String get parcelOutcomeInTransit => 'Đang giao';
+
+  @override
+  String get parcelOutcomeWaitingPickup => 'Chờ lấy hàng';
+
+  @override
+  String get parcelFailUnreachable => 'Không liên lạc được người nhận';
+
+  @override
+  String get parcelFailRefused => 'Người nhận từ chối';
+
+  @override
+  String get parcelFailAddress => 'Sai địa chỉ';
+
+  @override
+  String get parcelFailDamaged => 'Hàng bị hư hỏng';
+
+  @override
+  String get parcelFailOther => 'Lý do khác';
+
+  @override
+  String get parcelFailTitle => 'Vì sao không giao được?';
+
+  @override
+  String get parcelErrorNoVehicle => 'Không có xe phù hợp cho kích thước này';
+
+  @override
+  String get parcelErrorTooHeavy => 'Gói hàng quá nặng so với kích thước';
+
+  @override
+  String get parcelErrorRecipientCode => 'Mã người nhận không đúng';
+
+  @override
+  String get parcelErrorCodeLocked => 'Nhập sai quá nhiều lần. Thử lại sau';
+
+  @override
+  String get parcelErrorSizeUnavailable => 'Kích thước này tạm không khả dụng';
+
+  @override
+  String get parcelErrorPayerMethod => 'Người nhận trả chỉ áp dụng tiền mặt';
+
+  @override
+  String get parcelErrorPhoto => 'Cần chụp ảnh';
+
+  @override
+  String get parcelErrorState => 'Đơn đã thay đổi trạng thái. Vui lòng tải lại';
+
+  @override
+  String get parcelErrorNetwork => 'Lỗi kết nối. Thử lại';
+
+  @override
+  String get parcelErrorGeneric => 'Đã có lỗi xảy ra';
+
+  @override
+  String get parcelRetry => 'Thử lại';
+
+  @override
+  String parcelSenderLine(String name, String phone) {
+    return 'Người gửi: $name · $phone';
+  }
+
+  @override
+  String parcelRecipientLine(String name, String phone) {
+    return 'Người nhận: $name · $phone';
+  }
+
+  @override
+  String parcelRecipientCode(String code) {
+    return 'Mã nhận hàng: $code';
+  }
+
+  @override
+  String get parcelRecipientCodeHint =>
+      'Gửi mã này cho người nhận. Tài xế cần mã để hoàn tất giao hàng.';
+
+  @override
+  String get parcelPickupCta => 'Đã lấy hàng (chụp ảnh)';
+
+  @override
+  String get parcelReturningHint => 'Mang hàng hoàn về người gửi';
+
+  @override
+  String get parcelReturnedCta => 'Đã hoàn hàng (chụp ảnh)';
+
+  @override
+  String get parcelRecipientCodeInput => 'Mã người nhận';
+
+  @override
+  String get parcelDeliverCta => 'Đã giao (chụp ảnh)';
+
+  @override
+  String get parcelFailCta => 'Không giao được';
+
+  @override
+  String parcelServiceFeeLine(String amount) {
+    return 'Phí dịch vụ $amount (đã gồm trong cước)';
+  }
+
+  @override
+  String parcelReturnFeeLine(String amount) {
+    return 'Phí hoàn hàng nếu giao không thành công: $amount';
+  }
+
+  @override
+  String parcelReturnFeeCharged(String amount) {
+    return 'Phí hoàn hàng $amount';
+  }
+
+  @override
+  String get parcelReceiptServiceFee => 'Phí dịch vụ giao hàng (đã gồm)';
+
+  @override
+  String get parcelReceiptReturnFee => 'Phí hoàn hàng';
+
+  @override
+  String get driverServicesFoodMotorbikeOnly =>
+      'Đơn đồ ăn chỉ dành cho tài xế xe máy.';
+
+  @override
+  String get partnerKindFoodSafetyCommitment =>
+      'Bản cam kết bảo đảm an toàn thực phẩm';
+
+  @override
+  String get partnerFoodSafetyUseCommitment => 'Dùng bản cam kết ATTP';
+
+  @override
+  String get partnerFoodSafetyUseCommitmentHint =>
+      'Hộ kinh doanh nhỏ được nộp bản cam kết bảo đảm ATTP thay cho giấy chứng nhận.';
+
+  @override
+  String get kycOcrPrefilledNote =>
+      'Một số thông tin đã được điền tự động từ ảnh giấy tờ. Vui lòng kiểm tra và sửa nếu sai.';
+
+  @override
+  String get kycOcrReading => 'Đang đọc thông tin giấy tờ…';
 }

@@ -198,7 +198,10 @@ export type PartnerStatusOutboxInput = {
   applicationId: string;
   userId: string;
   role: string;
-  status: 'APPROVED' | 'REJECTED';
+  status: 'IN_REVIEW' | 'APPROVED' | 'REJECTED';
+  /** t61u: rejection reason / flagged sections for the applicant's realtime event. */
+  reason?: string | null;
+  sections?: string[];
   reviewedAt: Date;
 };
 
@@ -222,6 +225,8 @@ export async function writePartnerStatusOutbox(
           status: input.status,
           userId: input.userId,
           role: input.role,
+          ...(input.reason ? { reason: input.reason } : {}),
+          ...(input.sections?.length ? { sections: input.sections } : {}),
         } as Prisma.InputJsonValue,
       },
     ],

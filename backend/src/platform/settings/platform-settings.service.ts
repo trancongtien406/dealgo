@@ -23,6 +23,7 @@ import {
   validatePaymentMethodRegistry,
 } from './payment-method-registry.js';
 import { PLATFORM_SETTING_SEED_DEFAULTS } from './platform-settings.seed.js';
+import { normalizeParcelSizeClasses } from './parcel-size-classes.js';
 import type {
   PlatformSettingRecord,
   PlatformSettingsRepository,
@@ -40,7 +41,12 @@ export type PlatformSettingView = {
 
 const SETTING_CATEGORY_OVERRIDES: Readonly<Record<string, 'FARE' | 'DISPATCH' | 'ZONE_PAYMENT'>> = {
   RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE: 'FARE',
+  PARCEL_SIZE_CLASSES: 'FARE',
+  PARCEL_RECIPIENT_CODE_REQUIRED: 'DISPATCH',
+  PARCEL_SERVICE_FEE_VND: 'FARE',
+  PARCEL_RETURN_FEE_VND: 'FARE',
   RIDE_COUNTER_MAX_PERCENT_OF_OFFER: 'FARE',
+  RIDE_BID_CEILING_PERCENT_OF_REFERENCE: 'FARE',
   RIDE_CANCEL_FEE_BIKE_VND: 'FARE',
   RIDE_CANCEL_FEE_CAR_VND: 'FARE',
   RIDE_FREE_CANCEL_MINUTES: 'FARE',
@@ -353,6 +359,8 @@ export class PlatformSettingsService {
       case 'VOUCHER_SHARED_PLATFORM_PERCENT':
       case 'RIDE_PICKUP_CODE_MAX_ATTEMPTS':
       case 'RIDE_PICKUP_CODE_REQUIRED':
+      case 'PARCEL_SIZE_CLASSES':
+      case 'PARCEL_RECIPIENT_CODE_REQUIRED':
       case 'FOOD_DELIVERY_CODE_REQUIRED':
       case 'FOOD_DELIVERY_CODE_MAX_ATTEMPTS':
       case 'FOOD_HANDOVER_CODE_REQUIRED':
@@ -371,18 +379,24 @@ export class PlatformSettingsService {
       case 'AUTH_PASSWORD_RESET_MAX_ATTEMPTS':
       case 'AUTH_PASSWORD_RESET_MAX_PER_HOUR':
       case 'CHAT_RETENTION_DAYS':
+      case 'KYC_VIDEO_RETENTION_DAYS':
+      case 'KYC_AUTO_APPROVE_DRIVER':
+      case 'KYC_AUTO_APPROVE_MERCHANT':
       case 'APP_REVIEW_LOGIN_ENABLED':
       case 'APP_REVIEW_PHONE':
       case 'APP_REVIEW_EMAIL':
       case 'RIDE_REQUEST_WINDOW_SECONDS':
       case 'RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE':
       case 'RIDE_COUNTER_MAX_PERCENT_OF_OFFER':
+      case 'RIDE_BID_CEILING_PERCENT_OF_REFERENCE':
       case 'RIDE_MAX_OFFER_EDITS_PER_DRIVER':
       case 'RIDE_ASSIGNED_START_TIMEOUT_MINUTES':
       case 'RIDE_EN_ROUTE_TIMEOUT_MINUTES':
       case 'RIDE_NO_SHOW_WAIT_MINUTES':
       case 'RIDE_FREE_CANCEL_MINUTES':
       case 'RIDE_CANCEL_FEE_BIKE_VND':
+      case 'PARCEL_SERVICE_FEE_VND':
+      case 'PARCEL_RETURN_FEE_VND':
       case 'RIDE_CANCEL_FEE_CAR_VND':
       case 'FOOD_MERCHANT_ACCEPT_TIMEOUT_MINUTES':
       case 'FOOD_UNCLAIMED_READY_TIMEOUT_MINUTES':
@@ -486,6 +500,13 @@ export class PlatformSettingsService {
       if (key === 'PUBLIC_SITE_CONFIG') {
         try {
           return JSON.stringify(normalizePublicSiteConfig(parsed));
+        } catch (e) {
+          throw settingsError(400, 'PLATFORM_SETTING_INVALID', (e as Error).message);
+        }
+      }
+      if (key === 'PARCEL_SIZE_CLASSES') {
+        try {
+          return JSON.stringify(normalizeParcelSizeClasses(parsed));
         } catch (e) {
           throw settingsError(400, 'PLATFORM_SETTING_INVALID', (e as Error).message);
         }

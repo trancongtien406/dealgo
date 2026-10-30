@@ -28,14 +28,16 @@ function configFor(
 }
 
 describe('PartnerEligibilityService', () => {
-  it('Bypass defaults on only for local builds; staging/production stay strict', () => {
+  it('Bypass is off by default everywhere (t61u); only an explicit dev flag turns it on', () => {
     const svc = (nodeEnv: AppEnv['NODE_ENV'], deployEnv?: AppEnv['DEPLOY_ENV'], bypass?: boolean) =>
       new PartnerEligibilityService(
         new MemoryIdentityRepository(),
         new MemoryPartnerRepository(),
         configFor(nodeEnv, { deployEnv, bypass }),
       ).bypassEnabled();
-    expect(svc('development')).toBe(true);
+    expect(svc('development')).toBe(false);
+    expect(svc('development', 'local')).toBe(false);
+    expect(svc('development', 'local', true)).toBe(true);
     expect(svc('development', 'staging')).toBe(false);
     expect(svc('production')).toBe(false);
     expect(svc('development', 'staging', true)).toBe(true);
@@ -44,7 +46,7 @@ describe('PartnerEligibilityService', () => {
     );
   });
 
-  it('bypasses KYC in test after ACTIVE grant by default', async () => {
+  it('bypasses KYC after ACTIVE grant only with the explicit flag', async () => {
     const identity = new MemoryIdentityRepository();
     const partners = new MemoryPartnerRepository();
     const user = await identity.createUser({
@@ -53,7 +55,7 @@ describe('PartnerEligibilityService', () => {
       displayName: 'Driver',
     });
     await identity.insertGrant(user.id, 'DRIVER', 'ACTIVE');
-    const service = new PartnerEligibilityService(identity, partners, configFor('test'));
+    const service = new PartnerEligibilityService(identity, partners, configFor('test', { bypass: true }));
 
     await expect(service.requireEligibleDriver(user.id)).resolves.toBeUndefined();
   });

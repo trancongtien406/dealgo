@@ -103,8 +103,9 @@ export class PartnerDocumentParamsDto {
 
 export class OpsPartnerApplicationQueryDto {
   @IsOptional()
-  @IsIn(['SUBMITTED', 'APPROVED', 'REJECTED', 'DRAFT'])
-  status?: 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'DRAFT';
+  @IsIn(['SUBMITTED', 'IN_REVIEW', 'APPROVED', 'REJECTED', 'DRAFT', 'ALL'])
+  /** t54u: ALL = SUBMITTED + IN_REVIEW + APPROVED + REJECTED. Default SUBMITTED. */
+  status?: 'SUBMITTED' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED' | 'DRAFT' | 'ALL';
 
   @IsOptional()
   @IsIn(['DRIVER', 'MERCHANT'])

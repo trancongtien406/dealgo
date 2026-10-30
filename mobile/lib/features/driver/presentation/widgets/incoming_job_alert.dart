@@ -12,6 +12,7 @@ import '../../../../core/notifications/notification_router.dart';
 import '../../../../core/push/new_job_alert.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../parcel/presentation/widgets/parcel_labels.dart';
 import '../../../ride/domain/entities/ride_models.dart';
 import '../../../ride/domain/entities/ride_money.dart';
 import '../cubit/driver_duty_cubit.dart';
@@ -71,7 +72,7 @@ class AudioIncomingJobRinger implements IncomingJobRinger {
 /// the driver has not handled, a full-screen card with countdown stays up and
 /// rings + vibrates until "Xem & báo giá", "Bỏ qua", expiry, or the ride leaves
 /// the feed (cancelled / taken / expired — the feed is refreshed on socket
-/// hints, push taps, resume and every [pollEvery] while the card is up).
+/// hints incl. rideRequest CLOSED_*, push taps, reconnect and resume; no poll).
 /// The list comes from the same `GET /v1/rides/open` as "Việc nhận", so the
 /// alert criteria are the feed criteria.
 class IncomingJobAlertHost extends StatefulWidget {
@@ -80,7 +81,6 @@ class IncomingJobAlertHost extends StatefulWidget {
     required this.child,
     this.ringer,
     this.clock,
-    this.pollEvery = const Duration(seconds: 10),
     this.inCall,
   });
 
@@ -91,7 +91,6 @@ class IncomingJobAlertHost extends StatefulWidget {
   final Widget child;
   final IncomingJobRinger? ringer;
   final DateTime Function()? clock;
-  final Duration pollEvery;
   final bool Function()? inCall;
 
   @override
@@ -108,7 +107,6 @@ class _IncomingJobAlertHostState extends State<IncomingJobAlertHost> {
   final _subs = <StreamSubscription<Object?>>[];
   OpenRide? _current;
   Timer? _tick;
-  Timer? _poll;
   Timer? _debounce;
   bool _ringing = false;
 
@@ -140,7 +138,6 @@ class _IncomingJobAlertHostState extends State<IncomingJobAlertHost> {
       unawaited(s.cancel());
     }
     _tick?.cancel();
-    _poll?.cancel();
     _debounce?.cancel();
     _lifecycle.dispose();
     unawaited(_ringer.stop());
@@ -216,8 +213,6 @@ class _IncomingJobAlertHostState extends State<IncomingJobAlertHost> {
         setState(() {});
       }
     });
-    _poll?.cancel();
-    _poll = Timer.periodic(widget.pollEvery, (_) => _refresh());
     final inCall = (widget.inCall ?? NewJobAlert.instance.inCall)();
     if (!inCall && !_ringing) {
       _ringing = true;
@@ -227,7 +222,6 @@ class _IncomingJobAlertHostState extends State<IncomingJobAlertHost> {
 
   void _dismiss() {
     _tick?.cancel();
-    _poll?.cancel();
     if (_ringing) {
       _ringing = false;
       unawaited(_ringer.stop());
@@ -349,6 +343,21 @@ class _IncomingJobCard extends StatelessWidget {
                       ),
                   ],
                 ),
+                if (ride.isParcel) ...[
+                  const SizedBox(height: DealGoSpacing.s8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: DriverChip(
+                      key: const Key('incoming-job-parcel'),
+                      label: parcelBadgeText(
+                        l10n,
+                        ride.parcelSizeClass,
+                        ride.parcelWeightKg,
+                      ),
+                      tone: DriverChipTone.warning,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: DealGoSpacing.s8),
                 Text(
                   formatRideVnd(ride.offeredFareVnd),

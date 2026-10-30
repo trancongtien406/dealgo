@@ -92,6 +92,13 @@ class DriverServicesCubit extends Cubit<DriverServicesState> {
     ),
   );
 
+  void setParcel(bool value) => emit(
+    state.copyWith(
+      prefs: state.prefs.copyWith(parcelEnabled: value),
+      status: DriverServicesStatus.ready,
+    ),
+  );
+
   /// Sends the switches with the current online state; returns false when it did not stick.
   Future<bool> save() async {
     final repository = _repository;
@@ -109,6 +116,7 @@ class DriverServicesCubit extends Cubit<DriverServicesState> {
         online: _online(),
         rideEnabled: wanted.rideEnabled,
         foodEnabled: wanted.foodEnabled,
+        parcelEnabled: wanted.parcelEnabled,
       );
       if (!isClosed) {
         emit(

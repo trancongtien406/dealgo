@@ -14,6 +14,7 @@ import { RideExpiryService } from './ride-expiry.service.js';
 import { PrismaUploadReferences, UPLOAD_REFERENCE_SOURCE } from './upload-references.js';
 import { WorkersBootstrap } from './workers.bootstrap.js';
 import { ChatRetentionService } from './chat-retention.service.js';
+import { KycMediaRetentionService } from './kyc-media-retention.service.js';
 import { WorkerHeartbeatService } from './worker-heartbeat.service.js';
 import { PrismaWorkerHeartbeatStore, WORKER_HEARTBEAT_STORE } from '../platform/health/worker-heartbeat.js';
 import { OpsAlertService } from '../platform/observability/ops-alert.js';
@@ -30,6 +31,7 @@ import { OpsAlertService } from '../platform/observability/ops-alert.js';
     { provide: WORKER_HEARTBEAT_STORE, useClass: PrismaWorkerHeartbeatStore },
     WorkerHeartbeatService,
     ChatRetentionService,
+    KycMediaRetentionService,
   ],
   exports: [RideExpiryService, OrphanUploadCleanupService, ChatRetentionService],
 

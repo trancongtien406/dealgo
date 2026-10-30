@@ -1434,6 +1434,9 @@
   "partnerKindVehicleReg": "Vehicle registration",
   "partnerKindVehicleInsurance": "Vehicle insurance (photo)",
   "partnerKindBusinessLicense": "Business licence",
+  "partnerKindFoodSafetyCert": "Food safety certificate",
+  "kycLicenseClassMismatch": "Licence class {licenseClass} does not cover this vehicle. Go back and pick the class printed on your licence.",
+  "@kycLicenseClassMismatch": {"placeholders": {"licenseClass": {"type": "String"}}},
   "partnerKindRepIdFront": "Representative ID — front",
   "partnerKindRepIdBack": "Representative ID — back",
   "partnerKindStorefront": "Storefront photo",
@@ -2151,6 +2154,8 @@
   "driverRequestTitle": "Request",
   "driverRequestNotFound": "Request not found. It may have been taken or expired.",
   "apiErrGeneric": "Something went wrong. Please try again.",
+  "apiErrPasskeyUnavailable": "This device or app version does not support passkeys yet.",
+  "apiErrPasskeyInvalid": "Passkey verification failed. Please try again or use another sign-in method.",
   "apiErrNetwork": "Can't reach DealGo. Check your connection and try again.",
   "apiErrInvalidResponse": "We couldn't read the response. Please try again.",
   "apiErrForbidden": "You don't have permission to do this.",
@@ -3482,5 +3487,161 @@
         "type": "String"
       }
     }
-  }
+  },
+  "kycCaptureFrontTitle": "Capture ID front",
+  "kycCaptureBackTitle": "Capture ID back",
+  "kycCaptureAlignHint": "Fit the card in the frame, well lit, no glare",
+  "kycCaptureChecking": "Checking photo…",
+  "kycCaptureBlurry": "Photo is blurry",
+  "kycCaptureGlare": "Photo has glare",
+  "kycCaptureDark": "Photo is too dark",
+  "kycCaptureRetake": "Retake",
+  "kycCaptureCameraError": "Could not open the camera.",
+  "kycLivenessTitle": "Face check",
+  "kycLivenessCenter": "Look straight at the frame",
+  "kycLivenessTurnLeft": "Turn your face left",
+  "kycLivenessTurnRight": "Turn your face right",
+  "kycLivenessBlink": "Blink your eyes",
+  "kycLivenessNoFace": "No face in the frame",
+  "kycLivenessManyFaces": "Only one person in the frame",
+  "kycLivenessDone": "Done",
+  "kycLivenessTimeout": "Time is up, try again",
+  "kycHintFindCard": "Fit the card in the frame",
+  "kycHintCloser": "Closer",
+  "kycHintMoreLight": "More light",
+  "kycHintNoGlare": "Avoid glare",
+  "kycHintHoldStill": "Hold still",
+  "kycHintCaptured": "Captured",
+  "kycHintFaceInOval": "Face in the oval",
+  "kycLivenessRecording": "Recording",
+  "partnerDocSelfieVideo": "Face video",
+  "livenessClipRetry": "The face video didn't save (missing or too large). Let's try again.",
+  "parcelWhereTo": "Where is the package going?",
+  "driverServiceParcel": "Goods delivery",
+  "driverServiceParcelHint": "Receive parcel delivery requests",
+  "homeServiceParcel": "Delivery",
+  "homeServiceParcelSub": "Send a package across town, fast",
+  "parcelDetailsTitle": "Package details",
+  "parcelSizeTitle": "Package size",
+  "parcelSizeHint": "Max size {dims}",
+  "@parcelSizeHint": {
+    "placeholders": {
+      "dims": {
+        "type": "String"
+      }
+    }
+  },
+  "parcelSizeS": "Small",
+  "parcelSizeM": "Medium",
+  "parcelSizeL": "Large",
+  "parcelSizeXL": "Extra large",
+  "parcelWeightLabel": "Weight (optional)",
+  "parcelWeightInvalid": "Enter a valid weight",
+  "parcelWeightOver": "Over {limit} kg for this size",
+  "@parcelWeightOver": {
+    "placeholders": {
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
+  "parcelNoteLabel": "Note for the driver (optional)",
+  "parcelSenderTitle": "Sender",
+  "parcelRecipientTitle": "Recipient",
+  "parcelNameLabel": "Full name",
+  "parcelPhoneLabel": "Phone number",
+  "parcelFieldRequired": "Required",
+  "parcelPhoneInvalid": "Enter a valid phone number",
+  "parcelPayerSender": "Sender pays",
+  "parcelPayerRecipient": "Recipient pays (cash)",
+  "parcelItemPhotoAdd": "Add package photo",
+  "parcelItemPhotoAdded": "Package photo added",
+  "parcelVehicleTitle": "Vehicle",
+  "parcelOptionHint": "Offer {min} – {max}",
+  "@parcelOptionHint": {
+    "placeholders": {
+      "min": {
+        "type": "String"
+      },
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "parcelQuoteCta": "See price",
+  "parcelSubmitCta": "Book delivery",
+  "parcelDriverBadge": "Package",
+  "parcelOutcomeDelivered": "Delivered",
+  "parcelOutcomeReturning": "Returning to sender",
+  "parcelOutcomeReturned": "Returned to sender",
+  "parcelOutcomeInTransit": "On the way",
+  "parcelOutcomeWaitingPickup": "Waiting for pickup",
+  "parcelFailUnreachable": "Recipient unreachable",
+  "parcelFailRefused": "Recipient refused",
+  "parcelFailAddress": "Wrong address",
+  "parcelFailDamaged": "Package damaged",
+  "parcelFailOther": "Other reason",
+  "parcelFailTitle": "Why can't it be delivered?",
+  "parcelErrorNoVehicle": "No vehicle can carry this package size",
+  "parcelErrorTooHeavy": "Package is too heavy for this size",
+  "parcelErrorRecipientCode": "Recipient code is wrong",
+  "parcelErrorCodeLocked": "Too many wrong codes. Try again later",
+  "parcelErrorSizeUnavailable": "This size isn't available right now",
+  "parcelErrorPayerMethod": "Recipient-pays only works with cash",
+  "parcelErrorPhoto": "A photo is required",
+  "parcelErrorState": "The delivery has changed. Refresh",
+  "parcelErrorNetwork": "Connection problem. Try again",
+  "parcelErrorGeneric": "Something went wrong",
+  "parcelRetry": "Retry",
+  "parcelSenderLine": "Sender: {name} · {phone}",
+  "@parcelSenderLine": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "parcelRecipientLine": "Recipient: {name} · {phone}",
+  "@parcelRecipientLine": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "parcelRecipientCode": "Recipient code: {code}",
+  "@parcelRecipientCode": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "parcelRecipientCodeHint": "Share this code with the recipient. The driver needs it to complete the delivery.",
+  "parcelPickupCta": "Picked up (take photo)",
+  "parcelReturningHint": "Bring the package back to the sender",
+  "parcelReturnedCta": "Returned to sender (photo)",
+  "parcelRecipientCodeInput": "Recipient code",
+  "parcelDeliverCta": "Delivered (photo)",
+  "parcelFailCta": "Can't deliver",
+  "parcelServiceFeeLine": "Service fee {amount} (included in fare)",
+  "@parcelServiceFeeLine": {"placeholders": {"amount": {"type": "String"}}},
+  "parcelReturnFeeLine": "Return fee if delivery fails: {amount}",
+  "@parcelReturnFeeLine": {"placeholders": {"amount": {"type": "String"}}},
+  "parcelReturnFeeCharged": "Return fee {amount}",
+  "@parcelReturnFeeCharged": {"placeholders": {"amount": {"type": "String"}}},
+  "parcelReceiptServiceFee": "Parcel service fee (included)",
+  "parcelReceiptReturnFee": "Return fee",
+  "driverServicesFoodMotorbikeOnly": "Food orders are for motorbike drivers only.",
+  "partnerKindFoodSafetyCommitment": "Food safety commitment",
+  "partnerFoodSafetyUseCommitment": "Use the food safety commitment",
+  "partnerFoodSafetyUseCommitmentHint": "Small household shops may sign the food safety commitment instead of the certificate.",
+  "kycOcrPrefilledNote": "Some fields were filled from your document photos. Please check and correct them.",
+  "kycOcrReading": "Reading your document…"
 }

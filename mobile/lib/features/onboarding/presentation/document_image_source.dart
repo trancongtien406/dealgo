@@ -5,10 +5,18 @@ import 'package:image_picker/image_picker.dart';
 
 /// A photo picked for a KYC/KYB document slot.
 class PickedDocumentImage {
-  const PickedDocumentImage({required this.bytes, required this.contentType});
+  const PickedDocumentImage({
+    required this.bytes,
+    required this.contentType,
+    this.checks = const {},
+  });
 
   final Uint8List bytes;
   final String contentType;
+
+  /// t52u: device-side capture checks (metadata key → passed), e.g.
+  /// `captureIdFrontQualityOk`. Empty for gallery picks. Advisory only.
+  final Map<String, bool> checks;
 
   String get contentBase64 => base64Encode(bytes);
 }

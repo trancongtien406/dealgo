@@ -27,6 +27,7 @@ function draftFrom(row: RideVehicleClassRow): Draft {
     name: row.name,
     seats: row.seats,
     enabled: row.enabled,
+    parcelEnabled: row.parcelEnabled ?? false,
     baseFareVnd: row.baseFareVnd,
     perKmVnd: row.perKmVnd,
     perMinuteVnd: row.perMinuteVnd,
@@ -263,7 +264,7 @@ export function VehicleClassesBoard() {
                   <Stat label="Mỗi phút" value={vnd(draft.perMinuteVnd)} />
                 </dl>
                 <p className="text-sm text-muted">
-                  Khách chào từ {vnd(draft.minFareVnd)} đến {vnd(draft.maxFareVnd)}
+                  Cước tối thiểu {vnd(draft.minFareVnd)} · tối đa {vnd(draft.maxFareVnd)} · trả giá −30%…+30% giá app (chỉnh ở Cài đặt)
                 </p>
                 <label className="flex items-center gap-2 text-sm text-ink">
                   <input
@@ -276,6 +277,18 @@ export function VehicleClassesBoard() {
                     }
                   />
                   Nhận chuyến loại này
+                </label>
+                <label className="flex items-center gap-2 text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    checked={draft.parcelEnabled ?? false}
+                    onChange={(event) =>
+                      setDraft(setDrafts, row.code, draft, {
+                        parcelEnabled: event.target.checked,
+                      })
+                    }
+                  />
+                  Nhận giao hàng (hạng kích thước ở Cài đặt › PARCEL_SIZE_CLASSES)
                 </label>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field

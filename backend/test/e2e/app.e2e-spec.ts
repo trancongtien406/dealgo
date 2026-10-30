@@ -37,6 +37,8 @@ describe('AppController (e2e)', () => {
         database: expect.stringMatching(/^(up|down)$/),
         redis: expect.stringMatching(/^(up|down)$/),
       },
+      // Since DEC-PROD-053 /health also reports worker heartbeat + outbox lag when the DB is up.
+      ...(response.body.worker ? { worker: expect.objectContaining({ status: expect.any(String) }) } : {}),
     });
     expect(response.body).not.toHaveProperty('stack');
   });

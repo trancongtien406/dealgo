@@ -31,6 +31,7 @@ import '../../domain/usecases/get_ride.dart';
 import '../utils/ride_routes.dart';
 import '../utils/ride_vehicle_label.dart';
 import '../cubit/ride_tracking_cubit.dart';
+import '../../../parcel/presentation/widgets/parcel_trip_panel.dart';
 import '../widgets/ride_widgets.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
@@ -92,6 +93,9 @@ class _RideTrackingView extends StatelessWidget {
     return Scaffold(
       backgroundColor: DealGoColors.canvas,
       body: SafeArea(
+        // The tracking sheet handles the bottom inset itself; a page-level
+        // bottom SafeArea leaves an empty strip under the sheet.
+        bottom: false,
         child: BlocBuilder<RideTrackingCubit, RideTrackingState>(
           builder: (context, state) {
             final ride = state.ride;
@@ -398,6 +402,15 @@ class _TrackingLive extends StatelessWidget {
               code: pickupCode.split('').join(' '),
               codeKey: const Key('ride-pickup-code'),
               onTap: () => context.push(RideRoutes.pickupCode(current.id)),
+            ),
+          ),
+        if (current.isParcel)
+          TrackingSection(
+            child: ParcelTripPanel(
+              key: ValueKey('parcel-${current.id}-${current.status.wire}'),
+              rideId: current.id,
+              accessToken: () => rideAccessToken(context),
+              driver: false,
             ),
           ),
         TrackingSection(

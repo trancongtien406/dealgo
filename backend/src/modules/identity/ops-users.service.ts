@@ -69,6 +69,7 @@ export type OpsDriverListItem = OpsUserListItem & {
     /** DEC-PROD-023 service toggles (Admin "Dịch vụ" column). */
     rideEnabled: boolean;
     foodEnabled: boolean;
+    parcelEnabled: boolean;
     updatedAt: string;
   } | null;
 };
@@ -384,6 +385,7 @@ function mapPresence(
     serviceRegionCode: presence.serviceRegionCode ?? null,
     rideEnabled: presence.rideEnabled,
     foodEnabled: presence.foodEnabled,
+    parcelEnabled: presence.parcelEnabled,
     updatedAt: presence.updatedAt.toISOString(),
   };
 }

@@ -95,8 +95,8 @@ export class PaymentMethodRegistryService {
           : Boolean(adapter?.isConfigured()) && Boolean(this.options.publicBaseUrl);
       const services: Record<PaymentServiceCode, boolean> =
         entry.code === 'CASH'
-          ? { BIKE: true, CAR: true, FOOD: true }
-          : saved?.services ?? { BIKE: false, CAR: false, FOOD: false };
+          ? { BIKE: true, CAR: true, FOOD: true, PARCEL: true }
+          : { BIKE: false, CAR: false, FOOD: false, PARCEL: false, ...saved?.services };
       const gate = (svc: PaymentServiceCode) => {
         if (entry.code === 'CASH') {
           return true;
@@ -117,7 +117,7 @@ export class PaymentMethodRegistryService {
         services,
         sortOrder: saved?.sortOrder ?? entry.defaultSortOrder,
         unsupportedReason: saved?.unsupportedReason ?? null,
-        availableFor: { BIKE: gate('BIKE'), CAR: gate('CAR'), FOOD: gate('FOOD') },
+        availableFor: { BIKE: gate('BIKE'), CAR: gate('CAR'), FOOD: gate('FOOD'), PARCEL: gate('PARCEL') },
         locked: entry.code === 'CASH',
       };
     }).sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code));
@@ -177,7 +177,7 @@ export class PaymentMethodRegistryService {
         }
         const entry = PAYMENT_METHOD_CATALOG.find((c) => c.code === patch.code)!;
         const current = next.methods[patch.code] ?? {
-          services: { BIKE: false, CAR: false, FOOD: false },
+          services: { BIKE: false, CAR: false, FOOD: false, PARCEL: false },
           sortOrder: entry.defaultSortOrder,
           unsupportedReason: null,
         };

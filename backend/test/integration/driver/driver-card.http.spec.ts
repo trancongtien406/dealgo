@@ -5,6 +5,7 @@ import { DriverCardModule } from '../../../src/modules/driver-card/driver-card.m
 import { PARTNER_REPOSITORY } from '../../../src/modules/partner/partner.constants.js';
 import type { PartnerRepository } from '../../../src/modules/partner/partner.repository.js';
 import { OpsAuthService } from '../../../src/modules/identity/ops-auth.service.js';
+import { bidBandOffSettings } from '../../support/settings-fixture.js';
 import { createTestApp, type TestUser } from '../../support/app-harness.js';
 
 const pickup = { lat: 16.0544, lng: 108.2022, label: 'Cầu Rồng' };
@@ -16,7 +17,7 @@ describe('driver card http', () => {
   let serial = 0;
 
   beforeAll(async () => {
-    harness = await createTestApp([DriverCardModule]);
+    harness = await createTestApp([DriverCardModule], { settings: await bidBandOffSettings() });
     seedVehicleClassOnDriverGrant(harness.app, harness.identity);
     app = harness.app;
   });

@@ -33,7 +33,11 @@ const _suggestionLimit = 5;
 /// the destination picker opens first; the sheet lists pickup on top and the
 /// destination below, then map + sheet confirm before class/fare.
 class RideMapPage extends StatefulWidget {
-  const RideMapPage({super.key});
+  const RideMapPage({super.key, this.parcel = false});
+
+  /// Parcel delivery (DEC-PROD-071): same A→B map, no stops; continue opens
+  /// the package sheet instead of the passenger fare sheet.
+  final bool parcel;
 
   @override
   State<RideMapPage> createState() => _RideMapPageState();
@@ -349,6 +353,10 @@ class _RideMapPageState extends State<RideMapPage> {
     if (places == null || _samePlace) {
       return;
     }
+    if (widget.parcel) {
+      context.push(RideRoutes.parcelDetails, extra: places);
+      return;
+    }
     // inDrive-like hot path: A/B → class+fare sheet (skip overview hop).
     context.push(RideRoutes.fare, extra: places);
   }
@@ -497,7 +505,12 @@ class _RideMapPageState extends State<RideMapPage> {
                           children: [
                             const RideSheetHandle(),
                             const SizedBox(height: DealGoSpacing.s12),
-                            Text(l10n.rideWhereTo, style: textTheme.titleLarge),
+                            Text(
+                              widget.parcel
+                                  ? l10n.parcelWhereTo
+                                  : l10n.rideWhereTo,
+                              style: textTheme.titleLarge,
+                            ),
                             const SizedBox(height: DealGoSpacing.s12),
                             // Pickup on top, destination below — same order as
                             // RideStopList on every later ride screen.
@@ -568,7 +581,8 @@ class _RideMapPageState extends State<RideMapPage> {
                                 ),
                               ),
                             ),
-                            if (_maxStops > 0 &&
+                            if (!widget.parcel &&
+                                _maxStops > 0 &&
                                 dropoff != null &&
                                 _stops.length < _maxStops) ...[
                               const SizedBox(height: DealGoSpacing.s4),

@@ -970,13 +970,29 @@ class _DocumentsStep extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final kind in PartnerDocumentKind.merchantAll) ...[
+        if (state.canUseFoodSafetyCommitment) ...[
+          SwitchListTile(
+            key: const Key('kyb-food-safety-commitment'),
+            contentPadding: EdgeInsets.zero,
+            value: state.foodSafetyCommitment,
+            onChanged: cubit.setFoodSafetyCommitment,
+            title: Text(
+              AppLocalizations.of(context).partnerFoodSafetyUseCommitment,
+            ),
+            subtitle: Text(
+              AppLocalizations.of(context).partnerFoodSafetyUseCommitmentHint,
+            ),
+          ),
+          const SizedBox(height: DealGoSpacing.s8),
+        ],
+        for (final kind in state.documentKinds) ...[
           PartnerDocumentSlot(
             kind: kind,
             draft: state.documents,
             source: source,
             optional: kind == PartnerDocumentKind.storefront,
             onPicked: (image) => cubit.attachDocument(kind, image),
+            onPickedOther: cubit.attachDocument,
             onRemove: () => cubit.removeDocument(kind),
           ),
           const SizedBox(height: DealGoSpacing.s12),
@@ -1040,7 +1056,7 @@ class _MerchantReviewStep extends StatelessWidget {
               children: [
                 Text(l10n.partnerReviewTitleDocs, style: textTheme.titleMedium),
                 const SizedBox(height: DealGoSpacing.s12),
-                for (final kind in PartnerDocumentKind.merchantAll)
+                for (final kind in state.documentKinds)
                   InkWell(
                     onTap: () => cubit.goToStep(MerchantKybStep.documents),
                     child: PartnerReviewRow(

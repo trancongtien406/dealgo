@@ -124,6 +124,7 @@ class _FoodTrackingView extends StatelessWidget {
     return Scaffold(
       backgroundColor: DealGoColors.canvas,
       body: SafeArea(
+        bottom: false,
         child: BlocBuilder<FoodTrackingCubit, FoodTrackingState>(
           builder: (context, state) {
             final order = state.order;

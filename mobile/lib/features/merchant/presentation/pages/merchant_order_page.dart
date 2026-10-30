@@ -56,20 +56,23 @@ class MerchantOrderPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) =>
-          MerchantOrderCubit(
-              getMerchantOrder: context.read<GetMerchantOrder>(),
-              acceptMerchantOrder: context.read<AcceptMerchantOrder>(),
-              markMerchantOrderReady: context.read<MarkMerchantOrderReady>(),
-              rejectMerchantOrder: context.read<RejectMerchantOrder>(),
-              queue: context.read<MerchantQueueCubit>(),
-              order: order,
-              realtime: context.read<SnapshotRealtime>(),
-            )
-            ..loadLines(merchantAccessToken(context))
-            ..startAutoRefresh(
-              () => context.mounted ? merchantAccessToken(context) : null,
-            ),
+      create: (context) {
+        final auth = context.read<AuthCubit>();
+        return MerchantOrderCubit(
+          getMerchantOrder: context.read<GetMerchantOrder>(),
+          acceptMerchantOrder: context.read<AcceptMerchantOrder>(),
+          markMerchantOrderReady: context.read<MarkMerchantOrderReady>(),
+          rejectMerchantOrder: context.read<RejectMerchantOrder>(),
+          queue: context.read<MerchantQueueCubit>(),
+          order: order,
+          realtime: context.read<SnapshotRealtime>(),
+        )
+          ..loadLines(merchantAccessToken(context))
+          ..startAutoRefresh(() {
+            final s = auth.state;
+            return s is AuthSignedIn ? s.tokens.accessToken : null;
+          });
+      },
       child: const _MerchantOrderView(),
     );
   }

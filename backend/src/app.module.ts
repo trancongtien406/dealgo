@@ -41,6 +41,7 @@ import { AddressBookModule } from './modules/address-book/index.js';
 import { PlacesModule } from './modules/places/index.js';
 import { IntegrationsAdminModule } from './modules/integrations-admin/index.js';
 import { SystemErrorsModule } from './modules/system-errors/index.js';
+import { OpsEventsModule } from './platform/ops-events/index.js';
 import { RatingModule } from './modules/rating/index.js';
 import { DriverCardModule } from './modules/driver-card/index.js';
 import { RideShareModule } from './modules/ride-share/index.js';
@@ -128,6 +129,7 @@ function buildThrottlerOptions(config: ConfigService<AppEnv, true>): ThrottlerMo
     OpsModule,
     IntegrationsAdminModule,
     SystemErrorsModule,
+    OpsEventsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -178,6 +178,7 @@ const envSchema = z.object({
   OPS_ALERT_WEBHOOK_URL: optionalString,
   /** DEC-PROD-056: how often the worker purges chat messages older than the admin retention setting. */
   CHAT_RETENTION_PURGE_INTERVAL_MS: positiveInt(3_600_000),
+  KYC_MEDIA_RETENTION_INTERVAL_MS: positiveInt(3_600_000),
   /** Active PSP status reconciliation for online payments stuck pending (missed IPN). */
   PAYMENT_RECONCILE_INTERVAL_MS: positiveInt(120_000),
   SMTP_URL: optionalString,
@@ -262,7 +263,7 @@ const envSchema = z.object({
   RIDE_OFFER_TTL_SECONDS: positiveInt(60),
   RIDE_MIN_FARE_VND: fareVnd(10_000),
   RIDE_MAX_FARE_VND: fareVnd(500_000),
-  RIDE_REFERENCE_VND_PER_KM: fareVnd(8_000),
+  RIDE_REFERENCE_VND_PER_KM: fareVnd(5_000),
   FOOD_MIN_DELIVERY_VND: fareVnd(5_000),
   FOOD_MAX_DELIVERY_VND: fareVnd(100_000),
   // Per-km delivery quote; clamped by FOOD_MIN/MAX after distance.
@@ -305,6 +306,7 @@ const envSchema = z.object({
   // Defaults: true in production (fail closed); false outside production unless set.
   // No vendor API keys — owner loads secrets later (OPEN-008).
   PARTNER_CAR_KYC_EXTRA_DOCS: optionalBoolean,
+  // t52u (DRAFT): optional AI vision pre-check for KYC uploads. Blank = disabled (manual review only).
   SWAGGER_ENABLED: optionalBoolean,
   CORS_ALLOWED_ORIGINS: optionalString,
 });

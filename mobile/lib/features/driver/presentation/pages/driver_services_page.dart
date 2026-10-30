@@ -41,7 +41,12 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
     final services = context.watch<DriverServicesCubit>().state;
     final kyc = context.watch<DriverKycCubit>().state;
     final prefs = services.prefs;
-    final onCount = (prefs.rideEnabled ? 1 : 0) + (prefs.foodEnabled ? 1 : 0);
+    // DEC-PROD-071: FOOD is motorbike-only (server fails closed); hide it for cars.
+    final foodHidden =
+        kyc.vehicleClassCode != null && kyc.vehicleClassCode != 'MOTORBIKE';
+    final onCount =
+        (prefs.rideEnabled ? 1 : 0) +
+        (prefs.foodEnabled && !foodHidden ? 1 : 0);
     final vehicleName = [
       kyc.vehicleBrand.trim(),
       kyc.vehicleModel.trim(),
@@ -165,20 +170,34 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
                               .read<DriverServicesCubit>()
                               .setRide(value),
                   ),
-                  const Divider(height: 1),
-                  _ServiceRow(
-                    key: const Key('driver-services-food'),
-                    icon: DealGoIcons.store,
-                    iconColor: DealGoColors.brandGreen,
-                    title: l10n.driverServicesFoodTitle,
-                    registered: kyc.foodService != false,
-                    value: prefs.foodEnabled,
-                    onChanged: services.busy
-                        ? null
-                        : (value) => context
-                              .read<DriverServicesCubit>()
-                              .setFood(value),
-                  ),
+                  if (foodHidden) ...[
+                    const Divider(height: 1),
+                    Padding(
+                      key: const Key('driver-services-food-motorbike-only'),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: DealGoSpacing.s8,
+                      ),
+                      child: Text(
+                        l10n.driverServicesFoodMotorbikeOnly,
+                        style: textTheme.bodySmall,
+                      ),
+                    ),
+                  ] else ...[
+                    const Divider(height: 1),
+                    _ServiceRow(
+                      key: const Key('driver-services-food'),
+                      icon: DealGoIcons.store,
+                      iconColor: DealGoColors.brandGreen,
+                      title: l10n.driverServicesFoodTitle,
+                      registered: kyc.foodService != false,
+                      value: prefs.foodEnabled,
+                      onChanged: services.busy
+                          ? null
+                          : (value) => context
+                                .read<DriverServicesCubit>()
+                                .setFood(value),
+                    ),
+                  ],
                 ],
               ),
             ),

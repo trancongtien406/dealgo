@@ -24,6 +24,8 @@ export type RideVehicleClass = {
   assumedSpeedKmh: number;
   sortOrder: number;
   imageUrl: string | null;
+  /** DEC-PROD-071: bookable for parcel delivery (ops opt-in). */
+  parcelEnabled: boolean;
   updatedByUserId: string | null;
 };
 
@@ -68,6 +70,17 @@ export function clampToFareSteps(amountVnd: number, minVnd: number, maxVnd: numb
     return Math.min(maxVnd, Math.max(minVnd, amountVnd));
   }
   return Math.min(hi, Math.max(lo, roundUpToFareStep(amountVnd)));
+}
+
+/**
+ * Highest bid / counter allowed: RIDE_BID_CEILING_PERCENT_OF_REFERENCE of the
+ * suggested fare, rounded down to the step. Infinity when the ceiling is off.
+ */
+export function rideBidCeilingVnd(referenceFareVnd: number, ceilingPercent: number): number {
+  if (ceilingPercent <= 0 || referenceFareVnd <= 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return roundDownToFareStep((referenceFareVnd * ceilingPercent) / 100);
 }
 
 /**
@@ -147,68 +160,63 @@ export function isCarVehicleClassCode(code: string): boolean {
 /**
  * First-boot catalog (DG-DEC-VEH-001: MOTORBIKE + CAR).
  *
- * MOTORBIKE seeds from platform fare bounds (RIDE_* settings).
- * CAR_4 / CAR_7 seeds are **DRAFT / ADMIN_EDITABLE** proposals only —
- * NOT approved OPEN-003 production tariffs. Ops edits via ride-vehicle-classes
- * Admin UI; owner may replace these numbers at any time.
- * TODO(OPEN-003): replace DRAFT seeds with owner-approved per-class tariffs.
+ * Owner-provided tariff (pure per-km, no base / per-minute component):
+ *   MOTORBIKE 5.000đ/km, min 10.000đ · CAR_4 9.000đ/km, min 20.000đ ·
+ *   CAR_7 13.000đ/km, min 25.000đ.
+ * Still ADMIN_EDITABLE via the ride-vehicle-classes Admin UI; OPEN-003 stays
+ * open. The platform max fare (RIDE_MAX_FARE_VND) caps every class.
  */
+export const DEFAULT_CLASS_TARIFF = {
+  MOTORBIKE: { perKmVnd: 5_000, minFareVnd: 10_000 },
+  CAR_4: { perKmVnd: 9_000, minFareVnd: 20_000 },
+  CAR_7: { perKmVnd: 13_000, minFareVnd: 25_000 },
+} as const;
+
 export function defaultRideVehicleClasses(settings: {
-  minFareVnd: number;
   maxFareVnd: number;
-  perKmVnd: number;
+  /** Ignored: kept so callers may still pass the platform values. */
+  minFareVnd?: number;
+  perKmVnd?: number;
 }): RideVehicleClass[] {
-  const min = Math.max(1, money(settings.minFareVnd));
-  const max = Math.max(min, money(settings.maxFareVnd));
-  const perKm = Math.max(1, money(settings.perKmVnd));
+  const max = Math.max(
+    DEFAULT_CLASS_TARIFF.CAR_7.minFareVnd,
+    money(settings.maxFareVnd),
+  );
   const shared = {
     enabled: true,
     imageUrl: null as string | null,
+    parcelEnabled: false,
     updatedByUserId: null as string | null,
+    baseFareVnd: 0,
+    perMinuteVnd: 0,
+    maxFareVnd: max,
   };
-  // DRAFT/ADMIN_EDITABLE Car knobs — relative to platform per-km; not production law.
-  const car4PerKm = Math.max(perKm, money(perKm * 1.5));
-  const car7PerKm = Math.max(car4PerKm, money(perKm * 1.75));
   return [
     {
       ...shared,
+      ...DEFAULT_CLASS_TARIFF.MOTORBIKE,
       code: MOTORBIKE_CLASS_CODE,
       name: 'Xe máy',
       seats: 1,
       sortOrder: 0,
-      baseFareVnd: 0,
-      perKmVnd: perKm,
-      perMinuteVnd: 0,
-      minFareVnd: min,
-      maxFareVnd: max,
       assumedSpeedKmh: 25,
     },
     {
       ...shared,
+      ...DEFAULT_CLASS_TARIFF.CAR_4,
       code: 'CAR_4',
       name: 'Xe 4 chỗ',
       seats: 4,
       sortOrder: 1,
-      // DRAFT/ADMIN_EDITABLE — OPEN-003 pending owner edit
-      baseFareVnd: 15_000,
-      perKmVnd: car4PerKm,
-      perMinuteVnd: 300,
-      minFareVnd: Math.max(min, 25_000),
-      maxFareVnd: Math.max(max, 800_000),
       assumedSpeedKmh: 22,
     },
     {
       ...shared,
+      ...DEFAULT_CLASS_TARIFF.CAR_7,
       code: 'CAR_7',
       name: 'Xe 7 chỗ',
       seats: 7,
       sortOrder: 2,
-      // DRAFT/ADMIN_EDITABLE — OPEN-003 pending owner edit
-      baseFareVnd: 20_000,
-      perKmVnd: car7PerKm,
-      perMinuteVnd: 400,
-      minFareVnd: Math.max(min, 35_000),
-      maxFareVnd: Math.max(max, 1_000_000),
       assumedSpeedKmh: 20,
     },
   ];

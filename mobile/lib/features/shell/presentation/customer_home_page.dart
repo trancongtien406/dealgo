@@ -29,6 +29,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   /// One Ride entry — vehicle class is chosen inside the booking flow.
   void _openBook() => context.go('/customer/book');
 
+  void _openParcel() => context.push('/customer/parcel');
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -50,7 +52,11 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           HomeSearch(onBook: _openBook),
           const SizedBox(height: DealGoSpacing.s16),
           const HomeBannerCarousel(role: AppRole.customer),
-          ServiceRow(onRide: _openBook, onFood: _openShop),
+          ServiceRow(
+            onRide: _openBook,
+            onFood: _openShop,
+            onParcel: _openParcel,
+          ),
           const SizedBox(height: DealGoSpacing.s24),
           FeaturedShoppingCard(onOpen: _openShop),
           const SizedBox(height: DealGoSpacing.s24),

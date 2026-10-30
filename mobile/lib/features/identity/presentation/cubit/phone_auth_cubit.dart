@@ -484,11 +484,16 @@ class PhoneAuthCubit extends Cubit<PhoneAuthState> {
         emit(const PhoneAuthIdle());
         return;
       }
+      final errorCode = switch (error.kind) {
+        PasskeyFailureKind.unsupported => 'PASSKEY_UNAVAILABLE',
+        PasskeyFailureKind.alreadyRegistered => 'AUTH_PASSKEY_EXISTS',
+        _ => 'AUTH_PASSKEY_INVALID',
+      };
       emit(
         PhoneAuthError(
           error: ApiException(
-            statusCode: 0,
-            errorCode: 'PASSKEY_UNAVAILABLE',
+            statusCode: 400,
+            errorCode: errorCode,
             message: error.toString(),
           ),
           phase: PhoneAuthPhase.passkey,
@@ -503,7 +508,7 @@ class PhoneAuthCubit extends Cubit<PhoneAuthState> {
         emit(
           PhoneAuthError(
             error: ApiException(
-              statusCode: 0,
+              statusCode: 400,
               errorCode: 'PASSKEY_UNAVAILABLE',
               message: error.toString(),
             ),
@@ -563,6 +568,29 @@ class PhoneAuthCubit extends Cubit<PhoneAuthState> {
           refreshToken: session.refreshToken,
         ),
       );
+    } on PasskeyPlatformException catch (error) {
+      if (isClosed || requestId != _requestId) {
+        return;
+      }
+      if (error.kind == PasskeyFailureKind.cancelled) {
+        emit(const PhoneAuthIdle());
+        return;
+      }
+      final errorCode = switch (error.kind) {
+        PasskeyFailureKind.unsupported => 'PASSKEY_UNAVAILABLE',
+        PasskeyFailureKind.alreadyRegistered => 'AUTH_PASSKEY_EXISTS',
+        _ => 'AUTH_PASSKEY_INVALID',
+      };
+      emit(
+        PhoneAuthError(
+          error: ApiException(
+            statusCode: 400,
+            errorCode: errorCode,
+            message: error.toString(),
+          ),
+          phase: PhoneAuthPhase.passkey,
+        ),
+      );
     } on ApiException catch (error) {
       if (isClosed || requestId != _requestId) {
         return;
@@ -575,8 +603,8 @@ class PhoneAuthCubit extends Cubit<PhoneAuthState> {
       emit(
         PhoneAuthError(
           error: ApiException(
-            statusCode: 0,
-            errorCode: 'PASSKEY_UNAVAILABLE',
+            statusCode: 400,
+            errorCode: 'AUTH_PASSKEY_INVALID',
             message: error.toString(),
           ),
           phase: PhoneAuthPhase.passkey,
@@ -608,6 +636,29 @@ class PhoneAuthCubit extends Cubit<PhoneAuthState> {
           refreshToken: session.refreshToken,
         ),
       );
+    } on PasskeyPlatformException catch (error) {
+      if (isClosed || requestId != _requestId) {
+        return;
+      }
+      if (error.kind == PasskeyFailureKind.cancelled) {
+        emit(const PhoneAuthIdle());
+        return;
+      }
+      final errorCode = switch (error.kind) {
+        PasskeyFailureKind.unsupported => 'PASSKEY_UNAVAILABLE',
+        PasskeyFailureKind.alreadyRegistered => 'AUTH_PASSKEY_EXISTS',
+        _ => 'AUTH_PASSKEY_INVALID',
+      };
+      emit(
+        PhoneAuthError(
+          error: ApiException(
+            statusCode: 400,
+            errorCode: errorCode,
+            message: error.toString(),
+          ),
+          phase: PhoneAuthPhase.passkey,
+        ),
+      );
     } on ApiException catch (error) {
       if (!isClosed && requestId == _requestId) {
         emit(PhoneAuthError(error: error, phase: PhoneAuthPhase.passkey));
@@ -617,8 +668,8 @@ class PhoneAuthCubit extends Cubit<PhoneAuthState> {
         emit(
           PhoneAuthError(
             error: ApiException(
-              statusCode: 0,
-              errorCode: 'PASSKEY_UNAVAILABLE',
+              statusCode: 400,
+              errorCode: 'AUTH_PASSKEY_INVALID',
               message: error.toString(),
             ),
             phase: PhoneAuthPhase.passkey,

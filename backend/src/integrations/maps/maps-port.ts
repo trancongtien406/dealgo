@@ -350,17 +350,44 @@ export class MapboxMapsPort implements MapsPort {
     destination: GeoPoint,
   ): Promise<number> {
     const pair = `${origin.lng},${origin.lat};${destination.lng},${destination.lat}`;
-    const url = new URL(
+    const drivingUrl = new URL(
       `https://api.mapbox.com/directions/v5/mapbox/driving/${pair}`,
     );
-    url.searchParams.set('access_token', this.accessToken);
-    url.searchParams.set('overview', 'false');
-    const body = await this.fetchJson(url);
-    const meters = body?.routes?.[0]?.distance;
-    if (typeof meters !== 'number' || !Number.isFinite(meters) || meters < 0) {
+    drivingUrl.searchParams.set('access_token', this.accessToken);
+    drivingUrl.searchParams.set('overview', 'false');
+    drivingUrl.searchParams.set('alternatives', 'true');
+
+    const cyclingUrl = new URL(
+      `https://api.mapbox.com/directions/v5/mapbox/cycling/${pair}`,
+    );
+    cyclingUrl.searchParams.set('access_token', this.accessToken);
+    cyclingUrl.searchParams.set('overview', 'false');
+    cyclingUrl.searchParams.set('alternatives', 'true');
+
+    const [drivingRes, cyclingRes] = await Promise.all([
+      this.fetchJson(drivingUrl).catch(() => null),
+      this.fetchJson(cyclingUrl).catch(() => null),
+    ]);
+
+    const candidates: number[] = [];
+    for (const res of [drivingRes, cyclingRes]) {
+      if (res?.routes && Array.isArray(res.routes)) {
+        for (const route of res.routes) {
+          if (
+            typeof route.distance === 'number' &&
+            Number.isFinite(route.distance) &&
+            route.distance > 0
+          ) {
+            candidates.push(route.distance);
+          }
+        }
+      }
+    }
+
+    if (candidates.length === 0) {
       throw new UnavailableMapsError('Mapbox directions returned no distance');
     }
-    return meters / 1000;
+    return Math.min(...candidates) / 1000;
   }
 
   private async forward(

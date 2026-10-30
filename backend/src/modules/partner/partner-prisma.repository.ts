@@ -7,9 +7,11 @@ import type {
   PartnerApplicationRecord,
   PartnerRepository,
   PartnerRoleName,
+  PartnerReviewAudit,
   PartnerStatusEventInput,
   PartnerStatusName,
 } from './partner.repository.js';
+import { OPS_ALL_STATUSES, PARTNER_REVIEWABLE_STATUSES } from './partner.repository.js';
 import { writePartnerStatusOutbox } from '../communication/outbox/outbox.write.js';
 
 type Db = NonNullable<PrismaClient>;
@@ -51,14 +53,15 @@ export class PrismaPartnerRepository implements PartnerRepository {
   }
 
   async listForOps(input: {
-    status: PartnerStatusName;
+    status: PartnerStatusName | 'ALL';
     page: number;
     limit: number;
     q?: string;
     role?: PartnerRoleName;
   }): Promise<OpsPartnerPage> {
     const where: Prisma.PartnerApplicationWhereInput = {
-      status: input.status,
+      status:
+        input.status === 'ALL' ? { in: [...OPS_ALL_STATUSES] } : input.status,
     };
     if (input.role) {
       where.role = input.role;
@@ -142,28 +145,75 @@ export class PrismaPartnerRepository implements PartnerRepository {
     status: Extract<PartnerStatusName, 'APPROVED' | 'REJECTED'>;
     reason: string | null;
     reviewIssues: PartnerReviewIssue[];
-    reviewedBy: string;
+    reviewedBy: string | null;
     now: Date;
     metadata?: Record<string, unknown>;
+    audit?: PartnerReviewAudit;
   }): Promise<PartnerApplicationRecord | null> {
-    // Conditional on SUBMITTED so concurrent approve/reject cannot both win.
-    const updated = await this.db.partnerApplication.updateMany({
-      where: { id: input.id, status: 'SUBMITTED' },
-      data: {
-        status: input.status,
-        reason: input.reason,
-        reviewIssues: asInputJson(input.reviewIssues),
-        reviewedBy: input.reviewedBy,
-        reviewedAt: input.now,
-        ...(input.metadata ? { metadata: asInputJson(input.metadata) } : {}),
-      },
+    // Conditional on a pending status so concurrent approve/reject cannot both win;
+    // the OpsAuditLog row commits with the decision or not at all (t52u).
+    return this.db.$transaction(async (tx) => {
+      const updated = await tx.partnerApplication.updateMany({
+        where: { id: input.id, status: { in: [...PARTNER_REVIEWABLE_STATUSES] } },
+        data: {
+          status: input.status,
+          reason: input.reason,
+          reviewIssues: asInputJson(input.reviewIssues),
+          reviewedBy: input.reviewedBy,
+          reviewedAt: input.now,
+          ...(input.metadata ? { metadata: asInputJson(input.metadata) } : {}),
+        },
+      });
+      if (updated.count !== 1) {
+        return null;
+      }
+      if (input.audit) {
+        await writeAudit(tx, input.id, input.audit);
+      }
+      const row = await tx.partnerApplication.findUnique({ where: { id: input.id } });
+      return row ? mapRow(row) : null;
     });
-    if (updated.count !== 1) {
-      return null;
-    }
-    const row = await this.db.partnerApplication.findUnique({ where: { id: input.id } });
-    return row ? mapRow(row) : null;
   }
+
+  async claim(input: {
+    id: string;
+    reviewerId: string;
+    now: Date;
+    audit?: PartnerReviewAudit;
+  }): Promise<PartnerApplicationRecord | null> {
+    return this.db.$transaction(async (tx) => {
+      const updated = await tx.partnerApplication.updateMany({
+        where: { id: input.id, status: 'SUBMITTED' },
+        data: { status: 'IN_REVIEW', reviewedBy: input.reviewerId },
+      });
+      if (updated.count !== 1) {
+        return null;
+      }
+      if (input.audit) {
+        await writeAudit(tx, input.id, input.audit);
+      }
+      const row = await tx.partnerApplication.findUnique({ where: { id: input.id } });
+      return row ? mapRow(row) : null;
+    });
+  }
+
+}
+
+async function writeAudit(
+  tx: Prisma.TransactionClient,
+  applicationId: string,
+  audit: PartnerReviewAudit,
+): Promise<void> {
+  await tx.opsAuditLog.create({
+    data: {
+      actorUserId: audit.actorUserId,
+      action: audit.action,
+      entityType: 'PARTNER_APPLICATION',
+      entityId: applicationId,
+      reason: audit.reason.slice(0, 500),
+      metadata: asInputJson(audit.metadata),
+    },
+  });
 }
 
 function mapRow(row: {

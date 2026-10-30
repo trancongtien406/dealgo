@@ -88,13 +88,11 @@ class MerchantOrderCubit extends Cubit<MerchantOrderViewState> {
     this._rejectMerchantOrder,
     required MerchantQueueOrder order,
     this.realtime,
-    this.refreshInterval = const Duration(seconds: 10),
   }) : super(MerchantOrderViewReady(order: order, kitchenLines: const []));
 
-  /// Poll fallback when the store socket is disconnected (DEC-PROD-041).
-  final Duration refreshInterval;
+  // t50u: no poll fallback. REST reload on open, store:{id} hint and socket
+  // reconnect (SnapshotBinding), never on a timer.
   final SnapshotRealtime? realtime;
-  Timer? _refreshTimer;
   SnapshotBinding? _storeBinding;
   String? Function()? _tokenSource;
   var _refreshing = false;
@@ -107,12 +105,9 @@ class MerchantOrderCubit extends Cubit<MerchantOrderViewState> {
     'READY_FOR_PICKUP',
   };
 
-  bool get autoRefreshActive => _refreshTimer?.isActive ?? false;
-
   void startAutoRefresh(String? Function() token) {
     _tokenSource = token;
     unawaited(_startStoreRealtime());
-    _syncAutoRefresh();
   }
 
   Future<void> _startStoreRealtime() async {
@@ -125,26 +120,10 @@ class MerchantOrderCubit extends Cubit<MerchantOrderViewState> {
       room: StoreSnapshotRoom(_ready.order.storeId),
       onInvalidate: () {
         unawaited(_tick());
-        _syncAutoRefresh();
       },
     );
     _storeBinding = binding;
     await binding.start(accessToken: token);
-    _syncAutoRefresh();
-  }
-
-  void _syncAutoRefresh() {
-    if (isClosed || _tokenSource == null) return;
-    final waiting = awaitingStatuses.contains(_ready.order.status);
-    // Poll only while waiting AND socket is down (or realtime not wired).
-    final socketUp = realtime?.isConnected ?? false;
-    final shouldPoll = waiting && !socketUp;
-    if (shouldPoll && !autoRefreshActive) {
-      _refreshTimer = Timer.periodic(refreshInterval, (_) => _tick());
-    } else if (!shouldPoll) {
-      _refreshTimer?.cancel();
-      _refreshTimer = null;
-    }
   }
 
   Future<void> _tick() async {
@@ -160,7 +139,6 @@ class MerchantOrderCubit extends Cubit<MerchantOrderViewState> {
 
   @override
   Future<void> close() async {
-    _refreshTimer?.cancel();
     await _storeBinding?.stop();
     _storeBinding = null;
     return super.close();
@@ -213,7 +191,6 @@ class MerchantOrderCubit extends Cubit<MerchantOrderViewState> {
               latest.handoffDone || handedOverStatuses.contains(detail.status),
         ),
       );
-      _syncAutoRefresh();
     } catch (_) {
       // Queue summary remains; kitchen panel stays empty until retry.
     }
@@ -336,7 +313,6 @@ class MerchantOrderCubit extends Cubit<MerchantOrderViewState> {
       final next = current.order.apply(update);
       queue.replace(next);
       emit(current.copyWith(order: next, busy: false));
-      _syncAutoRefresh();
     } on ApiException catch (error) {
       if (isClosed) {
         return;

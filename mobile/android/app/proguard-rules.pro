@@ -24,3 +24,10 @@
 
 # Keep annotations / signatures that Gson-style mappers need.
 -keepattributes Signature,*Annotation*,InnerClasses,EnclosingMethod
+
+# ML Kit text recognition: only the Latin model is bundled (KYC OCR); the
+# plugin references optional script recognizers that are not on the classpath.
+-dontwarn com.google.mlkit.vision.text.chinese.**
+-dontwarn com.google.mlkit.vision.text.devanagari.**
+-dontwarn com.google.mlkit.vision.text.japanese.**
+-dontwarn com.google.mlkit.vision.text.korean.**

@@ -356,14 +356,14 @@ describe('ops platform settings + faqs http', () => {
       .post('/v1/rides')
       .set('Authorization', `Bearer ${customerNear.token}`)
       .set('Idempotency-Key', `radius-near-${Date.now()}`)
-      .send({ pickup: origin, dropoff: nearDrop, offeredFareVnd: 30_000, vehicleClassCode: 'MOTORBIKE'})
+      .send({ pickup: origin, dropoff: nearDrop, offeredFareVnd: 12_000, vehicleClassCode: 'MOTORBIKE'})
       .expect(200);
 
     await request(app.getHttpServer())
       .post('/v1/rides')
       .set('Authorization', `Bearer ${customerFar.token}`)
       .set('Idempotency-Key', `radius-far-${Date.now()}`)
-      .send({ pickup: farPickup, dropoff: farDrop, offeredFareVnd: 30_000, vehicleClassCode: 'MOTORBIKE'})
+      .send({ pickup: farPickup, dropoff: farDrop, offeredFareVnd: 12_000, vehicleClassCode: 'MOTORBIKE'})
       .expect(200);
 
     await request(app.getHttpServer())

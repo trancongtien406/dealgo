@@ -204,6 +204,7 @@ class RideViewModel {
     this.currentStopSeq,
     this.stopFeeVnd = 0,
     this.waitFeeVnd = 0,
+    this.serviceKind = 'RIDE',
   });
 
   final String id;
@@ -231,6 +232,7 @@ class RideViewModel {
   final int? currentStopSeq;
   final int stopFeeVnd;
   final int waitFeeVnd;
+  final String serviceKind;
 
   factory RideViewModel.fromJson(Map<String, Object?> json) {
     final id = json['id'];
@@ -295,6 +297,7 @@ class RideViewModel {
       currentStopSeq: _nullableInt(json['currentStopSeq']),
       stopFeeVnd: _nullableInt(json['stopFeeVnd']) ?? 0,
       waitFeeVnd: _nullableInt(json['waitFeeVnd']) ?? 0,
+      serviceKind: _nullableString(json['serviceKind']) ?? 'RIDE',
     );
   }
 
@@ -327,6 +330,7 @@ class RideViewModel {
       currentStopSeq: ride.currentStopSeq,
       stopFeeVnd: ride.stopFeeVnd,
       waitFeeVnd: ride.waitFeeVnd,
+      serviceKind: ride.serviceKind,
     );
   }
 
@@ -397,6 +401,7 @@ class RideViewModel {
       currentStopSeq: currentStopSeq,
       stopFeeVnd: stopFeeVnd < 0 ? 0 : stopFeeVnd,
       waitFeeVnd: waitFeeVnd < 0 ? 0 : waitFeeVnd,
+      serviceKind: serviceKind,
     );
   }
 }
@@ -416,6 +421,9 @@ class OpenRideModel {
     this.customerRating,
     this.stops = const [],
     this.routeVersion = 0,
+    this.serviceKind = 'RIDE',
+    this.parcelSizeClass,
+    this.parcelWeightKg,
   });
 
   final String id;
@@ -431,6 +439,9 @@ class OpenRideModel {
   final CustomerRatingSummary? customerRating;
   final List<RidePoint> stops;
   final int routeVersion;
+  final String serviceKind;
+  final String? parcelSizeClass;
+  final double? parcelWeightKg;
 
   factory OpenRideModel.fromJson(Map<String, Object?> json) {
     final id = json['id'];
@@ -472,6 +483,9 @@ class OpenRideModel {
       customerRating: parseCustomerRatingSummary(json['customerRating']),
       stops: [for (final stop in parseRideStops(json['stops'])) stop.point],
       routeVersion: _nullableInt(json['routeVersion']) ?? 0,
+      serviceKind: _nullableString(json['serviceKind']) ?? 'RIDE',
+      parcelSizeClass: _nullableString(asJsonMap(json['parcel'])?['sizeClass']),
+      parcelWeightKg: _asDouble(asJsonMap(json['parcel'])?['weightKg']),
     );
   }
 
@@ -490,6 +504,9 @@ class OpenRideModel {
       customerRating: ride.customerRating,
       stops: ride.stops,
       routeVersion: ride.routeVersion,
+      serviceKind: ride.serviceKind,
+      parcelSizeClass: ride.parcelSizeClass,
+      parcelWeightKg: ride.parcelWeightKg,
     );
   }
 
@@ -552,6 +569,9 @@ class OpenRideModel {
       customerRating: customerRating,
       stops: stops,
       routeVersion: routeVersion,
+      serviceKind: serviceKind,
+      parcelSizeClass: parcelSizeClass,
+      parcelWeightKg: parcelWeightKg,
     );
   }
 }

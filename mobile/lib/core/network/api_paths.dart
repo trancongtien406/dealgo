@@ -175,6 +175,17 @@ abstract final class ApiPaths {
 
   static const rides = '/v1/rides';
 
+  // Parcel delivery (DEC-PROD-071). Matching/tracking reuse the ride paths.
+  static const parcels = '/v1/parcels';
+  static const parcelSizeClasses = '/v1/parcels/size-classes';
+  static const parcelQuote = '/v1/parcels/quote';
+
+  static String parcel(String rideId) =>
+      '/v1/parcels/${Uri.encodeComponent(rideId)}';
+
+  static String parcelAction(String rideId, String action) =>
+      '/v1/parcels/${Uri.encodeComponent(rideId)}/$action';
+
   static const ridesOpen = '/v1/rides/open';
 
   static const rideVehicleClasses = '/v1/rides/vehicle-classes';

@@ -1,3 +1,5 @@
+import { PARTNER_REPOSITORY } from '../../src/modules/partner/partner.constants.js';
+import { MemoryPartnerRepository } from '../../src/modules/partner/partner.repository.js';
 import { MemoryRidePickupCodeStore, RIDE_PICKUP_CODE_STORE } from '../../src/modules/ride/ride-pickup-code.js';
 import { FOOD_ORDER_CODE_STORE, MemoryFoodOrderCodeStore } from '../../src/modules/food-order/food-order-code.js';
 import { randomUUID } from 'node:crypto';
@@ -30,6 +32,17 @@ describe('Food End-to-End Flow (e2e)', () => {
   let config: ConfigService<AppEnv, true>;
 
   beforeAll(async () => {
+    // Code confirmation is off by default since 0d21c55 (2026-10-29); this flow exercises the
+    // code path, so turn it on for this suite.
+    const settingsRepo = new MemoryPlatformSettingsRepository();
+    await settingsRepo.upsert({
+      key: 'FOOD_DELIVERY_CODE_REQUIRED',
+      value: 'true',
+      valueType: 'json',
+      updatedByUserId: null,
+      reason: 'e2e exercises the code path',
+      previousValue: null,
+    });
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
@@ -38,7 +51,7 @@ describe('Food End-to-End Flow (e2e)', () => {
       .overrideProvider(FOOD_REPOSITORY)
       .useValue(new MemoryFoodRepository())
       .overrideProvider(PLATFORM_SETTINGS_REPOSITORY)
-      .useValue(new MemoryPlatformSettingsRepository())
+      .useValue(settingsRepo)
       .overrideProvider(FOOD_ORDER_CODE_STORE)
       .useValue(new MemoryFoodOrderCodeStore())
       .overrideProvider(RIDE_PICKUP_CODE_STORE)
@@ -49,6 +62,8 @@ describe('Food End-to-End Flow (e2e)', () => {
       .useValue(new MemoryLedgerRepository())
       .overrideProvider(PAYMENT_REPOSITORY)
       .useValue(new MemoryPaymentRepository())
+      .overrideProvider(PARTNER_REPOSITORY)
+      .useValue(new MemoryPartnerRepository())
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -82,6 +97,20 @@ describe('Food End-to-End Flow (e2e)', () => {
     for (const role of roles) {
       if (!existingGrants.some((g: { role: string }) => g.role === role)) {
         await identityRepo.insertGrant(user.id, role, 'ACTIVE');
+      }
+    }
+    if (roles.includes('DRIVER')) {
+      // FOOD is motorbike-only and fails closed without a MOTORBIKE driver application.
+      const partners = app.get<MemoryPartnerRepository>(PARTNER_REPOSITORY);
+      if (!(await partners.findByUserAndRole(user.id, 'DRIVER'))) {
+        await partners.upsertSubmit({
+          id: randomUUID(),
+          userId: user.id,
+          role: 'DRIVER',
+          metadata: { vehicleClassCode: 'MOTORBIKE' },
+          documents: [],
+          now: new Date(),
+        });
       }
     }
     const session = await identityRepo.createSession({
@@ -149,7 +178,9 @@ describe('Food End-to-End Flow (e2e)', () => {
       .send({
         storeId: store.id,
         items: [{ itemId: item.id, quantity: 2 }],
-        dropoff: { lat: 10.7725, lng: 106.698, label: 'Ben Thanh, District 1' },
+        // The memory fixture store sits in Hải Châu, Đà Nẵng (FIXTURE_STORE_PIN); the drop-off must be
+        // within FOOD_MAX_DELIVERY_KM of it, so use a nearby Đà Nẵng point.
+        dropoff: { lat: 16.0611, lng: 108.2208, label: 'Bạch Đằng, Hải Châu' },
       })
       .expect(200);
 

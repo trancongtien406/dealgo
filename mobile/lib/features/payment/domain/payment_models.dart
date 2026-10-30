@@ -113,6 +113,10 @@ String effectivePaymentSelection(
 }
 
 /// Mirrors backend `serviceForVehicleClass`: motorbikes are BIKE, others CAR.
+/// Payment bucket for a ride view: parcels use the admin's PARCEL column.
+String paymentServiceForRide(String? vehicleClassCode, {bool parcel = false}) =>
+    parcel ? 'PARCEL' : paymentServiceForVehicleClass(vehicleClassCode);
+
 String paymentServiceForVehicleClass(String? code) {
   final c = (code ?? '').toUpperCase();
   return c.contains('MOTORBIKE') || c.contains('BIKE') ? 'BIKE' : 'CAR';

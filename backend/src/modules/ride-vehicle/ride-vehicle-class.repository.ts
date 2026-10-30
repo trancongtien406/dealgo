@@ -39,6 +39,7 @@ export interface RideVehicleClassRepository {
         | 'maxFareVnd'
         | 'assumedSpeedKmh'
         | 'imageUrl'
+        | 'parcelEnabled'
       >
     >,
     updatedByUserId: string,
@@ -111,6 +112,7 @@ function fromRecord(row: {
   assumedSpeedKmh: number;
   sortOrder: number;
   imageUrl: string | null;
+  parcelEnabled?: boolean;
   updatedByUserId: string | null;
 }): RideVehicleClass {
   return {
@@ -126,6 +128,7 @@ function fromRecord(row: {
     assumedSpeedKmh: row.assumedSpeedKmh,
     sortOrder: row.sortOrder,
     imageUrl: row.imageUrl,
+    parcelEnabled: row.parcelEnabled ?? false,
     updatedByUserId: row.updatedByUserId,
   };
 }

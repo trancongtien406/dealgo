@@ -6,6 +6,12 @@ import { DocumentStoreService } from './document-store.service.js';
 export const TINY_JPEG_BASE64 = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46]).toString(
   'base64',
 );
+/** t54u: smallest `ftyp` box the upload sniffer accepts as video/mp4. */
+export const TINY_MP4_BASE64 = Buffer.concat([
+  Buffer.from([0, 0, 0, 0x18]),
+  Buffer.from('ftypisom', 'latin1'),
+  Buffer.alloc(16, 1),
+]).toString('base64');
 export const TINY_PNG_BASE64 = Buffer.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d,
 ]).toString('base64');

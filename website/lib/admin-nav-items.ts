@@ -6,6 +6,7 @@ export type AdminNavHref =
   | "/exceptions"
   | "/rides"
   | "/negotiations"
+  | "/parcels"
   | "/food-orders"
   | "/deliveries"
   | "/customers"
@@ -35,6 +36,7 @@ export type AdminNavHref =
   | "/settings/sentry"
   | "/system-errors"
   | "/settings/vehicle-classes"
+  | "/settings/zone-tariffs"
   | "/settings/content"
   | "/settings/home-banners"
   | "/drivers/kyc"
@@ -96,6 +98,7 @@ export const adminNavSections: readonly AdminNavSection[] = [
         children: [
           { label: "Chuyến xe", href: "/rides" },
           { label: "Phiên trả giá", href: "/negotiations" },
+          { label: "Giao hàng", href: "/parcels" },
         ],
       },
       {
@@ -240,6 +243,7 @@ export const adminNavSections: readonly AdminNavSection[] = [
           { label: "Email", href: "/settings/email" },
           { label: "Sentry", href: "/settings/sentry" },
           { label: "Loại xe", href: "/settings/vehicle-classes" },
+          { label: "Giá theo khu vực", href: "/settings/zone-tariffs" },
           { label: "Nội dung & Pháp lý", href: "/settings/content" },
           { label: "Banner trang chủ", href: "/settings/home-banners" },
         ],
@@ -319,6 +323,12 @@ export const adminCommandExtras: readonly AdminNavItem[] = [
     icon: "car",
     href: "/settings/vehicle-classes",
     keywords: ["vehicle", "xe", "giá"],
+  },
+  {
+    label: "Giá theo khu vực",
+    icon: "car",
+    href: "/settings/zone-tariffs",
+    keywords: ["zone", "khu vực", "tỉnh", "giá/km", "tariff"],
   },
   {
     label: "Banner trang chủ app",
@@ -415,6 +425,9 @@ export function isAdminNavCurrent(pathname: string, href: AdminNavHref) {
   }
   if (href === "/disputes") {
     return pathname === "/disputes" || pathname.startsWith("/disputes/");
+  }
+  if (href === "/parcels") {
+    return pathname === "/parcels" || pathname.startsWith("/parcels/");
   }
   if (href === "/rides") {
     return pathname === "/rides" || pathname.startsWith("/rides/");

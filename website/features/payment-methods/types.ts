@@ -1,4 +1,4 @@
-export const PAYMENT_SERVICES = ["BIKE", "CAR", "FOOD"] as const;
+export const PAYMENT_SERVICES = ["BIKE", "CAR", "FOOD", "PARCEL"] as const;
 export type PaymentService = (typeof PAYMENT_SERVICES)[number];
 export type ServiceFlags = Record<PaymentService, boolean>;
 

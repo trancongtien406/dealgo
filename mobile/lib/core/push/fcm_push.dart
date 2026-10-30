@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import '../../features/voice/data/native/callkit_native_call_ui.dart';
 import '../../firebase_options.dart';
 import '../network/api_paths.dart';
+import '../network/dealgo_dio.dart';
 import '../network/dio_mapper.dart';
 import 'push_port.dart';
 
@@ -256,7 +257,10 @@ class FcmPush implements PushPort {
         await dio.delete<Object?>(
           ApiPaths.mePushTokens,
           data: {'token': voip},
-          options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+          options: Options(
+            headers: {'Authorization': 'Bearer $accessToken'},
+            extra: const {skipAuthRefreshExtra: true},
+          ),
         );
       }
     } catch (error) {
@@ -272,7 +276,10 @@ class FcmPush implements PushPort {
       await dio.delete<Object?>(
         ApiPaths.mePushTokens,
         data: {'token': token},
-        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+        options: Options(
+          headers: {'Authorization': 'Bearer $accessToken'},
+          extra: const {skipAuthRefreshExtra: true},
+        ),
       );
     } catch (error) {
       if (kDebugMode) {

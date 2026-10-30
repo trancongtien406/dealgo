@@ -79,7 +79,7 @@ class AuthCubit extends Cubit<AuthState> {
       await _syncPostAuth(profile);
       _emitSignedIn(next, profile);
     } on ApiException {
-      await signOut();
+      await signOut(revokeRemote: false);
     }
   }
 
@@ -116,21 +116,36 @@ class AuthCubit extends Cubit<AuthState> {
 
   /// Runs with the still-valid access token right before sign-out (push unregister).
   Future<void> Function(String accessToken)? beforeSignOut;
+  Future<void>? _signOutFlight;
 
-  Future<void> signOut() async {
+  Future<void> signOut({bool revokeRemote = true}) {
+    final inflight = _signOutFlight;
+    if (inflight != null) {
+      return inflight;
+    }
+    final future = _signOutOnce(revokeRemote: revokeRemote);
+    _signOutFlight = future.whenComplete(() {
+      _signOutFlight = null;
+    });
+    return _signOutFlight!;
+  }
+
+  Future<void> _signOutOnce({required bool revokeRemote}) async {
     final current = state;
     if (current is AuthSignedIn) {
+      final accessToken = revokeRemote ? current.tokens.accessToken : '';
       final hook = beforeSignOut;
       if (hook != null) {
         try {
-          await hook(current.tokens.accessToken)
-              .timeout(const Duration(seconds: 3));
+          await hook(accessToken).timeout(const Duration(seconds: 3));
         } catch (_) {}
       }
       final repo = _identityRepository;
-      if (repo != null) {
+      if (revokeRemote && repo != null) {
         try {
-          await repo.revokeSession(current.tokens.accessToken);
+          await repo
+              .revokeSession(current.tokens.accessToken)
+              .timeout(const Duration(seconds: 3));
         } catch (_) {
           // Always clear local tokens even if revoke fails (offline / expired).
         }

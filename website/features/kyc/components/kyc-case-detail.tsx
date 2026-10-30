@@ -19,6 +19,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/components/ui/toast";
 import {
   useApproveKycMutation,
+  useClaimKycMutation,
   useKycCaseQuery,
   useRejectKycMutation,
 } from "@/features/kyc/hooks";
@@ -30,7 +31,15 @@ import {
   PartnerIssuePicker,
   PartnerReviewOutcome,
 } from "@/features/kyc/components/partner-review-panels";
-import { validateIssues, type PartnerIssue } from "@/features/kyc/partner-review";
+import {
+  KycChecksPanel,
+  KycIdentityCompare,
+} from "@/features/kyc/components/kyc-identity-compare";
+import {
+  validateIssues,
+  type PartnerIssue,
+} from "@/features/kyc/partner-review";
+import { KycOcrFieldsPanel } from "@/features/kyc/components/kyc-ocr-fields-panel";
 
 const VEHICLE_CLASS_OPTIONS = [
   { value: "MOTORBIKE", label: "Xe máy (MOTORBIKE)" },
@@ -64,6 +73,16 @@ export function KycCaseDetail({ code }: { code: string }) {
   const forbidden = isError && isForbiddenError(error);
   const approveMutation = useApproveKycMutation(code);
   const rejectMutation = useRejectKycMutation(code);
+  const claimMutation = useClaimKycMutation(code);
+  const runClaim = async () => {
+    setActionError(null);
+    try {
+      await claimMutation.mutateAsync();
+      toast.success("Đã nhận hồ sơ để duyệt.");
+    } catch (claimError) {
+      setActionError(errorMessage(claimError));
+    }
+  };
   const [decision, setDecision] = useState<Decision>("");
   const [note, setNote] = useState("");
   const [outcome, setOutcome] = useState<LocalOutcome>({ kind: "idle" });
@@ -72,7 +91,8 @@ export function KycCaseDetail({ code }: { code: string }) {
   const [issues, setIssues] = useState<PartnerIssue[]>([]);
   // DEC-PROD-048: ops assigns or confirms the driver's class; empty = keep the applicant's.
   const [vehicleClass, setVehicleClass] = useState<string>("");
-  const effectiveVehicleClass = vehicleClass || selected?.vehicleClassCode || "";
+  const effectiveVehicleClass =
+    vehicleClass || selected?.vehicleClassCode || "";
   const needsVehicleClass = selected?.role === "DRIVER";
 
   const crumbs = useMemo(
@@ -121,9 +141,25 @@ export function KycCaseDetail({ code }: { code: string }) {
     if (locked || decision !== "reject" || note.trim().length === 0) {
       return;
     }
+    // t61u: reject may carry per-section notes (optional) — they reach the partner app.
+    const flagged = issues.filter((issue) => issue.section);
+    if (flagged.length > 0) {
+      const invalid = validateIssues(flagged);
+      if (invalid) {
+        setActionError(invalid);
+        return;
+      }
+    }
     setActionError(null);
     try {
-      await rejectMutation.mutateAsync(note.trim());
+      await rejectMutation.mutateAsync(
+        flagged.length > 0
+          ? {
+              reason: note.trim(),
+              issues: flagged.map((issue) => ({ ...issue, note: issue.note.trim() })),
+            }
+          : note.trim(),
+      );
       setOutcome({ kind: "rejected", note: note.trim() });
       toast.success("Đã từ chối hồ sơ KYC.");
       setConfirm(null);
@@ -361,6 +397,23 @@ export function KycCaseDetail({ code }: { code: string }) {
             <div className="space-y-4">
               <section className="rounded-2xl border border-border bg-white p-4 shadow-sm">
                 <h3 className="text-sm font-semibold text-ink">
+                  Đối chiếu CCCD và khuôn mặt
+                </h3>
+                <KycIdentityCompare documents={selected.documents} />
+              </section>
+              <section className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+                <h3 className="text-sm font-semibold text-ink">
+                  Kiểm tra tự động (tham khảo)
+                </h3>
+                <KycChecksPanel checks={selected.checks} />
+              </section>
+              <KycOcrFieldsPanel
+                fields={selected.ocrFields}
+                autoApproved={selected.autoApproved}
+                autoApproveSkipped={selected.autoApproveSkipped}
+              />
+              <section className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+                <h3 className="text-sm font-semibold text-ink">
                   Kiểm tra giấy tờ tải lên
                 </h3>
                 <PartnerDocumentsPanel documents={selected.documents} />
@@ -377,12 +430,16 @@ export function KycCaseDetail({ code }: { code: string }) {
                         className="flex justify-between gap-3 rounded-xl border border-border px-3 py-2"
                       >
                         <dt className="text-muted">{label}</dt>
-                        <dd className="text-right font-medium text-ink">{value}</dd>
+                        <dd className="text-right font-medium text-ink">
+                          {value}
+                        </dd>
                       </div>
                     ))}
                   </dl>
                 ) : (
-                  <p className="mt-3 text-sm text-muted">Hồ sơ chưa có thông tin khai báo.</p>
+                  <p className="mt-3 text-sm text-muted">
+                    Hồ sơ chưa có thông tin khai báo.
+                  </p>
                 )}
               </section>
             </div>
@@ -395,6 +452,18 @@ export function KycCaseDetail({ code }: { code: string }) {
                   Kiểm tra kỹ thông tin định danh, giấy tờ tùy thân và phương
                   tiện trước khi ra quyết định.
                 </div>
+                {selected.status === "UNDER_REVIEW" ? (
+                  <button
+                    type="button"
+                    onClick={() => void runClaim()}
+                    disabled={claimMutation.isPending}
+                    className={`mt-3 inline-flex h-10 w-full items-center justify-center rounded-xl border border-brand/30 bg-white px-3 text-sm font-medium text-brand disabled:opacity-40 ${focusRing}`}
+                  >
+                    {claimMutation.isPending
+                      ? "Đang nhận…"
+                      : "Nhận hồ sơ để duyệt"}
+                  </button>
+                ) : null}
                 {actionError ? (
                   <div
                     role="alert"
@@ -444,7 +513,7 @@ export function KycCaseDetail({ code }: { code: string }) {
                     />
                   </div>
                 ) : null}
-                {decision === "request" ? (
+                {decision === "request" || decision === "reject" ? (
                   <PartnerIssuePicker
                     role={selected.role}
                     value={issues}

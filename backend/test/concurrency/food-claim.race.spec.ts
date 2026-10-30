@@ -1,3 +1,4 @@
+import { seedDriverClass } from './driver-class.js';
 /**
  * Concurrent food claim against Postgres.
  * Skips when DATABASE_URL is unset (default unit suite uses memory repos).
@@ -105,7 +106,9 @@ describePg('food claim race (postgres)', () => {
     const identity = app.get(IDENTITY_REPOSITORY);
     await ensureGrant(identity, merchant.userId, 'MERCHANT');
     await ensureGrant(identity, driverA.userId, 'DRIVER');
+    await seedDriverClass(app, driverA.userId);
     await ensureGrant(identity, driverB.userId, 'DRIVER');
+    await seedDriverClass(app, driverB.userId);
 
     const suffix = `${Date.now()}-${randomUUID().slice(0, 8)}`;
     await request(app.getHttpServer())
@@ -166,6 +169,76 @@ describePg('food claim race (postgres)', () => {
     const rejected = first.status === 409 ? first : second;
     expect(success.body.data.status).toBe('ASSIGNED');
     expect(rejected.body.errorCode).toBe('FOOD_ALREADY_ASSIGNED');
+  });
+
+  it('FOOD motorbike-only: a CAR_4 and a MOTORBIKE driver race; only the bike wins, the car gets 403', async () => {
+    const customer = await login();
+    const merchant = await login();
+    const car = await login();
+    const bike = await login();
+    const identity = app.get(IDENTITY_REPOSITORY);
+    await ensureGrant(identity, merchant.userId, 'MERCHANT');
+    await ensureGrant(identity, car.userId, 'DRIVER');
+    await seedDriverClass(app, car.userId, 'CAR_4');
+    await ensureGrant(identity, bike.userId, 'DRIVER');
+    await seedDriverClass(app, bike.userId);
+
+    const suffix = `${Date.now()}-${randomUUID().slice(0, 8)}`;
+    await request(app.getHttpServer())
+      .get('/v1/food/merchant/catalog')
+      .set('Authorization', `Bearer ${merchant.token}`)
+      .expect(200);
+    const createdItem = await request(app.getHttpServer())
+      .post('/v1/food/merchant/items')
+      .set('Authorization', `Bearer ${merchant.token}`)
+      .send({ name: `Race Bun ${suffix}`, priceVnd: 45_000 })
+      .expect(200);
+    const catalog = await request(app.getHttpServer())
+      .get('/v1/food/merchant/catalog')
+      .set('Authorization', `Bearer ${merchant.token}`)
+      .expect(200);
+    await pinStore(app, merchant.token);
+    const storeId = catalog.body.data.id as string;
+    const itemId = createdItem.body.data.id as string;
+
+    const placed = await request(app.getHttpServer())
+      .post('/v1/food/orders')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .set('Idempotency-Key', `pg-food-claim-bike-${suffix}`)
+      .send({
+        storeId,
+        dropoff,
+        deliveryFareVnd: 15_000,
+        items: [{ itemId, quantity: 1 }],
+      });
+    if (placed.status !== 200) {
+      throw new Error(
+        `place failed ${placed.status}: ${JSON.stringify(placed.body)}`,
+      );
+    }
+    const orderId = placed.body.data.id as string;
+
+    await request(app.getHttpServer())
+      .post(`/v1/food/orders/${orderId}/accept`)
+      .set('Authorization', `Bearer ${merchant.token}`)
+      .expect(200);
+    await request(app.getHttpServer())
+      .post(`/v1/food/orders/${orderId}/ready`)
+      .set('Authorization', `Bearer ${merchant.token}`)
+      .expect(200);
+
+    const [carRes, bikeRes] = await Promise.all([
+      request(app.getHttpServer())
+        .post(`/v1/food/orders/${orderId}/claim`)
+        .set('Authorization', `Bearer ${car.token}`),
+      request(app.getHttpServer())
+        .post(`/v1/food/orders/${orderId}/claim`)
+        .set('Authorization', `Bearer ${bike.token}`),
+    ]);
+    expect(carRes.status).toBe(403);
+    expect(carRes.body.errorCode).toBe('FOOD_VEHICLE_NOT_ALLOWED');
+    expect(bikeRes.status).toBe(200);
+    expect(bikeRes.body.data.assignedDriverId).toBe(bike.userId);
   });
 });
 

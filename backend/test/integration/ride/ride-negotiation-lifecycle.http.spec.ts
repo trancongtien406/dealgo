@@ -107,7 +107,7 @@ describe('ride negotiation & lifecycle http', () => {
     app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
     await app.init();
     seedVehicleClassOnDriverGrant(app, repository);
-    reference = roundUpToFareStep(quoteReferenceFareVnd(haversineKm(pickup, dropoff), 8000, 10_000));
+    reference = roundUpToFareStep(quoteReferenceFareVnd(haversineKm(pickup, dropoff), 5000, 10_000));
   });
 
   afterAll(async () => {
@@ -119,7 +119,7 @@ describe('ride negotiation & lifecycle http', () => {
   });
 
   const http = () => request(app.getHttpServer());
-  const bid = () => rideBidFloorVnd(reference, 80) + 1000;
+  const bid = () => rideBidFloorVnd(reference, 70) + 1000;
 
   async function login(): Promise<Actor> {
     phoneSerial += 1;
@@ -196,7 +196,7 @@ describe('ride negotiation & lifecycle http', () => {
     const quote = await post(customer.token, '/v1/rides/quote', { pickup, dropoff }).expect(200);
     const bike = quote.body.data.options.find((o: { code: string }) => o.code === 'MOTORBIKE');
     expect(bike.referenceFareVnd % 1000).toBe(0);
-    expect(bike.minBidVnd).toBe(Math.max(bike.minFareVnd, rideBidFloorVnd(bike.referenceFareVnd, 80)));
+    expect(bike.minBidVnd).toBe(Math.max(bike.minFareVnd, rideBidFloorVnd(bike.referenceFareVnd, 70)));
     expect(bike.minBidVnd % 1000).toBe(0);
     expect(quote.body.data.pendingFeesVnd).toBe(0);
 

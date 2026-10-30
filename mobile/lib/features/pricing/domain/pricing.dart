@@ -10,6 +10,8 @@ class RideQuote {
     required this.referenceFareVnd,
     required this.minFareVnd,
     required this.maxFareVnd,
+    this._minBidVnd,
+    this._maxBidVnd,
     this.vehicleClassCode,
     this.vehicleClassName,
     this.seats,
@@ -28,6 +30,14 @@ class RideQuote {
   final int referenceFareVnd;
   final int minFareVnd;
   final int maxFareVnd;
+  final int? _minBidVnd;
+  final int? _maxBidVnd;
+
+  /// Lowest / highest bid the server accepts (about -30% / +30% of
+  /// [referenceFareVnd], never below the class minimum). Falls back to the
+  /// class bounds when the server does not send a band.
+  int get minBidVnd => (_minBidVnd ?? minFareVnd).clamp(minFareVnd, maxFareVnd);
+  int get maxBidVnd => (_maxBidVnd ?? maxFareVnd).clamp(minBidVnd, maxFareVnd);
   final String? vehicleClassCode;
   final String? vehicleClassName;
   final int? seats;
@@ -49,7 +59,7 @@ class RideQuote {
   final String? unavailableReason;
 
   bool allows(int amountVnd) =>
-      amountVnd >= minFareVnd && amountVnd <= maxFareVnd;
+      amountVnd >= minBidVnd && amountVnd <= maxBidVnd;
 
   /// Up to three bid shortcuts around the reference fare, rounded to 1.000đ
   /// and kept inside the admin bounds. They are only shortcuts: the customer
@@ -57,7 +67,7 @@ class RideQuote {
   List<int> get presetsVnd {
     int round(double value) {
       final rounded = (value / 1000).round() * 1000;
-      return rounded.clamp(minFareVnd, maxFareVnd);
+      return rounded.clamp(minBidVnd, maxBidVnd);
     }
 
     return {

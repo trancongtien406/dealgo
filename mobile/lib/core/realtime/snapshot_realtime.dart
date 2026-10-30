@@ -156,6 +156,8 @@ class PartnerStatusHint {
     required this.applicationId,
     required this.role,
     required this.status,
+    this.reason,
+    this.sections = const [],
   });
 
   final String applicationId;
@@ -165,6 +167,40 @@ class PartnerStatusHint {
 
   /// `APPROVED` or `REJECTED`.
   final String status;
+
+  /// t61u (DEC-PROD-070): ops' reject reason and flagged sections, so the
+  /// banner can show them at once; the REST re-read stays the source of truth.
+  final String? reason;
+  final List<String> sections;
+}
+
+/// `paymentStatus` push on the job customer's private `user:` room when a
+/// checkout intent changes (IPN, reconcile, refund). The payment page re-GETs
+/// the status by REST; the push is only a hint (t50u, no polling).
+class PaymentStatusHint {
+  const PaymentStatusHint({
+    required this.entityType,
+    required this.entityId,
+    required this.status,
+  });
+
+  /// `RIDE` or `FOOD_ORDER`.
+  final String entityType;
+  final String entityId;
+  final String status;
+}
+
+PaymentStatusHint? parsePaymentStatusHint(Object? raw) {
+  if (raw is! Map) {
+    return null;
+  }
+  final type = raw['entityType'];
+  final id = raw['entityId'];
+  final status = raw['status'];
+  if (type is! String || id is! String || status is! String) {
+    return null;
+  }
+  return PaymentStatusHint(entityType: type, entityId: id, status: status);
 }
 
 PartnerStatusHint? parsePartnerStatusHint(Object? raw) {
@@ -177,7 +213,20 @@ PartnerStatusHint? parsePartnerStatusHint(Object? raw) {
   if (id is! String || role is! String || status is! String) {
     return null;
   }
-  return PartnerStatusHint(applicationId: id, role: role, status: status);
+  final reason = raw['reason'];
+  final sections = raw['sections'];
+  return PartnerStatusHint(
+    applicationId: id,
+    role: role,
+    status: status,
+    reason: reason is String && reason.trim().isNotEmpty ? reason : null,
+    sections: sections is List
+        ? [
+            for (final s in sections)
+              if (s is String) s,
+          ]
+        : const [],
+  );
 }
 
 /// `rideUnassigned` on the dropped driver's private `user:` room: the driver
@@ -310,6 +359,9 @@ abstract interface class SnapshotRealtime {
 
   /// Partner application decisions for the signed-in user (no subscribe needed).
   Stream<PartnerStatusHint> get partnerStatuses;
+
+  /// Checkout status changes for the signed-in customer (no subscribe needed).
+  Stream<PaymentStatusHint> get paymentStatuses;
 
   /// `call` events on the signed-in user's private room (in-app voice calls:
   /// ringing, accepted, declined, missed, ended). Raw payload; the voice

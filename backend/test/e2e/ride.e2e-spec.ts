@@ -31,6 +31,17 @@ describe('Ride End-to-End Flow (e2e)', () => {
   let config: ConfigService<AppEnv, true>;
 
   beforeAll(async () => {
+    // Code confirmation is off by default since 0d21c55 (2026-10-29); this flow exercises the
+    // code path, so turn it on for this suite.
+    const settingsRepo = new MemoryPlatformSettingsRepository();
+    await settingsRepo.upsert({
+      key: 'RIDE_PICKUP_CODE_REQUIRED',
+      value: 'true',
+      valueType: 'json',
+      updatedByUserId: null,
+      reason: 'e2e exercises the code path',
+      previousValue: null,
+    });
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
@@ -39,7 +50,7 @@ describe('Ride End-to-End Flow (e2e)', () => {
       .overrideProvider(RIDE_REPOSITORY)
       .useValue(new MemoryRideRepository())
       .overrideProvider(PLATFORM_SETTINGS_REPOSITORY)
-      .useValue(new MemoryPlatformSettingsRepository())
+      .useValue(settingsRepo)
       .overrideProvider(RIDE_PICKUP_CODE_STORE)
       .useValue(new MemoryRidePickupCodeStore())
       .overrideProvider(EARNINGS_REPOSITORY)
@@ -119,6 +130,23 @@ describe('Ride End-to-End Flow (e2e)', () => {
       .expect(401);
   });
 
+  it('rejects a bid above the configured ceiling (DEC-PROD-069 band) with 400', async () => {
+    const customer = await createActor(['CUSTOMER']);
+    const res = await request(app.getHttpServer())
+      .post('/v1/rides')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .set('Idempotency-Key', 'idem-e2e-ride-out-of-band-001')
+      .send({
+        pickup: { lat: 10.7769, lng: 106.7009, label: 'Ben Thanh' },
+        dropoff: { lat: 10.7725, lng: 106.698, label: 'Bitexco' },
+        // ~0.6 km trip: reference = min fare 10,000; ceiling 130% = 13,000.
+        offeredFareVnd: 25000,
+        vehicleClassCode: 'MOTORBIKE',
+      })
+      .expect(400);
+    expect(res.body.errorCode).toBe('RIDE_FARE_OUT_OF_RANGE');
+  });
+
   it('completes full ride lifecycle: create negotiation -> driver counter offer -> customer select -> assigned -> driver en-route -> arrived -> in-trip -> completed', async () => {
     const customer = await createActor(['CUSTOMER']);
     const driver = await createActor(['CUSTOMER', 'DRIVER']);
@@ -131,19 +159,19 @@ describe('Ride End-to-End Flow (e2e)', () => {
       .send({
         pickup: { lat: 10.7769, lng: 106.7009, label: 'Ben Thanh' },
         dropoff: { lat: 10.7725, lng: 106.698, label: 'Bitexco' },
-        offeredFareVnd: 25000,
+        offeredFareVnd: 12000, // within the 70–130% band of the 10,000 reference
         vehicleClassCode: 'MOTORBIKE',
       })
       .expect(200);
     expect(createRes.body.data.status).toBe('NEGOTIATING');
-    expect(createRes.body.data.offeredFareVnd).toBe(25000);
+    expect(createRes.body.data.offeredFareVnd).toBe(12000);
     const rideId = createRes.body.data.id as string;
 
     // 2. Driver sends a counter-offer
     const offerRes = await request(app.getHttpServer())
       .post(`/v1/rides/${rideId}/offers`)
       .set('Authorization', `Bearer ${driver.token}`)
-      .send({ amountVnd: 30000 })
+      .send({ amountVnd: 13000 })
       .expect(200);
 
     expect(offerRes.body.data.offers).toHaveLength(1);
@@ -159,7 +187,7 @@ describe('Ride End-to-End Flow (e2e)', () => {
 
     expect(selectRes.body.data.status).toBe('ASSIGNED');
     expect(selectRes.body.data.assignedDriverId).toBe(driver.user.id);
-    expect(selectRes.body.data.agreedFareVnd).toBe(30000);
+    expect(selectRes.body.data.agreedFareVnd).toBe(13000);
 
     // 4. Driver marks en route
     const enRouteRes = await request(app.getHttpServer())

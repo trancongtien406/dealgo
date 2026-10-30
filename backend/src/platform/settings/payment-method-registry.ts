@@ -15,7 +15,7 @@ export const PAYMENT_METHOD_CODES = [
 ] as const;
 export type PaymentMethodCode = (typeof PAYMENT_METHOD_CODES)[number];
 
-export const PAYMENT_SERVICES = ['BIKE', 'CAR', 'FOOD'] as const;
+export const PAYMENT_SERVICES = ['BIKE', 'CAR', 'FOOD', 'PARCEL'] as const;
 export type PaymentServiceCode = (typeof PAYMENT_SERVICES)[number];
 
 export type PaymentMethodRegistryEntry = {
@@ -61,7 +61,7 @@ export function validatePaymentMethodRegistry(parsed: unknown): string | null {
       }
       for (const [svc, flag] of Object.entries(services as Record<string, unknown>)) {
         if (!isPaymentServiceCode(svc) || typeof flag !== 'boolean') {
-          return `${code}.services.${svc} must be BIKE/CAR/FOOD: boolean`;
+          return `${code}.services.${svc} must be BIKE/CAR/FOOD/PARCEL: boolean`;
         }
       }
     }
@@ -101,6 +101,7 @@ export function normalizePaymentMethodRegistry(parsed: unknown): PaymentMethodRe
         BIKE: code === 'CASH' ? true : services.BIKE === true,
         CAR: code === 'CASH' ? true : services.CAR === true,
         FOOD: code === 'CASH' ? true : services.FOOD === true,
+        PARCEL: code === 'CASH' ? true : services.PARCEL === true,
       },
       sortOrder: Number.isInteger(entry.sortOrder) ? (entry.sortOrder as number) : 100,
       unsupportedReason: reason,

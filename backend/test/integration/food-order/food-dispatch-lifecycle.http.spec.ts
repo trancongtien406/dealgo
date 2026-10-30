@@ -1,3 +1,4 @@
+import { seedMotorbikeOnDriverGrant } from './motorbike-drivers.js';
 import { INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
@@ -79,6 +80,7 @@ describe('food dispatch http', () => {
     app.useGlobalFilters(new HttpExceptionFilter());
     app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
     await app.init();
+    seedMotorbikeOnDriverGrant(repository, app);
     // These suites exercise the delivery-code flow; the shipped default is off.
     await app
       .get(PlatformSettingsService)

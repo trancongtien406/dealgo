@@ -12,6 +12,7 @@ import { AccountDeletionService } from '../modules/account-deletion/account-dele
 import { OrphanUploadCleanupService } from './orphan-upload-cleanup.service.js';
 import { RideExpiryService } from './ride-expiry.service.js';
 import { ChatRetentionService } from './chat-retention.service.js';
+import { KycMediaRetentionService } from './kyc-media-retention.service.js';
 import { WorkerHeartbeatService } from './worker-heartbeat.service.js';
 import { PaymentGatewayService } from '../modules/payment/checkout/payment-gateway.service.js';
 
@@ -22,6 +23,7 @@ const ACCOUNT_PURGE_JOB = 'account-purge';
 const QUEUE_NAME = 'dealgo-workers';
 const HEARTBEAT_JOB = 'worker-heartbeat';
 const CHAT_RETENTION_JOB = 'chat-retention';
+const KYC_MEDIA_RETENTION_JOB = 'kyc-media-retention';
 const PAYMENT_RECONCILE_JOB = 'payment-reconcile';
 
 /**
@@ -45,6 +47,7 @@ export class WorkersBootstrap implements OnModuleInit, OnModuleDestroy {
     private readonly accountDeletion: AccountDeletionService,
     private readonly heartbeat: WorkerHeartbeatService,
     private readonly chatRetention: ChatRetentionService,
+    private readonly kycMediaRetention: KycMediaRetentionService,
     private readonly payments: PaymentGatewayService,
   ) {}
 
@@ -60,6 +63,11 @@ export class WorkersBootstrap implements OnModuleInit, OnModuleDestroy {
         name: CHAT_RETENTION_JOB,
         every: this.config.get('CHAT_RETENTION_PURGE_INTERVAL_MS', { infer: true }),
         run: () => this.chatRetention.runOnce(),
+      },
+      {
+        name: KYC_MEDIA_RETENTION_JOB,
+        every: this.config.get('KYC_MEDIA_RETENTION_INTERVAL_MS', { infer: true }),
+        run: () => this.kycMediaRetention.runOnce(),
       },
       {
         name: PAYMENT_RECONCILE_JOB,

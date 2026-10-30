@@ -14,6 +14,8 @@ function service(order: Record<string, unknown> | null, rows: Array<{ userId: st
       requireEligibleDriver: vi.fn(async (id: string) => {
         if (id === 'unverified') throw new Error('not eligible');
       }),
+      // FOOD is motorbike-only: car / unknown-class drivers are skipped (fail closed).
+      canDeliverFood: vi.fn(async (id: string) => id !== 'car' && id !== 'noclass'),
     },
   });
   return { svc, presence };
@@ -38,6 +40,8 @@ describe('FoodService.readyAudience', () => {
       { userId: 'cust', lat: 10.7725, lng: 106.698 },
       { userId: 'unverified', lat: 10.7725, lng: 106.698 },
       { userId: 'far', lat: 10.9, lng: 106.698 },
+      { userId: 'car', lat: 10.7726, lng: 106.698 },
+      { userId: 'noclass', lat: 10.7726, lng: 106.698 },
     ]);
     await expect(svc.readyAudience('o1')).resolves.toEqual({
       driverIds: ['near', 'mid'],

@@ -84,7 +84,7 @@ export type RideUnassignment = {
   at: Date;
 };
 
-export type CustomerFeeKindName = 'LATE_CANCEL' | 'NO_SHOW';
+export type CustomerFeeKindName = 'LATE_CANCEL' | 'NO_SHOW' | 'PARCEL_RETURN';
 
 /** Fee owed by a customer, collected in the next completed ride's cash. */
 export type CustomerFeeRecord = {
@@ -333,6 +333,8 @@ export type DriverLifecycleInput = {
   rideId: string;
   driverId: string;
   now: Date;
+  /** complete() only: customer fee booked with the completion (DEC-PROD-071 parcel return fee). */
+  customerFee?: { kind: CustomerFeeKindName; amountVnd: number };
 };
 
 export type OpenRideListing = {
@@ -463,6 +465,15 @@ export class RideLedger {
       ledger.selections.set(selectionKey(selection.customerId, selection.idempotencyKey), selection);
     }
     return ledger;
+  }
+
+  /** Drops a ride created in this ledger session (memory rollback of a failed create hook). */
+  discardNew(rideId: string): void {
+    if (!this.newRideIds.has(rideId)) return;
+    this.rides.delete(rideId);
+    this.newRideIds.delete(rideId);
+    this.dirtyRideIds.delete(rideId);
+    this.dirtyStopRideIds.delete(rideId);
   }
 
   create(input: CreateRideInput): LedgerOutcome {
@@ -1355,6 +1366,9 @@ export class RideLedger {
     ride.updatedAt = input.now;
     ride.statusChangedAt = input.now;
     this.dirtyRideIds.add(ride.id);
+    if (input.customerFee && input.customerFee.amountVnd > 0) {
+      this.recordFee(ride, input.customerFee.kind, input.customerFee.amountVnd, input.now);
+    }
     return { ride: this.snapshot(ride) };
   }
 

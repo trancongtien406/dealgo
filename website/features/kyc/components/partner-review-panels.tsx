@@ -94,7 +94,9 @@ export function PartnerIssuePicker({
   };
   const setNote = (section: string, note: string) => {
     onChange(
-      value.map((issue) => (issue.section === section ? { ...issue, note } : issue)),
+      value.map((issue) =>
+        issue.section === section ? { ...issue, note } : issue,
+      ),
     );
   };
   return (
@@ -106,13 +108,21 @@ export function PartnerIssuePicker({
         const current = value.find((issue) => issue.section === section.value);
         const id = `issue-${section.value}`;
         return (
-          <div key={section.value} className="rounded-xl border border-border px-3 py-2">
-            <label htmlFor={id} className="flex items-center gap-2 text-sm text-ink">
+          <div
+            key={section.value}
+            className="rounded-xl border border-border px-3 py-2"
+          >
+            <label
+              htmlFor={id}
+              className="flex items-center gap-2 text-sm text-ink"
+            >
               <input
                 id={id}
                 type="checkbox"
                 checked={Boolean(current)}
-                onChange={(event) => toggle(section.value, event.target.checked)}
+                onChange={(event) =>
+                  toggle(section.value, event.target.checked)
+                }
                 className="size-4 accent-brand"
               />
               {section.label}
@@ -155,7 +165,9 @@ export function PartnerReviewOutcome({
         <ul className="mt-1 list-disc space-y-0.5 pl-5">
           {issues.map((issue) => (
             <li key={issue.section}>
-              <span className="font-medium">{issueSectionLabel(role, issue.section)}:</span>{" "}
+              <span className="font-medium">
+                {issueSectionLabel(role, issue.section)}:
+              </span>{" "}
               {issue.note}
             </li>
           ))}

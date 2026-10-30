@@ -4,17 +4,20 @@ import { MemoryPartnerRepository } from './partner.repository.js';
 import { MemoryIdentityRepository } from '../identity/identity.repository.js';
 import {
   TINY_JPEG_BASE64,
+  TINY_MP4_BASE64,
   TINY_PDF_BASE64,
   createTestDocumentStore,
 } from '../../platform/storage/testing.js';
 
 const jpeg = (kind: string) => ({ kind, contentType: 'image/jpeg', contentBase64: TINY_JPEG_BASE64 });
 
-const DRIVER_DOCS = ['ID_FRONT', 'ID_BACK', 'SELFIE', 'LICENSE', 'VEHICLE_REG'].map((kind) =>
-  jpeg(kind),
-) as never[];
+const DRIVER_DOCS = [
+  ...['ID_FRONT', 'ID_BACK', 'SELFIE', 'LICENSE', 'VEHICLE_REG'].map((kind) => jpeg(kind)),
+  { kind: 'SELFIE_VIDEO', contentType: 'video/mp4', contentBase64: TINY_MP4_BASE64 },
+] as never[];
 const MERCHANT_DOCS = [
   { kind: 'BUSINESS_LICENSE', contentType: 'application/pdf', contentBase64: TINY_PDF_BASE64 },
+  jpeg('FOOD_SAFETY_CERT'),
   jpeg('REP_ID_FRONT'),
   jpeg('REP_ID_BACK'),
 ] as never[];
@@ -41,7 +44,7 @@ describe('PartnerService', () => {
     const app = await service.submit(user.id, {
       role: 'DRIVER',
       metadata: {
-        vehicleClassCode: 'MOTORBIKE',
+        vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1',
         vehiclePlate: '51F-12345',
         vehicleModel: 'Honda Wave',
       },
@@ -55,9 +58,11 @@ describe('PartnerService', () => {
       'SELFIE',
       'LICENSE',
       'VEHICLE_REG',
+      'SELFIE_VIDEO',
     ]);
-    expect(app.documents.every((doc) => doc.hasFile && doc.contentType === 'image/jpeg')).toBe(true);
-    expect(storage.size).toBe(5);
+    expect(app.documents.every((doc) => doc.hasFile)).toBe(true);
+    expect(app.documents.at(-1)?.contentType).toBe('video/mp4');
+    expect(storage.size).toBe(6);
 
     const file = await service.readDocumentForOps(app.id, 3);
     expect(file.contentType).toBe('image/jpeg');
@@ -74,7 +79,7 @@ describe('PartnerService', () => {
     await expect(
       service.submit(user.id, {
         role: 'DRIVER',
-        metadata: { vehicleClassCode: 'MOTORBIKE' },
+        metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1' },
         documents: DRIVER_DOCS.slice(0, 2),
       }),
     ).rejects.toMatchObject({ response: { errorCode: 'PARTNER_DOCUMENTS_REQUIRED' } });
@@ -100,7 +105,7 @@ describe('PartnerService', () => {
     await expect(
       service.submit(user.id, {
         role: 'DRIVER',
-        metadata: { vehicleClassCode: 'MOTORBIKE' },
+        metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1' },
         documents: docs as never[],
       }),
     ).rejects.toMatchObject({ status: 415 });
@@ -111,7 +116,7 @@ describe('PartnerService', () => {
 
     const app = await service.submit(user.id, {
       role: 'DRIVER',
-      metadata: { vehicleClassCode: 'MOTORBIKE', vehiclePlate: '51F-12345' },
+      metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1', vehiclePlate: '51F-12345' },
       documents: DRIVER_DOCS,
     });
 
@@ -163,18 +168,19 @@ describe('PartnerService', () => {
     expect(resubmitted.reason).toBeNull();
     expect(resubmitted.documents.map((doc) => doc.kind)).toEqual([
       'BUSINESS_LICENSE',
+      'FOOD_SAFETY_CERT',
       'REP_ID_FRONT',
       'REP_ID_BACK',
     ]);
     // The replaced REP_ID_BACK file is discarded; only referenced files remain (DEC-PROD-021).
-    expect(storage.size).toBe(3);
+    expect(storage.size).toBe(4);
   });
 
   it('rejects issue sections that do not belong to the role', async () => {
     const { service, user } = await createService();
     const app = await service.submit(user.id, {
       role: 'DRIVER',
-      metadata: { vehicleClassCode: 'MOTORBIKE' },
+      metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1' },
       documents: DRIVER_DOCS,
     });
     await expect(
@@ -203,7 +209,7 @@ describe('PartnerService', () => {
     await expect(
       service.submit(user.id, {
         role: 'DRIVER',
-        metadata: { vehicleClassCode: 'CAR_4', vehiclePlate: '51A-12345' },
+        metadata: { vehicleClassCode: 'CAR_4', licenseClass: 'B', vehiclePlate: '51A-12345' },
         documents: DRIVER_DOCS,
       }),
     ).rejects.toMatchObject({ response: { errorCode: 'PARTNER_DOCUMENTS_REQUIRED' } });
@@ -212,7 +218,7 @@ describe('PartnerService', () => {
     const withInsurance = [...DRIVER_DOCS, jpeg('VEHICLE_INSURANCE')] as never[];
     const app = await service.submit(user.id, {
       role: 'DRIVER',
-      metadata: { vehicleClassCode: 'CAR_4', vehiclePlate: '51A-12345' },
+      metadata: { vehicleClassCode: 'CAR_4', licenseClass: 'B', vehiclePlate: '51A-12345' },
       documents: withInsurance,
     });
     expect(app.status).toBe('SUBMITTED');
@@ -238,7 +244,7 @@ describe('PartnerService', () => {
     const service = new PartnerService(partners, identity, store, config);
     const app = await service.submit(user.id, {
       role: 'DRIVER',
-      metadata: { vehicleClassCode: 'MOTORBIKE', vehiclePlate: '51F-12345' },
+      metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1', vehiclePlate: '51F-12345' },
       documents: DRIVER_DOCS,
     });
     expect(app.status).toBe('SUBMITTED');

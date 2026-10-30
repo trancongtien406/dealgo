@@ -47,6 +47,10 @@ const _malformed = {'INVALID_RESPONSE', 'MALFORMED_RESPONSE'};
 String? _byCode(AppLocalizations l10n, String code) => switch (code) {
   'NETWORK_ERROR' => l10n.apiErrNetwork,
   'INVALID_RESPONSE' || 'MALFORMED_RESPONSE' => l10n.apiErrInvalidResponse,
+  'AUTH_PASSKEY_INVALID' => l10n.apiErrPasskeyInvalid,
+  'PASSKEY_UNAVAILABLE' ||
+  'WEBAUTHN_NOT_CONFIGURED' => l10n.apiErrPasskeyUnavailable,
+  'AUTH_PASSKEY_EXISTS' => l10n.securityPasskeyExists,
   'UNAUTHORIZED' ||
   'AUTH_REFRESH_INVALID' ||
   'AUTH_REFRESH_REUSED' => l10n.errorSessionExpired,
@@ -72,7 +76,8 @@ String? _byCode(AppLocalizations l10n, String code) => switch (code) {
   'RIDE_NOT_FOUND' => l10n.apiErrRideNotFound,
   'RIDE_STATUS_CONFLICT' => l10n.apiErrRideChanged,
   'RIDE_NOT_CANCELLABLE' => l10n.apiErrRideNotCancellable,
-  'RIDE_FARE_OUT_OF_RANGE' => l10n.apiErrFareOutOfRange,
+  'RIDE_FARE_OUT_OF_RANGE' ||
+  'RIDE_COUNTER_OUT_OF_RANGE' => l10n.apiErrFareOutOfRange,
   'RIDE_ALREADY_OPEN' => l10n.apiErrRideAlreadyOpen,
   'RIDE_OFFER_EXPIRED' => l10n.rideOfferExpiredShort,
   'RIDE_OFFER_UNAVAILABLE' ||

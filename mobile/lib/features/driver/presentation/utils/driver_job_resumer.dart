@@ -17,7 +17,6 @@ class DriverJobResumer {
     this.maxDelay = const Duration(seconds: 60),
     this.maxAttempts = 8,
     this._currentLocation,
-    this.watchInterval = const Duration(seconds: 15),
     this._jobHints,
     this._reconnects,
     this._userNavigationClaimed,
@@ -38,10 +37,6 @@ class DriverJobResumer {
 
   bool get _yieldToUser => _userNavigationClaimed?.call() ?? false;
 
-  /// How often a signed-in driver re-checks for a job assigned while the app
-  /// is open (dispatch / ops / another device). Disabled without [currentLocation].
-  final Duration watchInterval;
-  Timer? _watch;
   bool _checking = false;
 
   /// Socket push: the server sends an ASSIGNED `snapshot` hint to
@@ -116,7 +111,6 @@ class DriverJobResumer {
     if (_currentLocation == null) {
       return;
     }
-    _watch?.cancel();
     for (final sub in _hintSubs) {
       unawaited(sub.cancel());
     }
@@ -140,14 +134,9 @@ class DriverJobResumer {
           }),
         );
       }
-      return;
     }
-    _watch = Timer.periodic(watchInterval, (_) {
-      if (generation != _generation) {
-        return;
-      }
-      unawaited(recheck());
-    });
+    // t50u: no watch timer. Without hints wired, a job assigned while the app
+    // is open is picked up on foreground resume / sign-in only.
   }
 
   static bool _onJobScreen(String location) =>
@@ -155,7 +144,7 @@ class DriverJobResumer {
       location.startsWith('/driver/food/');
 
   /// Opens a newly ASSIGNED in-progress job when the driver is not already on a
-  /// job screen. Called by the watch timer and when the app returns to foreground.
+  /// job screen. Called on an ASSIGNED hint, on reconnect and when the app returns to foreground.
   Future<void> recheck() async {
     final where = _currentLocation;
     if (where == null || _handledUser == null || _checking) {
@@ -191,8 +180,6 @@ class DriverJobResumer {
   /// Sign-out / account switch: forget the user and cancel pending retries.
   void reset() {
     _generation++;
-    _watch?.cancel();
-    _watch = null;
     for (final sub in _hintSubs) {
       unawaited(sub.cancel());
     }

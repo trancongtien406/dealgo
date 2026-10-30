@@ -2,6 +2,7 @@ import { seedVehicleClassOnDriverGrant } from '../../support/driver-class-fixtur
 import type { INestApplication } from '@nestjs/common';
 import { RideShareModule } from '../../../src/modules/ride-share/ride-share.module.js';
 import { RIDE_SHARE_VIEW_LIMIT_PER_MIN } from '../../../src/modules/ride-share/share-view-throttler.guard.js';
+import { bidBandOffSettings } from '../../support/settings-fixture.js';
 import { createTestApp, type TestUser } from '../../support/app-harness.js';
 
 const pickup = { lat: 16.0544, lng: 108.2022, label: 'Cầu Rồng' };
@@ -13,7 +14,7 @@ describe('ride share link http (DEC-PROD-021)', () => {
   let serial = 0;
 
   beforeAll(async () => {
-    harness = await createTestApp([RideShareModule]);
+    harness = await createTestApp([RideShareModule], { settings: await bidBandOffSettings() });
     seedVehicleClassOnDriverGrant(harness.app, harness.identity);
     app = harness.app;
   });

@@ -1,5 +1,6 @@
 import { HttpException, Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ModuleRef } from '@nestjs/core';
 import type { AppEnv } from '../../platform/config/env.js';
 import {
   DEFAULT_DRIVER_LOCATION_POLICY,
@@ -10,7 +11,7 @@ import {
   type LocationRejectReason,
 } from './driver-location-policy.js';
 import { DriverLocationEvents } from './driver-location-events.js';
-import { DRIVER_PRESENCE_REPOSITORY, IDENTITY_REPOSITORY } from './identity.constants.js';
+import { DRIVER_PRESENCE_REPOSITORY, FOOD_ELIGIBILITY, IDENTITY_REPOSITORY } from './identity.constants.js';
 import {
   DRIVER_LOCATION_FRESH_MS,
   DRIVER_PUSH_LOCATION_MAX_AGE_MS,
@@ -30,7 +31,17 @@ export class DriverPresenceService {
     @Inject(IDENTITY_REPOSITORY) private readonly identity: IdentityRepository,
     @Optional() private readonly locationEvents?: DriverLocationEvents,
     @Optional() private readonly config?: ConfigService<AppEnv, true>,
+    @Optional() private readonly moduleRef?: ModuleRef,
   ) {}
+
+  /** Null when PartnerModule is not loaded (unit tests); then presence is stored as sent. */
+  private foodEligibility(): FoodEligibility | null {
+    try {
+      return (this.moduleRef?.get(FOOD_ELIGIBILITY, { strict: false }) as FoodEligibility | undefined) ?? null;
+    } catch {
+      return null;
+    }
+  }
 
   /** Last accepted receive time per driver (per instance; ASSUMED good enough behind sticky LB). */
   private readonly lastAcceptedAt = new Map<string, number>();
@@ -53,6 +64,12 @@ export class DriverPresenceService {
 
   async upsert(userId: string, input: UpsertPresenceInput): Promise<DriverPresenceView> {
     await this.requireActiveDriver(userId);
+    // DEC-PROD-071: FOOD is motorbike-only. Non-motorbike drivers get foodEnabled=false
+    // (default and on every write) so presence never claims a service the server refuses.
+    const eligibility = this.foodEligibility();
+    if (eligibility && !(await eligibility.canDeliverFood(userId).catch(() => false))) {
+      return this.presence.upsert(userId, { ...input, foodEnabled: false });
+    }
     return this.presence.upsert(userId, input);
   }
 
@@ -248,7 +265,8 @@ export class DriverPresenceService {
   ): Promise<boolean> {
     const row = await this.presence.findByUserId(userId);
     if (!row) {
-      return !requirePresence;
+      // Parcel delivery is opt-in (DEC-PROD-071): no presence row means not opted in.
+      return service === 'PARCEL' ? false : !requirePresence;
     }
     if (!row.online) {
       return false;
@@ -258,6 +276,9 @@ export class DriverPresenceService {
     }
     if (service === 'FOOD') {
       return row.foodEnabled;
+    }
+    if (service === 'PARCEL') {
+      return row.parcelEnabled;
     }
     return true;
   }
@@ -281,3 +302,7 @@ export type ReportLocationResult = {
   reason?: LocationRejectReason;
   policy: DriverLocationPolicy;
 };
+
+export interface FoodEligibility {
+  canDeliverFood(userId: string): Promise<boolean>;
+}

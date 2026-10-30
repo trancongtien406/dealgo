@@ -46,7 +46,6 @@ MerchantOrderCubit _cubit(_Repo repo) => MerchantOrderCubit(
   markMerchantOrderReady: MarkMerchantOrderReady(repo),
   queue: MerchantQueueCubit(
     listMerchantOrderQueue: ListMerchantOrderQueue(repo),
-    pollInterval: Duration.zero,
   ),
   order: const MerchantQueueOrder(
     id: 'o1',
@@ -59,7 +58,6 @@ MerchantOrderCubit _cubit(_Repo repo) => MerchantOrderCubit(
     lineCount: 1,
     createdAt: '2026-10-28T00:00:00Z',
   ),
-  refreshInterval: Duration.zero,
 );
 
 void main() {

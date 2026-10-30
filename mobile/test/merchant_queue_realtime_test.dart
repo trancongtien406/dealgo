@@ -68,24 +68,23 @@ void main() {
     await cubit.close();
   });
 
-  test('periodic fallback refetches even without socket hints', () async {
+  test('t50u: no periodic poll; only refresh()/hints hit REST', () async {
     final repo = _Repo();
     final cubit = MerchantQueueCubit(
       listMerchantOrderQueue: ListMerchantOrderQueue(repo),
-      pollInterval: const Duration(milliseconds: 20),
     );
     cubit.setTokenSource(() => 'tok');
     await cubit.load('tok');
+    final afterLoad = repo.calls;
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    expect(repo.calls, afterLoad, reason: 'no timer-driven refetch');
     final states = <MerchantQueueState>[];
     final sub = cubit.stream.listen(states.add);
-    await Future<void>.delayed(const Duration(milliseconds: 75));
-    expect(repo.calls, greaterThanOrEqualTo(3));
+    await cubit.refresh();
+    expect(repo.calls, afterLoad + 1);
     expect(states.whereType<MerchantQueueLoading>(), isEmpty);
     await sub.cancel();
     await cubit.close();
-    final after = repo.calls;
-    await Future<void>.delayed(const Duration(milliseconds: 50));
-    expect(repo.calls, after, reason: 'poll stops on close');
   });
 
   test('joining the same store twice keeps one live subscription', () async {

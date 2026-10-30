@@ -276,6 +276,7 @@ class RideView {
     this.currentStopSeq,
     this.stopFeeVnd = 0,
     this.waitFeeVnd = 0,
+    this.serviceKind = 'RIDE',
   });
 
   final String id;
@@ -328,6 +329,11 @@ class RideView {
   /// Waiting beyond the free minutes at stops, added at completion.
   final int waitFeeVnd;
 
+  /// `RIDE` or `PARCEL` (DEC-PROD-071): a parcel ride carries goods, not a passenger.
+  final String serviceKind;
+
+  bool get isParcel => serviceKind == 'PARCEL';
+
   /// The stop the driver is heading to / waiting at, if any.
   RideStop? get currentStop {
     for (final stop in stops) {
@@ -370,6 +376,9 @@ class OpenRide {
     this.customerRating,
     this.stops = const [],
     this.routeVersion = 0,
+    this.serviceKind = 'RIDE',
+    this.parcelSizeClass,
+    this.parcelWeightKg,
   });
 
   final String id;
@@ -392,6 +401,13 @@ class OpenRide {
 
   /// Intermediate stops the driver will make (multi-stop rides).
   final List<RidePoint> stops;
+
+  /// `PARCEL` jobs carry goods (DEC-PROD-071); size/weight shown on the card.
+  final String serviceKind;
+  final String? parcelSizeClass;
+  final double? parcelWeightKg;
+
+  bool get isParcel => serviceKind == 'PARCEL';
 
   /// Route version the driver's offer must echo (RIDE_ROUTE_CHANGED otherwise).
   final int routeVersion;

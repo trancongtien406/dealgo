@@ -958,6 +958,10 @@ export class FoodService {
     query: DispatchQuery = {},
   ): Promise<Array<ReadyOrderSummary & { route: RouteGeometryView }>> {
     await this.eligibility.requireEligibleDriver(actor.userId);
+    // FOOD is motorbike-only (fail closed): car drivers never see READY orders.
+    if (!(await this.eligibility.canDeliverFood(actor.userId))) {
+      return [];
+    }
     const requirePresence = await this.settings.getBoolean(
       'DISPATCH_REQUIRE_FRESH_PRESENCE',
     );
@@ -1752,6 +1756,13 @@ export class FoodService {
 
   async claim(actor: RequestActor, orderId: string): Promise<PublicFoodOrder> {
     await this.eligibility.requireEligibleDriver(actor.userId);
+    if (!(await this.eligibility.canDeliverFood(actor.userId))) {
+      throw foodError(
+        403,
+        'FOOD_VEHICLE_NOT_ALLOWED',
+        'Food orders are delivered by motorbike only',
+      );
+    }
     if (!(await this.presence.isDispatchEligible(actor.userId, 'FOOD'))) {
       throw foodError(
         409,
@@ -1815,6 +1826,7 @@ export class FoodService {
       } catch {
         continue;
       }
+      if (!(await this.eligibility.canDeliverFood(row.userId))) continue;
       inRange.push({ id: row.userId, km });
     }
     const unclaimedMinutes = await this.settings.getNumber(
@@ -2309,7 +2321,8 @@ export class FoodService {
     }
     if (await this.hasActiveGrant(userId, 'DRIVER')) {
       if (order.status === 'READY') {
-        return true;
+        // Unclaimed order (and its food:{id} room): motorbike drivers only.
+        return this.eligibility.canDeliverFood(userId);
       }
       const assignedVisible =
         order.status === 'ASSIGNED' ||

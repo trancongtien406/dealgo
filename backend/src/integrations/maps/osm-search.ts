@@ -88,7 +88,7 @@ export class PhotonSearchPort implements OsmSearchPort {
     url.searchParams.set('lon', String(point.lng));
     url.searchParams.set('limit', String(Math.min(Math.max(limit, 1), 10)));
     // km: house numbers further than ~80 m are not "here".
-    url.searchParams.set('radius', '0.08');
+    url.searchParams.set('radius', '0.15');
     try {
       const response = await fetch(url, {
         headers: { 'User-Agent': 'DealGo/1.0 (reverse)' },
@@ -115,14 +115,17 @@ export function photonToSuggestions(body: PhotonJson): PlaceSuggestion[] {
       continue;
     }
     const kind = photonKind(p.osm_key, p.housenumber);
-    const base = p.name?.trim() || p.street?.trim();
-    if (!base) {
+    const street = p.street?.trim();
+    const house = p.housenumber?.trim();
+    let name = p.name?.trim() || street;
+    if (house && street) {
+      name = `${house} ${street}`;
+    } else if (house && name && !name.startsWith(house)) {
+      name = `${house} ${name}`;
+    }
+    if (!name) {
       continue;
     }
-    const name =
-      kind === 'address' && p.housenumber && !base.startsWith(p.housenumber)
-        ? `${p.housenumber} ${base}`
-        : base;
     const area = [p.district ?? p.locality, p.city ?? p.county, p.state]
       .map((part) => part?.trim())
       .filter((part, i, all): part is string => !!part && all.indexOf(part) === i && part !== name);
@@ -139,8 +142,8 @@ export function photonToSuggestions(body: PhotonJson): PlaceSuggestion[] {
 }
 
 function photonKind(osmKey: string | undefined, houseNumber: string | undefined): PlaceKind {
+  if (houseNumber) return 'address';
   if (osmKey === 'highway') return 'street';
   if (osmKey === 'place' || osmKey === 'boundary') return 'area';
-  if (houseNumber && (osmKey === 'building' || osmKey === 'place' || !osmKey)) return 'address';
   return 'poi';
 }

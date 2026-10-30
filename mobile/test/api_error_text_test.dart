@@ -24,6 +24,22 @@ void main() {
       apiErrorText(en, err(422, 'VOUCHER_MIN_ORDER')),
       en.apiErrVoucherMinOrder,
     );
+    expect(
+      apiErrorText(vi, err(401, 'AUTH_PASSKEY_INVALID')),
+      vi.apiErrPasskeyInvalid,
+    );
+    expect(
+      apiErrorText(vi, err(400, 'PASSKEY_UNAVAILABLE')),
+      vi.apiErrPasskeyUnavailable,
+    );
+    expect(
+      apiErrorText(vi, err(500, 'WEBAUTHN_NOT_CONFIGURED')),
+      vi.apiErrPasskeyUnavailable,
+    );
+    expect(
+      apiErrorText(vi, err(409, 'AUTH_PASSKEY_EXISTS')),
+      vi.securityPasskeyExists,
+    );
     expect(apiErrorText(vi, err(0, 'NETWORK_ERROR')), vi.apiErrNetwork);
   });
 

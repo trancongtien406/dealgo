@@ -7,7 +7,10 @@ const dropoff = { lat: 16.06, lng: 108.21, label: 'Nhà' };
 function service(routeImpl: () => Promise<unknown>, rows: Array<Record<string, unknown>>) {
   const svc = Object.create(FoodService.prototype) as FoodService;
   Object.assign(svc, {
-    eligibility: { requireEligibleDriver: vi.fn().mockResolvedValue(undefined) },
+    eligibility: {
+      requireEligibleDriver: vi.fn().mockResolvedValue(undefined),
+      canDeliverFood: vi.fn().mockResolvedValue(true),
+    },
     presence: {
       isDispatchEligible: vi.fn().mockResolvedValue(true),
       dispatchOrigin: vi.fn().mockResolvedValue(null),

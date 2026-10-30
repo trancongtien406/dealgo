@@ -1,3 +1,4 @@
+import { PaymentStatusBus } from './checkout/payment-status-bus.js';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { resolvePersistenceRepository, PrismaModule, PrismaService } from '../../platform/database/index.js';
@@ -65,6 +66,7 @@ function hasMomoKeys(config: ConfigService<AppEnv, true>): boolean {
   providers: [
     PaymentMethodRegistryService,
     PaymentGatewayService,
+    PaymentStatusBus,
     {
       provide: PAYMENT_ADAPTERS,
       inject: [ConfigService],
@@ -172,6 +174,7 @@ function hasMomoKeys(config: ConfigService<AppEnv, true>): boolean {
     OpsTransactionsService,
     PaymentMethodRegistryService,
     PaymentGatewayService,
+    PaymentStatusBus,
   ],
 })
 export class PaymentModule {}

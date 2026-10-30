@@ -195,8 +195,8 @@ export class PlacesService {
   }
 }
 
-/** A house number this close to the pin names the pin ("34 Mỹ Đa Đông 7"). */
-export const REVERSE_HOUSE_MAX_M = 40;
+/** A house number within this radius can name the pin. */
+export const REVERSE_HOUSE_MAX_M = 80;
 
 function distanceM(a: GeoPoint, b: GeoPoint): number {
   const r = 6_371_000;
@@ -221,20 +221,43 @@ export function mergeReverse(
   primary: PlaceSuggestion | null,
   osmNear: readonly PlaceSuggestion[],
 ): PlaceSuggestion | null {
-  const house = osmNear
+  const houseCandidates = osmNear
     .filter((p) => p.kind === 'address' && /^\S*\d/.test(p.name))
     .map((p) => ({ p, d: distanceM(fix, p) }))
-    .filter((x) => x.d <= REVERSE_HOUSE_MAX_M)
-    .sort((a, b) => a.d - b.d)[0]?.p;
+    .filter((x) => x.d <= REVERSE_HOUSE_MAX_M);
+
+  // Sort all candidates by distance ascending first
+  houseCandidates.sort((a, b) => a.d - b.d);
+
+  // If primary matches a specific street, prioritize house candidates on that street
+  let best: PlaceSuggestion | undefined;
+  if (primary && houseCandidates.length > 0) {
+    const primaryFolded = foldVietnamese(primary.name);
+    const sameStreet = houseCandidates.find((c) => {
+      const cFolded = foldVietnamese(c.p.name);
+      return (
+        primaryFolded.length > 3 &&
+        (cFolded.includes(primaryFolded) || primaryFolded.includes(cFolded))
+      );
+    });
+    if (sameStreet) {
+      best = sameStreet.p;
+    }
+  }
+
+  if (!best && houseCandidates.length > 0) {
+    best = houseCandidates[0].p;
+  }
+
   const primaryHasNumber = primary != null && /^\d/.test(primary.name.trim());
-  if (house && !primaryHasNumber) {
-    const name = cleanMapboxVnLabel(house.name) || house.name;
+  if (best && !primaryHasNumber) {
+    const name = cleanMapboxVnLabel(best.name) || best.name;
     const tail = primary
       ? cleanMapboxVnLabel(primary.address ?? '')
           .split(',')
           .map((s) => s.trim())
           .filter((s) => s.length > 0 && s !== primary.name && !foldVietnamese(name).includes(foldVietnamese(s)))
-      : cleanMapboxVnLabel(house.address ?? '')
+      : cleanMapboxVnLabel(best.address ?? '')
           .split(',')
           .map((s) => s.trim())
           .filter((s) => s.length > 0 && s !== name);
@@ -243,7 +266,7 @@ export function mergeReverse(
       lng: fix.lng,
       name,
       address: [name, ...tail].join(', '),
-      provider: primary?.provider ?? house.provider,
+      provider: primary?.provider ?? best.provider,
       kind: 'address',
     };
   }

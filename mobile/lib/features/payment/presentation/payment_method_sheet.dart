@@ -78,8 +78,6 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              // The theme's drag handle (showDragHandle) already reserves the
-              // top spacing; extra top padding here doubled the empty band.
               padding: const EdgeInsets.fromLTRB(
                 DealGoDimensions.pageGutter,
                 0,

@@ -1,3 +1,4 @@
+import { seedDriverClass } from './driver-class.js';
 /**
  * Driver history Prisma queries against Postgres (delivered food order → history + summary).
  * Skips when DATABASE_URL is unset (default unit suite uses memory repos).
@@ -119,6 +120,7 @@ describePg('driver history (postgres)', () => {
     const customer = await login();
     const driver = await login();
     await ensureGrant(app.get(IDENTITY_REPOSITORY), driver.userId, 'DRIVER');
+    await seedDriverClass(app, driver.userId);
 
     await get(customer.token, '/v1/driver/history').expect(403);
     const empty = await get(driver.token, '/v1/driver/history').expect(200);
@@ -200,6 +202,7 @@ describePg('driver history (postgres)', () => {
     const customer = await login();
     const driver = await login();
     await ensureGrant(app.get(IDENTITY_REPOSITORY), driver.userId, 'DRIVER');
+    await seedDriverClass(app, driver.userId);
     const settings = app.get(PlatformSettingsService);
     await settings.patch('FOOD_DRIVER_COMMISSION_PERCENT', '10', 'pg test TEST_ONLY', driver.userId);
 

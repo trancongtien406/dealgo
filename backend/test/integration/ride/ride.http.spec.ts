@@ -2,6 +2,7 @@ import { PlatformSettingsService } from '../../../src/platform/settings/platform
 import { PROD_ENV_OK } from '../../fixtures/prod-env.js';
 import { seedVehicleClassOnDriverGrant } from '../../support/driver-class-fixture.js';
 import { MemoryRidePickupCodeStore, RIDE_PICKUP_CODE_STORE } from '../../../src/modules/ride/ride-pickup-code.js';
+import { MemoryRideParcelStore, RIDE_PARCEL_STORE } from '../../../src/modules/ride/ride-parcel.store.js';
 import { INestApplication } from '@nestjs/common';
 import { EARNINGS_REPOSITORY, MemoryEarningsRepository } from '../../../src/modules/earnings/index.js';
 import { ConfigModule } from '@nestjs/config';
@@ -48,7 +49,8 @@ import { RideModule } from '../../../src/modules/ride/ride.module.js';
 import { PROMOTION_REPOSITORY } from '../../../src/modules/promotion/promotion.constants.js';
 import { MemoryPromotionRepository } from '../../../src/modules/promotion/promotion.repository.js';
 import { MemoryRideRepository } from '../../../src/modules/ride/ride.repository.js';
-import { RIDE_VEHICLE_CLASS_REPOSITORY } from '../../../src/modules/ride-vehicle/ride-vehicle-class.constants.js';
+import { RIDE_VEHICLE_CLASS_REPOSITORY, RIDE_ZONE_TARIFF_REPOSITORY } from '../../../src/modules/ride-vehicle/ride-vehicle-class.constants.js';
+import { MemoryRideZoneTariffRepository } from '../../../src/modules/ride-vehicle/ride-zone-tariff.repository.js';
 import { MemoryRideVehicleClassRepository } from '../../../src/modules/ride-vehicle/ride-vehicle-class.repository.js';
 import {
   EMAIL_SUPPRESSION_REPOSITORY,
@@ -156,7 +158,7 @@ describe('ride negotiation http', () => {
     expect(first.body.data.status).toBe('NEGOTIATING');
     expect(first.body.data.offeredFareVnd).toBe(30_000);
     expect(first.body.data.referenceFareVnd).toBe(
-      roundUpToFareStep(quoteReferenceFareVnd(haversineKm(pickup, dropoff), 8000, 10_000)),
+      roundUpToFareStep(quoteReferenceFareVnd(haversineKm(pickup, dropoff), 5000, 10_000)),
     );
     expect(Number.isInteger(first.body.data.referenceFareVnd)).toBe(true);
 
@@ -184,7 +186,7 @@ describe('ride negotiation http', () => {
       .send({ pickup, dropoff })
       .expect(200);
     const km = haversineKm(pickup, dropoff);
-    const referenceFareVnd = roundUpToFareStep(quoteReferenceFareVnd(km, 8000, 10_000));
+    const referenceFareVnd = roundUpToFareStep(quoteReferenceFareVnd(km, 5000, 10_000));
     expect(referenceFareVnd % 1000).toBe(0);
     expect(quote.body.data).toMatchObject({
       distanceKm: Math.round(km * 10) / 10,
@@ -432,6 +434,8 @@ describe('ride negotiation http', () => {
       pickupDistanceKm: expect.any(Number),
       stops: [],
       routeVersion: 0,
+      serviceKind: 'RIDE',
+      parcel: null,
     });
     expect(JSON.stringify(listed.body.data)).not.toContain('"phone"');
     expect(JSON.stringify(listed.body.data)).not.toContain(customer.userId);
@@ -1162,8 +1166,8 @@ describe('ride negotiation http', () => {
 
   it('RIDE-CAR-006: rejects CAR_4 fare below class min (out of range)', async () => {
     const customer = await login();
-    // DRAFT CAR_4 minFareVnd is max(platformMin, 25000) with test knobs → 25000.
-    const denied = await postRide(customer.token, 'idem-ride-car-006-low', 20_000, 'CAR_4');
+    // Owner tariff CAR_4 minFareVnd = 20000.
+    const denied = await postRide(customer.token, 'idem-ride-car-006-low', 19_000, 'CAR_4');
     expect(denied.status).toBe(400);
     expect(denied.body.errorCode).toBe('RIDE_FARE_OUT_OF_RANGE');
   });
@@ -1307,6 +1311,8 @@ describe('ride negotiation in production', () => {
       .useValue(new MemoryRidePickupCodeStore())
       .overrideProvider(RIDE_CUSTOMER_RATING_STORE)
       .useValue(new MemoryRideCustomerRatingStore())
+      .overrideProvider(RIDE_PARCEL_STORE)
+      .useValue(new MemoryRideParcelStore())
       .overrideProvider(EARNINGS_REPOSITORY)
       .useValue(new MemoryEarningsRepository())
       .overrideProvider(OPS_FAQ_REPOSITORY)
@@ -1317,6 +1323,8 @@ describe('ride negotiation in production', () => {
       .useValue(new MemoryPromotionRepository([]))
       .overrideProvider(RIDE_VEHICLE_CLASS_REPOSITORY)
       .useValue(new MemoryRideVehicleClassRepository())
+      .overrideProvider(RIDE_ZONE_TARIFF_REPOSITORY)
+      .useValue(new MemoryRideZoneTariffRepository())
       .overrideProvider(INTEGRATION_SETTINGS_REPOSITORY)
       .useValue(new MemoryIntegrationSettingsRepository())
       .overrideProvider(EMAIL_SUPPRESSION_REPOSITORY)

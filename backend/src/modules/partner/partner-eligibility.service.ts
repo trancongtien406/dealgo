@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { deployEnvOf, type AppEnv } from '../../platform/config/env.js';
+import { type AppEnv } from '../../platform/config/env.js';
 import { IDENTITY_REPOSITORY } from '../identity/identity.constants.js';
 import type { IdentityRepository } from '../identity/identity.repository.js';
 import {
@@ -11,6 +11,7 @@ import { partnerError } from './partner.error.js';
 import { shopPinFromMetadata } from './partner-shop-pin.js';
 import {
   isCarVehicleClassCode,
+  MOTORBIKE_CLASS_CODE,
   vehicleClassCodeFromMetadata,
 } from '../ride-vehicle/ride-vehicle-class.js';
 import type {
@@ -59,6 +60,16 @@ export class PartnerEligibilityService {
    * unknown vehicleClassCode → null. Callers must skip listOpen / refuse offer.
    * Never silent-default to MOTORBIKE.
    */
+  /**
+   * FOOD is motorbike-only: offers, push/socket fan-out, the READY room and claim all ask
+   * this. Fail closed: no application, not approved, unknown class, CAR_4/CAR_7 or any
+   * other class → false.
+   */
+  async canDeliverFood(userId: string): Promise<boolean> {
+    const code = await this.driverVehicleClassCode(userId).catch(() => null);
+    return code === MOTORBIKE_CLASS_CODE;
+  }
+
   async driverVehicleClassCode(userId: string): Promise<string | null> {
     const application = await this.partners.findByUserAndRole(userId, 'DRIVER');
     if (!application) {
@@ -78,16 +89,9 @@ export class PartnerEligibilityService {
 
   bypassEnabled(): boolean {
     const explicit = this.config.get('PARTNER_ELIGIBILITY_BYPASS', { infer: true });
-    if (explicit !== undefined) {
-      return explicit;
-    }
-    // Only a local/dev build bypasses by default; staging must exercise real KYC.
-    return (
-      deployEnvOf({
-        DEPLOY_ENV: this.config.get('DEPLOY_ENV', { infer: true }),
-        NODE_ENV: this.config.get('NODE_ENV', { infer: true }),
-      }) === 'local'
-    );
+    // t61u (DEC-PROD-070): never on by default — a local developer opts in with
+    // PARTNER_ELIGIBILITY_BYPASS=true (rejected at boot in production).
+    return explicit === true;
   }
 
   /**

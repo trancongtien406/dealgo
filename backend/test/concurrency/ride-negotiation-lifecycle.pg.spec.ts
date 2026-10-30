@@ -62,7 +62,7 @@ type Actor = { token: string; userId: string };
 
 /**
  * Behaviour over HTTP with catalog defaults (DRAFT values): request window 300 s,
- * bid floor 80 % of reference, counter cap 150 %, 2 offer edits, free cancel 5 min, bike fee
+ * bid floor (setting, 70 % since DEC-PROD-069) of reference, counter cap 150 %, 2 offer edits, free cancel 5 min, bike fee
  * 3 000 VND, no-show wait 5 min, assigned/en-route timeouts 5/30 min, debt limit 200 000 VND.
  */
 describePg('ride negotiation & lifecycle (postgres)', () => {
@@ -210,10 +210,14 @@ describePg('ride negotiation & lifecycle (postgres)', () => {
     const customer = await login();
     const quote = await post(customer.token, '/v1/rides/quote', { pickup, dropoff }).expect(200);
     const bike = quote.body.data.options.find((o: { code: string }) => o.code === 'MOTORBIKE');
-    // The floor (80% of reference) is rounded up to the fare step and kept inside the class bounds.
+    // The floor (RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE, 70% since DEC-PROD-069) is rounded up to
+    // the fare step and kept inside the class bounds. Read live so a settings change can't stale it.
+    const floorPct = await app
+      .get(PlatformSettingsService, { strict: false })
+      .getNumber('RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE');
     expect(bike.minBidVnd).toBe(
       clampToFareSteps(
-        Math.max(bike.minFareVnd, Math.ceil(bike.referenceFareVnd * 0.8)),
+        Math.max(bike.minFareVnd, Math.ceil((bike.referenceFareVnd * floorPct) / 100)),
         bike.minFareVnd,
         bike.maxFareVnd,
       ),

@@ -11,6 +11,7 @@ class FakePresenceClient implements PresenceClient {
       double? lng,
       bool? rideEnabled,
       bool? foodEnabled,
+      bool? parcelEnabled,
     })
   >
   calls = [];
@@ -25,6 +26,7 @@ class FakePresenceClient implements PresenceClient {
     double? lng,
     bool? rideEnabled,
     bool? foodEnabled,
+    bool? parcelEnabled,
   }) async {
     calls.add((
       online: online,
@@ -32,12 +34,17 @@ class FakePresenceClient implements PresenceClient {
       lng: lng,
       rideEnabled: rideEnabled,
       foodEnabled: foodEnabled,
+      parcelEnabled: parcelEnabled,
     ));
     final error = saveError;
     if (error != null) {
       throw error;
     }
-    prefs = prefs.copyWith(rideEnabled: rideEnabled, foodEnabled: foodEnabled);
+    prefs = prefs.copyWith(
+      rideEnabled: rideEnabled,
+      foodEnabled: foodEnabled,
+      parcelEnabled: parcelEnabled,
+    );
   }
 
   @override

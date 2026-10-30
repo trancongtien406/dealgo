@@ -25,14 +25,18 @@ import { PrismaService } from '../../src/platform/database/prisma.service.js';
 import { PARTNER_REPOSITORY } from '../../src/modules/partner/partner.constants.js';
 import type { PartnerRepository } from '../../src/modules/partner/partner.repository.js';
 import { RideModule } from '../../src/modules/ride/ride.module.js';
+import { PlatformSettingsService } from '../../src/platform/settings/platform-settings.service.js';
 
 const hasDatabase = Boolean(process.env.DATABASE_URL?.trim());
 const describePg = hasDatabase ? describe : describe.skip;
 
 const pickup = { lat: 16.047079, lng: 108.20623, label: 'Hải Châu' };
-// Fare floor (80 % of reference): keep the trip short so the fixed 30k bid clears the floor
-// whatever per-km price the local DB vehicle class carries.
-const dropoff = { lat: 16.05, lng: 108.208, label: 'Hải Châu 2' };
+// Bid band 70-130 % of reference (owner t50u, DEC-PROD-069). Amounts are derived from the live
+// /v1/rides/quote band in beforeAll, never hardcoded: tariff/zone/band edits by other runs moved
+// the ceiling under fixed 30k/45k amounts twice (2026-10-30). The global setting is never patched.
+const dropoff = { lat: 16.0853, lng: 108.2227, label: 'Thuận Phước' };
+const DISCOUNT_VND = 10_000;
+type Fares = { min: number; max: number; counterCap: number; bid: number; low: number; counter: number; mid: number; high: number };
 const OPS_EMAIL = `ops-ride-voucher-${Date.now()}@dealgo.test`;
 const OPS_PASSWORD = 'correct-horse-battery';
 
@@ -40,6 +44,7 @@ describePg('ride voucher (postgres)', () => {
   let app: INestApplication;
   let sms: MockSmsSender;
   let prisma: PrismaService;
+  let fares: Fares;
 
   beforeAll(async () => {
     sms = new MockSmsSender('test');
@@ -79,6 +84,7 @@ describePg('ride voucher (postgres)', () => {
     if (!prisma.db()) {
       throw new Error('DATABASE_URL did not open a Prisma client');
     }
+    fares = await liveFares();
     await app.get(OpsAuthService).ensureOperator(OPS_EMAIL, OPS_PASSWORD, 'test');
   });
 
@@ -86,10 +92,22 @@ describePg('ride voucher (postgres)', () => {
     await app.close();
   });
 
+  it('fixture amounts sit inside the live bid band (no global setting patch)', async () => {
+    const { min, max, counterCap, ...amounts } = fares;
+    for (const [name, v] of Object.entries(amounts)) {
+      expect(v, `${name} ${v} vs band ${min}-${max}`).toBeGreaterThanOrEqual(min);
+      expect(v, `${name} ${v} vs band ${min}-${max}`).toBeLessThanOrEqual(max);
+    }
+    for (const v of [fares.counter, fares.high]) expect(v).toBeLessThanOrEqual(counterCap);
+    expect(fares.low, 'fare must exceed the voucher discount').toBeGreaterThan(DISCOUNT_VND);
+    expect(fares.counter).toBeGreaterThan(fares.low);
+    expect(fares.high).toBeGreaterThan(fares.counter);
+  });
+
   it('lets only one of two customers take the last use', async () => {
     const code = await createPromotion({ usageLimit: 1 });
-    const a = await negotiate(40_000);
-    const b = await negotiate(40_000);
+    const a = await negotiate(fares.mid);
+    const b = await negotiate(fares.mid);
     const results = await Promise.all([
       select(a.customer.token, a.rideId, a.offerId, code),
       select(b.customer.token, b.rideId, b.offerId, code),
@@ -99,7 +117,7 @@ describePg('ride voucher (postgres)', () => {
     expect(results.find((r) => r.status === 422)?.body.errorCode).toBe('VOUCHER_USAGE_EXHAUSTED');
     const promo = await prisma.db()!.promotion.findUnique({ where: { code } });
     expect(promo?.usedCount).toBe(1);
-    expect(promo?.usedBudget).toBe(10_000);
+    expect(promo?.usedBudget).toBe(DISCOUNT_VND);
     // The loser's ride rolled back to negotiation with no voucher snapshot.
     const loser = results[0].status === 422 ? a : b;
     const row = await prisma.db()!.ride.findUnique({ where: { id: loser.rideId } });
@@ -108,7 +126,7 @@ describePg('ride voucher (postgres)', () => {
 
   it('redeems once when two selections of the same ride race', async () => {
     const code = await createPromotion({ usageLimit: 10 });
-    const { customer, rideId, offerId } = await negotiate(40_000);
+    const { customer, rideId, offerId } = await negotiate(fares.mid);
     const results = await Promise.all([
       select(customer.token, rideId, offerId, code),
       select(customer.token, rideId, offerId, code),
@@ -123,7 +141,7 @@ describePg('ride voucher (postgres)', () => {
 
   it('releases on cancel and revives the row after ops reassign', async () => {
     const code = await createPromotion({ usageLimit: 10, userLimit: 1 });
-    const first = await negotiate(30_000);
+    const first = await negotiate(fares.low);
     await select(first.customer.token, first.rideId, first.offerId, code).expect(200);
     await request(app.getHttpServer())
       .post(`/v1/rides/${first.rideId}/cancel`)
@@ -136,7 +154,7 @@ describePg('ride voucher (postgres)', () => {
     });
     expect(released?.releasedAt).not.toBeNull();
 
-    const second = await negotiate(30_000);
+    const second = await negotiate(fares.low);
     await select(second.customer.token, second.rideId, second.offerId, code).expect(200);
     const ops = await request(app.getHttpServer())
       .post('/v1/ops/sessions')
@@ -151,9 +169,9 @@ describePg('ride voucher (postgres)', () => {
     expect((await db.promotion.findUnique({ where: { code } }))?.usedCount).toBe(0);
 
     const driver2 = await driverLogin();
-    const offer2 = await offer(driver2.token, second.rideId, 35_000);
+    const offer2 = await offer(driver2.token, second.rideId, fares.counter);
     const again = await select(second.customer.token, second.rideId, offer2, code).expect(200);
-    expect(again.body.data).toMatchObject({ discountVnd: 10_000, cashDueVnd: 25_000 });
+    expect(again.body.data).toMatchObject({ discountVnd: DISCOUNT_VND, cashDueVnd: fares.counter - DISCOUNT_VND });
     const rows = await db.promotionRedemption.findMany({
       where: { entityType: 'RIDE', entityId: second.rideId },
     });
@@ -164,7 +182,7 @@ describePg('ride voucher (postgres)', () => {
 
   it('books cash = fare - discount and the funded share owed to the driver', async () => {
     const code = await createPromotion({ usageLimit: 10 });
-    const { customer, driver, rideId, offerId } = await negotiate(45_000);
+    const { customer, driver, rideId, offerId } = await negotiate(fares.high);
     await select(customer.token, rideId, offerId, code).expect(200);
     const step = (action: string, body?: object) =>
       request(app.getHttpServer())
@@ -180,7 +198,7 @@ describePg('ride voucher (postgres)', () => {
       .expect(200);
     await step('start', { pickupCode: view.body.data.pickupCode });
     const done = await step('complete');
-    expect(done.body.data).toMatchObject({ status: 'COMPLETED', cashDueVnd: 35_000 });
+    expect(done.body.data).toMatchObject({ status: 'COMPLETED', cashDueVnd: fares.high - DISCOUNT_VND });
 
     const db = prisma.db()!;
     const journals = await db.ledgerJournal.findMany({
@@ -188,13 +206,36 @@ describePg('ride voucher (postgres)', () => {
       include: { entries: { include: { account: true } } },
     });
     const byEvent = Object.fromEntries(journals.map((j) => [j.event, j]));
-    expect(byEvent.COD_OBLIGATION_POSTED?.amountVnd).toBe(35_000);
-    expect(byEvent.PROMOTION_DISCOUNT_FUNDED?.amountVnd).toBe(10_000);
+    expect(byEvent.COD_OBLIGATION_POSTED?.amountVnd).toBe(fares.high - DISCOUNT_VND);
+    expect(byEvent.PROMOTION_DISCOUNT_FUNDED?.amountVnd).toBe(DISCOUNT_VND);
     const credit = byEvent.PROMOTION_DISCOUNT_FUNDED?.entries.find((e) => e.direction === 'CREDIT');
     expect(credit?.account.code).toBe('sandbox.promo.driver_payable');
     const earning = await db.jobEarning.findFirst({ where: { entityType: 'RIDE', entityId: rideId } });
-    expect(earning?.fareVnd).toBe(45_000);
+    expect(earning?.fareVnd).toBe(fares.high);
   });
+
+  // Reads the live MOTORBIKE band and spreads the fixture amounts across it on 1.000đ steps.
+  async function liveFares(): Promise<Fares> {
+    const customer = await login();
+    const quote = await request(app.getHttpServer())
+      .post('/v1/rides/quote')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .send({ pickup, dropoff });
+    if (quote.status !== 200) throw new Error(`quote ${quote.status}: ${JSON.stringify(quote.body)}`);
+    const bike = (quote.body.data.options as Array<{ code: string; minBidVnd: number; maxBidVnd: number }>)
+      .find((o) => o.code === 'MOTORBIKE');
+    if (!bike) throw new Error('quote has no MOTORBIKE option');
+    const min = bike.minBidVnd;
+    const max = bike.maxBidVnd;
+    const lo = Math.ceil(min / 1000) * 1000;
+    const hi = Math.floor(max / 1000) * 1000;
+    const step = (v: number) => Math.min(hi, Math.max(lo, Math.round(v / 1000) * 1000));
+    // Driver counters are also capped at RIDE_COUNTER_MAX_PERCENT_OF_OFFER of the customer's bid.
+    const bid = step(lo + 0.4 * (hi - lo));
+    const pct = await app.get(PlatformSettingsService).getNumber('RIDE_COUNTER_MAX_PERCENT_OF_OFFER');
+    const counterCap = pct > 0 ? Math.min(hi, Math.floor((bid * pct) / 100 / 1000) * 1000) : hi;
+    return { min, max, counterCap, bid, low: bid, mid: bid, counter: step((bid + counterCap) / 2), high: counterCap };
+  }
 
   async function createPromotion(limits: { usageLimit: number; userLimit?: number }): Promise<string> {
     const code = `RV${randomUUID().slice(0, 8).toUpperCase()}`;
@@ -206,7 +247,7 @@ describePg('ride voucher (postgres)', () => {
         description: 'ride voucher race test',
         serviceType: 'RIDE',
         discountType: 'FIXED_AMOUNT',
-        discountValue: 10_000,
+        discountValue: DISCOUNT_VND,
         totalBudget: 1_000_000,
         usageLimit: limits.usageLimit,
         userLimit: limits.userLimit ?? 5,
@@ -224,7 +265,7 @@ describePg('ride voucher (postgres)', () => {
       .post('/v1/rides')
       .set('Authorization', `Bearer ${customer.token}`)
       .set('Idempotency-Key', `idem-rv-create-${randomUUID()}`)
-      .send({ pickup, dropoff, offeredFareVnd: 30_000, vehicleClassCode: 'MOTORBIKE'});
+      .send({ pickup, dropoff, offeredFareVnd: fares.bid, vehicleClassCode: 'MOTORBIKE' });
     if (created.status !== 200) throw new Error(`create ride ${created.status}: ${JSON.stringify(created.body)}`);
     const rideId = created.body.data.id as string;
     const offerId = await offer(driver.token, rideId, fare);
@@ -235,8 +276,8 @@ describePg('ride voucher (postgres)', () => {
     const res = await request(app.getHttpServer())
       .post(`/v1/rides/${rideId}/offers`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ amountVnd })
-      .expect(200);
+      .send({ amountVnd });
+    if (res.status !== 200) throw new Error(`offer ${amountVnd} ${res.status}: ${JSON.stringify(res.body)}`);
     const offers = res.body.data.offers as Array<{ id: string; status: string }>;
     return offers.filter((o) => o.status === 'PENDING').at(-1)!.id;
   }

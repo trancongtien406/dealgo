@@ -3211,6 +3211,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get partnerKindBusinessLicense => 'Business licence';
 
   @override
+  String get partnerKindFoodSafetyCert => 'Food safety certificate';
+
+  @override
+  String kycLicenseClassMismatch(String licenseClass) {
+    return 'Licence class $licenseClass does not cover this vehicle. Go back and pick the class printed on your licence.';
+  }
+
+  @override
   String get partnerKindRepIdFront => 'Representative ID — front';
 
   @override
@@ -4652,6 +4660,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get apiErrGeneric => 'Something went wrong. Please try again.';
+
+  @override
+  String get apiErrPasskeyUnavailable =>
+      'This device or app version does not support passkeys yet.';
+
+  @override
+  String get apiErrPasskeyInvalid =>
+      'Passkey verification failed. Please try again or use another sign-in method.';
 
   @override
   String get apiErrNetwork =>
@@ -7128,4 +7144,335 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get incomingJobDetails => 'Details';
+
+  @override
+  String get kycCaptureFrontTitle => 'Capture ID front';
+
+  @override
+  String get kycCaptureBackTitle => 'Capture ID back';
+
+  @override
+  String get kycCaptureAlignHint =>
+      'Fit the card in the frame, well lit, no glare';
+
+  @override
+  String get kycCaptureChecking => 'Checking photo…';
+
+  @override
+  String get kycCaptureBlurry => 'Photo is blurry';
+
+  @override
+  String get kycCaptureGlare => 'Photo has glare';
+
+  @override
+  String get kycCaptureDark => 'Photo is too dark';
+
+  @override
+  String get kycCaptureRetake => 'Retake';
+
+  @override
+  String get kycCaptureCameraError => 'Could not open the camera.';
+
+  @override
+  String get kycLivenessTitle => 'Face check';
+
+  @override
+  String get kycLivenessCenter => 'Look straight at the frame';
+
+  @override
+  String get kycLivenessTurnLeft => 'Turn your face left';
+
+  @override
+  String get kycLivenessTurnRight => 'Turn your face right';
+
+  @override
+  String get kycLivenessBlink => 'Blink your eyes';
+
+  @override
+  String get kycLivenessNoFace => 'No face in the frame';
+
+  @override
+  String get kycLivenessManyFaces => 'Only one person in the frame';
+
+  @override
+  String get kycLivenessDone => 'Done';
+
+  @override
+  String get kycLivenessTimeout => 'Time is up, try again';
+
+  @override
+  String get kycHintFindCard => 'Fit the card in the frame';
+
+  @override
+  String get kycHintCloser => 'Closer';
+
+  @override
+  String get kycHintMoreLight => 'More light';
+
+  @override
+  String get kycHintNoGlare => 'Avoid glare';
+
+  @override
+  String get kycHintHoldStill => 'Hold still';
+
+  @override
+  String get kycHintCaptured => 'Captured';
+
+  @override
+  String get kycHintFaceInOval => 'Face in the oval';
+
+  @override
+  String get kycLivenessRecording => 'Recording';
+
+  @override
+  String get partnerDocSelfieVideo => 'Face video';
+
+  @override
+  String get livenessClipRetry =>
+      'The face video didn\'t save (missing or too large). Let\'s try again.';
+
+  @override
+  String get parcelWhereTo => 'Where is the package going?';
+
+  @override
+  String get driverServiceParcel => 'Goods delivery';
+
+  @override
+  String get driverServiceParcelHint => 'Receive parcel delivery requests';
+
+  @override
+  String get homeServiceParcel => 'Delivery';
+
+  @override
+  String get homeServiceParcelSub => 'Send a package across town, fast';
+
+  @override
+  String get parcelDetailsTitle => 'Package details';
+
+  @override
+  String get parcelSizeTitle => 'Package size';
+
+  @override
+  String parcelSizeHint(String dims) {
+    return 'Max size $dims';
+  }
+
+  @override
+  String get parcelSizeS => 'Small';
+
+  @override
+  String get parcelSizeM => 'Medium';
+
+  @override
+  String get parcelSizeL => 'Large';
+
+  @override
+  String get parcelSizeXL => 'Extra large';
+
+  @override
+  String get parcelWeightLabel => 'Weight (optional)';
+
+  @override
+  String get parcelWeightInvalid => 'Enter a valid weight';
+
+  @override
+  String parcelWeightOver(String limit) {
+    return 'Over $limit kg for this size';
+  }
+
+  @override
+  String get parcelNoteLabel => 'Note for the driver (optional)';
+
+  @override
+  String get parcelSenderTitle => 'Sender';
+
+  @override
+  String get parcelRecipientTitle => 'Recipient';
+
+  @override
+  String get parcelNameLabel => 'Full name';
+
+  @override
+  String get parcelPhoneLabel => 'Phone number';
+
+  @override
+  String get parcelFieldRequired => 'Required';
+
+  @override
+  String get parcelPhoneInvalid => 'Enter a valid phone number';
+
+  @override
+  String get parcelPayerSender => 'Sender pays';
+
+  @override
+  String get parcelPayerRecipient => 'Recipient pays (cash)';
+
+  @override
+  String get parcelItemPhotoAdd => 'Add package photo';
+
+  @override
+  String get parcelItemPhotoAdded => 'Package photo added';
+
+  @override
+  String get parcelVehicleTitle => 'Vehicle';
+
+  @override
+  String parcelOptionHint(String min, String max) {
+    return 'Offer $min – $max';
+  }
+
+  @override
+  String get parcelQuoteCta => 'See price';
+
+  @override
+  String get parcelSubmitCta => 'Book delivery';
+
+  @override
+  String get parcelDriverBadge => 'Package';
+
+  @override
+  String get parcelOutcomeDelivered => 'Delivered';
+
+  @override
+  String get parcelOutcomeReturning => 'Returning to sender';
+
+  @override
+  String get parcelOutcomeReturned => 'Returned to sender';
+
+  @override
+  String get parcelOutcomeInTransit => 'On the way';
+
+  @override
+  String get parcelOutcomeWaitingPickup => 'Waiting for pickup';
+
+  @override
+  String get parcelFailUnreachable => 'Recipient unreachable';
+
+  @override
+  String get parcelFailRefused => 'Recipient refused';
+
+  @override
+  String get parcelFailAddress => 'Wrong address';
+
+  @override
+  String get parcelFailDamaged => 'Package damaged';
+
+  @override
+  String get parcelFailOther => 'Other reason';
+
+  @override
+  String get parcelFailTitle => 'Why can\'t it be delivered?';
+
+  @override
+  String get parcelErrorNoVehicle => 'No vehicle can carry this package size';
+
+  @override
+  String get parcelErrorTooHeavy => 'Package is too heavy for this size';
+
+  @override
+  String get parcelErrorRecipientCode => 'Recipient code is wrong';
+
+  @override
+  String get parcelErrorCodeLocked => 'Too many wrong codes. Try again later';
+
+  @override
+  String get parcelErrorSizeUnavailable =>
+      'This size isn\'t available right now';
+
+  @override
+  String get parcelErrorPayerMethod => 'Recipient-pays only works with cash';
+
+  @override
+  String get parcelErrorPhoto => 'A photo is required';
+
+  @override
+  String get parcelErrorState => 'The delivery has changed. Refresh';
+
+  @override
+  String get parcelErrorNetwork => 'Connection problem. Try again';
+
+  @override
+  String get parcelErrorGeneric => 'Something went wrong';
+
+  @override
+  String get parcelRetry => 'Retry';
+
+  @override
+  String parcelSenderLine(String name, String phone) {
+    return 'Sender: $name · $phone';
+  }
+
+  @override
+  String parcelRecipientLine(String name, String phone) {
+    return 'Recipient: $name · $phone';
+  }
+
+  @override
+  String parcelRecipientCode(String code) {
+    return 'Recipient code: $code';
+  }
+
+  @override
+  String get parcelRecipientCodeHint =>
+      'Share this code with the recipient. The driver needs it to complete the delivery.';
+
+  @override
+  String get parcelPickupCta => 'Picked up (take photo)';
+
+  @override
+  String get parcelReturningHint => 'Bring the package back to the sender';
+
+  @override
+  String get parcelReturnedCta => 'Returned to sender (photo)';
+
+  @override
+  String get parcelRecipientCodeInput => 'Recipient code';
+
+  @override
+  String get parcelDeliverCta => 'Delivered (photo)';
+
+  @override
+  String get parcelFailCta => 'Can\'t deliver';
+
+  @override
+  String parcelServiceFeeLine(String amount) {
+    return 'Service fee $amount (included in fare)';
+  }
+
+  @override
+  String parcelReturnFeeLine(String amount) {
+    return 'Return fee if delivery fails: $amount';
+  }
+
+  @override
+  String parcelReturnFeeCharged(String amount) {
+    return 'Return fee $amount';
+  }
+
+  @override
+  String get parcelReceiptServiceFee => 'Parcel service fee (included)';
+
+  @override
+  String get parcelReceiptReturnFee => 'Return fee';
+
+  @override
+  String get driverServicesFoodMotorbikeOnly =>
+      'Food orders are for motorbike drivers only.';
+
+  @override
+  String get partnerKindFoodSafetyCommitment => 'Food safety commitment';
+
+  @override
+  String get partnerFoodSafetyUseCommitment => 'Use the food safety commitment';
+
+  @override
+  String get partnerFoodSafetyUseCommitmentHint =>
+      'Small household shops may sign the food safety commitment instead of the certificate.';
+
+  @override
+  String get kycOcrPrefilledNote =>
+      'Some fields were filled from your document photos. Please check and correct them.';
+
+  @override
+  String get kycOcrReading => 'Reading your document…';
 }
