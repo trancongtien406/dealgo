@@ -1094,7 +1094,7 @@ export class PrismaIdentityRepository implements IdentityRepository {
   async saveCustomerCredential(userId: string, passwordHash: string): Promise<void> {
     await this.db.customerCredential.upsert({
       where: { userId },
-      create: { userId, passwordHash, staffRole: 'ADMIN' },
+      create: { userId, passwordHash },
       update: { passwordHash },
     });
   }

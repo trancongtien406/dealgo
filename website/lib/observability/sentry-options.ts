@@ -46,7 +46,8 @@ export function websiteSentryOptions(
       urlQueryParams: false,
     },
     beforeSend: (event, hint) =>
-      isExpectedClientError(hint?.originalException)
+      isExpectedClientError(hint?.originalException) ||
+      isThirdPartyNoise(event, hint)
         ? null
         : scrubSentryEvent(event),
     beforeBreadcrumb: scrubBreadcrumb,
@@ -116,6 +117,18 @@ export function isExpectedClientError(error: unknown): boolean {
     (error as { status?: unknown; statusCode?: unknown }).status ??
     (error as { statusCode?: unknown }).statusCode;
   return typeof status === "number" && status >= 400 && status < 500;
+}
+
+/** In-app webview injections (e.g. Zalo browser zaloJSV2) and extensions that aren't DealGo code. */
+export function isThirdPartyNoise(event: ErrorEvent, hint?: EventHint): boolean {
+  const ex = hint?.originalException;
+  const msg =
+    (typeof ex === "string" ? ex : (ex as { message?: string })?.message) ??
+    event.message ??
+    "";
+  const exValues = event.exception?.values ?? [];
+  const joined = `${msg} ${exValues.map((v) => `${v.type ?? ""} ${v.value ?? ""}`).join(" ")}`;
+  return /zaloJSV2/i.test(joined);
 }
 
 /** User id only; no headers, cookies, bodies, queries, tokens, phones or emails. */

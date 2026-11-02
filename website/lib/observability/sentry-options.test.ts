@@ -99,5 +99,14 @@ describe("Sentry scrubbing", () => {
         { originalException: new Error("boom") },
       ),
     ).toEqual({ type: undefined });
+    expect(
+      options.beforeSend(
+        {
+          type: undefined,
+          exception: { values: [{ value: "Can't find variable: zaloJSV2" }] },
+        },
+        {},
+      ),
+    ).toBeNull();
   });
 });
