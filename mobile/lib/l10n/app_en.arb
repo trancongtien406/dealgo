@@ -96,6 +96,11 @@
   "apiErrVoiceBusy": "There is already a call for this trip.",
   "apiErrVoiceNoCounterpart": "No driver has taken this trip yet.",
   "apiErrVoiceWindowClosed": "Calls are only available while the trip is in progress.",
+  "apiErrChatWindowClosed": "The contact window has closed for this trip or order.",
+  "apiErrChatNoCounterpart": "No driver has been assigned to this order yet.",
+  "apiErrChatForbidden": "You do not have access to this conversation.",
+  "apiErrChatUnavailable": "Chat is temporarily unavailable. Please try again later.",
+  "apiErrChatBodyInvalid": "Message content is invalid.",
   "bannerOfflineTitle": "You’re offline",
   "commonSelected": "Selected",
   "actionSeeDetail": "View details →",
@@ -348,9 +353,9 @@
   "authHelp": "Help",
   "authHelpHotline": "DealGo help center: 1900 6868",
   "authLegalPrefix": "By continuing, you agree to the ",
-  "authLegalTerms": "Terms",
-  "authTermsSoon": "DealGo Terms of Service are coming soon.",
-  "authPrivacySoon": "DealGo Privacy Policy is coming soon.",
+  "authLegalTerms": "Terms of Service",
+  "authLegalConsentPrefix": "I have read and agree to the ",
+  "authLegalConsentRequired": "Please read and agree to the Terms of Service and Privacy Policy to continue.",
   "authWelcomeTo": "Welcome to",
   "authMethodPasskey": "Passkey",
   "authMethodsEmptyTitle": "No sign-in methods",
@@ -362,7 +367,7 @@
   "emailErrRequired": "Please enter your email address",
   "emailErrInvalid": "Invalid email address",
   "passwordErrRequired": "Please enter your password",
-  "passwordErrTooShort": "Password must be at least 8 characters",
+  "passwordErrTooShort": "Password must be at least 6 characters",
   "passwordErrConfirm": "Please confirm your password",
   "passwordErrMismatch": "Passwords do not match",
   "emailErrWrongCredentials": "Incorrect email or password",
@@ -429,7 +434,6 @@
   "profileGenderFemale": "Female",
   "profileGenderOther": "Other",
   "profileDone": "Done",
-  "profileLater": "Add later",
   "rolePickerPrefix": "How do you want to use ",
   "rolePickerSuffix": "?",
   "rolePickerPartnerSection": "Complete partner profile",
@@ -508,6 +512,8 @@
   "driverFindOtherJobs": "Find other jobs",
   "driverJobTakenTitle": "Request already taken",
   "driverJobTakenBody": "Another driver took this.",
+  "driverOfferNotChosenTitle": "Your offer was not chosen",
+  "driverOfferNotChosenBody": "The customer picked another driver for this order.",
   "driverJobUnavailable": "Request no longer available",
   "driverRequestId": "Request ID",
   "driverService": "Service",
@@ -574,9 +580,18 @@
   "accountBusy": "Busy mode",
   "accountBusyBody": "Pause new orders",
   "accountSectionHelp": "Help & settings",
+  "accountSectionDisplay": "Display",
+  "accountLanguage": "Language",
+  "accountTheme": "Appearance",
+  "accountThemeSystem": "Match system",
+  "accountThemeLight": "Light",
+  "accountThemeDark": "Dark",
   "accountSupport": "Help center",
-  "accountSupportBody": "FAQs and complaints",
+  "accountSupportBody": "FAQs and Messenger chat on the web",
+  "accountSupportTicketsBody": "Track the support requests you sent",
   "accountSignOut": "Sign out",
+  "accountPartnerHubTitle": "Earn with DealGo",
+  "accountPartnerHubSubtitle": "Become a Driver partner or register a Shop with DealGo",
   "accountDriverPartner": "Driver partner profile",
   "accountShopPartner": "Shop partner profile",
   "partnerStatusDraft": "Not submitted",
@@ -1029,6 +1044,22 @@
   "driverOtpLocked": "Too many wrong codes. Contact support to continue this ride.",
   "ridePickupCodeUnavailable": "Your pickup code appears once a driver accepts the ride.",
   "driverCardRating": "{rating} · {count} ratings",
+  "driverCardNew": "New",
+  "driverDetailTitle": "Driver",
+  "driverDetailOpen": "View driver details",
+  "driverDetailVehicle": "Vehicle",
+  "driverDetailPlate": "Licence plate",
+  "driverDetailClass": "Vehicle type",
+  "driverAvatarOpen": "View profile photo",
+  "driverAvatarClose": "Close",
+  "driverCardTrips": "{count} trips",
+  "@driverCardTrips": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
   "@driverCardRating": {
     "placeholders": {
       "rating": {
@@ -1246,7 +1277,7 @@
   },
   "foodDiscoverySearchHint": "Search restaurants, dishes, drinks",
   "foodStoreBestsellers": "Best sellers",
-  "foodStorePrepChip": "~{minutes} min",
+  "foodStorePrepChip": "≈{minutes} min",
   "@foodStorePrepChip": {
     "placeholders": {
       "minutes": {
@@ -1417,7 +1448,7 @@
     }
   },
   "partnerDocTake": "Take photo",
-  "partnerDocPick": "Choose from library",
+  "partnerDocPick": "Photo library",
   "partnerDocRetake": "Retake",
   "partnerDocRemove": "Remove",
   "partnerDocStored": "Saved on your application",
@@ -1436,7 +1467,13 @@
   "partnerKindBusinessLicense": "Business licence",
   "partnerKindFoodSafetyCert": "Food safety certificate",
   "kycLicenseClassMismatch": "Licence class {licenseClass} does not cover this vehicle. Go back and pick the class printed on your licence.",
-  "@kycLicenseClassMismatch": {"placeholders": {"licenseClass": {"type": "String"}}},
+  "@kycLicenseClassMismatch": {
+    "placeholders": {
+      "licenseClass": {
+        "type": "String"
+      }
+    }
+  },
   "partnerKindRepIdFront": "Representative ID — front",
   "partnerKindRepIdBack": "Representative ID — back",
   "partnerKindStorefront": "Storefront photo",
@@ -1769,6 +1806,9 @@
   "merchantStatusPreparing": "Preparing",
   "merchantStatusReady": "Ready",
   "merchantStatusAssigned": "Driver assigned",
+  "merchantStatusPickedUp": "On the way",
+  "merchantStatusDelivered": "Delivered",
+  "merchantStatusUnknown": "Updating",
   "merchantNotSynced": "Not synced",
   "merchantHomeCancelledToday": "Cancelled today",
   "merchantHomeSalesToday": "Food sales today",
@@ -1933,6 +1973,25 @@
   "rideMatchingLoadFailed": "Could not load the request. The trip status has not changed.",
   "rideMatchingSent": "Offer sent",
   "rideMatchingWaiting": "Waiting for drivers to make offers...",
+  "rideViewersCount": "{count, plural, =1{1 driver is viewing your request} other{{count} drivers are viewing your request}}",
+  "@rideViewersCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "rideViewersNone": "No driver has opened your request yet",
+  "rideViewersNotifying": "Notifying drivers nearby",
+  "rideAutoAcceptLabel": "Auto-accept when a driver agrees to {price}",
+  "@rideAutoAcceptLabel": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "rideAutoAcceptHint": "Only your exact price is accepted. A different price still needs you to choose.",
   "rideStatusLabel": "Status",
   "rideStatusNegotiating": "Negotiating",
   "rideStatusAssigned": "Driver assigned",
@@ -2063,7 +2122,7 @@
   "rideYouAreOffline": "You are offline",
   "driverServicesOfflineTitle": "Offline",
   "driverServicesNotRegistered": "Not registered",
-  "driverServicesNoneOn": "Both services are off, so you will not get new jobs.",
+  "driverServicesNoneOn": "Every service is off, so you will not get new jobs.",
   "driverVehiclePlate": "Plate {plate}",
   "@driverVehiclePlate": {
     "placeholders": {
@@ -2158,6 +2217,9 @@
   "apiErrPasskeyInvalid": "Passkey verification failed. Please try again or use another sign-in method.",
   "apiErrNetwork": "Can't reach DealGo. Check your connection and try again.",
   "apiErrInvalidResponse": "We couldn't read the response. Please try again.",
+  "apiErrCarDocsTitle": "Car documents needed",
+  "apiErrCarDocsBody": "Car drivers need a vehicle insurance photo before taking trips. Add it so DealGo can review again.",
+  "actionCompleteDocuments": "Complete documents",
   "apiErrForbidden": "You don't have permission to do this.",
   "apiErrNotFound": "Not found. It may have been removed or changed.",
   "apiErrConflict": "This just changed. Reload and try again.",
@@ -2413,7 +2475,7 @@
   "merchantAcceptSaved": "Order acceptance settings saved.",
   "merchantAcceptPickTitle": "Choose a value",
   "merchantBusyExtraLabel": "Extra prep time",
-  "merchantBusyExtraHint": "Prep ~{minutes} min.",
+  "merchantBusyExtraHint": "Prep ≈{minutes} min.",
   "@merchantBusyExtraHint": {
     "placeholders": {
       "minutes": {
@@ -2858,7 +2920,7 @@
     }
   },
   "forgotPasswordCodeLabel": "6-digit code from the email",
-  "forgotPasswordNewLabel": "New password (8+ chars)",
+  "forgotPasswordNewLabel": "New password (6+ chars)",
   "forgotPasswordConfirmLabel": "Repeat the new password",
   "forgotPasswordSubmit": "Reset password",
   "forgotPasswordResend": "Resend code",
@@ -2910,7 +2972,7 @@
     }
   },
   "rideRebookAction": "Rebook ride",
-  "trackEtaMinutes": "~{minutes} min",
+  "trackEtaMinutes": "≈{minutes} min",
   "trackStepFinding": "Finding",
   "trackStepComing": "Coming",
   "trackStepArrived": "Arrived",
@@ -2996,7 +3058,7 @@
       }
     }
   },
-  "driverCustomerRatingNone": "New customer – no ratings yet",
+  "driverCustomerRatingNone": "No ratings yet",
   "driverCancelRide": "Cancel ride",
   "driverCancelReasonTitle": "Why are you cancelling?",
   "driverCancelHint": "Counts toward your cancel rate.",
@@ -3329,6 +3391,11 @@
   },
   "otpNoCodeYet": "Didn't get the code?",
   "otpEmailSpamHint": "Can't find the email? Check your Spam or Promotions folder.",
+  "emailVerifyLocked": "Too many wrong codes. Resend to get a new code.",
+  "emailVerifySuccess": "Email verified",
+  "emailVerifyPendingNotice": "Your new email is saved only after you enter the verification code.",
+  "profileEmailUnverified": "Email not verified",
+  "profileEmailVerifyAction": "Verify",
   "draftResumeTitle": "Continue where you left off?",
   "draftResumeBody": "We saved your progress on this device. Continue, or start over?",
   "draftResumeContinue": "Continue",
@@ -3553,7 +3620,7 @@
   "parcelFieldRequired": "Required",
   "parcelPhoneInvalid": "Enter a valid phone number",
   "parcelPayerSender": "Sender pays",
-  "parcelPayerRecipient": "Recipient pays (cash)",
+  "parcelPayerRecipient": "Recipient pays",
   "parcelItemPhotoAdd": "Add package photo",
   "parcelItemPhotoAdded": "Package photo added",
   "parcelVehicleTitle": "Vehicle",
@@ -3631,11 +3698,29 @@
   "parcelDeliverCta": "Delivered (photo)",
   "parcelFailCta": "Can't deliver",
   "parcelServiceFeeLine": "Service fee {amount} (included in fare)",
-  "@parcelServiceFeeLine": {"placeholders": {"amount": {"type": "String"}}},
+  "@parcelServiceFeeLine": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "parcelReturnFeeLine": "Return fee if delivery fails: {amount}",
-  "@parcelReturnFeeLine": {"placeholders": {"amount": {"type": "String"}}},
+  "@parcelReturnFeeLine": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "parcelReturnFeeCharged": "Return fee {amount}",
-  "@parcelReturnFeeCharged": {"placeholders": {"amount": {"type": "String"}}},
+  "@parcelReturnFeeCharged": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "parcelReceiptServiceFee": "Parcel service fee (included)",
   "parcelReceiptReturnFee": "Return fee",
   "driverServicesFoodMotorbikeOnly": "Food orders are for motorbike drivers only.",
@@ -3643,5 +3728,215 @@
   "partnerFoodSafetyUseCommitment": "Use the food safety commitment",
   "partnerFoodSafetyUseCommitmentHint": "Small household shops may sign the food safety commitment instead of the certificate.",
   "kycOcrPrefilledNote": "Some fields were filled from your document photos. Please check and correct them.",
-  "kycOcrReading": "Reading your document…"
+  "kycOcrReading": "Reading your document…",
+  "parcelPickContact": "Pick from contacts",
+  "parcelEditRoute": "Edit route",
+  "parcelEdit": "Edit",
+  "parcelMoreDetails": "Weight, note, photo (optional)",
+  "parcelPricing": "Getting price…",
+  "parcelSectionPackage": "Package",
+  "parcelSectionPayment": "Payment",
+  "parcelFareLabel": "Fare",
+  "parcelPhoneHint": "0901 234 567",
+  "parcelSenderYou": "You",
+  "parcelPayerRecipientNote": "The recipient pays the driver in cash on delivery.",
+  "parcelSubmitWithPrice": "Book · {price}",
+  "@parcelSubmitWithPrice": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "apiErrCrossRegion": "DealGo does not support trips between service regions yet. Please choose a destination in the same city as your pickup.",
+  "apiErrDriverAtCapacity": "You are on an active trip. Finish it before taking a new request.",
+  "apiErrDriverTooFar": "You are too far from the pickup. Move closer and try again.",
+  "apiErrOfferDriverUnavailable": "This driver just took another trip. Please choose another driver.",
+  "apiErrItemNotApproved": "This item is still awaiting approval and cannot be put on sale yet.",
+  "rideIntercity": "Intercity",
+  "rideIntercityQuote": "Intercity trip · {km} km · ≈{minutes} min",
+  "rideIntercityNote": "The destination is in another province/region. Drivers bid as usual.",
+  "driverPickupAwayKm": "{km} km away",
+  "driverServiceSettings": "Service settings",
+  "rideGoHome": "Back to home",
+  "apiErrIntercityStops": "Intercity trips go straight to one destination without extra stops.",
+  "apiErrIntercityTooFar": "This intercity trip is longer than DealGo currently supports.",
+  "apiErrIntercityVehicle": "This vehicle class does not run intercity. Please choose another vehicle.",
+  "apiErrIntercityNoVehicle": "No vehicle class runs intercity trips yet.",
+  "@rideIntercityQuote": {
+    "placeholders": {
+      "km": {
+        "type": "String"
+      },
+      "minutes": {
+        "type": "String"
+      }
+    }
+  },
+  "@driverPickupAwayKm": {
+    "placeholders": {
+      "km": {
+        "type": "String"
+      }
+    }
+  },
+  "driverJobTripKm": "Trip {km} km",
+  "@driverJobTripKm": {
+    "placeholders": {
+      "km": {
+        "type": "String"
+      }
+    }
+  },
+  "driverJobPickupKm": "{km} km to pickup",
+  "@driverJobPickupKm": {
+    "placeholders": {
+      "km": {
+        "type": "String"
+      }
+    }
+  },
+  "appUpdateRequiredTitle": "Update required",
+  "appUpdateRequiredBody": "This version of the app is no longer supported. Please update to keep using DealGo.",
+  "appUpdateNow": "Update now",
+  "appUpdateLatest": "New version: {version}",
+  "@appUpdateLatest": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "appUpdateOptionalTitle": "A new version is available",
+  "appUpdateOptionalBody": "Update to get the latest features and fixes.",
+  "appUpdateLater": "Later",
+  "appUpdateRetry": "Check again",
+  "legalConsentTitle": "Our terms have been updated",
+  "legalConsentBody": "Please review and accept the new terms to keep using DealGo.",
+  "legalConsentRead": "Read the full text",
+  "legalConsentEffective": "Effective {date}",
+  "@legalConsentEffective": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "legalConsentVersion": "version {version}",
+  "@legalConsentVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "legalConsentAgree": "I agree",
+  "legalConsentFailed": "Couldn't send. Please try again.",
+  "contactPhoneDial": "Call {phone}",
+  "@contactPhoneDial": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "contactPhoneDialFailed": "Couldn't open the phone app.",
+  "kycReviewAvatar": "Profile photo",
+  "kycAvatarMissing": "Required before you submit. Customers see this photo when you take their job.",
+  "kycAvatarReady": "Customers see this photo when you take their job.",
+  "kycAvatarAdd": "Add photo",
+  "partnerErrorAvatar": "Add a profile photo to your profile before submitting your driver application.",
+  "offlineJobUpdatedAt": "Last updated {time} · no connection",
+  "@offlineJobUpdatedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "offlineJobCallHint": "Regular phone calls work without mobile data.",
+  "legalRegulationsTitle": "Terms of use for partners",
+  "legalRegulationsBody": "For partner drivers and shops",
+  "legalTermsTitle": "Terms of Service",
+  "legalTermsBody": "Your rights and obligations when using DealGo",
+  "legalPrivacyTitle": "Privacy policy",
+  "legalPrivacyBody": "How DealGo collects and protects your data",
+  "legalLoadError": "Could not load this document. Please try again.",
+  "partnerConsentTitle": "Partner registration terms",
+  "partnerConsentRegulations": "I have read and agree to the Terms of use",
+  "partnerConsentPrivacy": "I have read and agree to the Privacy policy",
+  "partnerConsentView": "View",
+  "partnerConsentHint": "You must accept both to submit your application.",
+  "partnerConsentLoadError": "Could not load the terms — tap to retry",
+  "partnerErrorLegalConsent": "The Terms of use or Privacy policy was just updated. Please review and accept again.",
+  "foodFareSuggested": "Suggested delivery fee",
+  "foodFareYourOffer": "Your offer",
+  "foodFareHint": "The delivery fee is only a suggestion. Drivers can accept your offer or propose another one for you to choose; the fee is fixed once a driver takes the order.",
+  "foodFareHintFixed": "The delivery fee is only a suggestion; you can raise or lower it. Drivers accept exactly the fee you choose; it is fixed once a driver takes the order.",
+  "foodFareFixedWaiting": "Drivers can only accept the fee you offered. If it's taking a while, raise the fee to make the order more attractive.",
+  "driverFareFixed": "This order uses a fixed fee: you can only accept the customer's price.",
+  "foodFareDecrease": "Lower the fee",
+  "foodFareIncrease": "Raise the fee",
+  "foodFareReset": "Use the suggestion",
+  "foodFareNegotiationTitle": "Delivery fee",
+  "foodFareWaiting": "Waiting for a driver to accept {amount}",
+  "@foodFareWaiting": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "foodFareAgreed": "Agreed delivery fee: {amount}",
+  "@foodFareAgreed": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "foodFareOffersEmpty": "No driver has proposed another fee yet.",
+  "foodFareDriverOffer": "Driver offer",
+  "foodFareSelect": "Choose",
+  "foodFareRaise": "Raise to {amount}",
+  "@foodFareRaise": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "foodFareRaisesLeft": "{count} raises left",
+  "@foodFareRaisesLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "foodFareOfferExpired": "Expired",
+  "foodFareSelectFailed": "Could not choose this offer. It may have expired or the driver took another job.",
+  "foodFareRaiseFailed": "Could not raise the fee. Try again later.",
+  "foodFareCodExtra": "If the agreed fee is higher than what you paid online, the difference is collected in cash on delivery.",
+  "driverFareCounter": "Propose fee",
+  "driverFareCounterTitle": "Propose a delivery fee",
+  "driverFareCustomerOffer": "Customer offers {amount}",
+  "@driverFareCustomerOffer": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "driverFareCounterSend": "Send {amount}",
+  "@driverFareCounterSend": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "driverFareCounterSent": "Offer sent. Waiting for the customer.",
+  "driverFareCounterFailed": "Could not send the offer.",
+  "merchantFareAgreed": "Delivery fee (agreed)"
 }

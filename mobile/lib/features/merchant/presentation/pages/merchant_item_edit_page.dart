@@ -363,7 +363,7 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage>
                                 child: DealGoNetworkImage(
                                   resolveMediaUrl(url) ?? url,
                                   fit: BoxFit.cover,
-                                  fallback: const ColoredBox(
+                                  fallback: ColoredBox(
                                     color: DealGoColors.subtlePurple,
                                     child: Icon(
                                       DealGoIcons.restaurant,
@@ -376,7 +376,7 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage>
                           ),
                         ],
                         if (_imageUrls.isEmpty)
-                          const Padding(
+                          Padding(
                             padding: EdgeInsets.only(right: DealGoSpacing.s8),
                             child: SizedBox(
                               width: 88,

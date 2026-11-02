@@ -24,7 +24,16 @@ class RideQuote {
     this.route = RouteGeometry.unavailable,
     this.available = true,
     this.unavailableReason,
+    this.intercity = false,
+    this.bidCeilingPercent,
+    this.fareStepVnd = defaultFareStepVnd,
   });
+
+  /// Fallback when an older server sends no `fareStepVnd` (MOB-001).
+  static const defaultFareStepVnd = 1000;
+
+  /// Server fare step: every bid, counter and raise is a multiple of it.
+  final int fareStepVnd;
 
   final double distanceKm;
   final int referenceFareVnd;
@@ -58,6 +67,19 @@ class RideQuote {
   final bool available;
   final String? unavailableReason;
 
+  /// Server flag: trip leaves the pickup's served region (Liên tỉnh).
+  final bool intercity;
+
+  /// Admin ceiling as a percent of [referenceFareVnd] (130 = +30%).
+  final int? bidCeilingPercent;
+
+  /// Headroom above the reference the suggestion chips may split (ceiling − 100).
+  int? get bidHeadroomPercent {
+    final ceiling = bidCeilingPercent;
+    if (ceiling == null || ceiling <= 100) return null;
+    return ceiling - 100;
+  }
+
   bool allows(int amountVnd) =>
       amountVnd >= minBidVnd && amountVnd <= maxBidVnd;
 
@@ -78,7 +100,70 @@ class RideQuote {
   }
 }
 
+/// Admin `FOOD_DELIVERY_FEE_MODE`: [negotiate] lets drivers counter the
+/// customer's fee; [fixed] lets drivers only accept it.
+enum FoodDeliveryFeeMode { negotiate, fixed }
+
+/// Unknown/missing values keep the negotiation behaviour (older servers).
+FoodDeliveryFeeMode parseFoodDeliveryFeeMode(Object? raw) =>
+    raw is String && raw.toUpperCase() == 'FIXED'
+    ? FoodDeliveryFeeMode.fixed
+    : FoodDeliveryFeeMode.negotiate;
+
 /// A stop sent to the quote endpoints.
+/// `POST /v1/food/quote`: the fee is a suggestion; the customer offers an
+/// amount in [minOfferVnd]..[maxOfferVnd] (steps of [fareStepVnd]) and
+/// drivers accept or counter it.
+class FoodDeliveryQuote {
+  const FoodDeliveryQuote({
+    required this.suggestedVnd,
+    required this.minOfferVnd,
+    required this.maxOfferVnd,
+    required this.fareStepVnd,
+    this.feeMode = FoodDeliveryFeeMode.negotiate,
+  });
+
+  /// Older servers only send `deliveryFareVnd`: offer = suggestion, fixed.
+  const FoodDeliveryQuote.fixed(int fareVnd)
+    : suggestedVnd = fareVnd,
+      minOfferVnd = fareVnd,
+      maxOfferVnd = fareVnd,
+      fareStepVnd = 1000,
+      feeMode = FoodDeliveryFeeMode.negotiate;
+
+  final int suggestedVnd;
+  final int minOfferVnd;
+  final int maxOfferVnd;
+  final int fareStepVnd;
+
+  final FoodDeliveryFeeMode feeMode;
+
+  bool get negotiable => maxOfferVnd > minOfferVnd;
+
+  /// Drivers may propose another fee (false in FIXED mode).
+  bool get driversCanCounter => feeMode == FoodDeliveryFeeMode.negotiate;
+
+  /// Clamps [amount] into the bounds (the suggestion itself is always valid).
+  int clamp(int amount) {
+    if (amount < minOfferVnd) return minOfferVnd;
+    if (amount > maxOfferVnd) return maxOfferVnd;
+    return amount;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is FoodDeliveryQuote &&
+      other.suggestedVnd == suggestedVnd &&
+      other.minOfferVnd == minOfferVnd &&
+      other.maxOfferVnd == maxOfferVnd &&
+      other.fareStepVnd == fareStepVnd &&
+      other.feeMode == feeMode;
+
+  @override
+  int get hashCode =>
+      Object.hash(suggestedVnd, minOfferVnd, maxOfferVnd, fareStepVnd, feeMode);
+}
+
 typedef PricePoint = ({double lat, double lng, String label});
 
 class RideVehicleClassOption {
@@ -107,8 +192,8 @@ abstract interface class PricingRepository {
     required String accessToken,
   });
 
-  /// Delivery fare the server will charge for this store and drop-off.
-  Future<int> quoteFoodDelivery({
+  /// Suggested delivery fee plus the bounds the customer may offer within.
+  Future<FoodDeliveryQuote> quoteFoodDelivery({
     required String accessToken,
     required String storeId,
     required PricePoint dropoff,

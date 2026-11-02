@@ -25,7 +25,6 @@ Future<FoodOrderChange?> showMerchantOrderChangeSheet(
   return showModalBottomSheet<FoodOrderChange>(
     context: context,
     isScrollControlled: true,
-    showDragHandle: true,
     builder: (_) => MerchantOrderChangeSheet(
       orderId: orderId,
       lines: [

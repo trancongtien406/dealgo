@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/config/app_env.dart';
@@ -405,8 +406,14 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
     });
   }
 
+  /// pt5u: versions of Quy chế sử dụng + privacy the applicant ticked on the
+  /// review step; null until both boxes are checked (gates the submit button).
+  final ValueNotifier<List<AcceptedLegalDocument>?> legalConsent =
+      ValueNotifier(null);
+
   @override
   Future<void> close() async {
+    legalConsent.dispose();
     await _keeper?.flush();
     return super.close();
   }
@@ -713,6 +720,7 @@ class MerchantKybCubit extends Cubit<MerchantKybState> {
           accessToken: token,
           role: role,
           metadata: _metadataOf(state),
+          acceptedLegalDocuments: legalConsent.value ?? const [],
           documents: state.documentsRequired
               ? state.documents.uploads(state.documentKinds)
               : const [],

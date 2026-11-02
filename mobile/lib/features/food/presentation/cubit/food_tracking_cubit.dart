@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/network/request_failure.dart';
+import '../../../active_job/presentation/active_job_cache.dart';
+import '../utils/food_offline_snapshot.dart';
 import '../../../../core/realtime/snapshot_binding.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
 import '../../domain/entities/food_models.dart';
@@ -47,11 +51,15 @@ final class FoodTrackingOffline extends FoodTrackingState {
 }
 
 class FoodTrackingCubit extends Cubit<FoodTrackingState> {
-  FoodTrackingCubit({required this._getFoodOrder, required this.realtime})
-    : super(const FoodTrackingLoading());
+  FoodTrackingCubit({
+    required this._getFoodOrder,
+    required this.realtime,
+    this._offlineCache,
+  }) : super(const FoodTrackingLoading());
 
   final GetFoodOrder _getFoodOrder;
   final SnapshotRealtime realtime;
+  final ActiveJobCache? _offlineCache;
 
   SnapshotBinding? _binding;
   String? _orderId;
@@ -107,6 +115,13 @@ class FoodTrackingCubit extends Cubit<FoodTrackingState> {
         return;
       }
       emit(FoodTrackingReady(order));
+      unawaited(
+        _offlineCache?.recordJob(
+          foodOfflineSnapshot(order),
+          terminal: foodOrderEnded(order),
+          assignedDriverId: order.assignedDriverId,
+        ),
+      );
     } catch (error) {
       if (isClosed) {
         return;

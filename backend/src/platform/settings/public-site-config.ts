@@ -3,7 +3,12 @@
  * field is dropped so the website never renders a fake or placeholder link. No secrets here.
  */
 export type PublicSiteSocialKey =
-  'facebook' | 'tiktok' | 'zalo' | 'youtube' | 'instagram';
+  | 'facebook'
+  | 'messenger'
+  | 'tiktok'
+  | 'zalo'
+  | 'youtube'
+  | 'instagram';
 
 export type PublicSiteConfig = {
   appStoreUrl?: string;
@@ -24,6 +29,7 @@ export const PUBLIC_SITE_SOCIAL_HOSTS: Record<
   readonly string[]
 > = {
   facebook: ['facebook.com', 'www.facebook.com', 'm.facebook.com', 'fb.com'],
+  messenger: ['m.me', 'messenger.com', 'www.messenger.com'],
   tiktok: ['tiktok.com', 'www.tiktok.com'],
   zalo: ['zalo.me', 'oa.zalo.me'],
   youtube: ['youtube.com', 'www.youtube.com', 'youtu.be'],

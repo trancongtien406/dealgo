@@ -18,7 +18,7 @@ class DealGoInfoTip extends StatelessWidget {
       child: Semantics(
         button: true,
         label: message,
-        child: const Padding(
+        child: Padding(
           padding: EdgeInsets.all(DealGoSpacing.s4),
           child: Icon(
             Icons.info_outline_rounded,

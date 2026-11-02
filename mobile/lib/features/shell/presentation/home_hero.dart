@@ -62,7 +62,7 @@ class _LocationChip extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return Material(
       color: DealGoColors.card,
-      shape: StadiumBorder(side: const BorderSide(color: DealGoColors.border)),
+      shape: StadiumBorder(side: BorderSide(color: DealGoColors.border)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _pick(context),
@@ -90,7 +90,7 @@ class _LocationChip extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const Icon(
+                Icon(
                   DealGoIcons.expandMore,
                   size: 16,
                   color: DealGoColors.textSecondary,
@@ -129,9 +129,7 @@ class _BellState extends State<_Bell> {
         children: [
           Material(
             color: DealGoColors.card,
-            shape: const CircleBorder(
-              side: BorderSide(color: DealGoColors.border),
-            ),
+            shape: CircleBorder(side: BorderSide(color: DealGoColors.border)),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: () => context.push(
@@ -207,7 +205,6 @@ class _HomeSearchState extends State<HomeSearch> {
     final choice = await showModalBottomSheet<_HomeSearchKind>(
       context: context,
       useRootNavigator: true,
-      showDragHandle: true,
       builder: (sheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -282,7 +279,7 @@ class _HomeSearchState extends State<HomeSearch> {
       suffix: IconButton(
         onPressed: widget.onBook,
         tooltip: l10n.tabBook,
-        icon: const Icon(
+        icon: Icon(
           DealGoIcons.scan,
           color: DealGoColors.textSecondary,
           size: 22,

@@ -15,6 +15,7 @@ import type {
   IntentPatch,
   UpsertAttemptInput,
 } from './checkout.repository.js';
+import { RefundKeyConflictError } from './checkout.repository.js';
 
 type Row = Prisma.PaymentIntentGetPayload<object>;
 
@@ -69,6 +70,25 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
     return row ? toIntent(row) : null;
   }
 
+  async latestForEntityWithin(tx: unknown, entityType: PaymentEntityTypeName, entityId: string) {
+    const db = (tx as Prisma.TransactionClient | null) ?? this.db;
+    // Lock every attempt for the job: reserveRefund's UPDATE waits until the completion commits.
+    await db.$queryRaw`
+      SELECT 1 FROM "payment_intents"
+       WHERE "entityType"::text = ${entityType} AND "entityId"::text = ${entityId}
+       FOR UPDATE`;
+    const row = await db.paymentIntent.findFirst({
+      where: { entityType, entityId },
+      orderBy: { updatedAt: 'desc' },
+    });
+    return row ? toIntent(row) : null;
+  }
+
+  async settleWithin(tx: unknown, id: string, at: Date) {
+    const db = (tx as Prisma.TransactionClient | null) ?? this.db;
+    await db.paymentIntent.update({ where: { id }, data: { settledAt: at } });
+  }
+
   async findByEntityMethod(entityType: PaymentEntityTypeName, entityId: string, method: PaymentMethodName) {
     const row = await this.db.paymentIntent.findUnique({
       where: { entityType_entityId_method: { entityType, entityId, method } },
@@ -116,6 +136,14 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
 
   async update(id: string, patch: IntentPatch) {
     return toIntent(await this.db.paymentIntent.update({ where: { id }, data: patch }));
+  }
+
+  async transition(id: string, fromStatuses: readonly PaymentIntentStatusName[], patch: IntentPatch) {
+    const { count } = await this.db.paymentIntent.updateMany({
+      where: { id, status: { in: [...fromStatuses] } },
+      data: patch,
+    });
+    return count === 1;
   }
 
   async recordEvent(provider: PaymentProviderName, eventId: string, intentId: string | null, status: string) {
@@ -171,7 +199,23 @@ export class PrismaCheckoutRepository implements CheckoutRepository {
   }
 
   async createRefund(input: Omit<CheckoutRefund, 'id' | 'createdAt' | 'updatedAt'>) {
-    return toRefund(await this.db.paymentRefund.create({ data: input }));
+    try {
+      return toRefund(await this.db.paymentRefund.create({ data: input }));
+    } catch (error) {
+      if (
+        input.idempotencyKey &&
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new RefundKeyConflictError();
+      }
+      throw error;
+    }
+  }
+
+  async findRefundByKey(idempotencyKey: string) {
+    const row = await this.db.paymentRefund.findUnique({ where: { idempotencyKey } });
+    return row ? toRefund(row) : null;
   }
 
   async updateRefund(id: string, patch: Partial<Pick<CheckoutRefund, 'status' | 'providerRefundRef'>>) {
@@ -208,6 +252,7 @@ function toRefund(row: Prisma.PaymentRefundGetPayload<object>): CheckoutRefund {
     amountVnd: row.amountVnd,
     status: row.status as RefundStatusName,
     requestId: row.requestId,
+    idempotencyKey: row.idempotencyKey,
     providerRefundRef: row.providerRefundRef,
     reason: row.reason,
     actorUserId: row.actorUserId,

@@ -22,6 +22,7 @@ import '../../../promotion/presentation/widgets/food_voucher_picker_sheet.dart';
 import '../../../promotion/presentation/widgets/voucher_field.dart';
 import '../cubit/food_cart_cubit.dart';
 import 'food_dropoff_tile.dart';
+import 'food_fare_widgets.dart';
 import 'food_widgets.dart';
 import 'food_badges.dart';
 import '../utils/food_routes.dart';
@@ -226,7 +227,7 @@ class _Receipt extends StatelessWidget {
   Widget build(BuildContext context) {
     final cart = context.watch<FoodCartCubit>().state;
     final subtotal = order?.subtotalVnd ?? cart.subtotalVnd;
-    final delivery = order?.deliveryFareVnd ?? cart.deliveryFareVnd ?? 0;
+    final delivery = order?.deliveryFareVnd ?? cart.offeredDeliveryFareVnd ?? 0;
     final total = order?.totalVnd ?? cart.previewTotalVnd;
     final discount = order?.discountVnd ?? cart.voucherDiscountVnd;
     final lines = order == null
@@ -287,7 +288,7 @@ class _Receipt extends StatelessWidget {
               const SizedBox(height: DealGoSpacing.s12),
               Row(
                 children: [
-                  const CircleAvatar(
+                  CircleAvatar(
                     radius: 20,
                     backgroundColor: DealGoColors.subtlePurple,
                     child: Icon(DealGoIcons.user, color: DealGoColors.primary),
@@ -360,6 +361,10 @@ class _Receipt extends StatelessWidget {
             storeId: cart.storeId,
             initialCode: cart.voucherCode,
           ),
+          if (cart.deliveryQuote?.negotiable ?? false) ...[
+            const SizedBox(height: DealGoSpacing.s16),
+            const FoodFareOfferPanel(),
+          ],
         ],
         const SizedBox(height: DealGoSpacing.s16),
         FoodPanel(
@@ -404,7 +409,7 @@ class _Receipt extends StatelessWidget {
               ),
               const SizedBox(height: DealGoSpacing.s8),
               DecoratedBox(
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: DealGoColors.amberSurface,
                   borderRadius: BorderRadius.all(Radius.circular(999)),
                 ),
@@ -482,7 +487,7 @@ class _SubmittingBody extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: DealGoSpacing.s8),
-              const DecoratedBox(
+              DecoratedBox(
                 decoration: BoxDecoration(
                   color: DealGoColors.amberSurface,
                   borderRadius: BorderRadius.all(Radius.circular(999)),
@@ -533,7 +538,7 @@ class _OfflineBody extends StatelessWidget {
       ),
       children: [
         const SizedBox(height: DealGoSpacing.s24),
-        const Center(
+        Center(
           child: FoodStateIcon(
             icon: DealGoIcons.offline,
             background: DealGoColors.dangerSurface,
@@ -603,7 +608,7 @@ class _RepricedBody extends StatelessWidget {
       ),
       children: [
         const SizedBox(height: DealGoSpacing.s24),
-        const Center(
+        Center(
           child: FoodStateIcon(
             icon: DealGoIcons.alert,
             background: DealGoColors.warningSurface,
@@ -712,8 +717,12 @@ class CheckoutHeldAttempt {
           lng: cart.dropoffLng!,
           label: cart.dropoffLabel.trim(),
         ),
-        // Display quote only; the server recomputes the fee at placement.
-        deliveryFareVnd: cart.deliveryFareVnd!,
+        // The customer's offer (suggestion by default); the server checks
+        // its bounds, and drivers accept or counter it after placement.
+        deliveryFareVnd: cart.offeredDeliveryFareVnd!,
+        deliveryOfferVnd: cart.deliveryQuote == null
+            ? null
+            : cart.offeredDeliveryFareVnd,
         voucherCode: cart.voucherCode,
         paymentMethod: paymentMethod,
       ),

@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -26,6 +27,11 @@ export class PatchRideVehicleClassDto {
   @IsOptional()
   @IsBoolean()
   parcelEnabled?: boolean;
+
+  /** RIDE-004/005: BIKE | CAR — decides car KYC documents, licence and commission. */
+  @IsOptional()
+  @IsIn(['BIKE', 'CAR'])
+  kind?: 'BIKE' | 'CAR';
 
   @IsOptional()
   @IsString()

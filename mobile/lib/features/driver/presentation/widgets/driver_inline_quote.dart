@@ -14,20 +14,34 @@ import '../../../ride/domain/entities/ride_models.dart';
 import '../../../ride/domain/entities/ride_money.dart';
 import '../../../ride/domain/params/submit_ride_offer_params.dart';
 import '../../../ride/domain/usecases/get_ride.dart';
+import '../../../ride/domain/ride_fare_presets.dart';
+import '../../../ride/presentation/widgets/ride_fare_raise_chips.dart';
 import '../../../ride/presentation/widgets/ride_negotiation_ui.dart';
 import '../../domain/usecases/submit_driver_ride_offer.dart';
 import '../cubit/driver_offer_cubit.dart';
 import '../utils/driver_routes.dart';
 import 'driver_widgets.dart';
+import 'ride_view_beacon.dart';
 
 /// Quotes this driver sent in this app session (rideId → amount), shared by
 /// the incoming-job card and the job list so both show the sent state.
 final driverSentQuotes = ValueNotifier<Map<String, int>>(const {});
 
 const driverQuoteStepVnd = 1000;
-const driverQuoteChips = [5000, 10000];
 
-/// inDrive-style inline quote: −/+ by fare step, +5k/+10k, one-tap accept of
+/// Counter chips on the customer's fare. [OpenRide.maxCounterVnd] is the cap
+/// the server will store; the headroom is that cap split in three.
+List<RideFarePreset> driverQuoteChips(OpenRide ride) {
+  final max = ride.maxCounterVnd;
+  return rideFareRaisePresets(
+    suggestedVnd: ride.offeredFareVnd,
+    maxBidVnd: max ?? ride.offeredFareVnd * 3,
+    maxHeadroomPercent:
+        ride.counterHeadroomPercent ?? (max == null ? 30 : null),
+  );
+}
+
+/// inDrive-style inline quote: −/+ by fare step, +10/20/30% amount chips, one-tap accept of
 /// the customer's price, send — no separate page. Server rules (min/max,
 /// cap, edit limit, expiry) still apply and surface inline.
 class DriverInlineQuote extends StatelessWidget {
@@ -56,13 +70,19 @@ class DriverInlineQuote extends StatelessWidget {
     try {
       getRide = context.read<GetRide>();
     } catch (_) {}
-    return BlocProvider(
-      create: (context) => DriverOfferCubit(
-        submitDriverRideOffer: submit!,
-        getRide: getRide,
-        realtime: realtime,
-      ),
-      child: _InlineQuote(ride: ride, onSent: onSent),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        RideViewBeacon(rideId: ride.id),
+        BlocProvider(
+          create: (context) => DriverOfferCubit(
+            submitDriverRideOffer: submit!,
+            getRide: getRide,
+            realtime: realtime,
+          ),
+          child: _InlineQuote(ride: ride, onSent: onSent),
+        ),
+      ],
     );
   }
 }
@@ -120,8 +140,17 @@ class _InlineQuoteState extends State<_InlineQuote> {
   }
 
   void _nudge(int delta) {
-    final next = _amount + delta;
-    if (next < widget.ride.offeredFareVnd) return;
+    final floor = widget.ride.offeredFareVnd;
+    final cap = widget.ride.maxCounterVnd;
+    var next = _amount + delta;
+    if (next < floor) return;
+    if (cap != null && next > cap) {
+      if (delta > 0 && _amount < cap) {
+        next = cap;
+      } else {
+        return;
+      }
+    }
     setState(() {
       _amount = next;
       _error = null;
@@ -232,56 +261,86 @@ class _InlineQuoteState extends State<_InlineQuote> {
           ] else ...[
             Row(
               children: [
-                IconButton.outlined(
+                _StepButton(
                   key: Key('driver-inline-minus-$id'),
+                  icon: Icons.remove,
                   onPressed: _amount > fare
                       ? () => _nudge(-driverQuoteStepVnd)
                       : null,
-                  icon: const Icon(Icons.remove),
                 ),
                 Expanded(
-                  child: Text(
-                    formatRideVnd(_amount),
-                    key: Key('driver-inline-amount-$id'),
-                    textAlign: TextAlign.center,
-                    style: text.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      formatRideVnd(_amount),
+                      key: Key('driver-inline-amount-$id'),
+                      textAlign: TextAlign.center,
+                      style: text.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                 ),
-                IconButton.outlined(
+                _StepButton(
                   key: Key('driver-inline-plus-$id'),
-                  onPressed: () => _nudge(driverQuoteStepVnd),
-                  icon: const Icon(Icons.add),
+                  icon: Icons.add,
+                  onPressed:
+                      widget.ride.maxCounterVnd != null &&
+                          _amount >= widget.ride.maxCounterVnd!
+                      ? null
+                      : () => _nudge(driverQuoteStepVnd),
                 ),
               ],
             ),
-            const SizedBox(height: DealGoSpacing.s8),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: DealGoSpacing.s8,
-              children: [
-                for (final step in driverQuoteChips)
-                  ActionChip(
-                    key: Key('driver-inline-chip-$step-$id'),
-                    label: Text('+${formatRideVnd(step)}'),
-                    onPressed: () => setState(() {
-                      _amount = fare + step;
-                      _error = null;
-                    }),
-                  ),
-              ],
+            const SizedBox(height: DealGoSpacing.s4),
+            RideFareRaiseChips(
+              keyPrefix: 'driver-inline-chip',
+              keySuffix: '-$id',
+              presets: driverQuoteChips(widget.ride),
+              selectedVnd: _amount,
+              onPick: (amount) => setState(() {
+                _amount = amount;
+                _error = null;
+              }),
             ),
             const SizedBox(height: DealGoSpacing.s8),
-            DealGoPrimaryButton(
-              key: Key('driver-inline-send-$id'),
-              label: _amount == fare
-                  ? l10n.rideAcceptAmount(formatRideVnd(fare))
-                  : l10n.driverSendQuoteAmount(formatRideVnd(_amount)),
-              compact: true,
-              isLoading: _busy,
-              enabled: !_busy,
-              onPressed: () => _send(_amount),
+            Row(
+              children: [
+                if (_amount != fare) ...[
+                  Expanded(
+                    child: OutlinedButton(
+                      key: Key('driver-inline-accept-$id'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 40),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: DealGoSpacing.s8,
+                        ),
+                      ),
+                      onPressed: _busy ? null : () => _send(fare),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          l10n.rideAcceptAmount(formatRideVnd(fare)),
+                          maxLines: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: DealGoSpacing.s8),
+                ],
+                Expanded(
+                  child: DealGoPrimaryButton(
+                    key: Key('driver-inline-send-$id'),
+                    label: _amount == fare
+                        ? l10n.rideAcceptAmount(formatRideVnd(fare))
+                        : l10n.driverSendQuoteAmount(formatRideVnd(_amount)),
+                    compact: true,
+                    isLoading: _busy,
+                    enabled: !_busy,
+                    onPressed: () => _send(_amount),
+                  ),
+                ),
+              ],
             ),
           ],
           if (_error case final err?)
@@ -295,6 +354,24 @@ class _InlineQuoteState extends State<_InlineQuote> {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _StepButton extends StatelessWidget {
+  const _StepButton({required this.icon, required this.onPressed, super.key});
+
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton.outlined(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 18),
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+      padding: EdgeInsets.zero,
     );
   }
 }

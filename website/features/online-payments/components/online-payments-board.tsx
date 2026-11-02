@@ -253,6 +253,8 @@ function IntentDetail({ intent }: { intent: OpsPaymentIntentDetail }) {
   const [amount, setAmount] = useState(refundable > 0 ? String(refundable) : "");
   const [confirming, setConfirming] = useState<number | null>(null);
   const [amountError, setAmountError] = useState<string | null>(null);
+  // One key per confirmed refund; reused if the same confirmation is retried.
+  const [refundKey, setRefundKey] = useState<string>("");
   const mutation = useRefundPaymentIntentMutation();
 
   const rows: [string, string][] = [
@@ -275,6 +277,7 @@ function IntentDetail({ intent }: { intent: OpsPaymentIntentDetail }) {
       return;
     }
     setAmountError(null);
+    setRefundKey(crypto.randomUUID());
     setConfirming(parsed.amountVnd);
   };
 
@@ -365,7 +368,12 @@ function IntentDetail({ intent }: { intent: OpsPaymentIntentDetail }) {
           pending={mutation.isPending}
           onClose={() => setConfirming(null)}
           onConfirm={async (reason) => {
-            await mutation.mutateAsync({ id: intent.id, amountVnd: confirming, reason: reason.slice(0, 200) });
+            await mutation.mutateAsync({
+              id: intent.id,
+              amountVnd: confirming,
+              reason: reason.slice(0, 200),
+              idempotencyKey: refundKey || crypto.randomUUID(),
+            });
           }}
         />
       ) : null}

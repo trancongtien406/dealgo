@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RideLedger, type CreateRideInput } from './ride-ledger.js';
+import { exactPendingAccept, RideLedger, type CreateRideInput } from './ride-ledger.js';
 
 describe('RideLedger Domain Logic', () => {
   const now = new Date('2026-10-16T10:00:00.000Z');
@@ -375,6 +375,54 @@ describe('RideLedger Domain Logic', () => {
       expect(reassigned.ride?.status).toBe('NEGOTIATING');
       expect(reassigned.ride?.assignedDriverId).toBeNull();
       expect(reassigned.ride?.agreedFareVnd).toBeNull();
+    });
+  });
+
+  describe('setAutoAccept', () => {
+    it('stores the opt-in only while negotiating and picks the exact accept', () => {
+      const ledger = new RideLedger();
+      const created = ledger.create(baseInput);
+      const rideId = created.ride!.id;
+      const turnedOn = ledger.setAutoAccept({
+        rideId,
+        customerId: 'cust-1',
+        enabled: true,
+        now,
+      });
+      expect(turnedOn.ride?.autoAcceptOfferedFare).toBe(true);
+
+      const counter = ledger.offer({
+        rideId,
+        driverId: 'driver-1',
+        amountVnd: 55_000,
+        expiresAt: future,
+        now,
+      });
+      expect(exactPendingAccept(counter.ride!, now)).toBeNull();
+
+      const accepted = ledger.offer({
+        rideId,
+        driverId: 'driver-1',
+        amountVnd: 50_000,
+        expiresAt: future,
+        now,
+      });
+      expect(exactPendingAccept(accepted.ride!, now)?.driverId).toBe('driver-1');
+
+      ledger.select({
+        rideId,
+        customerId: 'cust-1',
+        offerId: accepted.ride!.offers[0]!.id,
+        idempotencyKey: 'pick-1',
+        now,
+      });
+      const locked = ledger.setAutoAccept({
+        rideId,
+        customerId: 'cust-1',
+        enabled: false,
+        now,
+      });
+      expect(locked.error).toBe('RIDE_NOT_NEGOTIATING');
     });
   });
 

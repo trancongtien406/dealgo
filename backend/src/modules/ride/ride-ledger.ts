@@ -129,6 +129,11 @@ export type RideSnapshot = {
   priorFeesVnd: number;
   /** Customer fare raises so far (each one opens a new negotiation round). */
   fareRaiseCount: number;
+  /**
+   * Customer opted in to take the first live ACCEPT at the current offered fare.
+   * A counter at any other price still waits for a tap.
+   */
+  autoAcceptOfferedFare?: boolean;
   /** EXPIRED ride this request re-posts. */
   repostOfRideId: string | null;
   offers: RideOfferSnapshot[];
@@ -234,6 +239,13 @@ export type RideFeePolicy = {
   amountVnd: number;
 };
 
+export type SetAutoAcceptInput = {
+  rideId: string;
+  customerId: string;
+  enabled: boolean;
+  now: Date;
+};
+
 export type RaiseFareInput = {
   rideId: string;
   customerId: string;
@@ -297,6 +309,11 @@ export type SelectInput = {
   maxConcurrentJobs?: number;
   /** DEC-PROD-024: optional voucher redeemed in the same transaction as the selection. */
   voucherCode?: string;
+  /**
+   * RIDE-003: rides whose PENDING offers from the newly assigned driver were withdrawn in the
+   * selection transaction (called after commit so callers can refresh those offer lists).
+   */
+  onOffersWithdrawn?: (rideIds: string[]) => void;
 };
 
 export type CancelInput = {
@@ -351,6 +368,8 @@ export type OpenRideListing = {
   offerCount: number;
   stops: GeoPoint[];
   routeVersion: number;
+  /** t82u: priced road distance (km); null/absent for legacy rows. */
+  routeDistanceKm?: number | null;
 };
 
 type RideRow = {
@@ -384,6 +403,7 @@ type RideRow = {
   cancelReasonCode: string | null;
   priorFeesVnd: number;
   fareRaiseCount: number;
+  autoAcceptOfferedFare: boolean;
   repostOfRideId: string | null;
   stops: StopRow[];
   routeVersion: number;
@@ -528,6 +548,7 @@ export class RideLedger {
       cancelReasonCode: null,
       priorFeesVnd: 0,
       fareRaiseCount: 0,
+      autoAcceptOfferedFare: false,
       repostOfRideId: input.repostOfRideId ?? null,
       stops: (input.stops ?? []).map((stop, index) => ({
         seq: index + 1,
@@ -848,6 +869,24 @@ export class RideLedger {
     ride.priorFeesVnd = charges.reduce((sum, charge) => sum + charge.amountVnd, 0);
     ride.updatedAt = now;
     this.dirtyRideIds.add(ride.id);
+  }
+
+  /** Customer opts in or out of taking an exact-price ACCEPT without another tap. */
+  setAutoAccept(input: SetAutoAcceptInput): LedgerOutcome {
+    const ride = this.rides.get(input.rideId);
+    if (!ride || ride.customerId !== input.customerId) {
+      return { error: 'RIDE_NOT_FOUND' };
+    }
+    this.expireIfDue(ride, input.now);
+    if (ride.status !== 'NEGOTIATING') {
+      return { error: 'RIDE_NOT_NEGOTIATING' };
+    }
+    if (ride.autoAcceptOfferedFare !== input.enabled) {
+      ride.autoAcceptOfferedFare = input.enabled;
+      ride.updatedAt = input.now;
+      this.dirtyRideIds.add(ride.id);
+    }
+    return { ride: this.snapshot(ride) };
   }
 
   /** Customer raises the bid (inDrive). Increase only; extends the request window. */
@@ -1577,6 +1616,7 @@ export class RideLedger {
       cancelReasonCode: ride.cancelReasonCode,
       priorFeesVnd: ride.priorFeesVnd,
       fareRaiseCount: ride.fareRaiseCount,
+      autoAcceptOfferedFare: ride.autoAcceptOfferedFare,
       repostOfRideId: ride.repostOfRideId,
       stops: ride.stops.map((stop) => ({
         ...stop,
@@ -1631,6 +1671,7 @@ export function rideRowFromRecord(input: {
   cancelReasonCode?: string | null;
   priorFeesVnd?: number;
   fareRaiseCount?: number;
+  autoAcceptOfferedFare?: boolean;
   repostOfRideId?: string | null;
   stops?: RideStopSnapshot[];
   routeVersion?: number;
@@ -1655,6 +1696,7 @@ export function rideRowFromRecord(input: {
     stopWaitFeeVndPerMinute: input.stopWaitFeeVndPerMinute ?? 0,
     waitFeeVnd: input.waitFeeVnd ?? 0,
     fareRaiseCount: input.fareRaiseCount ?? 0,
+    autoAcceptOfferedFare: input.autoAcceptOfferedFare ?? false,
     repostOfRideId: input.repostOfRideId ?? null,
     assignedAt: input.assignedAt ?? null,
     statusChangedAt: input.statusChangedAt ?? input.updatedAt,
@@ -1690,4 +1732,23 @@ export function stopWaitFeeVnd(
     total += Math.max(0, waited - Math.max(0, freeMinutes)) * feePerMinuteVnd;
   }
   return total;
+}
+
+/** Oldest live ACCEPT at the customer's current price, when auto-accept is on. */
+export function exactPendingAccept(
+  ride: Pick<RideSnapshot, 'status' | 'offeredFareVnd' | 'autoAcceptOfferedFare' | 'offers'>,
+  now: Date,
+): RideOfferSnapshot | null {
+  if (ride.autoAcceptOfferedFare !== true || ride.status !== 'NEGOTIATING') {
+    return null;
+  }
+  return (
+    ride.offers.find(
+      (offer) =>
+        offer.status === 'PENDING' &&
+        offer.kind === 'ACCEPT' &&
+        offer.amountVnd === ride.offeredFareVnd &&
+        offer.expiresAt.getTime() > now.getTime(),
+    ) ?? null
+  );
 }

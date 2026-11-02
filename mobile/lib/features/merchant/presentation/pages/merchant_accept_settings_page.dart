@@ -120,12 +120,11 @@ class _MerchantAcceptSettingsPageState
     final l10n = AppLocalizations.of(context);
     final picked = await showModalBottomSheet<(T,)>(
       context: context,
-      showDragHandle: true,
       builder: (sheetContext) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(
             DealGoSpacing.s16,
-            0,
+            DealGoSpacing.s20,
             DealGoSpacing.s16,
             DealGoSpacing.s16,
           ),

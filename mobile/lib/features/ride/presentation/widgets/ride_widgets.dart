@@ -11,6 +11,7 @@ import '../../../../core/network/api_exception.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
 import '../../domain/entities/ride_models.dart';
+import '../utils/ride_distance.dart';
 import '../utils/ride_vehicle_label.dart';
 import '../../../../l10n/app_localizations.dart';
 
@@ -29,48 +30,30 @@ bool rideFailureIsOffline(Object error) {
   return error.statusCode == 0 || error.errorCode == 'NETWORK_ERROR';
 }
 
-/// Drag handle used on ride bottom sheets (C002 / C003).
-class RideSheetHandle extends StatelessWidget {
-  const RideSheetHandle({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 36,
-        height: 4,
-        decoration: BoxDecoration(
-          color: DealGoColors.border,
-          borderRadius: BorderRadius.circular(DealGoRadius.pill),
-        ),
-      ),
-    );
-  }
-}
-
 class RidePanel extends StatelessWidget {
   const RidePanel({
     required this.child,
-    this.color = DealGoColors.card,
+    this.color,
     this.padding = const EdgeInsets.all(DealGoSpacing.s16),
     this.elevated = false,
     super.key,
   });
 
   final Widget child;
-  final Color color;
+  final Color? color;
   final EdgeInsetsGeometry padding;
   final bool elevated;
 
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(DealGoRadius.card);
+    final fill = color ?? DealGoColors.card;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: color,
+        color: fill,
         borderRadius: radius,
         border: Border.all(
-          color: color == DealGoColors.card
+          color: fill == DealGoColors.card
               ? DealGoColors.border
               : Colors.transparent,
         ),
@@ -90,7 +73,7 @@ class RideBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: DealGoColors.card,
         borderRadius: BorderRadius.vertical(
           top: Radius.circular(DealGoRadius.sheet),
@@ -110,9 +93,10 @@ class RideDraggableSheet extends StatelessWidget {
   const RideDraggableSheet({
     required this.builder,
     this.initialChildSize = 0.46,
-    this.minChildSize = 0.28,
+    this.minChildSize = 0.4,
     this.maxChildSize = 0.88,
-    this.snapSizes = const [0.28, 0.46, 0.72],
+    this.snapSizes = const [0.4, 0.46, 0.72],
+    this.controller,
     super.key,
   });
 
@@ -122,10 +106,12 @@ class RideDraggableSheet extends StatelessWidget {
   final double minChildSize;
   final double maxChildSize;
   final List<double> snapSizes;
+  final DraggableScrollableController? controller;
 
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
+      controller: controller,
       initialChildSize: initialChildSize,
       minChildSize: minChildSize,
       maxChildSize: maxChildSize,
@@ -392,7 +378,7 @@ class RideStopField extends StatelessWidget {
         color: DealGoColors.card,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(DealGoRadius.input),
-          side: const BorderSide(color: DealGoColors.border),
+          side: BorderSide(color: DealGoColors.border),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -536,14 +522,15 @@ class RideMoneyLine extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: DealGoSpacing.s4),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
+          Flexible(
             child: Text(
               label,
               style: emphasize ? textTheme.titleMedium : textTheme.bodyMedium,
             ),
           ),
-          const SizedBox(width: DealGoSpacing.s8),
+          const SizedBox(width: DealGoSpacing.s16),
           Flexible(
             child: Text(
               amount,
@@ -787,3 +774,75 @@ List<double> rideSheetSnapSizes(List<double> wanted, double maxSize) => [
   for (final size in wanted)
     if (size < maxSize - 0.01) size,
 ];
+
+/// Compact trip summary from server route data: "5,2 km · 14 phút".
+/// Renders nothing when the server sent neither value.
+class RideTripSummary extends StatelessWidget {
+  const RideTripSummary({
+    required this.distanceKm,
+    required this.durationMin,
+    super.key,
+  });
+
+  final double? distanceKm;
+  final int? durationMin;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final km = distanceKm;
+    final min = durationMin;
+    final hasKm = km != null && km > 0;
+    final hasMin = min != null && min > 0;
+    if (!hasKm && !hasMin) return const SizedBox.shrink();
+    final style = Theme.of(context).textTheme.labelLarge
+        ?.copyWith(color: DealGoColors.text, fontWeight: FontWeight.w700);
+    Widget item(IconData icon, String label, Key key) => Row(
+      key: key,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 18, color: DealGoColors.primary),
+        const SizedBox(width: DealGoSpacing.s6),
+        Text(label, style: style),
+      ],
+    );
+    return Container(
+      key: const Key('ride-trip-summary'),
+      padding: const EdgeInsets.symmetric(
+        horizontal: DealGoSpacing.s12,
+        vertical: DealGoSpacing.s8,
+      ),
+      decoration: BoxDecoration(
+        color: DealGoColors.lavender,
+        borderRadius: BorderRadius.circular(DealGoRadius.input),
+      ),
+      child: Row(
+        children: [
+          if (hasKm)
+            item(
+              DealGoIcons.route,
+              l10n.rideDistanceKm(formatRideKm(km)),
+              const Key('ride-trip-km'),
+            ),
+          if (hasKm && hasMin)
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: DealGoSpacing.s12,
+              ),
+              child: Container(
+                width: 1,
+                height: 16,
+                color: DealGoColors.border,
+              ),
+            ),
+          if (hasMin)
+            item(
+              DealGoIcons.clock,
+              l10n.rideEtaMinutes(min),
+              const Key('ride-trip-eta'),
+            ),
+        ],
+      ),
+    );
+  }
+}

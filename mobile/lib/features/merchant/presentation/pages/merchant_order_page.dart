@@ -59,14 +59,14 @@ class MerchantOrderPage extends StatelessWidget {
       create: (context) {
         final auth = context.read<AuthCubit>();
         return MerchantOrderCubit(
-          getMerchantOrder: context.read<GetMerchantOrder>(),
-          acceptMerchantOrder: context.read<AcceptMerchantOrder>(),
-          markMerchantOrderReady: context.read<MarkMerchantOrderReady>(),
-          rejectMerchantOrder: context.read<RejectMerchantOrder>(),
-          queue: context.read<MerchantQueueCubit>(),
-          order: order,
-          realtime: context.read<SnapshotRealtime>(),
-        )
+            getMerchantOrder: context.read<GetMerchantOrder>(),
+            acceptMerchantOrder: context.read<AcceptMerchantOrder>(),
+            markMerchantOrderReady: context.read<MarkMerchantOrderReady>(),
+            rejectMerchantOrder: context.read<RejectMerchantOrder>(),
+            queue: context.read<MerchantQueueCubit>(),
+            order: order,
+            realtime: context.read<SnapshotRealtime>(),
+          )
           ..loadLines(merchantAccessToken(context))
           ..startAutoRefresh(() {
             final s = auth.state;
@@ -269,7 +269,7 @@ class _Detail extends StatelessWidget {
                   const SizedBox(height: DealGoSpacing.s12),
                   Row(
                     children: [
-                      const CircleAvatar(
+                      CircleAvatar(
                         backgroundColor: DealGoColors.subtlePurple,
                         child: Icon(
                           DealGoIcons.user,
@@ -575,7 +575,7 @@ class _Detail extends StatelessWidget {
                     value: formatVnd(order.subtotalVnd),
                   ),
                   MerchantMoneyRow(
-                    label: l10n.merchantDeliveryFeeLabel,
+                    label: merchantDeliveryFeeLabel(l10n, order.status),
                     value: formatVnd(order.deliveryFareVnd),
                   ),
                   MerchantMoneyRow(
@@ -644,15 +644,19 @@ class _Detail extends StatelessWidget {
     if (choice == null || !context.mounted) {
       return;
     }
-    final l10n = AppLocalizations.of(context);
     final rejected = await onReject(choice.reason, choice.note);
     if (!rejected || !context.mounted) {
       return;
     }
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(l10n.merchantRejectDone)));
-    merchantBack(context);
+    _leaveDeclinedOrder(context);
   }
+}
+
+void _leaveDeclinedOrder(BuildContext context) {
+  final l10n = AppLocalizations.of(context);
+  ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text(l10n.merchantRejectDone)));
+  merchantReturnToOrders(context);
 }
 
 class _Conflict extends StatelessWidget {
@@ -702,7 +706,7 @@ class _Conflict extends StatelessWidget {
                   value: formatVnd(order.subtotalVnd),
                 ),
                 MerchantMoneyRow(
-                  label: l10n.merchantDeliveryFeeLabel,
+                  label: merchantDeliveryFeeLabel(l10n, order.status),
                   value: formatVnd(order.deliveryFareVnd),
                 ),
                 MerchantMoneyRow(
@@ -835,3 +839,10 @@ void openMerchantCustomerChat(BuildContext context, MerchantQueueOrder order) {
     counterpart: name.isEmpty ? null : ChatCounterpart(name: name),
   );
 }
+
+/// Once a driver is assigned the delivery fee is the one agreed between the
+/// customer and the driver; before that it is only the customer's offer.
+String merchantDeliveryFeeLabel(AppLocalizations l10n, String status) =>
+    const {'ASSIGNED', 'PICKED_UP', 'DELIVERED'}.contains(status)
+    ? l10n.merchantFareAgreed
+    : l10n.merchantDeliveryFeeLabel;

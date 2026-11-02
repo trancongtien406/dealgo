@@ -233,7 +233,7 @@ All pages read Nest through the `/api/ops/*` BFF; none renders fixtures.
 | A020 | Danh sách cửa hàng | `/stores` | LIVE | |
 | A021 | Chi tiết cửa hàng | `/stores/[code]` | LIVE | |
 | A022 | Duyệt hồ sơ cửa hàng | `/stores/approvals` | LIVE | |
-| A023 | Kiểm duyệt sản phẩm / thực đơn | `/catalog/moderation` | LIVE | Approve/reject items |
+| A023 | Kiểm duyệt sản phẩm / thực đơn | `/catalog/moderation` | LIVE | Queue filtered by PENDING / APPROVED / REJECTED with counts; detail drawer approve / reject (reason). New items start PENDING (DB default PENDING); a merchant cannot put a non-APPROVED item on sale (`FOOD_ITEM_NOT_APPROVED`) (FOOD-001 / ADM-002) |
 | A024 | Danh sách giao dịch | `/transactions` | LIVE | Read-only |
 | A025 | Đối soát & thanh toán đối tác | `/settlements`, `/stores/[code]` | PARTIAL | Day buckets (ICT) read-only; store commission statement per `MERCHANT_SETTLEMENT_CYCLE_DAYS` with "store paid" record; **no payout execution** |
 | A026 | Xử lý hoàn tiền | `/refunds` | PARTIAL | List only (COD — no refund rail) |

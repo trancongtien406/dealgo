@@ -5,7 +5,8 @@ import '../../motion/dealgo_page_transitions.dart';
 import '../tokens/dealgo_tokens.dart';
 
 abstract final class DealGoTheme {
-  static final ThemeData light = _light();
+  static final ThemeData light = _build(DealGoPalette.light);
+  static final ThemeData dark = _build(DealGoPalette.dark);
 
   /// Status bar for our light canvas: dark icons (time, battery) on a
   /// transparent bar. iOS otherwise follows the device appearance and shows
@@ -23,9 +24,10 @@ abstract final class DealGoTheme {
     statusBarBrightness: Brightness.dark,
   );
 
-  static ThemeData _light() {
-    const text = DealGoColors.text;
-    const secondary = DealGoColors.textSecondary;
+  static ThemeData _build(DealGoPalette colors) {
+    final text = colors.text;
+    final secondary = colors.textSecondary;
+    final dark = colors == DealGoPalette.dark;
     final baseline = Typography.material2021().black.apply(
       bodyColor: text,
       displayColor: text,
@@ -36,14 +38,14 @@ abstract final class DealGoTheme {
       TextStyle? source, {
       required double fontSize,
       required FontWeight fontWeight,
-      Color color = text,
+      Color? color,
       double height = 1.4,
       double letterSpacing = 0,
     }) {
       return (source ?? const TextStyle()).copyWith(
         fontSize: fontSize,
         fontWeight: fontWeight,
-        color: color,
+        color: color ?? text,
         height: height,
         letterSpacing: letterSpacing,
       );
@@ -140,18 +142,18 @@ abstract final class DealGoTheme {
       seedColor: DealGoColors.primary,
       primary: DealGoColors.primary,
       onPrimary: Colors.white,
-      primaryContainer: DealGoColors.subtlePurple,
-      onPrimaryContainer: DealGoColors.primaryDeep,
-      surface: DealGoColors.canvas,
+      primaryContainer: colors.subtlePurple,
+      onPrimaryContainer: colors.onPrimaryContainer,
+      surface: colors.canvas,
       onSurface: text,
       onSurfaceVariant: secondary,
-      surfaceContainerLowest: DealGoColors.card,
-      outline: DealGoColors.border,
-      outlineVariant: DealGoColors.divider,
+      surfaceContainerLowest: colors.card,
+      outline: colors.border,
+      outlineVariant: colors.divider,
       tertiary: DealGoColors.brandGreen,
       onTertiary: Colors.white,
       error: DealGoColors.danger,
-      errorContainer: DealGoColors.dangerSurface,
+      errorContainer: colors.dangerSurface,
     );
 
     OutlineInputBorder inputBorder(Color color, [double width = 1]) {
@@ -165,41 +167,41 @@ abstract final class DealGoTheme {
       useMaterial3: true,
       fontFamily: DealGoTypography.fontFamily,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: DealGoColors.canvas,
+      scaffoldBackgroundColor: colors.canvas,
       textTheme: textTheme,
-      dividerColor: DealGoColors.border,
+      dividerColor: colors.border,
       splashFactory: InkRipple.splashFactory,
       materialTapTargetSize: MaterialTapTargetSize.padded,
       visualDensity: VisualDensity.standard,
       pageTransitionsTheme: DealGoPageTransitions.theme,
-      iconTheme: const IconThemeData(color: text, size: 22),
-      dividerTheme: const DividerThemeData(
-        color: DealGoColors.divider,
+      iconTheme: IconThemeData(color: text, size: 22),
+      dividerTheme: DividerThemeData(
+        color: colors.divider,
         thickness: 1,
         space: 1,
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: DealGoColors.canvas,
+        backgroundColor: colors.canvas,
         foregroundColor: text,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         centerTitle: true,
         titleTextStyle: textTheme.titleMedium,
-        iconTheme: const IconThemeData(color: text, size: 22),
-        systemOverlayStyle: DealGoTheme.lightCanvasOverlay,
+        iconTheme: IconThemeData(color: text, size: 22),
+        systemOverlayStyle: dark
+            ? DealGoTheme.darkHeaderOverlay
+            : DealGoTheme.lightCanvasOverlay,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: DealGoColors.card,
+        fillColor: colors.card,
         isDense: false,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: DealGoSpacing.s16,
           vertical: DealGoSpacing.s16,
         ),
-        hintStyle: textTheme.bodyMedium?.copyWith(
-          color: DealGoColors.textTertiary,
-        ),
+        hintStyle: textTheme.bodyMedium?.copyWith(color: colors.textTertiary),
         labelStyle: textTheme.bodyMedium?.copyWith(color: secondary),
         floatingLabelStyle: textTheme.labelMedium?.copyWith(
           color: DealGoColors.primary,
@@ -208,9 +210,9 @@ abstract final class DealGoTheme {
         errorStyle: textTheme.bodySmall?.copyWith(color: DealGoColors.danger),
         prefixIconColor: secondary,
         suffixIconColor: secondary,
-        border: inputBorder(DealGoColors.border),
-        enabledBorder: inputBorder(DealGoColors.border),
-        disabledBorder: inputBorder(DealGoColors.divider),
+        border: inputBorder(colors.border),
+        enabledBorder: inputBorder(colors.border),
+        disabledBorder: inputBorder(colors.divider),
         focusedBorder: inputBorder(DealGoColors.primary, 1.6),
         errorBorder: inputBorder(DealGoColors.danger),
         focusedErrorBorder: inputBorder(DealGoColors.danger, 1.6),
@@ -247,27 +249,27 @@ abstract final class DealGoTheme {
         ),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: DealGoColors.card,
-        selectedColor: DealGoColors.subtlePurple,
-        side: const BorderSide(color: DealGoColors.border),
+        backgroundColor: colors.card,
+        selectedColor: colors.subtlePurple,
+        side: BorderSide(color: colors.border),
         labelStyle: textTheme.labelMedium,
         shape: const StadiumBorder(),
         showCheckmark: false,
       ),
       checkboxTheme: CheckboxThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-        side: const BorderSide(color: DealGoColors.border, width: 1.5),
+        side: BorderSide(color: colors.border, width: 1.5),
         fillColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
               ? DealGoColors.primary
-              : DealGoColors.card,
+              : colors.card,
         ),
       ),
       radioTheme: RadioThemeData(
         fillColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
               ? DealGoColors.primary
-              : DealGoColors.border,
+              : colors.border,
         ),
       ),
       switchTheme: SwitchThemeData(
@@ -276,19 +278,18 @@ abstract final class DealGoTheme {
         trackColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
               ? DealGoColors.primary
-              : DealGoColors.border,
+              : colors.border,
         ),
       ),
-      progressIndicatorTheme: const ProgressIndicatorThemeData(
+      progressIndicatorTheme: ProgressIndicatorThemeData(
         color: DealGoColors.primary,
-        linearTrackColor: DealGoColors.subtlePurple,
+        linearTrackColor: colors.subtlePurple,
         circularTrackColor: Colors.transparent,
       ),
-      bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: DealGoColors.card,
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: colors.card,
         surfaceTintColor: Colors.transparent,
-        showDragHandle: true,
-        dragHandleColor: DealGoColors.border,
+        showDragHandle: false,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(
             top: Radius.circular(DealGoRadius.sheet),
@@ -296,7 +297,7 @@ abstract final class DealGoTheme {
         ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: DealGoColors.card,
+        backgroundColor: colors.card,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(DealGoRadius.card),
@@ -306,8 +307,12 @@ abstract final class DealGoTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: DealGoColors.text,
-        contentTextStyle: textTheme.bodyMedium?.copyWith(color: Colors.white),
+        backgroundColor: dark
+            ? const Color(0xFFF4F1FA)
+            : const Color(0xFF171B2C),
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
+          color: dark ? const Color(0xFF171B2C) : Colors.white,
+        ),
         actionTextColor: DealGoColors.primaryLight,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(DealGoRadius.input),
@@ -315,10 +320,12 @@ abstract final class DealGoTheme {
       ),
       tooltipTheme: TooltipThemeData(
         decoration: BoxDecoration(
-          color: DealGoColors.text,
+          color: dark ? const Color(0xFFF4F1FA) : const Color(0xFF171B2C),
           borderRadius: BorderRadius.circular(DealGoRadius.small),
         ),
-        textStyle: textTheme.labelSmall?.copyWith(color: Colors.white),
+        textStyle: textTheme.labelSmall?.copyWith(
+          color: dark ? const Color(0xFF171B2C) : Colors.white,
+        ),
       ),
       listTileTheme: ListTileThemeData(
         iconColor: DealGoColors.primary,
@@ -327,11 +334,11 @@ abstract final class DealGoTheme {
         minVerticalPadding: DealGoSpacing.s12,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: DealGoColors.card,
+        backgroundColor: colors.card,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         shadowColor: Colors.transparent,
-        indicatorColor: DealGoColors.subtlePurple,
+        indicatorColor: colors.subtlePurple,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return textTheme.labelSmall?.copyWith(

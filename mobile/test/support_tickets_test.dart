@@ -91,6 +91,98 @@ void main() {
     expect(find.text('Đã tiếp nhận'), findsWidgets);
   });
 
+  testWidgets(
+    'help center marks the picked topic with a border, no extra text',
+    (tester) async {
+      _tallPhone(tester);
+      await pumpSignedIn(tester, profile: customerProfile);
+      await _go(tester, '/customer/account/help');
+
+      Color? border(String topic) {
+        final material = tester.widget<Material>(
+          find
+              .descendant(
+                of: find.byKey(Key('help-topic-$topic')),
+                matching: find.byType(Material),
+              )
+              .first,
+        );
+        return (material.shape as RoundedRectangleBorder?)?.side.color;
+      }
+
+      final idle = border('food');
+      await tester.tap(find.byKey(const Key('help-topic-food')));
+      await tester.pumpAndSettle();
+
+      expect(border('food'), isNot(idle));
+      expect(border('ride'), idle);
+      expect(find.text('Chủ đề cho yêu cầu hỗ trợ'), findsNothing);
+    },
+  );
+
+  Future<void> pickCategory(WidgetTester tester, String name) async {
+    await tester.tap(find.byKey(const Key('support-category-field')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(Key('support-category-$name')));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('support sheets render without a drag handle', (tester) async {
+    _tallPhone(tester);
+    final support = FakeSupportRepository();
+    await pumpSignedIn(tester, profile: customerProfile, support: support);
+    await _go(tester, '/customer/account/help/tickets/new');
+
+    final dragHandle = find.byWidgetPredicate(
+      (w) => w.runtimeType.toString() == '_DragHandle',
+    );
+    await tester.tap(find.byKey(const Key('support-category-field')));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(dragHandle, findsNothing);
+    await tester.tap(find.byKey(const Key('support-category-ride')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('support-related-field')));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(dragHandle, findsNothing);
+  });
+
+  testWidgets('related jobs follow the picked category, never mixed', (
+    tester,
+  ) async {
+    _tallPhone(tester);
+    final support = FakeSupportRepository();
+    await pumpSignedIn(tester, profile: customerProfile, support: support);
+    await _go(tester, '/customer/account/help/tickets/new');
+
+    await pickCategory(tester, 'food');
+    await tester.tap(find.byKey(const Key('support-related-field')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('support-related-food-hist-1')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('support-related-ride-hist-1')), findsNothing);
+    await tester.tap(find.byKey(const Key('support-related-food-hist-1')));
+    await tester.pumpAndSettle();
+
+    await pickCategory(tester, 'ride');
+    await tester.tap(find.byKey(const Key('support-related-field')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('support-related-ride-hist-1')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('support-related-food-hist-1')), findsNothing);
+    await tester.tap(find.byKey(const Key('support-related-none')));
+    await tester.pumpAndSettle();
+
+    await pickCategory(tester, 'payment');
+    expect(find.byKey(const Key('support-related-field')), findsNothing);
+  });
+
   testWidgets('limit reached shows the server rule instead of a fake success', (
     tester,
   ) async {

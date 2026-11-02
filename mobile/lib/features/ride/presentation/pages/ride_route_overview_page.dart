@@ -14,6 +14,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../pricing/domain/pricing.dart';
 import '../../domain/entities/ride_models.dart';
 import '../../domain/entities/ride_money.dart';
+import '../utils/ride_quote_error.dart';
 import '../utils/ride_routes.dart';
 import '../utils/ride_vehicle_label.dart';
 import '../widgets/ride_widgets.dart';
@@ -35,6 +36,7 @@ class RideRouteOverviewPage extends StatefulWidget {
 class _RideRouteOverviewPageState extends State<RideRouteOverviewPage> {
   RideQuote? _quote;
   var _failed = false;
+  Object? _error;
 
   RidePlaces get places => widget.places;
 
@@ -88,9 +90,12 @@ class _RideRouteOverviewPageState extends State<RideRouteOverviewPage> {
           }
         });
       }
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
-        setState(() => _failed = true);
+        setState(() {
+          _failed = true;
+          _error = error;
+        });
       }
     }
   }
@@ -225,19 +230,29 @@ class _RideRouteOverviewPageState extends State<RideRouteOverviewPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const RideSheetHandle(),
                     const SizedBox(height: DealGoSpacing.s12),
                     Text(
                       l10n.rideRouteOverviewTitle,
                       style: textTheme.titleLarge,
                     ),
                     if (_failed)
-                      DealGoBanner(
-                        key: const Key('ride-quote-error'),
-                        tone: DealGoBannerTone.warning,
-                        message: l10n.rideQuoteError,
-                        actionLabel: l10n.actionRetry,
-                        onAction: () => unawaited(_load()),
+                      Builder(
+                        builder: (context) {
+                          final zone = rideQuoteZoneErrorText(l10n, _error);
+                          return DealGoBanner(
+                            key: Key(
+                              zone == null
+                                  ? 'ride-quote-error'
+                                  : 'ride-quote-zone-error',
+                            ),
+                            tone: DealGoBannerTone.warning,
+                            message: zone ?? l10n.rideQuoteError,
+                            actionLabel: zone == null ? l10n.actionRetry : null,
+                            onAction: zone == null
+                                ? () => unawaited(_load())
+                                : null,
+                          );
+                        },
                       )
                     else
                       Row(

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/config/api_base_url.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/ride_models.dart';
+import '../cubit/vehicle_class_catalog_cubit.dart';
 import '../../../../core/design_system/components/dealgo_network_image.dart';
 
 IconData rideVehicleClassIcon(String? code) {
@@ -24,6 +26,57 @@ String rideVehicleClassLabel(AppLocalizations l10n, String? code) {
     null || '' => l10n.rideVehicleLabel,
     _ => code,
   };
+}
+
+/// Admin catalog name for [code] when loaded, else the built-in label.
+/// Call from `build` only: it subscribes to [VehicleClassCatalogCubit].
+String rideVehicleClassName(BuildContext context, String? code) {
+  final adminName = context.select<VehicleClassCatalogCubit, String?>(
+    (catalog) => catalog.find(code)?.name,
+  );
+  return adminName ?? rideVehicleClassLabel(AppLocalizations.of(context), code);
+}
+
+/// Admin-uploaded photo for the vehicle class; [icon] only when there is no
+/// photo (or it fails to load). [imageUrl] wins over the catalog photo so a
+/// ride keeps the image it was booked with.
+class RideVehicleClassVisual extends StatelessWidget {
+  const RideVehicleClassVisual({
+    required this.code,
+    required this.icon,
+    this.imageUrl,
+    this.size = 24,
+    this.color = DealGoColors.primary,
+    super.key,
+  });
+
+  final String? code;
+  final IconData icon;
+  final String? imageUrl;
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final catalogImage = context.select<VehicleClassCatalogCubit, String?>(
+      (catalog) => catalog.find(code)?.imageUrl,
+    );
+    final resolved = resolveMediaUrl(imageUrl) ?? resolveMediaUrl(catalogImage);
+    final fallback = Icon(icon, size: size, color: color);
+    if (resolved == null) {
+      return fallback;
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size / 4),
+      child: DealGoNetworkImage(
+        resolved,
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        fallback: fallback,
+      ),
+    );
+  }
 }
 
 class RideVehicleClassPhoto extends StatelessWidget {

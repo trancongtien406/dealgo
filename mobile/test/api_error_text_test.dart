@@ -15,6 +15,21 @@ void main() {
     errorCode: code,
   );
 
+  test('driver reach, busy driver and unapproved item codes', () {
+    // Ride offer and food claim both answer DRIVER_TOO_FAR (409).
+    expect(apiErrorText(vi, err(409, 'DRIVER_TOO_FAR')), vi.apiErrDriverTooFar);
+    expect(apiErrorText(en, err(409, 'DRIVER_TOO_FAR')), en.apiErrDriverTooFar);
+    expect(
+      apiErrorText(vi, err(409, 'RIDE_OFFER_DRIVER_UNAVAILABLE')),
+      vi.apiErrOfferDriverUnavailable,
+    );
+    expect(
+      apiErrorText(vi, err(409, 'FOOD_ITEM_NOT_APPROVED')),
+      vi.apiErrItemNotApproved,
+    );
+    expect(vi.apiErrDriverTooFar, contains('quá xa'));
+  });
+
   test('known codes get their own sentence in both languages', () {
     expect(
       apiErrorText(vi, err(409, 'FOOD_ALREADY_ASSIGNED')),
@@ -39,6 +54,22 @@ void main() {
     expect(
       apiErrorText(vi, err(409, 'AUTH_PASSKEY_EXISTS')),
       vi.securityPasskeyExists,
+    );
+    expect(
+      apiErrorText(vi, err(403, 'CHAT_WINDOW_CLOSED')),
+      vi.apiErrChatWindowClosed,
+    );
+    expect(
+      apiErrorText(en, err(403, 'CHAT_WINDOW_CLOSED')),
+      en.apiErrChatWindowClosed,
+    );
+    expect(
+      apiErrorText(vi, err(409, 'CHAT_NO_COUNTERPART')),
+      vi.apiErrChatNoCounterpart,
+    );
+    expect(
+      apiErrorText(vi, err(403, 'CHAT_FORBIDDEN')),
+      vi.apiErrChatForbidden,
     );
     expect(apiErrorText(vi, err(0, 'NETWORK_ERROR')), vi.apiErrNetwork);
   });

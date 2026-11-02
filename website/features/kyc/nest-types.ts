@@ -6,11 +6,14 @@ export type NestPartnerRole = "DRIVER" | "MERCHANT";
 
 export type NestPartnerApplicationView = {
   id: string;
+  userId?: string;
   role: NestPartnerRole;
   status: NestPartnerStatus;
   metadata: Record<string, unknown>;
   /** Case detail only: applicant's account phone (ops can call). */
   applicantPhone?: string;
+  applicantEmail?: string | null;
+  applicantName?: string | null;
   documents: Array<{
     index?: number;
     kind?: string | null;

@@ -1,3 +1,4 @@
+import { DriverWorkloadService } from '../../../src/modules/dispatch/driver-workload.service.js';
 import { PlatformSettingsService } from '../../../src/platform/settings/platform-settings.service.js';
 import { PROD_ENV_OK } from '../../fixtures/prod-env.js';
 import { seedVehicleClassOnDriverGrant } from '../../support/driver-class-fixture.js';
@@ -58,6 +59,8 @@ import {
 } from '../../../src/integrations/email/email-suppression.repository.js';
 import { INTEGRATION_SETTINGS_REPOSITORY } from '../../../src/platform/integration-settings/integration-settings.constants.js';
 import { MemoryIntegrationSettingsRepository } from '../../../src/platform/integration-settings/integration-settings.repository.js';
+import { MemoryPublicPagesRepository } from '../../../src/modules/public-pages/public-pages.repository.js';
+import { PUBLIC_PAGES_REPOSITORY } from '../../../src/modules/public-pages/public-pages.types.js';
 import { RideVehicleClassService } from '../../../src/modules/ride-vehicle/ride-vehicle-class.service.js';
 
 const OPS_EMAIL = 'ops@dealgo.test';
@@ -324,6 +327,62 @@ describe('ride negotiation http', () => {
     expect(stored.body.data.status).toBe('ASSIGNED');
   });
 
+  it('t71u: offer TTL race — accept just before expiry wins, after expiry is 409 and the driver may re-offer', async () => {
+    const customer = await login();
+    const driver = await login();
+    await repository.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');
+    const rideId = (await postRide(customer.token, 'idem-t71u-race', 30_000)).body.data.id as string;
+    const first = await request(app.getHttpServer())
+      .post(`/v1/rides/${rideId}/offers`)
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ amountVnd: 35_000 })
+      .expect(200);
+    const offerId = first.body.data.offers[0].id as string;
+    const ttlMs = Date.parse(first.body.data.offers[0].expiresAt) - clock.now().getTime();
+    clock.advanceSeconds(Math.ceil(ttlMs / 1000) + 1);
+    const late = await selectRide(customer.token, rideId, offerId, 'idem-t71u-late');
+    expect(late.status).toBe(409);
+    expect(late.body.errorCode).toBe('RIDE_OFFER_EXPIRED');
+    // Driver re-offers on the still-open ride; selecting inside the fresh TTL succeeds.
+    const again = await request(app.getHttpServer())
+      .post(`/v1/rides/${rideId}/offers`)
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ amountVnd: 35_000 })
+      .expect(200);
+    const fresh = again.body.data.offers[0];
+    expect(fresh.status).toBe('PENDING');
+    expect(Date.parse(fresh.expiresAt)).toBeGreaterThan(clock.now().getTime());
+    clock.advanceSeconds(Math.max(0, Math.floor(ttlMs / 1000) - 1));
+    const ok = await selectRide(customer.token, rideId, fresh.id as string, 'idem-t71u-ok');
+    expect(ok.status).toBe(200);
+  });
+
+  it('t71u: a driver on an active job cannot bid and sees no open requests', async () => {
+    const customer = await login();
+    const driver = await login();
+    await repository.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');
+    const rideId = (await postRide(customer.token, 'idem-t71u-busy', 30_000)).body.data.id as string;
+    const workload = app.get(DriverWorkloadService);
+    workload.useSource({
+      activeJobCounts: async (ids) => new Map(ids.map((id) => [id, id === driver.userId ? 1 : 0])),
+    });
+    try {
+      const bid = await request(app.getHttpServer())
+        .post(`/v1/rides/${rideId}/offers`)
+        .set('Authorization', `Bearer ${driver.token}`)
+        .send({ amountVnd: 35_000 });
+      expect(bid.status).toBe(409);
+      expect(bid.body.errorCode).toBe('DRIVER_AT_CAPACITY');
+    } finally {
+      workload.useSource(null);
+    }
+    await request(app.getHttpServer())
+      .post(`/v1/rides/${rideId}/offers`)
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ amountVnd: 35_000 })
+      .expect(200);
+  });
+
   it('rejects selection of an expired offer', async () => {
     const customer = await login();
     const driver = await login();
@@ -388,7 +447,9 @@ describe('ride negotiation http', () => {
 
   it('rejects a fare above the TEST_ONLY maximum', async () => {
     const customer = await login();
-    const response = await postRide(customer.token, 'idem-fare-too-high', 500_001);
+    // 500_001 is within one fare step of the 500_000 cap and is clamped to it
+    // (stepFareWithinCap); a full step above the cap is rejected.
+    const response = await postRide(customer.token, 'idem-fare-too-high', 501_000);
     expect(response.status).toBe(400);
     expect(response.body.errorCode).toBe('RIDE_FARE_OUT_OF_RANGE');
   });
@@ -432,8 +493,12 @@ describe('ride negotiation http', () => {
       offerCount: 0,
       customerRating: { average: null, count: 0 },
       pickupDistanceKm: expect.any(Number),
+      tripDistanceKm: expect.toBeOneOf([null, expect.any(Number)]),
+      intercity: false,
       stops: [],
       routeVersion: 0,
+      maxCounterVnd: expect.any(Number),
+      counterHeadroomPercent: expect.any(Number),
       serviceKind: 'RIDE',
       parcel: null,
     });
@@ -998,6 +1063,49 @@ describe('ride negotiation http', () => {
     return code;
   }
 
+  it('re-checks the offering driver at selection (RIDE-002)', async () => {
+    const customer = await login();
+    const driver = await login();
+    await repository.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');
+    const created = await postRide(customer.token, 'idem-ride002-create', 30_000).expect(200);
+    const rideId = created.body.data.id as string;
+    const offer = await request(app.getHttpServer())
+      .post(`/v1/rides/${rideId}/offers`)
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ amountVnd: 40_000 })
+      .expect(200);
+    const offerId = offer.body.data.offers[0].id as string;
+    await request(app.getHttpServer())
+      .post('/v1/me/presence')
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ online: false })
+      .expect(200);
+    const refused = await selectRide(customer.token, rideId, offerId, 'idem-ride002-select-1');
+    expect(refused.status).toBe(409);
+    expect(refused.body.errorCode).toBe('RIDE_OFFER_DRIVER_UNAVAILABLE');
+    await goOnlineNearPickup(driver.token);
+    const ok = await selectRide(customer.token, rideId, offerId, 'idem-ride002-select-2');
+    expect(ok.status).toBe(200);
+  });
+
+  it('refuses an offer from a driver far from the pickup (RIDE-001)', async () => {
+    const customer = await login();
+    const driver = await login();
+    await repository.insertGrant(driver.userId, 'DRIVER', 'ACTIVE');
+    const created = await postRide(customer.token, 'idem-ride001-create', 30_000).expect(200);
+    await request(app.getHttpServer())
+      .post('/v1/me/presence')
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ online: true, lat: pickup.lat + 2, lng: pickup.lng })
+      .expect(200);
+    const far = await request(app.getHttpServer())
+      .post(`/v1/rides/${created.body.data.id}/offers`)
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ amountVnd: 40_000 });
+    expect(far.status).toBe(409);
+    expect(far.body.errorCode).toBe('DRIVER_TOO_FAR');
+  });
+
   async function assignRide(
     customer: { token: string; userId: string },
     driver: { token: string; userId: string },
@@ -1291,6 +1399,9 @@ describe('ride negotiation in production', () => {
       .useValue(sms)
       .overrideProvider(IDENTITY_REPOSITORY)
       .useValue(identity)
+      // pt5u: partner submit now reads the public legal pages (consent versions).
+      .overrideProvider(PUBLIC_PAGES_REPOSITORY)
+      .useValue(new MemoryPublicPagesRepository())
       .overrideProvider(DRIVER_PRESENCE_REPOSITORY)
       .useValue(new MemoryDriverPresenceRepository())
       .overrideProvider(AUTH_METHOD_POLICY_REPOSITORY)

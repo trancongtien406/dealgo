@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 import {
   clampToFareSteps,
   defaultRideVehicleClasses,
+  fareHeadroomPercent,
+  fareRaisePercents,
   isCarVehicleClassCode,
   quoteVehicleClassFare,
   rideBidCeilingVnd,
   rideBidFloorVnd,
   roundDownToFareStep,
   roundUpToFareStep,
+  stepFareWithinCap,
   vehicleClassCodeFromMetadata,
 } from './ride-vehicle-class.js';
 
@@ -118,5 +121,26 @@ describe('vehicleClassCodeFromMetadata', () => {
     expect(vehicleClassCodeFromMetadata(undefined)).toBeNull();
     expect(vehicleClassCodeFromMetadata(null)).toBeNull();
     expect(vehicleClassCodeFromMetadata({})).toBeNull();
+  });
+});
+
+describe('stepFareWithinCap', () => {
+  it('keeps a round-up that would pass the ceiling on the ceiling', () => {
+    const ceiling = rideBidCeilingVnd(46_000, 130);
+    expect(ceiling).toBe(59_000);
+    // 46.000 × 130% = 59.800, which rounds up to 60.000 and used to be rejected.
+    expect(stepFareWithinCap(59_800, ceiling)).toBe(59_000);
+    expect(stepFareWithinCap(59_000, ceiling)).toBe(59_000);
+  });
+
+  it('still rejects a full step above the ceiling', () => {
+    expect(stepFareWithinCap(60_000, 59_000)).toBe(60_000);
+  });
+
+  it('splits a configurable headroom in three', () => {
+    expect(fareRaisePercents(30)).toEqual([10, 20, 30]);
+    expect(fareRaisePercents(45)).toEqual([15, 30, 45]);
+    expect(fareHeadroomPercent(46_000, 59_000, 30)).toBe(28);
+    expect(fareHeadroomPercent(100_000, 130_000, 30)).toBe(30);
   });
 });

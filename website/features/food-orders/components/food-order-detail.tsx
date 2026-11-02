@@ -319,6 +319,40 @@ export function FoodOrderDetail({ code }: { code: string }) {
                 </DetailSection>
               ) : null}
               <DetailSection
+                id="food-delivery-fee"
+                title="Phí giao (thoả thuận)"
+                extra={
+                  <StatusChip tone={order.fee.agreed ? "success" : "brand"}>
+                    {order.fee.agreed ? "Đã chốt" : "Đang thương lượng"}
+                  </StatusChip>
+                }
+              >
+                <FieldList
+                  rows={[
+                    {
+                      label: "Phí gợi ý",
+                      value: order.fee.suggested == null ? "—" : vnd(order.fee.suggested),
+                    },
+                    {
+                      label: order.fee.agreed ? "Phí đã thoả thuận" : "Khách đang đề nghị",
+                      value: vnd(order.fee.current),
+                    },
+                    { label: "Số lần khách tăng giá", value: String(order.fee.raiseCount) },
+                    { label: "Chế độ phí giao", value: order.fee.mode ?? "—" },
+                  ]}
+                />
+                {order.fee.offers.length > 0 ? (
+                  <ul className="mt-3 space-y-1 text-sm">
+                    {order.fee.offers.map((offer) => (
+                      <li key={offer.id} className="flex justify-between gap-3">
+                        <span>{offer.driver} · {offer.status}</span>
+                        <span className="tabular-nums">{vnd(offer.amount)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </DetailSection>
+              <DetailSection
                 id="food-payment"
                 title="Chi tiết thanh toán & đối soát"
                 extra={<StatusChip tone="brand">{order.payment}</StatusChip>}

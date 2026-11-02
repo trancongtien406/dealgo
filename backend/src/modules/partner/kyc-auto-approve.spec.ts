@@ -45,6 +45,7 @@ async function setup(values: Record<string, unknown>) {
   const identity = new MemoryIdentityRepository();
   const { store } = createTestDocumentStore();
   const user = await identity.createUser({ email: null, phone: '+84988771234', displayName: 'Auto' });
+  await identity.updateUserProfile(user.id, { avatarUrl: 'https://cdn.example/auto.png' });
   const settings = {
     getJson: async (key: string) => (key in values ? values[key] : true),
   } as unknown as PlatformSettingsService;

@@ -284,7 +284,7 @@ class _ArrowChip extends StatelessWidget {
           ),
         ],
       ),
-      child: const SizedBox(
+      child: SizedBox(
         width: 26,
         height: 26,
         child: Icon(DealGoIcons.arrowRight, color: DealGoColors.text, size: 16),
@@ -401,7 +401,7 @@ class QuickBookCard extends StatelessWidget {
                       width: 36,
                       height: 36,
                     ),
-                    icon: const Icon(
+                    icon: Icon(
                       DealGoIcons.swapVert,
                       color: DealGoColors.textSecondary,
                       size: 18,
@@ -409,7 +409,7 @@ class QuickBookCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: DealGoSpacing.s8),
-                const SizedBox(
+                SizedBox(
                   height: 72,
                   child: VerticalDivider(
                     width: 1,
@@ -452,7 +452,7 @@ class QuickBookCard extends StatelessWidget {
                           const SizedBox(height: DealGoSpacing.s4),
                           Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 DealGoIcons.clock,
                                 size: 12,
                                 color: DealGoColors.textSecondary,
@@ -517,7 +517,7 @@ class _VehicleChip extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 2),
-            const Icon(
+            Icon(
               DealGoIcons.chevronRight,
               size: 14,
               color: DealGoColors.textSecondary,

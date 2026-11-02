@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getSupportPage } from "@/features/content-cms/fetch-public-page";
 import { localeFromLang } from "@/features/content-cms/types";
+import { getPublicSiteConfig } from "@/features/site-config/fetch-public";
 import { SupportClient } from "./support-client";
 
 type Props = { searchParams: Promise<{ lang?: string | string[] }> };
@@ -27,6 +28,7 @@ export async function generateMetadata({
 }
 
 export default async function SupportPage({ searchParams }: Props) {
-  const page = await getSupportPage(localeFromLang((await searchParams).lang));
-  return <SupportClient page={page} />;
+  const locale = localeFromLang((await searchParams).lang);
+  const [page, siteConfig] = await Promise.all([getSupportPage(locale), getPublicSiteConfig()]);
+  return <SupportClient page={page} messengerUrl={siteConfig.socials?.messenger} />;
 }

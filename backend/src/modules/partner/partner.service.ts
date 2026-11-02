@@ -1,4 +1,5 @@
 import { HttpException, Inject, Injectable, Optional } from '@nestjs/common';
+import { LegalConsentService } from '../legal-consent/legal-consent.service.js';
 import { RideVehicleClassService } from '../ride-vehicle/ride-vehicle-class.service.js';
 import { IDENTITY_REPOSITORY } from '../identity/identity.constants.js';
 import {
@@ -20,14 +21,16 @@ import {
   PARTNER_AUTO_APPROVE_FIELDS,
   licenseClassCoversVehicle,
   LICENSE_CLASSES_FOR_VEHICLE,
+  PARTNER_DRIVER_CAR_EXTRA_DOCUMENTS,
 } from './partner.constants.js';
-import { vehicleClassCodeFromMetadata } from '../ride-vehicle/ride-vehicle-class.js';
+import { isCarVehicleClassCode, vehicleClassCodeFromMetadata } from '../ride-vehicle/ride-vehicle-class.js';
 import type {
   OpsPartnerApplicationQueryDto,
   PartnerReviewIssueDto,
   SubmitPartnerApplicationDto,
 } from './partner.dto.js';
 import { partnerError } from './partner.error.js';
+import { missingCarExtraDocs, resolveCarExtraDocsGate } from './partner-car-docs-gate.js';
 import { shopPinFromMetadata } from './partner-shop-pin.js';
 import { PlatformSettingsService } from '../../platform/settings/platform-settings.service.js';
 import { DocumentStoreService } from '../../platform/storage/document-store.service.js';
@@ -44,11 +47,14 @@ import { PARTNER_REVIEWABLE_STATUSES } from './partner.repository.js';
 
 export type PartnerApplicationView = {
   id: string;
+  userId?: string;
   role: PartnerRoleName;
   status: PartnerStatusName;
   metadata: Record<string, unknown>;
   /** Ops case detail only: applicant's account phone. */
   applicantPhone?: string;
+  applicantEmail?: string | null;
+  applicantName?: string | null;
   documents: PartnerDocumentView[];
   reason: string | null;
   /** Sections ops asked the applicant to fix (empty for approvals and plain rejections). */
@@ -81,6 +87,7 @@ export class PartnerService {
     @Optional() private readonly config?: ConfigService<AppEnv, true>,
     @Optional() private readonly vehicleClasses?: RideVehicleClassService,
     @Optional() private readonly settings?: PlatformSettingsService,
+    @Optional() private readonly legal?: LegalConsentService,
   ) {}
 
   /**
@@ -135,16 +142,17 @@ export class PartnerService {
     autoApprove: boolean;
   }> {
     const documentsRequired = await this.documentsRequired(role);
+    const carExtraDocsGate = await this.carExtraDocsGateEnabled();
+    const normalizedClass = vehicleClassCode?.trim().toUpperCase() || undefined;
     return {
       role,
       documentsRequired,
       requiredDocuments: documentsRequired
         ? requiredPartnerDocuments(role, {
-            vehicleClassCode:
-              vehicleClassCode?.trim().toUpperCase() || undefined,
-            carExtraDocsGate: this.carExtraDocsGateEnabled(),
+            vehicleClassCode: normalizedClass,
+            carExtraDocsGate,
           })
-        : [],
+        : quickModeCarDocs(role, normalizedClass, carExtraDocsGate),
       documentAlternatives: documentsRequired
         ? documentAlternatives(role, { registrationSubject })
         : {},
@@ -178,9 +186,17 @@ export class PartnerService {
   async submit(
     userId: string,
     dto: SubmitPartnerApplicationDto,
+    requestMeta: { ip?: string | null; userAgent?: string | null } = {},
   ): Promise<PartnerApplicationView> {
     const existing = await this.partners.findByUserAndRole(userId, dto.role);
-    if (existing?.status === 'APPROVED') {
+    // t90u: an approved car driver missing the car documents (admin gate on) may resubmit
+    // to add them; the application goes back to the ops queue (full process).
+    const carDocsTopUp =
+      existing?.status === 'APPROVED' &&
+      dto.role === 'DRIVER' &&
+      missingCarExtraDocs(existing.metadata, existing.documents).length > 0 &&
+      (await this.carExtraDocsGateEnabled());
+    if (existing?.status === 'APPROVED' && !carDocsTopUp) {
       throw partnerError(
         409,
         'PARTNER_APPLICATION_ALREADY_APPROVED',
@@ -195,6 +211,8 @@ export class PartnerService {
       );
     }
 
+    // pt5u: server-enforced consent to the current Quy chế sử dụng + privacy versions.
+    const consented = this.legal ? await this.legal.assertApplicationConsent(dto.acceptedLegalDocuments) : [];
     const uploads = dto.documents ?? [];
     const allowedKinds = PARTNER_DOCUMENT_KINDS[dto.role] as readonly string[];
     const seen = new Set<string>();
@@ -235,6 +253,18 @@ export class PartnerService {
         'Driver KYC requires a valid vehicleClassCode (MOTORBIKE | CAR_4 | CAR_7)',
       );
     }
+    // DEC-PROD-091: customers see the driver's face on every trip. Already-approved drivers
+    // topping up car documents are exempt.
+    if (dto.role === 'DRIVER' && !carDocsTopUp) {
+      const applicant = await this.identity.findUserById(userId);
+      if (!applicant?.avatarUrl?.trim()) {
+        throw partnerError(
+          400,
+          'PARTNER_AVATAR_REQUIRED',
+          'Driver KYC requires a profile photo customers can see',
+        );
+      }
+    }
     if (
       dto.role === 'MERCHANT' &&
       !shopPinFromMetadata(sanitizeMetadata(dto.metadata))
@@ -248,13 +278,17 @@ export class PartnerService {
       );
     }
     const documentsRequired = await this.documentsRequired(dto.role);
+    const carExtraDocsGate = await this.carExtraDocsGateEnabled();
+    // t90u: quick registration still needs the car extra documents while the admin gate is on.
     const missing = documentsRequired
       ? missingPartnerDocuments(dto.role, onFile, {
           vehicleClassCode: previewClass ?? undefined,
-          carExtraDocsGate: this.carExtraDocsGateEnabled(),
+          carExtraDocsGate,
           registrationSubject: sanitizeMetadata(dto.metadata).registrationSubject,
         })
-      : [];
+      : quickModeCarDocs(dto.role, previewClass ?? undefined, carExtraDocsGate).filter(
+          (kind) => !onFile.has(kind),
+        );
     if (missing.length > 0) {
       throw new HttpException(
         {
@@ -315,6 +349,17 @@ export class PartnerService {
     );
     // Audit trail for ops: this application was submitted while documents were waived.
     metadata.documentsWaived = !documentsRequired;
+    delete metadata.legalConsents;
+    if (consented.length > 0) {
+      metadata.legalConsents = consented.map((d) => ({ ...d, acceptedAt: now.toISOString() }));
+    }
+    if (dto.role === 'DRIVER' && !documentsRequired) {
+      // t88u: quick registration has no licence step, so older apps sent their default
+      // licenseClass 'A1' for every driver — a car driver then could never be approved.
+      // No licence was declared, so none is stored.
+      delete metadata.licenseClass;
+      delete metadata.licenseNumber;
+    }
     // t56u: no AI verdict exists; never store a client-supplied one.
     delete metadata.aiPrecheck;
     delete metadata.autoApproved;
@@ -344,6 +389,9 @@ export class PartnerService {
     } catch (error) {
       await this.documents.discard(fresh);
       throw error;
+    }
+    if (this.legal && consented.length > 0) {
+      await this.legal.recordApplicationConsent(userId, dto.role, consented, requestMeta);
     }
     // Files the new upload replaced are no longer referenced by any application.
     await this.documents.discard(
@@ -543,9 +591,12 @@ export class PartnerService {
     withFullPhone: boolean,
   ): Promise<PartnerApplicationView> {
     const view = toView(row);
+    view.userId = row.userId;
+    let user = null;
     let phone: string | null = null;
     try {
-      phone = (await this.identity.findUserById(row.userId))?.phone ?? null;
+      user = await this.identity.findUserById(row.userId);
+      phone = user?.phone ?? user?.contactPhone ?? null;
     } catch {
       phone = null;
     }
@@ -555,6 +606,22 @@ export class PartnerService {
       }
       if (withFullPhone) {
         view.applicantPhone = phone;
+      }
+    }
+    if (user?.email) {
+      view.applicantEmail = user.email;
+    }
+    if (user?.displayName && !view.metadata.fullName) {
+      view.metadata.fullName = user.displayName;
+    }
+    if (!view.metadata.area) {
+      const area =
+        (typeof view.metadata.address === 'string' && view.metadata.address.trim()) ||
+        (typeof view.metadata.shopAddress === 'string' && view.metadata.shopAddress.trim()) ||
+        (typeof view.metadata.serviceRegionCode === 'string' && view.metadata.serviceRegionCode.trim()) ||
+        null;
+      if (area) {
+        view.metadata.area = area;
       }
     }
     return view;
@@ -582,10 +649,14 @@ export class PartnerService {
         );
       }
       const finalClass = vehicleClassCodeFromMetadata(base)!;
-      const declaredLicense = (base as Record<string, unknown>).licenseClass;
+      // t88u: a quick registration (documents waived) never asked for a licence class; the
+      // stored value is an app default, not a declaration, so it cannot block approval.
+      const declaredLicense =
+        (base as Record<string, unknown>).documentsWaived === true
+          ? undefined
+          : (base as Record<string, unknown>).licenseClass;
       if (
-        typeof declaredLicense === 'string' &&
-        declaredLicense.trim() &&
+        hasDeclaredLicenseClass(declaredLicense) &&
         !licenseClassCoversVehicle(declaredLicense, finalClass)
       ) {
         // t60u: ops cannot bind a class the declared licence does not cover.
@@ -593,6 +664,18 @@ export class PartnerService {
           400,
           'PARTNER_LICENSE_CLASS_MISMATCH',
           `Licence class ${declaredLicense} does not cover ${finalClass}`,
+        );
+      }
+      // t90u: never approve a car driver without the car documents while the admin gate is on.
+      const missingCarDocs = missingCarExtraDocs(base, existing.documents);
+      if (missingCarDocs.length > 0 && (await this.carExtraDocsGateEnabled())) {
+        throw new HttpException(
+          {
+            message: `Car KYC documents required: ${missingCarDocs.join(', ')}`,
+            errorCode: 'PARTNER_CAR_DOCS_REQUIRED',
+            details: { vehicleClassCode: finalClass, missing: missingCarDocs },
+          },
+          400,
         );
       }
       const bound = await this.bindVehicleClass('DRIVER', base);
@@ -748,21 +831,9 @@ export class PartnerService {
     }
   }
 
-  /**
-   * OPEN-006 Car KYC extra-docs gate (fail closed in production when unset).
-   * Mirrors PARTNER_ELIGIBILITY_BYPASS defaults — no secrets invented.
-   */
-  private carExtraDocsGateEnabled(): boolean {
-    if (!this.config) {
-      return false;
-    }
-    const explicit = this.config.get('PARTNER_CAR_KYC_EXTRA_DOCS', {
-      infer: true,
-    });
-    if (explicit !== undefined) {
-      return explicit;
-    }
-    return this.config.get('NODE_ENV', { infer: true }) === 'production';
+  /** t90u: admin setting DRIVER_CAR_EXTRA_DOCS_REQUIRED (see partner-car-docs-gate.ts). */
+  private carExtraDocsGateEnabled(): Promise<boolean> {
+    return resolveCarExtraDocsGate(this.settings, this.config);
   }
 
   private async bindVehicleClass(
@@ -903,4 +974,19 @@ export function autoApproveBlockers(
     }
   }
   return blockers;
+}
+
+function quickModeCarDocs(
+  role: PartnerRoleName,
+  vehicleClassCode: string | undefined,
+  carExtraDocsGate: boolean,
+): string[] {
+  if (role !== 'DRIVER' || !carExtraDocsGate || !vehicleClassCode || !isCarVehicleClassCode(vehicleClassCode)) {
+    return [];
+  }
+  return [...PARTNER_DRIVER_CAR_EXTRA_DOCUMENTS];
+}
+
+function hasDeclaredLicenseClass(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
 }

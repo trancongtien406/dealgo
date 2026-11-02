@@ -95,6 +95,26 @@ void main() {
     expect(exists('/customer/ride/nope/x/y'), isFalse);
   });
 
+  test('merchant order detail stays inside the merchant bottom-nav shell', () {
+    final match = router.configuration.findMatch(
+      Uri.parse('/merchant/orders/o1'),
+    );
+
+    bool containsRoleShell(List<RouteMatchBase> matches) {
+      for (final routeMatch in matches) {
+        if (routeMatch is ShellRouteMatch) {
+          if (routeMatch.route is StatefulShellRoute) return true;
+          if (containsRoleShell(routeMatch.matches)) return true;
+        }
+      }
+      return false;
+    }
+
+    expect(match.error, isNull);
+    expect(containsRoleShell(match.matches), isTrue);
+    expect(match.fullPath, '/merchant/orders/:orderId');
+  });
+
   test('every derived push path is a real page', () {
     final samples = <(Map<String, Object?>, AppRole)>[
       for (final role in AppRole.values)

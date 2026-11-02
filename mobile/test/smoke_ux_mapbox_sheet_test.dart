@@ -110,14 +110,8 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
     await _shoot(tester, '5x-22-map-sheet');
 
-    expect(find.text('Chọn xe & đề xuất giá'), findsOneWidget);
+    // Destination chosen → the fare sheet opens on its own.
     expect(find.byType(AppBar), findsNothing);
-
-    await tester.ensureVisible(
-      find.byKey(const Key('ride-open-route-overview')),
-    );
-    await tester.tap(find.byKey(const Key('ride-open-route-overview')));
-    await tester.pumpAndSettle();
     await _shoot(tester, '5x-23-fare-sheet');
 
     // Redesign: the route overview sheet lists vehicle classes + one CTA with the fare.

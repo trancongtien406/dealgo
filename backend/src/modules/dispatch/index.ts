@@ -17,3 +17,4 @@ export interface DispatchOffer {
 export * from './dispatch-filter.js';
 export * from './driver-location-query.dto.js';
 
+export * from './driver-workload.service.js';

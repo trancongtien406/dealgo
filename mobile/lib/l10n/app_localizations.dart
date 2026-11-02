@@ -674,6 +674,36 @@ abstract class AppLocalizations {
   /// **'Calls are only available while the trip is in progress.'**
   String get apiErrVoiceWindowClosed;
 
+  /// No description provided for @apiErrChatWindowClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'The contact window has closed for this trip or order.'**
+  String get apiErrChatWindowClosed;
+
+  /// No description provided for @apiErrChatNoCounterpart.
+  ///
+  /// In en, this message translates to:
+  /// **'No driver has been assigned to this order yet.'**
+  String get apiErrChatNoCounterpart;
+
+  /// No description provided for @apiErrChatForbidden.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have access to this conversation.'**
+  String get apiErrChatForbidden;
+
+  /// No description provided for @apiErrChatUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat is temporarily unavailable. Please try again later.'**
+  String get apiErrChatUnavailable;
+
+  /// No description provided for @apiErrChatBodyInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Message content is invalid.'**
+  String get apiErrChatBodyInvalid;
+
   /// No description provided for @bannerOfflineTitle.
   ///
   /// In en, this message translates to:
@@ -2021,20 +2051,20 @@ abstract class AppLocalizations {
   /// No description provided for @authLegalTerms.
   ///
   /// In en, this message translates to:
-  /// **'Terms'**
+  /// **'Terms of Service'**
   String get authLegalTerms;
 
-  /// No description provided for @authTermsSoon.
+  /// No description provided for @authLegalConsentPrefix.
   ///
   /// In en, this message translates to:
-  /// **'DealGo Terms of Service are coming soon.'**
-  String get authTermsSoon;
+  /// **'I have read and agree to the '**
+  String get authLegalConsentPrefix;
 
-  /// No description provided for @authPrivacySoon.
+  /// No description provided for @authLegalConsentRequired.
   ///
   /// In en, this message translates to:
-  /// **'DealGo Privacy Policy is coming soon.'**
-  String get authPrivacySoon;
+  /// **'Please read and agree to the Terms of Service and Privacy Policy to continue.'**
+  String get authLegalConsentRequired;
 
   /// No description provided for @authWelcomeTo.
   ///
@@ -2105,7 +2135,7 @@ abstract class AppLocalizations {
   /// No description provided for @passwordErrTooShort.
   ///
   /// In en, this message translates to:
-  /// **'Password must be at least 8 characters'**
+  /// **'Password must be at least 6 characters'**
   String get passwordErrTooShort;
 
   /// No description provided for @passwordErrConfirm.
@@ -2462,12 +2492,6 @@ abstract class AppLocalizations {
   /// **'Done'**
   String get profileDone;
 
-  /// No description provided for @profileLater.
-  ///
-  /// In en, this message translates to:
-  /// **'Add later'**
-  String get profileLater;
-
   /// No description provided for @rolePickerPrefix.
   ///
   /// In en, this message translates to:
@@ -2791,6 +2815,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Another driver took this.'**
   String get driverJobTakenBody;
+
+  /// No description provided for @driverOfferNotChosenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your offer was not chosen'**
+  String get driverOfferNotChosenTitle;
+
+  /// No description provided for @driverOfferNotChosenBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The customer picked another driver for this order.'**
+  String get driverOfferNotChosenBody;
 
   /// No description provided for @driverJobUnavailable.
   ///
@@ -3128,6 +3164,42 @@ abstract class AppLocalizations {
   /// **'Help & settings'**
   String get accountSectionHelp;
 
+  /// No description provided for @accountSectionDisplay.
+  ///
+  /// In en, this message translates to:
+  /// **'Display'**
+  String get accountSectionDisplay;
+
+  /// No description provided for @accountLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get accountLanguage;
+
+  /// No description provided for @accountTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get accountTheme;
+
+  /// No description provided for @accountThemeSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'Match system'**
+  String get accountThemeSystem;
+
+  /// No description provided for @accountThemeLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get accountThemeLight;
+
+  /// No description provided for @accountThemeDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get accountThemeDark;
+
   /// No description provided for @accountSupport.
   ///
   /// In en, this message translates to:
@@ -3137,14 +3209,32 @@ abstract class AppLocalizations {
   /// No description provided for @accountSupportBody.
   ///
   /// In en, this message translates to:
-  /// **'FAQs and complaints'**
+  /// **'FAQs and Messenger chat on the web'**
   String get accountSupportBody;
+
+  /// No description provided for @accountSupportTicketsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Track the support requests you sent'**
+  String get accountSupportTicketsBody;
 
   /// No description provided for @accountSignOut.
   ///
   /// In en, this message translates to:
   /// **'Sign out'**
   String get accountSignOut;
+
+  /// No description provided for @accountPartnerHubTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Earn with DealGo'**
+  String get accountPartnerHubTitle;
+
+  /// No description provided for @accountPartnerHubSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Become a Driver partner or register a Shop with DealGo'**
+  String get accountPartnerHubSubtitle;
 
   /// No description provided for @accountDriverPartner.
   ///
@@ -4820,6 +4910,60 @@ abstract class AppLocalizations {
   /// **'{rating} · {count} ratings'**
   String driverCardRating(String rating, int count);
 
+  /// No description provided for @driverCardNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get driverCardNew;
+
+  /// No description provided for @driverDetailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver'**
+  String get driverDetailTitle;
+
+  /// No description provided for @driverDetailOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'View driver details'**
+  String get driverDetailOpen;
+
+  /// No description provided for @driverDetailVehicle.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle'**
+  String get driverDetailVehicle;
+
+  /// No description provided for @driverDetailPlate.
+  ///
+  /// In en, this message translates to:
+  /// **'Licence plate'**
+  String get driverDetailPlate;
+
+  /// No description provided for @driverDetailClass.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle type'**
+  String get driverDetailClass;
+
+  /// No description provided for @driverAvatarOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'View profile photo'**
+  String get driverAvatarOpen;
+
+  /// No description provided for @driverAvatarClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get driverAvatarClose;
+
+  /// No description provided for @driverCardTrips.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} trips'**
+  String driverCardTrips(String count);
+
   /// No description provided for @actionReload.
   ///
   /// In en, this message translates to:
@@ -5525,7 +5669,7 @@ abstract class AppLocalizations {
   /// No description provided for @foodStorePrepChip.
   ///
   /// In en, this message translates to:
-  /// **'~{minutes} min'**
+  /// **'≈{minutes} min'**
   String foodStorePrepChip(int minutes);
 
   /// No description provided for @foodSearchGroups.
@@ -6035,7 +6179,7 @@ abstract class AppLocalizations {
   /// No description provided for @partnerDocPick.
   ///
   /// In en, this message translates to:
-  /// **'Choose from library'**
+  /// **'Photo library'**
   String get partnerDocPick;
 
   /// No description provided for @partnerDocRetake.
@@ -7520,6 +7664,24 @@ abstract class AppLocalizations {
   /// **'Driver assigned'**
   String get merchantStatusAssigned;
 
+  /// No description provided for @merchantStatusPickedUp.
+  ///
+  /// In en, this message translates to:
+  /// **'On the way'**
+  String get merchantStatusPickedUp;
+
+  /// No description provided for @merchantStatusDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get merchantStatusDelivered;
+
+  /// No description provided for @merchantStatusUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Updating'**
+  String get merchantStatusUnknown;
+
   /// No description provided for @merchantNotSynced.
   ///
   /// In en, this message translates to:
@@ -7861,6 +8023,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Waiting for drivers to make offers...'**
   String get rideMatchingWaiting;
+
+  /// No description provided for @rideViewersCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 driver is viewing your request} other{{count} drivers are viewing your request}}'**
+  String rideViewersCount(int count);
+
+  /// No description provided for @rideViewersNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No driver has opened your request yet'**
+  String get rideViewersNone;
+
+  /// No description provided for @rideViewersNotifying.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifying drivers nearby'**
+  String get rideViewersNotifying;
+
+  /// No description provided for @rideAutoAcceptLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-accept when a driver agrees to {price}'**
+  String rideAutoAcceptLabel(String price);
+
+  /// No description provided for @rideAutoAcceptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only your exact price is accepted. A different price still needs you to choose.'**
+  String get rideAutoAcceptHint;
 
   /// No description provided for @rideStatusLabel.
   ///
@@ -8393,7 +8585,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverServicesNoneOn.
   ///
   /// In en, this message translates to:
-  /// **'Both services are off, so you will not get new jobs.'**
+  /// **'Every service is off, so you will not get new jobs.'**
   String get driverServicesNoneOn;
 
   /// No description provided for @driverVehiclePlate.
@@ -8815,6 +9007,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'We couldn\'t read the response. Please try again.'**
   String get apiErrInvalidResponse;
+
+  /// No description provided for @apiErrCarDocsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Car documents needed'**
+  String get apiErrCarDocsTitle;
+
+  /// No description provided for @apiErrCarDocsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Car drivers need a vehicle insurance photo before taking trips. Add it so DealGo can review again.'**
+  String get apiErrCarDocsBody;
+
+  /// No description provided for @actionCompleteDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete documents'**
+  String get actionCompleteDocuments;
 
   /// No description provided for @apiErrForbidden.
   ///
@@ -9725,7 +9935,7 @@ abstract class AppLocalizations {
   /// No description provided for @merchantBusyExtraHint.
   ///
   /// In en, this message translates to:
-  /// **'Prep ~{minutes} min.'**
+  /// **'Prep ≈{minutes} min.'**
   String merchantBusyExtraHint(int minutes);
 
   /// No description provided for @foodTrackingReadyBy.
@@ -11309,7 +11519,7 @@ abstract class AppLocalizations {
   /// No description provided for @forgotPasswordNewLabel.
   ///
   /// In en, this message translates to:
-  /// **'New password (8+ chars)'**
+  /// **'New password (6+ chars)'**
   String get forgotPasswordNewLabel;
 
   /// No description provided for @forgotPasswordConfirmLabel.
@@ -11537,7 +11747,7 @@ abstract class AppLocalizations {
   /// No description provided for @trackEtaMinutes.
   ///
   /// In en, this message translates to:
-  /// **'~{minutes} min'**
+  /// **'≈{minutes} min'**
   String trackEtaMinutes(int minutes);
 
   /// No description provided for @trackStepFinding.
@@ -11741,7 +11951,7 @@ abstract class AppLocalizations {
   /// No description provided for @driverCustomerRatingNone.
   ///
   /// In en, this message translates to:
-  /// **'New customer – no ratings yet'**
+  /// **'No ratings yet'**
   String get driverCustomerRatingNone;
 
   /// No description provided for @driverCancelRide.
@@ -12800,6 +13010,36 @@ abstract class AppLocalizations {
   /// **'Can\'t find the email? Check your Spam or Promotions folder.'**
   String get otpEmailSpamHint;
 
+  /// No description provided for @emailVerifyLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many wrong codes. Resend to get a new code.'**
+  String get emailVerifyLocked;
+
+  /// No description provided for @emailVerifySuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Email verified'**
+  String get emailVerifySuccess;
+
+  /// No description provided for @emailVerifyPendingNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Your new email is saved only after you enter the verification code.'**
+  String get emailVerifyPendingNotice;
+
+  /// No description provided for @profileEmailUnverified.
+  ///
+  /// In en, this message translates to:
+  /// **'Email not verified'**
+  String get profileEmailUnverified;
+
+  /// No description provided for @profileEmailVerifyAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify'**
+  String get profileEmailVerifyAction;
+
   /// No description provided for @draftResumeTitle.
   ///
   /// In en, this message translates to:
@@ -13583,7 +13823,7 @@ abstract class AppLocalizations {
   /// No description provided for @parcelPayerRecipient.
   ///
   /// In en, this message translates to:
-  /// **'Recipient pays (cash)'**
+  /// **'Recipient pays'**
   String get parcelPayerRecipient;
 
   /// No description provided for @parcelItemPhotoAdd.
@@ -13885,6 +14125,576 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reading your document…'**
   String get kycOcrReading;
+
+  /// No description provided for @parcelPickContact.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick from contacts'**
+  String get parcelPickContact;
+
+  /// No description provided for @parcelEditRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit route'**
+  String get parcelEditRoute;
+
+  /// No description provided for @parcelEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get parcelEdit;
+
+  /// No description provided for @parcelMoreDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight, note, photo (optional)'**
+  String get parcelMoreDetails;
+
+  /// No description provided for @parcelPricing.
+  ///
+  /// In en, this message translates to:
+  /// **'Getting price…'**
+  String get parcelPricing;
+
+  /// No description provided for @parcelSectionPackage.
+  ///
+  /// In en, this message translates to:
+  /// **'Package'**
+  String get parcelSectionPackage;
+
+  /// No description provided for @parcelSectionPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment'**
+  String get parcelSectionPayment;
+
+  /// No description provided for @parcelFareLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Fare'**
+  String get parcelFareLabel;
+
+  /// No description provided for @parcelPhoneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'0901 234 567'**
+  String get parcelPhoneHint;
+
+  /// No description provided for @parcelSenderYou.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get parcelSenderYou;
+
+  /// No description provided for @parcelPayerRecipientNote.
+  ///
+  /// In en, this message translates to:
+  /// **'The recipient pays the driver in cash on delivery.'**
+  String get parcelPayerRecipientNote;
+
+  /// No description provided for @parcelSubmitWithPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Book · {price}'**
+  String parcelSubmitWithPrice(String price);
+
+  /// No description provided for @apiErrCrossRegion.
+  ///
+  /// In en, this message translates to:
+  /// **'DealGo does not support trips between service regions yet. Please choose a destination in the same city as your pickup.'**
+  String get apiErrCrossRegion;
+
+  /// No description provided for @apiErrDriverAtCapacity.
+  ///
+  /// In en, this message translates to:
+  /// **'You are on an active trip. Finish it before taking a new request.'**
+  String get apiErrDriverAtCapacity;
+
+  /// No description provided for @apiErrDriverTooFar.
+  ///
+  /// In en, this message translates to:
+  /// **'You are too far from the pickup. Move closer and try again.'**
+  String get apiErrDriverTooFar;
+
+  /// No description provided for @apiErrOfferDriverUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This driver just took another trip. Please choose another driver.'**
+  String get apiErrOfferDriverUnavailable;
+
+  /// No description provided for @apiErrItemNotApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'This item is still awaiting approval and cannot be put on sale yet.'**
+  String get apiErrItemNotApproved;
+
+  /// No description provided for @rideIntercity.
+  ///
+  /// In en, this message translates to:
+  /// **'Intercity'**
+  String get rideIntercity;
+
+  /// No description provided for @rideIntercityQuote.
+  ///
+  /// In en, this message translates to:
+  /// **'Intercity trip · {km} km · ≈{minutes} min'**
+  String rideIntercityQuote(String km, String minutes);
+
+  /// No description provided for @rideIntercityNote.
+  ///
+  /// In en, this message translates to:
+  /// **'The destination is in another province/region. Drivers bid as usual.'**
+  String get rideIntercityNote;
+
+  /// No description provided for @driverPickupAwayKm.
+  ///
+  /// In en, this message translates to:
+  /// **'{km} km away'**
+  String driverPickupAwayKm(String km);
+
+  /// No description provided for @driverServiceSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Service settings'**
+  String get driverServiceSettings;
+
+  /// No description provided for @rideGoHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to home'**
+  String get rideGoHome;
+
+  /// No description provided for @apiErrIntercityStops.
+  ///
+  /// In en, this message translates to:
+  /// **'Intercity trips go straight to one destination without extra stops.'**
+  String get apiErrIntercityStops;
+
+  /// No description provided for @apiErrIntercityTooFar.
+  ///
+  /// In en, this message translates to:
+  /// **'This intercity trip is longer than DealGo currently supports.'**
+  String get apiErrIntercityTooFar;
+
+  /// No description provided for @apiErrIntercityVehicle.
+  ///
+  /// In en, this message translates to:
+  /// **'This vehicle class does not run intercity. Please choose another vehicle.'**
+  String get apiErrIntercityVehicle;
+
+  /// No description provided for @apiErrIntercityNoVehicle.
+  ///
+  /// In en, this message translates to:
+  /// **'No vehicle class runs intercity trips yet.'**
+  String get apiErrIntercityNoVehicle;
+
+  /// No description provided for @driverJobTripKm.
+  ///
+  /// In en, this message translates to:
+  /// **'Trip {km} km'**
+  String driverJobTripKm(String km);
+
+  /// No description provided for @driverJobPickupKm.
+  ///
+  /// In en, this message translates to:
+  /// **'{km} km to pickup'**
+  String driverJobPickupKm(String km);
+
+  /// No description provided for @appUpdateRequiredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update required'**
+  String get appUpdateRequiredTitle;
+
+  /// No description provided for @appUpdateRequiredBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This version of the app is no longer supported. Please update to keep using DealGo.'**
+  String get appUpdateRequiredBody;
+
+  /// No description provided for @appUpdateNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Update now'**
+  String get appUpdateNow;
+
+  /// No description provided for @appUpdateLatest.
+  ///
+  /// In en, this message translates to:
+  /// **'New version: {version}'**
+  String appUpdateLatest(String version);
+
+  /// No description provided for @appUpdateOptionalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A new version is available'**
+  String get appUpdateOptionalTitle;
+
+  /// No description provided for @appUpdateOptionalBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Update to get the latest features and fixes.'**
+  String get appUpdateOptionalBody;
+
+  /// No description provided for @appUpdateLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get appUpdateLater;
+
+  /// No description provided for @appUpdateRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Check again'**
+  String get appUpdateRetry;
+
+  /// No description provided for @legalConsentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Our terms have been updated'**
+  String get legalConsentTitle;
+
+  /// No description provided for @legalConsentBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Please review and accept the new terms to keep using DealGo.'**
+  String get legalConsentBody;
+
+  /// No description provided for @legalConsentRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Read the full text'**
+  String get legalConsentRead;
+
+  /// No description provided for @legalConsentEffective.
+  ///
+  /// In en, this message translates to:
+  /// **'Effective {date}'**
+  String legalConsentEffective(String date);
+
+  /// No description provided for @legalConsentVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'version {version}'**
+  String legalConsentVersion(String version);
+
+  /// No description provided for @legalConsentAgree.
+  ///
+  /// In en, this message translates to:
+  /// **'I agree'**
+  String get legalConsentAgree;
+
+  /// No description provided for @legalConsentFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t send. Please try again.'**
+  String get legalConsentFailed;
+
+  /// No description provided for @contactPhoneDial.
+  ///
+  /// In en, this message translates to:
+  /// **'Call {phone}'**
+  String contactPhoneDial(String phone);
+
+  /// No description provided for @contactPhoneDialFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open the phone app.'**
+  String get contactPhoneDialFailed;
+
+  /// No description provided for @kycReviewAvatar.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile photo'**
+  String get kycReviewAvatar;
+
+  /// No description provided for @kycAvatarMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Required before you submit. Customers see this photo when you take their job.'**
+  String get kycAvatarMissing;
+
+  /// No description provided for @kycAvatarReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers see this photo when you take their job.'**
+  String get kycAvatarReady;
+
+  /// No description provided for @kycAvatarAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add photo'**
+  String get kycAvatarAdd;
+
+  /// No description provided for @partnerErrorAvatar.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a profile photo to your profile before submitting your driver application.'**
+  String get partnerErrorAvatar;
+
+  /// No description provided for @offlineJobUpdatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Last updated {time} · no connection'**
+  String offlineJobUpdatedAt(String time);
+
+  /// No description provided for @offlineJobCallHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Regular phone calls work without mobile data.'**
+  String get offlineJobCallHint;
+
+  /// No description provided for @legalRegulationsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms of use for partners'**
+  String get legalRegulationsTitle;
+
+  /// No description provided for @legalRegulationsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'For partner drivers and shops'**
+  String get legalRegulationsBody;
+
+  /// No description provided for @legalTermsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms of Service'**
+  String get legalTermsTitle;
+
+  /// No description provided for @legalTermsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rights and obligations when using DealGo'**
+  String get legalTermsBody;
+
+  /// No description provided for @legalPrivacyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy policy'**
+  String get legalPrivacyTitle;
+
+  /// No description provided for @legalPrivacyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'How DealGo collects and protects your data'**
+  String get legalPrivacyBody;
+
+  /// No description provided for @legalLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load this document. Please try again.'**
+  String get legalLoadError;
+
+  /// No description provided for @partnerConsentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Partner registration terms'**
+  String get partnerConsentTitle;
+
+  /// No description provided for @partnerConsentRegulations.
+  ///
+  /// In en, this message translates to:
+  /// **'I have read and agree to the Terms of use'**
+  String get partnerConsentRegulations;
+
+  /// No description provided for @partnerConsentPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'I have read and agree to the Privacy policy'**
+  String get partnerConsentPrivacy;
+
+  /// No description provided for @partnerConsentView.
+  ///
+  /// In en, this message translates to:
+  /// **'View'**
+  String get partnerConsentView;
+
+  /// No description provided for @partnerConsentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You must accept both to submit your application.'**
+  String get partnerConsentHint;
+
+  /// No description provided for @partnerConsentLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the terms — tap to retry'**
+  String get partnerConsentLoadError;
+
+  /// No description provided for @partnerErrorLegalConsent.
+  ///
+  /// In en, this message translates to:
+  /// **'The Terms of use or Privacy policy was just updated. Please review and accept again.'**
+  String get partnerErrorLegalConsent;
+
+  /// No description provided for @foodFareSuggested.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested delivery fee'**
+  String get foodFareSuggested;
+
+  /// No description provided for @foodFareYourOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Your offer'**
+  String get foodFareYourOffer;
+
+  /// No description provided for @foodFareHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The delivery fee is only a suggestion. Drivers can accept your offer or propose another one for you to choose; the fee is fixed once a driver takes the order.'**
+  String get foodFareHint;
+
+  /// No description provided for @foodFareHintFixed.
+  ///
+  /// In en, this message translates to:
+  /// **'The delivery fee is only a suggestion; you can raise or lower it. Drivers accept exactly the fee you choose; it is fixed once a driver takes the order.'**
+  String get foodFareHintFixed;
+
+  /// No description provided for @foodFareFixedWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Drivers can only accept the fee you offered. If it\'s taking a while, raise the fee to make the order more attractive.'**
+  String get foodFareFixedWaiting;
+
+  /// No description provided for @driverFareFixed.
+  ///
+  /// In en, this message translates to:
+  /// **'This order uses a fixed fee: you can only accept the customer\'s price.'**
+  String get driverFareFixed;
+
+  /// No description provided for @foodFareDecrease.
+  ///
+  /// In en, this message translates to:
+  /// **'Lower the fee'**
+  String get foodFareDecrease;
+
+  /// No description provided for @foodFareIncrease.
+  ///
+  /// In en, this message translates to:
+  /// **'Raise the fee'**
+  String get foodFareIncrease;
+
+  /// No description provided for @foodFareReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the suggestion'**
+  String get foodFareReset;
+
+  /// No description provided for @foodFareNegotiationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery fee'**
+  String get foodFareNegotiationTitle;
+
+  /// No description provided for @foodFareWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for a driver to accept {amount}'**
+  String foodFareWaiting(String amount);
+
+  /// No description provided for @foodFareAgreed.
+  ///
+  /// In en, this message translates to:
+  /// **'Agreed delivery fee: {amount}'**
+  String foodFareAgreed(String amount);
+
+  /// No description provided for @foodFareOffersEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No driver has proposed another fee yet.'**
+  String get foodFareOffersEmpty;
+
+  /// No description provided for @foodFareDriverOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver offer'**
+  String get foodFareDriverOffer;
+
+  /// No description provided for @foodFareSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose'**
+  String get foodFareSelect;
+
+  /// No description provided for @foodFareRaise.
+  ///
+  /// In en, this message translates to:
+  /// **'Raise to {amount}'**
+  String foodFareRaise(String amount);
+
+  /// No description provided for @foodFareRaisesLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} raises left'**
+  String foodFareRaisesLeft(int count);
+
+  /// No description provided for @foodFareOfferExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get foodFareOfferExpired;
+
+  /// No description provided for @foodFareSelectFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not choose this offer. It may have expired or the driver took another job.'**
+  String get foodFareSelectFailed;
+
+  /// No description provided for @foodFareRaiseFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not raise the fee. Try again later.'**
+  String get foodFareRaiseFailed;
+
+  /// No description provided for @foodFareCodExtra.
+  ///
+  /// In en, this message translates to:
+  /// **'If the agreed fee is higher than what you paid online, the difference is collected in cash on delivery.'**
+  String get foodFareCodExtra;
+
+  /// No description provided for @driverFareCounter.
+  ///
+  /// In en, this message translates to:
+  /// **'Propose fee'**
+  String get driverFareCounter;
+
+  /// No description provided for @driverFareCounterTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Propose a delivery fee'**
+  String get driverFareCounterTitle;
+
+  /// No description provided for @driverFareCustomerOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer offers {amount}'**
+  String driverFareCustomerOffer(String amount);
+
+  /// No description provided for @driverFareCounterSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send {amount}'**
+  String driverFareCounterSend(String amount);
+
+  /// No description provided for @driverFareCounterSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer sent. Waiting for the customer.'**
+  String get driverFareCounterSent;
+
+  /// No description provided for @driverFareCounterFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not send the offer.'**
+  String get driverFareCounterFailed;
+
+  /// No description provided for @merchantFareAgreed.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery fee (agreed)'**
+  String get merchantFareAgreed;
 }
 
 class _AppLocalizationsDelegate

@@ -9,3 +9,4 @@ export * from './platform-settings.module.js';
 export * from './payment-method-registry.js';
 export * from './public-site-config.js';
 export * from './parcel-size-classes.js';
+export * from './app-version-policy.js';

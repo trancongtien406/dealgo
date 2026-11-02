@@ -26,7 +26,6 @@ import { isCashOnlyPaymentProvider } from '../../platform/config/env.js';
 
 import { UnavailablePaymentPort, type PaymentPort } from './payment-port.js';
 import { CHECKOUT_REPOSITORY, PAYMENT_PORT, PAYMENT_REPOSITORY } from './payment.constants.js';
-import { PaymentWebhookController } from './payment-webhook.controller.js';
 import { OpsRefundsController } from './ops-refunds.controller.js';
 import { OpsTransactionsController } from './ops-transactions.controller.js';
 import { OpsRefundsService } from './ops-refunds.service.js';
@@ -55,8 +54,9 @@ function hasMomoKeys(config: ConfigService<AppEnv, true>): boolean {
 
 @Module({
   imports: [PrismaModule, IdentityModule, SupportModule, LedgerModule, PlatformSettingsModule],
+  // MONEY-001: the legacy /v1/payments/webhooks stub controller is intentionally not registered;
+  // the only PSP entry point is the signed checkout IPN (/v1/payments/ipn/:provider).
   controllers: [
-    PaymentWebhookController,
     OpsRefundsController,
     OpsTransactionsController,
     PaymentMethodsController,

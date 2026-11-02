@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/media/alert_audio.dart';
 import '../../../../core/notifications/notification_router.dart';
@@ -18,7 +19,9 @@ import '../../../ride/domain/entities/ride_money.dart';
 import '../cubit/driver_duty_cubit.dart';
 import '../cubit/driver_feed_cubit.dart';
 import '../utils/driver_routes.dart';
+import '../../../ride/presentation/widgets/ride_negotiation_ui.dart';
 import 'driver_inline_quote.dart';
+import 'driver_job_distance.dart';
 import 'driver_widgets.dart';
 
 /// Loops the new-job sound and vibration while an incoming-job card is up.
@@ -359,9 +362,36 @@ class _IncomingJobCard extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: DealGoSpacing.s8),
-                Text(
-                  formatRideVnd(ride.offeredFareVnd),
-                  style: text.headlineSmall,
+                Row(
+                  children: [
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          formatRideVnd(ride.offeredFareVnd),
+                          style: text.headlineSmall,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: DealGoSpacing.s8),
+                    Row(
+                      key: const Key('incoming-job-rating'),
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          DealGoIcons.starFilled,
+                          size: 14,
+                          color: DealGoColors.amber,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          customerRatingText(l10n, ride.customerRating),
+                          style: text.labelSmall,
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
                 const SizedBox(height: DealGoSpacing.s12),
                 Text(
@@ -376,6 +406,8 @@ class _IncomingJobCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: text.bodySmall,
                 ),
+                // t82u (owner): trip km + how far I am from the pickup.
+                DriverJobDistanceRow(ride: ride, dense: false),
                 const SizedBox(height: DealGoSpacing.s16),
                 // Quote right here: −/+, +5k/+10k, one-tap accept, send.
                 DriverInlineQuote(

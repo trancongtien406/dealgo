@@ -3,7 +3,7 @@ export const LEDGER_REPOSITORY = Symbol('LEDGER_REPOSITORY');
 export const LEDGER_CASH_IN_TRANSIT_CODE = 'sandbox.cod.cash_in_transit';
 export const LEDGER_COD_OBLIGATION_CODE = 'sandbox.cod.obligation';
 
-export type LedgerEntityTypeName = 'RIDE' | 'FOOD_ORDER' | 'DISPUTE' | 'PAYMENT_REFUND';
+export type LedgerEntityTypeName = 'RIDE' | 'FOOD_ORDER' | 'DISPUTE' | 'PAYMENT_REFUND' | 'PAYMENT_INTENT';
 export type LedgerJournalEventName =
   | 'COD_OBLIGATION_POSTED'
   | 'SANDBOX_REFUND_RECORDED'

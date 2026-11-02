@@ -223,6 +223,10 @@ async function main(): Promise<void> {
       counts.drivers += 1;
     }
 
+    // 2b. Parcel delivery (DEC-PROD-071): DEV opens every class for parcels so quotes work.
+    await db.rideVehicleClass.updateMany({ data: { parcelEnabled: true } });
+    await db.driverPresence.updateMany({ where: { userId: { in: Object.values(driverIds) } }, data: { parcelEnabled: true } });
+
     // 3. Customer history
     const customerId = await ensureUser(db, CUSTOMER_PHONE, 'Khách DealGo');
     const classes = new Map((await db.rideVehicleClass.findMany()).map((c) => [c.code, c]));

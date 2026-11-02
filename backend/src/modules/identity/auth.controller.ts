@@ -94,7 +94,7 @@ export class AuthController {
   @UseGuards(ThrottlerGuard)
   @ApiOperation({
     summary:
-      'Start email+password sign-up: emails a 6-digit code and returns a pending challenge (no account yet; same response for existing emails; rate limited)',
+      'Start email+password sign-up: emails a 6-digit code and returns a pending challenge (no account yet; same response for existing emails; rate limited). When AUTH_EMAIL_VERIFICATION_REQUIRED is off, a new address is signed up at once: the response adds verificationRequired=false and session.',
   })
   registerEmail(@Body() body: EmailPasswordRegisterDto) {
     return this.emailPasswordAuth.register({
@@ -149,7 +149,7 @@ export class AuthController {
   @UseGuards(AccessAuthGuard)
   @ApiOperation({
     summary:
-      'Email a verification token for an address added to an existing account (not used by sign-up)',
+      'Email a 6-digit code verifying an address for the signed-in account (not used by sign-up). Repeats inside the resend cooldown return the live verification without mailing again',
   })
   requestEmailVerification(
     @CurrentActor() actor: RequestActor,
@@ -163,7 +163,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(ThrottlerGuard)
   confirmEmail(@Param('id', ParseUUIDPipe) id: string, @Body() body: ConfirmEmailDto) {
-    return this.emailVerification.confirm(id, body.token);
+    return this.emailVerification.confirm(id, body.code);
   }
 
   @Post('email/password-resets')

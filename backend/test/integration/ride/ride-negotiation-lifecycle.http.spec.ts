@@ -15,6 +15,7 @@ import {
 } from '../../../src/modules/identity/identity.constants.js';
 import { MemoryIdentityRepository } from '../../../src/modules/identity/identity.repository.js';
 import { MockSmsSender } from '../../../src/integrations/sms/sms-sender.js';
+import { PlatformSettingsService } from '../../../src/platform/settings/platform-settings.service.js';
 import { PLATFORM_SETTINGS_REPOSITORY } from '../../../src/platform/settings/platform-settings.constants.js';
 import { PARTNER_REPOSITORY } from '../../../src/modules/partner/partner.constants.js';
 import { MemoryPartnerRepository } from '../../../src/modules/partner/partner.repository.js';
@@ -214,7 +215,9 @@ describe('ride negotiation & lifecycle http', () => {
     const customer = await login();
     const d = await driver();
     const rideId = (await postRide(customer.token, 'ride-neg-counter', bid()).expect(200)).body.data.id;
-    const high = await offer(d.token, rideId, Math.floor(bid() * 1.5) + 1);
+    // Within one fare step above the cap the counter is clamped to the cap
+    // (stepFareWithinCap); a full step above it is rejected.
+    const high = await offer(d.token, rideId, roundDownToFareStep(bid() * 1.5) + 1000);
     expect(high.status).toBe(400);
     expect(high.body.errorCode).toBe('RIDE_COUNTER_OUT_OF_RANGE');
     const under = await offer(d.token, rideId, bid() - 1000);
@@ -391,6 +394,69 @@ describe('ride negotiation & lifecycle http', () => {
     const res = await postRide(customer.token, 'ride-neg-zone', bid(), { pickup: planned, dropoff });
     expect(res.status).toBe(422);
     expect(res.body.errorCode).toBe('RIDE_OUTSIDE_SERVICE_ZONE');
+  });
+
+  // t71u: city product stays in one active region (HN→DN rejected, HN→HN allowed).
+  it('rejects a pickup and drop-off in different active regions with RIDE_CROSS_REGION_NOT_SUPPORTED', async () => {
+    const customer = await login();
+    const hanoi = { lat: 21.0285, lng: 105.8542, label: 'Hoan Kiem' };
+    const hanoiWest = { lat: 21.038, lng: 105.782, label: 'Cau Giay' };
+    const danang = { lat: 16.0612, lng: 108.228, label: 'Cau Rong' };
+    const cross = await postRide(customer.token, 'ride-neg-cross', bid(), { pickup: hanoi, dropoff: danang });
+    expect(cross.status).toBe(422);
+    expect(cross.body.errorCode).toBe('RIDE_CROSS_REGION_NOT_SUPPORTED');
+    const quote = await request(app.getHttpServer())
+      .post('/v1/rides/quote')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .send({ pickup: hanoi, dropoff: danang });
+    expect(quote.status).toBe(422);
+    expect(quote.body.errorCode).toBe('RIDE_CROSS_REGION_NOT_SUPPORTED');
+    const outside = { lat: 12.2388, lng: 109.1967, label: 'Nha Trang' };
+    const far = await postRide(customer.token, 'ride-neg-cross-out', bid(), { pickup: hanoi, dropoff: outside });
+    expect(far.body.errorCode).toBe('RIDE_OUTSIDE_SERVICE_ZONE');
+    const local = await postRide(customer.token, 'ride-neg-local', bid(), { pickup: hanoi, dropoff: hanoiWest });
+    expect(local.body.errorCode).not.toBe('RIDE_CROSS_REGION_NOT_SUPPORTED');
+    expect(local.body.errorCode).not.toBe('RIDE_OUTSIDE_SERVICE_ZONE');
+  });
+
+  // t73u: with RIDE_INTERCITY_ENABLED a cross-region trip is a Liên tỉnh booking (bike and car).
+  it('turns a cross-region trip into an intercity booking when ops enable it', async () => {
+    const repo = app.get(PLATFORM_SETTINGS_REPOSITORY);
+    const settings = app.get(PlatformSettingsService);
+    const toggle = async (value: string) => {
+      await repo.upsert({
+        key: 'RIDE_INTERCITY_ENABLED',
+        value,
+        valueType: 'json',
+        updatedByUserId: null,
+        reason: 'test',
+        previousValue: null,
+      });
+      settings.invalidateCache();
+    };
+    await toggle('true');
+    try {
+      const customer = await login();
+      const hanoi = { lat: 21.0285, lng: 105.8542, label: 'Hoan Kiem' };
+      const danang = { lat: 16.0612, lng: 108.228, label: 'Cau Rong' };
+      const outside = { lat: 12.2388, lng: 109.1967, label: 'Nha Trang' };
+      const quote = await request(app.getHttpServer())
+        .post('/v1/rides/quote')
+        .set('Authorization', `Bearer ${customer.token}`)
+        .send({ pickup: hanoi, dropoff: outside });
+      if (quote.status === 200) {
+        expect(quote.body.data.intercity).toBe(true);
+      } else {
+        expect(quote.body.errorCode).toBe('RIDE_INTERCITY_NO_VEHICLE');
+      }
+      const bike = await postRide(customer.token, 'ride-intercity-bike', bid(), { pickup: hanoi, dropoff: danang });
+      expect(bike.body.errorCode).not.toBe('RIDE_INTERCITY_VEHICLE_NOT_ALLOWED');
+      expect(bike.body.errorCode).not.toBe('RIDE_CROSS_REGION_NOT_SUPPORTED');
+      const unserved = await postRide(customer.token, 'ride-intercity-out', bid(), { pickup: outside, dropoff: hanoi });
+      expect(unserved.body.errorCode).toBe('RIDE_OUTSIDE_SERVICE_ZONE');
+    } finally {
+      await toggle('false');
+    }
   });
 
   // --- P1: debt limit ---

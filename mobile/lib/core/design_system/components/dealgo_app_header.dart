@@ -13,7 +13,7 @@ class DealGoAppHeader extends StatelessWidget implements PreferredSizeWidget {
     this.actions,
     this.trailing,
     this.showBack = true,
-    this.backgroundColor = DealGoColors.card,
+    this.backgroundColor,
     this.centerTitle = false,
     this.applySafeArea = false,
     super.key,
@@ -29,7 +29,7 @@ class DealGoAppHeader extends StatelessWidget implements PreferredSizeWidget {
   /// Optional end widget (chips, mark-all, etc.).
   final Widget? trailing;
   final bool showBack;
-  final Color backgroundColor;
+  final Color? backgroundColor;
   final bool centerTitle;
 
   /// True for `Scaffold.appBar` / map overlays. Leave false under outer SafeArea.
@@ -113,7 +113,7 @@ class DealGoAppHeader extends StatelessWidget implements PreferredSizeWidget {
     );
 
     return Material(
-      color: backgroundColor,
+      color: backgroundColor ?? DealGoColors.card,
       child: applySafeArea ? SafeArea(bottom: false, child: row) : row,
     );
   }

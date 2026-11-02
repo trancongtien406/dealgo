@@ -71,6 +71,7 @@ export class PrismaIdentityRepository implements IdentityRepository {
     email: string | null;
     phone: string | null;
     displayName: string;
+    contactPhone?: string | null;
   }): Promise<UserRecord> {
     try {
       const user = await this.db.user.create({
@@ -78,6 +79,9 @@ export class PrismaIdentityRepository implements IdentityRepository {
           email: input.email,
           phone: input.phone,
           displayName: input.displayName,
+          ...(input.contactPhone !== undefined
+            ? { contactPhone: input.contactPhone }
+            : {}),
         },
       });
       return mapUser(user);
@@ -199,14 +203,38 @@ export class PrismaIdentityRepository implements IdentityRepository {
     email: string;
     tokenHash: string;
     expiresAt: Date;
+    sentAt: Date;
   }): Promise<EmailVerificationRecord> {
-    const verification = await this.db.emailVerification.create({ data: input });
+    const { sentAt, ...rest } = input;
+    const verification = await this.db.emailVerification.create({
+      data: { ...rest, lastSentAt: sentAt, createdAt: sentAt },
+    });
     return mapEmail(verification);
   }
 
   async findEmailVerification(id: string): Promise<EmailVerificationRecord | null> {
     const verification = await this.db.emailVerification.findUnique({ where: { id } });
     return verification ? mapEmail(verification) : null;
+  }
+
+  async findLatestEmailVerification(userId: string): Promise<EmailVerificationRecord | null> {
+    const verification = await this.db.emailVerification.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return verification ? mapEmail(verification) : null;
+  }
+
+  async countEmailVerificationsSince(userId: string, since: Date): Promise<number> {
+    return this.db.emailVerification.count({ where: { userId, createdAt: { gte: since } } });
+  }
+
+  async recordFailedEmailVerificationAttempt(id: string): Promise<EmailVerificationRecord> {
+    const verification = await this.db.emailVerification.update({
+      where: { id },
+      data: { attemptCount: { increment: 1 } },
+    });
+    return mapEmail(verification);
   }
 
   async consumeEmailVerification(id: string, at: Date): Promise<boolean> {
@@ -313,7 +341,7 @@ export class PrismaIdentityRepository implements IdentityRepository {
     email: string;
     displayName: string;
     passwordHash: string;
-    verifiedAt: Date;
+    verifiedAt: Date | null;
   }): Promise<UserRecord> {
     try {
       return await this.db.$transaction(async (tx) => {
@@ -570,6 +598,7 @@ export class PrismaIdentityRepository implements IdentityRepository {
               id: true,
               displayName: true,
               phone: true,
+              contactPhone: true,
               email: true,
             },
           },
@@ -587,7 +616,7 @@ export class PrismaIdentityRepository implements IdentityRepository {
         status: row.status,
         userId: row.userId,
         displayName: row.user.displayName,
-        phone: row.user.phone,
+        phone: row.user.phone?.trim() || row.user.contactPhone?.trim() || null,
         email: row.user.email,
         createdAt: row.createdAt,
       })),
@@ -661,7 +690,7 @@ export class PrismaIdentityRepository implements IdentityRepository {
       items: users.map((user) => ({
         id: user.id,
         email: user.email,
-        phone: user.phone,
+        phone: user.phone?.trim() || user.contactPhone?.trim() || null,
         displayName: user.displayName,
         phoneVerifiedAt: user.phoneVerifiedAt,
         emailVerifiedAt: user.emailVerifiedAt,
@@ -674,9 +703,15 @@ export class PrismaIdentityRepository implements IdentityRepository {
           role: grant.role,
           status: grant.status,
         })),
-        staffRole: user.opsCredential?.staffRole ?? 'OPS',
-        superAdmin: user.opsCredential?.superAdmin === true,
-        scope: 'NATIONAL' as const,
+        staffRole:
+          role === 'OPS'
+            ? (user.opsCredential?.staffRole ?? 'OPS')
+            : user.opsCredential?.staffRole,
+        superAdmin:
+          role === 'OPS'
+            ? user.opsCredential?.superAdmin === true
+            : user.opsCredential?.superAdmin,
+        scope: role === 'OPS' ? ('NATIONAL' as const) : undefined,
       })),
     };
   }
@@ -710,12 +745,22 @@ export class PrismaIdentityRepository implements IdentityRepository {
       const orConditions: any[] = [
         { displayName: { contains: q, mode: 'insensitive' } },
         { phone: { contains: q, mode: 'insensitive' } },
+        { contactPhone: { contains: q, mode: 'insensitive' } },
         { email: { contains: q, mode: 'insensitive' } },
       ];
       if (isUuid) {
         orConditions.push({ id: q });
       }
       and.push({ OR: orConditions });
+    }
+    if (role === 'CUSTOMER' && filter?.region && filter.region !== 'ALL') {
+      const reg = filter.region.toUpperCase();
+      and.push({
+        OR: [
+          { customerRides: { some: { serviceRegionCode: reg } } },
+          { customerFoodOrders: { some: { serviceRegionCode: reg } } },
+        ],
+      });
     }
     if (role === 'DRIVER' && filter?.region && filter.region !== 'ALL') {
       and.push({
@@ -843,7 +888,7 @@ export class PrismaIdentityRepository implements IdentityRepository {
   async findUserDirectory(id: string): Promise<OpsUserDirectoryRecord | null> {
     const user = await this.db.user.findUnique({
       where: { id },
-      include: { roleGrants: true },
+      include: { roleGrants: true, opsCredential: true },
     });
     if (!user) {
       return null;
@@ -851,7 +896,7 @@ export class PrismaIdentityRepository implements IdentityRepository {
     return {
       id: user.id,
       email: user.email,
-      phone: user.phone,
+      phone: user.phone?.trim() || user.contactPhone?.trim() || null,
       displayName: user.displayName,
       phoneVerifiedAt: user.phoneVerifiedAt,
       emailVerifiedAt: user.emailVerifiedAt,
@@ -864,6 +909,13 @@ export class PrismaIdentityRepository implements IdentityRepository {
         role: grant.role,
         status: grant.status,
       })),
+      ...(user.opsCredential?.staffRole
+        ? { staffRole: user.opsCredential.staffRole }
+        : {}),
+      ...(user.opsCredential?.superAdmin !== undefined
+        ? { superAdmin: user.opsCredential.superAdmin }
+        : {}),
+      ...(user.opsCredential ? { scope: 'NATIONAL' as const } : {}),
     };
   }
 
@@ -1180,9 +1232,22 @@ function mapEmail(verification: {
   email: string;
   tokenHash: string;
   expiresAt: Date;
+  attemptCount: number;
+  lastSentAt: Date;
   consumedAt: Date | null;
+  createdAt: Date;
 }): EmailVerificationRecord {
-  return verification;
+  return {
+    id: verification.id,
+    userId: verification.userId,
+    email: verification.email,
+    tokenHash: verification.tokenHash,
+    expiresAt: verification.expiresAt,
+    attemptCount: verification.attemptCount,
+    lastSentAt: verification.lastSentAt,
+    consumedAt: verification.consumedAt,
+    createdAt: verification.createdAt,
+  };
 }
 
 function mapPasswordReset(reset: {

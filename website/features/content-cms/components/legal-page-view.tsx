@@ -5,14 +5,14 @@ import type { LegalContent, PublicPageView } from "../types";
 import { PublicPageHeader } from "./public-page-header";
 
 const COPY = {
-  vi: { effective: "Hiệu lực từ", version: "Phiên bản", terms: "Điều khoản sử dụng", privacy: "Chính sách quyền riêng tư" },
-  en: { effective: "Effective", version: "Version", terms: "Terms of use", privacy: "Privacy policy" },
+  vi: { effective: "Hiệu lực từ", version: "Phiên bản", terms: "Điều khoản sử dụng", privacy: "Chính sách quyền riêng tư", regulations: "Quy chế sử dụng" },
+  en: { effective: "Effective", version: "Version", terms: "Terms of use", privacy: "Privacy policy", regulations: "Regulations" },
 } as const;
 
 /** Server-rendered legal document from the CMS (DEC-PROD-055). */
 export function LegalPageView({ page }: { page: PublicPageView<LegalContent> }) {
   const t = COPY[page.locale];
-  const other = page.slug === "privacy" ? "terms" : "privacy";
+  const others = (["terms", "privacy", "regulations"] as const).filter((s) => s !== page.slug);
   const q = page.locale === "en" ? "?lang=en" : "";
   const meta = [
     page.effectiveAt ? `${t.effective} ${formatOpsDate(page.effectiveAt)}` : null,
@@ -46,9 +46,11 @@ export function LegalPageView({ page }: { page: PublicPageView<LegalContent> }) 
           ))}
         </article>
         <div className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-border pt-6 text-xs">
-          <Link href={`/${other}${q}`} className="font-medium text-brand hover:underline">
-            {t[other]} →
-          </Link>
+          {others.map((other) => (
+            <Link key={other} href={`/${other}${q}`} className="font-medium text-brand hover:underline">
+              {t[other]} →
+            </Link>
+          ))}
         </div>
       </main>
     </div>

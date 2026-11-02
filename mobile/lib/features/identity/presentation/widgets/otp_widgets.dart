@@ -232,7 +232,7 @@ class OtpEntryPane extends StatelessWidget {
                               TextSpan(text: l10n.otpEmailBodyPrefix),
                               TextSpan(
                                 text: displayPhone,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: DealGoColors.text,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -387,7 +387,7 @@ class OtpInvalidPane extends StatelessWidget {
             padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
             child: Column(
               children: [
-                const _StatusMark(
+                _StatusMark(
                   icon: DealGoIcons.close,
                   color: DealGoColors.danger,
                   background: DealGoColors.dangerSurface,
@@ -528,7 +528,7 @@ class OtpCooldownPane extends StatelessWidget {
             padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
             child: Column(
               children: [
-                const _StatusMark(
+                _StatusMark(
                   icon: DealGoIcons.chartPie,
                   color: DealGoColors.amber,
                   background: DealGoColors.amberSurface,
@@ -676,7 +676,7 @@ class _LockMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const DecoratedBox(
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: DealGoColors.subtlePurple,
         borderRadius: BorderRadius.all(Radius.circular(20)),

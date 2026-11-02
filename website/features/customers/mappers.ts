@@ -1,5 +1,6 @@
 import { parseAccountDeletion } from "@/lib/account-deletion";
 import { personInitials, type StatusTone } from "@/lib/admin-format";
+import { serviceRegionLabel } from "@/lib/service-region-labels";
 import type { NestOpsCustomer } from "@/features/customers/nest-types";
 import type {
   CustomerListItem,
@@ -34,18 +35,28 @@ export function mapNestCustomerToListItem(
   customer: NestOpsCustomer,
 ): CustomerListItem {
   const name = customer.displayName.trim() || "Khách hàng";
+  const area =
+    customer.area?.trim() && customer.area !== "—"
+      ? customer.area
+      : customer.region
+        ? (serviceRegionLabel(customer.region) ?? customer.region)
+        : "—";
+
   return {
     code: customer.id,
     initials: personInitials(name) || "KH",
     name,
     phone: customer.phoneMasked || customer.phone || "—",
-    area: "—",
-    rides: 0,
-    food: 0,
-    delivery: 0,
-    spend: 0,
+    email: customer.email || undefined,
+    area,
+    rides: customer.rides ?? 0,
+    food: customer.food ?? 0,
+    delivery: customer.delivery ?? 0,
+    spend: customer.spend ?? 0,
     status: customerStatusFromGrants(customer),
     time: formatOpsClock(customer.createdAt),
+    createdAt: customer.createdAt,
+    phoneVerifiedAt: customer.phoneVerifiedAt,
     deletion: parseAccountDeletion(customer.deletion),
   };
 }

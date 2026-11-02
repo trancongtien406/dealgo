@@ -1,5 +1,4 @@
 export const PHONE_CHALLENGE_TTL_MS = 5 * 60 * 1000;
-export const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 export const PASSKEY_CHALLENGE_TTL_MS = 5 * 60 * 1000;
 export const MAX_PHONE_ATTEMPTS = 5;
 // Email delivery is slower than SMS, so the sign-up code lives longer than the phone OTP.

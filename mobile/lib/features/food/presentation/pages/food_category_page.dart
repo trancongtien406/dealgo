@@ -113,7 +113,7 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
                       DealGoIcons.search,
                       color: DealGoColors.primary,
                     ),
-                    suffixIcon: const Icon(
+                    suffixIcon: Icon(
                       DealGoIcons.edit,
                       color: DealGoColors.textSecondary,
                     ),

@@ -25,7 +25,11 @@ export type DriverListItem = {
   service: string;
   vehicle: string;
   vehicleKind: string;
+  vehicleBrand?: string;
+  vehicleModel?: string;
   plate: string;
+  licenseClass?: string;
+  licenseNumber?: string;
   kyc: DriverKycStatus;
   activity: DriverActivityStatus;
   rating: number | null;
@@ -35,5 +39,75 @@ export type DriverListItem = {
   finishedJobs: number | null;
   /** Completion rate 0..1; null when unknown or nothing finished yet. */
   completionRate: number | null;
+  phone?: string;
+  phoneMasked?: string;
+  email?: string;
+  createdAt?: string;
   deletion?: AccountDeletionInfo | null;
+  presence?: {
+    online: boolean;
+    lat: number | null;
+    lng: number | null;
+    serviceRegionCode?: string | null;
+    rideEnabled?: boolean;
+    foodEnabled?: boolean;
+    parcelEnabled?: boolean;
+    updatedAt: string;
+  } | null;
+  kycDetail?: {
+    applicationId: string;
+    status: string;
+    vehicleType?: string | null;
+    vehiclePlate?: string | null;
+    vehicleBrand?: string | null;
+    vehicleModel?: string | null;
+    vehicleClassCode?: string | null;
+    licenseClass?: string | null;
+    licenseNumber?: string | null;
+    bankName?: string | null;
+    bankAccountNumber?: string | null;
+    bankAccountHolder?: string | null;
+    documentsWaived?: boolean;
+    documentCount: number;
+    submittedAt?: string | null;
+    reviewedAt?: string | null;
+  } | null;
+  activeJob?: {
+    type: 'RIDE' | 'FOOD';
+    id: string;
+    code: string;
+    status: string;
+    statusLabel: string;
+    customerName?: string;
+    pickupLabel: string;
+    dropoffLabel: string;
+    fareVnd: number;
+    createdAt: string;
+  } | null;
+  performance7d?: Array<{
+    date: string;
+    dayLabel: string;
+    completedTrips: number;
+    fareVnd: number;
+    feeVnd: number;
+    netVnd: number;
+  }>;
+};
+
+export type DriverActivityItem = {
+  time: string;
+  code: string;
+  kind: string;
+  summary: string;
+  value: string;
+  status: string;
+  tone: string;
+};
+
+export type DriverActivitiesPage = {
+  items: DriverActivityItem[];
+  page: number;
+  limit: number;
+  total: number;
+  tab: string;
 };

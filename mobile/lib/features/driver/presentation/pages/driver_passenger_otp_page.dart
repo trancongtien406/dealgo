@@ -244,7 +244,7 @@ class _DriverPassengerOtpPageState extends State<DriverPassengerOtpPage>
               children: [
                 Row(
                   children: [
-                    const CircleAvatar(
+                    CircleAvatar(
                       backgroundColor: DealGoColors.subtlePurple,
                       child: Icon(
                         DealGoIcons.user,

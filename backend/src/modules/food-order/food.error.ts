@@ -20,6 +20,10 @@ export const FOOD_RULES = {
   },
   FOOD_ITEM_NOT_FOUND: { status: 404, message: 'Catalog item not found' },
   FOOD_ITEM_UNAVAILABLE: { status: 409, message: 'An item is unavailable' },
+  FOOD_ITEM_NOT_APPROVED: {
+    status: 409,
+    message: 'This item is waiting for (or failed) moderation and cannot be put on sale yet',
+  },
   FOOD_OPTION_INVALID: {
     status: 409,
     message: 'An item option choice is missing, unavailable or out of bounds',
@@ -68,6 +72,28 @@ export const FOOD_RULES = {
   FOOD_STORE_LOCATION_REQUIRED: {
     status: 409,
     message: 'The store needs a map location before it can take delivery orders',
+  },
+  FOOD_OFFER_NOT_FOUND: { status: 404, message: 'Delivery-fee offer not found' },
+  FOOD_OFFER_EXPIRED: { status: 409, message: 'This delivery-fee offer has expired' },
+  FOOD_FEE_NEGOTIATION_DISABLED: {
+    status: 409,
+    message: "Delivery fee is fixed: drivers can only accept the customer's price",
+  },
+  FOOD_OFFER_AMOUNT_INVALID: {
+    status: 422,
+    message: 'The delivery fee is outside the allowed range or step',
+  },
+  FOOD_OFFER_EDIT_LIMIT: {
+    status: 409,
+    message: 'You cannot change your delivery-fee offer on this order again',
+  },
+  FOOD_FARE_RAISE_LIMIT: {
+    status: 409,
+    message: 'The delivery-fee offer cannot be raised again on this order',
+  },
+  FOOD_FARE_LOCKED: {
+    status: 409,
+    message: 'The delivery fee is already agreed with a driver',
   },
   FOOD_CATEGORY_REORDER_INVALID: {
     status: 400,

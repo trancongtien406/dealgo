@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/auth/post_auth_gate.dart';
+import '../../data/profile_cache.dart';
 import '../../../../core/auth/token_store.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../domain/entities/auth_state.dart';
@@ -14,11 +17,13 @@ class AuthCubit extends Cubit<AuthState> {
     required this.tokens,
     this._identityRepository,
     this._postAuth,
+    this._profileCache,
   }) : super(const AuthRestoring());
 
   final FetchMe _fetchMe;
   final TokenStore tokens;
   final IdentityRepository? _identityRepository;
+  final ProfileCache? _profileCache;
   PostAuthGate? _postAuth;
 
   void bindPostAuth(PostAuthGate gate) {
@@ -26,8 +31,9 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   Future<void> restore() async {
+    StoredTokens? stored;
     try {
-      final stored = await tokens.read();
+      stored = await tokens.read();
       if (isClosed) {
         return;
       }
@@ -45,9 +51,20 @@ class AuthCubit extends Cubit<AuthState> {
       if (error.statusCode == 401) {
         await _clearQuietly();
       }
-      if (!isClosed) {
-        emit(const AuthSignedOut());
+      // No network (status 0): keep the session on the last known profile so
+      // the latest trip stays reachable; the server re-checks once online.
+      final cached = error.statusCode == 0 && stored != null
+          ? await _profileCache?.read()
+          : null;
+      if (isClosed) {
+        return;
       }
+      if (cached != null && stored != null) {
+        await _syncPostAuth(cached);
+        emit(AuthSignedIn(tokens: stored, profile: cached));
+        return;
+      }
+      emit(const AuthSignedOut());
     } catch (_) {
       await _clearQuietly();
       if (!isClosed) {
@@ -165,7 +182,17 @@ class AuthCubit extends Cubit<AuthState> {
     await gate.syncFromServerNeedsProfileSetup(profile.needsProfileSetup);
   }
 
+  @override
+  void onChange(Change<AuthState> change) {
+    super.onChange(change);
+    final next = change.nextState;
+    if (next is AuthSignedIn) {
+      unawaited(_profileCache?.write(next.profile));
+    }
+  }
+
   Future<bool> _clearQuietly() async {
+    unawaited(_profileCache?.clear());
     try {
       await tokens.clear();
       return true;

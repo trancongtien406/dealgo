@@ -68,6 +68,7 @@ export async function apiFetch<T = unknown>(
       !window.location.pathname.startsWith("/login") &&
       !window.location.pathname.startsWith("/terms") &&
       !window.location.pathname.startsWith("/privacy") &&
+      !window.location.pathname.startsWith("/regulations") &&
       !window.location.pathname.startsWith("/support");
 
     if (shouldRedirect) {

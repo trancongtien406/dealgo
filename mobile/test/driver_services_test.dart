@@ -66,6 +66,19 @@ void main() {
       await cubit.close();
     });
 
+    test('revert drops toggles that were not saved', () async {
+      final presence = FakePresenceClient();
+      final cubit = build(presence);
+      await cubit.load();
+      cubit.setParcel(true);
+      expect(cubit.state.dirty, isTrue);
+      cubit.revertUnsaved();
+      expect(cubit.state.prefs.parcelEnabled, isFalse);
+      expect(cubit.state.saved.parcelEnabled, isFalse);
+      expect(cubit.state.dirty, isFalse);
+      await cubit.close();
+    });
+
     test('a failed save keeps the last saved toggles', () async {
       final presence = FakePresenceClient()
         ..saveError = const ApiException(
@@ -137,6 +150,67 @@ void main() {
     expect(last.foodEnabled, isFalse);
     expect(last.rideEnabled, isTrue);
     expect(presence.prefs.foodEnabled, isFalse);
+  });
+
+  testWidgets('jobs and settings show the same services the overview saved', (
+    tester,
+  ) async {
+    final presence = FakePresenceClient();
+    await pumpSignedIn(
+      tester,
+      profile: _driverProfile,
+      rideClient: FakeRideClient(),
+      foodClient: FakeFoodClient(),
+      presenceClient: presence,
+    );
+    await tester.tap(find.byKey(const Key('driver-go-online')));
+    await tester.pumpAndSettle();
+
+    final parcelSwitch = find.byKey(const Key('driver-home-parcel-switch'));
+    await tester.scrollUntilVisible(
+      parcelSwitch,
+      120,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.ensureVisible(parcelSwitch);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(of: parcelSwitch, matching: find.byType(Switch)),
+    );
+    await tester.pumpAndSettle();
+    expect(presence.prefs.parcelEnabled, isTrue);
+    expect(presence.prefs.rideEnabled, isTrue);
+    expect(presence.prefs.foodEnabled, isTrue);
+
+    await tester.tap(navLabel('Việc nhận'));
+    await tester.pumpAndSettle();
+
+    for (final kind in ['ride', 'food', 'parcel']) {
+      final pill = find.byKey(Key('driver-jobs-service-$kind'));
+      expect(pill, findsOneWidget);
+      final label = tester.widget<Text>(
+        find.descendant(of: pill, matching: find.byType(Text)),
+      );
+      expect(label.maxLines, isNull);
+      expect(label.overflow, isNot(TextOverflow.ellipsis));
+      expect(label.data, isNotEmpty);
+    }
+    expect(find.text('Chở khách, Giao đồ ăn, Giao hàng'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('driver-jobs-open-services')));
+    await tester.pumpAndSettle();
+
+    void expectOn(Key key) {
+      final sw = tester.widget<Switch>(
+        find.descendant(of: find.byKey(key), matching: find.byType(Switch)),
+      );
+      expect(sw.value, isTrue);
+    }
+
+    expectOn(const Key('driver-services-ride'));
+    expectOn(const Key('driver-services-food'));
+    expectOn(const Key('driver-services-parcel'));
+    expect(find.text('3 dịch vụ'), findsOneWidget);
   });
 
   testWidgets(
@@ -312,19 +386,22 @@ void main() {
     expect(find.text('47.000đ'), findsWidgets);
   });
 
-  testWidgets('active ride that is not this assigned to this driver (404) says it is gone', (tester) async {
-    final rides = FakeRideClient();
-    await pumpSignedIn(
-      tester,
-      profile: _driverProfile,
-      rideClient: rides,
-      foodClient: FakeFoodClient(),
-    );
-    GoRouter.of(tester.element(find.text('Tổng quan tài xế')))
-        .push('/driver/rides/ride-open-1/active');
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('driver-active-gone')), findsOneWidget);
-  });
+  testWidgets(
+    'active ride that is not this assigned to this driver (404) says it is gone',
+    (tester) async {
+      final rides = FakeRideClient();
+      await pumpSignedIn(
+        tester,
+        profile: _driverProfile,
+        rideClient: rides,
+        foodClient: FakeFoodClient(),
+      );
+      GoRouter.of(tester.element(find.text('Tổng quan tài xế')))
+          .push('/driver/rides/ride-open-1/active');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('driver-active-gone')), findsOneWidget);
+    },
+  );
 }
 
 OpenRide _openRide() => const OpenRide(

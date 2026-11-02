@@ -72,9 +72,15 @@ Future<void> _openMap(WidgetTester tester, FakeRideClient rides) async {
   await tester.pumpAndSettle();
 }
 
+// Choosing a destination now opens the fare sheet on its own; tap the map
+// CTA only when the map is still showing.
 Future<void> _openFare(WidgetTester tester) async {
-  await tester.ensureVisible(find.byKey(const Key('ride-open-route-overview')));
-  await tester.tap(find.byKey(const Key('ride-open-route-overview')));
+  final cta = find.byKey(const Key('ride-open-route-overview'));
+  if (cta.evaluate().isNotEmpty &&
+      find.byKey(const Key('ride-fare-back')).evaluate().isEmpty) {
+    await tester.ensureVisible(cta);
+    await tester.tap(cta);
+  }
   await tester.pumpAndSettle();
 }
 
@@ -137,7 +143,8 @@ void main() {
     _phone(tester);
     await loadShotFonts(tester);
     await _openMap(tester, _rides());
-    expect(find.byKey(const Key('ride-map-back')), findsOneWidget);
+    // Destination chosen → prices open automatically.
+    expect(find.byKey(const Key('ride-fare-back')), findsOneWidget);
     await saveShot(tester, 'B1-map-back');
 
     await _openFare(tester);

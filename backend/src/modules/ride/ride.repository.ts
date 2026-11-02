@@ -11,6 +11,7 @@ import type {
   RideSnapshot,
   SelectInput,
   RaiseFareInput,
+  SetAutoAcceptInput,
   DeclineOfferInput,
   WithdrawOfferInput,
   DriverCancelInput,
@@ -45,6 +46,9 @@ export type RideCreateHook = (ctx: { tx: unknown; rideId: string }) => Promise<v
 export interface RideRepository {
   create(input: CreateRideInput, withinCreate?: RideCreateHook): Promise<RideSnapshot>;
   findById(id: string, now: Date): Promise<RideSnapshot | null>;
+  /** t82u: priced road distance shown to drivers (stored beside the ride, outside the ledger). */
+  setRouteDistanceKm?(rideId: string, km: number): Promise<void>;
+  routeDistanceKm?(rideId: string): Promise<number | null>;
   /** `area`: only rides whose pickup is inside this box (DB-side pre-filter). */
   listOpen(
     now: Date,
@@ -98,6 +102,8 @@ export interface RideRepository {
   expireDue(now: Date, limit?: number): Promise<string[]>;
   /** Customer raises the bid while negotiating. */
   raiseFare(input: RaiseFareInput): Promise<RideSnapshot>;
+  /** Customer turns exact-price auto-accept on or off while negotiating. */
+  setAutoAccept(input: SetAutoAcceptInput): Promise<RideSnapshot>;
   /** Customer declines one driver's offer. */
   declineOffer(input: DeclineOfferInput): Promise<RideSnapshot>;
   /** Customer edits stops while negotiating (live offers die, new round). */
@@ -147,13 +153,24 @@ export class MemoryRideRepository implements RideRepository {
     return this.run(() => this.ledger.read(id, now));
   }
 
-  listOpen(
+  private readonly routeKm = new Map<string, number>();
+
+  async setRouteDistanceKm(rideId: string, km: number): Promise<void> {
+    this.routeKm.set(rideId, km);
+  }
+
+  async routeDistanceKm(rideId: string): Promise<number | null> {
+    return this.routeKm.get(rideId) ?? null;
+  }
+
+  async listOpen(
     now: Date,
     limit?: number,
     vehicleClassCode?: string,
     area?: GeoBox,
   ): Promise<OpenRideListing[]> {
-    return this.run(() => this.ledger.listOpen(now, limit, vehicleClassCode, area));
+    const rows = await this.run(() => this.ledger.listOpen(now, limit, vehicleClassCode, area));
+    return rows.map((row) => ({ ...row, routeDistanceKm: this.routeKm.get(row.id) ?? null }));
   }
 
   listPage(
@@ -306,6 +323,10 @@ export class MemoryRideRepository implements RideRepository {
 
   raiseFare(input: RaiseFareInput): Promise<RideSnapshot> {
     return this.run(() => finish(this.ledger.raiseFare(input)));
+  }
+
+  setAutoAccept(input: SetAutoAcceptInput): Promise<RideSnapshot> {
+    return this.run(() => finish(this.ledger.setAutoAccept(input)));
   }
 
   declineOffer(input: DeclineOfferInput): Promise<RideSnapshot> {

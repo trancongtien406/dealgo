@@ -26,6 +26,7 @@ import '../cubit/ride_session.dart';
 import '../utils/ride_distance.dart';
 import '../utils/ride_routes.dart';
 import '../widgets/ride_widgets.dart';
+import '../../../parcel/presentation/pages/parcel_details_page.dart';
 
 const _suggestionLimit = 5;
 
@@ -55,6 +56,21 @@ class _RideMapPageState extends State<RideMapPage> {
   var _route = RouteGeometry.unavailable;
   RideDistance? _distance;
   var _routeSeq = 0;
+
+  /// A/B (+stops) last auto-advanced, so back from the fare sheet does not
+  /// bounce straight forward again for the same trip.
+  String? _advancedFor;
+
+  /// Parcel: A/B chosen → this sheet shows the package form (no new page).
+  var _parcelSheet = false;
+  final _sheet = DraggableScrollableController();
+
+  @override
+  void dispose() {
+    _sheet.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -285,10 +301,29 @@ class _RideMapPageState extends State<RideMapPage> {
         (pickup.lng - dropoff.lng).abs() < 0.0001;
   }
 
+  /// Destination chosen → prices at once (owner t63u): ride opens the
+  /// class+fare sheet (server quotes every class), parcel swaps this sheet
+  /// to the package form. No extra "continue" tap.
   void _tryAutoAdvance() {
-    // inDrive-like: keep map + sheet visible with A/B filled; user taps CTA.
-    // (Previously auto-pushed to fare and skipped the confirmation sheet.)
     unawaited(_loadRoute());
+    final places = _places;
+    if (places == null || _samePlace || _locating) {
+      return;
+    }
+    final key = [
+      places.pickup.lat,
+      places.pickup.lng,
+      places.dropoff.lat,
+      places.dropoff.lng,
+      for (final s in _stops) '${s.lat},${s.lng}',
+    ].join('|');
+    if (key == _advancedFor) {
+      return;
+    }
+    _advancedFor = key;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _continue();
+    });
   }
 
   /// A/B chosen → road route + km from Nest `GET /v1/rides/route` (the
@@ -354,7 +389,19 @@ class _RideMapPageState extends State<RideMapPage> {
       return;
     }
     if (widget.parcel) {
-      context.push(RideRoutes.parcelDetails, extra: places);
+      setState(() => _parcelSheet = true);
+      // Lift the sheet so the package form + price are visible at once.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _sheet.isAttached) {
+          unawaited(
+            _sheet.animateTo(
+              0.62,
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+            ),
+          );
+        }
+      });
       return;
     }
     // inDrive-like hot path: A/B → class+fare sheet (skip overview hop).
@@ -384,10 +431,15 @@ class _RideMapPageState extends State<RideMapPage> {
       _route = RouteGeometry.unavailable;
       _distance = null;
       _routeSeq++;
+      _advancedFor = null;
+      _parcelSheet = false;
     });
     unawaited(_locatePickup());
     unawaited(_loadSuggestions());
   }
+
+  bool get _showParcelSheet =>
+      widget.parcel && _parcelSheet && _places != null && !_samePlace;
 
   @override
   Widget build(BuildContext context) {
@@ -480,17 +532,27 @@ class _RideMapPageState extends State<RideMapPage> {
                 ),
               ),
               RideDraggableSheet(
-                initialChildSize: 0.42,
-                minChildSize: 0.26,
+                // Owner t63u: never below 40% of the screen.
+                controller: _sheet,
+                initialChildSize: _showParcelSheet ? 0.62 : 0.42,
+                minChildSize: 0.4,
                 // QA C8: stop the expanded sheet below the floating back
                 // button so it never sits on the "Điểm đón" label.
                 maxChildSize: rideSheetMaxSize(MediaQuery.of(context)),
                 snapSizes: rideSheetSnapSizes(const [
-                  0.26,
-                  0.42,
-                  0.68,
+                  0.4,
+                  0.62,
                 ], rideSheetMaxSize(MediaQuery.of(context))),
                 builder: (context, scrollController) {
+                  final parcelPlaces = _places;
+                  if (_showParcelSheet && parcelPlaces != null) {
+                    return ParcelDetailsPanel(
+                      key: ValueKey(_advancedFor),
+                      places: parcelPlaces,
+                      scrollController: scrollController,
+                      onEditRoute: () => setState(() => _parcelSheet = false),
+                    );
+                  }
                   return Column(
                     children: [
                       Expanded(
@@ -503,7 +565,6 @@ class _RideMapPageState extends State<RideMapPage> {
                             DealGoSpacing.s8,
                           ),
                           children: [
-                            const RideSheetHandle(),
                             const SizedBox(height: DealGoSpacing.s12),
                             Text(
                               widget.parcel
@@ -552,7 +613,7 @@ class _RideMapPageState extends State<RideMapPage> {
                                       key: Key('ride-stop-remove-${i + 1}'),
                                       tooltip: l10n.rideRemoveStop,
                                       onPressed: () => _removeStop(i),
-                                      icon: const Icon(
+                                      icon: Icon(
                                         DealGoIcons.close,
                                         color: DealGoColors.textSecondary,
                                       ),
@@ -639,7 +700,7 @@ class _RideMapPageState extends State<RideMapPage> {
                                       borderRadius: BorderRadius.circular(
                                         DealGoRadius.input,
                                       ),
-                                      side: const BorderSide(
+                                      side: BorderSide(
                                         color: DealGoColors.border,
                                       ),
                                     ),
@@ -687,7 +748,7 @@ class _RideMapPageState extends State<RideMapPage> {
                                                 ],
                                               ),
                                             ),
-                                            const Icon(
+                                            Icon(
                                               DealGoIcons.chevronRight,
                                               color: DealGoColors.textTertiary,
                                               size: 18,

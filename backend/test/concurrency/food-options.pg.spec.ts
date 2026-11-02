@@ -50,6 +50,7 @@ describePg('food item options (postgres)', () => {
     const customer = await db.user.create({ data: { displayName: 'Option Customer', phone: `+8493${tag}` } });
     await db.foodStore.create({ data: { ownerId: owner.id, name: `Options ${tag}` } });
     const item = await repo.createItem({ ownerId: owner.id, name: 'Trà sữa', priceVnd: 30_000 });
+    await db.foodItem.update({ where: { id: item.id }, data: { moderationStatus: 'APPROVED' } }); // FOOD-001
 
     const saved = await repo.replaceItemOptions({
       ownerId: owner.id,
@@ -113,6 +114,7 @@ describePg('food item options (postgres)', () => {
     const customer = await db.user.create({ data: { displayName: 'Option Customer 2', phone: `+8492${tag}` } });
     const store = await db.foodStore.create({ data: { ownerId: owner.id, name: `Options2 ${tag}` } });
     const item = await repo.createItem({ ownerId: owner.id, name: 'Cơm gà', priceVnd: 40_000 });
+    await db.foodItem.update({ where: { id: item.id }, data: { moderationStatus: 'APPROVED' } }); // FOOD-001
     const saved = await repo.replaceItemOptions({
       ownerId: owner.id,
       itemId: item.id,

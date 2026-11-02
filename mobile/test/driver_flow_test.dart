@@ -179,7 +179,8 @@ void main() {
     expect(food.readyCalls, ['access-token']);
     expect(find.text('123 Lê Lợi'), findsOneWidget);
     expect(find.text('42.000đ'), findsWidgets);
-    expect(find.textContaining('Xe máy'), findsWidgets);
+    // t73u: the green "Chở khách · Xe máy & ô tô" badge is gone.
+    expect(find.text('Chở khách · Xe máy & ô tô'), findsNothing);
   });
 
   testWidgets('ride ref never wraps mid-word beside the chips', (tester) async {

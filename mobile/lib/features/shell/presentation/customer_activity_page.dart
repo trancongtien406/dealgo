@@ -145,10 +145,7 @@ class _CustomerActivityViewState extends State<_CustomerActivityView> {
                   key: const Key('activity-refresh'),
                   tooltip: AppLocalizations.of(context).actionRefresh,
                   onPressed: state.busy ? null : () => _reload(context),
-                  icon: const Icon(
-                    DealGoIcons.refresh,
-                    color: DealGoColors.text,
-                  ),
+                  icon: Icon(DealGoIcons.refresh, color: DealGoColors.text),
                 ),
               ),
             ),

@@ -84,14 +84,10 @@ void main() {
       expect(find.text('Nam'), findsOneWidget);
       expect(find.text('Nữ'), findsOneWidget);
       expect(find.text('Khác'), findsOneWidget);
-      expect(find.text('Bổ sung sau'), findsOneWidget);
+      expect(find.text('Bổ sung sau'), findsNothing);
+      expect(find.byKey(const Key('profile-skip')), findsNothing);
       expect(find.text('Hoàn tất'), findsOneWidget);
       expect(find.bySemanticsLabel('Ảnh đại diện (tuỳ chọn)'), findsOneWidget);
-      // Skip sits in the top bar, not stacked under the primary button.
-      expect(
-        tester.getTopLeft(find.text('Bổ sung sau')).dy,
-        lessThan(tester.getTopLeft(find.text('Hoàn tất')).dy),
-      );
 
       final completeButton = tester.widget<FilledButton>(
         find.ancestor(

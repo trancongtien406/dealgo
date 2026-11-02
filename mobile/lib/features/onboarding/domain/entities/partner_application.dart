@@ -21,12 +21,35 @@ class SubmitPartnerApplicationRequest {
     required this.role,
     required this.metadata,
     this.documents = const [],
+    this.acceptedLegalDocuments = const [],
   });
 
   final String accessToken;
   final String role;
   final Map<String, Object?> metadata;
   final List<PartnerDocumentInput> documents;
+
+  /// pt5u: Quy chế sử dụng + privacy versions the applicant ticked.
+  final List<AcceptedLegalDocument> acceptedLegalDocuments;
+}
+
+/// pt5u: one legal document version (slug + version) accepted at submit.
+class AcceptedLegalDocument {
+  const AcceptedLegalDocument({required this.slug, required this.version});
+
+  final String slug;
+  final int version;
+
+  Map<String, Object?> toJson() => {'slug': slug, 'version': version};
+
+  @override
+  bool operator ==(Object other) =>
+      other is AcceptedLegalDocument &&
+      other.slug == slug &&
+      other.version == version;
+
+  @override
+  int get hashCode => Object.hash(slug, version);
 }
 
 /// Stored document summary as returned by the server (no storage key).

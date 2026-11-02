@@ -207,7 +207,7 @@ describe('PaymentGatewayService', () => {
     const intent = (await repo.findById(v.intentId!))!;
     await gateway.handleCallback('momo', momoIpn(intent.providerRef!, 50000));
     await gateway.handleCallback('momo', momoIpn(intent.providerRef!, 50000));
-    const cap = await ledgerRepo.findByEntity('RIDE', RIDE, 'PSP_PAYMENT_CAPTURED');
+    const cap = await ledgerRepo.findByEntity('PAYMENT_INTENT', intent.id, 'PSP_PAYMENT_CAPTURED');
     expect(cap?.amountVnd).toBe(50000);
     const r = await gateway.refund({ intentId: intent.id, amountVnd: 20000, reason: 'partial', actorUserId: 'ops' });
     expect((await ledgerRepo.findByEntity('PAYMENT_REFUND', r.refund.id, 'PSP_REFUND_RECORDED'))?.amountVnd).toBe(20000);
@@ -324,6 +324,115 @@ describe('online vs cash settlement', () => {
   });
 });
 
+describe('capture safety (MONEY-002 / MONEY-003)', () => {
+  it('a second online payment for the same job (other method) gets its own capture journal', async () => {
+    const ctx = setup();
+    await enable(ctx.registry, 'MOMO');
+    await enable(ctx.registry, 'ZALOPAY');
+    const zalo = await ctx.gateway.start({ entityType: 'RIDE', entityId: RIDE, service: 'BIKE', methodCode: 'ZALOPAY', amountVnd: 50000, userId: 'u' });
+    const momo = await ctx.gateway.start({ entityType: 'RIDE', entityId: RIDE, service: 'BIKE', methodCode: 'MOMO', amountVnd: 50000, userId: 'u' });
+    const zi = (await ctx.repo.findById(zalo.intentId!))!;
+    const mi = (await ctx.repo.findById(momo.intentId!))!;
+    // Customer paid in both apps (two open redirects): both captures must be on the books.
+    await ctx.gateway.handleCallback('momo', momoIpn(mi.providerRef!, 50000));
+    const data = JSON.stringify({ app_trans_id: zi.providerRef, zp_trans_id: 5, amount: 50000 });
+    await ctx.gateway.handleCallback('zalopay', { data, mac: createHmac('sha256', 'k2').update(data).digest('hex'), type: 1 });
+    expect((await ctx.ledgerRepo.findByEntity('PAYMENT_INTENT', mi.id, 'PSP_PAYMENT_CAPTURED'))?.amountVnd).toBe(50000);
+    expect((await ctx.ledgerRepo.findByEntity('PAYMENT_INTENT', zi.id, 'PSP_PAYMENT_CAPTURED'))?.amountVnd).toBe(50000);
+  });
+
+  it('concurrent IPNs (different event ids) capture and journal once', async () => {
+    const ctx = setup();
+    await enable(ctx.registry, 'MOMO');
+    const v = await ctx.gateway.start({ entityType: 'RIDE', entityId: RIDE, service: 'BIKE', methodCode: 'MOMO', amountVnd: 50000, userId: 'u' });
+    const intent = (await ctx.repo.findById(v.intentId!))!;
+    let posts = 0;
+    const orig = ctx.ledger.postEvent.bind(ctx.ledger);
+    ctx.ledger.postEvent = (async (...args: Parameters<typeof orig>) => {
+      posts += 1;
+      return orig(...args);
+    }) as typeof orig;
+    await Promise.all([
+      ctx.gateway.handleCallback('momo', momoIpn(intent.providerRef!, 50000, 0, 1)),
+      ctx.gateway.handleCallback('momo', momoIpn(intent.providerRef!, 50000, 0, 2)),
+    ]);
+    expect(posts).toBe(1);
+    expect((await ctx.repo.findById(intent.id))!.status).toBe('CAPTURED');
+  });
+
+  it('a failure IPN never overwrites a captured intent', async () => {
+    const ctx = setup();
+    const intent = await capturedMomo(ctx);
+    await ctx.repo.transition(intent.id, ['CREATED', 'PENDING_REDIRECT'], { status: 'FAILED' });
+    expect((await ctx.repo.findById(intent.id))!.status).toBe('CAPTURED');
+  });
+
+  it('a later failed attempt on another method cannot reopen a paid job', async () => {
+    const ctx = setup();
+    const paid = await capturedMomo(ctx);
+    await enable(ctx.registry, 'ZALOPAY');
+    const z = await ctx.gateway.start({ entityType: 'RIDE', entityId: RIDE, service: 'BIKE', methodCode: 'ZALOPAY', amountVnd: 50000, userId: 'u' });
+    expect(z).toMatchObject({ status: 'PAID', intentId: paid.id });
+  });
+});
+
+describe('auto refund on cancel (FOOD-002)', () => {
+  it('refunds the remaining prepayment in full exactly once, skipping settled jobs', async () => {
+    const ctx = setup();
+    const intent = await capturedMomo(ctx, 80000);
+    await ctx.gateway.refund({ intentId: intent.id, amountVnd: 10000, reason: 'partial', actorUserId: 'ops' });
+    const first = await ctx.gateway.refundOnCancel('RIDE', RIDE, 'u');
+    expect(first).toHaveLength(1);
+    expect((await ctx.repo.findById(intent.id))).toMatchObject({ status: 'REFUNDED', refundedVnd: 80000 });
+    // Outbox replay: same key → no second refund row.
+    const again = await ctx.gateway.refundOnCancel('RIDE', RIDE, 'u');
+    expect(again[0]).toMatchObject({ refundId: first[0]!.refundId, replayed: true });
+    expect((await ctx.gateway.intentDetail(intent.id)).refunds).toHaveLength(2);
+
+    const other = setup();
+    const settled = await capturedMomo(other, 50000);
+    await other.gateway.afterCompletion('RIDE', RIDE, settled.id);
+    expect(await other.gateway.refundOnCancel('RIDE', RIDE, 'u')).toEqual([]);
+    expect(await setup().gateway.refundOnCancel('RIDE', RIDE, 'u')).toEqual([]);
+  });
+});
+
+describe('refund idempotency (ADM-003)', () => {
+  it('the same key replays the first refund instead of refunding twice', async () => {
+    const ctx = setup();
+    const intent = await capturedMomo(ctx, 100000);
+    const a = await ctx.gateway.refund({ intentId: intent.id, amountVnd: 30000, reason: 'one', actorUserId: 'ops', idempotencyKey: 'key-aaaaaaaa' });
+    const b = await ctx.gateway.refund({ intentId: intent.id, amountVnd: 30000, reason: 'one', actorUserId: 'ops', idempotencyKey: 'key-aaaaaaaa' });
+    expect(b.refund.id).toBe(a.refund.id);
+    expect(b.refundedVnd).toBe(30000);
+    const detail = await ctx.gateway.intentDetail(intent.id);
+    expect(detail.refunds).toHaveLength(1);
+    const c = await ctx.gateway.refund({ intentId: intent.id, amountVnd: 10000, reason: 'two', actorUserId: 'ops', idempotencyKey: 'key-bbbbbbbb' });
+    expect(c.refundedVnd).toBe(40000);
+  });
+
+  it('concurrent submissions with one key refund once', async () => {
+    const ctx = setup();
+    const intent = await capturedMomo(ctx, 100000);
+    const [x, y] = await Promise.all([
+      ctx.gateway.refund({ intentId: intent.id, amountVnd: 20000, reason: 'dup', actorUserId: 'ops', idempotencyKey: 'key-cccccccc' }),
+      ctx.gateway.refund({ intentId: intent.id, amountVnd: 20000, reason: 'dup', actorUserId: 'ops', idempotencyKey: 'key-cccccccc' }),
+    ]);
+    expect(x.refund.id).toBe(y.refund.id);
+    expect((await ctx.repo.findById(intent.id))!.refundedVnd).toBe(20000);
+  });
+
+  it('rejects a key reused for another payment', async () => {
+    const ctx = setup();
+    const a = await capturedMomo(ctx, 50000);
+    await ctx.gateway.refund({ intentId: a.id, amountVnd: 1000, reason: 'one', actorUserId: 'ops', idempotencyKey: 'key-dddddddd' });
+    const b = await capturedMomo(ctx, 50000, '22222222-2222-4222-8222-222222222222');
+    await expect(
+      ctx.gateway.refund({ intentId: b.id, amountVnd: 1000, reason: 'one', actorUserId: 'ops', idempotencyKey: 'key-dddddddd' }),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+});
+
 describe('multiple partial refunds', () => {
   it('allows several refunds up to the captured amount, one journal each', async () => {
     const ctx = setup();
@@ -408,7 +517,7 @@ describe('active reconciliation', () => {
     // A late real IPN is a no-op (already captured) and the capture journal stays single.
     const intent = (await ctx.repo.findById(v.intentId!))!;
     await ctx.gateway.handleCallback('momo', momoIpn(intent.providerRef!, 50000, 0, 777));
-    expect((await ctx.ledgerRepo.findByEntity('RIDE', RIDE, 'PSP_PAYMENT_CAPTURED'))?.amountVnd).toBe(50000);
+    expect((await ctx.ledgerRepo.findByEntity('PAYMENT_INTENT', intent.id, 'PSP_PAYMENT_CAPTURED'))?.amountVnd).toBe(50000);
   });
 
   it('marks ZaloPay failures and keeps polling pending ones; amount mismatch is not captured', async () => {

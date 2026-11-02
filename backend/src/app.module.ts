@@ -29,6 +29,8 @@ import { SupportModule } from './modules/support/index.js';
 import { PublicPagesModule } from './modules/public-pages/index.js';
 import { AppLinksModule } from './modules/app-links/index.js';
 import { SiteConfigModule } from './modules/site-config/index.js';
+import { AppVersionModule } from './modules/app-version/index.js';
+import { LegalConsentModule } from './modules/legal-consent/index.js';
 import { SettlementModule } from './modules/settlement/index.js';
 import { NotificationModule } from './modules/communication/notifications/index.js';
 import { MerchantModule } from './modules/merchant/index.js';
@@ -104,6 +106,8 @@ function buildThrottlerOptions(config: ConfigService<AppEnv, true>): ThrottlerMo
     PublicPagesModule,
     AppLinksModule,
     SiteConfigModule,
+    AppVersionModule,
+    LegalConsentModule,
     SettlementModule,
     NotificationModule,
     MerchantModule,

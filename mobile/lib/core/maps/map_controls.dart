@@ -13,7 +13,7 @@ class MapRoundButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onPressed,
-    this.color = DealGoColors.text,
+    this.color,
     this.selected = false,
     super.key,
   });
@@ -21,7 +21,7 @@ class MapRoundButton extends StatelessWidget {
   final IconData icon;
   final String tooltip;
   final VoidCallback? onPressed;
-  final Color color;
+  final Color? color;
   final bool selected;
 
   static const size = 44.0;
@@ -41,7 +41,7 @@ class MapRoundButton extends StatelessWidget {
           tooltip: tooltip,
           padding: EdgeInsets.zero,
           onPressed: onPressed,
-          icon: Icon(icon, size: 20, color: color),
+          icon: Icon(icon, size: 20, color: color ?? DealGoColors.text),
         ),
       ),
     );

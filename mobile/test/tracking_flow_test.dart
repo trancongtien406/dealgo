@@ -8,9 +8,12 @@ import 'package:dealgo/features/driver_card/domain/driver_card.dart';
 import 'package:dealgo/features/ride/domain/entities/ride_models.dart';
 import 'package:dealgo/features/ride/presentation/utils/ride_routes.dart';
 import 'package:dealgo/features/food/presentation/utils/food_routes.dart';
+import 'package:dealgo/features/active_job/domain/active_job_snapshot.dart';
+import 'package:dealgo/features/active_job/presentation/active_job_cache.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import 'support/auth_test_harness.dart';
 import 'support/fake_food_client.dart';
@@ -198,8 +201,13 @@ void main() {
     expect(find.text('45.000đ'), findsWidgets);
     // Real driver card from the backend; no invented ETA or rating.
     expect(find.text('Lê Văn Tài'), findsOneWidget);
-    expect(find.text('Xe máy · 43B1-678.90'), findsOneWidget);
-    expect(find.text('4,8 · 12 đánh giá'), findsOneWidget);
+    expect(
+      find.byKey(const Key('driver-card-vehicle')).evaluate().single.widget,
+      isA<Text>().having((t) => t.data, 'data', 'Xe máy · 43B1-678.90'),
+    );
+    // The headline names the driver's own vehicle, not the booked class alone.
+    expect(find.text('Xe máy · 43B1-678.90'), findsNWidgets(2));
+    expect(find.text('4,8'), findsOneWidget); // t81u: inline next to name
     expect(cards.calls.single.job, DriverCardJob.ride);
     expect(find.textContaining('còn khoảng'), findsNothing);
     expect(find.textContaining('Q-CAR'), findsNothing);
@@ -223,7 +231,8 @@ void main() {
     expect(find.text('Tiền tip'), findsNothing);
     expect(find.textContaining('Xe 4 chỗ'), findsNothing);
     expect(find.textContaining('Toyota'), findsNothing);
-    expect(find.text('Xe máy'), findsOneWidget);
+    expect(find.byKey(const Key('ride-receipt-driver')), findsOneWidget);
+    expect(find.text('Lê Văn Tài'), findsWidgets);
   });
 
   testWidgets('COMPLETED ride shows the receipt CTA', (tester) async {
@@ -288,7 +297,16 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Tạm mất kết nối'), findsOneWidget);
-      expect(find.text('Tài xế đang đến đón'), findsNothing);
+      // The last known status only appears inside the stamped offline panel.
+      expect(find.byKey(const Key('ride-tracking-status-chip')), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('offline-job-panel')),
+          matching: find.text('Tài xế đang đến đón'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('offline-job-updated-at')), findsOneWidget);
       expect(find.text('Tài xế đã đến điểm đón'), findsNothing);
       expect(find.text('Tài xế đã đến'), findsNothing);
     },
@@ -340,6 +358,103 @@ void main() {
       expect(find.text('150.000đ'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'offline ride keeps the driver, their phone and the pickup code',
+    (tester) async {
+      final rides = FakeRideClient()
+        ..onGet = (_) => _ride(
+          status: RideStatus.driverEnRoute,
+          agreedFareVnd: 45000,
+          assignedDriverId: 'driver-tai',
+          pickupCode: '4821',
+        );
+      final cards = FakeDriverCardRemoteDataSource(card: _driverWithPhone);
+      await _pumpCustomer(tester, rides: rides, driverCard: cards);
+      await _push(tester, RideRoutes.tracking('ride-1'));
+      expect(find.byKey(const Key('contact-phone-dial')), findsOneWidget);
+
+      rides.getError = _networkDown;
+      await tester.tap(find.byKey(const Key('ride-tracking-retry')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tạm mất kết nối'), findsOneWidget);
+      expect(find.byKey(const Key('offline-job-panel')), findsOneWidget);
+      expect(find.text('Tài xế đang đến đón'), findsOneWidget);
+      expect(find.text('Lê Văn Tài'), findsOneWidget);
+      expect(find.text('Honda Vision · 43B1-678.90'), findsOneWidget);
+      expect(find.byKey(const Key('contact-phone-dial')), findsOneWidget);
+      expect(find.byKey(const Key('offline-job-call-hint')), findsOneWidget);
+      expect(find.text('4 8 2 1'), findsOneWidget);
+      expect(find.text('45.000đ'), findsOneWidget);
+    },
+  );
+
+  testWidgets('a relaunch without network opens the saved ride and its phone', (
+    tester,
+  ) async {
+    final rides = FakeRideClient()..getError = _networkDown;
+    await _pumpCustomer(tester, rides: rides);
+    final cache = Provider.of<ActiveJobCache>(
+      tester.element(find.byType(Scaffold).first),
+      listen: false,
+    );
+    await cache.recordJob(
+      ActiveJobSnapshot(
+        kind: ActiveJobKind.ride,
+        id: 'ride-1',
+        status: 'DRIVER_ARRIVED',
+        savedAt: DateTime.now(),
+        pickupLabel: 'Hải Châu',
+        dropoffLabel: 'Sân bay',
+        amountVnd: 45000,
+        code: '4821',
+        driver: _driverWithPhone,
+      ),
+      terminal: false,
+      assignedDriverId: 'driver-tai',
+    );
+
+    await _push(tester, RideRoutes.tracking('ride-1'));
+
+    expect(find.byKey(const Key('offline-job-panel')), findsOneWidget);
+    expect(find.text('Lê Văn Tài'), findsOneWidget);
+    expect(find.byKey(const Key('contact-phone-dial')), findsOneWidget);
+    expect(find.text('4 8 2 1'), findsOneWidget);
+    expect(find.text('Hải Châu'), findsOneWidget);
+  });
+
+  testWidgets('offline food order keeps the courier phone and delivery code', (
+    tester,
+  ) async {
+    final food = FakeFoodClient()
+      ..orderDetail = const FoodOrderDetail(
+        id: 'order-1',
+        status: 'PICKED_UP',
+        storeName: 'Bún Bò Huế',
+        subtotalVnd: 45000,
+        deliveryFareVnd: 15000,
+        totalVnd: 60000,
+        dropoff: FoodDropoff(lat: 16.1, lng: 108.2, label: 'Sơn Trà'),
+        lines: [],
+        assignedDriverId: 'driver-tai',
+        deliveryCode: '4821',
+      );
+    final cards = FakeDriverCardRemoteDataSource(card: _driverWithPhone);
+    await _pumpCustomer(tester, food: food, driverCard: cards);
+    await _push(tester, FoodRoutes.order('order-1'));
+
+    food.orderError = _networkDown;
+    await tester.tap(find.byKey(const Key('food-tracking-retry')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('offline-job-panel')), findsOneWidget);
+    expect(find.text('Lê Văn Tài'), findsOneWidget);
+    expect(find.byKey(const Key('contact-phone-dial')), findsOneWidget);
+    expect(find.text('4821'), findsOneWidget);
+    expect(find.text('Bún Bò Huế'), findsOneWidget);
+    expect(find.text('60.000đ'), findsOneWidget);
+  });
 
   testWidgets('store page shows the BUSY prep estimate (DEC-PROD-028)', (
     tester,
@@ -530,6 +645,20 @@ Future<void> _pumpCustomer(
     driverCard: driverCard,
   );
 }
+
+const _networkDown = ApiException(
+  statusCode: 0,
+  message: 'Không thể kết nối máy chủ',
+  errorCode: 'NETWORK_ERROR',
+);
+
+const _driverWithPhone = DriverCard(
+  driverId: 'driver-tai',
+  displayName: 'Lê Văn Tài',
+  vehicleName: 'Honda Vision',
+  vehiclePlate: '43B1-678.90',
+  phone: '+84901234567',
+);
 
 Future<void> _push(WidgetTester tester, String location) async {
   final context = tester.element(find.byType(Scaffold).first);

@@ -26,6 +26,8 @@ export class PrismaOutboxRepository implements OutboxRepository {
         SELECT id
         FROM "outbox_messages"
         WHERE "processedAt" IS NULL
+          AND "deadLetteredAt" IS NULL
+          AND ("nextAttemptAt" IS NULL OR "nextAttemptAt" <= ${now})
           AND ("lockedAt" IS NULL OR "lockedAt" < ${cutoff})
         ORDER BY "createdAt" ASC, id ASC
         LIMIT ${limit}
@@ -59,7 +61,7 @@ export class PrismaOutboxRepository implements OutboxRepository {
 
   async listPending(limit: number): Promise<OutboxPendingRow[]> {
     const rows = await this.db.outboxMessage.findMany({
-      where: { processedAt: null },
+      where: { processedAt: null, deadLetteredAt: null },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       take: limit,
     });
@@ -81,6 +83,21 @@ export class PrismaOutboxRepository implements OutboxRepository {
       data: { processedAt: at },
     });
     return updated.count === 1;
+  }
+
+  async recordFailure(
+    id: string,
+    input: { now: Date; nextAttemptAt: Date | null; deadLetter: boolean; error: string },
+  ): Promise<void> {
+    await this.db.outboxMessage.updateMany({
+      where: { id, processedAt: null },
+      data: {
+        lockedAt: null,
+        nextAttemptAt: input.nextAttemptAt,
+        lastError: input.error.slice(0, 2000),
+        ...(input.deadLetter ? { deadLetteredAt: input.now } : {}),
+      },
+    });
   }
 
   async bumpAttempts(id: string): Promise<void> {

@@ -21,6 +21,13 @@ export const PARTNER_APPLICATION_JSON_LIMIT = '45mb';
 export const SUPPORT_TICKET_UPLOAD_PATHS = ['/v1/support/tickets', '/v1/ops/support-tickets'];
 export const SUPPORT_TICKET_JSON_LIMIT = '24mb';
 
+/**
+ * Parcel booking (item photo) and driver proof photos (pickup/deliver/returned) send the
+ * image as base64 JSON; ParcelPhotoDto allows up to 12,000,000 characters.
+ */
+export const PARCEL_UPLOAD_PATH = '/v1/parcels';
+export const PARCEL_JSON_LIMIT = '16mb';
+
 /** Amazon SNS posts JSON with `Content-Type: text/plain`; parse it as JSON on this route only. */
 export const SES_WEBHOOK_BODY_PATH = '/v1/webhooks/ses';
 export const SES_WEBHOOK_JSON_LIMIT = '256kb';
@@ -47,6 +54,7 @@ export function registerRouteBodyParsers(app: INestApplication): void {
   for (const path of SUPPORT_TICKET_UPLOAD_PATHS) {
     app.use(path, ticketParser);
   }
+  app.use(PARCEL_UPLOAD_PATH, wrap(json({ limit: PARCEL_JSON_LIMIT })));
   app.use(SES_WEBHOOK_BODY_PATH, wrap(json({ limit: SES_WEBHOOK_JSON_LIMIT, type: () => true })));
 }
 

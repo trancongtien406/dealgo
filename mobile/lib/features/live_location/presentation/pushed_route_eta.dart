@@ -8,7 +8,7 @@ import '../../../core/maps/map_lat_lng.dart';
 import '../../../core/maps/route_geometry.dart';
 import '../../../core/realtime/snapshot_realtime.dart';
 
-/// Live ETA with no extra routing request (r25, DEC-PROD-035).
+/// Live ETA with no extra routing request (DEC-PROD-035).
 ///
 /// The server keeps ONE cached road leg per phase (REST `approachRoute` /
 /// `route`, or a `routeUpdated` push after a throttled re-route). The ETA is

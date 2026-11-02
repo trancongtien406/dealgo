@@ -82,6 +82,13 @@ export class RefundIntentDto {
   @MinLength(3)
   @MaxLength(200)
   reason!: string;
+
+  /** Client idempotency key (BFF forwards the Idempotency-Key header). */
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(64)
+  idempotencyKey?: string;
 }
 
 export class OpsIntentsQueryDto {

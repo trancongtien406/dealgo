@@ -41,6 +41,8 @@ export const apiPaths = {
 
   opsDrivers: () => "/api/ops/drivers",
   opsDriver: (id: string) => `/api/ops/drivers/${encodeURIComponent(id)}`,
+  opsDriverActivities: (id: string) =>
+    `/api/ops/drivers/${encodeURIComponent(id)}/activities`,
   opsStores: () => "/api/ops/stores",
   opsStore: (id: string) => `/api/ops/stores/${encodeURIComponent(id)}`,
   opsStoreStatement: (id: string) =>
@@ -91,6 +93,10 @@ export const apiPaths = {
   opsMapsProviders: () => "/api/ops/maps-providers",
   opsPaymentMethods: () => "/api/ops/payment-methods",
   opsSiteConfig: () => "/api/ops/site-config",
+  opsAppVersionPolicy: () => "/api/ops/app-version-policy",
+  opsLegalVersions: () => "/api/ops/legal-versions",
+  opsLegalVersionEmailPreview: (id: string) => `/api/ops/legal-versions/${encodeURIComponent(id)}/email-preview`,
+  opsLegalVersionEmail: (id: string) => `/api/ops/legal-versions/${encodeURIComponent(id)}/email`,
   opsPaymentIntents: () => "/api/ops/payment-intents",
   opsPaymentIntent: (id: string) => `/api/ops/payment-intents/${encodeURIComponent(id)}`,
   opsPaymentIntentRefund: (id: string) => `/api/ops/payment-intents/${encodeURIComponent(id)}/refund`,

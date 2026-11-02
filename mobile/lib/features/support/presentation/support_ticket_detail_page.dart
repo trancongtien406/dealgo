@@ -468,7 +468,7 @@ class _Bubble extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (staff) ...[
-          const CircleAvatar(
+          CircleAvatar(
             radius: 16,
             backgroundColor: DealGoColors.subtlePurple,
             child: Text(

@@ -98,6 +98,11 @@ function ridePath(id: string, role: PushRole, status: string, kind?: PushPathInp
 
 function foodPath(id: string, role: PushRole, status: string, kind?: PushPathInput['kind']): string | null {
   if (role === 'CUSTOMER') {
+    // A declined / gone order has no live tracking page. The detail route is
+    // above the shell, so the tap opens Shop (bottom nav) instead.
+    if (kind !== 'chat' && (PARTNER_GONE.has(status) || status === 'REJECTED')) {
+      return '/customer/shop';
+    }
     return `/customer/food/orders/${seg(id)}`;
   }
   if (role === 'DRIVER') {

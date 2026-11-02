@@ -101,6 +101,30 @@ export function notificationsFor(
  * Merchant edited a food order. PENDING asks the customer to confirm; ACCEPTED tells
  * the store to keep cooking. Decline / expiry arrive as the normal CANCELLED status push.
  */
+/** Delivery-fee negotiation: a driver counter rings the customer (raises refresh drivers by socket). */
+export function foodOrderFareNotifications(
+  orderId: string,
+  fareEvent: string,
+  amountVnd: number | null,
+  p: Participants,
+): RoleNotification[] {
+  if (fareEvent !== 'COUNTER') {
+    return [];
+  }
+  const code = shortOrderCode(orderId);
+  const amount =
+    amountVnd != null ? ` ${amountVnd.toLocaleString('vi-VN')}đ` : '';
+  return [
+    {
+      userId: p.customerId,
+      role: 'CUSTOMER',
+      category: 'FOOD',
+      title: `Tài xế đề xuất phí giao${amount} cho đơn ${code}`,
+      body: 'Mở ứng dụng để xem và chọn tài xế, hoặc tiếp tục chờ.',
+    },
+  ];
+}
+
 export function foodOrderChangeNotifications(
   orderId: string,
   changeStatus: string,

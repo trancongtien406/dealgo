@@ -40,6 +40,11 @@ import {
   type PartnerIssue,
 } from "@/features/kyc/partner-review";
 import { KycOcrFieldsPanel } from "@/features/kyc/components/kyc-ocr-fields-panel";
+import {
+  licenseAllowsVehicleClass,
+  licenseMismatchMessage,
+  carDocsRequiredMessage,
+} from "@/features/kyc/license-class";
 
 const VEHICLE_CLASS_OPTIONS = [
   { value: "MOTORBIKE", label: "Xe máy (MOTORBIKE)" },
@@ -94,6 +99,18 @@ export function KycCaseDetail({ code }: { code: string }) {
   const effectiveVehicleClass =
     vehicleClass || selected?.vehicleClassCode || "";
   const needsVehicleClass = selected?.role === "DRIVER";
+  // t88u: only classes the declared licence covers can be picked.
+  const vehicleClassOptions = VEHICLE_CLASS_OPTIONS.filter((option) =>
+    licenseAllowsVehicleClass(
+      selected?.licenseClass,
+      option.value,
+      selected?.documentsWaived ?? false,
+    ),
+  );
+  const vehicleClassBlocked =
+    needsVehicleClass &&
+    effectiveVehicleClass.length > 0 &&
+    !vehicleClassOptions.some((o) => o.value === effectiveVehicleClass);
 
   const crumbs = useMemo(
     () => [
@@ -116,7 +133,8 @@ export function KycCaseDetail({ code }: { code: string }) {
   const canApprove =
     decision === "approve" &&
     note.trim().length > 0 &&
-    (!needsVehicleClass || effectiveVehicleClass.length > 0);
+    (!needsVehicleClass ||
+      (effectiveVehicleClass.length > 0 && !vehicleClassBlocked));
 
   const runApprove = async () => {
     if (locked || !canApprove) {
@@ -330,8 +348,22 @@ export function KycCaseDetail({ code }: { code: string }) {
                   </div>
                 </div>
                 <dl className="mt-4 space-y-2 text-sm">
+                  {selected.userId ? (
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted">Mã tài khoản</dt>
+                      <dd className="text-right font-medium">
+                        <PreviewLink
+                          href={selected.role === "DRIVER" ? `/drivers/${selected.userId}` : `/customers/${selected.userId}`}
+                          tone="brand"
+                        >
+                          {selected.userId.slice(0, 8)}
+                        </PreviewLink>
+                      </dd>
+                    </div>
+                  ) : null}
                   {[
-                    ["Điện thoại", selected.phoneMasked],
+                    ["Điện thoại", selected.phone || selected.phoneMasked],
+                    ["Email", selected.email || "—"],
                     ["Khu vực đăng ký", selected.area],
                     ["Loại xe", selected.vehicleKind],
                     ["Mẫu xe", selected.vehicle],
@@ -508,9 +540,19 @@ export function KycCaseDetail({ code }: { code: string }) {
                       value={effectiveVehicleClass || null}
                       placeholder="Chọn hạng xe"
                       disabled={locked}
-                      options={VEHICLE_CLASS_OPTIONS}
+                      options={vehicleClassOptions}
                       onChange={(val) => setVehicleClass(val ?? "")}
                     />
+                    {vehicleClassBlocked ? (
+                      <p
+                        className="mt-2 text-sm text-destructive"
+                        data-testid="kyc-license-mismatch"
+                      >
+                        {licenseMismatchMessage(
+                          `Licence class ${selected.licenseClass ?? ""} does not cover ${effectiveVehicleClass}`,
+                        )}
+                      </p>
+                    ) : null}
                   </div>
                 ) : null}
                 {decision === "request" || decision === "reject" ? (
@@ -606,7 +648,11 @@ export function KycCaseDetail({ code }: { code: string }) {
 
 function errorMessage(error: unknown): string {
   if (error instanceof ApiError) {
-    return error.message;
+    return (
+      licenseMismatchMessage(error.message) ??
+      carDocsRequiredMessage(error.message) ??
+      error.message
+    );
   }
   if (error instanceof Error && error.message.trim()) {
     return error.message;

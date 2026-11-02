@@ -530,7 +530,7 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
         children: [
           if (_phase == DriverRidePhase.navigatePickup ||
               _phase == DriverRidePhase.onTrip) ...[
-            // r25: no in-app turn-by-turn — just where to go; guidance is
+            // DEC-PROD-035: no in-app turn-by-turn — just where to go; guidance is
             // handed to Google Maps / Apple Maps / Waze below the map.
             DriverPanel(
               key: const Key('driver-active-destination'),
@@ -728,26 +728,13 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
                   ],
                 ),
                 const SizedBox(height: DealGoSpacing.s12),
-                Row(
-                  children: [
-                    const CircleAvatar(
-                      backgroundColor: DealGoColors.subtlePurple,
-                      child: Icon(
-                        DealGoIcons.user,
-                        color: DealGoColors.primary,
-                      ),
-                    ),
-                    const SizedBox(width: DealGoSpacing.s12),
-                    Expanded(
-                      child: JobCustomerName(
-                        jobId: widget.rideId,
-                        subtitle: ride.customerRating == null
-                            ? null
-                            : customerRatingText(l10n, ride.customerRating),
-                      ),
-                    ),
-                    DriverContactActions(resourceId: widget.rideId),
-                  ],
+                JobCustomerTile(
+                  key: ValueKey('job-customer-${_phase.name}'),
+                  jobId: widget.rideId,
+                  subtitle: ride.customerRating == null
+                      ? null
+                      : customerRatingText(l10n, ride.customerRating),
+                  trailing: DriverContactActions(resourceId: widget.rideId),
                 ),
               ],
             ),

@@ -1,3 +1,4 @@
+import { DriverWorkloadService } from '../dispatch/driver-workload.service.js';
 import { type OpsDateWindow } from '../operations/ops-date-window.js';
 import type { DriverJobCounts } from '../../shared/driver-job-counts.js';
 import { resumeAt, type StoreServiceMode } from './store-service-mode.js';
@@ -35,6 +36,7 @@ import {
   type MapsPort,
 } from '../../integrations/maps/maps-port.js';
 import { PlatformSettingsService } from '../../platform/settings/platform-settings.service.js';
+import type { FoodDeliveryFeeMode } from '../../platform/settings/platform-settings.catalog.js';
 import { EarningsService } from '../earnings/earnings.service.js';
 import { platformFundedDiscountVnd } from '../promotion/voucher-funding.js';
 import { PartnerEligibilityService } from '../partner/partner-eligibility.service.js';
@@ -108,6 +110,10 @@ import type {
   OpsFoodInterveneResult,
   OpsStoreDetail,
   OpsStoreSummary,
+  OpsStoreKybDetail,
+  OpsStoreStats,
+  OpsStoreRecentOrder,
+  OpsStoreRecentReview,
   QueueOrderSummary,
   ReadyOrderSummary,
   StoreBrowseItem,
@@ -116,6 +122,7 @@ import type {
   StoreMenuSection,
   StoreFeaturedItem,
   FoodOrderChangeView,
+  FoodDeliveryOfferView,
 } from './food.repository.js';
 import { FOOD_CHANGE_EDITABLE_STATUSES } from './food.repository.js';
 
@@ -165,6 +172,11 @@ export type OpsStoreListItem = {
   lng: number | null;
   category: string | null;
   serviceRegionCode: string | null;
+  address?: string | null;
+  addressLabel?: string | null;
+  ownerName?: string | null;
+  ownerPhone?: string | null;
+  ownerEmail?: string | null;
   createdAt: string;
   itemCount: number;
   /** M024/M023 live state (DEC-PROD-026/027) — Admin shows it as the store's sale status. */
@@ -179,6 +191,10 @@ export type OpsStoreListItem = {
 
 export type OpsStoreView = OpsStoreListItem & {
   items: StoreItemView[];
+  kybDetail?: OpsStoreKybDetail | null;
+  stats?: OpsStoreStats | null;
+  recentOrders?: OpsStoreRecentOrder[];
+  recentReviews?: OpsStoreRecentReview[];
 };
 
 const FIXTURE_ITEMS = [
@@ -210,8 +226,15 @@ export function publishChange(
 
 export type PublicFoodOrder = Omit<
   FoodOrderView,
-  'ownerId' | 'updatedAt' | 'voucherSponsor' | 'estimatedReadyAt' | 'pickedUpAt'
+  | 'ownerId'
+  | 'updatedAt'
+  | 'voucherSponsor'
+  | 'estimatedReadyAt'
+  | 'pickedUpAt'
+  | 'deliveryFareAgreedAt'
 > & {
+  /** When customer and driver agreed the delivery fee (claim or selected counter); ISO. */
+  deliveryFareAgreedAt?: string | null;
   /** Pickup time as ISO; the fail sheet uses it for the minimum wait. */
   pickedUpAt: string | null;
   /** placedAt + prepMinutes as ISO; the customer tracking screen shows it while cooking. */
@@ -226,6 +249,10 @@ export type PublicFoodOrder = Omit<
   pendingChange?: PublicFoodOrderChange;
   /** Ops detail only — the latest merchant edit in any status (audit view). */
   latestChange?: PublicFoodOrderChange;
+  /** Ops detail only — delivery-fee offers from drivers (negotiation audit). */
+  deliveryOffers?: PublicFoodDeliveryOffer[];
+  /** Ops detail only — current FOOD_DELIVERY_FEE_MODE (platform-wide, not snapshotted per order). */
+  deliveryFeeMode?: FoodDeliveryFeeMode;
   /**
    * Cash the driver pays the store at pickup
    * (subtotal minus the merchant-funded part of the voucher) and collects at the door.
@@ -342,6 +369,7 @@ export class FoodService {
     @Optional() private readonly promotions?: PromotionService,
     @Optional() private readonly paymentMethods?: PaymentMethodRegistryService,
     @Optional() private readonly checkout?: PaymentGatewayService,
+    @Optional() private readonly workload?: DriverWorkloadService,
   ) {}
 
   /** Server-side enforcement of the FOOD payment method registry (CASH always allowed). */
@@ -911,12 +939,20 @@ export class FoodService {
     await this.probeDropoffMaps(dto.dropoff.label);
     await this.ensureSandboxFixtureCatalog();
     await this.assertWithinDeliveryRange(dto.storeId, dto.dropoff);
-    const deliveryFareVnd = await this.quoteDeliveryFare(
+    const suggestedDeliveryFareVnd = await this.quoteDeliveryFare(
       dto.storeId,
       dto.dropoff,
     );
+    const deliveryFareVnd =
+      dto.deliveryOfferVnd == null
+        ? suggestedDeliveryFareVnd
+        : await this.assertCustomerOffer(
+            dto.deliveryOfferVnd,
+            suggestedDeliveryFareVnd,
+          );
     const order = await this.unwrap(() =>
       this.food.place({
+        suggestedDeliveryFareVnd,
         customerId: actor.userId,
         storeId: dto.storeId,
         idempotencyKey,
@@ -976,6 +1012,10 @@ export class FoodService {
     }
     // Over the debt limit → no new cash jobs.
     await this.earnings.assertUnderDebtLimit(actor.userId);
+    // t71u: a driver on an active ride / parcel / food job sees no new READY orders.
+    if (this.workload && (await this.workload.isBusy(actor.userId))) {
+      return [];
+    }
     const now = new Date();
     // Radius from query coords or the fresh presence fix; no fix → 409.
     const origin = await this.presence.dispatchOrigin(
@@ -1617,6 +1657,14 @@ export class FoodService {
       : null;
   }
 
+  /** FOOD-002: called by the outbox relay for a CANCELLED order; full refund of any prepayment. */
+  async refundCancelledPrepayment(orderId: string): Promise<void> {
+    if (!this.checkout) return;
+    const order = await this.unwrapNullable(() => this.food.findOrder(orderId));
+    if (!order || order.status !== 'CANCELLED') return;
+    await this.checkout.refundOnCancel('FOOD_ORDER', order.id, order.customerId);
+  }
+
   async participantUserIds(orderId: string): Promise<string[]> {
     const order = await this.unwrapNullable(() => this.food.findOrder(orderId));
     if (!order) {
@@ -1755,6 +1803,20 @@ export class FoodService {
   }
 
   async claim(actor: RequestActor, orderId: string): Promise<PublicFoodOrder> {
+    const { maxConcurrentJobs, early } = await this.assertCanTakeJob(
+      actor.userId,
+      orderId,
+    );
+    return publish(
+      await this.unwrap(() =>
+        this.food.claim(orderId, actor.userId, maxConcurrentJobs, early),
+      ),
+    );
+  }
+
+  /** Same driver checks as a claim (eligible, motorbike, online, in reach, under debt limit). */
+  private async assertCanTakeJob(driverId: string, orderId: string) {
+    const actor = { userId: driverId };
     await this.eligibility.requireEligibleDriver(actor.userId);
     if (!(await this.eligibility.canDeliverFood(actor.userId))) {
       throw foodError(
@@ -1770,6 +1832,15 @@ export class FoodService {
         'Go online for food orders to claim one',
       );
     }
+    const target = await this.unwrapNullable(() => this.food.findOrder(orderId));
+    if (target) {
+      await this.presence.assertWithinReach?.(
+        actor.userId,
+        target.pickup ?? target.dropoff,
+        await this.settings.getNumber('DRIVER_SEARCH_RADIUS_KM'),
+        new Date(),
+      );
+    }
     await this.earnings.assertUnderDebtLimit(actor.userId);
     const maxConcurrentJobs = await this.settings.getNumber(
       'MAX_CONCURRENT_JOBS_PER_DRIVER',
@@ -1780,9 +1851,234 @@ export class FoodService {
       ),
       now: new Date(),
     };
+    return { maxConcurrentJobs, early };
+  }
+
+  /**
+   * Customer's opening offer: a step multiple within [floor, FOOD_MAX_DELIVERY_VND], where
+   * floor = max(FOOD_MIN_DELIVERY_VND, suggested × FOOD_FARE_FLOOR_PERCENT_OF_SUGGESTED%).
+   */
+  private async assertCustomerOffer(
+    amountVnd: number,
+    suggestedVnd: number,
+  ): Promise<number> {
+    const bounds = await this.fareBounds(suggestedVnd);
+    if (
+      !Number.isInteger(amountVnd) ||
+      amountVnd < bounds.minOfferVnd ||
+      amountVnd > bounds.maxOfferVnd ||
+      (amountVnd !== suggestedVnd && amountVnd % bounds.fareStepVnd !== 0)
+    ) {
+      throw foodError(
+        422,
+        'FOOD_OFFER_AMOUNT_INVALID',
+        `Delivery fee offer must be between ${bounds.minOfferVnd} and ${bounds.maxOfferVnd} VND in steps of ${bounds.fareStepVnd}`,
+      );
+    }
+    return amountVnd;
+  }
+
+  private async fareBounds(suggestedVnd: number) {
+    const minimum = await this.settings.getNumber('FOOD_MIN_DELIVERY_VND');
+    const maxOfferVnd = await this.settings.getNumber('FOOD_MAX_DELIVERY_VND');
+    const floorPct = await this.settings.getNumber(
+      'FOOD_FARE_FLOOR_PERCENT_OF_SUGGESTED',
+    );
+    const fareStepVnd = Math.max(
+      1,
+      await this.settings.getNumber('FOOD_FARE_STEP_VND'),
+    );
+    const rawFloor = Math.max(minimum, Math.ceil((suggestedVnd * floorPct) / 100));
+    const minOfferVnd = Math.min(
+      suggestedVnd,
+      Math.ceil(rawFloor / fareStepVnd) * fareStepVnd,
+    );
+    return {
+      suggestedDeliveryFareVnd: suggestedVnd,
+      minOfferVnd,
+      maxOfferVnd,
+      fareStepVnd,
+      counterMaxPercent: await this.settings.getNumber(
+        'FOOD_COUNTER_MAX_PERCENT_OF_OFFER',
+      ),
+    };
+  }
+
+  /** Admin FOOD_DELIVERY_FEE_MODE; anything unexpected falls back to NEGOTIATE. */
+  async deliveryFeeMode(): Promise<FoodDeliveryFeeMode> {
+    const raw = (await this.settings.getString('FOOD_DELIVERY_FEE_MODE')).trim().toUpperCase();
+    return raw === 'FIXED' ? 'FIXED' : 'NEGOTIATE';
+  }
+
+  private async assertNegotiationEnabled(): Promise<void> {
+    if ((await this.deliveryFeeMode()) === 'FIXED') {
+      throw foodError(
+        409,
+        'FOOD_FEE_NEGOTIATION_DISABLED',
+        "Delivery fee is fixed: drivers can only accept the customer's price",
+      );
+    }
+  }
+
+  /** Driver proposes a higher fee than the customer's offer (or edits their pending one). */
+  async counterDeliveryOffer(
+    actor: RequestActor,
+    orderId: string,
+    amountVnd: number,
+  ): Promise<PublicFoodDeliveryOffer> {
+    await this.assertNegotiationEnabled();
+    const { early } = await this.assertCanTakeJob(actor.userId, orderId);
+    const step = Math.max(1, await this.settings.getNumber('FOOD_FARE_STEP_VND'));
+    if (!Number.isInteger(amountVnd) || amountVnd % step !== 0) {
+      throw foodError(422, 'FOOD_OFFER_AMOUNT_INVALID', `Offer must be a multiple of ${step} VND`);
+    }
+    const ttlSeconds = await this.settings.getNumber('FOOD_OFFER_TTL_SECONDS');
+    const offer = await this.unwrap(async () =>
+      this.food.submitDeliveryOffer({
+        orderId,
+        driverId: actor.userId,
+        amountVnd,
+        expiresAt: new Date(early.now.getTime() + ttlSeconds * 1000),
+        maxEdits: await this.settings.getNumber('FOOD_MAX_OFFER_EDITS_PER_DRIVER'),
+        counterMaxPercent: await this.settings.getNumber(
+          'FOOD_COUNTER_MAX_PERCENT_OF_OFFER',
+        ),
+        maxFareVnd: await this.settings.getNumber('FOOD_MAX_DELIVERY_VND'),
+        early,
+      }),
+    );
+    return publishOffer(offer, new Date());
+  }
+
+  async withdrawDeliveryOffer(
+    actor: RequestActor,
+    orderId: string,
+  ): Promise<PublicFoodDeliveryOffer> {
+    const offer = await this.unwrap(() =>
+      this.food.withdrawDeliveryOffer(orderId, actor.userId),
+    );
+    return publishOffer(offer, new Date());
+  }
+
+  /**
+   * Customer, store owner and ops see every offer; a driver sees only their own.
+   * Expired PENDING offers come back as EXPIRED (not selectable).
+   */
+  async listDeliveryOffers(
+    actor: RequestActor,
+    orderId: string,
+  ): Promise<PublicFoodDeliveryOffers> {
+    const order = await this.unwrapNullable(() => this.food.findOrder(orderId));
+    if (!order) {
+      throw foodError(404, 'FOOD_ORDER_NOT_FOUND', 'Food order not found');
+    }
+    const isParty =
+      order.customerId === actor.userId || (await this.canRead(actor.userId, order));
+    const offers = await this.food.listDeliveryOffers(orderId);
+    const visible = isParty && order.assignedDriverId !== actor.userId
+      ? offers
+      : offers.filter((offer) => offer.driverId === actor.userId);
+    if (!isParty && visible.length === 0 && !(await this.isFoodDriver(actor.userId))) {
+      throw foodError(404, 'FOOD_ORDER_NOT_FOUND', 'Food order not found');
+    }
+    const now = new Date();
+    const bounds = await this.fareBounds(
+      order.suggestedDeliveryFareVnd ?? order.deliveryFareVnd,
+    );
+    const feeMode = await this.deliveryFeeMode();
+    return {
+      orderId,
+      feeMode,
+      deliveryFareVnd: order.deliveryFareVnd,
+      suggestedDeliveryFareVnd: order.suggestedDeliveryFareVnd ?? null,
+      deliveryFareAgreedAt: order.deliveryFareAgreedAt?.toISOString() ?? null,
+      deliveryFareRaiseCount: order.deliveryFareRaiseCount ?? 0,
+      maxFareRaises: await this.settings.getNumber('FOOD_MAX_FARE_RAISES_PER_ORDER'),
+      fareStepVnd: bounds.fareStepVnd,
+      maxOfferVnd: bounds.maxOfferVnd,
+      counterMaxVnd: Math.min(
+        bounds.maxOfferVnd,
+        Math.floor((order.deliveryFareVnd * bounds.counterMaxPercent) / 100),
+      ),
+      // FIXED: leftover counters (from before an admin switch) are hidden, not selectable.
+      offers: feeMode === 'FIXED' ? [] : visible.map((offer) => publishOffer(offer, now)),
+    };
+  }
+
+  private async isFoodDriver(userId: string): Promise<boolean> {
+    try {
+      await this.eligibility.requireEligibleDriver(userId);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Customer picks a driver's counter: atomically assigns that driver at the agreed fee
+   * (others → LOST). The driver must still pass every claim check.
+   */
+  async selectDeliveryOffer(
+    actor: RequestActor,
+    orderId: string,
+    offerId: string,
+  ): Promise<PublicFoodOrder> {
+    const order = await this.requireOwnOrder(actor, orderId);
+    await this.assertNegotiationEnabled();
+    const offers = await this.food.listDeliveryOffers(order.id);
+    const offer = offers.find((entry) => entry.id === offerId);
+    if (!offer) {
+      throw foodError(404, 'FOOD_OFFER_NOT_FOUND', 'Delivery offer not found');
+    }
+    const now = new Date();
+    if (offer.status === 'PENDING' && offer.expiresAt.getTime() <= now.getTime()) {
+      throw foodError(409, 'FOOD_OFFER_EXPIRED', 'This offer has expired');
+    }
+    const { maxConcurrentJobs, early } = await this.assertCanTakeJob(
+      offer.driverId,
+      orderId,
+    );
     return publish(
       await this.unwrap(() =>
-        this.food.claim(orderId, actor.userId, maxConcurrentJobs, early),
+        this.food.claim(orderId, offer.driverId, maxConcurrentJobs, early, {
+          offerId,
+          customerId: actor.userId,
+          now,
+        }),
+      ),
+    );
+  }
+
+  /** Customer raises their offer while no driver is assigned; drivers see the new fee. */
+  async raiseDeliveryFare(
+    actor: RequestActor,
+    orderId: string,
+    amountVnd: number,
+  ): Promise<PublicFoodOrder> {
+    const order = await this.requireOwnOrder(actor, orderId);
+    const bounds = await this.fareBounds(
+      order.suggestedDeliveryFareVnd ?? order.deliveryFareVnd,
+    );
+    if (
+      !Number.isInteger(amountVnd) ||
+      amountVnd > bounds.maxOfferVnd ||
+      amountVnd % bounds.fareStepVnd !== 0
+    ) {
+      throw foodError(
+        422,
+        'FOOD_OFFER_AMOUNT_INVALID',
+        `Delivery fee must be at most ${bounds.maxOfferVnd} VND in steps of ${bounds.fareStepVnd}`,
+      );
+    }
+    const maxRaises = await this.settings.getNumber('FOOD_MAX_FARE_RAISES_PER_ORDER');
+    return publish(
+      await this.unwrap(() =>
+        this.food.raiseDeliveryFare({
+          orderId,
+          customerId: actor.userId,
+          amountVnd,
+          maxRaises,
+        }),
       ),
     );
   }
@@ -1832,8 +2128,10 @@ export class FoodService {
     const unclaimedMinutes = await this.settings.getNumber(
       'FOOD_UNCLAIMED_READY_TIMEOUT_MINUTES',
     );
+    const nearest = inRange.sort((a, b) => a.km - b.km).map((d) => d.id);
     return {
-      driverIds: inRange.sort((a, b) => a.km - b.km).map((d) => d.id),
+      // t71u: drivers on an active job are not alerted.
+      driverIds: this.workload ? await this.workload.availableOnly(nearest) : nearest,
       order: {
         id: order.id,
         deliveryFareVnd: order.deliveryFareVnd,
@@ -1955,13 +2253,14 @@ export class FoodService {
         ),
       ) * 100,
     );
-    // Online prepayment (captured − refunded) replaces cash at the door.
-    const prepaid = (await this.checkout?.prepaidFor('FOOD_ORDER', orderId)) ?? null;
     let collectedCashVnd = 0;
     let appliedIntentId: string | null = null;
     // COD obligation, DealGo-funded discount, earnings and fee commit with the delivery itself.
     const order = await this.unwrap(() =>
       this.food.deliver(orderId, actor.userId, async (tx, delivered) => {
+        // Online prepayment (captured − refunded) replaces cash at the door; re-read inside the
+        // delivery transaction (FOOD-003) so a racing refund cannot be double-counted.
+        const prepaid = (await this.checkout?.prepaidWithin(tx, 'FOOD_ORDER', delivered.id)) ?? null;
         const split = splitCollection(delivered.totalVnd, prepaid?.amountVnd ?? 0);
         collectedCashVnd = split.cashVnd;
         // A fully discounted order has no cash to collect (the journal rejects 0).
@@ -1988,6 +2287,7 @@ export class FoodService {
             refId: prepaid.intentId,
             occurredAt: delivered.updatedAt,
           });
+          await this.checkout?.settleWithin(tx, prepaid.intentId, delivered.updatedAt);
         }
         // DEC-PROD-009/015: DealGo books only its own share of the voucher as an expense; the
         // merchant still receives the full subtotal for the platform share.
@@ -2083,6 +2383,11 @@ export class FoodService {
     if (change) {
       view.latestChange = publishChange(change);
     }
+    const now = new Date();
+    view.deliveryOffers = (await this.food.listDeliveryOffers(order.id)).map(
+      (offer) => publishOffer(offer, now),
+    );
+    view.deliveryFeeMode = await this.deliveryFeeMode();
     return view;
   }
 
@@ -2116,7 +2421,18 @@ export class FoodService {
     if (!store) {
       throw foodError(404, 'FOOD_STORE_NOT_FOUND', 'Store not found');
     }
-    return toOpsStoreView(store);
+    const view = toOpsStoreView(store);
+    try {
+      const owner = await this.identity.findUserById(store.ownerId);
+      if (owner) {
+        view.ownerName = owner.displayName ?? null;
+        view.ownerPhone = owner.phone ?? owner.contactPhone ?? null;
+        view.ownerEmail = owner.email ?? null;
+      }
+    } catch {
+      // Non-blocking
+    }
+    return view;
   }
 
   async listCatalogModeration(
@@ -2435,14 +2751,24 @@ export class FoodService {
     actor: RequestActor,
     storeId: string,
     dropoff: { lat: number; lng: number },
-  ): Promise<{ deliveryFareVnd: number }> {
+  ): Promise<FoodDeliveryQuote> {
     await this.requireActiveCustomer(actor.userId);
     const store = await this.food.findStore(storeId);
     if (!store) {
       throw foodError(404, 'FOOD_STORE_NOT_FOUND', 'Store not found');
     }
     await this.assertWithinDeliveryRange(storeId, dropoff);
-    return { deliveryFareVnd: await this.quoteDeliveryFare(storeId, dropoff) };
+    const suggested = await this.quoteDeliveryFare(storeId, dropoff);
+    const bounds = await this.fareBounds(suggested);
+    return {
+      // Kept for older apps: the suggestion is the default offer.
+      deliveryFareVnd: suggested,
+      suggestedDeliveryFareVnd: suggested,
+      minOfferVnd: bounds.minOfferVnd,
+      maxOfferVnd: bounds.maxOfferVnd,
+      fareStepVnd: bounds.fareStepVnd,
+      feeMode: await this.deliveryFeeMode(),
+    };
   }
 
   /**
@@ -2633,6 +2959,57 @@ export function merchantCommissionVnd(
   );
 }
 
+export type FoodDeliveryQuote = {
+  deliveryFareVnd: number;
+  suggestedDeliveryFareVnd: number;
+  minOfferVnd: number;
+  maxOfferVnd: number;
+  fareStepVnd: number;
+  /** NEGOTIATE: drivers may counter; FIXED: drivers only accept the customer's fee. */
+  feeMode: FoodDeliveryFeeMode;
+};
+
+export type PublicFoodDeliveryOffer = {
+  id: string;
+  orderId: string;
+  driverId: string;
+  amountVnd: number;
+  status: FoodDeliveryOfferView['status'] | 'EXPIRED';
+  expiresAt: string;
+  editCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublicFoodDeliveryOffers = {
+  orderId: string;
+  feeMode: FoodDeliveryFeeMode;
+  deliveryFareVnd: number;
+  suggestedDeliveryFareVnd: number | null;
+  deliveryFareAgreedAt: string | null;
+  deliveryFareRaiseCount: number;
+  maxFareRaises: number;
+  fareStepVnd: number;
+  maxOfferVnd: number;
+  counterMaxVnd: number;
+  offers: PublicFoodDeliveryOffer[];
+};
+
+export function publishOffer(
+  offer: FoodDeliveryOfferView,
+  now: Date,
+): PublicFoodDeliveryOffer {
+  const expired =
+    offer.status === 'PENDING' && offer.expiresAt.getTime() <= now.getTime();
+  return {
+    ...offer,
+    status: expired ? 'EXPIRED' : offer.status,
+    expiresAt: offer.expiresAt.toISOString(),
+    createdAt: offer.createdAt.toISOString(),
+    updatedAt: offer.updatedAt.toISOString(),
+  };
+}
+
 function publish(order: FoodOrderView): PublicFoodOrder {
   const {
     ownerId: _ownerId,
@@ -2640,10 +3017,12 @@ function publish(order: FoodOrderView): PublicFoodOrder {
     voucherSponsor: _voucherSponsor,
     estimatedReadyAt,
     pickedUpAt,
+    deliveryFareAgreedAt,
     ...publicOrder
   } = order;
   return {
     ...publicOrder,
+    deliveryFareAgreedAt: deliveryFareAgreedAt?.toISOString() ?? null,
     estimatedReadyAt: estimatedReadyAt?.toISOString() ?? null,
     pickedUpAt: pickedUpAt?.toISOString() ?? null,
     updatedAt: updatedAt.toISOString(),
@@ -2659,6 +3038,8 @@ function toOpsStoreListItem(store: OpsStoreSummary): OpsStoreListItem {
     lng: store.lng,
     category: store.category,
     serviceRegionCode: store.serviceRegionCode ?? null,
+    address: store.addressLabel ?? null,
+    addressLabel: store.addressLabel ?? null,
     createdAt: store.createdAt.toISOString(),
     itemCount: store.itemCount,
     serviceMode: store.serviceMode,
@@ -2674,6 +3055,10 @@ function toOpsStoreView(store: OpsStoreDetail): OpsStoreView {
   return {
     ...toOpsStoreListItem(store),
     items: store.items.map((item) => ({ ...item })),
+    kybDetail: store.kybDetail ?? null,
+    stats: store.stats ?? null,
+    recentOrders: store.recentOrders ?? [],
+    recentReviews: store.recentReviews ?? [],
   };
 }
 

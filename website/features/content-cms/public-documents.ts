@@ -1,6 +1,7 @@
 import type {
   LegalContent,
   PublicPageLocale,
+  LegalPageSlug,
   PublicPageSlug,
   PublicPageView,
   SupportContent,
@@ -18,11 +19,12 @@ const UNAVAILABLE: Record<PublicPageLocale, string> = {
 const TITLES: Record<PublicPageSlug, Record<PublicPageLocale, string>> = {
   terms: { vi: "Điều khoản sử dụng", en: "Terms of Use" },
   privacy: { vi: "Chính sách quyền riêng tư", en: "Privacy Policy" },
+  regulations: { vi: "Quy chế sử dụng", en: "Regulations" },
   support: { vi: "Trung tâm hỗ trợ", en: "Support" },
 };
 
 export function fallbackLegalPage(
-  slug: "terms" | "privacy",
+  slug: LegalPageSlug,
   locale: PublicPageLocale,
 ): PublicPageView<LegalContent> {
   return {

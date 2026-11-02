@@ -12,6 +12,7 @@ import '../../identity/domain/entities/auth_state.dart';
 import '../../identity/domain/repositories/identity_repository.dart';
 import '../../identity/presentation/auth_methods_store.dart';
 import '../../identity/presentation/cubit/auth_cubit.dart';
+import '../../identity/presentation/widgets/email_verification_sheet.dart';
 import '../../identity/presentation/widgets/profile_form.dart';
 
 /// "Chỉnh sửa hồ sơ": same [ProfileForm] and layout as "Hoàn thiện hồ sơ".
@@ -78,6 +79,16 @@ class _EditProfilePageState extends State<EditProfilePage> with TextDraftMixin {
           content: Text(l10n.editProfileSaved),
         ),
       );
+      if (!mounted) return;
+      final verified = await verifySubmittedProfileEmail(
+        context: context,
+        submittedEmail: email,
+        accountEmail: updated.email,
+        repository: repo,
+        auth: cubit,
+        accessToken: auth.tokens.accessToken,
+      );
+      _showEmailOutcome(messenger, l10n, verified);
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(apiErrorText(l10n, e))));
     } finally {
@@ -85,14 +96,68 @@ class _EditProfilePageState extends State<EditProfilePage> with TextDraftMixin {
     }
   }
 
+  Future<void> _verifyCurrentEmail(String email) async {
+    final l10n = AppLocalizations.of(context);
+    final auth = context.read<AuthCubit>();
+    final state = auth.state;
+    if (state is! AuthSignedIn || _busy) return;
+    final repo = context.read<IdentityRepository>();
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _busy = true);
+    try {
+      final verification = await repo.requestEmailVerification(
+        accessToken: state.tokens.accessToken,
+        email: email,
+      );
+      if (!mounted) return;
+      final verified = await showEmailVerificationSheet(
+        context: context,
+        verification: verification,
+        repository: repo,
+        auth: auth,
+        accessToken: state.tokens.accessToken,
+      );
+      _showEmailOutcome(messenger, l10n, verified ? true : null);
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(apiErrorText(l10n, e))));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _showEmailOutcome(
+    ScaffoldMessengerState messenger,
+    AppLocalizations l10n,
+    bool? verified,
+  ) {
+    if (verified == null) return;
+    messenger.showSnackBar(
+      SnackBar(
+        key: Key(verified ? 'email-verified-snack' : 'email-pending-snack'),
+        content: Text(
+          verified ? l10n.emailVerifySuccess : l10n.emailVerifyPendingNotice,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final auth = context.watch<AuthCubit>().state;
+    final profile = auth is AuthSignedIn ? auth.profile : null;
+    final unverifiedEmail = profile != null && profile.emailVerifiedAt == null
+        ? profile.email
+        : null;
     return ProfileFormScaffold(
       title: l10n.editProfileHeader,
       form: ProfileForm(
         controller: _form,
         onSubmitted: () => unawaited(_save()),
+        unverifiedEmail: unverifiedEmail,
+        onVerifyEmail: unverifiedEmail == null
+            ? null
+            : () => unawaited(_verifyCurrentEmail(unverifiedEmail)),
       ),
       action: ListenableBuilder(
         listenable: _form,

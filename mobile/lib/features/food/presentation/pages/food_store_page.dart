@@ -672,7 +672,7 @@ class _StoreHeading extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(top: 1),
                 child: Icon(
                   DealGoIcons.pin,
@@ -752,7 +752,7 @@ class _StoreHeading extends StatelessWidget {
           const SizedBox(height: DealGoSpacing.s8),
           Row(
             children: [
-              const Icon(
+              Icon(
                 DealGoIcons.clock,
                 size: 14,
                 color: DealGoColors.textSecondary,
@@ -1020,7 +1020,7 @@ class _Tabs extends StatelessWidget {
       (_StoreTab.info, l10n.foodStoreTabInfo),
     ];
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: DealGoColors.border)),
       ),
       child: SizedBox(
@@ -1120,11 +1120,11 @@ class _Menu extends StatelessWidget {
             isDense: true,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(DealGoRadius.button),
-              borderSide: const BorderSide(color: DealGoColors.border),
+              borderSide: BorderSide(color: DealGoColors.border),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(DealGoRadius.button),
-              borderSide: const BorderSide(color: DealGoColors.border),
+              borderSide: BorderSide(color: DealGoColors.border),
             ),
           ),
         ),
@@ -1248,7 +1248,7 @@ class _MenuItem extends StatelessWidget {
                       const SizedBox(height: DealGoSpacing.s4),
                       Row(
                         children: [
-                          const Icon(
+                          Icon(
                             DealGoIcons.clock,
                             size: 12,
                             color: DealGoColors.textSecondary,

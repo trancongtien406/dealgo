@@ -13,6 +13,7 @@ import { PartnerService } from './partner.service.js';
 import { PrismaPartnerRepository } from './partner-prisma.repository.js';
 import { RideVehicleClassModule } from '../ride-vehicle/ride-vehicle-class.module.js';
 import { PlatformSettingsModule } from '../../platform/settings/platform-settings.module.js';
+import { LegalConsentModule } from '../legal-consent/legal-consent.module.js';
 import { StorageModule } from '../../platform/storage/storage.module.js';
 
 @Module({
@@ -22,6 +23,7 @@ import { StorageModule } from '../../platform/storage/storage.module.js';
     StorageModule,
     RideVehicleClassModule,
     PlatformSettingsModule,
+    LegalConsentModule,
   ],
   controllers: [MePartnerApplicationsController, OpsPartnerApplicationsController],
   providers: [

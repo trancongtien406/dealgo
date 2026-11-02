@@ -32,6 +32,8 @@ export type AdminNavHref =
   | "/settings/maps"
   | "/settings/payments"
   | "/settings/website"
+  | "/settings/app-version"
+  | "/settings/legal-versions"
   | "/settings/email"
   | "/settings/sentry"
   | "/system-errors"
@@ -45,7 +47,8 @@ export type AdminNavHref =
   | "/reviews"
   | "/support"
   | "/terms"
-  | "/privacy";
+  | "/privacy"
+  | "/regulations";
 
 export type AdminNavChildItem = {
   label: string;
@@ -240,11 +243,13 @@ export const adminNavSections: readonly AdminNavSection[] = [
           { label: "Bản đồ", href: "/settings/maps" },
           { label: "Thanh toán", href: "/settings/payments" },
           { label: "Website & MXH", href: "/settings/website" },
+          { label: "Cập nhật ứng dụng", href: "/settings/app-version" },
           { label: "Email", href: "/settings/email" },
           { label: "Sentry", href: "/settings/sentry" },
           { label: "Loại xe", href: "/settings/vehicle-classes" },
           { label: "Giá theo khu vực", href: "/settings/zone-tariffs" },
           { label: "Nội dung & Pháp lý", href: "/settings/content" },
+          { label: "Đồng ý điều khoản", href: "/settings/legal-versions" },
           { label: "Banner trang chủ", href: "/settings/home-banners" },
         ],
       },
@@ -377,6 +382,12 @@ export const adminCommandExtras: readonly AdminNavItem[] = [
     icon: "shield",
     href: "/privacy",
     keywords: ["privacy", "quyền riêng tư", "bảo mật"],
+  },
+  {
+    label: "Quy chế sử dụng",
+    icon: "shield",
+    href: "/regulations",
+    keywords: ["regulations", "quy chế", "tài xế", "cửa hàng", "đối tác"],
   },
 ];
 

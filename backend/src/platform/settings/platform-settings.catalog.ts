@@ -20,6 +20,7 @@ export type PlatformSettingKey =
   | 'VOUCHER_SHARED_PLATFORM_PERCENT'
   | 'RIDE_PICKUP_CODE_MAX_ATTEMPTS'
   | 'RIDE_PICKUP_CODE_REQUIRED'
+  | 'AUTH_EMAIL_VERIFICATION_REQUIRED'
   | 'PARCEL_SIZE_CLASSES'
   | 'PARCEL_RECIPIENT_CODE_REQUIRED'
   | 'PARCEL_SERVICE_FEE_VND'
@@ -28,6 +29,7 @@ export type PlatformSettingKey =
   | 'FOOD_DELIVERY_CODE_MAX_ATTEMPTS'
   | 'FOOD_HANDOVER_CODE_REQUIRED'
   | 'ONBOARDING_DRIVER_KYC_REQUIRED'
+  | 'DRIVER_CAR_EXTRA_DOCS_REQUIRED'
   | 'ONBOARDING_MERCHANT_KYB_REQUIRED'
   | 'SUPPORT_TICKET_MAX_OPEN_PER_USER'
   | 'SUPPORT_PUBLIC_TICKETS_PER_CONTACT_PER_DAY'
@@ -63,6 +65,13 @@ export type PlatformSettingKey =
   | 'FOOD_UNCLAIMED_READY_TIMEOUT_MINUTES'
   | 'FOOD_EARLY_ASSIGN_LEAD_MINUTES'
   | 'FOOD_MAX_DELIVERY_KM'
+  | 'FOOD_FARE_FLOOR_PERCENT_OF_SUGGESTED'
+  | 'FOOD_COUNTER_MAX_PERCENT_OF_OFFER'
+  | 'FOOD_FARE_STEP_VND'
+  | 'FOOD_MAX_OFFER_EDITS_PER_DRIVER'
+  | 'FOOD_MAX_FARE_RAISES_PER_ORDER'
+  | 'FOOD_OFFER_TTL_SECONDS'
+  | 'FOOD_DELIVERY_FEE_MODE'
   | 'SERVICE_ZONE_ENFORCED'
   | 'DRIVER_DEBT_LIMIT_VND'
   | 'DISPATCH_REQUIRE_FRESH_PRESENCE'
@@ -90,8 +99,13 @@ export type PlatformSettingKey =
   | 'MAPS_REVERSE_PROVIDER'
   | 'MAPS_ROUTE_PROVIDER'
   | 'PUBLIC_SITE_CONFIG'
+  | 'APP_VERSION_POLICY'
   | 'RIDE_MULTI_STOP_BIKE_ENABLED'
   | 'RIDE_MULTI_STOP_CAR_ENABLED'
+  | 'RIDE_INTERCITY_ENABLED'
+  | 'RIDE_INTERCITY_VEHICLE_CLASSES'
+  | 'RIDE_INTERCITY_PRICING'
+  | 'RIDE_INTERCITY_MAX_KM'
   | 'RIDE_MAX_STOPS_BIKE'
   | 'RIDE_MAX_STOPS_CAR'
   | 'RIDE_STOP_FEE_BIKE_VND'
@@ -142,8 +156,9 @@ export const PLATFORM_SETTING_SPECS: readonly PlatformSettingSpec[] = [
     key: 'RIDE_OFFER_TTL_SECONDS',
     valueType: 'number',
     openIds: ['OPEN-004', 'OPEN-019'],
-    min: 1,
-    max: 86_400,
+    // t73u: 10–120 s (default 20; the customer card fades over this window).
+    min: 10,
+    max: 120,
   },
   {
     key: 'RIDE_MIN_FARE_VND',
@@ -284,6 +299,15 @@ export const PLATFORM_SETTING_SPECS: readonly PlatformSettingSpec[] = [
     seeded: true,
   },
   {
+    // JSON boolean, default true (2026-10-31): email sign-up needs the 6-digit mailbox code.
+    // Off = register creates the account at once (email left unverified) and login allows it.
+    key: 'AUTH_EMAIL_VERIFICATION_REQUIRED',
+    valueType: 'json',
+    openIds: [],
+    boolean: true,
+    seeded: true,
+  },
+  {
     // DEC-PROD-071 (DRAFT): parcel size classes (weight/dims/surcharge/allowed vehicle classes).
     key: 'PARCEL_SIZE_CLASSES',
     valueType: 'json',
@@ -330,6 +354,15 @@ export const PLATFORM_SETTING_SPECS: readonly PlatformSettingSpec[] = [
     key: 'ONBOARDING_DRIVER_KYC_REQUIRED',
     valueType: 'json',
     openIds: ['DEC-PROD-048'],
+    boolean: true,
+    seeded: true,
+  },
+  {
+    // t90u: true = a CAR_4/CAR_7 driver needs VEHICLE_INSURANCE on file to be approved,
+    // notified or take jobs (also in quick registration). false = admin skips that rule.
+    key: 'DRIVER_CAR_EXTRA_DOCS_REQUIRED',
+    valueType: 'json',
+    openIds: ['OPEN-006'],
     boolean: true,
     seeded: true,
   },
@@ -648,6 +681,67 @@ export const PLATFORM_SETTING_SPECS: readonly PlatformSettingSpec[] = [
     seeded: true,
   },
   {
+    // Customer delivery-fee offer floor as % of the suggested fee.
+    key: 'FOOD_FARE_FLOOR_PERCENT_OF_SUGGESTED',
+    valueType: 'number',
+    openIds: ['DEC-PROD-059'],
+    min: 0,
+    max: 100,
+    seeded: true,
+  },
+  {
+    // A driver counter on the delivery fee must be > the customer offer and <= this % of it.
+    key: 'FOOD_COUNTER_MAX_PERCENT_OF_OFFER',
+    valueType: 'number',
+    openIds: ['DEC-PROD-059'],
+    min: 100,
+    max: 300,
+    seeded: true,
+  },
+  {
+    // Delivery-fee offers and counters snap to this step (app stepper).
+    key: 'FOOD_FARE_STEP_VND',
+    valueType: 'number',
+    openIds: ['DEC-PROD-059'],
+    min: 100,
+    max: 10000,
+    seeded: true,
+  },
+  {
+    // Times one driver may change a delivery-fee counter on one order.
+    key: 'FOOD_MAX_OFFER_EDITS_PER_DRIVER',
+    valueType: 'number',
+    openIds: ['DEC-PROD-059'],
+    min: 0,
+    max: 10,
+    seeded: true,
+  },
+  {
+    // Times the customer may raise the delivery-fee offer while waiting.
+    key: 'FOOD_MAX_FARE_RAISES_PER_ORDER',
+    valueType: 'number',
+    openIds: ['DEC-PROD-059'],
+    min: 0,
+    max: 10,
+    seeded: true,
+  },
+  {
+    // A driver delivery-fee counter expires after this many seconds.
+    key: 'FOOD_OFFER_TTL_SECONDS',
+    valueType: 'number',
+    openIds: ['DEC-PROD-059'],
+    min: 30,
+    max: 1800,
+    seeded: true,
+  },
+  {
+    // NEGOTIATE | FIXED — NEGOTIATE: drivers may counter the customer's fee; FIXED: drivers only accept it.
+    key: 'FOOD_DELIVERY_FEE_MODE',
+    valueType: 'string',
+    openIds: ['DEC-PROD-059'],
+    seeded: true,
+  },
+  {
     // Max straight-line store->dropoff distance.
     key: 'FOOD_MAX_DELIVERY_KM',
     valueType: 'number',
@@ -946,13 +1040,56 @@ export const PLATFORM_SETTING_SPECS: readonly PlatformSettingSpec[] = [
     seeded: true,
   },
   {
+    // t73u DEC-RIDE-CROSS-REGION (AGENT_PROPOSED): intercity rides (pickup in an ACTIVE region,
+    // drop-off in another region / province). Off on prod until ops turns it on.
+    key: 'RIDE_INTERCITY_ENABLED',
+    valueType: 'json',
+    openIds: ['DEC-RIDE-CROSS-REGION'],
+    boolean: true,
+    seeded: true,
+  },
+  {
+    // JSON array of vehicle class codes allowed intercity; [] = every enabled class, bike included.
+    key: 'RIDE_INTERCITY_VEHICLE_CLASSES',
+    valueType: 'json',
+    openIds: ['DEC-RIDE-CROSS-REGION'],
+    seeded: true,
+  },
+  {
+    // JSON {"<CLASS>": {"perKmVnd"?, "minFareVnd"?, "maxFareVnd"?}}; {} = the class/zone tariff.
+    key: 'RIDE_INTERCITY_PRICING',
+    valueType: 'json',
+    openIds: ['DEC-RIDE-CROSS-REGION'],
+    seeded: true,
+  },
+  {
+    // Longest intercity route in km; 0 = no limit.
+    key: 'RIDE_INTERCITY_MAX_KM',
+    valueType: 'number',
+    openIds: ['DEC-RIDE-CROSS-REGION'],
+    min: 0,
+    max: 3000,
+    seeded: true,
+  },
+  {
     // Website store links, social accounts, contact and coming-soon cities (Cài đặt › Website).
     key: 'PUBLIC_SITE_CONFIG',
     valueType: 'json',
     openIds: ['DEC-WEB-SITE-CONFIG'],
     seeded: true,
   },
+  {
+    // t82u (DEC-PROD-089): per-platform min/latest build + store links (Cài đặt › Cập nhật ứng dụng).
+    key: 'APP_VERSION_POLICY',
+    valueType: 'json',
+    openIds: ['DEC-PROD-089'],
+    seeded: true,
+  },
 ] as const;
+
+/** Values accepted by FOOD_DELIVERY_FEE_MODE. */
+export const FOOD_DELIVERY_FEE_MODES = ['NEGOTIATE', 'FIXED'] as const;
+export type FoodDeliveryFeeMode = (typeof FOOD_DELIVERY_FEE_MODES)[number];
 
 /** Values accepted by the MAPS_*_PROVIDER settings. */
 export const MAPS_PROVIDER_CHOICES = ['mapbox', 'google'] as const;

@@ -17,6 +17,7 @@ import '../../../../core/maps/map_lat_lng.dart';
 import '../../../../core/maps/map_port.dart';
 import '../../../../core/maps/route_geometry.dart';
 import '../../../pricing/domain/pricing.dart';
+import '../../domain/ride_fare_presets.dart';
 import '../../domain/entities/ride_money.dart';
 import '../../domain/entities/ride_models.dart';
 import '../../domain/params/create_ride_params.dart';
@@ -27,8 +28,10 @@ import '../utils/ride_routes.dart';
 import '../utils/ride_vehicle_label.dart';
 import '../cubit/ride_session.dart';
 import '../widgets/ride_widgets.dart';
+import '../widgets/ride_fare_raise_chips.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/l10n/api_error_text.dart';
+import '../utils/ride_quote_error.dart';
 import '../../../../core/storage/customer_booking_prefs.dart';
 import '../../../../core/design_system/components/dealgo_network_image.dart';
 
@@ -62,7 +65,8 @@ class _RideFareView extends StatefulWidget {
 }
 
 class _RideFarePageState extends State<_RideFareView> {
-  static const _fareStepVnd = 1000;
+  /// MOB-001: step comes from the server quote (fallback 1.000đ).
+  int get _fareStepVnd => _quote.fareStepVnd;
 
   late RidePlaces _places;
   late List<RideQuote> _options;
@@ -73,6 +77,7 @@ class _RideFarePageState extends State<_RideFareView> {
   var _offline = false;
   var _quoting = false;
   var _quoteFailed = false;
+  Object? _quoteError;
   String? _message;
 
   RideQuote? get _quoteOrNull => _places.quote;
@@ -175,17 +180,18 @@ class _RideFarePageState extends State<_RideFareView> {
       setState(() {
         _options = options;
         _places = _places.selectClass(selected);
-        _fare.text = '$initial';
+        _fare.text = formatRideAmount(initial);
         _quoting = false;
         _quoteFailed = false;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
         _quoting = false;
         _quoteFailed = true;
+        _quoteError = error;
       });
     }
   }
@@ -204,7 +210,7 @@ class _RideFarePageState extends State<_RideFareView> {
         vehicleClassCode: option.vehicleClassCode,
         stops: _places.stops,
       );
-      _fare.text = '${option.referenceFareVnd}';
+      _fare.text = formatRideAmount(option.referenceFareVnd);
       _message = null;
       _openRideId = null;
       _attempt = null;
@@ -217,7 +223,7 @@ class _RideFarePageState extends State<_RideFareView> {
     }
     final current = _amount ?? _quote.referenceFareVnd;
     final next = (current + delta).clamp(_quote.minBidVnd, _quote.maxBidVnd);
-    _fare.text = '$next';
+    _fare.text = formatRideAmount(next);
     setState(() => _message = null);
   }
 
@@ -397,11 +403,12 @@ class _RideFarePageState extends State<_RideFareView> {
             ),
             RideDraggableSheet(
               initialChildSize: 0.56,
-              minChildSize: 0.32,
+              // Owner t63u: sheet never sinks below 40%.
+              minChildSize: 0.4,
               // Max + snaps together keep the sheet under the back button.
               maxChildSize: rideSheetMaxSize(MediaQuery.of(context)),
               snapSizes: rideSheetSnapSizes(const [
-                0.32,
+                0.4,
                 0.56,
                 0.78,
               ], rideSheetMaxSize(MediaQuery.of(context))),
@@ -418,13 +425,34 @@ class _RideFarePageState extends State<_RideFareView> {
                           DealGoSpacing.s8,
                         ),
                         children: [
-                          const RideSheetHandle(),
                           const SizedBox(height: DealGoSpacing.s8),
                           RideStopList(
                             pickup: _places.pickup.label,
                             dropoff: _places.dropoff.label,
                             stops: [for (final s in _places.stops) s.label],
                           ),
+                          if (quote != null && quote.intercity) ...[
+                            const SizedBox(height: DealGoSpacing.s12),
+                            DealGoBanner(
+                              key: const Key('ride-intercity-banner'),
+                              tone: DealGoBannerTone.info,
+                              title: l10n.rideIntercityQuote(
+                                quote.distanceKm.toStringAsFixed(0),
+                                "${quote.durationMin}",
+                              ),
+                              message: l10n.rideIntercityNote,
+                            ),
+                          ],
+                          if (quote != null) ...[
+                            const SizedBox(height: DealGoSpacing.s12),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: RideTripSummary(
+                                distanceKm: quote.distanceKm,
+                                durationMin: quote.durationMin,
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: DealGoSpacing.s12),
                           Row(
                             children: [
@@ -445,12 +473,28 @@ class _RideFarePageState extends State<_RideFareView> {
                               child: Center(child: CircularProgressIndicator()),
                             )
                           else if (_quoteFailed)
-                            DealGoBanner(
-                              key: const Key('ride-quote-error'),
-                              tone: DealGoBannerTone.warning,
-                              message: l10n.rideQuoteError,
-                              actionLabel: l10n.actionRetry,
-                              onAction: () => unawaited(_loadQuote()),
+                            Builder(
+                              builder: (context) {
+                                final zone = rideQuoteZoneErrorText(
+                                  l10n,
+                                  _quoteError,
+                                );
+                                return DealGoBanner(
+                                  key: Key(
+                                    zone == null
+                                        ? 'ride-quote-error'
+                                        : 'ride-quote-zone-error',
+                                  ),
+                                  tone: DealGoBannerTone.warning,
+                                  message: zone ?? l10n.rideQuoteError,
+                                  actionLabel: zone == null
+                                      ? l10n.actionRetry
+                                      : null,
+                                  onAction: zone == null
+                                      ? () => unawaited(_loadQuote())
+                                      : null,
+                                );
+                              },
                             )
                           else if (_options.isEmpty)
                             RideInfoBanner(
@@ -491,14 +535,20 @@ class _RideFarePageState extends State<_RideFareView> {
                             // between −/+, with the presets underneath.
                             _FareControl(
                               controller: _fare,
-                              presets: quote.presetsVnd,
+                              presets: rideFareRaisePresets(
+                                suggestedVnd: quote.referenceFareVnd,
+                                minBidVnd: quote.minBidVnd,
+                                maxBidVnd: quote.maxBidVnd,
+                                stepVnd: _fareStepVnd,
+                                maxHeadroomPercent: quote.bidHeadroomPercent,
+                              ),
                               selectedPreset: amount,
                               hintText: l10n.rideEnterAmount,
                               enabled: !_busy,
                               onMinus: () => _nudgeFare(-_fareStepVnd),
                               onPlus: () => _nudgeFare(_fareStepVnd),
                               onPreset: (preset) {
-                                _fare.text = '$preset';
+                                _fare.text = formatRideAmount(preset);
                                 setState(() => _message = null);
                               },
                               onChanged: () => setState(() => _message = null),
@@ -568,7 +618,7 @@ class _FareControl extends StatelessWidget {
   });
 
   final TextEditingController controller;
-  final List<int> presets;
+  final List<RideFarePreset> presets;
   final int? selectedPreset;
   final String hintText;
   final bool enabled;
@@ -591,12 +641,7 @@ class _FareControl extends StatelessWidget {
         borderRadius: BorderRadius.circular(DealGoRadius.card),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          DealGoSpacing.s8,
-          DealGoSpacing.s12,
-          DealGoSpacing.s8,
-          DealGoSpacing.s12,
-        ),
+        padding: const EdgeInsets.all(DealGoSpacing.s16),
         child: Column(
           children: [
             Row(
@@ -606,28 +651,52 @@ class _FareControl extends StatelessWidget {
                   icon: DealGoIcons.remove,
                   onTap: enabled ? onMinus : null,
                 ),
+                const SizedBox(width: DealGoSpacing.s16),
                 Expanded(
-                  child: TextField(
-                    key: const Key('ride-fare-field'),
-                    controller: controller,
-                    enabled: enabled,
-                    keyboardType: TextInputType.number,
-                    textAlign: TextAlign.center,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    style: amountStyle,
-                    decoration: InputDecoration(
-                      isDense: true,
-                      border: InputBorder.none,
-                      hintText: hintText,
-                      hintStyle: textTheme.titleSmall?.copyWith(
-                        color: DealGoColors.textSecondary,
-                      ),
-                      suffixText: 'đ',
-                      suffixStyle: amountStyle,
+                  child: Center(
+                    child: Row(
+                      key: const Key('ride-fare-amount'),
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Flexible(
+                          child: IntrinsicWidth(
+                            child: TextField(
+                              key: const Key('ride-fare-field'),
+                              controller: controller,
+                              enabled: enabled,
+                              keyboardType: TextInputType.number,
+                              textAlign: TextAlign.center,
+                              inputFormatters: const [
+                                RideAmountInputFormatter(),
+                              ],
+                              style: amountStyle,
+                              decoration: InputDecoration(
+                                isDense: true,
+                                filled: false,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: DealGoSpacing.s8,
+                                ),
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                disabledBorder: InputBorder.none,
+                                hintText: hintText,
+                                hintStyle: textTheme.titleSmall?.copyWith(
+                                  color: DealGoColors.textSecondary,
+                                ),
+                              ),
+                              onChanged: (_) => onChanged(),
+                            ),
+                          ),
+                        ),
+                        Text('đ', style: amountStyle),
+                      ],
                     ),
-                    onChanged: (_) => onChanged(),
                   ),
                 ),
+                const SizedBox(width: DealGoSpacing.s16),
                 _StepButton(
                   key: const Key('ride-fare-plus'),
                   icon: DealGoIcons.add,
@@ -637,19 +706,11 @@ class _FareControl extends StatelessWidget {
             ),
             if (presets.isNotEmpty) ...[
               const SizedBox(height: DealGoSpacing.s12),
-              Row(
-                children: [
-                  for (var i = 0; i < presets.length; i++) ...[
-                    if (i > 0) const SizedBox(width: DealGoSpacing.s8),
-                    Expanded(
-                      child: _FarePreset(
-                        amount: presets[i],
-                        selected: selectedPreset == presets[i],
-                        onTap: enabled ? () => onPreset(presets[i]) : null,
-                      ),
-                    ),
-                  ],
-                ],
+              RideFareRaiseChips(
+                presets: presets,
+                selectedVnd: selectedPreset,
+                enabled: enabled,
+                onPick: onPreset,
               ),
             ],
           ],
@@ -808,65 +869,30 @@ class _ClassTile extends StatelessWidget {
   }
 }
 
-class _FarePreset extends StatelessWidget {
-  const _FarePreset({
-    required this.amount,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final int amount;
-  final bool selected;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    // The border marks the choice; screen readers get it from `selected`.
-    return Semantics(
-      button: true,
-      selected: selected,
-      child: Material(
-        color: selected ? DealGoColors.card : DealGoColors.canvas,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(999),
-          side: BorderSide(
-            color: selected ? DealGoColors.primary : DealGoColors.border,
-            width: selected ? 1.4 : 1,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: DealGoSpacing.s8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Flexible(
-                  child: Text(
-                    formatRideVnd(amount),
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: selected
-                          ? DealGoColors.primary
-                          : DealGoColors.textSecondary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 bool _sameStops(List<RidePoint> a, List<RidePoint> b) {
   if (a.length != b.length) return false;
   for (var i = 0; i < a.length; i++) {
     if (a[i].lat != b[i].lat || a[i].lng != b[i].lng) return false;
   }
   return true;
+}
+
+/// Keeps the fare field grouped as the user types ("85000" → "85.000").
+class RideAmountInputFormatter extends TextInputFormatter {
+  const RideAmountInputFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return const TextEditingValue();
+    final trimmed = digits.length > 9 ? digits.substring(0, 9) : digits;
+    final text = formatRideAmount(int.parse(trimmed));
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
 }

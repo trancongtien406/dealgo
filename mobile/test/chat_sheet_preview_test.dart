@@ -1,4 +1,4 @@
-// Renders PNG previews of the r25 chat sheet (customer ride + driver food).
+// Renders PNG previews of the transaction chat sheet (customer ride + driver food).
 // Skipped unless a target directory is given:
 //   flutter test test/chat_sheet_preview_test.dart \
 //     --dart-define=CHAT_PREVIEW_DIR=/tmp/chat-preview

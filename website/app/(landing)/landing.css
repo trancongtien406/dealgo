@@ -181,3 +181,83 @@
     }
   }
 }
+
+
+/* ---- Landing dark mode (t78u) ----------------------------------------
+   The landing sections use fixed light colours; map them onto a dark
+   palette when <html class="dark">. Scoped to .dg-landing so admin pages
+   are untouched. */
+.dark .dg-landing { background-color: #0b0d17; color: #e5e7f0; }
+.dark .dg-landing section,
+.dark .dg-landing footer { color: #e5e7f0; }
+.dark .dg-landing .bg-white { background-color: #131628 !important; }
+.dark .dg-landing .bg-\[\#F8F7FF\],
+.dark .dg-landing .bg-\[\#F9F8FD\],
+.dark .dg-landing .bg-\[\#FAF9FF\],
+.dark .dg-landing .bg-\[\#FBFBFE\],
+.dark .dg-landing .bg-\[\#F4F6FA\],
+.dark .dg-landing .bg-gray-50 { background-color: #0e1120 !important; }
+.dark .dg-landing .bg-\[\#EDE9FE\],
+.dark .dg-landing .bg-\[\#EDE9FE\]\/95,
+.dark .dg-landing .bg-\[\#F3EFFE\],
+.dark .dg-landing .bg-purple-50,
+.dark .dg-landing .bg-purple-50\/80 { background-color: rgba(109, 40, 217, 0.22) !important; }
+.dark .dg-landing .bg-\[\#DCFCE7\] { background-color: rgba(0, 208, 108, 0.18) !important; }
+.dark .dg-landing .bg-gray-100,
+.dark .dg-landing .bg-gray-150,
+.dark .dg-landing .bg-gray-200 { background-color: #1d2136 !important; }
+.dark .dg-landing .bg-\[\#0F172A\] { background-color: #1e2238 !important; }
+
+.dark .dg-landing .text-\[\#0F172A\],
+.dark .dg-landing .text-\[\#1E293B\],
+.dark .dg-landing .text-gray-900,
+.dark .dg-landing .text-gray-800 { color: #f1f3fa !important; }
+.dark .dg-landing .text-\[\#2E1065\] { color: #ddd6fe !important; }
+.dark .dg-landing .text-gray-700,
+.dark .dg-landing .text-gray-600 { color: #c3c7d9 !important; }
+.dark .dg-landing .text-gray-500,
+.dark .dg-landing .text-gray-400 { color: #9aa0b8 !important; }
+.dark .dg-landing .text-\[\#6D28D9\],
+.dark .dg-landing .text-\[\#5B21B6\] { color: #b79cff !important; }
+
+.dark .dg-landing .border-gray-50,
+.dark .dg-landing .border-gray-100,
+.dark .dg-landing .border-gray-100\/60,
+.dark .dg-landing .border-gray-100\/70,
+.dark .dg-landing .border-gray-100\/90,
+.dark .dg-landing .border-gray-200,
+.dark .dg-landing .border-gray-200\/90,
+.dark .dg-landing .border-white,
+.dark .dg-landing .divide-gray-100 > * + * { border-color: #262b45 !important; }
+.dark .dg-landing .border-purple-50,
+.dark .dg-landing .border-purple-100,
+.dark .dg-landing .border-purple-100\/60,
+.dark .dg-landing .border-purple-200,
+.dark .dg-landing .border-purple-200\/50,
+.dark .dg-landing .border-\[\#DDD6FE\],
+.dark .dg-landing .border-emerald-100 { border-color: rgba(167, 139, 250, 0.28) !important; }
+
+/* Soft light gradients / washes become deep violet washes. */
+.dark .dg-landing .from-\[\#F6F4FE\],
+.dark .dg-landing .from-\[\#F8F7FF\],
+.dark .dg-landing .from-\[\#F5F3FF\],
+.dark .dg-landing .from-\[\#EDE9FE\],
+.dark .dg-landing .from-white\/90 { --tw-gradient-from: #0b0d17 !important; }
+.dark .dg-landing .from-\[\#F0FDF4\],
+.dark .dg-landing .from-\[\#DCFCE7\],
+.dark .dg-landing .from-\[\#DBEAFE\] { --tw-gradient-from: #151a2e !important; }
+.dark .dg-landing .via-\[\#F6F4FE\]\/95 { --tw-gradient-via: rgba(11, 13, 23, 0.95) !important; }
+.dark .dg-landing .via-\[\#F6F4FE\]\/75 { --tw-gradient-via: rgba(11, 13, 23, 0.75) !important; }
+.dark .dg-landing .via-\[\#EDE9FE\]\/50,
+.dark .dg-landing .via-\[\#ECFDF5\]\/60,
+.dark .dg-landing .via-purple-100\/40 { --tw-gradient-via: rgba(76, 29, 149, 0.25) !important; }
+.dark .dg-landing .to-\[\#F5F3FF\],
+.dark .dg-landing .to-\[\#F5F3FF\]\/40 { --tw-gradient-to: #0e1120 !important; }
+.dark .dg-landing .to-\[\#DDD6FE\],
+.dark .dg-landing .to-\[\#BFDBFE\],
+.dark .dg-landing .to-\[\#BBF7D0\] { --tw-gradient-to: #1d2136 !important; }
+.dark .dg-landing .shadow-sm,
+.dark .dg-landing .shadow-md,
+.dark .dg-landing .shadow-lg,
+.dark .dg-landing .shadow-xl { --tw-shadow-color: rgba(0, 0, 0, 0.5); }
+.dark .dg-landing img { color-scheme: normal; }

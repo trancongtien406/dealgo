@@ -304,7 +304,7 @@ class _MerchantProfilePageState extends State<MerchantProfilePage> {
                   width: 72,
                   height: 72,
                   child: logo == null
-                      ? const ColoredBox(
+                      ? ColoredBox(
                           key: Key('merchant-profile-logo-empty'),
                           color: DealGoColors.subtlePurple,
                           child: Icon(
@@ -316,7 +316,7 @@ class _MerchantProfilePageState extends State<MerchantProfilePage> {
                           resolveMediaUrl(logo) ?? logo,
                           key: const Key('merchant-profile-logo'),
                           fit: BoxFit.cover,
-                          fallback: const ColoredBox(
+                          fallback: ColoredBox(
                             color: DealGoColors.subtlePurple,
                             child: Icon(
                               DealGoIcons.restaurant,
@@ -424,7 +424,7 @@ class _MerchantProfilePageState extends State<MerchantProfilePage> {
   Widget _coverPanel(AppLocalizations l10n, FoodStoreDetail store) {
     final textTheme = Theme.of(context).textTheme;
     final cover = store.coverUrl;
-    const placeholder = ColoredBox(
+    final placeholder = ColoredBox(
       key: Key('merchant-profile-cover-empty'),
       color: DealGoColors.subtlePurple,
       child: Center(

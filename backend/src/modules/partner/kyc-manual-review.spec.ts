@@ -21,6 +21,7 @@ describe('KYC manual review (t52u)', () => {
     const identity = new MemoryIdentityRepository();
     const { store } = createTestDocumentStore();
     const user = await identity.createUser({ email: 'k@dealgo.vn', phone: '+84988770009', displayName: 'K' });
+    await identity.updateUserProfile(user.id, { avatarUrl: 'https://cdn.example/k.png' });
     const service = new PartnerService(partners, identity, store);
     const submit = (metadata: Record<string, unknown> = {}) =>
       service.submit(user.id, {
@@ -117,6 +118,7 @@ describe('SELFIE_VIDEO liveness clip (t53u)', () => {
     const identity = new MemoryIdentityRepository();
     const { store } = createTestDocumentStore();
     const user = await identity.createUser({ email: 'v@dealgo.vn', phone: '+84988770010', displayName: 'V' });
+    await identity.updateUserProfile(user.id, { avatarUrl: 'https://cdn.example/v.png' });
     const service = new PartnerService(partners, identity, store);
     const app = await service.submit(user.id, {
       role: 'DRIVER',
@@ -135,6 +137,7 @@ describe('SELFIE_VIDEO liveness clip (t53u)', () => {
     const identity = new MemoryIdentityRepository();
     const { store } = createTestDocumentStore();
     const user = await identity.createUser({ email: 'w@dealgo.vn', phone: '+84988770011', displayName: 'W' });
+    await identity.updateUserProfile(user.id, { avatarUrl: 'https://cdn.example/w.png' });
     const service = new PartnerService(partners, identity, store);
     await expect(
       service.submit(user.id, {

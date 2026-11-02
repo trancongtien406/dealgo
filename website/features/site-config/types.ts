@@ -1,5 +1,5 @@
 /** Mirrors backend PUBLIC_SITE_CONFIG (platform setting, DEC-WEB-SITE-CONFIG). Empty fields are omitted. */
-export const SOCIAL_KEYS = ["facebook", "tiktok", "zalo", "youtube", "instagram"] as const;
+export const SOCIAL_KEYS = ["facebook", "messenger", "tiktok", "zalo", "youtube", "instagram"] as const;
 export type SocialKey = (typeof SOCIAL_KEYS)[number];
 
 export type PublicSiteConfig = {
@@ -13,6 +13,7 @@ export type PublicSiteConfig = {
 
 export const SOCIAL_LABELS: Record<SocialKey, string> = {
   facebook: "Facebook",
+  messenger: "Messenger",
   tiktok: "TikTok",
   zalo: "Zalo OA",
   youtube: "YouTube",
@@ -24,6 +25,7 @@ export const ALLOWED_HOSTS = {
   appStoreUrl: ["apps.apple.com"],
   googlePlayUrl: ["play.google.com"],
   facebook: ["facebook.com", "www.facebook.com", "m.facebook.com", "fb.com"],
+  messenger: ["m.me", "messenger.com", "www.messenger.com"],
   tiktok: ["tiktok.com", "www.tiktok.com"],
   zalo: ["zalo.me", "oa.zalo.me"],
   youtube: ["youtube.com", "www.youtube.com", "youtu.be"],

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/appearance/app_appearance.dart';
+import '../../../core/appearance/appearance_sheet.dart';
 import '../../inbox/presentation/inbox_unread.dart';
 
 import '../../../core/config/api_base_url.dart';
@@ -20,6 +22,9 @@ import '../../onboarding/presentation/cubit/merchant_kyb_cubit.dart';
 import '../../onboarding/presentation/utils/merchant_kyb_routes.dart';
 import '../../merchant/presentation/utils/merchant_routes.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../legal/legal_document_page.dart';
+import '../../legal/legal_documents.dart';
+import '../../support/presentation/support_links.dart';
 import 'account_routes.dart';
 import 'driver_account_vehicle.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
@@ -57,11 +62,6 @@ class AccountPage extends StatelessWidget {
       shellPath,
     );
     final textTheme = Theme.of(context).textTheme;
-    final partnerRows = _partnerOnboardingRows(
-      context,
-      shellPath,
-      signedIn?.profile,
-    );
 
     return ColoredBox(
       color: DealGoColors.canvas,
@@ -77,7 +77,7 @@ class AccountPage extends StatelessWidget {
                 tooltip: AppLocalizations.of(context).accountNotifications,
                 onPressed: () =>
                     context.push(AccountRoutes.notifications(shellPath)),
-                icon: const InboxUnreadBadge(
+                icon: InboxUnreadBadge(
                   child: Icon(
                     DealGoIcons.notifications,
                     color: DealGoColors.text,
@@ -85,7 +85,7 @@ class AccountPage extends StatelessWidget {
                 ),
               ),
             ),
-            const Divider(height: 1, color: DealGoColors.divider),
+            Divider(height: 1, color: DealGoColors.divider),
             Expanded(
               child: SingleChildScrollView(
                 padding: dealGoScrollPadding(
@@ -104,15 +104,35 @@ class AccountPage extends StatelessWidget {
                       phone: headerTitle,
                       roleLabel: roleLabel,
                       avatarUrl: resolveMediaUrl(signedIn?.profile.avatarUrl),
+                      canSwitchRole: canSwitchRole,
                       onTap: signedIn == null
                           ? null
                           : () => context.push(
                               AccountRoutes.editProfile(shellPath),
                             ),
+                      onSwitchRole: canSwitchRole
+                          ? () => context.push(AuthRoutes.roles)
+                          : null,
                     ),
                     const SizedBox(height: DealGoSpacing.s12),
                     if (shellPath.startsWith('/driver')) ...[
                       const DriverAccountVehicle(),
+                      const SizedBox(height: DealGoSpacing.s12),
+                      _MenuGroup(
+                        children: [
+                          _driverOnboardingRow(context, signedIn?.profile),
+                        ],
+                      ),
+                      const SizedBox(height: DealGoSpacing.s12),
+                    ] else if (shellPath.startsWith('/merchant')) ...[
+                      _MenuGroup(
+                        children: [
+                          _merchantOnboardingRow(context, signedIn?.profile),
+                        ],
+                      ),
+                      const SizedBox(height: DealGoSpacing.s12),
+                    ] else if (signedIn != null) ...[
+                      _CustomerPartnerHubCard(profile: signedIn.profile),
                       const SizedBox(height: DealGoSpacing.s12),
                     ],
                     _MenuGroup(
@@ -162,21 +182,6 @@ class AccountPage extends StatelessWidget {
                           onTap: () =>
                               context.push(AccountRoutes.payments(shellPath)),
                         ),
-                        _MenuRow(
-                          icon: DealGoIcons.user,
-                          title: AppLocalizations.of(context).accountRoles,
-                          subtitle: roleLabel,
-                          trailing: canSwitchRole
-                              ? _LinkLabel(
-                                  AppLocalizations.of(context)
-                                      .accountSwitchRole,
-                                )
-                              : null,
-                          onTap: signedIn != null
-                              ? () => context.push(AuthRoutes.roles)
-                              : null,
-                        ),
-                        ...partnerRows,
                         if (shellPath.startsWith('/merchant')) ...[
                           _MenuRow(
                             icon: DealGoIcons.filter,
@@ -223,6 +228,35 @@ class AccountPage extends StatelessWidget {
                     ),
                     const SizedBox(height: DealGoSpacing.s20),
                     Text(
+                      AppLocalizations.of(context).accountSectionDisplay,
+                      style: textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: DealGoSpacing.s12),
+                    _MenuGroup(
+                      children: [
+                        _MenuRow(
+                          key: const Key('account-language'),
+                          icon: DealGoIcons.languages,
+                          title: AppLocalizations.of(context).accountLanguage,
+                          subtitle: localeLabel(
+                            context.watch<AppAppearance>().locale,
+                          ),
+                          onTap: () => showLanguageSheet(context),
+                        ),
+                        _MenuRow(
+                          key: const Key('account-theme'),
+                          icon: DealGoIcons.moon,
+                          title: AppLocalizations.of(context).accountTheme,
+                          subtitle: themeChoiceLabel(
+                            AppLocalizations.of(context),
+                            context.watch<AppAppearance>().themeChoice,
+                          ),
+                          onTap: () => showThemeSheet(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: DealGoSpacing.s20),
+                    Text(
                       AppLocalizations.of(context).accountSectionHelp,
                       style: textTheme.titleMedium,
                     ),
@@ -234,8 +268,56 @@ class AccountPage extends StatelessWidget {
                           title: AppLocalizations.of(context).accountSupport,
                           subtitle: AppLocalizations.of(context)
                               .accountSupportBody,
-                          onTap: () =>
-                              context.push(AccountRoutes.help(shellPath)),
+                          onTap: () async {
+                            final router = GoRouter.of(context);
+                            if (!await openHelpCenterWeb(context)) {
+                              router.push(AccountRoutes.help(shellPath));
+                            }
+                          },
+                        ),
+                        _MenuRow(
+                          key: const ValueKey('account-support-tickets-row'),
+                          icon: DealGoIcons.headset,
+                          title: AppLocalizations.of(context).helpMyTickets,
+                          subtitle: AppLocalizations.of(context)
+                              .accountSupportTicketsBody,
+                          onTap: () => context.push(
+                            AccountRoutes.supportTickets(shellPath),
+                          ),
+                        ),
+                        _MenuRow(
+                          key: const ValueKey('account-terms-row'),
+                          icon: DealGoIcons.document,
+                          title: AppLocalizations.of(context).legalTermsTitle,
+                          subtitle: AppLocalizations.of(context)
+                              .legalTermsBody,
+                          onTap: () => LegalDocumentPage.open(
+                            context,
+                            LegalSlug.terms,
+                          ),
+                        ),
+                        _MenuRow(
+                          key: const ValueKey('account-regulations-row'),
+                          icon: DealGoIcons.document,
+                          title: AppLocalizations.of(context)
+                              .legalRegulationsTitle,
+                          subtitle: AppLocalizations.of(context)
+                              .legalRegulationsBody,
+                          onTap: () => LegalDocumentPage.open(
+                            context,
+                            LegalSlug.regulations,
+                          ),
+                        ),
+                        _MenuRow(
+                          key: const ValueKey('account-privacy-row'),
+                          icon: DealGoIcons.lock,
+                          title: AppLocalizations.of(context).legalPrivacyTitle,
+                          subtitle: AppLocalizations.of(context)
+                              .legalPrivacyBody,
+                          onTap: () => LegalDocumentPage.open(
+                            context,
+                            LegalSlug.privacy,
+                          ),
                         ),
                         if (signedIn != null) ...[
                           _MenuRow(
@@ -284,65 +366,152 @@ class AccountPage extends StatelessWidget {
   }
 }
 
-List<Widget> _partnerOnboardingRows(
-  BuildContext context,
-  String shellPath,
-  UserProfile? profile,
-) {
-  if (shellPath.startsWith('/driver')) {
-    return [_driverOnboardingRow(context, profile)];
+class _CustomerPartnerHubCard extends StatelessWidget {
+  const _CustomerPartnerHubCard({
+    required this.profile,
+  });
+
+  final UserProfile? profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
+
+    return DealGoCard(
+      padding: EdgeInsets.zero,
+      borderColor: DealGoColors.border,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: DealGoSpacing.s16,
+              vertical: DealGoSpacing.s12,
+            ),
+            decoration: BoxDecoration(
+              color: DealGoColors.subtlePurple,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(DealGoRadius.card),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: DealGoColors.card,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    DealGoIcons.stars,
+                    color: DealGoColors.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: DealGoSpacing.s12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.accountPartnerHubTitle,
+                        style: textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        l10n.accountPartnerHubSubtitle,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: DealGoColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: DealGoColors.divider),
+          _driverOnboardingRow(context, profile),
+          Divider(height: 1, indent: 68, color: DealGoColors.divider),
+          _merchantOnboardingRow(context, profile),
+        ],
+      ),
+    );
   }
-  if (shellPath.startsWith('/merchant')) {
-    return [_merchantOnboardingRow(context, profile)];
+}
+
+DriverKycCubit? _maybeDriverKycCubit(BuildContext context) {
+  try {
+    return context.watch<DriverKycCubit>();
+  } on ProviderNotFoundException {
+    return null;
   }
-  if (shellPath.startsWith('/customer') && profile != null) {
-    return [
-      if (profile.needsPartnerOnboarding(AppRole.driver))
-        _driverOnboardingRow(context, profile),
-      if (profile.needsPartnerOnboarding(AppRole.merchant))
-        _merchantOnboardingRow(context, profile),
-    ];
+}
+
+MerchantKybCubit? _maybeMerchantKybCubit(BuildContext context) {
+  try {
+    return context.watch<MerchantKybCubit>();
+  } on ProviderNotFoundException {
+    return null;
   }
-  return const [];
 }
 
 Widget _driverOnboardingRow(BuildContext context, UserProfile? profile) {
-  final cubit = context.watch<DriverKycCubit>();
+  final cubit = _maybeDriverKycCubit(context);
   final l10n = AppLocalizations.of(context);
-  final status = cubit.state.seeded
+  final status = (cubit != null && cubit.state.seeded)
       ? cubit.state.status
       : _statusFromGrant(profile?.grantStatus(AppRole.driver));
   return _MenuRow(
-    icon: DealGoIcons.idCard,
+    icon: DealGoIcons.helmet,
+    iconBackground: DealGoColors.amberSurface,
+    iconColor: DealGoColors.amber,
     title: l10n.accountDriverPartner,
     subtitle: _partnerStatusLabel(l10n, status),
     trailing: _LinkLabel(_partnerActionLabel(l10n, status)),
     onTap: () {
-      if (profile != null) {
-        cubit.seedFromProfile(profile);
+      if (cubit != null) {
+        if (profile != null) {
+          cubit.seedFromProfile(profile);
+        }
+        // Skip the gate spinner — open the screen matching known grant status.
+        context.push(DriverKycRoutes.entryFromCubit(cubit));
+      } else {
+        context.push(DriverKycRoutes.root);
       }
-      // Skip the gate spinner — open the screen matching known grant status.
-      context.push(DriverKycRoutes.entryFromCubit(cubit));
     },
   );
 }
 
 Widget _merchantOnboardingRow(BuildContext context, UserProfile? profile) {
-  final cubit = context.watch<MerchantKybCubit>();
+  final cubit = _maybeMerchantKybCubit(context);
   final l10n = AppLocalizations.of(context);
-  final status = cubit.state.seeded
+  final status = (cubit != null && cubit.state.seeded)
       ? cubit.state.status
       : _statusFromGrant(profile?.grantStatus(AppRole.merchant));
   return _MenuRow(
     icon: DealGoIcons.store,
+    iconBackground: DealGoColors.greenSurface,
+    iconColor: DealGoColors.brandGreen,
     title: l10n.accountShopPartner,
     subtitle: _partnerStatusLabel(l10n, status),
     trailing: _LinkLabel(_partnerActionLabel(l10n, status)),
     onTap: () {
-      if (profile != null) {
-        cubit.seedFromProfile(profile);
+      if (cubit != null) {
+        if (profile != null) {
+          cubit.seedFromProfile(profile);
+        }
+        context.push(MerchantKybRoutes.entryFromCubit(cubit));
+      } else {
+        context.push(MerchantKybRoutes.root);
       }
-      context.push(MerchantKybRoutes.entryFromCubit(cubit));
     },
   );
 }
@@ -406,87 +575,154 @@ class _ProfileCard extends StatelessWidget {
     required this.roleLabel,
     this.avatarUrl,
     this.onTap,
+    this.canSwitchRole = false,
+    this.onSwitchRole,
   });
 
   final String? phone;
   final String? avatarUrl;
   final String roleLabel;
   final VoidCallback? onTap;
+  final bool canSwitchRole;
+  final VoidCallback? onSwitchRole;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final shownPhone = phone;
     return DealGoCard(
-      onTap: onTap,
+      padding: EdgeInsets.zero,
       color: DealGoColors.subtlePurple,
       borderColor: DealGoColors.border,
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            alignment: Alignment.center,
-            clipBehavior: Clip.antiAlias,
-            decoration: const BoxDecoration(
-              color: DealGoColors.card,
-              shape: BoxShape.circle,
-            ),
-            child: avatarUrl == null
-                ? const Icon(
-                    DealGoIcons.user,
-                    color: DealGoColors.primary,
-                    size: 32,
-                  )
-                : DealGoNetworkImage(
-                    avatarUrl!,
-                    key: const Key('account-avatar'),
-                    width: 56,
-                    height: 56,
-                    fit: BoxFit.cover,
-                    fallback: const Icon(
-                      DealGoIcons.user,
-                      color: DealGoColors.primary,
-                      size: 32,
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.vertical(
+                top: const Radius.circular(DealGoRadius.card),
+                bottom: Radius.circular(canSwitchRole ? 0 : DealGoRadius.card),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(DealGoSpacing.s16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.antiAlias,
+                      decoration: BoxDecoration(
+                        color: DealGoColors.card,
+                        shape: BoxShape.circle,
+                      ),
+                      child: avatarUrl == null
+                          ? const Icon(
+                              DealGoIcons.user,
+                              color: DealGoColors.primary,
+                              size: 32,
+                            )
+                          : DealGoNetworkImage(
+                              avatarUrl!,
+                              key: const Key('account-avatar'),
+                              width: 56,
+                              height: 56,
+                              fit: BoxFit.cover,
+                              fallback: const Icon(
+                                DealGoIcons.user,
+                                color: DealGoColors.primary,
+                                size: 32,
+                              ),
+                            ),
                     ),
-                  ),
-          ),
-          const SizedBox(width: DealGoSpacing.s12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (shownPhone != null && shownPhone.isNotEmpty) ...[
-                  Text(shownPhone, style: textTheme.titleMedium),
-                  const SizedBox(height: DealGoSpacing.s8),
-                ],
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: DealGoColors.greenSurface,
-                    borderRadius: BorderRadius.circular(DealGoRadius.pill),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: DealGoSpacing.s12,
-                      vertical: DealGoSpacing.s4,
-                    ),
-                    child: Text(
-                      roleLabel,
-                      style: textTheme.labelSmall?.copyWith(
-                        color: DealGoColors.brandGreen,
-                        fontWeight: FontWeight.w600,
+                    const SizedBox(width: DealGoSpacing.s12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (shownPhone != null && shownPhone.isNotEmpty) ...[
+                            Text(shownPhone, style: textTheme.titleMedium),
+                            const SizedBox(height: DealGoSpacing.s8),
+                          ],
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: DealGoColors.greenSurface,
+                              borderRadius:
+                                  BorderRadius.circular(DealGoRadius.pill),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: DealGoSpacing.s12,
+                                vertical: DealGoSpacing.s4,
+                              ),
+                              child: Text(
+                                roleLabel,
+                                style: textTheme.labelSmall?.copyWith(
+                                  color: DealGoColors.brandGreen,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
+                    if (onTap != null)
+                      const Icon(
+                        DealGoIcons.edit,
+                        color: DealGoColors.primary,
+                        size: 20,
+                      ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-          if (onTap != null)
-            const Icon(
-              DealGoIcons.chevronRight,
-              color: DealGoColors.textSecondary,
+          if (canSwitchRole) ...[
+            Divider(
+              height: 1,
+              color: DealGoColors.border.withValues(alpha: 0.6),
             ),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onSwitchRole,
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(DealGoRadius.card),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: DealGoSpacing.s16,
+                    vertical: DealGoSpacing.s12,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        DealGoIcons.swapHoriz,
+                        color: DealGoColors.primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: DealGoSpacing.s8),
+                      Text(
+                        AppLocalizations.of(context).accountSwitchRole,
+                        style: textTheme.labelLarge?.copyWith(
+                          color: DealGoColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const Spacer(),
+                      const Icon(
+                        DealGoIcons.chevronRight,
+                        color: DealGoColors.primary,
+                        size: 18,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -509,7 +745,7 @@ class _MenuGroup extends StatelessWidget {
         children: [
           for (var i = 0; i < children.length; i++) ...[
             if (i > 0)
-              const Divider(height: 1, indent: 68, color: DealGoColors.divider),
+              Divider(height: 1, indent: 68, color: DealGoColors.divider),
             children[i],
           ],
         ],
@@ -545,6 +781,8 @@ class _MenuRow extends StatelessWidget {
     this.trailing,
     this.onTap,
     this.showChevron = true,
+    this.iconBackground,
+    this.iconColor,
   });
 
   final IconData icon;
@@ -553,6 +791,8 @@ class _MenuRow extends StatelessWidget {
   final Widget? trailing;
   final VoidCallback? onTap;
   final bool showChevron;
+  final Color? iconBackground;
+  final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
@@ -565,7 +805,11 @@ class _MenuRow extends StatelessWidget {
           padding: const EdgeInsets.all(DealGoSpacing.s16),
           child: Row(
             children: [
-              _IconBadge(icon: icon),
+              _IconBadge(
+                icon: icon,
+                background: iconBackground,
+                color: iconColor,
+              ),
               const SizedBox(width: DealGoSpacing.s12),
               Expanded(
                 child: Column(
@@ -586,7 +830,7 @@ class _MenuRow extends StatelessWidget {
               ],
               if (showChevron) ...[
                 const SizedBox(width: DealGoSpacing.s4),
-                const Icon(
+                Icon(
                   DealGoIcons.chevronRight,
                   color: DealGoColors.textSecondary,
                 ),
@@ -600,9 +844,15 @@ class _MenuRow extends StatelessWidget {
 }
 
 class _IconBadge extends StatelessWidget {
-  const _IconBadge({required this.icon});
+  const _IconBadge({
+    required this.icon,
+    this.background,
+    this.color,
+  });
 
   final IconData icon;
+  final Color? background;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -610,11 +860,11 @@ class _IconBadge extends StatelessWidget {
       width: 40,
       height: 40,
       alignment: Alignment.center,
-      decoration: const BoxDecoration(
-        color: DealGoColors.subtlePurple,
+      decoration: BoxDecoration(
+        color: background ?? DealGoColors.subtlePurple,
         shape: BoxShape.circle,
       ),
-      child: Icon(icon, color: DealGoColors.primary, size: 22),
+      child: Icon(icon, color: color ?? DealGoColors.primary, size: 22),
     );
   }
 }
@@ -671,7 +921,7 @@ class _LogoutRowState extends State<_LogoutRow> {
                 width: 40,
                 height: 40,
                 alignment: Alignment.center,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: DealGoColors.dangerSurface,
                   shape: BoxShape.circle,
                 ),

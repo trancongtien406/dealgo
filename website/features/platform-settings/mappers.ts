@@ -59,7 +59,23 @@ const LABELS: Record<string, { label: string; hint: string }> = {
   },
   RIDE_OFFER_TTL_SECONDS: {
     label: "Hiệu lực mỗi đề nghị giá của tài xế (giây)",
-    hint: "OPEN-004/019 — không vượt quá thời gian mở yêu cầu chuyến",
+    hint: "10–120 giây (prod 20). Không vượt quá thời gian mở yêu cầu chuyến",
+  },
+  RIDE_INTERCITY_ENABLED: {
+    label: "Bật xe liên tỉnh",
+    hint: "Điểm đón trong khu vực phục vụ, điểm đến khác tỉnh/khu vực. Tắt = báo chưa hỗ trợ chuyến giữa khu vực",
+  },
+  RIDE_INTERCITY_VEHICLE_CLASSES: {
+    label: "Loại xe chạy liên tỉnh (JSON)",
+    hint: 'Mảng mã loại xe, ví dụ ["MOTORBIKE","CAR_4"]. [] = mọi loại xe đang bật (gồm cả xe máy)',
+  },
+  RIDE_INTERCITY_PRICING: {
+    label: "Giá liên tỉnh theo loại xe (JSON)",
+    hint: '{"CAR_4":{"perKmVnd":..,"minFareVnd":..,"maxFareVnd":..}} — bỏ trống = dùng giá loại xe; không có trần giá nội thành, biên độ trả giá % vẫn áp dụng',
+  },
+  RIDE_INTERCITY_MAX_KM: {
+    label: "Quãng đường liên tỉnh tối đa (km)",
+    hint: "0 = không giới hạn; 0–3000",
   },
   RIDE_MAX_LIVE_OFFERS_PER_RIDE: {
     label: "Số đề nghị giá đang mở tối đa / chuyến",
@@ -217,6 +233,34 @@ const LABELS: Record<string, { label: string; hint: string }> = {
     label: "Cho tài xế nhận đơn trước khi món xong (phút)",
     hint: "Mặc định 10 — 0 = chỉ nhận khi quán báo xong (0–60)",
   },
+  FOOD_FARE_FLOOR_PERCENT_OF_SUGGESTED: {
+    label: "Phí giao: khách đề nghị tối thiểu (% phí gợi ý)",
+    hint: "Mặc định 70 (0–100)",
+  },
+  FOOD_COUNTER_MAX_PERCENT_OF_OFFER: {
+    label: "Phí giao: tài xế đề xuất tối đa (% giá khách)",
+    hint: "Mặc định 150 (100–300)",
+  },
+  FOOD_FARE_STEP_VND: {
+    label: "Phí giao: bước tăng/giảm (đ)",
+    hint: "Mặc định 1000 (100–10000)",
+  },
+  FOOD_MAX_OFFER_EDITS_PER_DRIVER: {
+    label: "Số lần tài xế sửa đề xuất phí giao",
+    hint: "Mặc định 2 (0–10)",
+  },
+  FOOD_MAX_FARE_RAISES_PER_ORDER: {
+    label: "Số lần khách tăng phí giao mỗi đơn",
+    hint: "Mặc định 3 (0–10)",
+  },
+  FOOD_DELIVERY_FEE_MODE: {
+    label: "Chế độ phí giao Food / Delivery fee mode",
+    hint: "Cho trả giá (NEGOTIATE): tài xế nhận hoặc đề xuất giá khác · Giá cố định (FIXED): tài xế chỉ nhận đúng giá khách chọn",
+  },
+  FOOD_OFFER_TTL_SECONDS: {
+    label: "Đề xuất phí giao hết hạn sau (giây)",
+    hint: "Mặc định 120 (30–1800)",
+  },
   FOOD_MAX_DELIVERY_KM: {
     label: "Khoảng cách giao tối đa (km)",
     hint: "Mặc định 15 (1–50)",
@@ -281,9 +325,17 @@ const LABELS: Record<string, { label: string; hint: string }> = {
     label: "Bắt buộc hồ sơ KYC khi đăng ký tài xế",
     hint: "DEC-PROD-048 (DRAFT) — Tắt: app bỏ bước giấy tờ, tài xế vẫn chọn hạng xe và chờ admin duyệt (mặc định Bật)",
   },
+  DRIVER_CAR_EXTRA_DOCS_REQUIRED: {
+    label: "Bắt buộc giấy tờ ô tô (bảo hiểm xe) khi duyệt tài xế ô tô",
+    hint: "Bật (mặc định): tài xế ô tô phải có ảnh bảo hiểm xe mới được duyệt và nhận đơn. Tắt: bỏ qua yêu cầu này.",
+  },
   ONBOARDING_MERCHANT_KYB_REQUIRED: {
     label: "Bắt buộc hồ sơ KYB khi đăng ký cửa hàng",
     hint: "DEC-PROD-048 (DRAFT) — Tắt: app bỏ bước giấy tờ, cửa hàng vẫn chờ admin duyệt (mặc định Bật)",
+  },
+  AUTH_EMAIL_VERIFICATION_REQUIRED: {
+    label: "Bắt buộc xác minh email khi đăng ký",
+    hint: "t78u — Tắt: đăng ký bằng email vào app ngay, không gửi mã xác minh và đăng nhập không bị chặn với email chưa xác minh (mặc định Bật)",
   },
   KYC_AUTO_APPROVE_DRIVER: {
     label: "Tự động duyệt KYC tài xế",
@@ -352,6 +404,8 @@ const PERCENT_KEYS = new Set([
 
 /** Integer settings: [min, max, Vietnamese error]. Mirrors the backend catalog. */
 const INTEGER_RANGES: Record<string, [number, number, string]> = {
+  RIDE_OFFER_TTL_SECONDS: [10, 120, "Hiệu lực đề nghị giá phải là số nguyên từ 10 đến 120 giây."],
+  RIDE_INTERCITY_MAX_KM: [0, 3000, "Quãng đường tối đa phải là số nguyên từ 0 đến 3000 km."],
   RATING_WINDOW_DAYS: [1, 365, "Thời hạn đánh giá phải là số nguyên từ 1 đến 365 ngày."],
   RIDE_PICKUP_CODE_MAX_ATTEMPTS: [1, 20, "Số lần nhập sai phải là số nguyên từ 1 đến 20."],
   FOOD_DELIVERY_CODE_MAX_ATTEMPTS: [1, 20, "Số lần nhập sai phải là số nguyên từ 1 đến 20."],
@@ -383,6 +437,12 @@ const INTEGER_RANGES: Record<string, [number, number, string]> = {
   FOOD_MERCHANT_ACCEPT_TIMEOUT_MINUTES: [0, 60, "Giá trị phải là số nguyên từ 0 đến 60 phút."],
   FOOD_UNCLAIMED_READY_TIMEOUT_MINUTES: [0, 240, "Giá trị phải là số nguyên từ 0 đến 240 phút."],
   FOOD_EARLY_ASSIGN_LEAD_MINUTES: [0, 60, "Giá trị phải là số nguyên từ 0 đến 60 phút."],
+  FOOD_FARE_FLOOR_PERCENT_OF_SUGGESTED: [0, 100, "Giá trị phải là số nguyên từ 0 đến 100."],
+  FOOD_COUNTER_MAX_PERCENT_OF_OFFER: [100, 300, "Giá trị phải là số nguyên từ 100 đến 300."],
+  FOOD_FARE_STEP_VND: [100, 10000, "Giá trị phải là số nguyên từ 100 đến 10000."],
+  FOOD_MAX_OFFER_EDITS_PER_DRIVER: [0, 10, "Giá trị phải là số nguyên từ 0 đến 10."],
+  FOOD_MAX_FARE_RAISES_PER_ORDER: [0, 10, "Giá trị phải là số nguyên từ 0 đến 10."],
+  FOOD_OFFER_TTL_SECONDS: [30, 1800, "Giá trị phải là số nguyên từ 30 đến 1800 giây."],
   FOOD_MAX_DELIVERY_KM: [1, 50, "Giá trị phải là số nguyên từ 1 đến 50 km."],
   DRIVER_DEBT_LIMIT_VND: [0, 10000000, "Giá trị phải là số nguyên từ 0 đến 10000000."],
   RIDE_MAX_LIVE_OFFERS_PER_RIDE: [0, 100, "Giá trị phải là số nguyên từ 0 đến 100."],
@@ -407,10 +467,27 @@ const INTEGER_RANGES: Record<string, [number, number, string]> = {
 };
 
 /** JSON boolean settings (backend spec.boolean): the editor offers Bật / Tắt. */
+/** Fixed-choice string settings: admin picks one option (vi / en label). */
+export const ENUM_SETTING_OPTIONS: Readonly<
+  Record<string, ReadonlyArray<{ value: string; label: string; labelEn: string }>>
+> = {
+  FOOD_DELIVERY_FEE_MODE: [
+    { value: "NEGOTIATE", label: "Cho trả giá", labelEn: "Negotiate" },
+    { value: "FIXED", label: "Giá cố định", labelEn: "Fixed price" },
+  ],
+};
+
+export function enumSettingLabel(key: string, value: string): string | null {
+  const choice = ENUM_SETTING_OPTIONS[key]?.find((c) => c.value === value.trim().toUpperCase());
+  return choice ? `${choice.label} (${choice.labelEn})` : null;
+}
+
 export const BOOLEAN_SETTING_KEYS: ReadonlySet<string> = new Set([
+  "RIDE_INTERCITY_ENABLED",
   "FOOD_DELIVERY_CODE_REQUIRED",
   "FOOD_HANDOVER_CODE_REQUIRED",
   "ONBOARDING_DRIVER_KYC_REQUIRED",
+  "DRIVER_CAR_EXTRA_DOCS_REQUIRED",
   "ONBOARDING_MERCHANT_KYB_REQUIRED",
   "KYC_AUTO_APPROVE_DRIVER",
   "KYC_AUTO_APPROVE_MERCHANT",
@@ -421,6 +498,7 @@ export const BOOLEAN_SETTING_KEYS: ReadonlySet<string> = new Set([
   "VOICE_CALLS_ENABLED",
   "RIDE_MULTI_STOP_BIKE_ENABLED",
   "RIDE_MULTI_STOP_CAR_ENABLED",
+  "AUTH_EMAIL_VERIFICATION_REQUIRED",
 ]);
 
 export const UPLOAD_SNIFFABLE_TYPES = [
@@ -472,10 +550,23 @@ export function validateSettingValue(key: string, value: string): string | null 
   if (key === "UPLOAD_ALLOWED_TYPES") {
     return validateUploadTypes(trimmed);
   }
+  const choices = ENUM_SETTING_OPTIONS[key];
+  if (choices) {
+    const upper = trimmed.toUpperCase();
+    return choices.some((choice) => choice.value === upper)
+      ? null
+      : `Giá trị phải là ${choices.map((c) => c.value).join(" hoặc ")}.`;
+  }
   if (key.startsWith("MAPS_") && key.endsWith("_PROVIDER")) {
     return /^(mapbox|google)$/i.test(trimmed)
       ? null
       : "Giá trị phải là mapbox hoặc google.";
+  }
+  if (key === "RIDE_INTERCITY_VEHICLE_CLASSES") {
+    return validateIntercityClasses(trimmed);
+  }
+  if (key === "RIDE_INTERCITY_PRICING") {
+    return validateIntercityPricing(trimmed);
   }
   if (BOOLEAN_SETTING_KEYS.has(key)) {
     return trimmed === "true" || trimmed === "false"
@@ -493,6 +584,8 @@ export function validateSettingValue(key: string, value: string): string | null 
 }
 
 export function categorizeSetting(key: string): CategoryKey {
+  if (key === "RIDE_INTERCITY_PRICING") return "FARE";
+  if (key.startsWith("RIDE_INTERCITY_")) return "DISPATCH";
   if (key.startsWith("SUPPORT_") || key.startsWith("MAPS_") || key.startsWith("UPLOAD_") || key.startsWith("ACCOUNT_") || key.startsWith("VOICE_")) {
     return "SUPPORT";
   }
@@ -507,9 +600,20 @@ export function categorizeSetting(key: string): CategoryKey {
     key === "RIDE_FREE_CANCEL_MINUTES" ||
     key === "RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE" ||
     key === "RIDE_COUNTER_MAX_PERCENT_OF_OFFER" ||
-    key === "RIDE_BID_CEILING_PERCENT_OF_REFERENCE"
+    key === "RIDE_BID_CEILING_PERCENT_OF_REFERENCE" ||
+    key === "FOOD_FARE_FLOOR_PERCENT_OF_SUGGESTED" ||
+    key === "FOOD_COUNTER_MAX_PERCENT_OF_OFFER" ||
+    key === "FOOD_FARE_STEP_VND"
   ) {
     return "FARE";
+  }
+  if (
+    key === "FOOD_MAX_OFFER_EDITS_PER_DRIVER" ||
+    key === "FOOD_MAX_FARE_RAISES_PER_ORDER" ||
+    key === "FOOD_OFFER_TTL_SECONDS" ||
+    key === "FOOD_DELIVERY_FEE_MODE"
+  ) {
+    return "DISPATCH";
   }
   // Same grouping as the backend SETTING_CATEGORY_OVERRIDES map (platform-settings.service.ts).
   if (
@@ -583,4 +687,38 @@ export function enrichPlatformSetting(row: {
 /** Real on/off switches for the Settings "Feature flags" tab (no hard-coded demo flags). */
 export function featureFlagRows<T extends { key: string }>(rows: readonly T[]): T[] {
   return rows.filter((row) => BOOLEAN_SETTING_KEYS.has(row.key));
+}
+
+function validateIntercityClasses(raw: string): string | null {
+  const message = 'Phải là mảng mã loại xe, ví dụ ["CAR_4","CAR_7"] hoặc [].';
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.every((code) => typeof code === "string" && /^[A-Z0-9_]{1,32}$/.test(code))
+      ? null
+      : message;
+  } catch {
+    return message;
+  }
+}
+
+function validateIntercityPricing(raw: string): string | null {
+  const message = 'Phải là JSON {"CAR_4":{"perKmVnd":số,"minFareVnd":số,"maxFareVnd":số}}, số nguyên VND ≥ 0, min ≤ max.';
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return message;
+    for (const [code, entry] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!/^[A-Z0-9_]{1,32}$/.test(code) || !entry || typeof entry !== "object" || Array.isArray(entry)) return message;
+      const fields = entry as Record<string, unknown>;
+      for (const [field, value] of Object.entries(fields)) {
+        if (!["perKmVnd", "minFareVnd", "maxFareVnd"].includes(field)) return message;
+        if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 2_000_000_000) return message;
+      }
+      if (typeof fields.minFareVnd === "number" && typeof fields.maxFareVnd === "number" && fields.minFareVnd > fields.maxFareVnd) {
+        return message;
+      }
+    }
+    return null;
+  } catch {
+    return message;
+  }
 }

@@ -55,7 +55,7 @@ class DealGoNetworkImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const skeleton = ColoredBox(color: DealGoColors.skeletonBase);
+    final skeleton = ColoredBox(color: DealGoColors.skeletonBase);
     final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 2.0;
     final screenWidth = MediaQuery.maybeSizeOf(context)?.width ?? 400;
     return LayoutBuilder(

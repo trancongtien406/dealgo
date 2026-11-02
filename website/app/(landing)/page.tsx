@@ -35,6 +35,7 @@ export default async function Home() {
           __html: JSON.stringify(landingJsonLd(siteConfig)).replace(/</g, "\\u003c"),
         }}
       />
+      <div className="dg-landing">
       <Navbar />
       <main>
         <HeroSection siteConfig={siteConfig} />
@@ -64,6 +65,7 @@ export default async function Home() {
         </section>
       </main>
       <Footer siteConfig={siteConfig} />
+      </div>
     </>
   );
 }

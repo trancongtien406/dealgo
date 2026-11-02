@@ -156,33 +156,30 @@ void main() {
     expect(unauthorizedCalls, 0);
   });
 
-  test(
-    'step-up re-authentication 401 (AUTH_CODE_INVALID) does not refresh or sign out',
-    () async {
-      final adapter = _Adapter((_) async {
-        return _json(
-          '{"success":false,"statusCode":401,"message":"Invalid verification code",'
-          '"errorCode":"AUTH_CODE_INVALID"}',
-          401,
-        );
-      });
-      final dio = build(adapter);
-
-      await expectLater(
-        dio.post<Object?>(
-          '/v1/me/account-deletion/req-1/confirm',
-          data: {'code': '000000'},
-        ),
-        throwsA(
-          isA<DioException>().having(
-            (e) => e.response?.statusCode,
-            'status',
-            401,
-          ),
-        ),
+  test('step-up re-authentication 401 (AUTH_CODE_INVALID) does not refresh or sign out', () async {
+    final adapter = _Adapter((_) async {
+      return _json(
+        '{"success":false,"statusCode":401,"message":"Invalid verification code",'
+        '"errorCode":"AUTH_CODE_INVALID"}',
+        401,
       );
-      expect(adapter.refreshCalls, 0);
-      expect(unauthorizedCalls, 0);
-    },
-  );
+    });
+    final dio = build(adapter);
+
+    await expectLater(
+      dio.post<Object?>(
+        '/v1/me/account-deletion/req-1/confirm',
+        data: {'code': '000000'},
+      ),
+      throwsA(
+        isA<DioException>().having(
+          (e) => e.response?.statusCode,
+          'status',
+          401,
+        ),
+      ),
+    );
+    expect(adapter.refreshCalls, 0);
+    expect(unauthorizedCalls, 0);
+  });
 }

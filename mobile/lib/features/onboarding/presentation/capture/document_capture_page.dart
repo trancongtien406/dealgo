@@ -11,6 +11,7 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/partner_documents.dart';
 import '../document_image_source.dart';
+import 'camera_cover_preview.dart';
 import 'camera_frames.dart';
 import 'capture_hint.dart';
 import 'capture_quality.dart';
@@ -163,12 +164,8 @@ class _DocumentCaptureViewState extends State<_DocumentCaptureView> {
             kind == PartnerDocumentKind.repIdBack;
         return Scaffold(
           backgroundColor: Colors.black,
-          appBar: AppBar(
-            backgroundColor: Colors.black,
-            foregroundColor: Colors.white,
-            title: Text(
-              isBack ? l10n.kycCaptureBackTitle : l10n.kycCaptureFrontTitle,
-            ),
+          appBar: captureAppBar(
+            isBack ? l10n.kycCaptureBackTitle : l10n.kycCaptureFrontTitle,
           ),
           body: SafeArea(
             child: _failed
@@ -181,13 +178,21 @@ class _DocumentCaptureViewState extends State<_DocumentCaptureView> {
                 : Stack(
                     fit: StackFit.expand,
                     children: [
+                      // The guide lives inside the preview box: it is 88% of the
+                      // preview width, the same region CardGuide checks.
                       if (controller != null && controller.value.isInitialized)
-                        Center(child: CameraPreview(controller))
-                      else
+                        CameraAspectPreview(
+                          controller: controller,
+                          overlay: IgnorePointer(
+                            child: _CardFrame(ready: state.stableFrames > 0),
+                          ),
+                        )
+                      else ...[
                         const Center(child: CircularProgressIndicator()),
-                      IgnorePointer(
-                        child: _CardFrame(ready: state.stableFrames > 0),
-                      ),
+                        IgnorePointer(
+                          child: _CardFrame(ready: state.stableFrames > 0),
+                        ),
+                      ],
                       Positioned(
                         left: 0,
                         right: 0,

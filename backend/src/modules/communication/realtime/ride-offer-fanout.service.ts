@@ -41,6 +41,8 @@ export class RideOfferFanoutService implements OnModuleInit, OnModuleDestroy {
   /** Requests this node announced and that may still be open → re-push + close hint. */
   private readonly openRequests = new Map<string, OpenRequest>();
   private repushTimer: ReturnType<typeof setInterval> | null = null;
+  /** `${rideId}:${offerId}:${expiresAt}` → timer that announces that offer's expiry (t71u). */
+  private readonly offerExpiryTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   constructor(
     private readonly events: RideOfferEvents,
@@ -66,6 +68,67 @@ export class RideOfferFanoutService implements OnModuleInit, OnModuleDestroy {
     this.subscription = null;
     if (this.repushTimer) clearInterval(this.repushTimer);
     this.repushTimer = null;
+    for (const timer of this.offerExpiryTimers.values()) clearTimeout(timer);
+    this.offerExpiryTimers.clear();
+  }
+
+  /**
+   * t71u: arm one timer per live offer at its server `expiresAt`. The ledger already refuses a
+   * late select (409 RIDE_OFFER_EXPIRED); this only tells both sides promptly.
+   */
+  private scheduleOfferExpiry(
+    rideId: string,
+    offers: ReadonlyArray<{ id: string; status: string; expiresAt: string }>,
+    nowMs: number,
+  ): void {
+    if (process.env.NODE_ENV === 'test' && !this.armTimersInTest) return;
+    for (const offer of offers) {
+      if (offer.status !== 'PENDING') continue;
+      const expiresMs = Date.parse(offer.expiresAt);
+      if (!Number.isFinite(expiresMs) || expiresMs <= nowMs) continue;
+      const key = `${rideId}:${offer.id}:${offer.expiresAt}`;
+      if (this.offerExpiryTimers.has(key)) continue;
+      const timer = setTimeout(() => {
+        this.offerExpiryTimers.delete(key);
+        void this.announceOfferExpiry(rideId, offer.id, new Date());
+      }, expiresMs - nowMs + 250);
+      timer.unref?.();
+      this.offerExpiryTimers.set(key, timer);
+    }
+  }
+
+  /** Test hook: arm real expiry timers even under NODE_ENV=test. */
+  armTimersInTest = false;
+
+  /**
+   * If the offer is still PENDING but past `expiresAt`, refresh the customer's offer list
+   * (reason OFFER_EXPIRED → the card disappears) and tell that driver (`rideRequest` with
+   * reason OFFER_EXPIRED) so their app may re-offer while the ride is still NEGOTIATING.
+   */
+  async announceOfferExpiry(rideId: string, offerId: string, now: Date = new Date()): Promise<boolean> {
+    try {
+      const snapshot = await this.rides.customerOffersSnapshot(rideId);
+      if (!snapshot || snapshot.status !== 'NEGOTIATING') return false;
+      const offer = snapshot.offers.find((o) => o.id === offerId);
+      if (!offer || offer.status !== 'PENDING' || Date.parse(offer.expiresAt) > now.getTime()) return false;
+      this.fanout.emitRideOffers({
+        rideId,
+        reason: 'OFFER_EXPIRED',
+        status: snapshot.status,
+        offers: snapshot.offers,
+        revision: snapshot.updatedAt,
+        at: now.toISOString(),
+      });
+      this.fanout.emitRideRequest([offer.driverId], {
+        reason: 'OFFER_EXPIRED',
+        ride: { id: rideId, status: 'NEGOTIATING', offerId, canReoffer: true },
+        at: now.toISOString(),
+      });
+      return true;
+    } catch (error) {
+      this.logger.warn({ msg: 'realtime.ride_offer_expiry_failed', rideId, error: String(error) });
+      return false;
+    }
   }
 
   private track(rideId: string, driverIds: readonly string[], nowMs: number, repush: boolean): void {
@@ -274,6 +337,9 @@ export class RideOfferFanoutService implements OnModuleInit, OnModuleDestroy {
         revision: snapshot.updatedAt,
         at: change.at.toISOString(),
       });
+      if (snapshot.status === 'NEGOTIATING') {
+        this.scheduleOfferExpiry(change.rideId, snapshot.offers, change.at.getTime());
+      }
       await this.pushFirstOffer(change, snapshot.offers.filter((o) => o.status === 'PENDING').length);
     } catch (error) {
       this.logger.warn({ msg: 'realtime.ride_offers_fanout_failed', error: String(error) });

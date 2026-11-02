@@ -5,6 +5,25 @@
 /// afterwards. The server owns every rule (fare floor, edit caps, free-cancel
 /// window, no-show wait) — admin settings, DRAFT defaults.
 abstract interface class RideNegotiationClient {
+  /// Customer opts in to taking an exact-price accept (`POST /v1/rides/:id/auto-accept`).
+  Future<void> setAutoAccept({
+    required String accessToken,
+    required String rideId,
+    required bool enabled,
+  });
+
+  /// Driver has this request on screen (`POST /v1/rides/:id/viewing`).
+  Future<void> noteViewing({
+    required String accessToken,
+    required String rideId,
+  });
+
+  /// Driver left the request (`DELETE /v1/rides/:id/viewing`).
+  Future<void> leaveViewing({
+    required String accessToken,
+    required String rideId,
+  });
+
   /// Customer raises the fare while NEGOTIATING (`POST /v1/rides/:id/fare`).
   Future<void> raiseFare({
     required String accessToken,

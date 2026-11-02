@@ -108,6 +108,11 @@ String? derivePushPath(Map<String, Object?> data, AppRole role) {
     case 'FoodOrder':
       switch (role) {
         case AppRole.customer:
+          // Same as the server path: a gone order opens Shop, not the
+          // full-screen detail (that page has no bottom nav).
+          if (!chat && (gone || status == 'REJECTED')) {
+            return '/customer/shop';
+          }
           return '/customer/food/orders/$seg';
         case AppRole.driver:
           // A nearby READY order ("request") is not the driver's yet: open the job list.

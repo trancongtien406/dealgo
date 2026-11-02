@@ -294,10 +294,7 @@ class _AddressCard extends StatelessWidget {
           PopupMenuButton<_CardAction>(
             key: Key('address-menu-${address.id}'),
             tooltip: l10n.addrBookMore,
-            icon: const Icon(
-              DealGoIcons.more,
-              color: DealGoColors.textSecondary,
-            ),
+            icon: Icon(DealGoIcons.more, color: DealGoColors.textSecondary),
             onSelected: (action) => switch (action) {
               _CardAction.edit => onEdit(),
               _CardAction.makeDefault => onMakeDefault(),

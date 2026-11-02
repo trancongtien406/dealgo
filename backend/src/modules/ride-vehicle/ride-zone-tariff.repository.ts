@@ -42,6 +42,7 @@ export interface RideZoneTariffRepository {
   remove(regionCode: string, vehicleClassCode: string, actorUserId: string, audit: ZoneTariffAudit): Promise<boolean>;
   saveSnapshot(snapshot: RidePricingSnapshot): Promise<void>;
   findSnapshot(rideId: string): Promise<RidePricingSnapshot | null>;
+  findSnapshots(rideIds: readonly string[]): Promise<Map<string, RidePricingSnapshot>>;
 }
 
 const key = (regionCode: string, vehicleClassCode: string) => `${regionCode}:${vehicleClassCode}`;
@@ -94,6 +95,15 @@ export class MemoryRideZoneTariffRepository implements RideZoneTariffRepository 
   findSnapshot(rideId: string): Promise<RidePricingSnapshot | null> {
     const found = this.snapshots.get(rideId);
     return Promise.resolve(found ? { ...found } : null);
+  }
+
+  findSnapshots(rideIds: readonly string[]): Promise<Map<string, RidePricingSnapshot>> {
+    const found = new Map<string, RidePricingSnapshot>();
+    for (const rideId of rideIds) {
+      const snapshot = this.snapshots.get(rideId);
+      if (snapshot) found.set(rideId, { ...snapshot });
+    }
+    return Promise.resolve(found);
   }
 }
 
@@ -195,17 +205,38 @@ export class PrismaRideZoneTariffRepository implements RideZoneTariffRepository 
 
   async findSnapshot(rideId: string): Promise<RidePricingSnapshot | null> {
     const row = await this.db.ridePricingSnapshot.findUnique({ where: { rideId } });
-    if (!row) return null;
-    return {
-      rideId: row.rideId,
-      regionCode: row.regionCode,
-      tariffSource: row.tariffSource === 'ZONE' ? 'ZONE' : 'DEFAULT',
-      zoneTariffId: row.zoneTariffId,
-      tariffVersion: row.tariffVersion,
-      perKmVnd: row.perKmVnd,
-      minFareVnd: row.minFareVnd,
-      bidFloorPercent: row.bidFloorPercent,
-      bidCeilingPercent: row.bidCeilingPercent,
-    };
+    return row ? snapshotFromRow(row) : null;
   }
+
+  async findSnapshots(rideIds: readonly string[]): Promise<Map<string, RidePricingSnapshot>> {
+    const found = new Map<string, RidePricingSnapshot>();
+    if (rideIds.length === 0) return found;
+    const rows = await this.db.ridePricingSnapshot.findMany({ where: { rideId: { in: [...rideIds] } } });
+    for (const row of rows) found.set(row.rideId, snapshotFromRow(row));
+    return found;
+  }
+}
+
+function snapshotFromRow(row: {
+  rideId: string;
+  regionCode: string | null;
+  tariffSource: string;
+  zoneTariffId: string | null;
+  tariffVersion: number;
+  perKmVnd: number;
+  minFareVnd: number;
+  bidFloorPercent: number;
+  bidCeilingPercent: number;
+}): RidePricingSnapshot {
+  return {
+    rideId: row.rideId,
+    regionCode: row.regionCode,
+    tariffSource: row.tariffSource === 'ZONE' ? 'ZONE' : 'DEFAULT',
+    zoneTariffId: row.zoneTariffId,
+    tariffVersion: row.tariffVersion,
+    perKmVnd: row.perKmVnd,
+    minFareVnd: row.minFareVnd,
+    bidFloorPercent: row.bidFloorPercent,
+    bidCeilingPercent: row.bidCeilingPercent,
+  };
 }

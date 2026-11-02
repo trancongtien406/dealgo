@@ -8,6 +8,7 @@ import 'map_lat_lng.dart';
 import 'map_markers.dart';
 import 'map_port.dart';
 import 'map_style.dart';
+import 'map_zoom.dart';
 
 /// Live map over a configured raster XYZ tile source (flutter_map).
 class TileMapPort implements MapPort {
@@ -163,7 +164,8 @@ class _TileMapViewState extends State<TileMapView>
     return CameraFit.coordinates(
       coordinates: points,
       padding: stopPinSafeFitPadding(widget.fitPadding, _pinSize),
-      maxZoom: 17,
+      minZoom: kMapMinZoom,
+      maxZoom: kMapFitMaxZoom,
     );
   }
 
@@ -339,6 +341,8 @@ class _TileMapViewState extends State<TileMapView>
       options: MapOptions(
         initialCenter: _ll(widget.center),
         initialZoom: _zoom,
+        minZoom: kMapMinZoom,
+        maxZoom: kMapMaxZoom,
         initialCameraFit: _fit(),
         backgroundColor: const Color(0xFFE7EEF5),
         interactionOptions: const InteractionOptions(

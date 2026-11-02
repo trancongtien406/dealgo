@@ -153,14 +153,13 @@ class _NavigationSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
-    // The theme draws the single drag handle (bottomSheetTheme.showDragHandle).
     return SafeArea(
       top: false,
       child: Padding(
         key: const Key('driver-nav-sheet'),
         padding: const EdgeInsets.fromLTRB(
           DealGoSpacing.s16,
-          0,
+          DealGoSpacing.s20,
           DealGoSpacing.s16,
           DealGoSpacing.s12,
         ),
@@ -252,7 +251,7 @@ class _NavigationAppTile extends StatelessWidget {
                   ),
                 ),
               const SizedBox(width: DealGoSpacing.s4),
-              const Icon(
+              Icon(
                 DealGoIcons.chevronRight,
                 size: 20,
                 color: DealGoColors.textTertiary,

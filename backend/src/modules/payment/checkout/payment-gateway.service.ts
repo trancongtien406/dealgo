@@ -9,7 +9,7 @@ import {
 } from '../../../integrations/payment-gateways/providers/index.js';
 import { LedgerService } from '../../ledger/ledger.service.js';
 import { CHECKOUT_REPOSITORY, type PaymentEntityTypeName, type PaymentProviderName } from '../payment.constants.js';
-import type { CheckoutIntent, CheckoutRefund, CheckoutRepository } from './checkout.repository.js';
+import { RefundKeyConflictError, type CheckoutIntent, type CheckoutRefund, type CheckoutRepository } from './checkout.repository.js';
 import { PAYMENT_ADAPTERS, type PaymentAdapterMap } from './payment-adapters.js';
 import { PAYMENT_GATEWAY_OPTIONS, type PaymentGatewayOptions } from './payment-gateway.options.js';
 import { catalogEntry } from './payment-method.catalog.js';
@@ -59,6 +59,10 @@ export const SUPERSEDED_BY_CASH = 'SUPERSEDED_BY_CASH';
 export const LATE_CAPTURE_AFTER_CASH = 'LATE_CAPTURE_AFTER_CASH';
 
 const HELD_STATUSES: readonly string[] = ['CAPTURED', 'REFUND_PENDING'];
+/** Statuses a PSP capture may still move an intent out of (never CAPTURED/REFUND_*). */
+const CAPTURABLE_STATUSES = ['CREATED', 'PENDING_REDIRECT', 'FAILED', 'EXPIRED', 'SANDBOX_RECORDED', 'CAPTURED_STUB'] as const;
+/** Statuses a failure callback may still move an intent out of. */
+const FAILABLE_STATUSES = ['CREATED', 'PENDING_REDIRECT'] as const;
 
 const PENDING_TTL_MS = 15 * 60 * 1000;
 /** Reconciliation gives up waiting for a provider after this and marks the attempt EXPIRED. */
@@ -171,10 +175,16 @@ export class PaymentGatewayService {
     const entry = catalogEntry(code);
 
     // Never switch away from (or double-charge) a job that is already paid.
+    // Checks every attempt (not only the latest): a later failed attempt on another method must
+    // not let a new attempt overwrite (and re-charge) an intent that already holds money.
     const latest = await this.repo.latestForEntity(input.entityType, input.entityId);
-    if (latest && ['CAPTURED', 'REFUND_PENDING', 'REFUNDED'].includes(latest.status)) {
-      const paidCode = (latest.methodCode as PaymentMethodCode | null) ?? code;
-      return this.toView(input.entityType, input.entityId, paidCode, latest, now);
+    const held = (await this.repo.listIntents({ limit: 20, q: input.entityId })).find(
+      (r) => r.entityType === input.entityType && r.entityId === input.entityId && HELD_STATUSES.includes(r.status),
+    );
+    const paid = held ?? (latest && latest.status === 'REFUNDED' ? latest : null);
+    if (paid) {
+      const paidCode = (paid.methodCode as PaymentMethodCode | null) ?? code;
+      return this.toView(input.entityType, input.entityId, paidCode, paid, now);
     }
 
     await this.repo.setSelection(input.entityType, input.entityId, code);
@@ -260,7 +270,10 @@ export class PaymentGatewayService {
     if (cb.success) {
       await this.applyCapture(intent, cb.providerTransId, cb.providerPayDate);
     } else {
-      await this.repo.update(intent.id, { status: 'FAILED', failureReason: cb.failureReason?.slice(0, 255) ?? 'FAILED' });
+      await this.repo.transition(intent.id, FAILABLE_STATUSES, {
+        status: 'FAILED',
+        failureReason: cb.failureReason?.slice(0, 255) ?? 'FAILED',
+      });
     }
     await this.notifyStatus(intent.id);
     return adapter.ack('OK');
@@ -318,10 +331,25 @@ export class PaymentGatewayService {
    * Ops refund of a captured online payment. Supports several partial refunds; the running total
    * can never exceed the captured amount (atomic reservation). Each refund gets its own journal.
    */
-  async refund(input: { intentId: string; amountVnd?: number; reason: string; actorUserId: string; clientIp?: string }) {
+  async refund(input: {
+    intentId: string;
+    amountVnd?: number;
+    reason: string;
+    actorUserId: string;
+    clientIp?: string;
+    /** Same key → same refund (double submit / network retry never refunds twice). */
+    idempotencyKey?: string;
+  }) {
     const intent = await this.repo.findById(input.intentId);
     if (!intent) {
       throw paymentError(404, 'PAYMENT_INTENT_NOT_FOUND', 'Payment intent not found');
+    }
+    const key = input.idempotencyKey?.trim().slice(0, 64) || null;
+    if (key) {
+      const prior = await this.repo.findRefundByKey(key);
+      if (prior) {
+        return this.refundReplay(intent, prior);
+      }
     }
     if (!HELD_STATUSES.includes(intent.status)) {
       throw paymentError(409, 'PAYMENT_NOT_REFUNDABLE', `Intent is ${intent.status}; only a CAPTURED payment can be refunded`);
@@ -338,16 +366,32 @@ export class PaymentGatewayService {
     const now = new Date();
     const requestId = `RF${now.getTime().toString(36)}${randomUUID().replace(/-/g, '').slice(0, 10)}`.toUpperCase();
     const reason = input.reason.slice(0, 200) || 'DealGo refund';
-    const row = await this.repo.createRefund({
-      paymentIntentId: intent.id,
-      amountVnd: amount,
-      status: 'PENDING',
-      requestId,
-      providerRefundRef: null,
-      reason,
-      actorUserId: input.actorUserId,
-      afterSettlement: intent.settledAt !== null,
-    });
+    // Read after the reservation: a completion holding the intent lock has committed by now.
+    const settled = (await this.repo.findById(intent.id))?.settledAt ?? intent.settledAt;
+    let row: CheckoutRefund;
+    try {
+      row = await this.repo.createRefund({
+        paymentIntentId: intent.id,
+        amountVnd: amount,
+        status: 'PENDING',
+        requestId,
+        idempotencyKey: key,
+        providerRefundRef: null,
+        reason,
+        actorUserId: input.actorUserId,
+        afterSettlement: settled !== null,
+      });
+    } catch (error) {
+      if (error instanceof RefundKeyConflictError && key) {
+        // A concurrent submission with the same key won the insert: undo our reservation.
+        await this.repo.releaseRefund(intent.id, amount);
+        const prior = await this.repo.findRefundByKey(key);
+        if (prior) {
+          return this.refundReplay((await this.repo.findById(intent.id)) ?? intent, prior);
+        }
+      }
+      throw error;
+    }
     let result;
     try {
       result = await adapter.refund({
@@ -395,6 +439,45 @@ export class PaymentGatewayService {
     };
   }
 
+  private refundReplay(intent: CheckoutIntent, prior: CheckoutRefund) {
+    if (prior.paymentIntentId !== intent.id) {
+      throw paymentError(409, 'PAYMENT_REFUND_KEY_REUSED', 'Idempotency key was used for another payment');
+    }
+    return {
+      intentId: intent.id,
+      status: intent.status,
+      refundedVnd: intent.refundedVnd,
+      refundableVnd: this.refundableVnd(intent),
+      refund: this.refundRow(prior),
+      replayed: true as const,
+    };
+  }
+
+  /**
+   * FOOD-002: the job was cancelled after the customer paid online → refund what DealGo still
+   * holds, in full. Driven by the job's CANCELLED status outbox row (retried until it succeeds);
+   * the per-intent idempotency key makes a replayed row a no-op. Settled intents are skipped.
+   */
+  async refundOnCancel(entityType: PaymentEntityTypeName, entityId: string, actorUserId: string) {
+    const rows = await this.repo.listIntents({ limit: 20, q: entityId });
+    const results: Array<{ intentId: string; refundId: string; status: string; replayed: boolean }> = [];
+    for (const intent of rows.filter((r) => r.entityType === entityType && r.entityId === entityId)) {
+      const key = `auto-cancel:${intent.id}`;
+      const prior = await this.repo.findRefundByKey(key);
+      if (!prior && (!HELD_STATUSES.includes(intent.status) || intent.settledAt || this.refundableVnd(intent) <= 0)) {
+        continue;
+      }
+      const r = await this.refund({
+        intentId: intent.id,
+        reason: `Tự động hoàn tiền: ${entityType === 'RIDE' ? 'chuyến' : 'đơn'} đã huỷ`,
+        actorUserId,
+        idempotencyKey: key,
+      });
+      results.push({ intentId: intent.id, refundId: r.refund.id, status: r.refund.status, replayed: 'replayed' in r });
+    }
+    return results;
+  }
+
   /** Online amount DealGo holds for the job and has not yet applied to a completion. */
   async prepaidFor(entityType: PaymentEntityTypeName, entityId: string): Promise<{ intentId: string; amountVnd: number } | null> {
     const latest = await this.repo.latestForEntity(entityType, entityId);
@@ -403,6 +486,25 @@ export class PaymentGatewayService {
     }
     const held = latest.amountVnd - latest.refundedVnd;
     return held > 0 ? { intentId: latest.id, amountVnd: held } : null;
+  }
+
+  /**
+   * FOOD-003 / MONEY-003: prepaid amount re-read inside the completion transaction (intent rows
+   * locked), so a refund racing the completion either lands first (smaller prepaid, more cash) or
+   * waits and is booked as an after-settlement refund. Pair with {@link settleWithin}.
+   */
+  async prepaidWithin(tx: unknown, entityType: PaymentEntityTypeName, entityId: string): Promise<{ intentId: string; amountVnd: number } | null> {
+    const latest = await this.repo.latestForEntityWithin(tx, entityType, entityId);
+    if (!latest || !HELD_STATUSES.includes(latest.status) || latest.settledAt) {
+      return null;
+    }
+    const held = latest.amountVnd - latest.refundedVnd;
+    return held > 0 ? { intentId: latest.id, amountVnd: held } : null;
+  }
+
+  /** Marks the applied prepayment settled in the same transaction as the completion journals. */
+  async settleWithin(tx: unknown, intentId: string, at = new Date()) {
+    await this.repo.settleWithin(tx, intentId, at);
   }
 
   /**
@@ -415,7 +517,8 @@ export class PaymentGatewayService {
       if (row.id === appliedIntentId) {
         await this.repo.update(row.id, { settledAt: at });
       } else if (row.status === 'PENDING_REDIRECT' || row.status === 'CREATED') {
-        await this.repo.update(row.id, { status: 'EXPIRED', failureReason: SUPERSEDED_BY_CASH });
+        // Conditional: a capture racing this completion wins and is flagged as a late capture.
+        await this.repo.transition(row.id, FAILABLE_STATUSES, { status: 'EXPIRED', failureReason: SUPERSEDED_BY_CASH });
       }
     }
   }
@@ -487,11 +590,13 @@ export class PaymentGatewayService {
         await this.notifyStatus(intent.id);
         summary.captured += 1;
       } else if (result.state === 'FAILED') {
-        await this.repo.update(intent.id, { ...bump, status: 'FAILED', failureReason: result.message ?? 'FAILED' });
+        await this.repo.transition(intent.id, FAILABLE_STATUSES, { status: 'FAILED', failureReason: result.message ?? 'FAILED' });
+        await this.repo.update(intent.id, bump);
         await this.notifyStatus(intent.id);
         summary.failed += 1;
       } else if (now.getTime() - intent.updatedAt.getTime() > RECONCILE_GIVE_UP_MS) {
-        await this.repo.update(intent.id, { ...bump, status: 'EXPIRED', failureReason: 'RECONCILE_TIMEOUT' });
+        await this.repo.transition(intent.id, FAILABLE_STATUSES, { status: 'EXPIRED', failureReason: 'RECONCILE_TIMEOUT' });
+        await this.repo.update(intent.id, bump);
         await this.notifyStatus(intent.id);
         summary.expired += 1;
       } else {
@@ -504,14 +609,20 @@ export class PaymentGatewayService {
 
   private async applyCapture(intent: CheckoutIntent, providerTransId: string | null, providerPayDate: string | null) {
     // An attempt retired because the job finished in cash: keep the money trail, flag for refund.
-    const late = intent.status === 'EXPIRED' && intent.failureReason === SUPERSEDED_BY_CASH;
-    await this.repo.update(intent.id, {
+    // Re-read: a concurrent completion may have retired the attempt since the caller looked.
+    const current = (await this.repo.findById(intent.id)) ?? intent;
+    const late = current.status === 'EXPIRED' && current.failureReason === SUPERSEDED_BY_CASH;
+    const moved = await this.repo.transition(current.id, CAPTURABLE_STATUSES, {
       status: 'CAPTURED',
       providerTransId,
       providerPayDate,
       failureReason: late ? LATE_CAPTURE_AFTER_CASH : null,
     });
-    await this.postLedger('PSP_PAYMENT_CAPTURED', intent, intent.amountVnd);
+    if (!moved) {
+      // Already CAPTURED / refunded by a concurrent callback or reconcile: never re-journal.
+      return;
+    }
+    await this.postLedger('PSP_PAYMENT_CAPTURED', current, current.amountVnd);
     if (late) {
       this.logger.warn(`late capture after cash completion: intent ${intent.id} must be refunded`);
     }
@@ -581,7 +692,9 @@ export class PaymentGatewayService {
       return;
     }
     try {
-      await this.ledger.postEvent(event, { entityType: intent.entityType, entityId: intent.entityId, amountVnd });
+      // One capture journal per intent (not per job): a second online payment for the same job
+      // (another method) is journaled too, so PSP clearing matches what the providers hold.
+      await this.ledger.postEvent(event, { entityType: 'PAYMENT_INTENT', entityId: intent.id, amountVnd });
     } catch (error) {
       // The PSP state is already final; ledger drift is surfaced in logs for reconciliation.
       this.logger.error(`ledger ${event} failed for intent ${intent.id}: ${String(error)}`);

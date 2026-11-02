@@ -2,6 +2,7 @@ import {
   Ip,
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   HttpCode,
@@ -26,6 +27,7 @@ import {
   QuoteRideDto,
   RaiseFareDto,
   RateCustomerDto,
+  SetAutoAcceptDto,
   RidePageQueryDto,
   RideRouteQueryDto,
   SelectOfferDto,
@@ -259,6 +261,34 @@ export class RideController {
     @Param('seq', ParseIntPipe) seq: number,
   ) {
     return this.rides.departStop(actor, id, seq);
+  }
+
+  @Post(':id/auto-accept')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Customer opts in to auto-selecting the first driver who accepts the current offered fare (NEGOTIATING)',
+  })
+  setAutoAccept(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SetAutoAcceptDto,
+  ) {
+    return this.rides.setAutoAccept(actor, id, dto.enabled);
+  }
+
+  @Post(':id/viewing')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Driver heartbeat: this negotiating request is on screen' })
+  noteViewing(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.rides.noteViewing(actor, id);
+  }
+
+  @Delete(':id/viewing')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Driver left the negotiating request' })
+  leaveViewing(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.rides.leaveViewing(actor, id);
   }
 
   @Post(':id/fare')

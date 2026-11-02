@@ -80,6 +80,8 @@ abstract final class DealGoIcons {
   static const IconData map = LucideIcons.map;
   static const IconData layers = LucideIcons.layers;
   static const IconData moon = LucideIcons.moon;
+  static const IconData sun = LucideIcons.sun;
+  static const IconData languages = LucideIcons.languages;
   static const IconData earth = LucideIcons.earth;
   static const IconData medical = LucideIcons.stethoscope;
   static const IconData mic = LucideIcons.mic;
@@ -95,6 +97,7 @@ abstract final class DealGoIcons {
   static const IconData pause = LucideIcons.circlePause;
   static const IconData phone = LucideIcons.phone;
   static const IconData phoneMissed = LucideIcons.phoneMissed;
+  static const IconData phoneOutgoing = LucideIcons.phoneOutgoing;
   static const IconData pickupDot = LucideIcons.circleDot;
   static const IconData pin = LucideIcons.mapPin;
   static const IconData pinFilled = LucideIcons.mapPin;
@@ -114,6 +117,7 @@ abstract final class DealGoIcons {
   static const IconData search = LucideIcons.search;
   static const IconData send = LucideIcons.send;
   static const IconData settings = LucideIcons.settings;
+  static const IconData tune = LucideIcons.slidersHorizontal;
   static const IconData shield = LucideIcons.shieldCheck;
   static const IconData shieldPlain = LucideIcons.shield;
   static const IconData shoppingBag = LucideIcons.shoppingBag;

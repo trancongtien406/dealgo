@@ -33,7 +33,9 @@ export const SERVICE_REGIONS: readonly ServiceRegion[] = [
     label: 'Đà Nẵng',
     centerLat: 16.0544,
     centerLng: 108.2022,
-    bbox: { minLat: 15.95, maxLat: 16.22, minLng: 108.05, maxLng: 108.35 },
+    // Since the 2025 merger Đà Nẵng includes former Quảng Nam: cover Hội An
+    // (phố cổ ~15.877,108.328; An Bàng/Cửa Đại up to ~108.39) and Điện Bàn.
+    bbox: { minLat: 15.84, maxLat: 16.22, minLng: 108.05, maxLng: 108.42 },
     status: 'ACTIVE',
   },
   {

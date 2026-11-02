@@ -1,5 +1,6 @@
 import 'package:dealgo/core/realtime/fake_snapshot_realtime.dart';
 import 'package:dealgo/core/realtime/snapshot_realtime.dart';
+import 'package:dealgo/core/network/api_exception.dart';
 import 'package:dealgo/features/chat/domain/usecases/list_food_order_chat_messages.dart';
 import 'package:dealgo/features/chat/domain/usecases/list_ride_chat_messages.dart';
 import 'package:dealgo/features/chat/domain/usecases/send_food_order_chat_message.dart';
@@ -50,7 +51,7 @@ Future<void> _flush() => Future<void>.delayed(Duration.zero);
 void main() {
   final t0 = DateTime.utc(2026, 10, 26, 14, 0);
 
-  group('ChatCubit (r25)', () {
+  group('ChatCubit', () {
     test('orders by time then id, converts to local time', () async {
       final repo = FakeChatRepository(
         messages: [
@@ -266,15 +267,17 @@ void main() {
       required ChatViewer viewer,
       List<String>? calls,
       FakeDriverCards? cards,
+      FakeChatRepository? repo,
     }) async {
-      final repo = FakeChatRepository(
-        messages: [
-          chatMessage('m1', 'drv', 'Tôi đang tới', DateTime.now().toUtc()),
-        ],
-      );
+      final repository = repo ??
+          FakeChatRepository(
+            messages: [
+              chatMessage('m1', 'drv', 'Tôi đang tới', DateTime.now().toUtc()),
+            ],
+          );
       await tester.pumpWidget(
         chatProviders(
-          repo,
+          repository,
           extra: [
             RepositoryProvider<DriverCardRepository>.value(
               value: cards ?? FakeDriverCards(),
@@ -308,7 +311,7 @@ void main() {
       );
       await tester.tap(find.byKey(const Key('open')));
       await tester.pumpAndSettle();
-      return repo;
+      return repository;
     }
 
     testWidgets('customer: one handle, header, quick reply sends', (
@@ -327,9 +330,7 @@ void main() {
         viewer: ChatViewer.customer,
         cards: cards,
       );
-      expect(find.byKey(const Key('chat-handle')), findsOneWidget);
-      // Theme handle is off: exactly one grabber in the sheet.
-      expect(find.byKey(const Key('chat-handle')), findsOneWidget);
+      expect(find.byKey(const Key('chat-handle')), findsNothing);
       expect(find.text('Nguyễn Văn An'), findsOneWidget);
       expect(find.text('Tài xế · Xe máy · 43A-123.45'), findsOneWidget);
       expect(find.text('Tôi đang tới'), findsOneWidget);
@@ -367,5 +368,24 @@ void main() {
       expect(calls, ['call']);
       expect(find.byKey(const Key('chat-sheet')), findsNothing);
     });
+
+    testWidgets(
+      'closed contact window: shows localized error, no retry button, composer hidden',
+      (tester) async {
+        final repo = FakeChatRepository();
+        repo.listError = const ApiException(
+          statusCode: 403,
+          message: 'Contact window is closed for this transaction',
+          errorCode: 'CHAT_WINDOW_CLOSED',
+        );
+        await pumpSheet(tester, viewer: ChatViewer.customer, repo: repo);
+        expect(
+          find.text('Đã hết thời hạn liên hệ cho chuyến đi hoặc đơn hàng này.'),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('chat-reload')), findsNothing);
+        expect(find.byKey(const Key('chat-input')), findsNothing);
+      },
+    );
   });
 }

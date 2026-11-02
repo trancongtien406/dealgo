@@ -1,4 +1,5 @@
 import '../../domain/entities/auth_method_policy.dart';
+import '../../domain/entities/email_verification.dart';
 import '../../domain/entities/phone_challenge.dart';
 import '../../domain/entities/user_profile.dart';
 import '../../domain/entities/verified_session.dart';
@@ -146,6 +147,30 @@ class IdentityRepositoryImpl implements IdentityRepository {
       contentBase64: contentBase64,
       dataUrl: dataUrl,
       contentType: contentType,
+    );
+  }
+
+  @override
+  Future<EmailVerification> requestEmailVerification({
+    required String accessToken,
+    required String email,
+  }) async {
+    final normalized = email.trim().toLowerCase();
+    final model = await _remote.requestEmailVerification(
+      accessToken: accessToken,
+      email: normalized,
+    );
+    return model.toEntity(normalized);
+  }
+
+  @override
+  Future<void> confirmEmailVerification({
+    required String verificationId,
+    required String code,
+  }) {
+    return _remote.confirmEmailVerification(
+      verificationId: verificationId,
+      code: code,
     );
   }
 

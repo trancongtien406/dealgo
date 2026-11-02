@@ -224,7 +224,7 @@ describe('ops auth methods http', () => {
       [`/v1/auth/email/register/${id}/resend`, {}],
       ['/v1/auth/email/login', { email: 'x@dealgo.test', password: 'password123' }],
       ['/v1/auth/email/verifications', { email: 'x@dealgo.test' }],
-      [`/v1/auth/email/verifications/${id}/confirm`, { token: 't' }],
+      [`/v1/auth/email/verifications/${id}/confirm`, { code: '123456' }],
       ['/v1/auth/email/password-resets', { email: 'x@dealgo.test' }],
       [`/v1/auth/email/password-resets/${id}/resend`, {}],
       [`/v1/auth/email/password-resets/${id}/confirm`, { code: '123456', password: 'password123' }],

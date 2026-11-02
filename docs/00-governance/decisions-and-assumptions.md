@@ -287,7 +287,7 @@ Status: `DRAFT` (2026-10-26) · Thay thế phần điều phối của `DEC-PROD
 | Setting | Mặc định | Khoảng | Nguồn / lý do |
 |---|---|---|---|
 | `RIDE_REQUEST_WINDOW_SECONDS` | 300 | 60–1800 | Thời gian mở yêu cầu chuyến. DealGo chọn; inDrive cho khách tự nâng giá/chờ ([inDrive fares](https://indrive.com/en-in/help/passengers/how-fares-are-calculated)). |
-| `RIDE_OFFER_TTL_SECONDS` | 60 | — | Hiệu lực **mỗi đề nghị** của tài xế, không vượt thời gian mở yêu cầu. |
+| `RIDE_OFFER_TTL_SECONDS` | 20 (t71u, trước là 60) | — | Hiệu lực **mỗi đề nghị** của tài xế, không vượt thời gian mở yêu cầu. Khách thấy đếm ngược, nút Chấp nhận mờ dần; hết hạn → server trả 409 `RIDE_OFFER_EXPIRED`, realtime `OFFER_EXPIRED` tới khách + tài xế, tài xế được gửi lại. |
 | `RIDE_FARE_FLOOR_PERCENT_OF_REFERENCE` | 80 | 0–100 | Sàn tương đối so với giá tham khảo của hạng xe. inDrive chặn giá quá thấp so với giá gợi ý (cùng nguồn); 80 % DealGo chọn. |
 | `RIDE_COUNTER_MAX_PERCENT_OF_OFFER` | 150 | 100–300 | Trần giá tài xế trả lại so với giá khách đưa. DealGo chọn. |
 | `RIDE_MAX_OFFER_EDITS_PER_DRIVER` | 2 | 0–10 | Số lần tài xế sửa giá; tài xế được rút đề nghị (`WITHDRAWN`). DealGo chọn. |
@@ -520,6 +520,13 @@ Status: `DRAFT` (t58u, 2026-10-30). Yêu cầu chủ dự án (t58u): "thêm tí
 | Thông tin đơn | `DRAFT` | Người gửi/nhận (tên, SĐT VN), hạng, cân nặng, ghi chú, ảnh hàng (tuỳ chọn), người trả (`SENDER`/`RECIPIENT`; người nhận trả → chỉ tiền mặt). SĐT bị ẩn với tài xế khi còn đang trả giá. |
 | Trạng thái | `AGENT_PROPOSED` | Ride `ACCEPTED → IN_TRIP → COMPLETED`; parcel `PENDING` (lấy hàng ghi `pickedUpAt`) `→ DELIVERED`, hoặc `PENDING → RETURNING` (giao thất bại, có lý do) `→ RETURNED` (ảnh trả lại, rồi hoàn tất chuyến). |
 | Bằng chứng | `AGENT_PROPOSED` | Ảnh lúc lấy hàng bắt buộc trước `startTrip`, ảnh giao bắt buộc trước `complete` (409 `PARCEL_PROOF_REQUIRED`). Mã người nhận 4 số: setting `PARCEL_RECIPIENT_CODE_REQUIRED` (mặc định `false`); sai tối đa 5 lần → `PARCEL_CODE_LOCKED`. |
+
+#### DEC-RIDE-CROSS-REGION — Chuyến giữa hai khu vực dịch vụ (t71u)
+
+| Hạng mục | Trạng thái | Nội dung |
+| --- | --- | --- |
+| Chặn liên vùng | `AGENT_PROPOSED` | Báo giá/đặt chuyến (ride + parcel dùng chung) mà điểm đón và các điểm đến thuộc **khác** `service_regions` ACTIVE → 422 `RIDE_CROSS_REGION_NOT_SUPPORTED`; điểm ngoài mọi vùng ACTIVE → `RIDE_OUTSIDE_SERVICE_ZONE`. App hiển thị thông báo tiếng Việt ngay ở bước báo giá. Lý do: trước t71u HN→ĐN báo giá 753 km xe máy, kẹp trần 1.000.000đ, không có tài xế phía đích — sản phẩm vô nghĩa. |
+| Sản phẩm liên tỉnh | `OPEN` | Tham khảo: Grab "GrabCar Chuyến Xa" (thử nghiệm 02/7/2026, đón ở HN/HCM, tối thiểu 50/100 km, giá riêng); Be "be Đi Tỉnh" (1/2 chiều từ thành phố có dịch vụ ra tỉnh lân cận); Xanh SM "Xanh Liên Tỉnh" (tuyến cố định, đặt ghế/bao xe, lịch giờ); inDrive "Liên tỉnh" (trả giá, đặt giờ). Phương án: (A) giữ chặn; (B) loại dịch vụ "Đi tỉnh" ô tô, đón trong vùng ACTIVE, bảng giá/km riêng + tối thiểu km, cho phép đích ngoài vùng; (C) trả giá kiểu inDrive có hẹn giờ. Cần owner chọn. |
 | API | `DRAFT` | `v1/parcels` (size-classes, quote, create, :id, pickup, deliver, fail, returned, photos/:kind) và ops `v1/ops/parcels` (quyền `rides.read`). Migration `20261220090000_ride_parcels` — đã áp dụng DEV DB (chủ dự án chạy, 2026-10-30); chưa áp prod. |
 | Thanh toán | `DRAFT` (t59u) | Như checkout: dùng lại các phương thức thanh toán hiện có; Admin bật/tắt từng phương thức cho dịch vụ `PARCEL` (cờ `services.PARCEL`). Người trả `SENDER` hoặc `RECIPIENT`; `RECIPIENT` → chỉ tiền mặt. |
 | Phí (Admin sửa, có lý do + nhật ký) | `DRAFT` (t59u) | `PARCEL_SERVICE_FEE_VND` (mặc định 0, 0–200.000) cộng vào giá tham chiếu cùng phụ phí S/M/L/XL (`PARCEL_SIZE_CLASSES`) **trước** khoảng trả giá; máy chủ tính trong quote và snapshot vào `ride_parcels.serviceFeeVnd`. Phí dịch vụ đi vào giá chuyến nên chịu hoa hồng như cước. `PARCEL_RETURN_FEE_VND` (mặc định 10.000, 0–500.000) snapshot vào `returnFeeVnd`, **chỉ** tính khi `FAILED/RETURNING → RETURNED`: ghi `customer_fee_charges` loại `PARCEL_RETURN` cùng giao dịch hoàn tất chuyến (trả cho tài xế, thu ở chuyến tiền mặt kế tiếp của người gửi). Giao thành công không tính. Migration `20261221090000_parcel_fees` — đã áp dụng DEV DB (2026-10-30); chưa áp prod. |
@@ -1011,3 +1018,32 @@ Phân cấp này **tương thích** `BLOCKER-L0..L2` trong `scope-release-plan.m
 ### 20.3. Tài liệu tiếp theo trong bộ 69 docs
 
 **`docs/01-product/product-requirements.md`** — PRD chi tiết: mục tiêu, persona, phạm vi, luồng Ride/Food, functional requirements, acceptance criteria và các quyết định `OPEN-*` vẫn đang chặn behavior production.
+
+### DEC-RIDE-INTERCITY (t73u, 2026-10-31, AGENT_PROPOSED; extends DEC-RIDE-CROSS-REGION)
+- Owner asked for "xe liên tỉnh". Model: Grab Chuyến Xa / Be / inDrive intercity.
+- Pickup must be inside a served region. When `RIDE_INTERCITY_ENABLED=true`, a drop-off outside the region or in another region is a ride flagged `intercity` (not 422 CROSS_REGION).
+- Classes: `RIDE_INTERCITY_CLASSES` (JSON array; empty = every enabled class, motorbike included — owner request 2026-11-01). `RIDE_INTERCITY_MAX_KM` (0 = no limit). `RIDE_INTERCITY_PRICING` (JSON `{perKmVnd,minFareVnd,maxFareVnd}` overrides; empty = class/zone rates, with the city max cap lifted). The bid band % still applies.
+- No stops (RIDE_INTERCITY_STOPS_NOT_SUPPORTED) and no parcel intercity (CROSS_REGION). Dispatch stays around the pickup.
+- Prod default OFF (migration 20270101090000_intercity_offer_ttl); DEV ON. The same migration sets RIDE_OFFER_TTL_SECONDS=20 (admin range 10–120).
+
+### DEC-PROD-089 (t82u, 2026-10-31, AGENT_PROPOSED) — Bắt buộc cập nhật ứng dụng
+- Admin (Settings → Phiên bản ứng dụng) sets per platform (ios/android): `minBuild`, `latestBuild`, `latestVersion`, `storeUrl`, `message` (setting `APP_VERSION_POLICY`; the seed inserts an empty default, so nothing is enforced until admin sets it). Each change needs an ops reason (audit).
+- Public `GET /v1/app/version-policy?platform=&build=` → verdict `NONE|OPTIONAL|REQUIRED`. App checks on start + resume: build < min → blocking screen "Cập nhật bắt buộc" (store button + retry); build < latest → a dismissible card.
+- The app sends `X-App-Platform`/`X-App-Build`; when the server guard is enabled, older builds get 426 `APP_UPDATE_REQUIRED` and Dio shows the blocking screen. Requests without headers (web, admin, old builds that predate this) are never blocked by the guard → the old builds already in the field can only be covered by the guard once they send headers; the version check fails open offline.
+
+### DEC-PROD-090 (t82u, 2026-10-31, AGENT_PROPOSED) — Phiên bản điều khoản & đồng ý
+- Admin publishes a new version of an **existing** legal doc (terms/privacy/...) with a changelog + effective date; text comes from the existing docs — the agent wrote no legal text.
+- `GET /v1/legal/consents/pending` lists versions the signed-in user has not accepted (by audience); `POST .../:id/accept` records user, version, time, IP, user agent. The app shows a blocking screen with "Tôi đồng ý" until all are accepted.
+- Notification email: admin clicks "Xem trước người nhận" (count), then "Gửi email" with that count confirmed; sent via the outbox in batches with pacing, once per version. Prod sending needs owner/Legal approval of the text + the mail provider.
+
+### DEC-PROD-091 (2026-11-01, OWNER_REQUESTED) — Thông tin hai bên trên chuyến đang chạy
+- Customer and assigned driver see each other's **full name** (no ellipsis), **avatar** and **phone number** with a `tel:` dial button, alongside the existing in-app chat/voice call. Supersedes the earlier "no phone, calls only via masked voice/chat" rule for the assigned pair.
+- Phone is returned only while the job runs: ride `ASSIGNED | DRIVER_EN_ROUTE | DRIVER_ARRIVED | IN_TRIP`, food `ASSIGNED | PICKED_UP` (`GET /v1/rides/:id/driver|customer`, `/v1/food/orders/:id/courier|customer`). Never on offer cards during bidding, on the public share link, or after the job ends.
+- Trip info shows the driver's declared vehicle (make + model + plate from approved KYC, e.g. "Honda Vision · 43B1-678.90"); the generic class ("Xe máy"/"Ô tô") remains only on booking/selection screens, on jobs a driver is deciding on, and as a fallback when make/model were not declared.
+- Driver avatar (owner choice): `POST /v1/me/partner-applications` for `DRIVER` returns 400 `PARTNER_AVATAR_REQUIRED` when the profile has no avatar; the KYC review step shows the photo and links to "Chỉnh sửa hồ sơ". Already-approved drivers are not blocked (incl. car-document top-ups); dispatch does not check the avatar.
+
+### DEC-PROD-092 (2026-11-01, OWNER_REQUESTED) — Đơn gần nhất khi mất mạng (khách hàng)
+- The customer app keeps **one** snapshot of the latest ride / food order it tracked (status, places, agreed price / COD total, pickup or delivery code, driver name, avatar URL, vehicle, phone) in the OS keystore (`flutter_secure_storage`), owned by the signed-in user. It is display-only: no action (cancel, raise fare, chat, in-app call) is taken from it, and the server copy replaces it as soon as the network returns.
+- Without network the tracking screens show it with "Cập nhật lúc HH:mm · đang mất kết nối", and the driver phone dials via `tel:` (cellular call, no data needed).
+- Retention (owner choice): phone and code are removed the moment the server reports a terminal status (matches DEC-PROD-091); the rest stays 30 minutes, then is deleted. Any snapshot is dropped 6 hours after the last server copy, on sign-out, and is never shown to another account. A finished job never replaces a running one.
+- Relaunch offline: with stored tokens and a network error (status 0) the app reopens signed in on the last `/v1/me` profile (also in the keystore; cleared on sign-out / 401) and opens the saved trip; a 401 still signs out. Driver-side offline snapshot and on-disk avatar caching are not in scope yet.

@@ -33,6 +33,7 @@ describe('PartnerService', () => {
       phone: '+84988776655',
       displayName: 'Tran Tai Xe',
     });
+    await identity.updateUserProfile(user.id, { avatarUrl: 'https://cdn.example/driver.png' });
 
     const service = new PartnerService(partners, identity, store);
     return { service, partners, identity, user, storage };
@@ -197,6 +198,7 @@ describe('PartnerService', () => {
       phone: '+84988776656',
       displayName: 'Car Tai Xe',
     });
+    await identity.updateUserProfile(user.id, { avatarUrl: 'https://cdn.example/car.png' });
     const config = {
       get(key: string) {
         if (key === 'PARTNER_CAR_KYC_EXTRA_DOCS') return true;
@@ -234,6 +236,7 @@ describe('PartnerService', () => {
       phone: '+84988776657',
       displayName: 'Bike Tai Xe',
     });
+    await identity.updateUserProfile(user.id, { avatarUrl: 'https://cdn.example/bike.png' });
     const config = {
       get(key: string) {
         if (key === 'PARTNER_CAR_KYC_EXTRA_DOCS') return true;

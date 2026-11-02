@@ -94,7 +94,6 @@ class _ParcelTripBody extends StatelessWidget {
     final cubit = context.read<ParcelTripCubit>();
     final reason = await showModalBottomSheet<ParcelFailReason>(
       context: context,
-      showDragHandle: true,
       builder: (sheet) {
         final l10n = AppLocalizations.of(sheet);
         return SafeArea(

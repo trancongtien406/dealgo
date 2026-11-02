@@ -10,6 +10,7 @@ import request from 'supertest';
 import { HttpExceptionFilter } from './http-exception.filter.js';
 import {
   AVATAR_UPLOAD_PATH,
+  PARCEL_UPLOAD_PATH,
   PARTNER_APPLICATION_PATH,
   registerRouteBodyParsers,
 } from './route-body-parsers.js';
@@ -33,6 +34,11 @@ class EchoController {
 
   @Post('v1/public/support/tickets')
   publicTicket(@Body() body: { data?: string }) {
+    return { length: body.data?.length ?? 0 };
+  }
+
+  @Post('v1/parcels/:id/pickup')
+  parcelPickup(@Body() body: { data?: string }) {
     return { length: body.data?.length ?? 0 };
   }
 
@@ -69,6 +75,15 @@ describe('registerRouteBodyParsers', () => {
       .send({ data })
       .expect(201);
     expect(response.body).toEqual({ length: 2_000_000 });
+  });
+
+  it('accepts a camera-sized parcel proof photo (regression: 413 on pickup photo)', async () => {
+    const data = 'A'.repeat(4_000_000);
+    const response = await request(app.getHttpServer())
+      .post(`${PARCEL_UPLOAD_PATH}/ride-1/pickup`)
+      .send({ data })
+      .expect(201);
+    expect(response.body).toEqual({ length: 4_000_000 });
   });
 
   it('accepts multi-file document bodies on upload routes only', async () => {

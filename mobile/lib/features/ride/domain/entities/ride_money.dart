@@ -11,6 +11,12 @@ String formatRideVnd(int amount) {
   return '$sign${groups.reversed.join('.')}đ';
 }
 
+/// Grouped amount without the currency sign, e.g. 85000 → "85.000".
+String formatRideAmount(int amount) {
+  final text = formatRideVnd(amount);
+  return text.substring(0, text.length - 1);
+}
+
 String formatRideVndDelta(int amount) {
   if (amount > 0) {
     return '+${formatRideVnd(amount)}';

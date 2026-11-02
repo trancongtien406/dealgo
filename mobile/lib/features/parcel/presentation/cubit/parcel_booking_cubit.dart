@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/network/api_exception.dart';
 import '../../domain/parcel_client.dart';
+import '../../../ride/domain/entities/ride_models.dart';
 import '../../domain/parcel_models.dart';
 
 enum ParcelBookingStatus { idle, loading, ready, quoting, submitting, failed }
@@ -124,6 +127,44 @@ class ParcelBookingCubit extends Cubit<ParcelBookingState> {
     }
   }
 
+  RidePlaces? _places;
+  double? _weightKg;
+
+  /// One-sheet flow: A/B known → load sizes and price the default size at
+  /// once (server quote; contacts are not part of the quote body).
+  Future<void> start(RidePlaces places) async {
+    _places = places;
+    if (state.sizes.isEmpty) await load();
+    await autoQuote();
+  }
+
+  /// Re-prices with the bound A/B, size and optional weight.
+  Future<void> autoQuote() async {
+    final places = _places;
+    final size = state.sizeCode;
+    if (places == null || size == null || isClosed) return;
+    await quote(
+      ParcelDraft(
+        places: places,
+        sizeClass: size,
+        weightKg: _weightKg,
+        sender: const ParcelContact(name: '', phone: ''),
+        recipient: const ParcelContact(name: '', phone: ''),
+      ),
+    );
+    // Size tapped while the previous size was being priced: price the new one.
+    if (!isClosed && !state.busy && state.sizeCode != size) {
+      await autoQuote();
+    }
+  }
+
+  /// Optional weight changed (null = cleared): price again when bound.
+  void setWeight(double? kg) {
+    if (kg == _weightKg) return;
+    _weightKg = kg;
+    if (_places != null) unawaited(autoQuote());
+  }
+
   void selectSize(String code) {
     if (code == state.sizeCode) return;
     emit(
@@ -133,6 +174,7 @@ class ParcelBookingCubit extends Cubit<ParcelBookingState> {
         status: ParcelBookingStatus.ready,
       ),
     );
+    if (_places != null) unawaited(autoQuote());
   }
 
   /// Package details changed after a quote: price again before booking.

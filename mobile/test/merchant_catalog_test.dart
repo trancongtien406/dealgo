@@ -156,6 +156,42 @@ void main() {
       await cubit.close();
     });
 
+    test('putting an unapproved item on sale explains the review', () async {
+      final orders = FakeMerchantOrdersClient(
+        onGetCatalog: () => const FoodStoreDetail(
+          id: 'store-owned',
+          name: 'My Store',
+          items: [
+            FoodMenuItem(
+              id: 'item-1',
+              name: 'Bún',
+              priceVnd: 60000,
+              available: false,
+            ),
+          ],
+        ),
+        availabilityError: const ApiException(
+          statusCode: 409,
+          message: 'Item is not approved',
+          errorCode: 'FOOD_ITEM_NOT_APPROVED',
+        ),
+      );
+      final cubit = _catalogCubit(orders);
+      await cubit.load('access-token');
+      await cubit.setAvailability(
+        accessToken: 'access-token',
+        itemId: 'item-1',
+        available: true,
+      );
+      final state = cubit.state as MerchantCatalogReady;
+      expect(state.store.items.single.available, isFalse);
+      expect(
+        state.actionError!.resolve(lookupAppLocalizations(const Locale('vi'))),
+        'Món này đang chờ duyệt nên chưa thể mở bán.',
+      );
+      await cubit.close();
+    });
+
     test('availability failure keeps ready and sets actionError', () async {
       final orders = FakeMerchantOrdersClient(
         onGetCatalog: () => const FoodStoreDetail(

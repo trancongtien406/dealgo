@@ -3,7 +3,7 @@ import type {
   NestOpsDriver,
   NestOpsDriverPage,
 } from "@/features/drivers/nest-types";
-import type { DriverListItem } from "@/features/drivers/types";
+import type { DriverActivitiesPage, DriverListItem } from "@/features/drivers/types";
 import { apiFetch } from "@/lib/api/client";
 import type { PaginatedList } from "@/lib/api/pagination";
 import { apiPaths } from "@/lib/api/paths";
@@ -40,6 +40,33 @@ export async function fetchDriverByCode(
     }
     throw error;
   }
+}
+
+export type FetchDriverActivitiesParams = {
+  code: string;
+  tab?: string;
+  page?: number;
+  limit?: number;
+};
+
+export async function fetchDriverActivities(
+  params: FetchDriverActivitiesParams,
+): Promise<DriverActivitiesPage> {
+  const page = Math.max(1, params.page ?? 1);
+  const limit = Math.max(1, Math.min(50, params.limit ?? 10));
+  const search = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  if (params.tab) {
+    search.set("tab", params.tab);
+  }
+
+  const envelope = await apiFetch<{
+    success: boolean;
+    data: DriverActivitiesPage;
+  }>(`${apiPaths.opsDriverActivities(params.code)}?${search.toString()}`);
+  return envelope.data;
 }
 
 async function fetchDriversFromBff(

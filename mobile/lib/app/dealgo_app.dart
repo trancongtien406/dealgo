@@ -1,4 +1,9 @@
 import 'dart:developer' as developer;
+
+import '../core/appearance/app_appearance.dart';
+import '../core/design_system/components/dealgo_nav_insets.dart';
+import '../core/app_gate/app_gate_host.dart';
+
 import 'dart:async';
 
 import '../features/ride/domain/stops/ride_stops_client.dart';
@@ -51,6 +56,7 @@ import '../features/identity/data/datasources/identity_remote_datasource.dart';
 import '../features/inbox/data/datasources/inbox_remote_datasource.dart';
 import '../features/identity/domain/auth_redirect.dart';
 import '../features/identity/domain/entities/auth_state.dart';
+import '../features/ride/data/datasources/customer_active_trip_client.dart';
 import '../features/identity/domain/passkey_platform.dart';
 import '../features/ride/data/datasources/ride_remote_datasource.dart';
 import '../l10n/app_localizations.dart';
@@ -152,7 +158,7 @@ class DealGoApp extends StatefulWidget {
   State<DealGoApp> createState() => _DealGoAppState();
 }
 
-class _DealGoAppState extends State<DealGoApp> {
+class _DealGoAppState extends State<DealGoApp> with WidgetsBindingObserver {
   late final DealGoDependencies _deps;
   late final PostAuthGate _postAuth;
   late final AuthRefreshListenable _authRefresh;
@@ -160,6 +166,7 @@ class _DealGoAppState extends State<DealGoApp> {
   late final GoRouter _router;
   late final DeepLinkRouterHook _deepLinks;
   StreamSubscription<AuthState>? _authSub;
+  StreamSubscription<bool>? _connectivitySub;
   StreamSubscription<RideUnassignedHint>? _unassignedSub;
 
   /// Ride ids the socket already announced as unassigned (push dedupe).
@@ -167,11 +174,16 @@ class _DealGoAppState extends State<DealGoApp> {
   late final DriverJobResumer _driverResume;
   late final CustomerTripResumer _customerResume;
   late final AppLifecycleListener _lifecycle;
+  late final AppAppearance _appearance;
   var _ownsPostAuth = false;
 
   @override
   void initState() {
     super.initState();
+    _appearance = AppAppearance.fromWarmup();
+    _appearance.addListener(_onAppearance);
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncChrome());
     _deps = DealGoDependencies.create(
       identityClient: widget.identityClient,
       authMethodsCache: widget.authMethodsCache,
@@ -216,6 +228,7 @@ class _DealGoAppState extends State<DealGoApp> {
       // Memory copy is dropped at once; the disk copy is removed in the
       // background so a slow platform store never delays sign-out.
       unawaited(PlaceHistoryCache.clear());
+      unawaited(_deps.activeJobs.clear());
       await _deps.voiceCallCubit.signOut();
       await _deps.push.unregister(accessToken: token);
     };
@@ -273,6 +286,7 @@ class _DealGoAppState extends State<DealGoApp> {
       navigate: (route) => _router.go(route),
       currentLocation: () => _router.state.uri.path,
       userNavigationClaimed: () => _deps.notificationRouter.claimsNavigation,
+      cachedRoute: _cachedTripRoute,
     );
     _lifecycle = AppLifecycleListener(
       onResume: () {
@@ -281,11 +295,23 @@ class _DealGoAppState extends State<DealGoApp> {
           realtime.resumeIfDisconnected();
         }
         unawaited(_driverResume.recheck());
+        // t82u: re-check min build + pending terms on every resume.
+        unawaited(_deps.appGateCubit.onResume());
       },
     );
     _postAuth.addListener(_maybeResumeDriverJob);
+    unawaited(_deps.appGateCubit.checkVersion());
+    unawaited(
+      _deps.appGateCubit.setSignedIn(_deps.authCubit.state is AuthSignedIn),
+    );
+    _bindActiveJobOwner(_deps.authCubit.state);
+    _connectivitySub = _deps.connectivity.onStatusChanged.listen((online) {
+      if (online) unawaited(_deps.authCubit.refreshProfile());
+    });
     _authSub = _deps.authCubit.stream.listen((state) {
+      _bindActiveJobOwner(state);
       _maybeResumeDriverJob();
+      unawaited(_deps.appGateCubit.setSignedIn(state is AuthSignedIn));
       if (state is AuthSignedIn) {
         unawaited(_deps.voiceCallCubit.refreshConfig());
         _maybePromptRuntimePermissions();
@@ -332,6 +358,20 @@ class _DealGoAppState extends State<DealGoApp> {
   }
 
   bool _promptingPermissions = false;
+
+  void _bindActiveJobOwner(AuthState state) {
+    _deps.activeJobs.bindUser(state is AuthSignedIn ? state.profile.id : null);
+  }
+
+  Future<String?> _cachedTripRoute() async {
+    final snapshot = await _deps.activeJobs.lookup();
+    if (snapshot == null || snapshot.ended) return null;
+    return CustomerActiveTrip(
+      kind: snapshot.kind.wire,
+      id: snapshot.id,
+      status: snapshot.status,
+    ).route;
+  }
 
   /// Relaunch: reopen the driver's in-progress job (and go back on duty) or the
   /// customer's live ride / open food order.
@@ -562,8 +602,27 @@ class _DealGoAppState extends State<DealGoApp> {
     });
   }
 
+  void _onAppearance() {
+    if (mounted) setState(_syncChrome);
+  }
+
+  @override
+  void didChangePlatformBrightness() {
+    if (_appearance.themeChoice == AppThemeChoice.system && mounted) {
+      setState(_syncChrome);
+    }
+  }
+
+  void _syncChrome() {
+    final platform =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    applySystemNavigationStyle(_appearance.brightness(platform));
+  }
+
   @override
   void dispose() {
+    _appearance.removeListener(_onAppearance);
+    WidgetsBinding.instance.removeObserver(this);
     _refresh.removeListener(_flushPendingPushTap);
     _refresh.removeListener(_maybeReleaseLaunch);
     _router.routerDelegate.removeListener(_maybeReleaseLaunch);
@@ -574,6 +633,7 @@ class _DealGoAppState extends State<DealGoApp> {
     _customerResume.reset();
     _lifecycle.dispose();
     unawaited(_authSub?.cancel() ?? Future<void>.value());
+    unawaited(_connectivitySub?.cancel() ?? Future<void>.value());
     unawaited(_unassignedSub?.cancel() ?? Future<void>.value());
     _deepLinks.router = null;
     _router.dispose();
@@ -587,31 +647,43 @@ class _DealGoAppState extends State<DealGoApp> {
 
   @override
   Widget build(BuildContext context) {
+    final platform =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    final brightness = _appearance.brightness(platform);
+    _appearance.applyPalette(platform);
     return _deps.provide(
-      child: ChangeNotifierProvider<PostAuthGate>.value(
-        value: _postAuth,
-        child: MaterialApp.router(
-          title: 'DealGo',
-          debugShowCheckedModeBanner: false,
-          theme: DealGoTheme.light,
-          locale: const Locale('vi'),
-          supportedLocales: AppLocalizations.supportedLocales,
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          routerConfig: _router,
-          scaffoldMessengerKey: _messengerKey,
-          scrollBehavior: const DealGoScrollBehavior(),
-          // App-wide default: dark status bar icons on our light canvas.
-          // Screens with dark/brand headers override with their own
-          // AnnotatedRegion (e.g. splash), which wins over this one.
-          builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
-            value: DealGoTheme.lightCanvasOverlay,
-            child: KeyboardDismissOnTapOutside(
-              child: VoiceCallHost(child: child ?? const SizedBox.shrink()),
+      child: ChangeNotifierProvider<AppAppearance>.value(
+        value: _appearance,
+        child: ChangeNotifierProvider<PostAuthGate>.value(
+          value: _postAuth,
+          child: MaterialApp.router(
+            title: 'DealGo',
+            debugShowCheckedModeBanner: false,
+            theme: DealGoTheme.light,
+            darkTheme: DealGoTheme.dark,
+            themeMode: _appearance.themeMode,
+            locale: _appearance.locale,
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            routerConfig: _router,
+            scaffoldMessengerKey: _messengerKey,
+            scrollBehavior: const DealGoScrollBehavior(),
+            // Status-bar icons follow the resolved appearance. Screens with a
+            // brand-colored header override this with their own AnnotatedRegion.
+            builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+              value: brightness == Brightness.dark
+                  ? DealGoTheme.darkHeaderOverlay
+                  : DealGoTheme.lightCanvasOverlay,
+              child: KeyboardDismissOnTapOutside(
+                child: AppGateHost(
+                  child: VoiceCallHost(child: child ?? const SizedBox.shrink()),
+                ),
+              ),
             ),
           ),
         ),

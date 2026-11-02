@@ -11,6 +11,7 @@ import {
   type LocationRejectReason,
 } from './driver-location-policy.js';
 import { DriverLocationEvents } from './driver-location-events.js';
+import { haversineKm } from '../../shared/geo/haversine.js';
 import { DRIVER_PRESENCE_REPOSITORY, FOOD_ELIGIBILITY, IDENTITY_REPOSITORY } from './identity.constants.js';
 import {
   DRIVER_LOCATION_FRESH_MS,
@@ -22,6 +23,9 @@ import {
   type UpsertPresenceInput,
 } from './driver-presence.repository.js';
 import type { IdentityRepository } from './identity.repository.js';
+
+/** Offer/claim distance tolerance multiplier on DRIVER_SEARCH_RADIUS_KM. */
+export const DRIVER_REACH_TOLERANCE = 1.5;
 
 @Injectable()
 export class DriverPresenceService {
@@ -197,6 +201,31 @@ export class DriverPresenceService {
       );
     }
     return null;
+  }
+
+  /**
+   * RIDE-001 / FOOD-005: taking a job (offer / claim) must happen within reach of its pickup.
+   * Tolerance: DRIVER_REACH_TOLERANCE × radius + 1 km for GPS drift and movement since the list
+   * loaded. No usable fix → not checked here (dispatch eligibility already gates presence).
+   */
+  async assertWithinReach(
+    userId: string,
+    point: { lat: number; lng: number },
+    radiusKm: number,
+    now: Date,
+  ): Promise<void> {
+    if (!(radiusKm > 0)) return;
+    const fix =
+      (await this.freshLocation(userId, now)) ??
+      (await this.recentLocation(userId, now, DRIVER_PUSH_LOCATION_MAX_AGE_MS));
+    if (!fix) return;
+    const limitKm = radiusKm * DRIVER_REACH_TOLERANCE + 1;
+    if (haversineKm(fix, point) > limitKm) {
+      throw new HttpException(
+        { message: 'You are too far from this pickup to take it', errorCode: 'DRIVER_TOO_FAR' },
+        409,
+      );
+    }
   }
 
   /** Online drivers near a point for a new / raised / returned request. */

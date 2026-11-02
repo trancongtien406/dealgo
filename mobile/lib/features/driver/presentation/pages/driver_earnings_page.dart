@@ -9,7 +9,6 @@ import '../../../../core/design_system/components/dealgo_refresh.dart';
 import '../../../../core/design_system/components/dealgo_segmented_control.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
-import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../driver_history/domain/driver_history.dart';
@@ -17,7 +16,9 @@ import '../../../driver_history/presentation/driver_history_cubit.dart';
 import '../../../food/domain/entities/food_money.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
+import '../../../onboarding/presentation/cubit/driver_kyc_cubit.dart';
 import '../utils/driver_routes.dart';
+import '../utils/driver_service_icons.dart';
 import '../widgets/driver_widgets.dart';
 import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 
@@ -305,7 +306,7 @@ class _Hero extends StatelessWidget {
                     ),
                     child: Text(
                       l10n.drvHistJobs(jobs),
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: DealGoColors.card,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -468,9 +469,18 @@ class _HistoryRow extends StatelessWidget {
             child: SizedBox(
               width: 44,
               height: 44,
-              child: Icon(
-                isRide ? DealGoIcons.motorbike : DealGoIcons.shoppingBag,
-                color: DealGoColors.primary,
+              child: Center(
+                child: isRide
+                    ? DriverVehicleVisual(
+                        vehicleClassCode: context
+                            .select<DriverKycCubit, String?>(
+                              (cubit) => cubit.state.vehicleClassCode,
+                            ),
+                      )
+                    : const Icon(
+                        DriverServiceIcons.food,
+                        color: DealGoColors.primary,
+                      ),
               ),
             ),
           ),

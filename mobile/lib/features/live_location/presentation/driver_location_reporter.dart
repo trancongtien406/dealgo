@@ -51,6 +51,9 @@ class DriverLocationReporter {
 
   bool get running => _running;
 
+  /// t82u: last fix reported this session (client km fallback on job cards).
+  DriverLocationFix? get lastFix => _lastSent;
+
   /// Cadence currently in force (server reply or initial).
   DriverLocationPolicy get policy => _policy;
 

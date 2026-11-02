@@ -164,8 +164,8 @@ export default function Footer({ siteConfig = {} }: { siteConfig?: PublicSiteCon
                   </a>
                 </li>
                 <li>
-                  <a href="/partner-policy" className="hover:text-[#6D28D9] transition-colors whitespace-nowrap">
-                    Quy định đối tác
+                  <a href="/regulations" className="hover:text-[#6D28D9] transition-colors whitespace-nowrap">
+                    Quy chế sử dụng
                   </a>
                 </li>
               </ul>

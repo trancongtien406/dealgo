@@ -174,7 +174,7 @@ class _FoodDiscoveryViewState extends State<_FoodDiscoveryView> {
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(DealGoRadius.button),
-                      borderSide: const BorderSide(color: DealGoColors.border),
+                      borderSide: BorderSide(color: DealGoColors.border),
                     ),
                   ),
                   child: Text(
@@ -351,7 +351,7 @@ class _LocationChip extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return Material(
       color: DealGoColors.card,
-      shape: const StadiumBorder(side: BorderSide(color: DealGoColors.border)),
+      shape: StadiumBorder(side: BorderSide(color: DealGoColors.border)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _pick(context),
@@ -379,7 +379,7 @@ class _LocationChip extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const Icon(
+                Icon(
                   DealGoIcons.expandMore,
                   size: 16,
                   color: DealGoColors.textSecondary,
@@ -726,7 +726,7 @@ class _WideStoreCard extends StatelessWidget {
         color: DealGoColors.card,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(DealGoRadius.button),
-          side: const BorderSide(color: DealGoColors.border),
+          side: BorderSide(color: DealGoColors.border),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -788,7 +788,7 @@ class _StoreCover extends StatelessWidget {
       width: double.infinity,
       height: double.infinity,
       errorBuilder: (context, error, stack) =>
-          const ColoredBox(color: DealGoColors.amberSurface),
+          ColoredBox(color: DealGoColors.amberSurface),
     );
     if (resolved == null || resolved.isEmpty) {
       return placeholder;

@@ -260,7 +260,7 @@ const envSchema = z.object({
   S3_ACCESS_KEY_ID: optionalString,
   S3_SECRET_ACCESS_KEY: optionalString,
   // Bootstrap defaults for Admin PlatformSettings (DB overrides when present).
-  RIDE_OFFER_TTL_SECONDS: positiveInt(60),
+  RIDE_OFFER_TTL_SECONDS: positiveInt(20),
   RIDE_MIN_FARE_VND: fareVnd(10_000),
   RIDE_MAX_FARE_VND: fareVnd(500_000),
   RIDE_REFERENCE_VND_PER_KM: fareVnd(5_000),

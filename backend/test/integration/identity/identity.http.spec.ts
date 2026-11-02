@@ -371,38 +371,50 @@ describe('identity http', () => {
     });
   });
 
-  it('confirms an email token and does not return it from the request', async () => {
+  it('confirms an emailed 6-digit code and does not return it from the request', async () => {
     const created = await request(app.getHttpServer())
       .post('/v1/auth/phone/challenges')
       .send({ phone: '+84904444444' })
       .expect(200);
-    const code = sms.sent.at(-1)?.code;
     const verified = await request(app.getHttpServer())
       .post(`/v1/auth/phone/challenges/${created.body.data.challengeId}/verify`)
-      .send({ code })
+      .send({ code: sms.sent.at(-1)?.code })
       .expect(200);
 
+    const mailsBefore = mail.sent.length;
     const requested = await request(app.getHttpServer())
       .post('/v1/auth/email/verifications')
       .set('Authorization', `Bearer ${verified.body.data.accessToken}`)
       .send({ email: 'rider@dealgo.test' })
       .expect(200);
-    const token = mail.sent.at(-1)?.token;
-    expect(token).toEqual(expect.any(String));
-    expect(JSON.stringify(requested.body)).not.toContain(token);
+    const code = mail.sent.at(-1)?.code as string;
+    expect(code).toMatch(/^\d{6}$/);
+    expect(mail.sent).toHaveLength(mailsBefore + 1);
+    expect(JSON.stringify(requested.body)).not.toContain(code);
     expect(requested.body.data).toEqual({
       verificationId: expect.any(String),
       expiresAt: expect.any(String),
+      resendAvailableAt: expect.any(String),
     });
 
-    await request(app.getHttpServer())
+    const repeated = await request(app.getHttpServer())
+      .post('/v1/auth/email/verifications')
+      .set('Authorization', `Bearer ${verified.body.data.accessToken}`)
+      .send({ email: 'rider@dealgo.test' })
+      .expect(200);
+    expect(repeated.body.data.verificationId).toBe(requested.body.data.verificationId);
+    expect(mail.sent).toHaveLength(mailsBefore + 1);
+
+    const wrong = code === '000000' ? '111111' : '000000';
+    const rejected = await request(app.getHttpServer())
       .post(`/v1/auth/email/verifications/${requested.body.data.verificationId}/confirm`)
-      .send({ token: 'not-the-real-token-value-here' })
+      .send({ code: wrong })
       .expect(401);
+    expect(rejected.body.errorCode).toBe('AUTH_CODE_INVALID');
 
     await request(app.getHttpServer())
       .post(`/v1/auth/email/verifications/${requested.body.data.verificationId}/confirm`)
-      .send({ token })
+      .send({ code })
       .expect(200);
 
     const profile = await request(app.getHttpServer())

@@ -26,6 +26,7 @@ export '../cubit/driver_offer_cubit.dart'
     show DriverOfferSelection, driverOfferSelectionFor;
 import '../utils/driver_routes.dart';
 import '../widgets/driver_widgets.dart';
+import '../widgets/ride_view_beacon.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../features/food/domain/entities/food_money.dart';
 import '../../../../core/format/short_ref.dart';
@@ -62,104 +63,121 @@ class DriverRideDetailPage extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final classPhoto = resolveMediaUrl(ride.imageUrl);
     return Scaffold(
-      body: DriverPageFrame(
-        title: l10n.driverRideDetailTitle,
-        subtitle: rideVehicleClassLabel(l10n, ride.vehicleClassCode),
-        trailing: classPhoto == null
-            ? null
-            : RideVehicleClassPhoto(
-                imageUrl: ride.imageUrl,
-                code: ride.vehicleClassCode,
-                size: 36,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          DriverPageFrame(
+            title: l10n.driverRideDetailTitle,
+            subtitle: rideVehicleClassLabel(l10n, ride.vehicleClassCode),
+            trailing: classPhoto == null
+                ? null
+                : RideVehicleClassPhoto(
+                    imageUrl: ride.imageUrl,
+                    code: ride.vehicleClassCode,
+                    size: 36,
+                  ),
+            insetBottom: true,
+            onBack: () => driverBack(context),
+            footer: DriverFooter(
+              // inDrive-style: one tap takes the customer's price; a counter
+              // offer stays one step away.
+              secondaryLabel: l10n.driverCounterOffer,
+              secondaryKey: const Key('driver-open-offer'),
+              primaryLabel: l10n.driverAcceptAtPrice(
+                formatVnd(ride.offeredFareVnd),
               ),
-        insetBottom: true,
-        onBack: () => driverBack(context),
-        footer: DriverFooter(
-          // inDrive-style: one tap takes the customer's price; a counter
-          // offer stays one step away.
-          secondaryLabel: l10n.driverCounterOffer,
-          secondaryKey: const Key('driver-open-offer'),
-          primaryLabel: l10n.driverAcceptAtPrice(
-            formatVnd(ride.offeredFareVnd),
-          ),
-          primaryKey: const Key('driver-quick-accept'),
-          onSecondary: () =>
-              context.push(DriverRoutes.offer(ride.id), extra: ride),
-          onPrimary: () => context.push(
-            '${DriverRoutes.offer(ride.id)}?accept=1',
-            extra: ride,
-          ),
-        ),
-        body: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            DealGoDimensions.pageGutter,
-            DealGoSpacing.s8,
-            DealGoDimensions.pageGutter,
-            DealGoSpacing.s16,
-          ),
-          children: [
-            DriverPanel(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  DriverChip(
-                    label: l10n.driverRideChip,
-                    tone: DriverChipTone.green,
-                  ),
-                  const SizedBox(height: DealGoSpacing.s12),
-                  Text(AppLocalizations.of(context).rideRef(shortRef(ride.id))),
-                  const SizedBox(height: DealGoSpacing.s12),
-                  DriverStop(
-                    color: DealGoColors.brandGreen,
-                    label: l10n.driverPickupLabel,
-                    value: ride.pickup.label,
-                  ),
-                  for (final (i, stop) in ride.stops.indexed) ...[
-                    const SizedBox(height: DealGoSpacing.s12),
-                    DriverStop(
-                      key: Key('driver-offer-stop-${i + 1}'),
-                      color: DealGoColors.amber,
-                      label: l10n.rideStopNumbered(i + 1),
-                      value: stop.label,
-                    ),
-                  ],
-                  const SizedBox(height: DealGoSpacing.s12),
-                  DriverStop(
-                    color: DealGoColors.danger,
-                    label: l10n.driverDropoffLabel,
-                    value: ride.dropoff.label,
-                  ),
-                ],
+              primaryKey: const Key('driver-quick-accept'),
+              onSecondary: () =>
+                  context.push(DriverRoutes.offer(ride.id), extra: ride),
+              onPrimary: () => context.push(
+                '${DriverRoutes.offer(ride.id)}?accept=1',
+                extra: ride,
               ),
             ),
-            const SizedBox(height: DealGoSpacing.s12),
-            DriverPanel(
-              child: Column(
-                children: [
-                  DriverMoneyRow(
-                    label: l10n.driverCustomerFare,
-                    value: formatRideVnd(ride.offeredFareVnd),
-                    emphasize: true,
-                  ),
-                  DriverMoneyRow(
-                    label: l10n.driverReferenceFare,
-                    value: formatRideVnd(ride.referenceFareVnd),
-                  ),
-                  DriverMoneyRow(
-                    label: l10n.driverOfferCount,
-                    value: '${ride.offerCount}',
-                  ),
-                  // Drivers see the customer's rating first.
-                  DriverMoneyRow(
-                    key: const Key('driver-customer-rating'),
-                    label: l10n.driverCustomerRating,
-                    value: customerRatingText(l10n, ride.customerRating),
-                  ),
-                ],
+            body: ListView(
+              padding: const EdgeInsets.fromLTRB(
+                DealGoDimensions.pageGutter,
+                DealGoSpacing.s8,
+                DealGoDimensions.pageGutter,
+                DealGoSpacing.s16,
               ),
+              children: [
+                DriverPanel(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // t73u: no green service badge; intercity is the one tag kept.
+                      if (ride.intercity) ...[
+                        DriverChip(
+                          label: l10n.rideIntercity,
+                          tone: DriverChipTone.warning,
+                        ),
+                        const SizedBox(height: DealGoSpacing.s12),
+                      ],
+                      Text(
+                        AppLocalizations.of(context).rideRef(shortRef(ride.id)),
+                      ),
+                      const SizedBox(height: DealGoSpacing.s12),
+                      DriverStop(
+                        color: DealGoColors.brandGreen,
+                        label: l10n.driverPickupLabel,
+                        value: ride.pickup.label,
+                      ),
+                      for (final (i, stop) in ride.stops.indexed) ...[
+                        const SizedBox(height: DealGoSpacing.s12),
+                        DriverStop(
+                          key: Key('driver-offer-stop-${i + 1}'),
+                          color: DealGoColors.amber,
+                          label: l10n.rideStopNumbered(i + 1),
+                          value: stop.label,
+                        ),
+                      ],
+                      const SizedBox(height: DealGoSpacing.s12),
+                      DriverStop(
+                        color: DealGoColors.danger,
+                        label: l10n.driverDropoffLabel,
+                        value: ride.dropoff.label,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: DealGoSpacing.s12),
+                DriverPanel(
+                  child: Column(
+                    children: [
+                      DriverMoneyRow(
+                        label: l10n.driverCustomerFare,
+                        value: formatRideVnd(ride.offeredFareVnd),
+                        emphasize: true,
+                      ),
+                      DriverMoneyRow(
+                        label: l10n.driverReferenceFare,
+                        value: formatRideVnd(ride.referenceFareVnd),
+                      ),
+                      DriverMoneyRow(
+                        label: l10n.driverOfferCount,
+                        value: '${ride.offerCount}',
+                      ),
+                      // Drivers see the customer's rating first.
+                      DriverMoneyRow(
+                        key: const Key('driver-customer-rating'),
+                        label: l10n.driverCustomerRating,
+                        value: customerRatingText(l10n, ride.customerRating),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          Positioned(
+            left: 0,
+            top: 0,
+            width: 0,
+            height: 0,
+            child: RideViewBeacon(rideId: ride.id),
+          ),
+        ],
       ),
     );
   }

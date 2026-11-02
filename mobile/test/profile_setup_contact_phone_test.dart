@@ -68,11 +68,21 @@ Future<FakeIdentityClient> _pump(WidgetTester tester, {String? phone}) async {
 }
 
 void main() {
-  test('vnMobileFromInput accepts VN mobiles only', () {
+  test('vnMobileFromInput accepts assigned VN mobile prefixes only', () {
     expect(vnMobileFromInput('0901 234 567'), '+84901234567');
     expect(vnMobileFromInput('901234567'), '+84901234567');
+    expect(vnMobileFromInput('84901234567'), '+84901234567');
     expect(vnMobileFromInput('+84 389 999 999'), '+84389999999');
-    expect(vnMobileFromInput('0241234567'), isNull); // landline
+    expect(vnMobileFromInput('0321234567'), '+84321234567');
+    expect(vnMobileFromInput('0551234567'), '+84551234567');
+    expect(vnMobileFromInput('0871234567'), '+84871234567');
+    expect(vnMobileFromInput('0991234567'), '+84991234567');
+    expect(vnMobileFromInput('0241234567'), isNull);
+    expect(vnMobileFromInput('0301234567'), isNull);
+    expect(vnMobileFromInput('0712345678'), isNull);
+    expect(vnMobileFromInput('0801234567'), isNull);
+    expect(vnMobileFromInput('0951234567'), isNull);
+    expect(vnMobileFromInput('+840901234567'), isNull);
     expect(vnMobileFromInput('09012345'), isNull);
     expect(vnMobileFromInput('+14155550100'), isNull);
     expect(vnMobileFromInput(''), isNull);

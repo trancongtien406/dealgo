@@ -1451,6 +1451,7 @@ describe('food order http', () => {
       { name: 'Bánh xèo', priceVnd: 30_000 },
     ]);
     const itemId = store.items[0]!.id;
+    await foods.setCatalogModeration(itemId, 'APPROVED');
     const browse = () =>
       request(app.getHttpServer())
         .get('/v1/food/stores')
@@ -2011,6 +2012,7 @@ describe('food order http', () => {
       .send({ name: 'Trà sữa thử tuỳ chọn', priceVnd: 30_000 })
       .expect(200);
     const itemId = created.body.data.id as string;
+    await app.get(FOOD_REPOSITORY).setCatalogModeration(itemId, 'APPROVED');
     expect(created.body.data.optionGroups).toEqual([]);
 
     const layout = {
@@ -2256,7 +2258,11 @@ async function createPinnedStore(
   name: string,
   items: { name: string; priceVnd: number }[],
 ): Promise<Awaited<ReturnType<MemoryFoodRepository['createStore']>>> {
-  await foods.createStore(ownerId, name, items);
+  const created = await foods.createStore(ownerId, name, items);
+  // FOOD-001: new dishes start PENDING; the fixture plays the admin and approves them.
+  for (const item of created.items) {
+    await foods.setCatalogModeration(item.id, 'APPROVED');
+  }
   return foods.updateStoreLocation({
     ownerId,
     lat: 16.0544,

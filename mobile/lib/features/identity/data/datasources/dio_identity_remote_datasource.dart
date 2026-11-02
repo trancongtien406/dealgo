@@ -6,6 +6,7 @@ import '../../../../core/network/api_paths.dart';
 import '../../../../core/network/dealgo_dio.dart';
 import '../../../../core/network/dio_mapper.dart';
 import '../models/auth_method_policy_model.dart';
+import '../models/email_verification_model.dart';
 import '../models/phone_challenge_model.dart';
 import '../models/user_profile_model.dart';
 import '../models/verified_session_model.dart';
@@ -233,6 +234,37 @@ class DioIdentityRemoteDataSource implements IdentityRemoteDataSource {
         );
       }
       return avatarUrl;
+    } on DioException catch (error) {
+      throw apiExceptionFromDio(error);
+    }
+  }
+
+  @override
+  Future<EmailVerificationModel> requestEmailVerification({
+    required String accessToken,
+    required String email,
+  }) {
+    return _request(
+      () => dio.post<Object?>(
+        ApiPaths.emailVerifications,
+        data: {'email': email},
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      ),
+      EmailVerificationModel.fromJson,
+    );
+  }
+
+  @override
+  Future<void> confirmEmailVerification({
+    required String verificationId,
+    required String code,
+  }) async {
+    try {
+      final response = await dio.post<Object?>(
+        ApiPaths.emailVerificationConfirm(verificationId),
+        data: {'code': code},
+      );
+      readSuccessPayload(response.data);
     } on DioException catch (error) {
       throw apiExceptionFromDio(error);
     }

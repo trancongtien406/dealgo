@@ -425,10 +425,7 @@ class _SettingsLink extends StatelessWidget {
             Icon(icon, color: DealGoColors.primary),
             const SizedBox(width: DealGoSpacing.s12),
             Expanded(child: Text(label)),
-            const Icon(
-              DealGoIcons.chevronRight,
-              color: DealGoColors.textSecondary,
-            ),
+            Icon(DealGoIcons.chevronRight, color: DealGoColors.textSecondary),
           ],
         ),
       ),

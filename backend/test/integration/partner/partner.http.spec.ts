@@ -34,6 +34,12 @@ const MERCHANT_DOCS = [
   jpeg('REP_ID_BACK'),
 ];
 
+/** pt5u: nothing published in this memory app, so the built-in texts are version 0. */
+const CONSENTS = [
+  { slug: 'regulations', version: 0 },
+  { slug: 'privacy', version: 0 },
+];
+
 const OPS_EMAIL = 'ops@dealgo.test';
 const OPS_PASSWORD = 'correct-horse-battery';
 
@@ -93,12 +99,23 @@ describe('partner application http', () => {
     await app.close();
   });
 
+  it('DEC-PROD-091: refuses driver KYC without a profile avatar', async () => {
+    const driver = await login('+84907' + String(phoneSerial++).padStart(5, '0'), { withAvatar: false });
+    const refused = await request(app.getHttpServer())
+      .post('/v1/me/partner-applications')
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ acceptedLegalDocuments: CONSENTS, role: 'DRIVER', metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1' }, documents: DRIVER_DOCS })
+      .expect(400);
+    expect(refused.body.errorCode).toBe('PARTNER_AVATAR_REQUIRED');
+  });
+
   it('submits KYC, lists for ops, approves to ACTIVE grant, rejects to SUSPENDED', async () => {
     const driver = await login('+84907' + String(phoneSerial++).padStart(5, '0'));
     const submitted = await request(app.getHttpServer())
       .post('/v1/me/partner-applications')
       .set('Authorization', `Bearer ${driver.token}`)
       .send({
+        acceptedLegalDocuments: CONSENTS,
         role: 'DRIVER',
         metadata: { fullName: 'Nguyen Van A', licenseNumber: 'B2-123', vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1' },
         documents: DRIVER_DOCS,
@@ -176,7 +193,7 @@ describe('partner application http', () => {
     const merchantApp = await request(app.getHttpServer())
       .post('/v1/me/partner-applications')
       .set('Authorization', `Bearer ${merchant.token}`)
-      .send({ role: 'MERCHANT', metadata: { shopName: 'Bun Bo', shopLat: 16.06, shopLng: 108.22 }, documents: MERCHANT_DOCS })
+      .send({ acceptedLegalDocuments: CONSENTS, role: 'MERCHANT', metadata: { shopName: 'Bun Bo', shopLat: 16.06, shopLng: 108.22 }, documents: MERCHANT_DOCS })
       .expect(200);
 
     const rejected = await request(app.getHttpServer())
@@ -202,7 +219,7 @@ describe('partner application http', () => {
     const resubmitted = await request(app.getHttpServer())
       .post('/v1/me/partner-applications')
       .set('Authorization', `Bearer ${merchant.token}`)
-      .send({ role: 'MERCHANT', metadata: { shopName: 'Bun Bo', shopLat: 16.06, shopLng: 108.22 }, documents: [jpeg('STOREFRONT')] })
+      .send({ acceptedLegalDocuments: CONSENTS, role: 'MERCHANT', metadata: { shopName: 'Bun Bo', shopLat: 16.06, shopLng: 108.22 }, documents: [jpeg('STOREFRONT')] })
       .expect(200);
     expect(resubmitted.body.data.documents.map((doc: { kind: string }) => doc.kind)).toEqual([
       'BUSINESS_LICENSE',
@@ -220,7 +237,7 @@ describe('partner application http', () => {
     const submitted = await request(app.getHttpServer())
       .post('/v1/me/partner-applications')
       .set('Authorization', `Bearer ${driver.token}`)
-      .send({ role: 'DRIVER', metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1', aiPrecheck: 'PASSED' }, documents: DRIVER_DOCS })
+      .send({ acceptedLegalDocuments: CONSENTS, role: 'DRIVER', metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1', aiPrecheck: 'PASSED' }, documents: DRIVER_DOCS })
       .expect(200);
     const id = submitted.body.data.id as string;
     expect(submitted.body.data.metadata.aiPrecheck).toBeUndefined();
@@ -250,7 +267,7 @@ describe('partner application http', () => {
     await request(app.getHttpServer())
       .post('/v1/me/partner-applications')
       .set('Authorization', `Bearer ${driver.token}`)
-      .send({ role: 'DRIVER', metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1' }, documents: DRIVER_DOCS })
+      .send({ acceptedLegalDocuments: CONSENTS, role: 'DRIVER', metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1' }, documents: DRIVER_DOCS })
       .expect(409);
 
     const rejected = await request(app.getHttpServer())
@@ -274,19 +291,20 @@ describe('partner application http', () => {
     const missing = await request(app.getHttpServer())
       .post('/v1/me/partner-applications')
       .set('Authorization', `Bearer ${user.token}`)
-      .send({ role: 'DRIVER', metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1' }, documents: DRIVER_DOCS.slice(0, 2) })
+      .send({ acceptedLegalDocuments: CONSENTS, role: 'DRIVER', metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1' }, documents: DRIVER_DOCS.slice(0, 2) })
       .expect(400);
     expect(missing.body.errorCode).toBe('PARTNER_DOCUMENTS_REQUIRED');
     expect(missing.body.details.missing).toEqual(['SELFIE', 'SELFIE_VIDEO', 'LICENSE', 'VEHICLE_REG']);
     await request(app.getHttpServer())
       .post('/v1/me/partner-applications')
       .set('Authorization', `Bearer ${user.token}`)
-      .send({ role: 'DRIVER', metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1' }, documents: [{ kind: 'PASSPORT', contentBase64: TINY_JPEG_BASE64 }] })
+      .send({ acceptedLegalDocuments: CONSENTS, role: 'DRIVER', metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1' }, documents: [{ kind: 'PASSPORT', contentBase64: TINY_JPEG_BASE64 }] })
       .expect(400);
     const wrongBytes = await request(app.getHttpServer())
       .post('/v1/me/partner-applications')
       .set('Authorization', `Bearer ${user.token}`)
       .send({
+        acceptedLegalDocuments: CONSENTS,
         role: 'DRIVER',
         metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1' },
         documents: DRIVER_DOCS.map((doc, i) =>
@@ -297,7 +315,41 @@ describe('partner application http', () => {
     expect(wrongBytes.body.errorCode).toBe('UPLOAD_TYPE_NOT_ALLOWED');
   });
 
-  async function login(phone: string): Promise<{ token: string; userId: string }> {
+  it('pt5u: lists the documents to accept and refuses a submit without current consent', async () => {
+    const docs = await request(app.getHttpServer()).get('/v1/public/legal-documents/partner-application').expect(200);
+    expect(docs.body.data).toEqual(CONSENTS);
+    const driver = await login('+84907' + String(phoneSerial++).padStart(5, '0'));
+    const body = { role: 'DRIVER', metadata: { vehicleClassCode: 'MOTORBIKE', licenseClass: 'A1' }, documents: DRIVER_DOCS };
+    for (const accepted of [undefined, [CONSENTS[0]], [{ slug: 'regulations', version: 3 }, CONSENTS[1]]]) {
+      const refused = await request(app.getHttpServer())
+        .post('/v1/me/partner-applications')
+        .set('Authorization', `Bearer ${driver.token}`)
+        .send({ ...body, ...(accepted ? { acceptedLegalDocuments: accepted } : {}) })
+        .expect(400);
+      expect(refused.body.errorCode).toBe('PARTNER_LEGAL_CONSENT_REQUIRED');
+    }
+    const merchant = await login('+84907' + String(phoneSerial++).padStart(5, '0'));
+    const refusedShop = await request(app.getHttpServer())
+      .post('/v1/me/partner-applications')
+      .set('Authorization', `Bearer ${merchant.token}`)
+      .send({ role: 'MERCHANT', metadata: { shopName: 'Bun Bo', shopLat: 16.06, shopLng: 108.22 }, documents: MERCHANT_DOCS })
+      .expect(400);
+    expect(refusedShop.body.errorCode).toBe('PARTNER_LEGAL_CONSENT_REQUIRED');
+    const ok = await request(app.getHttpServer())
+      .post('/v1/me/partner-applications')
+      .set('Authorization', `Bearer ${driver.token}`)
+      .send({ ...body, acceptedLegalDocuments: CONSENTS, metadata: { ...body.metadata, legalConsents: 'forged' } })
+      .expect(200);
+    expect(ok.body.data.metadata.legalConsents).toEqual([
+      expect.objectContaining({ slug: 'regulations', version: 0 }),
+      expect.objectContaining({ slug: 'privacy', version: 0 }),
+    ]);
+  });
+
+  async function login(
+    phone: string,
+    { withAvatar = true }: { withAvatar?: boolean } = {},
+  ): Promise<{ token: string; userId: string }> {
     const created = await request(app.getHttpServer())
       .post('/v1/auth/phone/challenges')
       .send({ phone })
@@ -307,10 +359,11 @@ describe('partner application http', () => {
       .post(`/v1/auth/phone/challenges/${created.body.data.challengeId}/verify`)
       .send({ code })
       .expect(200);
-    return {
-      token: verified.body.data.accessToken as string,
-      userId: verified.body.data.user.id as string,
-    };
+    const userId = verified.body.data.user.id as string;
+    if (withAvatar) {
+      await identity.updateUserProfile(userId, { avatarUrl: `https://cdn.example/${userId}.png` });
+    }
+    return { token: verified.body.data.accessToken as string, userId };
   }
 
   async function opsLogin(): Promise<{ token: string }> {

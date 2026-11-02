@@ -19,6 +19,12 @@ export type NestOpsCustomer = {
   grants: NestOpsUserGrant[];
   /** S027 (DEC-PROD-037): null/absent = active account. */
   deletion?: unknown;
+  region?: string | null;
+  area?: string | null;
+  rides?: number;
+  food?: number;
+  delivery?: number;
+  spend?: number;
 };
 
 export type NestOpsCustomerPage = {

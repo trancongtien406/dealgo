@@ -38,6 +38,9 @@ RideView _negotiating({required int offerAmount, required String id}) =>
         ),
       ],
       vehicleClassCode: 'MOTORBIKE',
+      // Server cap and headroom drive the raise chips (10/20/30%).
+      maxOfferedFareVnd: 56000,
+      fareHeadroomPercent: 30,
     );
 
 const _driver = UserProfile(
@@ -259,8 +262,9 @@ void main() {
 
     await tester.tap(find.byKey(const Key('ride-raise-fare')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('reason-raise-10000')));
+    // +20% of 42.000đ = 50.400đ, rounded up to the 1.000đ step.
+    await tester.tap(find.byKey(const Key('reason-raise-20')));
     await tester.pumpAndSettle();
-    expect(_negotiation(tester).calls, contains('raiseFare:ride-1:52000'));
+    expect(_negotiation(tester).calls, contains('raiseFare:ride-1:51000'));
   });
 }

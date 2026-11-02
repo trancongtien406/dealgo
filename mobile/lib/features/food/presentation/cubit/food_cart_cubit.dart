@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/entities/food_models.dart';
 import '../../domain/entities/food_money.dart';
+import '../../../pricing/domain/pricing.dart';
 
 class FoodCartLine {
   const FoodCartLine({
@@ -89,6 +90,8 @@ class FoodCartState {
     required this.idempotencyKey,
     this.voucherCode,
     this.voucherDiscountVnd = 0,
+    this.deliveryQuote,
+    this.deliveryOfferVnd,
     this.minOrderVnd = 0,
     this.prepMinutes,
     this.storeDistanceKm,
@@ -114,6 +117,17 @@ class FoodCartState {
   /// Server quote (`POST /v1/food/quote`); null until store and drop-off
   /// are known. Placement recomputes it, so this is for display only.
   final int? deliveryFareVnd;
+
+  /// Full quote with the offer bounds and step (null on old servers / before
+  /// the quote). [deliveryFareVnd] is its suggestion.
+  final FoodDeliveryQuote? deliveryQuote;
+
+  /// The customer's delivery-fee offer; null = take the suggestion. Drivers
+  /// accept it or counter; the agreed fee is fixed when one is assigned.
+  final int? deliveryOfferVnd;
+
+  /// What is sent and shown: the offer, else the suggestion.
+  int? get offeredDeliveryFareVnd => deliveryOfferVnd ?? deliveryFareVnd;
   final String dropoffLabel;
   final double? dropoffLat;
   final double? dropoffLng;
@@ -155,7 +169,8 @@ class FoodCartState {
   int get subtotalVnd => lines.fold(0, (sum, line) => sum + line.lineTotalVnd);
 
   int get previewTotalVnd {
-    final total = subtotalVnd + (deliveryFareVnd ?? 0) - voucherDiscountVnd;
+    final total =
+        subtotalVnd + (offeredDeliveryFareVnd ?? 0) - voucherDiscountVnd;
     return total < 0 ? 0 : total;
   }
 
@@ -174,6 +189,8 @@ class FoodCartState {
     List<FoodCartLine>? lines,
     int? deliveryFareVnd,
     bool clearDeliveryFare = false,
+    FoodDeliveryQuote? deliveryQuote,
+    int? deliveryOfferVnd,
     String? dropoffLabel,
     double? dropoffLat,
     double? dropoffLng,
@@ -199,6 +216,15 @@ class FoodCartState {
       deliveryFareVnd: clearDeliveryFare || storeChanged
           ? null
           : deliveryFareVnd ?? this.deliveryFareVnd,
+      deliveryQuote: clearDeliveryFare || storeChanged
+          ? null
+          : deliveryQuote ??
+                (deliveryFareVnd != null ? null : this.deliveryQuote),
+      // A new quote (or store/address) resets the offer to the suggestion.
+      deliveryOfferVnd: clearDeliveryFare || storeChanged
+          ? null
+          : deliveryOfferVnd ??
+                (deliveryFareVnd != null ? null : this.deliveryOfferVnd),
       dropoffLabel: dropoffLabel ?? this.dropoffLabel,
       dropoffLat: dropoffLat ?? this.dropoffLat,
       dropoffLng: dropoffLng ?? this.dropoffLng,
@@ -223,6 +249,8 @@ class FoodCartState {
         other.storeName == storeName &&
         _sameLines(other.lines, lines) &&
         other.deliveryFareVnd == deliveryFareVnd &&
+        other.deliveryQuote == deliveryQuote &&
+        other.deliveryOfferVnd == deliveryOfferVnd &&
         other.dropoffLabel == dropoffLabel &&
         other.dropoffLat == dropoffLat &&
         other.dropoffLng == dropoffLng &&
@@ -239,7 +267,7 @@ class FoodCartState {
     storeId,
     storeName,
     Object.hashAll(lines),
-    deliveryFareVnd,
+    Object.hash(deliveryFareVnd, deliveryQuote, deliveryOfferVnd),
     dropoffLabel,
     dropoffLat,
     dropoffLng,
@@ -430,6 +458,57 @@ class FoodCartCubit extends Cubit<FoodCartState> {
       return;
     }
     emit(state.copyWith(deliveryFareVnd: amount));
+  }
+
+  /// Stores the full quote; the offer resets to the suggestion.
+  void setDeliveryQuote(FoodDeliveryQuote quote) {
+    if (quote == state.deliveryQuote &&
+        quote.suggestedVnd == state.deliveryFareVnd) {
+      return;
+    }
+    emit(
+      state.copyWith(deliveryFareVnd: quote.suggestedVnd, deliveryQuote: quote),
+    );
+  }
+
+  /// Checkout stepper: moves the offer by [steps] × server fareStep, kept in
+  /// the quote bounds. Returns false when it cannot move further.
+  bool stepDeliveryOffer(int steps) {
+    final quote = state.deliveryQuote;
+    final current = state.offeredDeliveryFareVnd;
+    if (quote == null || current == null || !quote.negotiable) return false;
+    final step = quote.fareStepVnd;
+    // Snap to the step grid first so odd suggestions (e.g. 15.400đ) round.
+    final base = steps > 0
+        ? (current ~/ step) * step
+        : ((current + step - 1) ~/ step) * step;
+    final next = quote.clamp(base + steps * step);
+    if (next == current) return false;
+    emit(state.copyWith(deliveryOfferVnd: next));
+    return true;
+  }
+
+  /// Back to the suggested fee.
+  void resetDeliveryOffer() {
+    if (state.deliveryOfferVnd == null) return;
+    emit(
+      FoodCartState(
+        storeId: state.storeId,
+        storeName: state.storeName,
+        lines: state.lines,
+        deliveryFareVnd: state.deliveryFareVnd,
+        deliveryQuote: state.deliveryQuote,
+        dropoffLabel: state.dropoffLabel,
+        dropoffLat: state.dropoffLat,
+        dropoffLng: state.dropoffLng,
+        idempotencyKey: state.idempotencyKey,
+        voucherCode: state.voucherCode,
+        voucherDiscountVnd: state.voucherDiscountVnd,
+        minOrderVnd: state.minOrderVnd,
+        prepMinutes: state.prepMinutes,
+        storeDistanceKm: state.storeDistanceKm,
+      ),
+    );
   }
 
   /// New drop-off from the place picker; the old fare quote no longer applies.

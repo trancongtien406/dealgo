@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** DEC-PROD-055: admin-editable public pages. */
-export const PUBLIC_PAGE_SLUGS = ['privacy', 'terms', 'support'] as const;
+export const PUBLIC_PAGE_SLUGS = ['privacy', 'terms', 'regulations', 'support'] as const;
 export type PublicPageSlug = (typeof PUBLIC_PAGE_SLUGS)[number];
 export const PUBLIC_PAGE_LOCALES = ['vi', 'en'] as const;
 export type PublicPageLocale = (typeof PUBLIC_PAGE_LOCALES)[number];

@@ -8,6 +8,7 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/ride_models.dart';
 import '../../domain/negotiation/ride_negotiation_client.dart';
+import '../../domain/ride_fare_presets.dart';
 
 /// Negotiation actions are optional on a screen: when no [RideNegotiationClient] is
 /// provided (older widget tests, previews) the buttons are simply hidden.
@@ -41,7 +42,6 @@ Future<T?> showReasonSheet<T>({
 }) {
   return showModalBottomSheet<T>(
     context: context,
-    showDragHandle: true,
     builder: (sheetContext) {
       final textTheme = Theme.of(sheetContext).textTheme;
       return SafeArea(
@@ -49,7 +49,7 @@ Future<T?> showReasonSheet<T>({
           shrinkWrap: true,
           padding: const EdgeInsets.fromLTRB(
             DealGoDimensions.pageGutter,
-            0,
+            DealGoSpacing.s20,
             DealGoDimensions.pageGutter,
             DealGoSpacing.s16,
           ),
@@ -142,14 +142,30 @@ String customerRatingText(
   );
 }
 
-/// Fare steps offered when the customer raises the price (VND).
-const rideRaiseFareSteps = [5000, 10000, 20000];
+/// Raises of the current fare. [maxFareVnd] is the server cap; [headroomPercent]
+/// is the configurable max (split in three). Amounts stay inside that cap.
+List<({int percent, int amountVnd})> rideRaiseFareOptions(
+  int currentFareVnd, {
+  int? maxFareVnd,
+  int? headroomPercent,
+}) {
+  return [
+    for (final preset in rideFareRaisePresets(
+      suggestedVnd: currentFareVnd,
+      maxBidVnd: maxFareVnd ?? currentFareVnd,
+      maxHeadroomPercent: headroomPercent,
+    ))
+      (percent: preset.percent, amountVnd: preset.amountVnd),
+  ];
+}
 
 /// Asks for a fare step; returns the new total fare or null.
 Future<int?> showRaiseFareSheet({
   required BuildContext context,
   required int currentFareVnd,
   required String Function(int amountVnd) formatVnd,
+  int? maxFareVnd,
+  int? headroomPercent,
 }) {
   final l10n = AppLocalizations.of(context);
   return showReasonSheet<int>(
@@ -157,12 +173,12 @@ Future<int?> showRaiseFareSheet({
     title: l10n.rideRaiseFareTitle,
     hint: l10n.rideRaiseFareBody(formatVnd(currentFareVnd)),
     reasons: [
-      for (final step in rideRaiseFareSteps)
-        (
-          currentFareVnd + step,
-          'raise-$step',
-          '${l10n.rideRaiseFareStep(formatVnd(step))} → ${formatVnd(currentFareVnd + step)}',
-        ),
+      for (final o in rideRaiseFareOptions(
+        currentFareVnd,
+        maxFareVnd: maxFareVnd,
+        headroomPercent: headroomPercent,
+      ))
+        (o.amountVnd, 'raise-${o.percent}', formatVnd(o.amountVnd)),
     ],
   );
 }

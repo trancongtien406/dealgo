@@ -209,7 +209,7 @@ class _FoodItemOptionsPageState extends State<FoodItemOptionsPage> {
               ),
             ),
             DecoratedBox(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: DealGoColors.card,
                 boxShadow: DealGoShadows.floating,
               ),
@@ -397,9 +397,7 @@ class _OptionSection extends StatelessWidget {
                             choice.label,
                             style: choice.available
                                 ? null
-                                : const TextStyle(
-                                    color: DealGoColors.textSecondary,
-                                  ),
+                                : TextStyle(color: DealGoColors.textSecondary),
                           ),
                         ),
                         Text(
@@ -449,7 +447,7 @@ class _QtyOptionRow extends StatelessWidget {
                   choice.label,
                   style: choice.available
                       ? null
-                      : const TextStyle(color: DealGoColors.textSecondary),
+                      : TextStyle(color: DealGoColors.textSecondary),
                 ),
                 Text(
                   choice.available

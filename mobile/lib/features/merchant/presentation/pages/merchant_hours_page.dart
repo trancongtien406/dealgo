@@ -476,7 +476,7 @@ class _DayToggle extends StatelessWidget {
         color: open ? DealGoColors.card : DealGoColors.canvas,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: DealGoColors.border),
+          side: BorderSide(color: DealGoColors.border),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),

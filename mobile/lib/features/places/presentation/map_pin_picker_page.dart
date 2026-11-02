@@ -467,7 +467,7 @@ class _MapPinPickerPageState extends State<MapPinPickerPage> {
                           child: Row(
                             children: [
                               const SizedBox(width: DealGoSpacing.s12),
-                              const Icon(
+                              Icon(
                                 DealGoIcons.search,
                                 size: 18,
                                 color: DealGoColors.textSecondary,
@@ -475,7 +475,7 @@ class _MapPinPickerPageState extends State<MapPinPickerPage> {
                               const SizedBox(width: DealGoSpacing.s8),
                               Text(
                                 l10n.mapPickerSearch,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 15,
                                   color: DealGoColors.textSecondary,
                                 ),
@@ -549,7 +549,7 @@ class _MapPinPickerPageState extends State<MapPinPickerPage> {
     final named = _resolved;
     final busy = _moving || _resolving;
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: DealGoColors.card,
         boxShadow: DealGoShadows.floating,
         borderRadius: BorderRadius.vertical(

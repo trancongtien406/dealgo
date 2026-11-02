@@ -4,14 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/config/api_base_url.dart';
 import '../../../../core/network/request_failure.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
-import '../../../../core/motion/dealgo_motion_widgets.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/ride_money.dart';
 import '../../domain/entities/ride_models.dart';
@@ -21,6 +19,8 @@ import '../cubit/ride_matching_cubit.dart';
 import '../utils/ride_routes.dart';
 import '../utils/ride_vehicle_label.dart';
 import '../cubit/ride_session.dart';
+import '../../domain/ride_fare_presets.dart';
+import '../widgets/ride_fare_raise_chips.dart';
 import '../widgets/ride_widgets.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/maps/map_controls.dart';
@@ -34,6 +34,8 @@ import '../../domain/params/select_ride_offer_params.dart';
 import '../../domain/ride_idempotency.dart';
 import '../../domain/usecases/select_ride_offer.dart';
 import '../widgets/ride_negotiation_ui.dart';
+import '../widgets/ride_offer_countdown.dart';
+import '../widgets/ride_search_status.dart';
 
 class RideMatchingPage extends StatelessWidget {
   const RideMatchingPage({required this.rideId, this.clock, super.key});
@@ -159,6 +161,7 @@ class _RideMatchingPageState extends State<_RideMatchingView> {
       if (silent) {
         setState(() {
           _ride = ride;
+          _autoAccept = ride.autoAcceptOfferedFare;
           _loading = false;
           _offline = false;
           _failure = null;
@@ -177,6 +180,7 @@ class _RideMatchingPageState extends State<_RideMatchingView> {
       if (!silent) {
         setState(() {
           _ride = ride;
+          _autoAccept = ride.autoAcceptOfferedFare;
           _loading = false;
           _busy = false;
           _offline = false;
@@ -215,6 +219,11 @@ class _RideMatchingPageState extends State<_RideMatchingView> {
 
   String? _actingOn;
   String? _inlineError;
+  var _autoAccept = false;
+
+  /// MOB-002: one Idempotency-Key per (ride, offer) selection attempt, reused when the
+  /// customer retries after a timeout so the server replays instead of double-selecting.
+  final Map<String, String> _selectKeys = {};
 
   /// One tap: take this driver's price (inDrive style) and go to tracking.
   Future<void> _accept(RideView ride, RideOffer offer) async {
@@ -228,11 +237,15 @@ class _RideMatchingPageState extends State<_RideMatchingView> {
       final updated = await context.read<SelectRideOffer>()(
         SelectRideOfferRequest(
           accessToken: token,
-          idempotencyKey: createRideIdempotencyKey(),
+          idempotencyKey: _selectKeys.putIfAbsent(
+            '${ride.id}:${offer.id}',
+            createRideIdempotencyKey,
+          ),
           rideId: ride.id,
           offerId: offer.id,
         ),
       );
+      _selectKeys.remove('${ride.id}:${offer.id}');
       if (!mounted) return;
       context.read<RideSessionCubit>().clear();
       DealGoHaptics.success();
@@ -270,6 +283,36 @@ class _RideMatchingPageState extends State<_RideMatchingView> {
       );
     } catch (error) {
       if (mounted) _inlineError = negotiationErrorText(context, error);
+    }
+    if (!mounted) return;
+    setState(() => _actingOn = null);
+    await _load(silent: true);
+  }
+
+  Future<void> _setAutoAccept(bool enabled) async {
+    final client = maybeRideNegotiation(context);
+    final token = rideAccessToken(context);
+    final ride = _ride;
+    if (_actingOn != null || client == null || token == null || ride == null) {
+      return;
+    }
+    final previous = _autoAccept;
+    setState(() {
+      _autoAccept = enabled;
+      _actingOn = 'auto';
+      _inlineError = null;
+    });
+    try {
+      await client.setAutoAccept(
+        accessToken: token,
+        rideId: ride.id,
+        enabled: enabled,
+      );
+    } catch (error) {
+      if (mounted) {
+        _inlineError = negotiationErrorText(context, error);
+        _autoAccept = previous;
+      }
     }
     if (!mounted) return;
     setState(() => _actingOn = null);
@@ -409,11 +452,15 @@ class _RideMatchingPageState extends State<_RideMatchingView> {
       onRaise: maybeRideNegotiation(context) == null
           ? null
           : (amount) => _raise(ride, amount),
+      autoAccept: _autoAccept,
+      onAutoAccept: maybeRideNegotiation(context) == null
+          ? null
+          : _setAutoAccept,
     );
   }
 }
 
-class _MatchingWait extends StatelessWidget {
+class _MatchingWait extends StatefulWidget {
   const _MatchingWait({
     required this.ride,
     required this.busy,
@@ -427,6 +474,8 @@ class _MatchingWait extends StatelessWidget {
     this.onAccept,
     this.onDecline,
     this.onRaise,
+    this.autoAccept = false,
+    this.onAutoAccept,
   });
 
   final List<RideOffer> offers;
@@ -435,6 +484,8 @@ class _MatchingWait extends StatelessWidget {
   final ValueChanged<RideOffer>? onAccept;
   final ValueChanged<RideOffer>? onDecline;
   final ValueChanged<int>? onRaise;
+  final bool autoAccept;
+  final ValueChanged<bool>? onAutoAccept;
 
   final RideView ride;
   final bool busy;
@@ -445,6 +496,75 @@ class _MatchingWait extends StatelessWidget {
   final VoidCallback onBack;
   final VoidCallback onCancel;
   final VoidCallback? onOpenOffers;
+
+  @override
+  State<_MatchingWait> createState() => _MatchingWaitState();
+}
+
+/// Receiving offers: the sheet opens near full height (animated) so offers are
+/// visible without a swipe, and re-expands when a new offer arrives.
+class _MatchingWaitState extends State<_MatchingWait> {
+  final _sheet = DraggableScrollableController();
+  final _offersKey = GlobalKey();
+  double _max = 0.86;
+
+  RideView get ride => widget.ride;
+  bool get busy => widget.busy;
+  bool get offline => widget.offline;
+  VoidCallback get onBack => widget.onBack;
+  VoidCallback get onCancel => widget.onCancel;
+  VoidCallback? get onOpenOffers => widget.onOpenOffers;
+  List<RideOffer> get offers => widget.offers;
+  String? get actingOn => widget.actingOn;
+  String? get inlineError => widget.inlineError;
+  ValueChanged<RideOffer>? get onAccept => widget.onAccept;
+  ValueChanged<RideOffer>? get onDecline => widget.onDecline;
+  ValueChanged<int>? get onRaise => widget.onRaise;
+  bool get autoAccept => widget.autoAccept;
+  ValueChanged<bool>? get onAutoAccept => widget.onAutoAccept;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _expand());
+  }
+
+  @override
+  void didUpdateWidget(covariant _MatchingWait oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final added = widget.offers.any(
+      (o) => !oldWidget.offers.any((old) => old.id == o.id),
+    );
+    if (added) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _expand());
+    }
+  }
+
+  @override
+  void dispose() {
+    _sheet.dispose();
+    super.dispose();
+  }
+
+  Future<void> _expand() async {
+    if (!mounted || !_sheet.isAttached) return;
+    if (_sheet.size < _max - 0.005) {
+      await _sheet.animateTo(
+        _max,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+      );
+    }
+    final target = _offersKey.currentContext;
+    if (mounted && target != null && target.mounted) {
+      await Scrollable.ensureVisible(
+        target,
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOut,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -478,12 +598,14 @@ class _MatchingWait extends StatelessWidget {
           ),
         ),
         RideDraggableSheet(
+          key: const Key('ride-matching-sheet'),
+          controller: _sheet,
           initialChildSize: 0.46,
-          minChildSize: 0.28,
+          minChildSize: 0.4,
           // Max + snaps together keep the sheet under the back button.
-          maxChildSize: rideSheetMaxSize(MediaQuery.of(context)),
+          maxChildSize: _max = rideSheetMaxSize(MediaQuery.of(context)),
           snapSizes: rideSheetSnapSizes(const [
-            0.28,
+            0.4,
             0.46,
             0.72,
           ], rideSheetMaxSize(MediaQuery.of(context))),
@@ -500,7 +622,6 @@ class _MatchingWait extends StatelessWidget {
                       DealGoSpacing.s8,
                     ),
                     children: [
-                      const RideSheetHandle(),
                       const SizedBox(height: DealGoSpacing.s8),
                       Text(
                         l10n.rideMatchingReceiving,
@@ -508,30 +629,9 @@ class _MatchingWait extends StatelessWidget {
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      const SizedBox(height: DealGoSpacing.s8),
-                      Row(
-                        children: [
-                          DealGoPulse(
-                            color: DealGoColors.primary,
-                            child: _VehicleMark(ride: ride),
-                          ),
-                          const SizedBox(width: DealGoSpacing.s12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  l10n.rideMatchingWaiting,
-                                  style: textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: DealGoSpacing.s16),
+                      const SizedBox(height: DealGoSpacing.s12),
+                      RideViewerBanner(count: ride.viewingDriverCount),
+                      const SizedBox(height: DealGoSpacing.s12),
                       RidePanel(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -563,13 +663,20 @@ class _MatchingWait extends StatelessWidget {
                           ],
                         ),
                       ),
+                      if (onAutoAccept case final toggle?) ...[
+                        const SizedBox(height: DealGoSpacing.s12),
+                        RideAutoAcceptSwitch(
+                          priceVnd: ride.offeredFareVnd,
+                          enabled: autoAccept,
+                          busy: actingOn != null,
+                          onChanged: toggle,
+                        ),
+                      ],
                       if (onRaise case final raise?) ...[
                         const SizedBox(height: DealGoSpacing.s8),
-                        Wrap(
+                        Column(
                           key: const Key('ride-inline-raise'),
-                          spacing: DealGoSpacing.s8,
-                          runSpacing: DealGoSpacing.s4,
-                          crossAxisAlignment: WrapCrossAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               l10n.rideRaiseFare,
@@ -577,17 +684,25 @@ class _MatchingWait extends StatelessWidget {
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
-
-                            for (final step in rideRaiseFareSteps)
-                              ActionChip(
-                                key: Key('ride-inline-raise-$step'),
-                                label: Text(
-                                  l10n.rideRaiseFareStep(formatRideVnd(step)),
-                                ),
-                                onPressed: actingOn != null
-                                    ? null
-                                    : () => raise(ride.offeredFareVnd + step),
+                            const SizedBox(height: DealGoSpacing.s4),
+                            // t73u (owner): amount only, one compact row.
+                            RideFareRaiseChips(
+                              keyPrefix: 'ride-inline-raise',
+                              presets: rideFareRaisePresets(
+                                suggestedVnd: ride.offeredFareVnd,
+                                maxBidVnd:
+                                    ride.maxOfferedFareVnd ??
+                                    ride.offeredFareVnd * 3,
+                                maxHeadroomPercent:
+                                    ride.fareHeadroomPercent ??
+                                    (ride.maxOfferedFareVnd == null
+                                        ? 30
+                                        : null),
                               ),
+                              selectedVnd: null,
+                              enabled: actingOn == null,
+                              onPick: raise,
+                            ),
                           ],
                         ),
                       ],
@@ -605,23 +720,31 @@ class _MatchingWait extends StatelessWidget {
                         const SizedBox(height: DealGoSpacing.s12),
                         Text(
                           l10n.rideOffersCount(offers.length),
+                          key: _offersKey,
                           style: textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                         const SizedBox(height: DealGoSpacing.s8),
                         for (final offer in offers) ...[
-                          _InlineOfferCard(
-                            rideId: ride.id,
-                            offer: offer,
-                            busy: actingOn == offer.id,
-                            enabled: actingOn == null,
-                            onAccept: onAccept == null
-                                ? null
-                                : () => onAccept!(offer),
-                            onDecline: onDecline == null
-                                ? null
-                                : () => onDecline!(offer),
+                          RideOfferCountdown(
+                            key: ValueKey('offer-cd-${offer.id}'),
+                            expiresAt: offer.expiresAt,
+                            builder: (context, progress, seconds) =>
+                                _InlineOfferCard(
+                                  rideId: ride.id,
+                                  offer: offer,
+                                  progress: progress,
+                                  seconds: seconds,
+                                  busy: actingOn == offer.id,
+                                  enabled: actingOn == null,
+                                  onAccept: onAccept == null
+                                      ? null
+                                      : () => onAccept!(offer),
+                                  onDecline: onDecline == null
+                                      ? null
+                                      : () => onDecline!(offer),
+                                ),
                           ),
                           const SizedBox(height: DealGoSpacing.s8),
                         ],
@@ -723,10 +846,16 @@ class _InlineOfferCard extends StatelessWidget {
     required this.enabled,
     required this.onAccept,
     required this.onDecline,
+    this.progress = 1,
+    this.seconds = 20,
   });
 
   final String rideId;
   final RideOffer offer;
+
+  /// t81u: countdown shown inside the Accept button only.
+  final double progress;
+  final int seconds;
   final bool busy;
   final bool enabled;
   final VoidCallback? onAccept;
@@ -788,13 +917,14 @@ class _InlineOfferCard extends StatelessWidget {
                 const SizedBox(width: DealGoSpacing.s8),
               ],
               Expanded(
-                child: DealGoPrimaryButton(
+                child: RideOfferAcceptButton(
                   key: Key('ride-inline-accept-${offer.id}'),
                   label: l10n.rideOfferAcceptShort,
-                  compact: true,
-                  isLoading: busy,
+                  progress: progress,
+                  seconds: seconds,
+                  busy: busy,
                   enabled: enabled && onAccept != null,
-                  onPressed: onAccept ?? () {},
+                  onPressed: onAccept,
                 ),
               ),
             ],
@@ -984,40 +1114,6 @@ class _CancelledMatch extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _VehicleMark extends StatelessWidget {
-  const _VehicleMark({required this.ride});
-
-  final RideView ride;
-
-  @override
-  Widget build(BuildContext context) {
-    final photo = resolveMediaUrl(ride.imageUrl);
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: DealGoColors.subtlePurple,
-        shape: BoxShape.circle,
-      ),
-      child: SizedBox(
-        width: 56,
-        height: 56,
-        child: photo == null
-            ? Icon(
-                rideVehicleClassIcon(ride.vehicleClassCode),
-                color: DealGoColors.primary,
-                size: 26,
-              )
-            : ClipOval(
-                child: RideVehicleClassPhoto(
-                  imageUrl: ride.imageUrl,
-                  code: ride.vehicleClassCode,
-                  size: 56,
-                ),
-              ),
-      ),
     );
   }
 }

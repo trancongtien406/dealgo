@@ -62,7 +62,7 @@ class DioPricingRemoteDataSource implements PricingRepository {
   }
 
   @override
-  Future<int> quoteFoodDelivery({
+  Future<FoodDeliveryQuote> quoteFoodDelivery({
     required String accessToken,
     required String storeId,
     required PricePoint dropoff,
@@ -73,19 +73,35 @@ class DioPricingRemoteDataSource implements PricingRepository {
         data: {'storeId': storeId, 'dropoff': _point(dropoff)},
         options: _auth(accessToken),
       );
-      final fare = requireSuccessData(response.data)['deliveryFareVnd'];
-      if (fare is! num) {
-        throw const ApiException(
-          statusCode: 502,
-          message: 'Malformed delivery quote',
-          errorCode: 'MALFORMED_RESPONSE',
-        );
-      }
-      return fare.toInt();
+      return decodeFoodDeliveryQuote(requireSuccessData(response.data));
     } on DioException catch (error) {
       throw apiExceptionFromDio(error);
     }
   }
+}
+
+FoodDeliveryQuote decodeFoodDeliveryQuote(Map<String, Object?> data) {
+  final fare = data['suggestedDeliveryFareVnd'] ?? data['deliveryFareVnd'];
+  if (fare is! num) {
+    throw const ApiException(
+      statusCode: 502,
+      message: 'Malformed delivery quote',
+      errorCode: 'MALFORMED_RESPONSE',
+    );
+  }
+  final min = data['minOfferVnd'];
+  final max = data['maxOfferVnd'];
+  final step = data['fareStepVnd'];
+  if (min is! num || max is! num) {
+    return FoodDeliveryQuote.fixed(fare.toInt());
+  }
+  return FoodDeliveryQuote(
+    suggestedVnd: fare.toInt(),
+    minOfferVnd: min.toInt(),
+    maxOfferVnd: max.toInt(),
+    fareStepVnd: step is num && step > 0 ? step.toInt() : 1000,
+    feeMode: parseFoodDeliveryFeeMode(data['feeMode']),
+  );
 }
 
 RideQuote decodeRideQuote(Map<String, Object?> data) {
@@ -120,16 +136,35 @@ RideQuote decodeRideQuote(Map<String, Object?> data) {
     imageUrl: _text(data['imageUrl']),
     // Class options inherit the same A→B road geometry (coords live on the
     // parent quote payload, not per-class rows).
-    options: _decodeOptions(data['options'], km, route),
+    options: _decodeOptions(
+      data['options'],
+      km,
+      route,
+      intercity: data['intercity'] == true,
+    ),
     route: route,
+    intercity: data['intercity'] == true,
+    bidCeilingPercent: _ceilingPercent(data),
+    fareStepVnd: _fareStep(data),
   );
+}
+
+int? _ceilingPercent(Map<String, Object?> data) {
+  final direct = _int(data['bidCeilingPercent']);
+  if (direct != null) return direct;
+  final tariff = data['tariff'];
+  if (tariff is Map) {
+    return _int(Map<String, Object?>.from(tariff)['bidCeilingPercent']);
+  }
+  return null;
 }
 
 List<RideQuote> _decodeOptions(
   Object? raw,
   double distanceKm,
-  RouteGeometry route,
-) {
+  RouteGeometry route, {
+  bool intercity = false,
+}) {
   if (raw is! List) {
     return const [];
   }
@@ -166,6 +201,9 @@ List<RideQuote> _decodeOptions(
         // Multi-stop: a class whose service has stops off / too few allowed.
         available: data['available'] != false,
         unavailableReason: _text(data['unavailableReason']),
+        intercity: intercity,
+        bidCeilingPercent: _ceilingPercent(data),
+        fareStepVnd: _fareStep(data),
       ),
     );
   }
@@ -207,6 +245,23 @@ String? _text(Object? value) {
   }
   final trimmed = value.trim();
   return trimmed.isEmpty ? null : trimmed;
+}
+
+/// MOB-001: the server's fare step (falls back to 1.000đ; top-level falls back to the first option).
+int _fareStep(Map<String, Object?> data) {
+  int? read(Object? raw) {
+    final v = _int(raw);
+    return v != null && v > 0 ? v : null;
+  }
+
+  final direct = read(data['fareStepVnd']);
+  if (direct != null) return direct;
+  final options = data['options'];
+  if (options is List && options.isNotEmpty && options.first is Map) {
+    final nested = read((options.first as Map)['fareStepVnd']);
+    if (nested != null) return nested;
+  }
+  return RideQuote.defaultFareStepVnd;
 }
 
 int? _int(Object? value) {
@@ -347,13 +402,18 @@ class FakePricingRemoteDataSource implements PricingRepository {
   }
 
   @override
-  Future<int> quoteFoodDelivery({
+  Future<FoodDeliveryQuote> quoteFoodDelivery({
     required String accessToken,
     required String storeId,
     required PricePoint dropoff,
   }) async {
     _maybeFail();
-    return deliveryFareVnd;
+    return FoodDeliveryQuote(
+      suggestedVnd: deliveryFareVnd,
+      minOfferVnd: (deliveryFareVnd * 0.7 / 1000).ceil() * 1000,
+      maxOfferVnd: deliveryFareVnd * 3,
+      fareStepVnd: 1000,
+    );
   }
 }
 

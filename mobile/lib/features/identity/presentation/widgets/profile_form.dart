@@ -99,26 +99,24 @@ class ProfileFormController extends ChangeNotifier {
   }
 }
 
-/// `+84901234567` → `0901 234 567` for the editable field.
-String displayVnPhone(String? e164) {
-  if (e164 == null || e164.isEmpty) return '';
-  var digits = e164.replaceAll(RegExp(r'[^0-9]'), '');
-  if (digits.startsWith('84')) digits = '0${digits.substring(2)}';
-  if (digits.length != 10) return digits;
-  return '${digits.substring(0, 4)} ${digits.substring(4, 7)} ${digits.substring(7)}';
-}
-
 class ProfileForm extends StatefulWidget {
   const ProfileForm({
     required this.controller,
     required this.onSubmitted,
     this.permissionService,
     this.avatarImageSource,
+    this.unverifiedEmail,
+    this.onVerifyEmail,
     super.key,
   });
 
   final ProfileFormController controller;
   final VoidCallback onSubmitted;
+
+  /// The account email while it is still unverified; the field then offers
+  /// [onVerifyEmail] as long as it still shows that address.
+  final String? unverifiedEmail;
+  final VoidCallback? onVerifyEmail;
   final AppPermissionService? permissionService;
   final AvatarImageSource? avatarImageSource;
 
@@ -247,9 +245,11 @@ class _ProfileFormState extends State<ProfileForm> {
               fieldKey: const Key('email-field'),
               label: 'Email',
               controller: _c.email,
+              onChanged: (_) => _c.touch(),
               keyboardType: TextInputType.emailAddress,
               prefixIcon: DealGoIcons.mail,
             ),
+            if (_showVerifyEmail) _unverifiedEmailRow(l10n),
           ],
           const SizedBox(height: 12),
           DealGoDateField(
@@ -291,6 +291,41 @@ class _ProfileFormState extends State<ProfileForm> {
           ),
         ],
       ),
+    );
+  }
+
+  bool get _showVerifyEmail {
+    final unverified = widget.unverifiedEmail?.toLowerCase();
+    return widget.onVerifyEmail != null &&
+        unverified != null &&
+        unverified.isNotEmpty &&
+        _c.email.text.trim().toLowerCase() == unverified;
+  }
+
+  Widget _unverifiedEmailRow(AppLocalizations l10n) {
+    final textTheme = Theme.of(context).textTheme;
+    return Row(
+      children: [
+        Icon(
+          DealGoIcons.info,
+          size: 16,
+          color: DealGoColors.textSecondary,
+        ),
+        const SizedBox(width: DealGoSpacing.s6),
+        Expanded(
+          child: Text(
+            l10n.profileEmailUnverified,
+            style: textTheme.labelMedium?.copyWith(
+              color: DealGoColors.textSecondary,
+            ),
+          ),
+        ),
+        TextButton(
+          key: const Key('email-verify-action'),
+          onPressed: widget.onVerifyEmail,
+          child: Text(l10n.profileEmailVerifyAction),
+        ),
+      ],
     );
   }
 
@@ -398,7 +433,7 @@ class _FormField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
             color: DealGoColors.text,
@@ -470,6 +505,7 @@ class ProfileFormScaffold extends StatelessWidget {
     required this.form,
     required this.action,
     this.trailing,
+    this.canLeave = true,
     super.key,
   });
 
@@ -478,10 +514,13 @@ class ProfileFormScaffold extends StatelessWidget {
   final Widget action;
   final Widget? trailing;
 
+  /// False on the post-signup screen: back would leave the profile unfinished.
+  final bool canLeave;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F7FC),
+      backgroundColor: DealGoColors.canvas,
       body: SafeArea(
         child: Column(
           children: [
@@ -494,7 +533,7 @@ class ProfileFormScaffold extends StatelessWidget {
                 height: DealGoDimensions.minTapTarget,
                 child: Row(
                   children: [
-                    if (Navigator.of(context).canPop())
+                    if (canLeave && Navigator.of(context).canPop())
                       AuthBackButton(
                         onPressed: () => Navigator.of(context).maybePop(),
                       )
@@ -503,10 +542,10 @@ class ProfileFormScaffold extends StatelessWidget {
                     Expanded(
                       child: Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF0F172A),
+                          color: DealGoColors.text,
                         ),
                       ),
                     ),

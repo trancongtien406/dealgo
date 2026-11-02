@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/config/app_env.dart';
@@ -65,6 +66,7 @@ class DriverKycState {
     this.submitting = false,
     this.submitError,
     this.documentsRequired = true,
+    this.carDocsRequired = true,
     this.ocr = const OcrPrefill(),
     this.ocrReading = false,
   });
@@ -133,6 +135,16 @@ class DriverKycState {
   /// only services, name and vehicle class; ops still approves.
   final bool documentsRequired;
 
+  /// t90u: admin DRIVER_CAR_EXTRA_DOCS_REQUIRED — car drivers upload the insurance
+  /// photo even in quick registration. Fails closed (true).
+  final bool carDocsRequired;
+
+  /// t90u: car insurance photo needed for the current class (both modes).
+  bool get needsCarInsurance =>
+      hasSelectedVehicleClass &&
+      PartnerDocumentKind.isCarClass(vehicleClassCode!) &&
+      (documentsRequired || carDocsRequired);
+
   /// t61u: values read from document photos on the device.
   final OcrPrefill ocr;
   final bool ocrReading;
@@ -184,14 +196,20 @@ class DriverKycState {
   }
 
   /// t60u: false when e.g. an A1 (motorbike) licence is paired with CAR_4.
+  /// t88u: quick mode has no licence step, so there is no declared class to check.
   bool get licenseMatchesVehicle =>
+      !documentsRequired ||
       !hasSelectedVehicleClass ||
       PartnerDocumentKind.licenseCoversVehicle(licenseClass, vehicleClassCode!);
 
   bool get canContinueVehicleStep {
     if (!documentsRequired) {
-      // Quick registration: plate + an explicit class (fail closed), no photos.
-      return canContinueVehicle && hasSelectedVehicleClass;
+      // Quick registration: plate + an explicit class (fail closed); a car also
+      // needs the insurance photo while the admin car-docs gate is on (t90u).
+      return canContinueVehicle &&
+          hasSelectedVehicleClass &&
+          (!needsCarInsurance ||
+              documents.has(PartnerDocumentKind.vehicleInsurance));
     }
     if (!canContinueVehicle || !documents.has(PartnerDocumentKind.vehicleReg)) {
       return false;
@@ -264,11 +282,13 @@ class DriverKycState {
     String? submitError,
     bool clearSubmitError = false,
     bool? documentsRequired,
+    bool? carDocsRequired,
     OcrPrefill? ocr,
     bool? ocrReading,
   }) {
     return DriverKycState(
       documentsRequired: documentsRequired ?? this.documentsRequired,
+      carDocsRequired: carDocsRequired ?? this.carDocsRequired,
       ocr: ocr ?? this.ocr,
       ocrReading: ocrReading ?? this.ocrReading,
       status: status ?? this.status,
@@ -308,6 +328,7 @@ class DriverKycCubit extends Cubit<DriverKycState> {
     this._getMyPartnerApplication,
     this._accessToken,
     this._loadDocumentsRequired,
+    this._loadCarDocsRequired,
     this._draftStore,
     this._draftOwner,
     bool? useMock,
@@ -327,6 +348,8 @@ class DriverKycCubit extends Cubit<DriverKycState> {
     required String role,
   })?
   _loadDocumentsRequired;
+  final Future<bool> Function({required String accessToken})?
+  _loadCarDocsRequired;
   final bool _useMock;
 
   /// Unsent-draft persistence (app killed mid-flow); off without a store/user.
@@ -461,8 +484,14 @@ class DriverKycCubit extends Cubit<DriverKycState> {
     });
   }
 
+  /// pt5u: versions of Quy chế sử dụng + privacy the applicant ticked on the
+  /// review step; null until both boxes are checked (gates the submit button).
+  final ValueNotifier<List<AcceptedLegalDocument>?> legalConsent =
+      ValueNotifier(null);
+
   @override
   Future<void> close() async {
+    legalConsent.dispose();
     await _keeper?.flush();
     return super.close();
   }
@@ -475,10 +504,18 @@ class DriverKycCubit extends Cubit<DriverKycState> {
       return;
     }
     final required = await load(accessToken: token, role: role);
-    if (isClosed || required == state.documentsRequired) {
+    final carDocs =
+        await _loadCarDocsRequired?.call(accessToken: token) ??
+        state.carDocsRequired;
+    if (isClosed ||
+        (required == state.documentsRequired &&
+            carDocs == state.carDocsRequired)) {
       return;
     }
-    final next = state.copyWith(documentsRequired: required);
+    final next = state.copyWith(
+      documentsRequired: required,
+      carDocsRequired: carDocs,
+    );
     emit(
       next.steps.contains(next.step)
           ? next
@@ -790,8 +827,9 @@ class DriverKycCubit extends Cubit<DriverKycState> {
     'birthDate': state.birthDate.trim(),
     'address': state.address.trim(),
     'idNumber': state.idNumber,
-    'licenseClass': state.licenseClass,
-    'licenseNumber': state.licenseNumber,
+    // t88u: quick mode never shows the licence step; don't send the 'A1' default.
+    if (state.documentsRequired) 'licenseClass': state.licenseClass,
+    if (state.documentsRequired) 'licenseNumber': state.licenseNumber,
     'vehiclePlate': state.vehiclePlate.trim(),
     if (state.vehicleClassCode != null &&
         state.vehicleClassCode!.trim().isNotEmpty)
@@ -843,8 +881,13 @@ class DriverKycCubit extends Cubit<DriverKycState> {
           accessToken: token,
           role: role,
           metadata: _metadata(),
+          acceptedLegalDocuments: legalConsent.value ?? const [],
           documents: state.documentsRequired
               ? state.documents.uploads(state.requiredDriverDocumentKinds)
+              : state.needsCarInsurance
+              ? state.documents.uploads(const [
+                  PartnerDocumentKind.vehicleInsurance,
+                ])
               : const [],
         ),
       );

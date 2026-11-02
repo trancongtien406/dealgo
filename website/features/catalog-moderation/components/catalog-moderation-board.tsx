@@ -478,22 +478,31 @@ export function CatalogModerationBoard() {
               Kiểm tra kỹ chất lượng hình ảnh, định giá món và chính sách an
               toàn thực phẩm trước khi phê duyệt niêm yết lên thực đơn.
             </div>
-            {selected.status === "PENDING" && selected.id !== "---" ? (
+            {selected.id !== "---" ? (
+              // ADM-002: an approved dish can be unlisted (reject) and a rejected one re-approved.
               <div className="mt-4 flex flex-wrap gap-2">
-                <PreviewButton
-                  tone="danger"
-                  compact
-                  onClick={() => void runModeration("reject")}
-                >
-                  {actionPending ? "Đang xử lý…" : "Từ chối"}
-                </PreviewButton>
-                <PreviewButton
-                  tone="brand"
-                  compact
-                  onClick={() => void runModeration("approve")}
-                >
-                  {actionPending ? "Đang xử lý…" : "Duyệt"}
-                </PreviewButton>
+                {selected.status !== "REJECTED" ? (
+                  <PreviewButton
+                    tone="danger"
+                    compact
+                    onClick={() => void runModeration("reject")}
+                  >
+                    {actionPending
+                      ? "Đang xử lý…"
+                      : selected.status === "APPROVED"
+                        ? "Gỡ niêm yết"
+                        : "Từ chối"}
+                  </PreviewButton>
+                ) : null}
+                {selected.status !== "APPROVED" ? (
+                  <PreviewButton
+                    tone="brand"
+                    compact
+                    onClick={() => void runModeration("approve")}
+                  >
+                    {actionPending ? "Đang xử lý…" : "Duyệt"}
+                  </PreviewButton>
+                ) : null}
               </div>
             ) : null}
           </aside>

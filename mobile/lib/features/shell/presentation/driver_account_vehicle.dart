@@ -96,7 +96,12 @@ class _DriverAccountVehicleState extends State<DriverAccountVehicle> {
     if (code == null) {
       return null;
     }
-    final officialName = _metadataText(view.metadata, 'vehicleType');
+    final officialName =
+        _makeAndModel(
+          _metadataText(view.metadata, 'vehicleBrand'),
+          _metadataText(view.metadata, 'vehicleModel'),
+        ) ??
+        _metadataText(view.metadata, 'vehicleType');
     var imageUrl = _metadataText(view.metadata, 'imageUrl');
     imageUrl ??= await _classImageUrl(accessToken, code);
     return _RegisteredVehicle(
@@ -154,10 +159,7 @@ class _DriverAccountVehicleState extends State<DriverAccountVehicle> {
             Row(
               children: [
                 if (vehicle == null)
-                  const Icon(
-                    DealGoIcons.info,
-                    color: DealGoColors.textSecondary,
-                  )
+                  Icon(DealGoIcons.info, color: DealGoColors.textSecondary)
                 else if (photo == null)
                   Icon(
                     rideVehicleClassIcon(vehicle.code),
@@ -179,6 +181,16 @@ class _DriverAccountVehicleState extends State<DriverAccountVehicle> {
       ),
     );
   }
+}
+
+/// "Honda" + "Vision" → "Honda Vision", without repeating a brand the model
+/// already starts with (same rule as the backend driver card).
+String? _makeAndModel(String? brand, String? model) {
+  if (brand == null) return model;
+  if (model == null) return brand;
+  return model.toLowerCase().startsWith(brand.toLowerCase())
+      ? model
+      : '$brand $model';
 }
 
 String? _metadataText(Map<String, Object?> metadata, String key) {

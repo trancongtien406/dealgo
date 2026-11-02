@@ -120,7 +120,10 @@ export class PrismaPaymentRepository implements PaymentRepository {
           const matching = await tx.paymentIntent.findFirst({
             where: { provider: input.provider, providerRef: input.providerRef },
           });
-          if (matching) {
+          if (matching && LEGACY_FINAL_STATUSES.includes(matching.status)) {
+            // Never downgrade a verified capture / refund (the signed checkout IPN owns these).
+            intent = toView(matching);
+          } else if (matching) {
             const updated = await tx.paymentIntent.update({
               where: { id: matching.id },
               data: { status: input.markStatus },
@@ -151,6 +154,8 @@ export class PrismaPaymentRepository implements PaymentRepository {
     }
   }
 }
+
+const LEGACY_FINAL_STATUSES: readonly string[] = ['CAPTURED', 'REFUND_PENDING', 'REFUNDED'];
 
 function toView(row: {
   id: string;

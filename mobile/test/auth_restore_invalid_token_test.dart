@@ -45,60 +45,55 @@ void main() {
     expect(await store.read(), isNull);
   });
 
-  test(
-    'signOut after account deletion (revoked session on server) does not deadlock',
-    () async {
-      final store = MemoryTokenStore();
-      const session = StoredTokens(
-        accessToken: 'revoked-access-token',
-        refreshToken: 'revoked-refresh-token-123456',
+  test('signOut after account deletion (revoked session on server) does not deadlock', () async {
+    final store = MemoryTokenStore();
+    const session = StoredTokens(
+      accessToken: 'revoked-access-token',
+      refreshToken: 'revoked-refresh-token-123456',
+    );
+    await store.write(session);
+
+    var revoked = false;
+    late final AuthCubit auth;
+    final dio = createDealGoDio(
+      baseUrl: 'https://api.test',
+      tokenStore: store,
+      onSessionRefreshed: (next) => auth.applyRefreshedTokens(next),
+      onUnauthorized: () => auth.signOut(revokeRemote: false),
+      enableLogging: false,
+    );
+    dio.httpClientAdapter = _RevocableSessionAdapter(isRevoked: () => revoked);
+
+    final identity = DioIdentityRemoteDataSource(dio: dio);
+    final repo = IdentityRepositoryImpl(identity);
+    auth = AuthCubit(
+      fetchMe: FetchMe(repo),
+      tokens: store,
+      identityRepository: repo,
+    );
+    auth.beforeSignOut = (token) async {
+      if (token.isEmpty) return;
+      await dio.delete<Object?>(
+        ApiPaths.mePushTokens,
+        data: {'token': 'fcm-1'},
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          extra: const {skipAuthRefreshExtra: true},
+        ),
       );
-      await store.write(session);
+    };
 
-      var revoked = false;
-      late final AuthCubit auth;
-      final dio = createDealGoDio(
-        baseUrl: 'https://api.test',
-        tokenStore: store,
-        onSessionRefreshed: (next) => auth.applyRefreshedTokens(next),
-        onUnauthorized: () => auth.signOut(revokeRemote: false),
-        enableLogging: false,
-      );
-      dio.httpClientAdapter = _RevocableSessionAdapter(isRevoked: () => revoked);
+    await auth.completeSignIn(session);
+    expect(auth.state, isA<AuthSignedIn>());
 
-      final identity = DioIdentityRemoteDataSource(dio: dio);
-      final repo = IdentityRepositoryImpl(identity);
-      auth = AuthCubit(
-        fetchMe: FetchMe(repo),
-        tokens: store,
-        identityRepository: repo,
-      );
-      auth.beforeSignOut = (token) async {
-        if (token.isEmpty) return;
-        await dio.delete<Object?>(
-          ApiPaths.mePushTokens,
-          data: {'token': 'fcm-1'},
-          options: Options(
-            headers: {'Authorization': 'Bearer $token'},
-            extra: const {skipAuthRefreshExtra: true},
-          ),
-        );
-      };
+    // Simulate backend confirming account deletion: all sessions are revoked.
+    revoked = true;
 
-      await auth.completeSignIn(session);
-      expect(auth.state, isA<AuthSignedIn>());
+    await auth.signOut(revokeRemote: false).timeout(const Duration(seconds: 1));
 
-      // Simulate backend confirming account deletion: all sessions are revoked.
-      revoked = true;
-
-      await auth.signOut(revokeRemote: false).timeout(
-        const Duration(seconds: 1),
-      );
-
-      expect(auth.state, isA<AuthSignedOut>());
-      expect(await store.read(), isNull);
-    },
-  );
+    expect(auth.state, isA<AuthSignedOut>());
+    expect(await store.read(), isNull);
+  });
 }
 
 class _RevocableSessionAdapter implements HttpClientAdapter {

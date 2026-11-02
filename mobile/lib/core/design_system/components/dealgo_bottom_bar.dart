@@ -45,7 +45,7 @@ class DealGoBottomBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: DealGoColors.card.withValues(alpha: frosted ? 0.88 : 1),
         boxShadow: DealGoShadows.floating,
-        border: const Border(top: BorderSide(color: DealGoColors.divider)),
+        border: Border(top: BorderSide(color: DealGoColors.divider)),
       ),
       child: content,
     );

@@ -32,7 +32,15 @@ void merchantBack(BuildContext context) {
   final auth = context.read<AuthCubit>().state;
   if (auth is AuthSignedIn && auth.profile.activeAppRoles.length > 1) {
     context.push(AuthRoutes.roles);
+    return;
   }
+  // This route replaced the shell (push / cold start). Pop cannot bring the bar back.
+  context.go('/merchant');
+}
+
+/// A declined order must leave the detail branch and select the orders tab.
+void merchantReturnToOrders(BuildContext context) {
+  context.go('/merchant/orders');
 }
 
 String merchantStatusLabel(AppLocalizations l10n, String status) {
@@ -41,15 +49,22 @@ String merchantStatusLabel(AppLocalizations l10n, String status) {
     'PREPARING' => l10n.merchantStatusPreparing,
     'READY' || 'READY_FOR_PICKUP' => l10n.merchantStatusReady,
     'ASSIGNED' => l10n.merchantStatusAssigned,
+    'PICKED_UP' => l10n.merchantStatusPickedUp,
+    'DELIVERED' => l10n.merchantStatusDelivered,
+    'FAILED' => l10n.statusFailed,
     'CANCELLED' || 'CANCELED' || 'REJECTED' => l10n.statusCancelled,
-    _ => status,
+    _ => l10n.merchantStatusUnknown,
   };
 }
 
 MerchantChipTone merchantStatusTone(String status) {
   return switch (status) {
     'PLACED' => MerchantChipTone.warning,
-    'PREPARING' || 'READY' => MerchantChipTone.green,
+    'PREPARING' ||
+    'READY' ||
+    'READY_FOR_PICKUP' ||
+    'PICKED_UP' ||
+    'DELIVERED' => MerchantChipTone.green,
     _ => MerchantChipTone.neutral,
   };
 }
@@ -230,7 +245,7 @@ class MerchantHeader extends StatelessWidget {
 class MerchantPanel extends StatelessWidget {
   const MerchantPanel({
     required this.child,
-    this.color = DealGoColors.card,
+    this.color,
     this.elevated = false,
     this.borderColor,
     this.padding = const EdgeInsets.all(DealGoSpacing.s16),
@@ -238,7 +253,7 @@ class MerchantPanel extends StatelessWidget {
   });
 
   final Widget child;
-  final Color color;
+  final Color? color;
   final bool elevated;
   final Color? borderColor;
   final EdgeInsetsGeometry padding;
@@ -246,12 +261,13 @@ class MerchantPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(DealGoRadius.card);
+    final fill = color ?? DealGoColors.card;
     final side =
         borderColor ??
-        (color == DealGoColors.card ? DealGoColors.border : Colors.transparent);
+        (fill == DealGoColors.card ? DealGoColors.border : Colors.transparent);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: color,
+        color: fill,
         borderRadius: radius,
         border: Border.all(color: side),
         boxShadow: elevated ? DealGoShadows.card : null,

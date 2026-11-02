@@ -21,14 +21,14 @@ String? currentAccessToken(BuildContext context) {
 class FoodPanel extends StatelessWidget {
   const FoodPanel({
     required this.child,
-    this.color = DealGoColors.card,
+    this.color,
     this.padding = const EdgeInsets.all(DealGoSpacing.s16),
     this.elevated = false,
     super.key,
   });
 
   final Widget child;
-  final Color color;
+  final Color? color;
   final EdgeInsetsGeometry padding;
 
   /// Soft purple shadow for menu/store cards (C022/C025).
@@ -37,12 +37,13 @@ class FoodPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(DealGoRadius.card);
+    final fill = color ?? DealGoColors.card;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: color,
+        color: fill,
         borderRadius: radius,
         border: Border.all(
-          color: color == DealGoColors.card
+          color: fill == DealGoColors.card
               ? DealGoColors.border
               : Colors.transparent,
         ),

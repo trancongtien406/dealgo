@@ -41,13 +41,20 @@ void main() {
   testWidgets('logout asks for confirmation; cancel keeps the session', (
     tester,
   ) async {
-    await tester.binding.setSurfaceSize(const Size(400, 1800));
+    await tester.binding.setSurfaceSize(const Size(400, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await pumpSignedIn(tester, profile: customerProfile);
     await tester.tap(navLabel('Tôi'));
     await tester.pumpAndSettle();
     expect(find.text('Nguyễn Văn A'), findsWidgets);
     expect(find.text('+84911111111'), findsNothing);
+    // The sign-out row sits at the bottom of the page, under the bottom nav:
+    // centre it before tapping.
+    await Scrollable.ensureVisible(
+      tester.element(find.byKey(const Key('account-signout'))),
+      alignment: 0.5,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('account-signout')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('account-signout-confirm')), findsOneWidget);
@@ -55,6 +62,13 @@ void main() {
     await tester.pumpAndSettle();
     final ctx = tester.element(find.byType(AccountPage));
     expect(ctx.read<AuthCubit>().state, isA<AuthSignedIn>());
+    // The sign-out row sits at the bottom of the page, under the bottom nav:
+    // centre it before tapping.
+    await Scrollable.ensureVisible(
+      tester.element(find.byKey(const Key('account-signout'))),
+      alignment: 0.5,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('account-signout')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('account-signout-confirm')));
@@ -72,7 +86,11 @@ void main() {
     GoRouter.of(tester.element(find.byType(Scaffold).first))
         .push(RideRoutes.offers('ride-1'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('ride-offer-offer-1')));
+    // Tap the card body (its center now holds the t81u Accept button).
+    await tester.tapAt(
+      tester.getTopLeft(find.byKey(const Key('ride-offer-offer-1'))) +
+          const Offset(24, 24),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('ride-select-offer')));
     await tester.pumpAndSettle();
@@ -81,6 +99,22 @@ void main() {
     await tester.tap(find.byKey(const Key('ride-offer-confirm')));
     await tester.pumpAndSettle();
     expect(rides.selectCalls, hasLength(1));
+  });
+
+  testWidgets('t81u: the Accept button on an offer card asks to confirm', (
+    tester,
+  ) async {
+    final rides = FakeRideClient()..onGet = (_) => _ride();
+    await tester.binding.setSurfaceSize(const Size(400, 1800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await pumpSignedIn(tester, profile: customerProfile, rideClient: rides);
+    GoRouter.of(tester.element(find.byType(Scaffold).first))
+        .push(RideRoutes.offers('ride-1'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('ride-offer-accept-offer-1')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('ride-offer-confirm')), findsOneWidget);
+    expect(rides.selectCalls, isEmpty);
   });
 }
 

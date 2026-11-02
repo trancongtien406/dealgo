@@ -28,7 +28,7 @@ void main() {
       expect(ios, hasLength(2));
     });
 
-    test('Apple Maps (r25): maps:// on iOS, then maps.apple.com', () {
+    test('Apple Maps: maps:// on iOS, then maps.apple.com', () {
       final ios = navigationUris(
         NavigationApp.appleMaps,
         lat: 16.06,

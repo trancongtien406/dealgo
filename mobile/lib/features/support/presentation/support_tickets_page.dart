@@ -277,7 +277,7 @@ class _TicketCard extends StatelessWidget {
                 style: textTheme.bodySmall,
               ),
               const SizedBox(width: DealGoSpacing.s16),
-              const Icon(
+              Icon(
                 DealGoIcons.clock,
                 size: 14,
                 color: DealGoColors.textSecondary,
@@ -289,7 +289,7 @@ class _TicketCard extends StatelessWidget {
                   style: textTheme.bodySmall,
                 ),
               ),
-              const Icon(
+              Icon(
                 DealGoIcons.chevronRight,
                 size: 18,
                 color: DealGoColors.textSecondary,

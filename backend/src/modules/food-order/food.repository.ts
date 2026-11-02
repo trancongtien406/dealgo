@@ -87,6 +87,7 @@ export type StoreListItem = {
   lng: number | null;
   category: string | null;
   serviceRegionCode?: string | null;
+  addressLabel?: string | null;
   /** M030 logo path (DEC-PROD-045); null = none uploaded. */
   logoUrl?: string | null;
   /** Merchant cover photo path; null = none (clients fall back to a dish photo). */
@@ -250,8 +251,55 @@ export type OpsStoreSummary = StoreListItem &
     estimatedPrepMinutes: number;
   };
 
+export type OpsStoreKybDetail = {
+  applicationId: string;
+  status: string;
+  representativeName: string;
+  businessType: string;
+  registrationSubject: string;
+  bankName: string;
+  bankAccountNumber: string;
+  bankAccountHolder: string;
+  documentsWaived: boolean;
+  documentCount: number;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+};
+
+export type OpsStoreStats = {
+  completedOrders: number;
+  cancelledOrders: number;
+  totalOrders: number;
+  completionRate: number | null;
+  ratingAverage: number | null;
+  ratingCount: number;
+};
+
+export type OpsStoreRecentOrder = {
+  id: string;
+  code: string;
+  status: string;
+  statusLabel: string;
+  totalVnd: number;
+  dropoffLabel: string;
+  customerName: string;
+  createdAt: string;
+};
+
+export type OpsStoreRecentReview = {
+  id: string;
+  stars: number;
+  comment: string | null;
+  raterName: string;
+  createdAt: string;
+};
+
 export type OpsStoreDetail = OpsStoreSummary & {
   items: StoreItemView[];
+  kybDetail?: OpsStoreKybDetail | null;
+  stats?: OpsStoreStats | null;
+  recentOrders?: OpsStoreRecentOrder[];
+  recentReviews?: OpsStoreRecentReview[];
 };
 
 export type OpsStorePage = {
@@ -342,7 +390,64 @@ export type FoodOrderView = {
   /** When the order was placed (Admin list time column, date filters). */
   createdAt: Date;
   updatedAt: Date;
+  /** Checkout suggestion (reference only); deliveryFareVnd is the offer/agreed fee. */
+  suggestedDeliveryFareVnd?: number | null;
+  /** Set once a driver accepted the customer's offer or the customer selected a counter. */
+  deliveryFareAgreedAt?: Date | null;
+  deliveryFareRaiseCount?: number;
 };
+
+export type FoodDeliveryOfferStatusName =
+  | 'PENDING'
+  | 'SELECTED'
+  | 'LOST'
+  | 'WITHDRAWN';
+
+/** A driver's counter on the delivery fee (the customer selects one). */
+export type FoodDeliveryOfferView = {
+  id: string;
+  orderId: string;
+  driverId: string;
+  amountVnd: number;
+  status: FoodDeliveryOfferStatusName;
+  expiresAt: Date;
+  editCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/** Customer selects a driver counter: the claim also writes the agreed fee. */
+export type FoodClaimFare = { offerId: string; customerId: string; now: Date };
+
+export type SubmitFoodDeliveryOfferInput = {
+  orderId: string;
+  driverId: string;
+  amountVnd: number;
+  expiresAt: Date;
+  /** Times a driver may change the counter (FOOD_MAX_OFFER_EDITS_PER_DRIVER). */
+  maxEdits: number;
+  /** Counter must be > the current offer and <= offer x this % (FOOD_COUNTER_MAX_PERCENT_OF_OFFER). */
+  counterMaxPercent: number;
+  /** Absolute ceiling (FOOD_MAX_DELIVERY_VND). */
+  maxFareVnd: number;
+  early: FoodEarlyClaim;
+};
+
+export type RaiseFoodDeliveryFareInput = {
+  orderId: string;
+  customerId: string;
+  amountVnd: number;
+  maxRaises: number;
+};
+
+/** Shared counter bound: offer < counter <= min(ceiling, offer x percent). */
+export function counterCeilingVnd(
+  offerVnd: number,
+  counterMaxPercent: number,
+  maxFareVnd: number,
+): number {
+  return Math.min(maxFareVnd, Math.floor((offerVnd * counterMaxPercent) / 100));
+}
 
 /** One edited line; toQuantity 0 removes it. */
 export type FoodOrderChangeLine = {
@@ -601,7 +706,10 @@ export type PlaceFoodInput = {
   idempotencyKey: string;
   items: PlaceFoodLineInput[];
   dropoff: { lat: number; lng: number; label: string };
+  /** Customer's delivery-fee offer (validated by the service against the suggestion). */
   deliveryFareVnd: number;
+  /** System suggestion shown at checkout (reference only). */
+  suggestedDeliveryFareVnd?: number;
   /** Re-validated and redeemed in the same unit of work as the order. */
   voucherCode?: string;
 };
@@ -770,12 +878,30 @@ export interface FoodRepository {
   ): Promise<Map<string, DriverJobCounts>>;
   accept(orderId: string, ownerId: string): Promise<FoodOrderView>;
   markReady(orderId: string, ownerId: string): Promise<FoodOrderView>;
+  /**
+   * Driver accepts the customer's current delivery-fee offer (no `fare`), or the customer
+   * selects a driver counter (`fare`): atomic assignment; the other pending counters → LOST.
+   */
   claim(
     orderId: string,
     driverId: string,
     maxConcurrentJobs?: number,
     early?: FoodEarlyClaim,
+    fare?: FoodClaimFare,
   ): Promise<FoodOrderView>;
+  /** Driver creates/updates a counter on an open, unassigned order (one per driver). */
+  submitDeliveryOffer(
+    input: SubmitFoodDeliveryOfferInput,
+  ): Promise<FoodDeliveryOfferView>;
+  /** Driver withdraws a pending counter. */
+  withdrawDeliveryOffer(
+    orderId: string,
+    driverId: string,
+  ): Promise<FoodDeliveryOfferView>;
+  /** Every counter on the order, newest first. */
+  listDeliveryOffers(orderId: string): Promise<FoodDeliveryOfferView[]>;
+  /** Customer raises the offer while no driver is assigned (re-post). */
+  raiseDeliveryFare(input: RaiseFoodDeliveryFareInput): Promise<FoodOrderView>;
   /** Assigned driver hands the order back before pickup (counts as a driver cancel). */
   release(
     orderId: string,
@@ -939,6 +1065,7 @@ export class MemoryFoodRepository implements FoodRepository {
 
   private readonly stores: StoredStore[] = [];
   private readonly items: StoredItem[] = [];
+  private readonly deliveryOffers: FoodDeliveryOfferView[] = [];
   private readonly seededAt = new Date();
   private lastItemCreatedAt = this.seededAt.getTime();
 
@@ -1311,6 +1438,10 @@ export class MemoryFoodRepository implements FoodRepository {
       ownerId: store.ownerId,
       status: placementStatus(acceptSettings),
       deliveryFareVnd: input.deliveryFareVnd,
+      suggestedDeliveryFareVnd:
+        input.suggestedDeliveryFareVnd ?? input.deliveryFareVnd,
+      deliveryFareAgreedAt: null,
+      deliveryFareRaiseCount: 0,
       subtotalVnd,
       discountVnd,
       voucherCode,
@@ -1719,7 +1850,8 @@ export class MemoryFoodRepository implements FoodRepository {
       priceVnd: input.priceVnd,
       originalPriceVnd: input.originalPriceVnd ?? null,
       available,
-      moderationStatus: available ? 'APPROVED' : 'PENDING',
+      // FOOD-001: every new dish waits for admin moderation before it can be ordered.
+      moderationStatus: 'PENDING',
       createdAt: this.nextItemCreatedAt(),
       description: input.description ?? null,
       prepMinutes: input.prepMinutes ?? null,
@@ -1964,10 +2096,11 @@ export class MemoryFoodRepository implements FoodRepository {
     input: SetItemAvailabilityInput,
   ): Promise<StoreItemView> {
     const item = this.requireOwnedItem(input.ownerId, input.itemId);
-    item.available = input.available;
-    if (input.available && item.moderationStatus === 'REJECTED') {
-      item.moderationStatus = 'APPROVED';
+    // FOOD-001: availability never changes moderation; only APPROVED items can go on sale.
+    if (input.available && item.moderationStatus !== 'APPROVED') {
+      throw new FoodRuleError('FOOD_ITEM_NOT_APPROVED');
     }
+    item.available = input.available;
     return memoryItemView(item);
   }
 
@@ -2182,8 +2315,28 @@ export class MemoryFoodRepository implements FoodRepository {
     driverId: string,
     maxConcurrentJobs = 1,
     early?: FoodEarlyClaim,
+    fare?: FoodClaimFare,
   ): Promise<FoodOrderView> {
     const order = this.orders.find((entry) => entry.id === orderId);
+    const offer = fare
+      ? this.deliveryOffers.find(
+          (entry) =>
+            entry.id === fare.offerId &&
+            entry.orderId === orderId &&
+            entry.driverId === driverId,
+        )
+      : undefined;
+    if (fare) {
+      if (!order || order.customerId !== fare.customerId) {
+        throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
+      }
+      if (!offer || offer.status !== 'PENDING') {
+        throw new FoodRuleError('FOOD_OFFER_NOT_FOUND');
+      }
+      if (offer.expiresAt.getTime() <= fare.now.getTime()) {
+        throw new FoodRuleError('FOOD_OFFER_EXPIRED');
+      }
+    }
     if (!order) {
       throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
     }
@@ -2219,6 +2372,138 @@ export class MemoryFoodRepository implements FoodRepository {
       order.status = 'ASSIGNED';
     }
     order.assignedDriverId = driverId;
+    if (offer) {
+      order.deliveryFareVnd = offer.amountVnd;
+      order.totalVnd = Math.max(
+        0,
+        order.subtotalVnd + offer.amountVnd - order.discountVnd,
+      );
+    }
+    order.deliveryFareAgreedAt = fare?.now ?? new Date();
+    const stamp = new Date();
+    for (const entry of this.deliveryOffers) {
+      if (entry.orderId === orderId && entry.status === 'PENDING') {
+        entry.status = entry.id === offer?.id ? 'SELECTED' : 'LOST';
+        entry.updatedAt = stamp;
+      }
+    }
+    touchOrder(order);
+    return copyOrder(order);
+  }
+
+  async submitDeliveryOffer(
+    input: SubmitFoodDeliveryOfferInput,
+  ): Promise<FoodDeliveryOfferView> {
+    const order = this.orders.find((entry) => entry.id === input.orderId);
+    if (!order) {
+      throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
+    }
+    if (order.customerId === input.driverId) {
+      throw new FoodRuleError('FOOD_SELF_CLAIM');
+    }
+    if (order.assignedDriverId !== null || order.status === 'ASSIGNED') {
+      throw new FoodRuleError('FOOD_ALREADY_ASSIGNED');
+    }
+    if (order.status === 'PREPARING') {
+      const opensAt = earlyClaimOpensAt(order, input.early.leadMinutes);
+      if (!opensAt || opensAt.getTime() > input.early.now.getTime()) {
+        throw new FoodRuleError('FOOD_NOT_YET_CLAIMABLE');
+      }
+    } else if (order.status !== 'READY') {
+      throw new FoodRuleError('FOOD_STATUS_CONFLICT');
+    }
+    const ceiling = counterCeilingVnd(
+      order.deliveryFareVnd,
+      input.counterMaxPercent,
+      input.maxFareVnd,
+    );
+    if (
+      input.amountVnd <= order.deliveryFareVnd ||
+      input.amountVnd > ceiling
+    ) {
+      throw new FoodRuleError('FOOD_OFFER_AMOUNT_INVALID');
+    }
+    const now = input.early.now;
+    const existing = this.deliveryOffers.find(
+      (entry) =>
+        entry.orderId === input.orderId && entry.driverId === input.driverId,
+    );
+    if (existing) {
+      if (existing.status === 'SELECTED' || existing.status === 'LOST') {
+        throw new FoodRuleError('FOOD_STATUS_CONFLICT');
+      }
+      if (existing.editCount >= input.maxEdits) {
+        throw new FoodRuleError('FOOD_OFFER_EDIT_LIMIT');
+      }
+      existing.amountVnd = input.amountVnd;
+      existing.status = 'PENDING';
+      existing.expiresAt = new Date(input.expiresAt);
+      existing.editCount += 1;
+      existing.updatedAt = now;
+      return { ...existing };
+    }
+    const created: FoodDeliveryOfferView = {
+      id: randomUUID(),
+      orderId: input.orderId,
+      driverId: input.driverId,
+      amountVnd: input.amountVnd,
+      status: 'PENDING',
+      expiresAt: new Date(input.expiresAt),
+      editCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.deliveryOffers.push(created);
+    return { ...created };
+  }
+
+  async withdrawDeliveryOffer(
+    orderId: string,
+    driverId: string,
+  ): Promise<FoodDeliveryOfferView> {
+    const offer = this.deliveryOffers.find(
+      (entry) => entry.orderId === orderId && entry.driverId === driverId,
+    );
+    if (!offer || offer.status !== 'PENDING') {
+      throw new FoodRuleError('FOOD_OFFER_NOT_FOUND');
+    }
+    offer.status = 'WITHDRAWN';
+    offer.updatedAt = new Date();
+    return { ...offer };
+  }
+
+  async listDeliveryOffers(orderId: string): Promise<FoodDeliveryOfferView[]> {
+    return this.deliveryOffers
+      .filter((entry) => entry.orderId === orderId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .map((entry) => ({ ...entry }));
+  }
+
+  async raiseDeliveryFare(
+    input: RaiseFoodDeliveryFareInput,
+  ): Promise<FoodOrderView> {
+    const order = this.orders.find((entry) => entry.id === input.orderId);
+    if (!order || order.customerId !== input.customerId) {
+      throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
+    }
+    if (
+      order.assignedDriverId !== null ||
+      !['PLACED', 'PREPARING', 'READY'].includes(order.status)
+    ) {
+      throw new FoodRuleError('FOOD_FARE_LOCKED');
+    }
+    if ((order.deliveryFareRaiseCount ?? 0) >= input.maxRaises) {
+      throw new FoodRuleError('FOOD_FARE_RAISE_LIMIT');
+    }
+    if (input.amountVnd <= order.deliveryFareVnd) {
+      throw new FoodRuleError('FOOD_OFFER_AMOUNT_INVALID');
+    }
+    order.deliveryFareVnd = input.amountVnd;
+    order.totalVnd = Math.max(
+      0,
+      order.subtotalVnd + input.amountVnd - order.discountVnd,
+    );
+    order.deliveryFareRaiseCount = (order.deliveryFareRaiseCount ?? 0) + 1;
     touchOrder(order);
     return copyOrder(order);
   }
@@ -2235,6 +2520,7 @@ export class MemoryFoodRepository implements FoodRepository {
     const fromStatus = order.status;
     order.status = order.status === 'ASSIGNED' ? 'READY' : 'PREPARING';
     order.assignedDriverId = null;
+    order.deliveryFareAgreedAt = null;
     this.driverCancellations.push({
       orderId,
       driverId,
@@ -2610,7 +2896,9 @@ export class MemoryFoodRepository implements FoodRepository {
     requested: PlaceFoodLineInput[],
   ): FoodLineView[] {
     return snapshotFoodLines(
-      this.items.filter((entry) => entry.storeId === storeId),
+      this.items
+        .filter((entry) => entry.storeId === storeId)
+        .map((entry) => ({ ...memoryItemView(entry), moderationStatus: entry.moderationStatus })),
       requested,
     );
   }
@@ -2645,6 +2933,7 @@ function toStoreListItem(store: StoredStore): StoreListItem {
     lat: store.lat,
     lng: store.lng,
     category: store.category,
+    addressLabel: store.addressLabel ?? null,
     logoUrl: store.logoUrl ?? null,
     coverUrl: store.coverUrl ?? null,
     description: store.description ?? null,
@@ -2706,7 +2995,7 @@ export function snapshotFoodLines(
     Pick<
       StoreItemView,
       'id' | 'name' | 'priceVnd' | 'available' | 'optionGroups' | 'imageUrl'
-    >
+    > & { moderationStatus: string }
   >,
   requested: PlaceFoodLineInput[],
 ): FoodLineView[] {
@@ -2718,7 +3007,7 @@ export function snapshotFoodLines(
     }
     seen.add(key);
     const item = catalog.find((entry) => entry.id === line.itemId);
-    if (!item || !item.available) {
+    if (!item || !item.available || item.moderationStatus !== 'APPROVED') {
       throw new FoodRuleError('FOOD_ITEM_UNAVAILABLE');
     }
     const priced = priceOptionSelection(
@@ -2780,6 +3069,12 @@ function copyOrder(order: StoredOrder): FoodOrderView {
     merchantCashVnd: order.merchantCashVnd ?? null,
     createdAt: new Date(order.createdAt),
     updatedAt: new Date(order.updatedAt),
+    suggestedDeliveryFareVnd:
+      order.suggestedDeliveryFareVnd ?? order.deliveryFareVnd,
+    deliveryFareAgreedAt: order.deliveryFareAgreedAt
+      ? new Date(order.deliveryFareAgreedAt)
+      : null,
+    deliveryFareRaiseCount: order.deliveryFareRaiseCount ?? 0,
   };
 }
 

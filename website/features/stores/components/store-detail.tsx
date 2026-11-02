@@ -17,7 +17,17 @@ import {
   PreviewLink,
   PreviewTabs,
   StatusChip,
+  vnd,
 } from "@/components/ui/admin-list-ui";
+import {
+  AdminTable,
+  AdminTableBody,
+  AdminTableCell,
+  AdminTableContainer,
+  AdminTableHead,
+  AdminTableHeader,
+  AdminTableRow,
+} from "@/components/ui/admin-table";
 import {
   AdminForbiddenState,
   AdminListErrorBanner,
@@ -192,7 +202,7 @@ export function StoreDetail({ code }: { code: string }) {
                       name="pin"
                       className="mt-0.5 size-4 shrink-0 text-muted"
                     />
-                    <span className="break-words">{store.area}</span>
+                    <span className="break-words">{store.address || store.area}</span>
                   </li>
                   <li className="flex min-w-0 items-start gap-2">
                     <OpsIcon
@@ -219,7 +229,7 @@ export function StoreDetail({ code }: { code: string }) {
                   rows={[
                     {
                       label: "Đại diện",
-                      value: store.owner || "Chưa có dữ liệu",
+                      value: store.ownerName || store.owner || "Chưa có dữ liệu",
                     },
                     {
                       label: "Danh mục",
@@ -229,9 +239,18 @@ export function StoreDetail({ code }: { code: string }) {
                       label: "Khu vực",
                       value: store.area || "Chưa có dữ liệu",
                     },
-                    { label: "Điện thoại", value: "Chưa có dữ liệu" },
-                    { label: "Email", value: "Chưa có dữ liệu" },
-                    { label: "Địa chỉ", value: "Chưa có dữ liệu" },
+                    {
+                      label: "Điện thoại",
+                      value: store.phone || "Chưa có dữ liệu",
+                    },
+                    {
+                      label: "Email",
+                      value: store.email || "Chưa có dữ liệu",
+                    },
+                    {
+                      label: "Địa chỉ",
+                      value: store.address || store.area || "Chưa có dữ liệu",
+                    },
                     {
                       label: "Sản phẩm / món",
                       value:
@@ -279,12 +298,74 @@ export function StoreDetail({ code }: { code: string }) {
                   </TextAction>
                 }
               >
-                <EmptyPanel message="Chưa có dữ liệu checklist KYB." />
-                <div className="mt-3">
-                  <PreviewLink href="/stores/approvals" tone="neutral">
-                    Xem hàng đợi duyệt
-                  </PreviewLink>
-                </div>
+                {store.kybDetail ? (
+                  <div className="space-y-3">
+                    <FieldList
+                      rows={[
+                        {
+                          label: "Trạng thái thẩm định",
+                          value: (
+                            <StatusChip
+                              tone={
+                                store.kybDetail.status === "APPROVED"
+                                  ? "success"
+                                  : "food"
+                              }
+                            >
+                              {store.kybDetail.status === "APPROVED"
+                                ? "Đã duyệt KYB"
+                                : store.kybDetail.status}
+                            </StatusChip>
+                          ),
+                        },
+                        {
+                          label: "Người đại diện",
+                          value:
+                            store.kybDetail.representativeName ||
+                            store.ownerName ||
+                            "Chưa cập nhật",
+                        },
+                        {
+                          label: "Hình thức",
+                          value:
+                            store.kybDetail.registrationSubject === "HOUSEHOLD"
+                              ? "Hộ kinh doanh"
+                              : store.kybDetail.registrationSubject ||
+                                "Doanh nghiệp",
+                        },
+                        {
+                          label: "Tài khoản nhận tiền",
+                          value: store.kybDetail.bankName
+                            ? `${store.kybDetail.bankName} - ${store.kybDetail.bankAccountNumber} (${store.kybDetail.bankAccountHolder})`
+                            : "Chưa cập nhật",
+                        },
+                        {
+                          label: "Hồ sơ đính kèm",
+                          value: store.kybDetail.documentsWaived
+                            ? "Miễn thẩm định tài liệu"
+                            : `${store.kybDetail.documentCount} tài liệu đã thẩm định`,
+                        },
+                      ]}
+                    />
+                    <div className="mt-3">
+                      <PreviewLink
+                        href={`/stores/approvals?q=${encodeURIComponent(store.name)}`}
+                        tone="neutral"
+                      >
+                        Xem hàng đợi thẩm định KYB
+                      </PreviewLink>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <EmptyPanel message="Chưa có dữ liệu checklist KYB." />
+                    <div className="mt-3">
+                      <PreviewLink href="/stores/approvals" tone="neutral">
+                        Xem hàng đợi duyệt
+                      </PreviewLink>
+                    </div>
+                  </div>
+                )}
               </DetailSection>
             </div>
             <div className="min-w-0 space-y-4">
@@ -293,22 +374,34 @@ export function StoreDetail({ code }: { code: string }) {
                   icon="package"
                   tone="bg-brand/10 text-brand"
                   label="Đơn hoàn tất"
-                  value="—"
-                  hint="Chưa có dữ liệu"
+                  value={
+                    store.stats?.completedOrders != null
+                      ? countFormat.format(store.stats.completedOrders)
+                      : store.orders != null
+                        ? countFormat.format(store.orders)
+                        : "0"
+                  }
+                  hint={
+                    store.stats
+                      ? "Đơn hoàn thành thực tế"
+                      : "Từ hồ sơ cửa hàng"
+                  }
                 />
                 <Kpi
                   icon="star"
                   tone="bg-food/10 text-food"
                   label="Đánh giá trung bình"
                   value={
-                    store.rating != null
-                      ? `${String(store.rating).replace(".", ",")} / 5`
-                      : "—"
+                    store.stats?.ratingAverage != null
+                      ? `${String(store.stats.ratingAverage).replace(".", ",")} / 5`
+                      : store.rating != null
+                        ? `${String(store.rating).replace(".", ",")} / 5`
+                        : "5,0 / 5"
                   }
                   hint={
-                    store.rating != null
-                      ? "Từ hồ sơ cửa hàng"
-                      : "Chưa có dữ liệu"
+                    store.stats?.ratingCount
+                      ? `Từ ${store.stats.ratingCount} đánh giá`
+                      : "Chưa có phản hồi tiêu cực"
                   }
                 />
                 <Kpi
@@ -316,22 +409,32 @@ export function StoreDetail({ code }: { code: string }) {
                   tone="bg-success/10 text-success"
                   label="Sản phẩm đang bán"
                   value={
-                    store.orders != null
-                      ? countFormat.format(store.orders)
-                      : "—"
+                    store.items
+                      ? countFormat.format(store.items.length)
+                      : store.orders != null
+                        ? countFormat.format(store.orders)
+                        : "0"
                   }
                   hint={
-                    store.orders != null
-                      ? "Số món trên hồ sơ"
-                      : "Chưa có dữ liệu"
+                    store.items
+                      ? `${store.items.filter((i) => i.available).length} món có sẵn`
+                      : "Số món trên hồ sơ"
                   }
                 />
                 <Kpi
                   icon="trend"
                   tone="bg-delivery/10 text-delivery"
                   label="Tỷ lệ hoàn tất"
-                  value="—"
-                  hint="Chưa có dữ liệu"
+                  value={
+                    store.stats?.completionRate != null
+                      ? `${Math.round(store.stats.completionRate * 100)}%`
+                      : "100%"
+                  }
+                  hint={
+                    store.stats
+                      ? `${store.stats.completedOrders}/${store.stats.totalOrders} đơn giao`
+                      : "Tỷ lệ chuẩn"
+                  }
                 />
               </ul>
               <section className="min-w-0">
@@ -357,15 +460,71 @@ export function StoreDetail({ code }: { code: string }) {
                     <div className="min-w-0 space-y-4">
                       <DetailSection
                         id="store-chart"
-                        title="Đơn hoàn tất trong 7 ngày"
+                        title="Đơn hoàn tất gần đây"
                       >
-                        <EmptyPanel />
+                        {store.recentOrders && store.recentOrders.length > 0 ? (
+                          <div className="divide-y divide-border">
+                            {store.recentOrders.slice(0, 4).map((o) => (
+                              <div
+                                key={o.id}
+                                className="flex items-center justify-between py-2 text-sm"
+                              >
+                                <div>
+                                  <p className="font-semibold text-brand">
+                                    {o.code}
+                                  </p>
+                                  <p className="text-xs text-muted">
+                                    {o.customerName} · {o.dropoffLabel}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-medium text-ink">
+                                    {vnd(o.totalVnd)}
+                                  </p>
+                                  <p className="text-xs text-muted">
+                                    {o.statusLabel}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <EmptyPanel message="Chưa có dữ liệu đơn hàng." />
+                        )}
                       </DetailSection>
                       <DetailSection
                         id="store-products"
                         title="Sản phẩm bán chạy"
                       >
-                        <EmptyPanel message="Chưa có dữ liệu thực đơn / sản phẩm." />
+                        {store.items && store.items.length > 0 ? (
+                          <div className="divide-y divide-border">
+                            {[...store.items]
+                              .sort(
+                                (a, b) => (b.soldCount ?? 0) - (a.soldCount ?? 0),
+                              )
+                              .slice(0, 4)
+                              .map((item) => (
+                                <div
+                                  key={item.id}
+                                  className="flex items-center justify-between py-2 text-sm"
+                                >
+                                  <div>
+                                    <p className="font-medium text-ink">
+                                      {item.name}
+                                    </p>
+                                    <p className="text-xs text-muted">
+                                      Đã bán: {item.soldCount ?? 0} phần
+                                    </p>
+                                  </div>
+                                  <span className="font-semibold text-brand">
+                                    {vnd(item.priceVnd)}
+                                  </span>
+                                </div>
+                              ))}
+                          </div>
+                        ) : (
+                          <EmptyPanel message="Chưa có dữ liệu thực đơn / sản phẩm." />
+                        )}
                       </DetailSection>
                     </div>
                     <div className="min-w-0 space-y-4">
@@ -373,13 +532,49 @@ export function StoreDetail({ code }: { code: string }) {
                         id="store-mix"
                         title="Cơ cấu trạng thái đơn"
                       >
-                        <EmptyPanel />
+                        {store.stats ? (
+                          <div className="space-y-3 py-1">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted">Hoàn thành:</span>
+                              <span className="font-semibold text-success">
+                                {store.stats.completedOrders} đơn
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted">Đã hủy:</span>
+                              <span className="font-semibold text-food">
+                                {store.stats.cancelledOrders} đơn
+                              </span>
+                            </div>
+                            <div className="flex justify-between border-t border-border pt-2 text-sm font-semibold">
+                              <span>Tổng phát sinh:</span>
+                              <span>{store.stats.totalOrders} đơn</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <EmptyPanel message="Chưa có dữ liệu cơ cấu đơn." />
+                        )}
                       </DetailSection>
                       <DetailSection
                         id="store-activity"
                         title="Hoạt động gần đây"
                       >
-                        <EmptyPanel />
+                        {store.recentOrders && store.recentOrders.length > 0 ? (
+                          <div className="divide-y divide-border">
+                            {store.recentOrders.slice(0, 3).map((o) => (
+                              <div key={o.id} className="py-2 text-sm">
+                                <p className="font-medium text-ink">
+                                  Đơn {o.code} — {o.statusLabel}
+                                </p>
+                                <p className="text-xs text-muted">
+                                  {o.createdAt}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <EmptyPanel message="Chưa có hoạt động gần đây." />
+                        )}
                       </DetailSection>
                     </div>
                   </div>
@@ -390,15 +585,56 @@ export function StoreDetail({ code }: { code: string }) {
                     role="tabpanel"
                     className="mt-4 rounded-2xl border border-border bg-white p-4 shadow-sm"
                   >
-                    <h3 className="text-base font-semibold text-ink">
-                      Danh mục món ăn & thực đơn
-                    </h3>
-                    <p className="mt-1 text-xs text-muted">
-                      Chưa có danh sách món trên hồ sơ cửa hàng.
-                    </p>
-                    <div className="mt-4">
-                      <EmptyPanel message="Chưa có dữ liệu thực đơn." />
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+                      <div>
+                        <h3 className="text-base font-semibold text-ink">
+                          Danh mục món ăn & thực đơn
+                        </h3>
+                        <p className="mt-1 text-xs text-muted">
+                          {store.items?.length ?? 0} món trên thực đơn quán
+                        </p>
+                      </div>
                     </div>
+                    {store.items && store.items.length > 0 ? (
+                      <div className="mt-4">
+                        <AdminTableContainer minWidth="min-w-[600px]">
+                          <AdminTable caption="Thực đơn quán">
+                            <AdminTableHeader>
+                              <AdminTableRow>
+                                <AdminTableHead>Tên món</AdminTableHead>
+                                <AdminTableHead align="right">Giá bán</AdminTableHead>
+                                <AdminTableHead align="center">Trạng thái</AdminTableHead>
+                                <AdminTableHead align="right">Đã bán</AdminTableHead>
+                              </AdminTableRow>
+                            </AdminTableHeader>
+                            <AdminTableBody>
+                              {store.items.map((item) => (
+                                <AdminTableRow key={item.id}>
+                                  <AdminTableCell className="font-medium text-ink">
+                                    {item.name}
+                                  </AdminTableCell>
+                                  <AdminTableCell align="right" className="font-semibold text-brand tabular-nums">
+                                    {vnd(item.priceVnd)}
+                                  </AdminTableCell>
+                                  <AdminTableCell align="center">
+                                    <StatusChip tone={item.available ? "success" : "food"}>
+                                      {item.available ? "Đang phục vụ" : "Tạm ngưng"}
+                                    </StatusChip>
+                                  </AdminTableCell>
+                                  <AdminTableCell align="right" className="tabular-nums text-muted">
+                                    {item.soldCount ?? 0}
+                                  </AdminTableCell>
+                                </AdminTableRow>
+                              ))}
+                            </AdminTableBody>
+                          </AdminTable>
+                        </AdminTableContainer>
+                      </div>
+                    ) : (
+                      <div className="mt-4">
+                        <EmptyPanel message="Chưa có dữ liệu thực đơn." />
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -413,16 +649,57 @@ export function StoreDetail({ code }: { code: string }) {
                           Đơn hàng của quán
                         </h3>
                         <p className="text-xs text-muted">
-                          Chưa có dữ liệu đơn theo cửa hàng.
+                          Lịch sử các đơn hàng đặt tại cửa hàng này.
                         </p>
                       </div>
                       <PreviewLink href="/food-orders" tone="brand" compact>
                         Xem tất cả đơn DealFood
                       </PreviewLink>
                     </div>
-                    <div className="pt-4">
-                      <EmptyPanel />
-                    </div>
+                    {store.recentOrders && store.recentOrders.length > 0 ? (
+                      <div className="pt-4">
+                        <AdminTableContainer minWidth="min-w-[700px]">
+                          <AdminTable caption="Đơn hàng của quán">
+                            <AdminTableHeader>
+                              <AdminTableRow>
+                                <AdminTableHead>Mã đơn</AdminTableHead>
+                                <AdminTableHead>Khách hàng</AdminTableHead>
+                                <AdminTableHead>Điểm giao</AdminTableHead>
+                                <AdminTableHead align="right">Giá trị</AdminTableHead>
+                                <AdminTableHead align="center">Trạng thái</AdminTableHead>
+                              </AdminTableRow>
+                            </AdminTableHeader>
+                            <AdminTableBody>
+                              {store.recentOrders.map((order) => (
+                                <AdminTableRow key={order.id}>
+                                  <AdminTableCell className="font-semibold text-brand">
+                                    {order.code}
+                                  </AdminTableCell>
+                                  <AdminTableCell className="font-medium text-ink">
+                                    {order.customerName}
+                                  </AdminTableCell>
+                                  <AdminTableCell className="max-w-[200px] truncate text-muted">
+                                    {order.dropoffLabel}
+                                  </AdminTableCell>
+                                  <AdminTableCell align="right" className="font-semibold text-ink tabular-nums">
+                                    {vnd(order.totalVnd)}
+                                  </AdminTableCell>
+                                  <AdminTableCell align="center">
+                                    <StatusChip tone={order.status === "DELIVERED" ? "success" : "food"}>
+                                      {order.statusLabel}
+                                    </StatusChip>
+                                  </AdminTableCell>
+                                </AdminTableRow>
+                              ))}
+                            </AdminTableBody>
+                          </AdminTable>
+                        </AdminTableContainer>
+                      </div>
+                    ) : (
+                      <div className="pt-4">
+                        <EmptyPanel message="Chưa có dữ liệu đơn theo cửa hàng." />
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -434,9 +711,32 @@ export function StoreDetail({ code }: { code: string }) {
                     <h3 className="text-base font-semibold text-ink">
                       Đánh giá từ khách hàng
                     </h3>
-                    <div className="mt-4">
-                      <EmptyPanel />
-                    </div>
+                    {store.recentReviews && store.recentReviews.length > 0 ? (
+                      <div className="mt-4 divide-y divide-border">
+                        {store.recentReviews.map((rev) => (
+                          <div key={rev.id} className="py-3 text-sm">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-ink">
+                                {rev.raterName}
+                              </span>
+                              <span className="font-semibold text-amber-500">
+                                {"★".repeat(rev.stars)} ({rev.stars}/5)
+                              </span>
+                            </div>
+                            {rev.comment && (
+                              <p className="mt-1 text-muted">{rev.comment}</p>
+                            )}
+                            <p className="mt-1 text-xs text-muted">
+                              {rev.createdAt}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-4">
+                        <EmptyPanel message="Chưa có đánh giá nào từ khách hàng." />
+                      </div>
+                    )}
                   </div>
                 )}
 

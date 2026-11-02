@@ -1,4 +1,7 @@
 import '../core/mock/fake_ride_client.dart';
+import '../core/app_gate/app_build_info.dart';
+import '../core/app_gate/app_gate_client.dart';
+import '../core/app_gate/app_gate_cubit.dart';
 import '../core/drafts/draft_store.dart';
 import '../core/drafts/text_draft.dart';
 
@@ -70,6 +73,7 @@ import '../features/driver/domain/usecases/list_ready_driver_orders.dart';
 import '../features/driver/domain/usecases/submit_driver_ride_offer.dart';
 import '../features/driver/presentation/cubit/driver_duty_cubit.dart';
 import '../features/driver/presentation/cubit/driver_services_cubit.dart';
+import '../features/food/data/food_fare_negotiation.dart';
 import '../features/food/data/datasources/dio_food_remote_datasource.dart';
 import '../features/food/data/datasources/food_remote_datasource.dart';
 import '../features/food/data/repositories/food_repository_impl.dart';
@@ -94,6 +98,9 @@ import '../features/account_settings/domain/account_settings.dart';
 import '../features/support/data/support_remote_datasource.dart';
 import '../features/support/domain/support_ticket.dart';
 import '../features/driver_card/domain/driver_card.dart';
+import '../features/active_job/data/active_job_snapshot_store.dart';
+import '../features/active_job/presentation/active_job_cache.dart';
+import '../features/identity/data/profile_cache.dart';
 import '../features/pricing/domain/pricing.dart';
 import '../features/food/data/food_category_remote_datasource.dart';
 import '../features/food/domain/entities/food_category.dart';
@@ -157,6 +164,7 @@ import '../features/onboarding/data/datasources/dio_partner_applications_remote_
 import '../features/onboarding/data/datasources/fake_partner_applications_client.dart';
 import '../features/onboarding/data/ocr/mlkit_document_text_reader.dart';
 import '../features/onboarding/data/datasources/partner_requirements_client.dart';
+import '../features/legal/legal_documents.dart';
 import '../features/onboarding/data/datasources/partner_applications_remote_datasource.dart';
 import '../features/onboarding/data/repositories/partner_applications_repository_impl.dart';
 import '../features/onboarding/domain/repositories/partner_applications_repository.dart';
@@ -190,6 +198,7 @@ import '../features/ride/domain/usecases/select_ride_offer.dart';
 import '../features/ride/domain/usecases/submit_ride_offer.dart';
 import '../features/ride/presentation/cubit/ride_destination.dart';
 import '../features/ride/presentation/cubit/ride_vehicle_pref.dart';
+import '../features/ride/presentation/cubit/vehicle_class_catalog_cubit.dart';
 import '../features/ride/presentation/cubit/ride_session.dart';
 import '../features/voice/data/native/callkit_native_call_ui.dart';
 import '../features/voice/domain/ports/native_call_ui.dart';
@@ -225,6 +234,7 @@ class DealGoDependencies {
       _locator<DriverActiveJobSource>();
   CustomerActiveTripSource get customerActiveTrip =>
       _locator<CustomerActiveTripSource>();
+  ActiveJobCache get activeJobs => _locator<ActiveJobCache>();
   IdentityClient get identityClient => _locator<IdentityClient>();
   IdentityRepository get identityRepository => _locator<IdentityRepository>();
   FoodClient get foodClient => _locator<FoodClient>();
@@ -261,6 +271,7 @@ class DealGoDependencies {
   VoiceClient get voiceClient => _locator<VoiceClient>();
   VoiceRepository get voiceRepository => _locator<VoiceRepository>();
   VoiceCallCubit get voiceCallCubit => _locator<VoiceCallCubit>();
+  AppGateCubit get appGateCubit => _locator<AppGateCubit>();
   PresenceClient get presenceClient => _locator<PresenceClient>();
   PresenceRepository get presenceRepository => _locator<PresenceRepository>();
   HistoryClient get historyClient => _locator<HistoryClient>();
@@ -499,10 +510,14 @@ class DealGoDependencies {
     }
     final tokens = tokenStore ?? SecureTokenStore();
     late final AuthCubit auth;
+    late final AppGateCubit appGate;
     final sessionRefresher = SessionRefresher();
+    final appBuild = AppBuildInfo();
     final dio = createDealGoDio(
       tokenStore: tokens,
       sessionRefresher: sessionRefresher,
+      appBuild: appBuild,
+      onAppUpdateRequired: () => appGate.forceRequired(),
       onSessionRefreshed: (next) => auth.applyRefreshedTokens(next),
       onUnauthorized: () => auth.signOut(revokeRemote: false),
     );
@@ -532,6 +547,7 @@ class DealGoDependencies {
       fetchMe: fetchMe,
       tokens: tokens,
       identityRepository: identityRepository,
+      profileCache: useOverrides ? MemoryProfileCache() : SecureProfileCache(),
     );
 
     late final PartnerApplicationsClient partners;
@@ -746,6 +762,13 @@ class DealGoDependencies {
     }
 
     put<TokenStore>(tokens);
+    put<ActiveJobCache>(
+      ActiveJobCache(
+        store: useOverrides
+            ? MemoryActiveJobSnapshotStore()
+            : SecureActiveJobSnapshotStore(),
+      ),
+    );
     put<Dio>(dio);
     put<DriverActiveJobSource>(
       useOverrides || useMockData
@@ -784,6 +807,11 @@ class DealGoDependencies {
     put<RefreshSession>(RefreshSession(identityRepository));
     put<FoodClient>(food);
     put<FoodRemoteDataSource>(food);
+    put<FoodFareClient>(
+      useOverrides || useMockData
+          ? FakeFoodFareClient()
+          : DioFoodFareClient(dio: dio),
+    );
     put<FoodRepository>(foodRepository);
     put<ListFoodStores>(ListFoodStores(foodRepository));
     put<GetFoodStore>(GetFoodStore(foodRepository));
@@ -895,6 +923,11 @@ class DealGoDependencies {
     if (documentImageSource == null) {
       put<SmartCaptureLauncher>(const CameraSmartCaptureLauncher());
     }
+    put<LegalDocumentsSource>(
+      useMockData
+          ? const FixedLegalDocumentsSource()
+          : DioLegalDocumentsSource(dio),
+    );
     put<PartnerRequirementsSource>(
       partnerRequirements ??
           (useMockData
@@ -917,6 +950,12 @@ class DealGoDependencies {
         ? FakeVoiceMediaEngine()
         : LiveKitVoiceMediaEngine();
     put<VoiceMediaEngine>(voiceMedia);
+    // t82u: update + consent gate; off in tests and mock builds.
+    appGate = AppGateCubit(
+      client: useOverrides || useMockData ? null : DioAppGateClient(dio: dio),
+      build: appBuild,
+    );
+    put<AppGateCubit>(appGate);
     put<VoiceCallCubit>(
       VoiceCallCubit(
         startVoiceCall: StartVoiceCall(voiceRepository),
@@ -1034,6 +1073,9 @@ class DealGoDependencies {
         RepositoryProvider<DriverCardRepository>.value(
           value: _locator<DriverCardRepository>(),
         ),
+        RepositoryProvider<ActiveJobCache>.value(
+          value: _locator<ActiveJobCache>(),
+        ),
         RepositoryProvider<SupportRepository>.value(
           value: _locator<SupportRepository>(),
         ),
@@ -1054,6 +1096,9 @@ class DealGoDependencies {
         ),
         RepositoryProvider<PricingRepository>.value(
           value: _locator<PricingRepository>(),
+        ),
+        RepositoryProvider<FoodFareClient>.value(
+          value: _locator<FoodFareClient>(),
         ),
         RepositoryProvider<DriverLocationRepository>.value(
           value: _locator<DriverLocationRepository>(),
@@ -1155,6 +1200,9 @@ class DealGoDependencies {
         RepositoryProvider<ReplaceMerchantItemOptions>.value(
           value: _locator<ReplaceMerchantItemOptions>(),
         ),
+        RepositoryProvider<LegalDocumentsSource>.value(
+          value: _locator<LegalDocumentsSource>(),
+        ),
         RepositoryProvider<PartnerApplicationsClient>.value(
           value: partnerApplicationsClient,
         ),
@@ -1217,6 +1265,7 @@ class DealGoDependencies {
         providers: [
           BlocProvider<AuthCubit>.value(value: authCubit),
           BlocProvider<VoiceCallCubit>.value(value: voiceCallCubit),
+          BlocProvider<AppGateCubit>.value(value: appGateCubit),
           BlocProvider(
             create: (_) => attachFoodCartDraft(
               FoodCartCubit(),
@@ -1226,6 +1275,12 @@ class DealGoDependencies {
           BlocProvider(create: (_) => RideSessionCubit()),
           BlocProvider(create: (_) => RideDestinationCubit()),
           BlocProvider(create: (_) => RideVehiclePrefCubit()),
+          BlocProvider(
+            create: (_) => VehicleClassCatalogCubit(
+              repository: _locator<PricingRepository>(),
+              accessToken: _accessToken,
+            ),
+          ),
           BlocProvider(
             create: (_) => DriverDutyCubit(
               setPresence: _locator<SetPresence>(),
@@ -1263,6 +1318,8 @@ class DealGoDependencies {
               accessToken: _accessToken,
               loadDocumentsRequired:
                   _locator<PartnerRequirementsSource>().documentsRequired,
+              loadCarDocsRequired:
+                  _locator<PartnerRequirementsSource>().carExtraDocsRequired,
               draftStore: _formDrafts,
               draftOwner: _signedInUserId,
               useMock: useMockData,

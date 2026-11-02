@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import { useDriverDetailQuery } from "@/features/drivers/hooks";
+import { useMemo, useState } from "react";
+import { useDriverActivitiesQuery, useDriverDetailQuery } from "@/features/drivers/hooks";
 import {
   completionRateLabel,
   driverActivityStatusLabel,
@@ -15,13 +15,26 @@ import { DriverFeeCard } from "@/features/account-deletion/components/driver-fee
 import {
   AdminBreadcrumb,
   Avatar,
+  ExportCsvButton,
+  focusRing,
   PreviewLink,
   StatusChip,
+  vnd,
 } from "@/components/ui/admin-list-ui";
 import {
   AdminForbiddenState,
   AdminListErrorBanner,
 } from "@/components/ui/admin-state-ui";
+import {
+  AdminTable,
+  AdminTableBody,
+  AdminTableCell,
+  AdminTableContainer,
+  AdminTableHead,
+  AdminTableHeader,
+  AdminTableRow,
+} from "@/components/ui/admin-table";
+import { formatOpsDate } from "@/lib/ops-time";
 import {
   BackToList,
   DetailHeader,
@@ -30,6 +43,8 @@ import {
   SampleNotFound,
 } from "@/components/ui/admin-detail-ui";
 import { isForbiddenError } from "@/lib/api/errors";
+
+const DRIVER_ACTIVITY_TABS = ["Tất cả", "Chuyến xe", "Giao đồ ăn", "Thu nhập"];
 
 function EmptyPanel({ message = "Chưa có dữ liệu" }: { message?: string }) {
   return (
@@ -48,6 +63,21 @@ export function DriverDetail({ code }: { code: string }) {
     refetch,
   } = useDriverDetailQuery(code);
   const forbidden = isError && isForbiddenError(error);
+
+  const [currentTab, setCurrentTab] = useState<string>("Tất cả");
+  const [page, setPage] = useState<number>(1);
+  const { data: activitiesPage, isPending: isActivitiesPending } =
+    useDriverActivitiesQuery(code, currentTab, page);
+
+  const activities = activitiesPage?.items ?? [];
+  const totalItems = activitiesPage?.total ?? activities.length;
+  const limit = activitiesPage?.limit ?? 6;
+  const totalPages = Math.max(1, Math.ceil(totalItems / limit));
+
+  const handleTabChange = (tab: string) => {
+    setCurrentTab(tab);
+    setPage(1);
+  };
 
   const crumbs = useMemo(
     () => [
@@ -219,13 +249,24 @@ export function DriverDetail({ code }: { code: string }) {
                   <FieldList
                     rows={[
                       { label: "Mã đối tác", value: driver.code },
-                      { label: "Điện thoại", value: "Chưa có dữ liệu" },
-                      { label: "Email", value: "Chưa có dữ liệu" },
+                      {
+                        label: "Điện thoại",
+                        value: driver.phone || "Chưa có dữ liệu",
+                      },
+                      {
+                        label: "Email",
+                        value: driver.email || "Chưa có dữ liệu",
+                      },
                       {
                         label: "Khu vực",
                         value: driver.area || "Chưa có dữ liệu",
                       },
-                      { label: "Ngày tham gia", value: "Chưa có dữ liệu" },
+                      {
+                        label: "Ngày tham gia",
+                        value: driver.createdAt
+                          ? formatOpsDate(driver.createdAt)
+                          : "Chưa có dữ liệu",
+                      },
                       {
                         label: "Dịch vụ đủ điều kiện",
                         value: driver.service || "Chưa có dữ liệu",
@@ -283,6 +324,50 @@ export function DriverDetail({ code }: { code: string }) {
               <DriverFeeCard driverId={driver.code} name={driver.name} />
             </div>
             <div className="min-w-0 space-y-4">
+              <DetailSection id="driver-live" title="Theo dõi vận hành">
+                {driver.activeJob ? (
+                  <div className="rounded-xl border border-brand/20 bg-brand/5 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 text-sm font-semibold text-brand">
+                        <span className="size-2 rounded-full bg-brand animate-ping" />
+                        {driver.activeJob.type === 'RIDE' ? 'Chuyến xe đang thực hiện' : 'Đơn ăn đang giao'}
+                      </span>
+                      <StatusChip tone="brand">{driver.activeJob.statusLabel}</StatusChip>
+                    </div>
+                    <div className="text-sm">
+                      <p className="font-semibold text-ink">{driver.activeJob.code} · {driver.activeJob.customerName}</p>
+                      <p className="text-xs text-muted mt-1">{driver.activeJob.pickupLabel} → {driver.activeJob.dropoffLabel}</p>
+                      <p className="text-sm font-bold text-ink mt-2">{vnd(driver.activeJob.fareVnd)}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-border bg-canvas/30 p-4 space-y-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className={`size-2.5 rounded-full ${driver.presence?.online ? 'bg-success' : 'bg-muted'}`} />
+                      <p className="font-semibold text-ink">
+                        {driver.presence?.online ? 'Tài xế đang Trực tuyến (Online)' : 'Tài xế đang Ngoại tuyến (Offline)'}
+                      </p>
+                    </div>
+                    <p className="text-xs text-muted">
+                      Khu vực hoạt động: <span className="font-medium text-ink">{driver.area || "—"}</span>
+                    </p>
+                    {driver.presence?.lat && driver.presence?.lng ? (
+                      <p className="text-xs text-muted">
+                        Tọa độ GPS: <span className="font-mono text-ink">{driver.presence.lat.toFixed(4)}, {driver.presence.lng.toFixed(4)}</span>
+                      </p>
+                    ) : null}
+                    <p className="text-xs text-muted">
+                      Dịch vụ nhận chuyến: <span className="font-medium text-ink">{driver.service || "—"}</span>
+                    </p>
+                    {driver.presence?.updatedAt ? (
+                      <p className="text-xs text-muted">
+                        Cập nhật tín hiệu lần cuối: {formatOpsDate(driver.presence.updatedAt)}
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+              </DetailSection>
+
               <DetailSection
                 id="driver-performance"
                 title="Hiệu suất hoạt động"
@@ -290,21 +375,153 @@ export function DriverDetail({ code }: { code: string }) {
                   <span className="text-xs text-muted">7 ngày gần đây</span>
                 }
               >
-                <EmptyPanel message="Chưa có dữ liệu hiệu suất theo ngày." />
+                {driver.performance7d && driver.performance7d.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-border text-muted">
+                          <th className="py-2 pr-2 font-medium">Ngày</th>
+                          <th className="py-2 px-2 text-center font-medium">Chuyến</th>
+                          <th className="py-2 px-2 text-right font-medium">Tổng cước</th>
+                          <th className="py-2 pl-2 text-right font-medium">Thu nhập</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/50">
+                        {driver.performance7d.map((row) => (
+                          <tr key={row.date} className="hover:bg-canvas/40">
+                            <td className="py-2 pr-2 font-medium text-ink">{row.dayLabel}</td>
+                            <td className="py-2 px-2 text-center text-ink">{row.completedTrips}</td>
+                            <td className="py-2 px-2 text-right text-muted tabular-nums">{vnd(row.fareVnd)}</td>
+                            <td className="py-2 pl-2 text-right font-semibold text-success tabular-nums">{vnd(row.netVnd)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <EmptyPanel message="Chưa có dữ liệu hiệu suất theo ngày." />
+                )}
               </DetailSection>
+
               <DetailSection
                 id="driver-activity"
                 title="Hoạt động gần đây"
                 extra={
                   <span className="text-xs text-muted">
-                    Theo dòng thời gian
+                    {totalItems} mục
                   </span>
                 }
               >
-                <EmptyPanel message="Chưa có dữ liệu hoạt động gần đây." />
-              </DetailSection>
-              <DetailSection id="driver-live" title="Theo dõi vận hành">
-                <EmptyPanel message="Chưa có chuyến đang chạy trên hồ sơ này." />
+                <div className="min-w-0 overflow-x-auto">
+                  <div
+                    role="tablist"
+                    aria-label="Phân loại hoạt động"
+                    className="flex w-max min-w-full gap-3 border-b border-border pb-2"
+                  >
+                    {DRIVER_ACTIVITY_TABS.map((tab) => {
+                      const current = tab === currentTab;
+                      return (
+                        <button
+                          key={tab}
+                          type="button"
+                          role="tab"
+                          aria-selected={current}
+                          onClick={() => handleTabChange(tab)}
+                          className={
+                            current
+                              ? `border-b-2 border-brand px-1 pb-1 text-xs font-semibold whitespace-nowrap text-brand cursor-pointer ${focusRing}`
+                              : `border-b-2 border-transparent px-1 pb-1 text-xs whitespace-nowrap text-muted hover:text-ink cursor-pointer ${focusRing}`
+                          }
+                        >
+                          {tab}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  {isActivitiesPending ? (
+                    <div className="py-6 text-center text-xs text-muted animate-pulse">
+                      Đang tải danh sách hoạt động…
+                    </div>
+                  ) : activities.length === 0 ? (
+                    <EmptyPanel message="Chưa có hoạt động nào trong danh mục này." />
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex justify-end">
+                        <ExportCsvButton
+                          compact
+                          filename={`${driver.code}-activities.csv`}
+                          headers={["Thời gian", "Mã", "Loại", "Nội dung", "Giá trị", "Trạng thái"]}
+                          rows={activities.map((a) => [a.time, a.code, a.kind, a.summary, a.value, a.status])}
+                        >
+                          <OpsIcon name="download" className="size-3.5" />
+                          Xuất CSV
+                        </ExportCsvButton>
+                      </div>
+                      <AdminTableContainer minWidth="min-w-[480px]">
+                        <AdminTable caption="Hoạt động tài xế">
+                          <AdminTableHeader>
+                            <AdminTableRow>
+                              <AdminTableHead>Thời gian</AdminTableHead>
+                              <AdminTableHead>Mã</AdminTableHead>
+                              <AdminTableHead>Lộ trình / Chi tiết</AdminTableHead>
+                              <AdminTableHead className="text-right">Cước phí</AdminTableHead>
+                              <AdminTableHead>Trạng thái</AdminTableHead>
+                            </AdminTableRow>
+                          </AdminTableHeader>
+                          <AdminTableBody>
+                            {activities.map((act) => (
+                              <AdminTableRow key={act.code}>
+                                <AdminTableCell className="text-xs text-muted whitespace-nowrap">
+                                  {act.time}
+                                </AdminTableCell>
+                                <AdminTableCell className="font-mono text-xs font-semibold text-brand whitespace-nowrap">
+                                  {act.code}
+                                </AdminTableCell>
+                                <AdminTableCell className="text-xs text-ink max-w-[200px] truncate" title={act.summary}>
+                                  {act.summary}
+                                </AdminTableCell>
+                                <AdminTableCell className="text-right text-xs font-medium tabular-nums whitespace-nowrap">
+                                  {act.value}
+                                </AdminTableCell>
+                                <AdminTableCell className="whitespace-nowrap">
+                                  <StatusChip tone={act.tone as any}>
+                                    {act.status}
+                                  </StatusChip>
+                                </AdminTableCell>
+                              </AdminTableRow>
+                            ))}
+                          </AdminTableBody>
+                        </AdminTable>
+                      </AdminTableContainer>
+                      {totalPages > 1 ? (
+                        <div className="flex items-center justify-between text-xs text-muted pt-2">
+                          <span>Trang {page} / {totalPages}</span>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              disabled={page <= 1}
+                              onClick={() => setPage((p) => Math.max(1, p - 1))}
+                              className="rounded border border-border px-2 py-1 disabled:opacity-50 hover:bg-canvas/40"
+                            >
+                              Trước
+                            </button>
+                            <button
+                              type="button"
+                              disabled={page >= totalPages}
+                              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                              className="rounded border border-border px-2 py-1 disabled:opacity-50 hover:bg-canvas/40"
+                            >
+                              Sau
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
               </DetailSection>
             </div>
             <div className="min-w-0 space-y-4">
@@ -340,24 +557,63 @@ export function DriverDetail({ code }: { code: string }) {
                         value: driver.service || "Chưa có dữ liệu",
                       },
                       {
-                        label: "Đăng ký xe",
-                        value: "Chưa có dữ liệu",
+                        label: "Hạng GPLX",
+                        value: driver.licenseClass ? `Hạng ${driver.licenseClass}` : "Chưa có dữ liệu",
                       },
                       {
-                        label: "Điều kiện lái xe",
-                        value: "Chưa có dữ liệu",
+                        label: "Số GPLX",
+                        value: driver.licenseNumber || "Chưa có dữ liệu",
                       },
                     ]}
                   />
                 </div>
               </DetailSection>
               <DetailSection id="driver-kyc" title="Trạng thái hồ sơ & KYC">
-                <EmptyPanel message="Chưa có danh sách giấy tờ KYC." />
-                <div className="mt-2">
-                  <PreviewLink href="/drivers/kyc" tone="neutral">
-                    Xem hàng đợi KYC
-                  </PreviewLink>
-                </div>
+                {driver.kycDetail ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-ink">Hồ sơ đối tác</span>
+                      <StatusChip tone={driver.kycDetail.status === 'APPROVED' ? 'success' : driver.kycDetail.status === 'REJECTED' ? 'danger' : 'food'}>
+                        {driver.kycDetail.status === 'APPROVED' ? 'Đã duyệt' : driver.kycDetail.status === 'REJECTED' ? 'Từ chối' : 'Chờ duyệt'}
+                      </StatusChip>
+                    </div>
+                    <dl className="space-y-1.5 text-xs">
+                      <div className="flex justify-between">
+                        <dt className="text-muted">Mã hồ sơ KYC</dt>
+                        <dd className="font-mono text-ink">{driver.kycDetail.applicationId.slice(0, 8)}</dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt className="text-muted">Hạng GPLX</dt>
+                        <dd className="font-medium text-ink">{driver.kycDetail.licenseClass || "—"}</dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt className="text-muted">Số giấy tờ nộp</dt>
+                        <dd className="font-medium text-ink">{driver.kycDetail.documentCount} tài liệu</dd>
+                      </div>
+                      {driver.kycDetail.submittedAt ? (
+                        <div className="flex justify-between">
+                          <dt className="text-muted">Thời gian nộp</dt>
+                          <dd className="text-ink">{formatOpsDate(driver.kycDetail.submittedAt)}</dd>
+                        </div>
+                      ) : null}
+                    </dl>
+                    <div className="pt-2">
+                      <PreviewLink href={`/drivers/kyc/${driver.kycDetail.applicationId}`} tone="brand">
+                        Xem chi tiết hồ sơ KYC
+                        <OpsIcon name="arrowRight" className="size-4" />
+                      </PreviewLink>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <EmptyPanel message="Chưa có danh sách giấy tờ KYC." />
+                    <div className="mt-2">
+                      <PreviewLink href="/drivers/kyc" tone="neutral">
+                        Xem hàng đợi KYC
+                      </PreviewLink>
+                    </div>
+                  </>
+                )}
               </DetailSection>
             </div>
           </div>

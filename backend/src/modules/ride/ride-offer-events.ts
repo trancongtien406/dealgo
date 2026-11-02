@@ -16,7 +16,11 @@ export type RideOfferChangeReason =
   | 'DRIVER_CANCELLED'
   | 'TIMEOUT'
   // Customer edited the stops while negotiating: pending offers died, a new round starts.
-  | 'ROUTE_CHANGED';
+  | 'ROUTE_CHANGED'
+  // t71u: one driver's offer reached its expiresAt (RIDE_OFFER_TTL_SECONDS, default 20s).
+  | 'OFFER_EXPIRED'
+  // A driver opened or left the request. Customer reload only; not a new dispatch.
+  | 'VIEWERS';
 
 /** Reasons after which a NEGOTIATING ride should be (re)announced to nearby drivers. */
 export const RIDE_REQUEST_BROADCAST_REASONS: ReadonlySet<RideOfferChangeReason> = new Set([

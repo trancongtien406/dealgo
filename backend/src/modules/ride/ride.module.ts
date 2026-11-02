@@ -1,3 +1,4 @@
+import { DriverWorkloadService } from '../dispatch/driver-workload.service.js';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { resolvePersistenceRepository, PrismaModule, PrismaService } from '../../platform/database/index.js';
@@ -41,6 +42,7 @@ import { RideVehicleClassModule } from '../ride-vehicle/ride-vehicle-class.modul
 import { RoutingModule } from '../routing/index.js';
 import { RideService } from './ride.service.js';
 import { RideOfferEvents } from './ride-offer-events.js';
+import { RideViewerPresence } from './ride-viewer-presence.js';
 
 @Module({
   imports: [
@@ -59,6 +61,8 @@ import { RideOfferEvents } from './ride-offer-events.js';
   ],
   controllers: [RideController, RideOpsController, ParcelController, ParcelOpsController],
   providers: [
+    DriverWorkloadService,
+    RideViewerPresence,
     RideService,
     ParcelService,
     RideOfferEvents,

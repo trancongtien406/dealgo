@@ -151,7 +151,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     if (_password.text.isEmpty) {
       return _fail(l10n.passwordErrRequired);
     }
-    if (_password.text.length < 8) {
+    if (_password.text.length < 6) {
       return _fail(l10n.passwordErrTooShort);
     }
     if (_confirm.text.isEmpty) {

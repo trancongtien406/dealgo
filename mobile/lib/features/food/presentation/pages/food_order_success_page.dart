@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
@@ -6,6 +9,9 @@ import '../../../../core/design_system/components/dealgo_success_mark.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../domain/entities/food_models.dart';
 import '../../domain/entities/food_money.dart';
+import '../../domain/usecases/get_food_order.dart';
+import '../../../../core/realtime/snapshot_realtime.dart';
+import '../cubit/food_tracking_cubit.dart';
 import '../utils/food_routes.dart';
 import '../widgets/food_widgets.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
@@ -25,10 +31,99 @@ class FoodOrderSuccessArgs {
   final String? storeAddress;
 }
 
+/// Status after which the success page hands over to live tracking (driver
+/// search, delivery offers, assignment and terminal states live there).
+bool foodSuccessShouldOpenTracking(String status) =>
+    !(status == 'PLACED' || status == 'PREPARING');
+
+/// Polling fallback when the socket hint is missed (REST stays authoritative).
+const foodSuccessPollInterval = Duration(seconds: 10);
+
 class FoodOrderSuccessPage extends StatelessWidget {
   const FoodOrderSuccessPage({required this.args, super.key});
 
   final FoodOrderSuccessArgs args;
+
+  @override
+  Widget build(BuildContext context) {
+    GetFoodOrder? getOrder;
+    SnapshotRealtime? realtime;
+    try {
+      getOrder = context.read<GetFoodOrder>();
+      realtime = context.read<SnapshotRealtime>();
+    } on ProviderNotFoundException {
+      // Static fallback (widget tests without the live providers).
+    }
+    if (getOrder == null || realtime == null) {
+      return _FoodOrderSuccessView(args: args);
+    }
+    return BlocProvider(
+      create: (context) => FoodTrackingCubit(
+        getFoodOrder: getOrder!,
+        realtime: realtime!,
+      )..start(
+          orderId: args.order.id,
+          accessToken: currentAccessToken(context),
+        ),
+      child: _LiveSuccess(args: args),
+    );
+  }
+}
+
+/// Live-updating wrapper: socket hints on `food:{id}` plus a poll fallback.
+class _LiveSuccess extends StatefulWidget {
+  const _LiveSuccess({required this.args});
+
+  final FoodOrderSuccessArgs args;
+
+  @override
+  State<_LiveSuccess> createState() => _LiveSuccessState();
+}
+
+class _LiveSuccessState extends State<_LiveSuccess> {
+  Timer? _poll;
+  var _left = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _poll = Timer.periodic(foodSuccessPollInterval, (_) {
+      if (mounted) {
+        context.read<FoodTrackingCubit>().refresh();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocConsumer<FoodTrackingCubit, FoodTrackingState>(
+      listener: (context, state) {
+        final status = state.order?.status;
+        if (!_left && status != null && foodSuccessShouldOpenTracking(status)) {
+          _left = true;
+          _poll?.cancel();
+          context.pushReplacement(FoodRoutes.order(widget.args.order.id));
+        }
+      },
+      builder: (context, state) => _FoodOrderSuccessView(
+        args: widget.args,
+        liveStatus: state.order?.status,
+      ),
+    );
+  }
+}
+
+class _FoodOrderSuccessView extends StatelessWidget {
+  const _FoodOrderSuccessView({required this.args, this.liveStatus});
+
+  final FoodOrderSuccessArgs args;
+  final String? liveStatus;
 
   void _track(BuildContext context) {
     context.pushReplacement(FoodRoutes.order(args.order.id));
@@ -104,7 +199,7 @@ class FoodOrderSuccessPage extends StatelessWidget {
                         const SizedBox(height: DealGoSpacing.s12),
                         Row(
                           children: [
-                            const DecoratedBox(
+                            DecoratedBox(
                               decoration: BoxDecoration(
                                 color: DealGoColors.subtlePurple,
                                 borderRadius: BorderRadius.all(
@@ -181,15 +276,25 @@ class FoodOrderSuccessPage extends StatelessWidget {
                         ),
                         const SizedBox(height: DealGoSpacing.s8),
                         _ProgressRow(
+                          key: const Key('food-success-step-store'),
                           label: AppLocalizations.of(context)
                               .foodStepAwaitStore,
-                          tone: FoodChipTone.warning,
+                          tone: liveStatus == 'PREPARING'
+                              ? FoodChipTone.green
+                              : FoodChipTone.warning,
+                          done: liveStatus == 'PREPARING',
                         ),
                         const SizedBox(height: DealGoSpacing.s8),
                         _ProgressRow(
-                          label: AppLocalizations.of(context)
-                              .foodStepNotPreparing,
-                          tone: FoodChipTone.neutral,
+                          key: const Key('food-success-step-prep'),
+                          label: liveStatus == 'PREPARING'
+                              ? AppLocalizations.of(context)
+                                  .merchantStatusPreparing
+                              : AppLocalizations.of(context)
+                                  .foodStepNotPreparing,
+                          tone: liveStatus == 'PREPARING'
+                              ? FoodChipTone.purple
+                              : FoodChipTone.neutral,
                         ),
                       ],
                     ),
@@ -221,6 +326,7 @@ class FoodOrderSuccessPage extends StatelessWidget {
 class _ProgressRow extends StatelessWidget {
   const _ProgressRow({
     required this.label,
+    super.key,
     required this.tone,
     this.done = false,
   });

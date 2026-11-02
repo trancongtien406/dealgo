@@ -51,6 +51,8 @@ String partnerSubmitErrorText(AppLocalizations l10n, String code) {
     PartnerSubmitError.sessionExpired => l10n.partnerErrorSession,
     PartnerSubmitError.network => l10n.partnerErrorNetwork,
     PartnerSubmitError.missingDocuments => l10n.partnerErrorMissingDocs,
+    PartnerSubmitError.avatarRequired => l10n.partnerErrorAvatar,
+    PartnerSubmitError.legalConsent => l10n.partnerErrorLegalConsent,
     'UPLOAD_TOO_LARGE' => l10n.partnerErrorTooLarge,
     'UPLOAD_TYPE_NOT_ALLOWED' ||
     'UPLOAD_TYPE_MISMATCH' => l10n.partnerErrorType,
@@ -199,31 +201,12 @@ class PartnerDocumentSlot extends StatelessWidget {
             const SizedBox(height: DealGoSpacing.s8),
             Text(l10n.partnerDocHint, style: textTheme.bodySmall),
             const SizedBox(height: DealGoSpacing.s12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    key: Key('doc-camera-$kind'),
-                    onPressed: () => _pick(context, camera: true),
-                    icon: const Icon(DealGoIcons.camera),
-                    label: Text(
-                      present ? l10n.partnerDocRetake : l10n.partnerDocTake,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: DealGoSpacing.s8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    key: Key('doc-gallery-$kind'),
-                    onPressed: () => _pick(context, camera: false),
-                    icon: const Icon(DealGoIcons.addPhoto),
-                    label: Text(
-                      l10n.partnerDocPick,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-              ],
+            _DocSlotActions(
+              kind: kind,
+              takeLabel: present ? l10n.partnerDocRetake : l10n.partnerDocTake,
+              pickLabel: l10n.partnerDocPick,
+              onTake: () => _pick(context, camera: true),
+              onPick: () => _pick(context, camera: false),
             ),
             if (picked != null)
               TextButton.icon(
@@ -499,6 +482,67 @@ class PartnerBankFields extends StatelessWidget {
           icon: DealGoIcons.shieldPlain,
         ),
       ],
+    );
+  }
+}
+
+/// Camera / library buttons. Side by side when each half fits its label on
+/// one line, otherwise stacked full width, so labels never end in "…".
+class _DocSlotActions extends StatelessWidget {
+  const _DocSlotActions({
+    required this.kind,
+    required this.takeLabel,
+    required this.pickLabel,
+    required this.onTake,
+    required this.onPick,
+  });
+
+  final String kind;
+  final String takeLabel;
+  final String pickLabel;
+  final VoidCallback onTake;
+  final VoidCallback onPick;
+
+  // t71u (owner): icon-first actions — camera / photo library glyphs with
+  // tooltip + semantics, so long labels never truncate on narrow screens.
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      key: const Key('doc-actions-icons'),
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _button(
+          Key('doc-camera-$kind'),
+          Icons.photo_camera_outlined,
+          takeLabel,
+          onTake,
+        ),
+        const SizedBox(width: DealGoSpacing.s16),
+        _button(
+          Key('doc-gallery-$kind'),
+          Icons.photo_library_outlined,
+          pickLabel,
+          onPick,
+        ),
+      ],
+    );
+  }
+
+  Widget _button(Key key, IconData icon, String label, VoidCallback onTap) {
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: Tooltip(
+        message: label,
+        child: IconButton.outlined(
+          key: key,
+          onPressed: onTap,
+          iconSize: 26,
+          constraints: const BoxConstraints(minWidth: 56, minHeight: 48),
+          icon: Icon(icon),
+        ),
+      ),
     );
   }
 }

@@ -44,7 +44,9 @@ Future<(List<ApiFailureReport>, List<ApiFailureReport>)> _run(
 
 void main() {
   test('EMAIL_DELIVERY_FAILED is a breadcrumb, not a Sentry error', () async {
-    final (reports, crumbs) = await _run({'errorCode': 'EMAIL_DELIVERY_FAILED'});
+    final (reports, crumbs) = await _run({
+      'errorCode': 'EMAIL_DELIVERY_FAILED',
+    });
     expect(reports, isEmpty);
     expect(crumbs.single.errorCode, 'EMAIL_DELIVERY_FAILED');
   });

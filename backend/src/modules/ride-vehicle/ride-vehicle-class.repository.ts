@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { PrismaClient } from '../../generated/prisma/client.js';
-import type { RideVehicleClass } from './ride-vehicle-class.js';
+import { legacyVehicleKind, type RideVehicleClass } from './ride-vehicle-class.js';
 
 /** Field-level change recorded in the ops audit log: `{ field: { from, to } }`. */
 export type VehicleClassChanges = Record<string, { from: unknown; to: unknown }>;
@@ -40,6 +40,7 @@ export interface RideVehicleClassRepository {
         | 'assumedSpeedKmh'
         | 'imageUrl'
         | 'parcelEnabled'
+        | 'kind'
       >
     >,
     updatedByUserId: string,
@@ -113,6 +114,7 @@ function fromRecord(row: {
   sortOrder: number;
   imageUrl: string | null;
   parcelEnabled?: boolean;
+  kind?: string | null;
   updatedByUserId: string | null;
 }): RideVehicleClass {
   return {
@@ -129,6 +131,7 @@ function fromRecord(row: {
     sortOrder: row.sortOrder,
     imageUrl: row.imageUrl,
     parcelEnabled: row.parcelEnabled ?? false,
+    kind: row.kind === 'BIKE' || row.kind === 'CAR' ? row.kind : legacyVehicleKind(row.code),
     updatedByUserId: row.updatedByUserId,
   };
 }
@@ -161,6 +164,7 @@ export class PrismaRideVehicleClassRepository implements RideVehicleClassReposit
         maxFareVnd: row.maxFareVnd,
         assumedSpeedKmh: row.assumedSpeedKmh,
         sortOrder: row.sortOrder,
+        kind: row.kind ?? legacyVehicleKind(row.code),
       })),
       skipDuplicates: true,
     });

@@ -205,6 +205,10 @@ class RideViewModel {
     this.stopFeeVnd = 0,
     this.waitFeeVnd = 0,
     this.serviceKind = 'RIDE',
+    this.autoAcceptOfferedFare = false,
+    this.viewingDriverCount = 0,
+    this.maxOfferedFareVnd,
+    this.fareHeadroomPercent,
   });
 
   final String id;
@@ -233,6 +237,10 @@ class RideViewModel {
   final int stopFeeVnd;
   final int waitFeeVnd;
   final String serviceKind;
+  final bool autoAcceptOfferedFare;
+  final int viewingDriverCount;
+  final int? maxOfferedFareVnd;
+  final int? fareHeadroomPercent;
 
   factory RideViewModel.fromJson(Map<String, Object?> json) {
     final id = json['id'];
@@ -298,6 +306,10 @@ class RideViewModel {
       stopFeeVnd: _nullableInt(json['stopFeeVnd']) ?? 0,
       waitFeeVnd: _nullableInt(json['waitFeeVnd']) ?? 0,
       serviceKind: _nullableString(json['serviceKind']) ?? 'RIDE',
+      autoAcceptOfferedFare: json['autoAcceptOfferedFare'] == true,
+      viewingDriverCount: _nullableInt(json['viewingDriverCount']) ?? 0,
+      maxOfferedFareVnd: _nullableInt(json['maxOfferedFareVnd']),
+      fareHeadroomPercent: _nullableInt(json['fareHeadroomPercent']),
     );
   }
 
@@ -331,6 +343,10 @@ class RideViewModel {
       stopFeeVnd: ride.stopFeeVnd,
       waitFeeVnd: ride.waitFeeVnd,
       serviceKind: ride.serviceKind,
+      autoAcceptOfferedFare: ride.autoAcceptOfferedFare,
+      viewingDriverCount: ride.viewingDriverCount,
+      maxOfferedFareVnd: ride.maxOfferedFareVnd,
+      fareHeadroomPercent: ride.fareHeadroomPercent,
     );
   }
 
@@ -362,6 +378,11 @@ class RideViewModel {
       'currentStopSeq': currentStopSeq,
       'stopFeeVnd': stopFeeVnd,
       'waitFeeVnd': waitFeeVnd,
+      'autoAcceptOfferedFare': autoAcceptOfferedFare,
+      'viewingDriverCount': viewingDriverCount,
+      if (maxOfferedFareVnd != null) 'maxOfferedFareVnd': maxOfferedFareVnd,
+      if (fareHeadroomPercent != null)
+        'fareHeadroomPercent': fareHeadroomPercent,
       'route': {
         'available': route.available,
         'provider': route.provider,
@@ -402,6 +423,10 @@ class RideViewModel {
       stopFeeVnd: stopFeeVnd < 0 ? 0 : stopFeeVnd,
       waitFeeVnd: waitFeeVnd < 0 ? 0 : waitFeeVnd,
       serviceKind: serviceKind,
+      autoAcceptOfferedFare: autoAcceptOfferedFare,
+      viewingDriverCount: viewingDriverCount < 0 ? 0 : viewingDriverCount,
+      maxOfferedFareVnd: maxOfferedFareVnd,
+      fareHeadroomPercent: fareHeadroomPercent,
     );
   }
 }
@@ -424,6 +449,11 @@ class OpenRideModel {
     this.serviceKind = 'RIDE',
     this.parcelSizeClass,
     this.parcelWeightKg,
+    this.pickupDistanceKm,
+    this.tripDistanceKm,
+    this.intercity = false,
+    this.maxCounterVnd,
+    this.counterHeadroomPercent,
   });
 
   final String id;
@@ -442,6 +472,11 @@ class OpenRideModel {
   final String serviceKind;
   final String? parcelSizeClass;
   final double? parcelWeightKg;
+  final double? pickupDistanceKm;
+  final double? tripDistanceKm;
+  final bool intercity;
+  final int? maxCounterVnd;
+  final int? counterHeadroomPercent;
 
   factory OpenRideModel.fromJson(Map<String, Object?> json) {
     final id = json['id'];
@@ -486,6 +521,11 @@ class OpenRideModel {
       serviceKind: _nullableString(json['serviceKind']) ?? 'RIDE',
       parcelSizeClass: _nullableString(asJsonMap(json['parcel'])?['sizeClass']),
       parcelWeightKg: _asDouble(asJsonMap(json['parcel'])?['weightKg']),
+      pickupDistanceKm: _asDouble(json['pickupDistanceKm']),
+      tripDistanceKm: _asDouble(json['tripDistanceKm']),
+      intercity: json['intercity'] == true,
+      maxCounterVnd: _nullableInt(json['maxCounterVnd']),
+      counterHeadroomPercent: _nullableInt(json['counterHeadroomPercent']),
     );
   }
 
@@ -507,6 +547,11 @@ class OpenRideModel {
       serviceKind: ride.serviceKind,
       parcelSizeClass: ride.parcelSizeClass,
       parcelWeightKg: ride.parcelWeightKg,
+      pickupDistanceKm: ride.pickupDistanceKm,
+      tripDistanceKm: ride.tripDistanceKm,
+      intercity: ride.intercity,
+      maxCounterVnd: ride.maxCounterVnd,
+      counterHeadroomPercent: ride.counterHeadroomPercent,
     );
   }
 
@@ -551,6 +596,12 @@ class OpenRideModel {
           {'seq': i + 1, 'lat': stop.lat, 'lng': stop.lng, 'label': stop.label},
       ],
       'routeVersion': routeVersion,
+      if (pickupDistanceKm != null) 'pickupDistanceKm': pickupDistanceKm,
+      if (tripDistanceKm != null) 'tripDistanceKm': tripDistanceKm,
+      if (intercity) 'intercity': true,
+      if (maxCounterVnd != null) 'maxCounterVnd': maxCounterVnd,
+      if (counterHeadroomPercent != null)
+        'counterHeadroomPercent': counterHeadroomPercent,
     };
   }
 
@@ -572,6 +623,11 @@ class OpenRideModel {
       serviceKind: serviceKind,
       parcelSizeClass: parcelSizeClass,
       parcelWeightKg: parcelWeightKg,
+      pickupDistanceKm: pickupDistanceKm,
+      tripDistanceKm: tripDistanceKm,
+      intercity: intercity,
+      maxCounterVnd: maxCounterVnd,
+      counterHeadroomPercent: counterHeadroomPercent,
     );
   }
 }

@@ -22,6 +22,7 @@ export type CustomerListItem = {
   status: CustomerStatus;
   time: string;
   createdAt?: string;
+  phoneVerifiedAt?: string | null;
   lastLogin?: string;
   deletion?: AccountDeletionInfo | null;
 };

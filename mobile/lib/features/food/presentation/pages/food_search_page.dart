@@ -284,12 +284,12 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
                   for (final item in _history)
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: const Icon(
+                      leading: Icon(
                         DealGoIcons.history,
                         color: DealGoColors.textSecondary,
                       ),
                       title: Text(item),
-                      trailing: const Icon(
+                      trailing: Icon(
                         DealGoIcons.chevronRight,
                         color: DealGoColors.textSecondary,
                       ),

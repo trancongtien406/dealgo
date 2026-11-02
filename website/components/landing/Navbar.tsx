@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 const navLinks = [
   { label: "Dịch vụ", href: "#dich-vu" },
@@ -61,7 +62,8 @@ export default function Navbar() {
           </nav>
 
           {/* Right Action: Location Selector only (Login/Register removed as requested) */}
-          <div className="hidden lg:flex items-center">
+          <div className="hidden lg:flex items-center gap-3">
+            <ThemeToggle />
             <div className="relative">
               <button
                 onClick={() => setCityDropdown(!cityDropdown)}
@@ -119,6 +121,7 @@ export default function Navbar() {
 
           {/* Mobile Menu Button */}
           <div className="flex items-center gap-2 lg:hidden">
+            <ThemeToggle compact className="size-9" />
             {/* Mobile Location Badge */}
             <span className="flex items-center gap-1 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-full px-3 py-1.5 shadow-sm">
               <svg className="w-3.5 h-3.5 text-[#6D28D9]" viewBox="0 0 24 24" fill="currentColor">

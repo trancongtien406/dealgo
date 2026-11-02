@@ -157,7 +157,7 @@ class _DriverDutyMapState extends State<DriverDutyMap> {
                     widget.online
                         ? AppLocalizations.of(context).driverOnDutyMapLabel
                         : AppLocalizations.of(context).driverOfflineChip,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: DealGoColors.card,
                       fontWeight: FontWeight.w700,
                       fontSize: 12,

@@ -153,3 +153,21 @@ describe("maps provider settings", () => {
     expect(validateSettingValue("MAPS_REVERSE_PROVIDER", "here")).not.toBeNull();
   });
 });
+
+describe("intercity + offer TTL settings (t73u)", () => {
+  it("validates the offer TTL range 10–120 s", () => {
+    expect(validateSettingValue("RIDE_OFFER_TTL_SECONDS", "20")).toBeNull();
+    expect(validateSettingValue("RIDE_OFFER_TTL_SECONDS", "9")).not.toBeNull();
+    expect(validateSettingValue("RIDE_OFFER_TTL_SECONDS", "121")).not.toBeNull();
+  });
+  it("treats the intercity flag as a switch and validates its JSON", () => {
+    expect(BOOLEAN_SETTING_KEYS.has("RIDE_INTERCITY_ENABLED")).toBe(true);
+    expect(categorizeSetting("RIDE_INTERCITY_ENABLED")).toBe("DISPATCH");
+    expect(categorizeSetting("RIDE_INTERCITY_PRICING")).toBe("FARE");
+    expect(validateSettingValue("RIDE_INTERCITY_VEHICLE_CLASSES", '["CAR_4"]')).toBeNull();
+    expect(validateSettingValue("RIDE_INTERCITY_VEHICLE_CLASSES", '["car 4"]')).not.toBeNull();
+    expect(validateSettingValue("RIDE_INTERCITY_PRICING", '{"CAR_4":{"perKmVnd":9000}}')).toBeNull();
+    expect(validateSettingValue("RIDE_INTERCITY_PRICING", '{"CAR_4":{"minFareVnd":5,"maxFareVnd":1}}')).not.toBeNull();
+    expect(validateSettingValue("RIDE_INTERCITY_MAX_KM", "3001")).not.toBeNull();
+  });
+});

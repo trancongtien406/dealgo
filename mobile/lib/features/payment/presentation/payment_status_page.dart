@@ -290,7 +290,7 @@ class _PaymentStatusPageState extends State<PaymentStatusPage>
                             view.status,
                           ),
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
                       color: DealGoColors.text,
@@ -311,9 +311,7 @@ class _PaymentStatusPageState extends State<PaymentStatusPage>
                       child: Text(
                         reason,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: DealGoColors.textSecondary,
-                        ),
+                        style: TextStyle(color: DealGoColors.textSecondary),
                       ),
                     ),
                   if (_error != null)

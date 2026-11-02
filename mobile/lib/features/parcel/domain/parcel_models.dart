@@ -37,7 +37,12 @@ class ParcelQuoteOption {
     this.parcelSurchargeVnd = 0,
     this.serviceFeeVnd = 0,
     this.returnFeeVnd = 0,
+    this.bidCeilingPercent,
+    this.fareStepVnd = 1000,
   });
+
+  /// MOB-001: server fare step (fallback 1.000đ).
+  final int fareStepVnd;
 
   final String code;
   final String name;
@@ -53,6 +58,15 @@ class ParcelQuoteOption {
 
   /// Admin `PARCEL_RETURN_FEE_VND`, charged only if the package comes back.
   final int returnFeeVnd;
+
+  /// Admin ceiling as a percent of the reference (130 = +30%).
+  final int? bidCeilingPercent;
+
+  int? get bidHeadroomPercent {
+    final ceiling = bidCeilingPercent;
+    if (ceiling == null || ceiling <= 100) return null;
+    return ceiling - 100;
+  }
 
   /// Keeps an offer inside the server band.
   int clamp(int fareVnd) => fareVnd < minBidVnd

@@ -1,4 +1,6 @@
+import 'package:dealgo/core/config/app_env.dart';
 import 'package:dealgo/features/identity/domain/entities/user_profile.dart';
+import 'package:dealgo/features/support/presentation/support_links.dart';
 import 'package:dealgo/features/places/data/places_remote_datasource.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -124,6 +126,29 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Trung tâm hỗ trợ'), findsWidgets);
+  });
+
+  test('help center opens the localized website support page', () {
+    expect(
+      helpCenterWebUri(const Locale('vi')).toString(),
+      'https://$appLinkHost/support',
+    );
+    expect(
+      helpCenterWebUri(const Locale('en')).toString(),
+      'https://$appLinkHost/support?lang=en',
+    );
+  });
+
+  testWidgets('account lists the in-app support requests', (tester) async {
+    await pumpSignedIn(tester, profile: customerProfile);
+    await tester.tap(navLabel('Tôi'));
+    await tester.pumpAndSettle();
+    final row = find.byKey(const ValueKey('account-support-tickets-row'));
+    await tester.ensureVisible(row);
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('support-new-icon')), findsOneWidget);
   });
 
   testWidgets('the account bell opens the notification inbox', (tester) async {

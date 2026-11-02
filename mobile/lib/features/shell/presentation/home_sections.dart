@@ -252,7 +252,7 @@ class _StoreCard extends StatelessWidget {
         color: DealGoColors.card,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(DealGoRadius.button),
-          side: const BorderSide(color: DealGoColors.border),
+          side: BorderSide(color: DealGoColors.border),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -266,7 +266,7 @@ class _StoreCard extends StatelessWidget {
                   fit: StackFit.expand,
                   children: [
                     _StoreCover(imageUrl: store.imageUrl),
-                    const Positioned(
+                    Positioned(
                       top: DealGoSpacing.s8,
                       right: DealGoSpacing.s8,
                       child: DecoratedBox(
@@ -463,7 +463,7 @@ class _RecentTripCardState extends State<RecentTripCard> {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(DealGoRadius.button),
-        side: const BorderSide(color: DealGoColors.border),
+        side: BorderSide(color: DealGoColors.border),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -473,7 +473,7 @@ class _RecentTripCardState extends State<RecentTripCard> {
           child: Row(
             children: [
               DecoratedBox(
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: DealGoColors.subtlePurple,
                   shape: BoxShape.circle,
                 ),

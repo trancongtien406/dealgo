@@ -27,6 +27,12 @@ describe('service-regions', () => {
     expect(inferRegionCodeFromCoords(21.0285, 105.8542)).toBe('HN');
   });
 
+  it('covers Hội An inside merged Đà Nẵng (phố cổ, An Bàng, Cửa Đại)', () => {
+    expect(inferRegionCodeFromCoords(15.8771, 108.3287)).toBe('DN');
+    expect(inferRegionCodeFromCoords(15.9135, 108.3412)).toBe('DN');
+    expect(inferRegionCodeFromCoords(15.8960, 108.3880)).toBe('DN');
+  });
+
   it('infers from Vietnamese labels', () => {
     expect(inferRegionCodeFromLabel('Hải Châu, Đà Nẵng')).toBe('DN');
     expect(inferRegionCodeFromLabel('Quận 1, Hồ Chí Minh')).toBe('HCM');

@@ -53,6 +53,17 @@ export class PartnerReviewIssueDto {
   note!: string;
 }
 
+/** pt5u: one accepted legal document version (Quy chế sử dụng / privacy). */
+export class AcceptedLegalDocumentDto {
+  @IsString()
+  @MaxLength(60)
+  slug!: string;
+
+  @IsInt()
+  @Min(0)
+  version!: number;
+}
+
 export class SubmitPartnerApplicationDto {
   @IsIn(PARTNER_APPLICATION_ROLES)
   role!: 'DRIVER' | 'MERCHANT';
@@ -65,6 +76,14 @@ export class SubmitPartnerApplicationDto {
   @Type(() => PartnerDocumentDto)
   @ArrayMaxSize(PARTNER_MAX_DOCUMENTS_PER_REQUEST)
   documents?: PartnerDocumentDto[];
+
+  /** pt5u: current versions of `regulations` and `privacy` the applicant ticked. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => AcceptedLegalDocumentDto)
+  acceptedLegalDocuments?: AcceptedLegalDocumentDto[];
 }
 
 /** DEC-PROD-048: ops may assign or confirm the driver's vehicle class when approving. */

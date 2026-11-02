@@ -1,4 +1,5 @@
 import '../models/auth_method_policy_model.dart';
+import '../models/email_verification_model.dart';
 import '../models/phone_challenge_model.dart';
 import '../models/user_profile_model.dart';
 import '../models/verified_session_model.dart';
@@ -63,6 +64,18 @@ abstract interface class IdentityRemoteDataSource {
     String? contentBase64,
     String? dataUrl,
     String? contentType,
+  });
+
+  /// Mails a 6-digit code to [email]. Inside the resend cooldown the server
+  /// returns the live verification without mailing again.
+  Future<EmailVerificationModel> requestEmailVerification({
+    required String accessToken,
+    required String email,
+  });
+
+  Future<void> confirmEmailVerification({
+    required String verificationId,
+    required String code,
   });
 
   Future<Map<String, Object?>> passkeyAuthenticationOptions();

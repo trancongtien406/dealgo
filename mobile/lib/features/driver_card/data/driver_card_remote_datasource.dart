@@ -35,7 +35,7 @@ class DioDriverCardRemoteDataSource implements DriverCardRepository {
   }
 
   @override
-  Future<String> fetchCustomerName({
+  Future<CustomerCard> fetchCustomer({
     required String accessToken,
     required String jobId,
     bool isFood = false,
@@ -47,13 +47,21 @@ class DioDriverCardRemoteDataSource implements DriverCardRepository {
             : ApiPaths.rideCustomer(jobId),
         options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       );
-      final name = requireSuccessData(response.data)['displayName'];
-      return name is String ? name.trim() : '';
+      return decodeCustomerCard(requireSuccessData(response.data));
     } on DioException catch (error) {
       throw apiExceptionFromDio(error);
     }
   }
 }
+
+String? _cardText(Object? value) =>
+    value is String && value.trim().isNotEmpty ? value.trim() : null;
+
+CustomerCard decodeCustomerCard(Map<String, Object?> data) => CustomerCard(
+  displayName: _cardText(data['displayName']) ?? '',
+  avatarUrl: _cardText(data['avatarUrl']),
+  phone: _cardText(data['phone']),
+);
 
 DriverCard decodeDriverCard(Map<String, Object?> data) {
   final id = data['driverId'];
@@ -65,27 +73,37 @@ DriverCard decodeDriverCard(Map<String, Object?> data) {
       errorCode: 'MALFORMED_RESPONSE',
     );
   }
-  String? text(Object? value) =>
-      value is String && value.trim().isNotEmpty ? value.trim() : null;
+  const text = _cardText;
   final average = data['ratingAverage'];
   final count = data['ratingCount'];
+  final trips = data['completedTrips'];
   return DriverCard(
     driverId: id,
     displayName: name.trim(),
     avatarUrl: text(data['avatarUrl']),
     vehiclePlate: text(data['vehiclePlate']),
     vehicleType: text(data['vehicleType']),
+    vehicleName: text(data['vehicleName']),
     ratingAverage: average is num ? average.toDouble() : null,
     ratingCount: count is num ? count.toInt() : 0,
+    completedTrips: trips is num ? trips.toInt() : null,
+    phone: text(data['phone']),
   );
 }
 
 /// Test/mock source. Without [card] it behaves like a job with no driver yet.
 class FakeDriverCardRemoteDataSource implements DriverCardRepository {
-  FakeDriverCardRemoteDataSource({this.card, this.customerName = ''});
+  FakeDriverCardRemoteDataSource({
+    this.card,
+    this.customerName = '',
+    this.customerAvatarUrl,
+    this.customerPhone,
+  });
 
   DriverCard? card;
   String customerName;
+  String? customerAvatarUrl;
+  String? customerPhone;
   final calls = <({DriverCardJob job, String jobId})>[];
 
   /// Per-driver cards for offer lists, keyed by offer id.
@@ -111,9 +129,13 @@ class FakeDriverCardRemoteDataSource implements DriverCardRepository {
   }
 
   @override
-  Future<String> fetchCustomerName({
+  Future<CustomerCard> fetchCustomer({
     required String accessToken,
     required String jobId,
     bool isFood = false,
-  }) async => customerName;
+  }) async => CustomerCard(
+    displayName: customerName,
+    avatarUrl: customerAvatarUrl,
+    phone: customerPhone,
+  );
 }

@@ -5,6 +5,9 @@ import '../../../../core/design_system/components/dealgo_logo.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../legal/legal_document_page.dart';
+import '../../../legal/legal_documents.dart';
+import '../../../support/presentation/support_links.dart';
 import 'auth_widgets.dart';
 
 /// Shared shell for auth screens (S003–S004): lavender wash, soft brand
@@ -115,25 +118,37 @@ class _AuthBackdrop extends StatelessWidget {
   }
 }
 
-/// "Trợ giúp" header link; shows the hotline until the help center ships.
+/// "Trợ giúp" header link: opens the admin-configured Messenger chat, or the
+/// website help page when no Messenger link is set.
 class AuthHelpButton extends StatelessWidget {
   const AuthHelpButton({super.key});
 
+  Future<void> _open(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final fallback = AppLocalizations.of(context).authHelpHotline;
+    if (!await openSupportMessenger(context)) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(fallback)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     return TextButton(
-      onPressed: () => ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(l10n.authHelpHotline))),
-      child: Text(l10n.authHelp),
+      key: const Key('auth-help-btn'),
+      onPressed: () => _open(context),
+      child: Text(AppLocalizations.of(context).authHelp),
     );
   }
 }
 
-/// Terms / privacy consent line with tappable links (48dp-friendly padding).
-class AuthLegalFooter extends StatelessWidget {
-  const AuthLegalFooter({super.key});
+/// Terms / privacy links opening the full documents in-app.
+class _AuthLegalLinks extends StatelessWidget {
+  const _AuthLegalLinks({required this.prefix, this.alignment});
+
+  final String prefix;
+  final WrapAlignment? alignment;
 
   @override
   Widget build(BuildContext context) {
@@ -146,14 +161,11 @@ class AuthLegalFooter extends StatelessWidget {
       decorationColor: DealGoColors.primary,
     );
 
-    void snack(String message) => ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
-
-    Widget linkSpan(String text, String message) => Semantics(
+    Widget linkSpan(String text, String slug) => Semantics(
       link: true,
       child: InkWell(
-        onTap: () => snack(message),
+        key: Key('auth-legal-$slug'),
+        onTap: () => LegalDocumentPage.open(context, slug),
         borderRadius: BorderRadius.circular(DealGoRadius.small),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: DealGoSpacing.s4),
@@ -162,17 +174,92 @@ class AuthLegalFooter extends StatelessWidget {
       ),
     );
 
+    return Wrap(
+      alignment: alignment ?? WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text(prefix, style: base),
+        linkSpan(l10n.authLegalTerms, LegalSlug.terms),
+        Text(l10n.authTermsAnd, style: base),
+        linkSpan(l10n.authPrivacyPolicy, LegalSlug.privacy),
+        Text('.', style: base),
+      ],
+    );
+  }
+}
+
+/// Reminder of the accepted terms on screens after the method picker.
+class AuthLegalFooter extends StatelessWidget {
+  const AuthLegalFooter({super.key});
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: DealGoSpacing.s16),
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        crossAxisAlignment: WrapCrossAlignment.center,
+      child: _AuthLegalLinks(
+        prefix: AppLocalizations.of(context).authLegalPrefix,
+      ),
+    );
+  }
+}
+
+/// Required "I have read and agree" checkbox; every sign-in method can create
+/// an account, so the method picker stays locked until it is ticked.
+class AuthLegalConsent extends StatelessWidget {
+  const AuthLegalConsent({
+    required this.accepted,
+    required this.onChanged,
+    this.showError = false,
+    super.key,
+  });
+
+  final bool accepted;
+  final ValueChanged<bool> onChanged;
+  final bool showError;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: DealGoSpacing.s16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(l10n.authLegalPrefix, style: base),
-          linkSpan(l10n.authLegalTerms, l10n.authTermsSoon),
-          Text(l10n.authTermsAnd, style: base),
-          linkSpan(l10n.authPrivacyPolicy, l10n.authPrivacySoon),
-          Text('.', style: base),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Checkbox(
+                key: const Key('auth-legal-consent'),
+                value: accepted,
+                isError: showError && !accepted,
+                onChanged: (value) => onChanged(value ?? false),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: DealGoSpacing.s8),
+                  child: _AuthLegalLinks(
+                    prefix: l10n.authLegalConsentPrefix,
+                    alignment: WrapAlignment.start,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (showError && !accepted)
+            Padding(
+              padding: const EdgeInsets.only(left: DealGoSpacing.s12),
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  l10n.authLegalConsentRequired,
+                  key: const Key('auth-legal-consent-error'),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: DealGoColors.danger,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

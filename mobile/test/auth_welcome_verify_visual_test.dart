@@ -90,6 +90,10 @@ void main() {
       await tester.pumpAndSettle();
       await shot('01-welcome');
 
+      await tester.ensureVisible(find.byKey(const Key('auth-legal-consent')));
+      await tester.tap(find.byKey(const Key('auth-legal-consent')));
+      await tester.pump();
+      await tester.ensureVisible(find.byKey(const Key('auth-method-email')));
       await tester.tap(find.byKey(const Key('auth-method-email')));
       await tester.pumpAndSettle();
       await shot('02-email-login');

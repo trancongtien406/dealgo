@@ -6,7 +6,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { uniqueTestPhone } from './test-phone.js';
-import { pinStore } from './store-pin.js';
+import { approveStoreItems, pinStore } from './store-pin.js';
 import { INestApplication } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
@@ -120,6 +120,7 @@ describePg('food merchant order change (postgres)', () => {
   async function twoLineOrder(tag: string) {
     const { merchant, storeId, itemId } = await merchantWithItem(`${tag} Bún`);
     const drink = await post(merchant.token, '/v1/food/merchant/items', { name: `${tag} Trà ${RUN}`, priceVnd: 10_000 }).expect(200);
+    await approveStoreItems(app, merchant.token);
     const customer = await login();
     const placed = await http()
       .post('/v1/food/orders')

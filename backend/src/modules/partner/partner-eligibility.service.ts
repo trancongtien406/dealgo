@@ -1,16 +1,14 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { HttpException, Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type AppEnv } from '../../platform/config/env.js';
+import { PlatformSettingsService } from '../../platform/settings/platform-settings.service.js';
+import { missingCarExtraDocs, resolveCarExtraDocsGate } from './partner-car-docs-gate.js';
 import { IDENTITY_REPOSITORY } from '../identity/identity.constants.js';
 import type { IdentityRepository } from '../identity/identity.repository.js';
-import {
-  PARTNER_DRIVER_CAR_EXTRA_DOCUMENTS,
-  PARTNER_REPOSITORY,
-} from './partner.constants.js';
+import { PARTNER_REPOSITORY } from './partner.constants.js';
 import { partnerError } from './partner.error.js';
 import { shopPinFromMetadata } from './partner-shop-pin.js';
 import {
-  isCarVehicleClassCode,
   MOTORBIKE_CLASS_CODE,
   vehicleClassCodeFromMetadata,
 } from '../ride-vehicle/ride-vehicle-class.js';
@@ -26,6 +24,7 @@ export class PartnerEligibilityService {
     @Inject(IDENTITY_REPOSITORY) private readonly identity: IdentityRepository,
     @Inject(PARTNER_REPOSITORY) private readonly partners: PartnerRepository,
     private readonly config: ConfigService<AppEnv, true>,
+    @Optional() private readonly settings?: PlatformSettingsService,
   ) {}
 
   async requireEligibleDriver(userId: string): Promise<void> {
@@ -50,7 +49,7 @@ export class PartnerEligibilityService {
       );
     }
     if (role === 'DRIVER') {
-      this.assertCarExtraDocsIfRequired(application);
+      await this.assertCarExtraDocsIfRequired(application);
     }
   }
 
@@ -75,10 +74,23 @@ export class PartnerEligibilityService {
     if (!application) {
       return null;
     }
-    if (!this.bypassEnabled() && application.status !== 'APPROVED') {
+    if (this.bypassEnabled()) {
+      return vehicleClassCodeFromMetadata(application.metadata);
+    }
+    if (application.status !== 'APPROVED') {
+      return null;
+    }
+    // t90u: a car driver missing the car documents (gate on) is not dispatchable — no
+    // push/socket offer, no job detail, no bid — matching requireEligibleDriver.
+    if ((await this.carDocsMissing(application)).length > 0) {
       return null;
     }
     return vehicleClassCodeFromMetadata(application.metadata);
+  }
+
+  /** t90u: single answer for "may this driver be offered / shown jobs?". */
+  async driverDispatchEligible(userId: string): Promise<boolean> {
+    return Boolean(await this.driverVehicleClassCode(userId).catch(() => null));
   }
 
   /** The pin from the merchant's KYB application, used to seed a store without coordinates. */
@@ -94,37 +106,29 @@ export class PartnerEligibilityService {
     return explicit === true;
   }
 
-  /**
-   * OPEN-006 scaffold: fail closed for Car when gate is on and insurance missing.
-   * Does not invent regulatory claims or vendor secrets.
-   */
-  carExtraDocsGateEnabled(): boolean {
-    const explicit = this.config.get('PARTNER_CAR_KYC_EXTRA_DOCS', { infer: true });
-    if (explicit !== undefined) {
-      return explicit;
-    }
-    return this.config.get('NODE_ENV', { infer: true }) === 'production';
+  /** t90u: admin setting DRIVER_CAR_EXTRA_DOCS_REQUIRED (env fallback without settings). */
+  carExtraDocsGateEnabled(): Promise<boolean> {
+    return resolveCarExtraDocsGate(this.settings, this.config);
   }
 
-  private assertCarExtraDocsIfRequired(application: PartnerApplicationRecord): void {
-    if (!this.carExtraDocsGateEnabled()) {
-      return;
+  private async carDocsMissing(application: PartnerApplicationRecord): Promise<string[]> {
+    const missing = missingCarExtraDocs(application.metadata, application.documents);
+    if (missing.length === 0 || !(await this.carExtraDocsGateEnabled())) {
+      return [];
     }
-    const code = vehicleClassCodeFromMetadata(application.metadata);
-    if (!code || !isCarVehicleClassCode(code)) {
-      return;
-    }
-    const onFile = new Set(
-      (application.documents ?? [])
-        .map((doc) => doc.kind)
-        .filter((kind): kind is string => typeof kind === 'string' && kind.length > 0),
-    );
-    const missing = PARTNER_DRIVER_CAR_EXTRA_DOCUMENTS.filter((kind) => !onFile.has(kind));
+    return missing;
+  }
+
+  private async assertCarExtraDocsIfRequired(application: PartnerApplicationRecord): Promise<void> {
+    const missing = await this.carDocsMissing(application);
     if (missing.length > 0) {
-      throw partnerError(
+      throw new HttpException(
+        {
+          message: `Car KYC documents required: ${missing.join(', ')}`,
+          errorCode: 'PARTNER_KYC_REQUIRED',
+          details: { reason: 'CAR_DOCS_REQUIRED', missing },
+        },
         403,
-        'PARTNER_KYC_REQUIRED',
-        `Car KYC documents required: ${missing.join(', ')}`,
       );
     }
   }

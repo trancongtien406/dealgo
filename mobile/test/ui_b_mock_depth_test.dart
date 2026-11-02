@@ -65,10 +65,7 @@ void main() {
     expect(find.text('Bạn muốn đi đâu?'), findsOneWidget);
     await tester.tap(find.text(airport.name));
     await tester.pumpAndSettle();
-    // Map confirm sheet then class+fare (skip overview only).
-    expect(find.byKey(const Key('ride-open-route-overview')), findsOneWidget);
-    await tester.tap(find.byKey(const Key('ride-open-route-overview')));
-    await tester.pumpAndSettle();
+    // Destination chosen → class+fare opens automatically.
     expect(find.text('Đề xuất của bạn'), findsOneWidget);
     expect(find.text('Xe máy'), findsWidgets);
     expect(find.text('Xe 4 chỗ'), findsWidgets);

@@ -1,6 +1,6 @@
 import { personInitials, type StatusTone } from "@/lib/admin-format";
 import { areaLabelFromRegionOrCoords } from "@/lib/service-region-labels";
-import type { NestOpsStore } from "@/features/stores/nest-types";
+import type { NestOpsStore, NestOpsStoreDetail } from "@/features/stores/nest-types";
 import type {
   StoreKybStatus,
   StoreListItem,
@@ -75,6 +75,24 @@ export function mapNestStoreToListItem(store: NestOpsStore): StoreListItem {
     acceptSummary: storeAcceptSummary(store),
     prepMinutes: store.estimatedPrepMinutes ?? null,
     locationMissing: store.lat == null || store.lng == null,
+    address: store.address || store.addressLabel || undefined,
+    phone: store.ownerPhone || undefined,
+    email: store.ownerEmail || undefined,
+    ownerName: store.ownerName || undefined,
+  };
+}
+
+export function mapNestStoreDetailToItem(store: NestOpsStoreDetail): StoreListItem {
+  const base = mapNestStoreToListItem(store);
+  return {
+    ...base,
+    rating: store.stats?.ratingAverage ?? null,
+    orders: store.stats?.completedOrders ?? store.itemCount,
+    items: store.items,
+    kybDetail: store.kybDetail,
+    stats: store.stats,
+    recentOrders: store.recentOrders,
+    recentReviews: store.recentReviews,
   };
 }
 

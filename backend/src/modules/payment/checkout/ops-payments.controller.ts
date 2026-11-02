@@ -70,6 +70,12 @@ export class OpsPaymentsController {
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() body: RefundIntentDto,
   ) {
-    return this.gateway.refund({ intentId: id, amountVnd: body.amountVnd, reason: body.reason, actorUserId: actor.userId });
+    return this.gateway.refund({
+      intentId: id,
+      amountVnd: body.amountVnd,
+      reason: body.reason,
+      actorUserId: actor.userId,
+      idempotencyKey: body.idempotencyKey,
+    });
   }
 }

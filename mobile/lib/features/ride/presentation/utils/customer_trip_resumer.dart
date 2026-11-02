@@ -15,9 +15,14 @@ class CustomerTripResumer {
     this.maxDelay = const Duration(seconds: 30),
     this.maxAttempts = 5,
     this._userNavigationClaimed,
+    this._cachedRoute,
   });
 
   final CustomerActiveTripSource _source;
+
+  /// Screen of the trip saved on the device, opened when the first lookup
+  /// fails (no network) so the customer still sees it and can call.
+  final Future<String?> Function()? _cachedRoute;
   final void Function(String route) _navigate;
   final String Function() _currentLocation;
   final Duration baseDelay;
@@ -67,6 +72,12 @@ class CustomerTripResumer {
       if (generation != _generation) {
         return;
       }
+      if (attempt == 0) {
+        await _openCached(generation);
+        if (generation != _generation) {
+          return;
+        }
+      }
       if (attempt + 1 >= maxAttempts) {
         _pendingUser = null;
         return;
@@ -89,6 +100,22 @@ class CustomerTripResumer {
       return;
     }
     _navigate(trip.route);
+  }
+
+  Future<void> _openCached(int generation) async {
+    final String? route;
+    try {
+      route = await _cachedRoute?.call();
+    } catch (_) {
+      return;
+    }
+    if (route == null ||
+        generation != _generation ||
+        !canReopenFrom(_currentLocation()) ||
+        (_userNavigationClaimed?.call() ?? false)) {
+      return;
+    }
+    _navigate(route);
   }
 
   /// Sign-out / account switch: forget the user and cancel pending retries.

@@ -567,7 +567,7 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
                   tooltip: l10n.placeHistoryDelete,
                   visualDensity: VisualDensity.compact,
                   onPressed: () => unawaited(_deleteHistory(place)),
-                  icon: const Icon(
+                  icon: Icon(
                     DealGoIcons.close,
                     size: 16,
                     color: DealGoColors.textSecondary,

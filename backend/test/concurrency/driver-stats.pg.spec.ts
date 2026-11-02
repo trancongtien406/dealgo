@@ -63,6 +63,7 @@ describePg('driver stats + pickup snapshot (postgres)', () => {
       },
     });
     const item = await food.createItem({ ownerId: owner.id, name: 'Mì Quảng', priceVnd: 40_000 });
+    await db.foodItem.update({ where: { id: item.id }, data: { moderationStatus: 'APPROVED' } }); // FOOD-001
 
     const place = (key: string) =>
       food.place({

@@ -1,7 +1,6 @@
 export * from './payment.module.js';
 export * from './payment.constants.js';
 export * from './payment-port.js';
-export * from './payment-webhook.controller.js';
 export * from './payment.repository.js';
 export * from './payment-prisma.repository.js';
 export * from './ops-refunds.controller.js';

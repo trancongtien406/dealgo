@@ -38,3 +38,27 @@ describe('DriverPresenceService.dispatchOrigin vs push audience', () => {
     await expect(svc.dispatchOrigin('nobody', {}, now, true)).rejects.toMatchObject({ status: 409 });
   });
 });
+
+describe('DriverPresenceService.assertWithinReach (RIDE-001 / FOOD-005)', () => {
+  const now = new Date('2026-10-29T10:52:40Z');
+  async function svcAt(lat: number, lng: number) {
+    const repo = new MemoryDriverPresenceRepository();
+    await repo.upsert('d', { online: true });
+    await repo.updateLocation('d', { lat, lng, at: new Date(now.getTime() - 60_000) });
+    await repo.upsert('d', { online: true });
+    return new DriverPresenceService(repo, {} as never);
+  }
+  const pickup = { lat: 16.0196, lng: 108.1966 };
+
+  it('accepts inside radius × tolerance + 1 km and rejects far drivers with DRIVER_TOO_FAR', async () => {
+    // ~6.7 km north: outside 3 km radius but inside 3×1.5+1 = 5.5? no → rejected; 5 km radius → 8.5 ok.
+    const svc = await svcAt(16.08, 108.1966);
+    await expect(svc.assertWithinReach('d', pickup, 5, now)).resolves.toBeUndefined();
+    await expect(svc.assertWithinReach('d', pickup, 3, now)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('skips the check when the driver has no usable fix', async () => {
+    const svc = await svcAt(10, 106);
+    await expect(svc.assertWithinReach('nobody', pickup, 3, now)).resolves.toBeUndefined();
+  });
+});

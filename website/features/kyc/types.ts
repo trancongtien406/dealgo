@@ -11,17 +11,22 @@ export type KycStatus = (typeof KYC_STATUSES)[number];
 
 export type KycCase = {
   code: string;
+  userId?: string;
   role: import("@/features/kyc/nest-types").NestPartnerRole;
   initials: string;
   name: string;
   submittedAt: string;
   phoneMasked: string;
+  phone?: string;
+  email?: string;
   area: string;
   vehicleKind: string;
   vehicle: string;
   plate: string;
   /** DRIVER only: MOTORBIKE | CAR_4 | CAR_7 from the application (DEC-PROD-048). */
   vehicleClassCode: string | null;
+  /** t88u: declared driving-licence class (DRIVER only). */
+  licenseClass: string | null;
   /** Submitted while the admin KYC/KYB switch was OFF (DEC-PROD-048). */
   documentsWaived: boolean;
   status: KycStatus;

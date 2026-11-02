@@ -9,6 +9,8 @@ import '../../../../core/design_system/components/dealgo_segmented_control.dart'
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../legal/legal_documents.dart';
+import '../../../legal/partner_legal_consent.dart';
 import '../../../food/presentation/food_categories_store.dart';
 import '../../../food/presentation/widgets/food_category_tile.dart';
 import '../../../identity/domain/entities/auth_state.dart';
@@ -367,36 +369,40 @@ class MerchantKybStepsPage extends StatelessWidget {
             }
             cubit.previousStep();
           },
-          footer: OnboardingContinueBar(
-            label: isReview
-                ? (state.issues.isEmpty
-                      ? l10n.kybSubmitCta
-                      : l10n.kybResubmitCta)
-                : l10n.partnerContinue,
-            enabled:
-                !state.submitting &&
-                switch (state.step) {
-                  MerchantKybStep.shopInfo => state.canContinueShopInfo,
-                  MerchantKybStep.representative =>
-                    state.canContinueRepresentative,
-                  MerchantKybStep.documents => state.canContinueDocuments,
-                  MerchantKybStep.review => state.canSubmit,
-                  _ => true,
-                },
-            onPressed: () async {
-              if (isReview) {
-                await cubit.submit();
-                if (!context.mounted) {
+          footer: ValueListenableBuilder<List<AcceptedLegalDocument>?>(
+            valueListenable: cubit.legalConsent,
+            builder: (context, _, _) => OnboardingContinueBar(
+              label: isReview
+                  ? (state.issues.isEmpty
+                        ? l10n.kybSubmitCta
+                        : l10n.kybResubmitCta)
+                  : l10n.partnerContinue,
+              enabled:
+                  !state.submitting &&
+                  switch (state.step) {
+                    MerchantKybStep.shopInfo => state.canContinueShopInfo,
+                    MerchantKybStep.representative =>
+                      state.canContinueRepresentative,
+                    MerchantKybStep.documents => state.canContinueDocuments,
+                    MerchantKybStep.review =>
+                      state.canSubmit && cubit.legalConsent.value != null,
+                    _ => true,
+                  },
+              onPressed: () async {
+                if (isReview) {
+                  await cubit.submit();
+                  if (!context.mounted) {
+                    return;
+                  }
+                  if (cubit.state.submitError == null &&
+                      cubit.state.status == PartnerApplicationStatus.pending) {
+                    context.go(MerchantKybRoutes.status);
+                  }
                   return;
                 }
-                if (cubit.state.submitError == null &&
-                    cubit.state.status == PartnerApplicationStatus.pending) {
-                  context.go(MerchantKybRoutes.status);
-                }
-                return;
-              }
-              cubit.nextStep();
-            },
+                cubit.nextStep();
+              },
+            ),
           ),
           body: ListView(
             padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
@@ -1079,6 +1085,8 @@ class _MerchantReviewStep extends StatelessWidget {
               ? l10n.kybReviewNote
               : l10n.kybQuickModeBanner,
         ),
+        const SizedBox(height: DealGoSpacing.s16),
+        PartnerLegalConsent(consent: cubit.legalConsent),
       ],
     );
   }

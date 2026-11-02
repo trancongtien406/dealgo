@@ -23,6 +23,8 @@ import '../../domain/usecases/get_ride.dart';
 import '../cubit/ride_receipt_cubit.dart';
 import '../utils/ride_vehicle_label.dart';
 import '../widgets/ride_widgets.dart';
+import '../../../driver_card/domain/driver_card.dart';
+import '../../../driver_card/presentation/driver_card_tile.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
 
@@ -230,7 +232,7 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
             subjectId: ride.id,
             hasDriver: ride.assignedDriverId != null,
           ),
-        const Center(
+        Center(
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: DealGoColors.greenSurface,
@@ -315,18 +317,28 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
                   label: l10n.rideReceiptFinishedAt,
                   amount: finishedAt,
                 ),
-              if (resolveMediaUrl(ride.imageUrl) != null) ...[
-                RideVehicleClassPhoto(
-                  imageUrl: ride.imageUrl,
-                  code: ride.vehicleClassCode,
-                  size: 48,
-                ),
+              if (ride.assignedDriverId != null) ...[
                 const SizedBox(height: DealGoSpacing.s8),
+                DriverCardTile(
+                  key: const Key('ride-receipt-driver'),
+                  job: DriverCardJob.ride,
+                  jobId: ride.id,
+                  accessToken: rideAccessToken(context) ?? '',
+                ),
+              ] else ...[
+                if (resolveMediaUrl(ride.imageUrl) != null) ...[
+                  RideVehicleClassPhoto(
+                    imageUrl: ride.imageUrl,
+                    code: ride.vehicleClassCode,
+                    size: 48,
+                  ),
+                  const SizedBox(height: DealGoSpacing.s8),
+                ],
+                RideMoneyLine(
+                  label: l10n.rideVehicleLabel,
+                  amount: rideVehicleClassLabel(l10n, ride.vehicleClassCode),
+                ),
               ],
-              RideMoneyLine(
-                label: l10n.rideVehicleLabel,
-                amount: rideVehicleClassLabel(l10n, ride.vehicleClassCode),
-              ),
             ],
           ),
         ),

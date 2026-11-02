@@ -18,7 +18,10 @@ import type { RideVehicleClassRepository, VehicleClassChanges } from './ride-veh
 import {
   defaultRideVehicleClasses,
   quoteVehicleClassFare,
+  registerVehicleClassKinds,
+  vehicleKindOf,
   type RideVehicleClass,
+  type VehicleKind,
   type VehicleClassQuote,
 } from './ride-vehicle-class.js';
 
@@ -36,6 +39,7 @@ export type RideVehicleClassView = {
   sortOrder: number;
   imageUrl: string | null;
   parcelEnabled: boolean;
+  kind: VehicleKind;
 };
 
 export type RideQuoteOptionView = RideVehicleClassView & {
@@ -58,6 +62,7 @@ function toView(row: RideVehicleClass): RideVehicleClassView {
     sortOrder: row.sortOrder,
     imageUrl: row.imageUrl,
     parcelEnabled: row.parcelEnabled,
+    kind: row.kind ?? vehicleKindOf(row.code),
   };
 }
 
@@ -141,6 +146,7 @@ export class RideVehicleClassService {
       maxFareVnd: patch.maxFareVnd ?? current.maxFareVnd,
       assumedSpeedKmh: patch.assumedSpeedKmh ?? current.assumedSpeedKmh,
       parcelEnabled: patch.parcelEnabled ?? current.parcelEnabled,
+      kind: patch.kind ?? vehicleKindOf(current.code),
     };
     const changed =
       next.name !== current.name ||
@@ -152,7 +158,8 @@ export class RideVehicleClassService {
       next.minFareVnd !== current.minFareVnd ||
       next.maxFareVnd !== current.maxFareVnd ||
       next.assumedSpeedKmh !== current.assumedSpeedKmh ||
-      next.parcelEnabled !== current.parcelEnabled;
+      next.parcelEnabled !== current.parcelEnabled ||
+      next.kind !== vehicleKindOf(current.code);
     if (!changed) {
       throw new HttpException(
         { message: 'No vehicle class field to update', errorCode: 'VALIDATION_ERROR' },
@@ -176,6 +183,7 @@ export class RideVehicleClassService {
         404,
       );
     }
+    registerVehicleClassKinds(await this.classes.list());
     return toView(saved);
   }
 
@@ -268,7 +276,9 @@ export class RideVehicleClassService {
 
   private async load(): Promise<RideVehicleClass[]> {
     await this.ensureDefaults();
-    return this.classes.list();
+    const rows = await this.classes.list();
+    registerVehicleClassKinds(rows);
+    return rows;
   }
 
   private async ensureDefaults(): Promise<void> {

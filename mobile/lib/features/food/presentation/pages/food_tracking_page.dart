@@ -6,6 +6,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../driver_card/domain/driver_card.dart';
 import '../../../driver_card/presentation/driver_card_tile.dart';
+import '../../../active_job/domain/active_job_snapshot.dart';
+import '../../../active_job/presentation/active_job_cache.dart';
+import '../../../active_job/presentation/offline_job_panel.dart';
 
 import '../../../../core/design_system/components/dealgo_banner.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
@@ -30,6 +33,7 @@ import '../../domain/entities/food_money.dart';
 import '../../domain/usecases/get_food_order.dart';
 import '../utils/food_routes.dart';
 import '../cubit/food_tracking_cubit.dart';
+import '../widgets/food_fare_widgets.dart';
 import '../widgets/food_order_change_card.dart';
 import '../widgets/food_reject_reason.dart';
 import '../widgets/food_reorder_button.dart';
@@ -56,6 +60,7 @@ class FoodTrackingPage extends StatelessWidget {
       create: (context) => FoodTrackingCubit(
         getFoodOrder: context.read<GetFoodOrder>(),
         realtime: context.read<SnapshotRealtime>(),
+        offlineCache: maybeActiveJobCache(context),
       )..start(orderId: orderId, accessToken: currentAccessToken(context)),
       child: _FoodTrackingView(orderId: orderId),
     );
@@ -121,80 +126,126 @@ class _FoodTrackingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: DealGoColors.canvas,
-      body: SafeArea(
-        bottom: false,
-        child: BlocBuilder<FoodTrackingCubit, FoodTrackingState>(
-          builder: (context, state) {
-            final order = state.order;
-            final loading = state is FoodTrackingLoading && order == null;
-            final busy = state.busy;
-            if (loading) {
-              return Column(
-                children: [
-                  DealGoAppHeader(
-                    title: AppLocalizations.of(context).foodTrackingTitle,
-                    onBack: () => _back(context),
-                  ),
-                  const Expanded(
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                ],
-              );
-            }
-            if (state is FoodTrackingOffline && order == null) {
-              return Column(
-                children: [
-                  DealGoAppHeader(
-                    title: AppLocalizations.of(context).foodTrackingTitle,
-                    onBack: () => _back(context),
-                  ),
-                  Expanded(
-                    child: DealGoStateView.failure(
-                      context,
+    return BlocListener<FoodTrackingCubit, FoodTrackingState>(
+      listenWhen: (previous, next) {
+        final before = previous.order?.stage;
+        final after = next.order?.stage;
+        if (before == null || after == null || before == after) {
+          return false;
+        }
+        final wasLive =
+            before != FoodTrackingStage.cancelled &&
+            before != FoodTrackingStage.failed;
+        return wasLive &&
+            (after == FoodTrackingStage.cancelled ||
+                after == FoodTrackingStage.failed);
+      },
+      listener: (context, state) {
+        final order = state.order;
+        if (order == null) return;
+        final l10n = AppLocalizations.of(context);
+        final reason = order.cancelReason;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              reason == null
+                  ? l10n.inboxFoodCancelledBody
+                  : foodCancelReasonText(l10n, reason),
+            ),
+          ),
+        );
+        context.go('/customer/shop');
+      },
+      child: Scaffold(
+        backgroundColor: DealGoColors.canvas,
+        body: SafeArea(
+          bottom: false,
+          child: BlocBuilder<FoodTrackingCubit, FoodTrackingState>(
+            builder: (context, state) {
+              final order = state.order;
+              final loading = state is FoodTrackingLoading && order == null;
+              final busy = state.busy;
+              if (loading) {
+                return Column(
+                  children: [
+                    DealGoAppHeader(
+                      title: AppLocalizations.of(context).foodTrackingTitle,
+                      onBack: () => _back(context),
+                    ),
+                    const Expanded(
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  ],
+                );
+              }
+              if (state is FoodTrackingOffline) {
+                return ActiveJobSnapshotBuilder(
+                  id: orderId,
+                  builder: (context, snapshot, waiting) {
+                    if (order == null && snapshot == null) {
+                      return Column(
+                        children: [
+                          DealGoAppHeader(
+                            title: AppLocalizations.of(context)
+                                .foodTrackingTitle,
+                            onBack: () => _back(context),
+                          ),
+                          Expanded(
+                            child: waiting
+                                ? const Center(
+                                    child: CircularProgressIndicator(),
+                                  )
+                                : DealGoStateView.failure(
+                                    context,
+                                    onRetry: () => context
+                                        .read<FoodTrackingCubit>()
+                                        .refresh(),
+                                    cause: state.cause,
+                                  ),
+                          ),
+                        ],
+                      );
+                    }
+                    return _FoodReconnect(
+                      order: order,
+                      snapshot: snapshot,
+                      busy: busy,
+                      onBack: () => _back(context),
                       onRetry: () =>
                           context.read<FoodTrackingCubit>().refresh(),
-                      cause: state.cause,
-                    ),
+                    );
+                  },
+                );
+              }
+              return OpenChatOnArrival(
+                shop: true,
+                onOpen: () => _openShopChat(context, orderId, order?.storeName),
+                child: OpenChatOnArrival(
+                  // Driver thread only exists once a driver is assigned.
+                  onOpen: () {
+                    if (order?.assignedDriverId != null) {
+                      unawaited(_openChat(context, orderId));
+                    }
+                  },
+                  child: _FoodLive(
+                    order: order,
+                    busy: busy,
+                    onBack: () => _back(context),
+                    onRefresh: () =>
+                        context.read<FoodTrackingCubit>().refresh(),
+                    onCancelStub: () =>
+                        context.push(FoodRoutes.cancel(orderId)),
+                    onOpenChat: () => _openChat(context, orderId),
+                    onOpenShopChat: () =>
+                        _openShopChat(context, orderId, order?.storeName),
+                    onOpenVoice: voiceCallsEnabled(context)
+                        ? () => _openVoice(context, orderId)
+                        : null,
                   ),
-                ],
-              );
-            }
-            if (state is FoodTrackingOffline) {
-              return _FoodReconnect(
-                order: order,
-                busy: busy,
-                onBack: () => _back(context),
-                onRetry: () => context.read<FoodTrackingCubit>().refresh(),
-              );
-            }
-            return OpenChatOnArrival(
-              shop: true,
-              onOpen: () => _openShopChat(context, orderId, order?.storeName),
-              child: OpenChatOnArrival(
-                // Driver thread only exists once a driver is assigned.
-                onOpen: () {
-                  if (order?.assignedDriverId != null) {
-                    unawaited(_openChat(context, orderId));
-                  }
-                },
-                child: _FoodLive(
-                  order: order,
-                  busy: busy,
-                  onBack: () => _back(context),
-                  onRefresh: () => context.read<FoodTrackingCubit>().refresh(),
-                  onCancelStub: () => context.push(FoodRoutes.cancel(orderId)),
-                  onOpenChat: () => _openChat(context, orderId),
-                  onOpenShopChat: () =>
-                      _openShopChat(context, orderId, order?.storeName),
-                  onOpenVoice: voiceCallsEnabled(context)
-                      ? () => _openVoice(context, orderId)
-                      : null,
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
@@ -376,6 +427,16 @@ class _FoodLive extends StatelessWidget {
               accessToken: currentAccessToken(context),
             ),
           ),
+        if (!hasDriver &&
+            const {'PLACED', 'PREPARING', 'READY'}.contains(current.status))
+          TrackingSection(
+            child: FoodFareNegotiationCard(
+              key: ValueKey('food-fare-${current.id}'),
+              orderId: current.id,
+              accessToken: () => currentAccessToken(context) ?? '',
+              onAgreed: onRefresh,
+            ),
+          ),
         if (current.deliveryCode case final code?)
           if (current.stage == FoodTrackingStage.onTheWay)
             TrackingSection(
@@ -394,6 +455,12 @@ class _FoodLive extends StatelessWidget {
               jobId: current.id,
               accessToken: currentAccessToken(context) ?? '',
               assigned: true,
+              refreshKey: current.status,
+              onLoaded: (card) => maybeActiveJobCache(context)?.recordDriver(
+                kind: ActiveJobKind.foodOrder,
+                jobId: current.id,
+                card: card,
+              ),
               trailing: contact,
             ),
           ),
@@ -403,7 +470,7 @@ class _FoodLive extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const CircleAvatar(
+                  CircleAvatar(
                     radius: 18,
                     backgroundColor: DealGoColors.subtlePurple,
                     child: Icon(
@@ -571,12 +638,14 @@ class _FoodLive extends StatelessWidget {
 class _FoodReconnect extends StatelessWidget {
   const _FoodReconnect({
     required this.order,
+    required this.snapshot,
     required this.busy,
     required this.onBack,
     required this.onRetry,
   });
 
   final FoodOrderDetail? order;
+  final ActiveJobSnapshot? snapshot;
   final bool busy;
   final VoidCallback onBack;
   final VoidCallback onRetry;
@@ -584,6 +653,7 @@ class _FoodReconnect extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final current = order;
+    final saved = snapshot;
     final textTheme = Theme.of(context).textTheme;
     return Column(
       children: [
@@ -600,7 +670,7 @@ class _FoodReconnect extends StatelessWidget {
               DealGoSpacing.s16,
             ),
             children: [
-              const Center(
+              Center(
                 child: FoodStateIcon(
                   icon: DealGoIcons.offline,
                   background: DealGoColors.amberSurface,
@@ -621,7 +691,17 @@ class _FoodReconnect extends StatelessWidget {
                   color: DealGoColors.textSecondary,
                 ),
               ),
-              if (current != null) ...[
+              if (saved != null) ...[
+                const SizedBox(height: DealGoSpacing.s16),
+                OfflineJobPanel(
+                  snapshot: saved,
+                  statusTitle: foodTrackingTitle(
+                    AppLocalizations.of(context),
+                    foodTrackingStage(saved.status),
+                    status: saved.status,
+                  ),
+                ),
+              ] else if (current != null) ...[
                 const SizedBox(height: DealGoSpacing.s16),
                 FoodPanel(
                   child: Column(

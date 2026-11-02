@@ -2,7 +2,7 @@ import 'package:dealgo/features/onboarding/domain/entities/partner_documents.dar
 import 'package:dealgo/features/onboarding/presentation/cubit/driver_kyc_cubit.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// t60u: KYB needs the food-safety certificate; licence class must cover the vehicle.
+// KYB needs the food-safety certificate; licence class must cover the vehicle.
 void main() {
   test('merchant checklist requires the food-safety certificate', () {
     expect(
@@ -31,6 +31,14 @@ void main() {
       ..setVehicleClass(code: 'CAR_4', name: 'Car');
     expect(cubit.state.licenseMatchesVehicle, isFalse);
     cubit.setLicenseClass('B');
+    expect(cubit.state.licenseMatchesVehicle, isTrue);
+  });
+
+  test('quick mode does not judge the never-asked default licence', () {
+    final cubit = DriverKycCubit(useMock: true);
+    cubit.emit(cubit.state.copyWith(documentsRequired: false));
+    cubit.setVehicleClass(code: 'CAR_4', name: 'Car');
+    expect(cubit.state.licenseClass, 'A1');
     expect(cubit.state.licenseMatchesVehicle, isTrue);
   });
 }

@@ -4,7 +4,8 @@ export type OutboxAggregateType =
   | 'Ride'
   | 'FoodOrder'
   | 'NotificationCampaign'
-  | 'PartnerApplication';
+  | 'PartnerApplication'
+  | 'LegalPolicy';
 
 export type StatusOutboxAggregateType = 'Ride' | 'FoodOrder';
 
@@ -265,6 +266,51 @@ export async function writeFoodChangeOutbox(
           changeId: input.changeId,
           changeStatus: input.changeStatus,
           ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
+        } as Prisma.InputJsonValue,
+      },
+    ],
+    skipDuplicates: true,
+  });
+  return result.count === 1 ? 'written' : 'duplicate';
+}
+
+/** Delivery-fee negotiation on a food order (driver counter → customer; customer raise → drivers). */
+export const FOOD_FARE_EVENT_PREFIX = 'FoodOrder.fare.';
+
+/** Food side events that carry a status snapshot but are not status transitions. */
+export function isFoodSideEvent(eventType: string): boolean {
+  return (
+    eventType.startsWith(FOOD_CHANGE_EVENT_PREFIX) ||
+    eventType.startsWith(FOOD_FARE_EVENT_PREFIX)
+  );
+}
+
+export type FoodFareOutboxInput = {
+  orderId: string;
+  kind: 'COUNTER' | 'RAISED';
+  /** Unique per event (offer id + edit count, or raise count). */
+  ref: string;
+  status: string;
+  storeId: string;
+  amountVnd: number;
+};
+
+export async function writeFoodFareOutbox(
+  tx: OutboxTx,
+  input: FoodFareOutboxInput,
+): Promise<'written' | 'duplicate'> {
+  const result = await tx.outboxMessage.createMany({
+    data: [
+      {
+        eventKey: `FoodOrder:${input.orderId}:fare:${input.kind}:${input.ref}`,
+        aggregateType: 'FoodOrder',
+        aggregateId: input.orderId,
+        eventType: `${FOOD_FARE_EVENT_PREFIX}${input.kind}`,
+        payload: {
+          status: input.status,
+          storeId: input.storeId,
+          fareEvent: input.kind,
+          amountVnd: input.amountVnd,
         } as Prisma.InputJsonValue,
       },
     ],

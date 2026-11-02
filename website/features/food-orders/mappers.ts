@@ -73,6 +73,7 @@ export function mapNestFoodOrderToListItem(
     items,
     lines,
     total: order.totalVnd,
+    fee: mapDeliveryFee(order),
     payment: "COD",
     driver: order.assignedDriverId
       ? personLabel(order.driverProfile, "TX", order.assignedDriverId)
@@ -84,6 +85,35 @@ export function mapNestFoodOrderToListItem(
     pickupPoint: geoPoint(order.pickup),
     dropoffPoint: geoPoint(order.dropoff),
     change: mapFoodOrderChange(order.latestChange),
+  };
+}
+
+const OFFER_STATUS_LABELS: Record<string, string> = {
+  PENDING: "Đang chờ khách",
+  SELECTED: "Được chọn",
+  LOST: "Không được chọn",
+  WITHDRAWN: "Tài xế rút",
+  EXPIRED: "Hết hạn",
+};
+
+export function mapDeliveryFee(order: NestFoodOrderView): FoodOrderListItem["fee"] {
+  return {
+    suggested: order.suggestedDeliveryFareVnd ?? null,
+    current: order.deliveryFareVnd,
+    agreed: Boolean(order.deliveryFareAgreedAt),
+    raiseCount: order.deliveryFareRaiseCount ?? 0,
+    mode:
+      order.deliveryFeeMode === "FIXED"
+        ? "Giá cố định (Fixed)"
+        : order.deliveryFeeMode === "NEGOTIATE"
+          ? "Cho trả giá (Negotiate)"
+          : null,
+    offers: (order.deliveryOffers ?? []).map((offer) => ({
+      id: offer.id,
+      driver: actorLabel("TX", offer.driverId),
+      amount: offer.amountVnd,
+      status: OFFER_STATUS_LABELS[offer.status] ?? offer.status,
+    })),
   };
 }
 

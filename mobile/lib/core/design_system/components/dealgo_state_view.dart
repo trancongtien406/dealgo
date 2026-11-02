@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../motion/dealgo_motion.dart';
@@ -8,6 +9,9 @@ import '../icons/dealgo_icons.dart';
 import '../tokens/dealgo_tokens.dart';
 import 'dealgo_primary_button.dart';
 import 'dealgo_secondary_button.dart';
+
+/// t90u: driver KYC gate opened straight at the vehicle step to add car documents.
+const carDocsFixRoute = '/driver/kyc?fix=car-docs';
 
 /// Illustration set for empty / error / offline states (`/design` state_*).
 enum DealGoStateArt {
@@ -81,6 +85,19 @@ class DealGoStateView extends StatelessWidget {
     Key? key,
   }) {
     final l10n = AppLocalizations.of(context);
+    if (isCarDocsRequired(cause)) {
+      return DealGoStateView(
+        key: key ?? const Key('state-car-docs-required'),
+        art: DealGoStateArt.kycPending,
+        title: l10n.apiErrCarDocsTitle,
+        message: l10n.apiErrCarDocsBody,
+        actionLabel: l10n.actionCompleteDocuments,
+        onAction: () => GoRouter.of(context).push(carDocsFixRoute),
+        secondaryLabel: l10n.actionRetry,
+        onSecondary: onRetry,
+        compact: compact,
+      );
+    }
     final expired =
         cause is ApiException &&
         (cause.statusCode == 401 || cause.errorCode == 'UNAUTHORIZED');

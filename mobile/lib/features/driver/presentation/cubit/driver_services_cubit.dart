@@ -99,6 +99,17 @@ class DriverServicesCubit extends Cubit<DriverServicesState> {
     ),
   );
 
+  /// Drop switch edits that were never saved, so overview and the job list
+  /// keep showing the server-confirmed services.
+  void revertUnsaved() {
+    if (isClosed || state.busy || !state.dirty) {
+      return;
+    }
+    emit(
+      state.copyWith(prefs: state.saved, status: DriverServicesStatus.ready),
+    );
+  }
+
   /// Sends the switches with the current online state; returns false when it did not stick.
   Future<bool> save() async {
     final repository = _repository;

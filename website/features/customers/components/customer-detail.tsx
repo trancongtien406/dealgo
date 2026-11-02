@@ -88,6 +88,11 @@ export function CustomerDetail({ code }: { code: string }) {
   const limit = activitiesPage?.limit ?? 6;
   const totalPages = Math.max(1, Math.ceil(totalItems / limit));
 
+  const latestNegotiation = useMemo(
+    () => activities.find((a) => a.kind === "Phiên trả giá"),
+    [activities],
+  );
+
   return (
     <div className="min-w-0 space-y-5">
       {forbidden ? (
@@ -191,9 +196,11 @@ export function CustomerDetail({ code }: { code: string }) {
                         {accountDeletionLabel(customer.deletion)}
                       </StatusChip>
                     ) : null}
-                    <StatusChip tone="delivery">
-                      Đã xác thực điện thoại
-                    </StatusChip>
+                    {customer.phoneVerifiedAt ? (
+                      <StatusChip tone="delivery">
+                        Đã xác thực điện thoại
+                      </StatusChip>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -228,7 +235,10 @@ export function CustomerDetail({ code }: { code: string }) {
                     },
                     {
                       label: "Khu vực chính",
-                      value: customer.area || "Đà Nẵng",
+                      value:
+                        customer.area && customer.area !== "—"
+                          ? customer.area
+                          : "Toàn quốc",
                     },
                     {
                       label: "Ngày đăng ký",
@@ -271,7 +281,9 @@ export function CustomerDetail({ code }: { code: string }) {
                     { label: "Cảnh báo rủi ro", value: "Không có cảnh báo" },
                     {
                       label: "Phiên trả giá gần đây",
-                      value: "Chưa có dữ liệu",
+                      value: latestNegotiation
+                        ? `${latestNegotiation.code} · ${latestNegotiation.time}`
+                        : "Chưa có phiên nào",
                     },
                   ]}
                 />
@@ -334,7 +346,10 @@ export function CustomerDetail({ code }: { code: string }) {
                       label="Đơn giao hoàn thành"
                       value={`${customer.delivery} đơn`}
                     />
-                    <Metric label="Phiên trả giá gần nhất" value="01 phiên" />
+                    <Metric
+                      label="Phiên trả giá gần nhất"
+                      value={latestNegotiation ? latestNegotiation.code : "Chưa có"}
+                    />
                   </ul>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="text-base font-semibold text-ink">

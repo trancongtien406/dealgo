@@ -16,6 +16,7 @@ import {
 } from './identity.constants.js';
 import { MemoryIdentityRepository } from './identity.repository.js';
 import { SessionService } from './session.service.js';
+import type { PlatformSettingsService } from '../../platform/settings/platform-settings.service.js';
 
 async function errorOf(promise: Promise<unknown>): Promise<HttpException> {
   const error = await promise.catch((err: unknown) => err);
@@ -529,5 +530,62 @@ describe('EmailPasswordAuthService', () => {
       expect(JSON.stringify(error.getResponse())).not.toMatch(/email|disabled|method/i);
     }
     expect(mail.signupCodes).toHaveLength(sentBefore);
+  });
+
+  describe('AUTH_EMAIL_VERIFICATION_REQUIRED', () => {
+    function withToggle(required: boolean | 'throws') {
+      const settings = {
+        getBoolean: async () => {
+          if (required === 'throws') throw new Error('settings down');
+          return required;
+        },
+      } as unknown as PlatformSettingsService;
+      return new EmailPasswordAuthService(
+        repository, sessions, passwords, authMethods, mail, config, undefined, settings,
+      );
+    }
+
+    it('uses a random code, never a fixed one, when verification is required', async () => {
+      const on = withToggle(true);
+      await on.register({ email: 'a1@dealgo.vn', password: 'password123' });
+      await on.register({ email: 'a2@dealgo.vn', password: 'password123' });
+      const codes = mail.signupCodes.map((c) => c.code);
+      expect(codes).toHaveLength(2);
+      expect(codes).not.toContain('000000');
+      expect(await repository.findUserByEmail('a1@dealgo.vn')).toBeNull();
+    });
+
+    it('off: signs up at once without mail; email stays unverified; login works', async () => {
+      const off = withToggle(false);
+      const result = await off.register({ email: 'Bo@DealGo.vn', password: 'password123' });
+      expect(mail.signupCodes).toHaveLength(0);
+      expect(result).toMatchObject({ verificationRequired: false });
+      expect('session' in result && result.session.accessToken).toBeTruthy();
+      expect(result.challengeId).toEqual(expect.any(String));
+      const user = await repository.findUserByEmail('bo@dealgo.vn');
+      expect(user?.emailVerifiedAt).toBeNull();
+      // The placeholder challenge can never be verified or resent.
+      expectError(await errorOf(off.verifyRegistration(result.challengeId, '000000')), 401, 'AUTH_CODE_INVALID');
+      expectError(await errorOf(off.resendRegistration(result.challengeId)), 401, 'AUTH_CODE_INVALID');
+      const login = await off.login({ email: 'bo@dealgo.vn', password: 'password123' });
+      expect(login.accessToken).toBeTruthy();
+    });
+
+    it('off: an existing address keeps the private notice path (no account leak)', async () => {
+      await signUp('cu@dealgo.vn');
+      const off = withToggle(false);
+      const result = await off.register({ email: 'cu@dealgo.vn', password: 'other12345' });
+      expect(result).not.toHaveProperty('session');
+    });
+
+    it('turning it back on requires the code again at login for unverified accounts', async () => {
+      await withToggle(false).register({ email: 'di@dealgo.vn', password: 'password123' });
+      const error = await errorOf(withToggle(true).login({ email: 'di@dealgo.vn', password: 'password123' }));
+      expectError(error, 403, 'AUTH_EMAIL_NOT_VERIFIED');
+    });
+
+    it('defaults to required when settings cannot be read', async () => {
+      await expect(withToggle('throws').verificationRequired()).resolves.toBe(true);
+    });
   });
 });

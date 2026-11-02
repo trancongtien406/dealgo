@@ -27,6 +27,10 @@ import '../../domain/entities/ride_money.dart';
 import '../../domain/entities/ride_models.dart';
 import '../../../driver_card/domain/driver_card.dart';
 import '../../../driver_card/presentation/driver_card_tile.dart';
+import '../../../driver_card/presentation/driver_detail_sheet.dart';
+import '../../../active_job/domain/active_job_snapshot.dart';
+import '../../../active_job/presentation/active_job_cache.dart';
+import '../../../active_job/presentation/offline_job_panel.dart';
 import '../../domain/usecases/get_ride.dart';
 import '../utils/ride_routes.dart';
 import '../utils/ride_vehicle_label.dart';
@@ -49,6 +53,7 @@ class RideTrackingPage extends StatelessWidget {
       create: (context) => RideTrackingCubit(
         getRide: context.read<GetRide>(),
         realtime: context.read<SnapshotRealtime>(),
+        offlineCache: maybeActiveJobCache(context),
       )..start(rideId: rideId, accessToken: rideAccessToken(context)),
       child: _RideTrackingView(rideId: rideId),
     );
@@ -61,6 +66,13 @@ class _RideTrackingView extends StatelessWidget {
   final String rideId;
 
   void _back(BuildContext context) {
+    // t73u: once the trip is done, back always lands on home (not the
+    // matching/fare pages left underneath in the stack).
+    if (context.read<RideTrackingCubit>().state.ride?.status ==
+        RideStatus.completed) {
+      context.go('/customer');
+      return;
+    }
     if (context.canPop()) {
       context.pop();
       return;
@@ -90,75 +102,108 @@ class _RideTrackingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: DealGoColors.canvas,
-      body: SafeArea(
-        // The tracking sheet handles the bottom inset itself; a page-level
-        // bottom SafeArea leaves an empty strip under the sheet.
-        bottom: false,
-        child: BlocBuilder<RideTrackingCubit, RideTrackingState>(
-          builder: (context, state) {
-            final ride = state.ride;
-            final loading = state is RideTrackingLoading && ride == null;
-            final busy = state.busy;
-            if (loading) {
-              return Column(
-                children: [
-                  DealGoAppHeader(
-                    title: AppLocalizations.of(context).rideTrackTitle,
-                    onBack: () => _back(context),
-                  ),
-                  const Expanded(
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                ],
-              );
-            }
-            if (state is RideTrackingOffline && ride == null) {
-              return Column(
-                children: [
-                  DealGoAppHeader(
-                    title: AppLocalizations.of(context).rideTrackTitle,
-                    onBack: () => _back(context),
-                  ),
-                  Expanded(
-                    child: DealGoStateView.failure(
-                      context,
+    final completed = context.select<RideTrackingCubit, bool>(
+      (c) => c.state.ride?.status == RideStatus.completed,
+    );
+    return PopScope(
+      canPop: !completed,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) context.go('/customer');
+      },
+      child: Scaffold(
+        backgroundColor: DealGoColors.canvas,
+        body: SafeArea(
+          // The tracking sheet handles the bottom inset itself; a page-level
+          // bottom SafeArea leaves an empty strip under the sheet.
+          bottom: false,
+          child: BlocBuilder<RideTrackingCubit, RideTrackingState>(
+            builder: (context, state) {
+              final ride = state.ride;
+              final loading = state is RideTrackingLoading && ride == null;
+              final busy = state.busy;
+              if (loading) {
+                return Column(
+                  children: [
+                    DealGoAppHeader(
+                      title: AppLocalizations.of(context).rideTrackTitle,
+                      onBack: () => _back(context),
+                    ),
+                    const Expanded(
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  ],
+                );
+              }
+              if (state is RideTrackingOffline) {
+                return ActiveJobSnapshotBuilder(
+                  id: rideId,
+                  builder: (context, snapshot, waiting) {
+                    if (ride == null && snapshot == null) {
+                      return Column(
+                        children: [
+                          DealGoAppHeader(
+                            title: AppLocalizations.of(context).rideTrackTitle,
+                            onBack: () => _back(context),
+                          ),
+                          Expanded(
+                            child: waiting
+                                ? const Center(
+                                    child: CircularProgressIndicator(),
+                                  )
+                                : DealGoStateView.failure(
+                                    context,
+                                    onRetry: () => context
+                                        .read<RideTrackingCubit>()
+                                        .refresh(),
+                                    cause: state.cause,
+                                  ),
+                          ),
+                        ],
+                      );
+                    }
+                    return _TrackingOffline(
+                      ride: ride,
+                      snapshot: snapshot,
+                      busy: busy,
+                      onBack: () => _back(context),
                       onRetry: () =>
                           context.read<RideTrackingCubit>().refresh(),
-                      cause: state.cause,
-                    ),
-                  ),
-                ],
+                    );
+                  },
+                );
+              }
+              return OpenChatOnArrival(
+                onOpen: () => _openChat(context, rideId),
+                child: _TrackingLive(
+                  ride: ride,
+                  busy: busy,
+                  onBack: () => _back(context),
+                  onRefresh: () => context.read<RideTrackingCubit>().refresh(),
+                  onOpenChat: () => _openChat(context, rideId),
+                  onOpenVoice: voiceCallsEnabled(context)
+                      ? () => _openVoice(context, rideId)
+                      : null,
+                ),
               );
-            }
-            if (state is RideTrackingOffline) {
-              return _TrackingOffline(
-                ride: ride,
-                busy: busy,
-                onBack: () => _back(context),
-                onRetry: () => context.read<RideTrackingCubit>().refresh(),
-              );
-            }
-            return OpenChatOnArrival(
-              onOpen: () => _openChat(context, rideId),
-              child: _TrackingLive(
-                ride: ride,
-                busy: busy,
-                onBack: () => _back(context),
-                onRefresh: () => context.read<RideTrackingCubit>().refresh(),
-                onOpenChat: () => _openChat(context, rideId),
-                onOpenVoice: voiceCallsEnabled(context)
-                    ? () => _openVoice(context, rideId)
-                    : null,
-              ),
-            );
-          },
+            },
+          ),
         ),
       ),
     );
   }
 }
+
+String rideTrackingTitle(AppLocalizations l10n, RideStatus status) =>
+    switch (status) {
+      RideStatus.assigned => l10n.rideTrackAssigned,
+      RideStatus.driverEnRoute => l10n.rideTrackAssigned,
+      RideStatus.driverArrived => l10n.rideTrackArrived,
+      RideStatus.inTrip => l10n.rideTrackInTrip,
+      RideStatus.completed => l10n.rideTrackCompleted,
+      RideStatus.negotiating => l10n.rideTrackNegotiating,
+      RideStatus.expired => l10n.rideTrackExpired,
+      RideStatus.cancelled => l10n.rideTrackCancelled,
+    };
 
 /// Statuses in which the customer sees the driver's live position.
 const _rideTrackingStatuses = {
@@ -217,16 +262,7 @@ class _TrackingLive extends StatelessWidget {
     final openReceipt = agreed == null || current.status != RideStatus.completed
         ? null
         : () => context.push(RideRoutes.receipt(current.id));
-    final title = switch (current.status) {
-      RideStatus.assigned => l10n.rideTrackAssigned,
-      RideStatus.driverEnRoute => l10n.rideTrackAssigned,
-      RideStatus.driverArrived => l10n.rideTrackArrived,
-      RideStatus.inTrip => l10n.rideTrackInTrip,
-      RideStatus.completed => l10n.rideTrackCompleted,
-      RideStatus.negotiating => l10n.rideTrackNegotiating,
-      RideStatus.expired => l10n.rideTrackExpired,
-      RideStatus.cancelled => l10n.rideTrackCancelled,
-    };
+    final title = rideTrackingTitle(l10n, current.status);
     // DEC-PROD-017: issued by the backend, only on the customer's own ride.
     final pickupCode = current.pickupCode;
     final hasDriver = current.assignedDriverId != null;
@@ -247,6 +283,49 @@ class _TrackingLive extends StatelessWidget {
       lng: current.dropoff.lng,
     );
     final canCancel = _preTrip.contains(current.status);
+    return DriverCardLoader(
+      job: DriverCardJob.ride,
+      jobId: current.id,
+      accessToken: rideAccessToken(context) ?? '',
+      assigned: hasDriver,
+      refreshKey: current.status,
+      onLoaded: (card) => maybeActiveJobCache(
+        context,
+      )?.recordDriver(kind: ActiveJobKind.ride, jobId: current.id, card: card),
+      builder: (context, driver) => _scaffold(
+        context,
+        current: current,
+        driver: hasDriver ? driver : null,
+        title: title,
+        eta: eta,
+        pickupCode: pickupCode,
+        hasDriver: hasDriver,
+        inTrip: inTrip,
+        pickup: pickup,
+        dropoff: dropoff,
+        canCancel: canCancel,
+        agreed: agreed,
+        openReceipt: openReceipt,
+      ),
+    );
+  }
+
+  Widget _scaffold(
+    BuildContext context, {
+    required RideView current,
+    required DriverCard? driver,
+    required String title,
+    required String? eta,
+    required String? pickupCode,
+    required bool hasDriver,
+    required bool inTrip,
+    required MapLatLng pickup,
+    required MapLatLng dropoff,
+    required bool canCancel,
+    required int? agreed,
+    required VoidCallback? openReceipt,
+  }) {
+    final l10n = AppLocalizations.of(context);
     return TrackingScaffold(
       onBack: onBack,
       // Status and route chips wrap onto a second line on narrow phones
@@ -319,7 +398,9 @@ class _TrackingLive extends StatelessWidget {
             eta: pushedSec != null && pushedSec > 0
                 ? l10n.trackEtaMinutes((pushedSec / 60).ceil())
                 : eta,
-            subtitle: rideVehicleClassLabel(l10n, current.vehicleClassCode),
+            subtitle:
+                driver?.vehicleLine ??
+                rideVehicleClassLabel(l10n, current.vehicleClassCode),
           ),
         ),
         const SizedBox(height: DealGoSpacing.s16),
@@ -362,11 +443,12 @@ class _TrackingLive extends StatelessWidget {
           )
         else
           TrackingSection(
-            child: DriverCardTile(
-              job: DriverCardJob.ride,
-              jobId: current.id,
-              accessToken: rideAccessToken(context) ?? '',
-              assigned: hasDriver,
+            child: DriverCardRow(
+              card: driver,
+              onOpenDetail: switch (driver) {
+                final card? => () => showDriverDetailSheet(context, card),
+                null => null,
+              },
               trailing: hasDriver
                   ? DealGoContactActions(
                       children: [
@@ -480,13 +562,30 @@ class _TrackingLive extends StatelessWidget {
           ),
         ),
       ],
-      footer: openReceipt == null
+      // t73u (owner): a finished trip offers "Về trang chủ" first and the
+      // receipt second.
+      footer: current.status != RideStatus.completed
           ? null
-          : DealGoPrimaryButton(
-              key: const Key('ride-open-receipt'),
-              label: l10n.rideViewReceipt,
-              enabled: !busy,
-              onPressed: openReceipt,
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                DealGoPrimaryButton(
+                  key: const Key('ride-go-home'),
+                  label: l10n.rideGoHome,
+                  enabled: !busy,
+                  onPressed: () => context.go('/customer'),
+                ),
+                if (openReceipt != null) ...[
+                  const SizedBox(height: DealGoSpacing.s8),
+                  OutlinedButton.icon(
+                    key: const Key('ride-open-receipt'),
+                    onPressed: busy ? null : openReceipt,
+                    icon: const Icon(DealGoIcons.receipt, size: 18),
+                    label: Text(l10n.rideViewReceipt),
+                  ),
+                ],
+              ],
             ),
     );
   }
@@ -495,12 +594,14 @@ class _TrackingLive extends StatelessWidget {
 class _TrackingOffline extends StatelessWidget {
   const _TrackingOffline({
     required this.ride,
+    required this.snapshot,
     required this.busy,
     required this.onBack,
     required this.onRetry,
   });
 
   final RideView? ride;
+  final ActiveJobSnapshot? snapshot;
   final bool busy;
   final VoidCallback onBack;
   final VoidCallback onRetry;
@@ -510,6 +611,8 @@ class _TrackingOffline extends StatelessWidget {
     final current = ride;
     final agreed = current?.agreedFareVnd;
     final l10n = AppLocalizations.of(context);
+    final saved = snapshot;
+    final savedStatus = saved == null ? null : RideStatus.parse(saved.status);
     return Column(
       children: [
         DealGoAppHeader(title: l10n.rideTrackTitle, onBack: onBack),
@@ -530,7 +633,14 @@ class _TrackingOffline extends StatelessWidget {
                 message: l10n.rideOfflineBody,
               ),
               const SizedBox(height: DealGoSpacing.s16),
-              if (current != null)
+              if (saved != null)
+                OfflineJobPanel(
+                  snapshot: saved,
+                  statusTitle: savedStatus == null
+                      ? l10n.rideTrackTitle
+                      : rideTrackingTitle(l10n, savedStatus),
+                )
+              else if (current != null)
                 RidePanel(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kReleaseMode;
 
+import '../app_gate/app_build_info.dart';
 import '../auth/token_store.dart';
 import '../config/api_base_url.dart';
 import 'api_envelope.dart';
@@ -53,6 +54,8 @@ Dio createDealGoDio({
   required SessionUnauthorized onUnauthorized,
   bool? enableLogging,
   SessionRefresher? sessionRefresher,
+  AppBuildInfo? appBuild,
+  void Function()? onAppUpdateRequired,
 }) {
   final resolvedBase = normalizeBaseUrl(baseUrl ?? apiBaseUrl);
   assertSecureApiBaseUrl(resolvedBase, isRelease: kReleaseMode);
@@ -76,6 +79,14 @@ Dio createDealGoDio({
     onSessionRefreshed: onSessionRefreshed,
     onUnauthorized: onUnauthorized,
   );
+  if (appBuild != null) {
+    final gate = AppVersionInterceptor(
+      appBuild: appBuild,
+      onUpdateRequired: onAppUpdateRequired,
+    );
+    dio.interceptors.add(gate);
+    refreshDio.interceptors.add(gate);
+  }
   dio.interceptors.add(auth);
   // After auth: a 401 that refresh recovers never reaches the reporter.
   // Before the reporter: a launch GET that succeeds on retry is not an error.
@@ -288,5 +299,35 @@ Future<String?> refreshRealtimeToken(
     return null;
   } catch (_) {
     return null;
+  }
+}
+
+/// t82u (DEC-PROD-089): tags every call with this build and maps the API's
+/// `426 APP_UPDATE_REQUIRED` to the blocking "Cập nhật bắt buộc" screen.
+class AppVersionInterceptor extends Interceptor {
+  AppVersionInterceptor({required this.appBuild, this.onUpdateRequired});
+
+  final AppBuildInfo appBuild;
+  final void Function()? onUpdateRequired;
+
+  static bool isUpdateRequired(DioException err) {
+    final data = err.response?.data;
+    final code = data is Map ? data['errorCode'] : null;
+    return code == 'APP_UPDATE_REQUIRED' ||
+        (err.response?.statusCode == 426 && code == null);
+  }
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    options.headers.addAll(appBuild.headers);
+    handler.next(options);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    if (isUpdateRequired(err)) {
+      onUpdateRequired?.call();
+    }
+    handler.next(err);
   }
 }

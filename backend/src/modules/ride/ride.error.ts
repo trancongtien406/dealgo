@@ -45,6 +45,15 @@ export const RIDE_RULES = {
   RIDE_CANCEL_REASON_REQUIRED: { status: 400, message: 'A cancellation reason is required' },
   RIDE_ALREADY_RATED: { status: 409, message: 'This ride has already been rated' },
   RIDE_OUTSIDE_SERVICE_ZONE: { status: 422, message: 'The pickup is outside our service area' },
+  RIDE_CROSS_REGION_NOT_SUPPORTED: {
+    status: 422,
+    message: 'Trips between service regions are not supported yet',
+  },
+  // t73u intercity (Liên tỉnh).
+  RIDE_INTERCITY_STOPS_NOT_SUPPORTED: { status: 422, message: 'Intercity trips go straight to one destination' },
+  RIDE_INTERCITY_TOO_FAR: { status: 422, message: 'This intercity trip is longer than allowed' },
+  RIDE_INTERCITY_VEHICLE_NOT_ALLOWED: { status: 422, message: 'This vehicle class does not run intercity trips' },
+  RIDE_INTERCITY_NO_VEHICLE: { status: 422, message: 'No vehicle class is available for intercity trips' },
   DRIVER_LOCATION_STALE: {
     status: 409,
     message: 'Go online and share your current location to see nearby requests',

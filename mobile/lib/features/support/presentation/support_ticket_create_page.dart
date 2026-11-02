@@ -8,6 +8,7 @@ import '../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../core/drafts/text_draft.dart';
+import '../../../core/format/date_time_format.dart';
 import '../../../core/format/short_ref.dart';
 import '../../../core/motion/dealgo_sheet.dart';
 import '../../../core/network/api_exception.dart';
@@ -46,6 +47,7 @@ class _SupportTicketCreatePageState extends State<SupportTicketCreatePage>
   late SupportCategory _category =
       widget.initialCategory ?? SupportCategory.ride;
   HistoryItem? _related;
+  var _loadingRelated = false;
   var _submitting = false;
   String? _subjectError;
   String? _descriptionError;
@@ -76,6 +78,14 @@ class _SupportTicketCreatePageState extends State<SupportTicketCreatePage>
     super.dispose();
   }
 
+  /// Only ride / food tickets can point at a job, and only at a job of the
+  /// same kind.
+  HistoryKind? get _relatedKind => switch (_category) {
+    SupportCategory.ride => HistoryKind.ride,
+    SupportCategory.food => HistoryKind.food,
+    _ => null,
+  };
+
   Future<void> _pickCategory() async {
     final l10n = AppLocalizations.of(context);
     final picked = await showDealGoSheet<SupportCategory>(
@@ -99,24 +109,37 @@ class _SupportTicketCreatePageState extends State<SupportTicketCreatePage>
       ),
     );
     if (picked != null && mounted) {
-      setState(() => _category = picked);
+      _selectCategory(picked);
     }
+  }
+
+  void _selectCategory(SupportCategory category) {
+    setState(() {
+      _category = category;
+      if (_related?.kind != _relatedKind) {
+        _related = null;
+      }
+    });
   }
 
   Future<void> _pickRelated() async {
     final token = _token;
-    if (token == null) return;
+    final kind = _relatedKind;
+    if (token == null || kind == null || _loadingRelated) return;
     final l10n = AppLocalizations.of(context);
-    final rides = context.read<ListRideHistory>();
-    final food = context.read<ListFoodHistory>();
+    final load = kind == HistoryKind.ride
+        ? context.read<ListRideHistory>().call
+        : context.read<ListFoodHistory>().call;
+    setState(() => _loadingRelated = true);
     List<HistoryItem> items;
     try {
-      final results = await Future.wait([rides(token), food(token)]);
-      items = [...results[0], ...results[1]];
+      items = await load(token);
     } on ApiException {
       items = const [];
     }
     if (!mounted) return;
+    setState(() => _loadingRelated = false);
+    if (_relatedKind != kind) return;
     final picked = await showDealGoSheet<Object>(
       context: context,
       isScrollControlled: true,
@@ -149,13 +172,14 @@ class _SupportTicketCreatePageState extends State<SupportTicketCreatePage>
               for (final item in items.take(20))
                 ListTile(
                   key: Key('support-related-${item.id}'),
-                  leading: Icon(
-                    item.kind == HistoryKind.ride
-                        ? DealGoIcons.car
-                        : DealGoIcons.restaurant,
+                  leading: Icon(supportCategoryIcon(_category)),
+                  title: Text(
+                    item.title.isEmpty ? shortRef(item.id) : item.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  title: Text(item.title),
-                  subtitle: Text('${shortRef(item.id)} · ${item.meta}'),
+                  subtitle: Text(_relatedMeta(l10n, item)),
+                  selected: item.id == _related?.id,
                   onTap: () => Navigator.of(context).pop(item),
                 ),
             ],
@@ -163,20 +187,19 @@ class _SupportTicketCreatePageState extends State<SupportTicketCreatePage>
         ),
       ),
     );
-    if (!mounted || picked == null) return;
-    setState(() {
-      if (picked is HistoryItem) {
-        _related = picked;
-        if (_category == SupportCategory.ride ||
-            _category == SupportCategory.food) {
-          _category = picked.kind == HistoryKind.ride
-              ? SupportCategory.ride
-              : SupportCategory.food;
-        }
-      } else {
-        _related = null;
-      }
-    });
+    if (!mounted || picked == null || _relatedKind != kind) return;
+    setState(() => _related = picked is HistoryItem ? picked : null);
+  }
+
+  /// "#AB12CD · Hôm nay · 14:32". [HistoryItem.meta] is the server ISO-8601
+  /// UTC stamp, so it is converted to Vietnam time and never shown raw.
+  String _relatedMeta(AppLocalizations l10n, HistoryItem item) {
+    final time = formatRecentTime(
+      item.meta,
+      today: l10n.inboxSectionToday,
+      yesterday: l10n.inboxSectionYesterday,
+    );
+    return [shortRef(item.id), ?time].join(' · ');
   }
 
   Future<void> _submit() async {
@@ -265,14 +288,18 @@ class _SupportTicketCreatePageState extends State<SupportTicketCreatePage>
                     value: supportCategoryLabel(l10n, _category),
                     onTap: _pickCategory,
                   ),
-                  if (_canLinkJobs) ...[
+                  if (_canLinkJobs && _relatedKind != null) ...[
                     const SizedBox(height: DealGoSpacing.s16),
                     _PickerField(
                       fieldKey: const Key('support-related-field'),
                       label: l10n.supportFieldRelated,
                       value: related == null
                           ? l10n.supportRelatedNone
-                          : '${shortRef(related.id)} · ${related.title}',
+                          : [
+                              if (related.title.isNotEmpty) related.title,
+                              _relatedMeta(l10n, related),
+                            ].join('\n'),
+                      loading: _loadingRelated,
                       onTap: _pickRelated,
                     ),
                   ],
@@ -378,12 +405,14 @@ class _PickerField extends StatelessWidget {
     required this.label,
     required this.value,
     required this.onTap,
+    this.loading = false,
   });
 
   final Key fieldKey;
   final String label;
   final String value;
   final VoidCallback onTap;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -395,14 +424,20 @@ class _PickerField extends StatelessWidget {
         const SizedBox(height: DealGoSpacing.s8),
         DealGoCard(
           key: fieldKey,
-          onTap: onTap,
+          onTap: loading ? null : onTap,
           child: Row(
             children: [
               Expanded(child: Text(value, style: textTheme.bodyMedium)),
-              const Icon(
-                DealGoIcons.chevronRight,
-                color: DealGoColors.textSecondary,
-              ),
+              if (loading)
+                const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                Icon(
+                  DealGoIcons.chevronRight,
+                  color: DealGoColors.textSecondary,
+                ),
             ],
           ),
         ),

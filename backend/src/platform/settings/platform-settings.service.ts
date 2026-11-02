@@ -1,3 +1,4 @@
+import { normalizeAppVersionPolicy } from './app-version-policy.js';
 import { normalizePublicSiteConfig } from './public-site-config.js';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -5,6 +6,7 @@ import type { AppEnv } from '../config/env.js';
 import { MapKeysService } from '../integration-settings/map-keys.service.js';
 import {
   MAPS_PROVIDER_CHOICES,
+  FOOD_DELIVERY_FEE_MODES,
   MAPS_PROVIDER_SETTING_KEYS,
   PLATFORM_SETTING_SPECS,
   UPLOAD_SNIFFABLE_TYPES,
@@ -28,6 +30,7 @@ import type {
   PlatformSettingRecord,
   PlatformSettingsRepository,
 } from './platform-settings.repository.js';
+import { normalizeIntercityClasses, normalizeIntercityPricing } from './intercity-settings.js';
 
 export type PlatformSettingView = {
   key: PlatformSettingKey;
@@ -53,6 +56,13 @@ const SETTING_CATEGORY_OVERRIDES: Readonly<Record<string, 'FARE' | 'DISPATCH' | 
   RIDE_MAX_OFFER_EDITS_PER_DRIVER: 'DISPATCH',
   RIDE_REQUEST_WINDOW_SECONDS: 'DISPATCH',
   FOOD_MAX_DELIVERY_KM: 'ZONE_PAYMENT',
+  FOOD_FARE_FLOOR_PERCENT_OF_SUGGESTED: 'FARE',
+  FOOD_COUNTER_MAX_PERCENT_OF_OFFER: 'FARE',
+  FOOD_FARE_STEP_VND: 'FARE',
+  FOOD_MAX_OFFER_EDITS_PER_DRIVER: 'DISPATCH',
+  FOOD_MAX_FARE_RAISES_PER_ORDER: 'DISPATCH',
+  FOOD_OFFER_TTL_SECONDS: 'DISPATCH',
+  FOOD_DELIVERY_FEE_MODE: 'DISPATCH',
   SERVICE_ZONE_ENFORCED: 'ZONE_PAYMENT',
   DRIVER_DEBT_LIMIT_VND: 'ZONE_PAYMENT',
   RIDE_MAX_LIVE_OFFERS_PER_RIDE: 'DISPATCH',
@@ -80,6 +90,10 @@ const SETTING_CATEGORY_OVERRIDES: Readonly<Record<string, 'FARE' | 'DISPATCH' | 
   VOUCHER_SHARED_PLATFORM_PERCENT: 'FARE',
   RIDE_MULTI_STOP_BIKE_ENABLED: 'DISPATCH',
   RIDE_MULTI_STOP_CAR_ENABLED: 'DISPATCH',
+  RIDE_INTERCITY_ENABLED: 'DISPATCH',
+  RIDE_INTERCITY_VEHICLE_CLASSES: 'DISPATCH',
+  RIDE_INTERCITY_PRICING: 'FARE',
+  RIDE_INTERCITY_MAX_KM: 'DISPATCH',
   RIDE_MAX_STOPS_BIKE: 'DISPATCH',
   RIDE_MAX_STOPS_CAR: 'DISPATCH',
   RIDE_STOP_FEE_BIKE_VND: 'FARE',
@@ -359,12 +373,14 @@ export class PlatformSettingsService {
       case 'VOUCHER_SHARED_PLATFORM_PERCENT':
       case 'RIDE_PICKUP_CODE_MAX_ATTEMPTS':
       case 'RIDE_PICKUP_CODE_REQUIRED':
+      case 'AUTH_EMAIL_VERIFICATION_REQUIRED':
       case 'PARCEL_SIZE_CLASSES':
       case 'PARCEL_RECIPIENT_CODE_REQUIRED':
       case 'FOOD_DELIVERY_CODE_REQUIRED':
       case 'FOOD_DELIVERY_CODE_MAX_ATTEMPTS':
       case 'FOOD_HANDOVER_CODE_REQUIRED':
       case 'ONBOARDING_DRIVER_KYC_REQUIRED':
+      case 'DRIVER_CAR_EXTRA_DOCS_REQUIRED':
       case 'ONBOARDING_MERCHANT_KYB_REQUIRED':
       case 'SUPPORT_TICKET_MAX_OPEN_PER_USER':
       case 'SUPPORT_PUBLIC_TICKETS_PER_CONTACT_PER_DAY':
@@ -402,6 +418,13 @@ export class PlatformSettingsService {
       case 'FOOD_UNCLAIMED_READY_TIMEOUT_MINUTES':
       case 'FOOD_EARLY_ASSIGN_LEAD_MINUTES':
       case 'FOOD_MAX_DELIVERY_KM':
+      case 'FOOD_FARE_FLOOR_PERCENT_OF_SUGGESTED':
+      case 'FOOD_COUNTER_MAX_PERCENT_OF_OFFER':
+      case 'FOOD_FARE_STEP_VND':
+      case 'FOOD_MAX_OFFER_EDITS_PER_DRIVER':
+      case 'FOOD_MAX_FARE_RAISES_PER_ORDER':
+      case 'FOOD_OFFER_TTL_SECONDS':
+      case 'FOOD_DELIVERY_FEE_MODE':
       case 'SERVICE_ZONE_ENFORCED':
       case 'DRIVER_DEBT_LIMIT_VND':
       case 'DISPATCH_REQUIRE_FRESH_PRESENCE':
@@ -428,8 +451,13 @@ export class PlatformSettingsService {
       case 'MAPS_REVERSE_PROVIDER':
       case 'MAPS_ROUTE_PROVIDER':
       case 'PUBLIC_SITE_CONFIG':
+      case 'APP_VERSION_POLICY':
       case 'RIDE_MULTI_STOP_BIKE_ENABLED':
       case 'RIDE_MULTI_STOP_CAR_ENABLED':
+      case 'RIDE_INTERCITY_ENABLED':
+      case 'RIDE_INTERCITY_VEHICLE_CLASSES':
+      case 'RIDE_INTERCITY_PRICING':
+      case 'RIDE_INTERCITY_MAX_KM':
       case 'RIDE_MAX_STOPS_BIKE':
       case 'RIDE_MAX_STOPS_CAR':
       case 'RIDE_STOP_FEE_BIKE_VND':
@@ -477,6 +505,13 @@ export class PlatformSettingsService {
       if ((MAPS_PROVIDER_SETTING_KEYS as readonly string[]).includes(key)) {
         return this.normalizeMapsProvider(key, trimmed);
       }
+      if (key === 'FOOD_DELIVERY_FEE_MODE') {
+        const mode = trimmed.toUpperCase();
+        if (!(FOOD_DELIVERY_FEE_MODES as readonly string[]).includes(mode)) {
+          throw settingsError(400, 'PLATFORM_SETTING_INVALID', `${key} must be NEGOTIATE or FIXED`);
+        }
+        return mode;
+      }
       return trimmed;
     }
 
@@ -500,6 +535,22 @@ export class PlatformSettingsService {
       if (key === 'PUBLIC_SITE_CONFIG') {
         try {
           return JSON.stringify(normalizePublicSiteConfig(parsed));
+        } catch (e) {
+          throw settingsError(400, 'PLATFORM_SETTING_INVALID', (e as Error).message);
+        }
+      }
+      if (key === 'RIDE_INTERCITY_VEHICLE_CLASSES' || key === 'RIDE_INTERCITY_PRICING') {
+        try {
+          return JSON.stringify(
+            key === 'RIDE_INTERCITY_PRICING' ? normalizeIntercityPricing(parsed) : normalizeIntercityClasses(parsed),
+          );
+        } catch (e) {
+          throw settingsError(400, 'PLATFORM_SETTING_INVALID', (e as Error).message);
+        }
+      }
+      if (key === 'APP_VERSION_POLICY') {
+        try {
+          return JSON.stringify(normalizeAppVersionPolicy(parsed));
         } catch (e) {
           throw settingsError(400, 'PLATFORM_SETTING_INVALID', (e as Error).message);
         }

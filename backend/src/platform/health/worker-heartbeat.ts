@@ -65,7 +65,8 @@ export class PrismaWorkerHeartbeatStore implements WorkerHeartbeatStore {
       return null;
     }
     const row = await db.outboxMessage.findFirst({
-      where: { processedAt: null },
+      // REL-001: dead-lettered rows are parked for ops, not backlog.
+      where: { processedAt: null, deadLetteredAt: null },
       orderBy: { createdAt: 'asc' },
       select: { createdAt: true },
     });

@@ -335,6 +335,16 @@ class PhoneAuthCubit extends Cubit<PhoneAuthState> {
       if (isClosed || requestId != _requestId) {
         return;
       }
+      if (challenge.signedIn) {
+        // Verification is off on the server: signed in already, skip the code.
+        await auth.completeSignIn(
+          StoredTokens(
+            accessToken: challenge.accessToken!,
+            refreshToken: challenge.refreshToken!,
+          ),
+        );
+        return;
+      }
       emit(
         PhoneAuthEmailChallengeReady(
           email: trimmedEmail,

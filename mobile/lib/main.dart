@@ -16,6 +16,7 @@ import 'core/maps/maps_client_config.dart';
 import 'core/mock/mock_seed.dart';
 import 'core/observability/crash_reporting.dart';
 import 'core/push/fcm_push.dart';
+import 'core/appearance/app_appearance.dart';
 import 'core/storage/customer_booking_prefs.dart';
 import 'firebase_options.dart';
 
@@ -27,9 +28,8 @@ Future<void> _start() async {
   LaunchSplash.hold();
   enableAndroidEdgeToEdge();
   await CustomerBookingPrefs.warmUp();
+  await AppAppearance.warmUp();
   if (!useMockData) {
-    // Map token before the first frame: cached → instant, first launch →
-    // short network wait under the native splash (see MapsClientConfig).
     await MapsClientConfig.resolveAtLaunch(
       Dio(
         BaseOptions(

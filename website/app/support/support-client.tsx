@@ -35,6 +35,7 @@ const COPY = {
     address: "Địa chỉ",
     terms: "Điều khoản",
     privacy: "Quyền riêng tư",
+    messenger: "Chat với DealGo qua Messenger",
   },
   en: {
     heading: "How can we help?",
@@ -63,6 +64,7 @@ const COPY = {
     address: "Address",
     terms: "Terms",
     privacy: "Privacy",
+    messenger: "Chat with DealGo on Messenger",
   },
 } as const;
 
@@ -78,7 +80,7 @@ const fieldClass =
   "mt-1.5 h-10 w-full rounded-xl border border-border bg-white px-3 text-sm text-ink focus:border-brand focus:outline-none";
 const labelClass = "block text-xs font-medium text-muted";
 
-export function SupportClient({ page }: { page: PublicPageView<SupportContent> }) {
+export function SupportClient({ page, messengerUrl }: { page: PublicPageView<SupportContent>; messengerUrl?: string }) {
   const t = COPY[page.locale];
   const config = page.content;
   const hotline = shownContact(config.hotline);
@@ -163,6 +165,22 @@ export function SupportClient({ page }: { page: PublicPageView<SupportContent> }
               className="h-12 w-full rounded-2xl border border-border bg-white pr-4 pl-11 text-sm text-ink shadow-sm placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none"
             />
           </div>
+          {messengerUrl ? (
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+              <a
+                href={messengerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-11 items-center gap-2 rounded-xl bg-brand px-5 text-sm font-semibold text-white shadow-sm hover:bg-brand/90 focus:ring-2 focus:ring-brand/30 focus:outline-none"
+              >
+                <OpsIcon name="headset" className="size-4.5" />
+                {t.messenger}
+              </a>
+              <a href="#ticket-form" className="inline-flex h-11 items-center rounded-xl border border-border bg-white px-5 text-sm font-semibold text-ink hover:border-brand hover:text-brand">
+                {t.formTitle}
+              </a>
+            </div>
+          ) : null}
         </div>
       </section>
 

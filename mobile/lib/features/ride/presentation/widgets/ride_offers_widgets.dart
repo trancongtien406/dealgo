@@ -17,6 +17,7 @@ import '../utils/ride_routes.dart';
 import 'ride_widgets.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
+import 'ride_offer_countdown.dart';
 
 class OfferBlock {
   const OfferBlock.expired({this.amountVnd}) : taken = false;
@@ -477,6 +478,7 @@ class OfferList extends StatelessWidget {
     required this.onSelectOffer,
     required this.onConfirm,
     required this.onCancel,
+    this.onAcceptOffer,
     this.onRaiseFare,
     this.onEditStops,
     this.onDeclineSelected,
@@ -497,6 +499,9 @@ class OfferList extends StatelessWidget {
   final ValueChanged<String> onSelectOffer;
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
+
+  /// t81u: per-card Accept (select + confirm); null = the button only selects.
+  final ValueChanged<String>? onAcceptOffer;
 
   /// Raise the fare while drivers are still bidding.
   final VoidCallback? onRaiseFare;
@@ -601,14 +606,24 @@ class OfferList extends StatelessWidget {
               ),
               const SizedBox(height: DealGoSpacing.s12),
               for (final offer in offers) ...[
-                _OfferCard(
-                  rideId: ride.id,
-                  offer: offer,
-                  selected: offer.id == selectedOfferId,
-                  onTap: () => onSelectOffer(offer.id),
-                  onOpenDetail: () => context.push(
-                    RideRoutes.offerDetail(ride.id, offerId: offer.id),
-                    extra: RideOfferDetailArgs(ride: ride, offer: offer),
+                RideOfferCountdown(
+                  key: ValueKey('offer-cd-${offer.id}'),
+                  expiresAt: offer.expiresAt,
+                  builder: (context, progress, seconds) => _OfferCard(
+                    rideId: ride.id,
+                    offer: offer,
+                    progress: progress,
+                    seconds: seconds,
+                    busy: busy,
+                    selected: offer.id == selectedOfferId,
+                    onTap: () => onSelectOffer(offer.id),
+                    onAccept: onAcceptOffer == null
+                        ? () => onSelectOffer(offer.id)
+                        : () => onAcceptOffer!(offer.id),
+                    onOpenDetail: () => context.push(
+                      RideRoutes.offerDetail(ride.id, offerId: offer.id),
+                      extra: RideOfferDetailArgs(ride: ride, offer: offer),
+                    ),
                   ),
                 ),
                 const SizedBox(height: DealGoSpacing.s12),
@@ -731,10 +746,18 @@ class _OfferCard extends StatelessWidget {
     required this.selected,
     required this.onTap,
     required this.onOpenDetail,
+    required this.onAccept,
+    this.progress = 1,
+    this.seconds = 20,
+    this.busy = false,
   });
 
   final String rideId;
   final RideOffer offer;
+  final double progress;
+  final int seconds;
+  final bool busy;
+  final VoidCallback onAccept;
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback onOpenDetail;
@@ -820,6 +843,15 @@ class _OfferCard extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: DealGoSpacing.s12),
+              RideOfferAcceptButton(
+                key: Key('ride-offer-accept-${offer.id}'),
+                label: l10n.rideOfferAcceptShort,
+                progress: progress,
+                seconds: seconds,
+                enabled: !busy,
+                onPressed: onAccept,
               ),
             ],
           ),

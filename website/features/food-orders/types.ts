@@ -39,6 +39,16 @@ export type FoodOrderListItem = {
   items: string;
   lines: FoodOrderLine[];
   total: number;
+  /** Delivery fee: suggestion vs customer offer / agreed fee (negotiated). */
+  fee: {
+    suggested: number | null;
+    current: number;
+    agreed: boolean;
+    raiseCount: number;
+    /** "Cho trả giá" | "Giá cố định" (null when the server did not say). */
+    mode: string | null;
+    offers: Array<{ id: string; driver: string; amount: number; status: string }>;
+  };
   payment: string;
   driver: string | null;
   status: FoodOrderStatus;

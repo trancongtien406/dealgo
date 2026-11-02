@@ -17,6 +17,7 @@ describe('KYC required documents (t60u)', () => {
   const setup = async () => {
     const identity = new MemoryIdentityRepository();
     const user = await identity.createUser({ email: 't60u@dealgo.vn', phone: '+84988770060', displayName: 'T' });
+    await identity.updateUserProfile(user.id, { avatarUrl: 'https://cdn.example/t.png' });
     const service = new PartnerService(new MemoryPartnerRepository(), identity, createTestDocumentStore().store);
     return { service, user };
   };

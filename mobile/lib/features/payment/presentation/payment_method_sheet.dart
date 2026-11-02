@@ -80,7 +80,7 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 DealGoDimensions.pageGutter,
-                0,
+                DealGoSpacing.s12,
                 DealGoSpacing.s8,
                 DealGoSpacing.s8,
               ),
@@ -89,7 +89,7 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
                   Expanded(
                     child: Text(
                       AppLocalizations.of(context).paymentSheetTitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
                         color: DealGoColors.text,
@@ -125,7 +125,7 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
                           AppLocalizations.of(context),
                           entry.key,
                         ),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
                           color: DealGoColors.textSecondary,
@@ -142,10 +142,7 @@ class _PaymentMethodSheetState extends State<PaymentMethodSheet> {
                         children: [
                           for (var i = 0; i < entry.value.length; i++) ...[
                             if (i > 0)
-                              const Divider(
-                                height: 1,
-                                color: DealGoColors.divider,
-                              ),
+                              Divider(height: 1, color: DealGoColors.divider),
                             PaymentMethodRow(
                               option: entry.value[i],
                               selected: entry.value[i].code == _selected,
@@ -383,7 +380,7 @@ class _PaymentMethodTileState extends State<PaymentMethodTile> {
                         AppLocalizations.of(context),
                         current,
                       )!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         color: DealGoColors.textSecondary,
                       ),
@@ -405,10 +402,7 @@ class _PaymentMethodTileState extends State<PaymentMethodTile> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-            const Icon(
-              DealGoIcons.chevronRight,
-              color: DealGoColors.textTertiary,
-            ),
+            Icon(DealGoIcons.chevronRight, color: DealGoColors.textTertiary),
           ],
         ),
       ),

@@ -9,10 +9,12 @@ Future<T?> showDealGoSheet<T>({
   required WidgetBuilder builder,
   bool isScrollControlled = false,
   Color? backgroundColor,
+  bool useRootNavigator = false,
 }) {
   final reduce = DealGoMotion.prefersReducedMotion(context);
   return showModalBottomSheet<T>(
     context: context,
+    useRootNavigator: useRootNavigator,
     isScrollControlled: isScrollControlled,
     backgroundColor: backgroundColor ?? DealGoColors.card,
     barrierColor: Colors.black.withValues(alpha: reduce ? 0.45 : 0.32),

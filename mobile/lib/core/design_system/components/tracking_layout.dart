@@ -64,7 +64,7 @@ class TrackingScaffold extends StatelessWidget {
           snap: true,
           snapSizes: [initialSize],
           builder: (context, controller) => DecoratedBox(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: DealGoColors.card,
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
               boxShadow: [
@@ -82,29 +82,14 @@ class TrackingScaffold extends StatelessWidget {
                     controller: controller,
                     padding: EdgeInsets.fromLTRB(
                       DealGoDimensions.pageGutter,
-                      DealGoSpacing.s8,
+                      DealGoSpacing.s16,
                       DealGoDimensions.pageGutter,
                       DealGoSpacing.s16 +
                           (footer == null
                               ? MediaQuery.paddingOf(context).bottom
                               : 0),
                     ),
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          margin: const EdgeInsets.only(
-                            bottom: DealGoSpacing.s12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: DealGoColors.border,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                      ...sheet,
-                    ],
+                    children: sheet,
                   ),
                 ),
                 if (footer != null)
@@ -362,7 +347,7 @@ class TrackingSection extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: DealGoSpacing.s12),
       child: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           border: Border(top: BorderSide(color: DealGoColors.divider)),
         ),
         child: Padding(

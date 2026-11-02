@@ -107,7 +107,7 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
     if (password.isEmpty) {
       return _setFieldError(_EmailField.password, l10n.passwordErrRequired);
     }
-    if (password.length < 8) {
+    if (password.length < 6) {
       return _setFieldError(_EmailField.password, l10n.passwordErrTooShort);
     }
     if (_tab == _EmailAuthTab.register) {

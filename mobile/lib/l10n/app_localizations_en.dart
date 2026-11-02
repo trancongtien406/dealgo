@@ -306,6 +306,25 @@ class AppLocalizationsEn extends AppLocalizations {
       'Calls are only available while the trip is in progress.';
 
   @override
+  String get apiErrChatWindowClosed =>
+      'The contact window has closed for this trip or order.';
+
+  @override
+  String get apiErrChatNoCounterpart =>
+      'No driver has been assigned to this order yet.';
+
+  @override
+  String get apiErrChatForbidden =>
+      'You do not have access to this conversation.';
+
+  @override
+  String get apiErrChatUnavailable =>
+      'Chat is temporarily unavailable. Please try again later.';
+
+  @override
+  String get apiErrChatBodyInvalid => 'Message content is invalid.';
+
+  @override
   String get bannerOfflineTitle => 'You’re offline';
 
   @override
@@ -989,13 +1008,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authLegalPrefix => 'By continuing, you agree to the ';
 
   @override
-  String get authLegalTerms => 'Terms';
+  String get authLegalTerms => 'Terms of Service';
 
   @override
-  String get authTermsSoon => 'DealGo Terms of Service are coming soon.';
+  String get authLegalConsentPrefix => 'I have read and agree to the ';
 
   @override
-  String get authPrivacySoon => 'DealGo Privacy Policy is coming soon.';
+  String get authLegalConsentRequired =>
+      'Please read and agree to the Terms of Service and Privacy Policy to continue.';
 
   @override
   String get authWelcomeTo => 'Welcome to';
@@ -1031,7 +1051,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get passwordErrRequired => 'Please enter your password';
 
   @override
-  String get passwordErrTooShort => 'Password must be at least 8 characters';
+  String get passwordErrTooShort => 'Password must be at least 6 characters';
 
   @override
   String get passwordErrConfirm => 'Please confirm your password';
@@ -1217,9 +1237,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileDone => 'Done';
 
   @override
-  String get profileLater => 'Add later';
-
-  @override
   String get rolePickerPrefix => 'How do you want to use ';
 
   @override
@@ -1388,6 +1405,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get driverJobTakenBody => 'Another driver took this.';
+
+  @override
+  String get driverOfferNotChosenTitle => 'Your offer was not chosen';
+
+  @override
+  String get driverOfferNotChosenBody =>
+      'The customer picked another driver for this order.';
 
   @override
   String get driverJobUnavailable => 'Request no longer available';
@@ -1562,13 +1586,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountSectionHelp => 'Help & settings';
 
   @override
+  String get accountSectionDisplay => 'Display';
+
+  @override
+  String get accountLanguage => 'Language';
+
+  @override
+  String get accountTheme => 'Appearance';
+
+  @override
+  String get accountThemeSystem => 'Match system';
+
+  @override
+  String get accountThemeLight => 'Light';
+
+  @override
+  String get accountThemeDark => 'Dark';
+
+  @override
   String get accountSupport => 'Help center';
 
   @override
-  String get accountSupportBody => 'FAQs and complaints';
+  String get accountSupportBody => 'FAQs and Messenger chat on the web';
+
+  @override
+  String get accountSupportTicketsBody => 'Track the support requests you sent';
 
   @override
   String get accountSignOut => 'Sign out';
+
+  @override
+  String get accountPartnerHubTitle => 'Earn with DealGo';
+
+  @override
+  String get accountPartnerHubSubtitle =>
+      'Become a Driver partner or register a Shop with DealGo';
 
   @override
   String get accountDriverPartner => 'Driver partner profile';
@@ -2496,6 +2548,35 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get driverCardNew => 'New';
+
+  @override
+  String get driverDetailTitle => 'Driver';
+
+  @override
+  String get driverDetailOpen => 'View driver details';
+
+  @override
+  String get driverDetailVehicle => 'Vehicle';
+
+  @override
+  String get driverDetailPlate => 'Licence plate';
+
+  @override
+  String get driverDetailClass => 'Vehicle type';
+
+  @override
+  String get driverAvatarOpen => 'View profile photo';
+
+  @override
+  String get driverAvatarClose => 'Close';
+
+  @override
+  String driverCardTrips(String count) {
+    return '$count trips';
+  }
+
+  @override
   String get actionReload => 'Reload';
 
   @override
@@ -2880,7 +2961,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String foodStorePrepChip(int minutes) {
-    return '~$minutes min';
+    return '≈$minutes min';
   }
 
   @override
@@ -3159,7 +3240,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get partnerDocTake => 'Take photo';
 
   @override
-  String get partnerDocPick => 'Choose from library';
+  String get partnerDocPick => 'Photo library';
 
   @override
   String get partnerDocRetake => 'Retake';
@@ -3949,6 +4030,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get merchantStatusAssigned => 'Driver assigned';
 
   @override
+  String get merchantStatusPickedUp => 'On the way';
+
+  @override
+  String get merchantStatusDelivered => 'Delivered';
+
+  @override
+  String get merchantStatusUnknown => 'Updating';
+
+  @override
   String get merchantNotSynced => 'Not synced';
 
   @override
@@ -4153,6 +4243,32 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get rideMatchingWaiting => 'Waiting for drivers to make offers...';
+
+  @override
+  String rideViewersCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count drivers are viewing your request',
+      one: '1 driver is viewing your request',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get rideViewersNone => 'No driver has opened your request yet';
+
+  @override
+  String get rideViewersNotifying => 'Notifying drivers nearby';
+
+  @override
+  String rideAutoAcceptLabel(String price) {
+    return 'Auto-accept when a driver agrees to $price';
+  }
+
+  @override
+  String get rideAutoAcceptHint =>
+      'Only your exact price is accepted. A different price still needs you to choose.';
 
   @override
   String get rideStatusLabel => 'Status';
@@ -4445,7 +4561,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get driverServicesNoneOn =>
-      'Both services are off, so you will not get new jobs.';
+      'Every service is off, so you will not get new jobs.';
 
   @override
   String driverVehiclePlate(String plate) {
@@ -4676,6 +4792,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get apiErrInvalidResponse =>
       'We couldn\'t read the response. Please try again.';
+
+  @override
+  String get apiErrCarDocsTitle => 'Car documents needed';
+
+  @override
+  String get apiErrCarDocsBody =>
+      'Car drivers need a vehicle insurance photo before taking trips. Add it so DealGo can review again.';
+
+  @override
+  String get actionCompleteDocuments => 'Complete documents';
 
   @override
   String get apiErrForbidden => 'You don\'t have permission to do this.';
@@ -5175,7 +5301,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String merchantBusyExtraHint(int minutes) {
-    return 'Prep ~$minutes min.';
+    return 'Prep ≈$minutes min.';
   }
 
   @override
@@ -6040,7 +6166,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get forgotPasswordCodeLabel => '6-digit code from the email';
 
   @override
-  String get forgotPasswordNewLabel => 'New password (8+ chars)';
+  String get forgotPasswordNewLabel => 'New password (6+ chars)';
 
   @override
   String get forgotPasswordConfirmLabel => 'Repeat the new password';
@@ -6169,7 +6295,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String trackEtaMinutes(int minutes) {
-    return '~$minutes min';
+    return '≈$minutes min';
   }
 
   @override
@@ -6285,7 +6411,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get driverCustomerRatingNone => 'New customer – no ratings yet';
+  String get driverCustomerRatingNone => 'No ratings yet';
 
   @override
   String get driverCancelRide => 'Cancel ride';
@@ -6875,6 +7001,23 @@ class AppLocalizationsEn extends AppLocalizations {
       'Can\'t find the email? Check your Spam or Promotions folder.';
 
   @override
+  String get emailVerifyLocked =>
+      'Too many wrong codes. Resend to get a new code.';
+
+  @override
+  String get emailVerifySuccess => 'Email verified';
+
+  @override
+  String get emailVerifyPendingNotice =>
+      'Your new email is saved only after you enter the verification code.';
+
+  @override
+  String get profileEmailUnverified => 'Email not verified';
+
+  @override
+  String get profileEmailVerifyAction => 'Verify';
+
+  @override
   String get draftResumeTitle => 'Continue where you left off?';
 
   @override
@@ -7305,7 +7448,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get parcelPayerSender => 'Sender pays';
 
   @override
-  String get parcelPayerRecipient => 'Recipient pays (cash)';
+  String get parcelPayerRecipient => 'Recipient pays';
 
   @override
   String get parcelItemPhotoAdd => 'Add package photo';
@@ -7475,4 +7618,351 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get kycOcrReading => 'Reading your document…';
+
+  @override
+  String get parcelPickContact => 'Pick from contacts';
+
+  @override
+  String get parcelEditRoute => 'Edit route';
+
+  @override
+  String get parcelEdit => 'Edit';
+
+  @override
+  String get parcelMoreDetails => 'Weight, note, photo (optional)';
+
+  @override
+  String get parcelPricing => 'Getting price…';
+
+  @override
+  String get parcelSectionPackage => 'Package';
+
+  @override
+  String get parcelSectionPayment => 'Payment';
+
+  @override
+  String get parcelFareLabel => 'Fare';
+
+  @override
+  String get parcelPhoneHint => '0901 234 567';
+
+  @override
+  String get parcelSenderYou => 'You';
+
+  @override
+  String get parcelPayerRecipientNote =>
+      'The recipient pays the driver in cash on delivery.';
+
+  @override
+  String parcelSubmitWithPrice(String price) {
+    return 'Book · $price';
+  }
+
+  @override
+  String get apiErrCrossRegion =>
+      'DealGo does not support trips between service regions yet. Please choose a destination in the same city as your pickup.';
+
+  @override
+  String get apiErrDriverAtCapacity =>
+      'You are on an active trip. Finish it before taking a new request.';
+
+  @override
+  String get apiErrDriverTooFar =>
+      'You are too far from the pickup. Move closer and try again.';
+
+  @override
+  String get apiErrOfferDriverUnavailable =>
+      'This driver just took another trip. Please choose another driver.';
+
+  @override
+  String get apiErrItemNotApproved =>
+      'This item is still awaiting approval and cannot be put on sale yet.';
+
+  @override
+  String get rideIntercity => 'Intercity';
+
+  @override
+  String rideIntercityQuote(String km, String minutes) {
+    return 'Intercity trip · $km km · ≈$minutes min';
+  }
+
+  @override
+  String get rideIntercityNote =>
+      'The destination is in another province/region. Drivers bid as usual.';
+
+  @override
+  String driverPickupAwayKm(String km) {
+    return '$km km away';
+  }
+
+  @override
+  String get driverServiceSettings => 'Service settings';
+
+  @override
+  String get rideGoHome => 'Back to home';
+
+  @override
+  String get apiErrIntercityStops =>
+      'Intercity trips go straight to one destination without extra stops.';
+
+  @override
+  String get apiErrIntercityTooFar =>
+      'This intercity trip is longer than DealGo currently supports.';
+
+  @override
+  String get apiErrIntercityVehicle =>
+      'This vehicle class does not run intercity. Please choose another vehicle.';
+
+  @override
+  String get apiErrIntercityNoVehicle =>
+      'No vehicle class runs intercity trips yet.';
+
+  @override
+  String driverJobTripKm(String km) {
+    return 'Trip $km km';
+  }
+
+  @override
+  String driverJobPickupKm(String km) {
+    return '$km km to pickup';
+  }
+
+  @override
+  String get appUpdateRequiredTitle => 'Update required';
+
+  @override
+  String get appUpdateRequiredBody =>
+      'This version of the app is no longer supported. Please update to keep using DealGo.';
+
+  @override
+  String get appUpdateNow => 'Update now';
+
+  @override
+  String appUpdateLatest(String version) {
+    return 'New version: $version';
+  }
+
+  @override
+  String get appUpdateOptionalTitle => 'A new version is available';
+
+  @override
+  String get appUpdateOptionalBody =>
+      'Update to get the latest features and fixes.';
+
+  @override
+  String get appUpdateLater => 'Later';
+
+  @override
+  String get appUpdateRetry => 'Check again';
+
+  @override
+  String get legalConsentTitle => 'Our terms have been updated';
+
+  @override
+  String get legalConsentBody =>
+      'Please review and accept the new terms to keep using DealGo.';
+
+  @override
+  String get legalConsentRead => 'Read the full text';
+
+  @override
+  String legalConsentEffective(String date) {
+    return 'Effective $date';
+  }
+
+  @override
+  String legalConsentVersion(String version) {
+    return 'version $version';
+  }
+
+  @override
+  String get legalConsentAgree => 'I agree';
+
+  @override
+  String get legalConsentFailed => 'Couldn\'t send. Please try again.';
+
+  @override
+  String contactPhoneDial(String phone) {
+    return 'Call $phone';
+  }
+
+  @override
+  String get contactPhoneDialFailed => 'Couldn\'t open the phone app.';
+
+  @override
+  String get kycReviewAvatar => 'Profile photo';
+
+  @override
+  String get kycAvatarMissing =>
+      'Required before you submit. Customers see this photo when you take their job.';
+
+  @override
+  String get kycAvatarReady =>
+      'Customers see this photo when you take their job.';
+
+  @override
+  String get kycAvatarAdd => 'Add photo';
+
+  @override
+  String get partnerErrorAvatar =>
+      'Add a profile photo to your profile before submitting your driver application.';
+
+  @override
+  String offlineJobUpdatedAt(String time) {
+    return 'Last updated $time · no connection';
+  }
+
+  @override
+  String get offlineJobCallHint =>
+      'Regular phone calls work without mobile data.';
+
+  @override
+  String get legalRegulationsTitle => 'Terms of use for partners';
+
+  @override
+  String get legalRegulationsBody => 'For partner drivers and shops';
+
+  @override
+  String get legalTermsTitle => 'Terms of Service';
+
+  @override
+  String get legalTermsBody => 'Your rights and obligations when using DealGo';
+
+  @override
+  String get legalPrivacyTitle => 'Privacy policy';
+
+  @override
+  String get legalPrivacyBody => 'How DealGo collects and protects your data';
+
+  @override
+  String get legalLoadError =>
+      'Could not load this document. Please try again.';
+
+  @override
+  String get partnerConsentTitle => 'Partner registration terms';
+
+  @override
+  String get partnerConsentRegulations =>
+      'I have read and agree to the Terms of use';
+
+  @override
+  String get partnerConsentPrivacy =>
+      'I have read and agree to the Privacy policy';
+
+  @override
+  String get partnerConsentView => 'View';
+
+  @override
+  String get partnerConsentHint =>
+      'You must accept both to submit your application.';
+
+  @override
+  String get partnerConsentLoadError =>
+      'Could not load the terms — tap to retry';
+
+  @override
+  String get partnerErrorLegalConsent =>
+      'The Terms of use or Privacy policy was just updated. Please review and accept again.';
+
+  @override
+  String get foodFareSuggested => 'Suggested delivery fee';
+
+  @override
+  String get foodFareYourOffer => 'Your offer';
+
+  @override
+  String get foodFareHint =>
+      'The delivery fee is only a suggestion. Drivers can accept your offer or propose another one for you to choose; the fee is fixed once a driver takes the order.';
+
+  @override
+  String get foodFareHintFixed =>
+      'The delivery fee is only a suggestion; you can raise or lower it. Drivers accept exactly the fee you choose; it is fixed once a driver takes the order.';
+
+  @override
+  String get foodFareFixedWaiting =>
+      'Drivers can only accept the fee you offered. If it\'s taking a while, raise the fee to make the order more attractive.';
+
+  @override
+  String get driverFareFixed =>
+      'This order uses a fixed fee: you can only accept the customer\'s price.';
+
+  @override
+  String get foodFareDecrease => 'Lower the fee';
+
+  @override
+  String get foodFareIncrease => 'Raise the fee';
+
+  @override
+  String get foodFareReset => 'Use the suggestion';
+
+  @override
+  String get foodFareNegotiationTitle => 'Delivery fee';
+
+  @override
+  String foodFareWaiting(String amount) {
+    return 'Waiting for a driver to accept $amount';
+  }
+
+  @override
+  String foodFareAgreed(String amount) {
+    return 'Agreed delivery fee: $amount';
+  }
+
+  @override
+  String get foodFareOffersEmpty => 'No driver has proposed another fee yet.';
+
+  @override
+  String get foodFareDriverOffer => 'Driver offer';
+
+  @override
+  String get foodFareSelect => 'Choose';
+
+  @override
+  String foodFareRaise(String amount) {
+    return 'Raise to $amount';
+  }
+
+  @override
+  String foodFareRaisesLeft(int count) {
+    return '$count raises left';
+  }
+
+  @override
+  String get foodFareOfferExpired => 'Expired';
+
+  @override
+  String get foodFareSelectFailed =>
+      'Could not choose this offer. It may have expired or the driver took another job.';
+
+  @override
+  String get foodFareRaiseFailed => 'Could not raise the fee. Try again later.';
+
+  @override
+  String get foodFareCodExtra =>
+      'If the agreed fee is higher than what you paid online, the difference is collected in cash on delivery.';
+
+  @override
+  String get driverFareCounter => 'Propose fee';
+
+  @override
+  String get driverFareCounterTitle => 'Propose a delivery fee';
+
+  @override
+  String driverFareCustomerOffer(String amount) {
+    return 'Customer offers $amount';
+  }
+
+  @override
+  String driverFareCounterSend(String amount) {
+    return 'Send $amount';
+  }
+
+  @override
+  String get driverFareCounterSent => 'Offer sent. Waiting for the customer.';
+
+  @override
+  String get driverFareCounterFailed => 'Could not send the offer.';
+
+  @override
+  String get merchantFareAgreed => 'Delivery fee (agreed)';
 }

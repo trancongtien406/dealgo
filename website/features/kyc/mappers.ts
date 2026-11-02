@@ -93,6 +93,7 @@ export function mapNestPartnerApplicationToKycCase(
   ).filter(([, value]) => value.length > 0);
   return {
     code: app.id,
+    userId: app.userId,
     role: app.role,
     initials,
     name,
@@ -103,7 +104,14 @@ export function mapNestPartnerApplicationToKycCase(
       readString(app.metadata, "phoneMasked") ||
       readString(app.metadata, "phone") ||
       "—",
-    area: readString(app.metadata, "area") || "—",
+    phone: app.applicantPhone || undefined,
+    email: app.applicantEmail || readString(app.metadata, "email") || undefined,
+    area:
+      readString(app.metadata, "area") ||
+      readString(app.metadata, "address") ||
+      readString(app.metadata, "shopAddress") ||
+      readString(app.metadata, "serviceRegionCode") ||
+      "—",
     vehicleKind:
       app.role === "DRIVER"
         ? readString(app.metadata, "vehicleType") ||
@@ -137,6 +145,7 @@ export function mapNestPartnerApplicationToKycCase(
       app.role === "DRIVER"
         ? readString(app.metadata, "vehicleClassCode") || null
         : null,
+    licenseClass: readString(app.metadata, "licenseClass") || null,
     documentsWaived: app.metadata?.documentsWaived === true,
     activated: app.status === "APPROVED",
     details,

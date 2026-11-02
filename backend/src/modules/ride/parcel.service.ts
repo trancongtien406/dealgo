@@ -101,6 +101,10 @@ export class ParcelService {
     const fees = await this.fees();
     const allowed = await this.allowedClassCodes(size);
     const base = await this.rides.quote(actor, { pickup: dto.pickup, dropoff: dto.dropoff });
+    if (base.intercity) {
+      // t73u: parcel delivery stays a city product (intercity is passenger rides only).
+      throw rideError(422, 'RIDE_CROSS_REGION_NOT_SUPPORTED', 'Parcel delivery stays inside one service region');
+    }
     const { floorPercent, ceilingPercent } = await this.rides.currentBand();
     const options = base.options
       .filter((o) => allowed.has(o.code))

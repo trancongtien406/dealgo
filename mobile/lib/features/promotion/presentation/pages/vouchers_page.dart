@@ -190,7 +190,7 @@ class _VoucherCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const AccountToneIcon(
+              AccountToneIcon(
                 icon: DealGoIcons.voucher,
                 background: DealGoColors.subtlePurple,
                 foreground: DealGoColors.primary,

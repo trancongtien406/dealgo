@@ -98,7 +98,7 @@ class _FoodDropoffTileState extends State<FoodDropoffTile> {
     final pricing = context.read<PricingRepository>();
     final cubit = context.read<FoodCartCubit>();
     try {
-      final fare = await pricing.quoteFoodDelivery(
+      final quote = await pricing.quoteFoodDelivery(
         accessToken: token,
         storeId: storeId,
         dropoff: (
@@ -115,7 +115,7 @@ class _FoodDropoffTileState extends State<FoodDropoffTile> {
       if (now.storeId == storeId &&
           now.dropoffLat == cart.dropoffLat &&
           now.dropoffLng == cart.dropoffLng) {
-        cubit.setDeliveryFare(fare);
+        cubit.setDeliveryQuote(quote);
       }
       setState(() => _quoting = false);
     } catch (_) {
@@ -188,7 +188,7 @@ class _FoodDropoffTileState extends State<FoodDropoffTile> {
                         ),
                       ],
                       if (widget.enabled && !chosen)
-                        const Icon(
+                        Icon(
                           DealGoIcons.chevronRight,
                           color: DealGoColors.textSecondary,
                         ),

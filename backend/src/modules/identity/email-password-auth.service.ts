@@ -33,6 +33,7 @@ import { normalizeEmail } from './phone-number.js';
 import { MailDeliveryError } from '../../integrations/email/mail-sender.js';
 import { captureServerError } from '../../platform/observability/sentry.js';
 import { SessionService, type SessionResult } from './session.service.js';
+import { PlatformSettingsService } from '../../platform/settings/platform-settings.service.js';
 
 export type EmailPasswordRegisterInput = {
   email: string;
@@ -44,6 +45,12 @@ export type EmailSignupChallengeView = {
   challengeId: string;
   expiresAt: string;
   resendAvailableAt: string;
+};
+
+/** Register response when AUTH_EMAIL_VERIFICATION_REQUIRED is off: signed in at once. */
+export type EmailSignupInstantView = EmailSignupChallengeView & {
+  verificationRequired: false;
+  session: SessionResult;
 };
 
 export type EmailPasswordLoginInput = {
@@ -73,6 +80,7 @@ export class EmailPasswordAuthService {
     @Inject(MAIL_SENDER) private readonly mail: MailSender,
     private readonly config: ConfigService<AppEnv, true>,
     @Optional() private readonly review?: AppReviewLoginService,
+    @Optional() private readonly settings?: PlatformSettingsService,
   ) {
 }
 
@@ -80,7 +88,9 @@ export class EmailPasswordAuthService {
    * Responds identically whether or not the address already has an account; the
    * existing owner gets a notice email instead of a code, so verify can never succeed.
    */
-  async register(input: EmailPasswordRegisterInput): Promise<EmailSignupChallengeView> {
+  async register(
+    input: EmailPasswordRegisterInput,
+  ): Promise<EmailSignupChallengeView | EmailSignupInstantView> {
     await this.authMethods.assertEnabled('EMAIL_LOGIN_IDENTIFIER');
     const email = normalizeEmail(input.email);
     // Hash before any branching so both paths cost the same argon2 work.
@@ -90,6 +100,9 @@ export class EmailPasswordAuthService {
     await this.assertHourlyCap(email, now);
 
     const existing = await this.repository.findUserByEmail(email);
+    if (!existing && !(await this.verificationRequired())) {
+      return this.registerWithoutVerification(email, passwordHash, input.displayName, now);
+    }
     const reviewCode = existing ? null : await this.reviewCode(email);
     const code = reviewCode ?? randomOtpCode();
     const expiresAt = new Date(now.getTime() + EMAIL_SIGNUP_TTL_MS);
@@ -110,6 +123,57 @@ export class EmailPasswordAuthService {
       );
     }
     return toView(challenge);
+  }
+
+  /**
+   * AUTH_EMAIL_VERIFICATION_REQUIRED = false: no code is mailed; the account is created
+   * now with the email left unverified (it can still be verified later from the profile)
+   * and the session comes back with the usual challenge fields. The challenge row is
+   * stored already consumed with an unusable code, so verify/resend on it always fail.
+   * An address that already has an account keeps the normal path (notice email), so
+   * account existence is still not revealed.
+   */
+  private async registerWithoutVerification(
+    email: string,
+    passwordHash: string,
+    displayName: string | undefined,
+    now: Date,
+  ): Promise<EmailSignupInstantView> {
+    let user;
+    try {
+      user = await this.repository.createEmailPasswordUser({
+        email,
+        displayName: resolveDisplayName(displayName, email),
+        passwordHash,
+        verifiedAt: null,
+      });
+    } catch (error) {
+      if (error instanceof UniqueConflictError) {
+        throw authError(409, 'EMAIL_IN_USE', 'Email is already in use');
+      }
+      throw error;
+    }
+    const challenge = await this.repository.createEmailSignupChallenge({
+      email,
+      passwordHash: null,
+      displayName: user.displayName ?? resolveDisplayName(displayName, email),
+      codeHash: this.unusableCodeHash(),
+      expiresAt: now,
+      sentAt: now,
+    });
+    await this.repository.consumeEmailSignupChallenge(challenge.id, now);
+    const session = await this.sessions.issue(user, 'customer');
+    return { ...toView(challenge), verificationRequired: false, session };
+  }
+
+  /** Admin toggle; defaults to required when settings are unavailable or unreadable. */
+  async verificationRequired(): Promise<boolean> {
+    if (!this.settings) return true;
+    try {
+      return await this.settings.getBoolean('AUTH_EMAIL_VERIFICATION_REQUIRED');
+    } catch {
+      return true;
+    }
   }
 
   async verifyRegistration(challengeId: string, code: string): Promise<SessionResult> {
@@ -239,7 +303,7 @@ export class EmailPasswordAuthService {
     }
     // Only reachable with the right password, so it does not leak account existence.
     // Accounts created before OTP sign-up get a code here (password reset also verifies).
-    if (!user.emailVerifiedAt) {
+    if (!user.emailVerifiedAt && (await this.verificationRequired())) {
       const challenge = await this.startActivation(user, email);
       throw authError(
         403,

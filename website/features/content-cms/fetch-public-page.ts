@@ -2,6 +2,7 @@ import { nestApiBaseUrl } from "@/lib/api/nest-base-url";
 import { fallbackLegalPage, fallbackSupportPage } from "./public-documents";
 import type {
   LegalContent,
+  LegalPageSlug,
   PublicPageLocale,
   PublicPageView,
   SupportContent,
@@ -30,7 +31,7 @@ async function fetchFromApi<C>(
 
 /** Server-side read of a published legal page (falls back offline). */
 export async function getLegalPage(
-  slug: "terms" | "privacy",
+  slug: LegalPageSlug,
   locale: PublicPageLocale,
 ): Promise<PublicPageView<LegalContent>> {
   const page = await fetchFromApi<LegalContent>(slug, locale);

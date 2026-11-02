@@ -105,7 +105,7 @@ export function SiteConfigBoard() {
             <h2 className="text-base font-bold text-ink">Mạng xã hội</h2>
             <div className="grid gap-4 md:grid-cols-2">
               {SOCIAL_KEYS.map((k) => (
-                <Field key={k} label={SOCIAL_LABELS[k]} placeholder="https://…" value={d.socials[k]} error={errors[k]} onChange={(v) => set({ socials: { ...d.socials, [k]: v } })} />
+                <Field key={k} label={SOCIAL_LABELS[k]} placeholder={k === "messenger" ? "https://m.me/…" : "https://…"} value={d.socials[k]} error={errors[k]} onChange={(v) => set({ socials: { ...d.socials, [k]: v } })} />
               ))}
             </div>
           </section>

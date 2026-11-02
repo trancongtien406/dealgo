@@ -9,6 +9,8 @@ describe("site config", () => {
     expect(linkError("appStoreUrl", "")).toBeNull();
     expect(linkError("appStoreUrl", "http://apps.apple.com/x")).toMatch(/https/);
     expect(linkError("zalo", "https://zalo.me.evil.com/x")).toMatch(/Chỉ chấp nhận/);
+    expect(linkError("messenger", "https://m.me/dealgo")).toBeNull();
+    expect(linkError("messenger", "https://www.facebook.com/dealgo")).toMatch(/Chỉ chấp nhận/);
   });
 
   it("drops invalid or empty values so nothing fake renders", () => {

@@ -35,10 +35,14 @@ export async function POST(request: Request, context: RouteContext) {
   if (typeof reason !== "string" || reason.trim().length < 3 || reason.trim().length > 200) {
     return bad("Lý do cần 3–200 ký tự.");
   }
+  const idempotencyKey = request.headers.get("idempotency-key")?.trim() ?? "";
+  if (idempotencyKey && !/^[A-Za-z0-9_-]{8,64}$/.test(idempotencyKey)) {
+    return bad("Idempotency-Key không hợp lệ.");
+  }
   const result = await fetchOpsUpstream({
     method: "POST",
     path: `/v1/ops/payment-intents/${id}/refund`,
-    body: { amountVnd, reason: reason.trim() },
+    body: { amountVnd, reason: reason.trim(), ...(idempotencyKey ? { idempotencyKey } : {}) },
   });
   return jsonFromOpsUpstream(result);
 }

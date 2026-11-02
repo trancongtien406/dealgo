@@ -1,3 +1,4 @@
+import { APP_VERSION_POLICY_DEFAULT } from './app-version-policy.js';
 import type { PlatformSettingKey } from './platform-settings.catalog.js';
 import { PARCEL_SIZE_CLASSES_DEFAULT } from './parcel-size-classes.js';
 
@@ -38,6 +39,8 @@ export const PLATFORM_SETTING_SEED_DEFAULTS: Readonly<Partial<Record<PlatformSet
     RIDE_PICKUP_CODE_MAX_ATTEMPTS: '5',
     // Code confirmation is off by default (2026-10-29); admins can turn it back on.
     RIDE_PICKUP_CODE_REQUIRED: 'false',
+    // Email sign-up verification code (on by default); admins can turn it off.
+    AUTH_EMAIL_VERIFICATION_REQUIRED: 'true',
     // DEC-PROD-071 (DRAFT): parcel size classes and the optional recipient code.
     PARCEL_SIZE_CLASSES: JSON.stringify(PARCEL_SIZE_CLASSES_DEFAULT),
     PARCEL_RECIPIENT_CODE_REQUIRED: 'false',
@@ -49,10 +52,13 @@ export const PLATFORM_SETTING_SEED_DEFAULTS: Readonly<Partial<Record<PlatformSet
     PAYMENT_WALLET_ENABLED: 'false',
     // Website links: all empty until an admin sets real ones (no placeholder links).
     PUBLIC_SITE_CONFIG: '{}',
+    // t82u: no build is blocked or nagged until an admin sets min/latest builds.
+    APP_VERSION_POLICY: JSON.stringify(APP_VERSION_POLICY_DEFAULT),
     FOOD_DELIVERY_CODE_MAX_ATTEMPTS: '5',
     FOOD_HANDOVER_CODE_REQUIRED: 'false',
     // DEC-PROD-048 (DRAFT): KYC/KYB documents required by default (fail closed).
     ONBOARDING_DRIVER_KYC_REQUIRED: 'true',
+    DRIVER_CAR_EXTRA_DOCS_REQUIRED: 'true',
     ONBOARDING_MERCHANT_KYB_REQUIRED: 'true',
     // DEC-PROD-037: S027 grace period (days) before a deleted account is anonymized.
     ACCOUNT_DELETION_GRACE_DAYS: '7',
@@ -84,6 +90,14 @@ export const PLATFORM_SETTING_SEED_DEFAULTS: Readonly<Partial<Record<PlatformSet
     FOOD_UNCLAIMED_READY_TIMEOUT_MINUTES: '30',
     FOOD_EARLY_ASSIGN_LEAD_MINUTES: '10',
     FOOD_MAX_DELIVERY_KM: '15',
+    // Food delivery fee negotiation (suggested fee + customer offer + driver counters).
+    FOOD_FARE_FLOOR_PERCENT_OF_SUGGESTED: '70',
+    FOOD_COUNTER_MAX_PERCENT_OF_OFFER: '150',
+    FOOD_FARE_STEP_VND: '1000',
+    FOOD_MAX_OFFER_EDITS_PER_DRIVER: '2',
+    FOOD_MAX_FARE_RAISES_PER_ORDER: '3',
+    FOOD_OFFER_TTL_SECONDS: '120',
+    FOOD_DELIVERY_FEE_MODE: 'NEGOTIATE',
     SERVICE_ZONE_ENFORCED: 'true',
     DRIVER_DEBT_LIMIT_VND: '200000',
     DISPATCH_REQUIRE_FRESH_PRESENCE: 'true',
@@ -106,6 +120,11 @@ export const PLATFORM_SETTING_SEED_DEFAULTS: Readonly<Partial<Record<PlatformSet
     // Multi-stop rides (DRAFT, flags OFF until legal/ops approve; Grab-like defaults).
     RIDE_MULTI_STOP_BIKE_ENABLED: 'false',
     RIDE_MULTI_STOP_CAR_ENABLED: 'false',
+    // t73u intercity (DEC-RIDE-CROSS-REGION): off by default; [] = every class; {} = class tariff; 0 = no km cap.
+    RIDE_INTERCITY_ENABLED: 'false',
+    RIDE_INTERCITY_VEHICLE_CLASSES: '[]',
+    RIDE_INTERCITY_PRICING: '{}',
+    RIDE_INTERCITY_MAX_KM: '0',
     RIDE_MAX_STOPS_BIKE: '1',
     RIDE_MAX_STOPS_CAR: '2',
     RIDE_STOP_FEE_BIKE_VND: '5000',

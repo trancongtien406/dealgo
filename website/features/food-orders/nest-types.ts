@@ -58,6 +58,20 @@ export type NestFoodOrderView = {
   serviceRegionCode?: string | null;
   status: NestFoodOrderStatus;
   deliveryFareVnd: number;
+  /** Server suggestion at checkout; deliveryFareVnd is the customer offer / agreed fee. */
+  suggestedDeliveryFareVnd?: number | null;
+  deliveryFareAgreedAt?: string | null;
+  deliveryFareRaiseCount?: number;
+  /** Ops detail: current FOOD_DELIVERY_FEE_MODE. */
+  deliveryFeeMode?: "NEGOTIATE" | "FIXED";
+  deliveryOffers?: Array<{
+    id: string;
+    driverId: string;
+    amountVnd: number;
+    status: "PENDING" | "SELECTED" | "LOST" | "WITHDRAWN" | "EXPIRED";
+    editCount: number;
+    createdAt: string;
+  }>;
   subtotalVnd: number;
   totalVnd: number;
   dropoff: { lat: number; lng: number; label: string };

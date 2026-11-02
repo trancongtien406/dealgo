@@ -88,6 +88,7 @@ describePg('account deletion (postgres)', () => {
 
     const store = await db.foodStore.create({ data: { ownerId: owner.id, name: `Del ${tag}` } });
     const item = await food.createItem({ ownerId: owner.id, name: 'Bún chả', priceVnd: 35_000 });
+    await db.foodItem.update({ where: { id: item.id }, data: { moderationStatus: 'APPROVED' } }); // FOOD-001
     const order = await food.place({
       customerId: customer.id,
       storeId: store.id,

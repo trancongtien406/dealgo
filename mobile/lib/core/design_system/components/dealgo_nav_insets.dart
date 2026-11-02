@@ -94,12 +94,20 @@ DealGoNavBarMetrics dealGoNavBarMetricsOf(BuildContext context) =>
 void enableAndroidEdgeToEdge() {
   if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  applySystemNavigationStyle(Brightness.light);
+}
+
+/// Android system-nav icons. Light icons on a dark app, dark icons on a light app.
+void applySystemNavigationStyle(Brightness brightness) {
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
   SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      systemNavigationBarColor: Color(0x00000000),
-      systemNavigationBarDividerColor: Color(0x00000000),
+    SystemUiOverlayStyle(
+      systemNavigationBarColor: const Color(0x00000000),
+      systemNavigationBarDividerColor: const Color(0x00000000),
       systemNavigationBarContrastEnforced: false,
-      systemNavigationBarIconBrightness: Brightness.dark,
+      systemNavigationBarIconBrightness: brightness == Brightness.dark
+          ? Brightness.light
+          : Brightness.dark,
     ),
   );
 }

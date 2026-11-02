@@ -76,4 +76,22 @@ describe('OpsUsersService.listStaff filters', () => {
       opsIds.sort(),
     );
   });
+
+  it('lists customers with contactPhone fallback and without OPS role/scope leak', async () => {
+    const customer = await identity.createUser({
+      displayName: 'Khách Hàng A',
+      phone: null,
+      contactPhone: '+84912345678',
+      email: 'khachhang@dealgo.test',
+    });
+    await identity.insertGrant(customer.id, 'CUSTOMER', 'ACTIVE');
+
+    const result = await service.listCustomers(1, 10);
+    const item = result.items.find((c) => c.id === customer.id);
+    expect(item).toBeDefined();
+    expect(item?.phone).toBe('+84912345678');
+    expect(item?.phoneMasked).toBe('+8491 *** 678');
+    expect(item?.role).toBeUndefined();
+    expect(item?.scope).toBeUndefined();
+  });
 });

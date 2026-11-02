@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsDefined,
   IsInt,
@@ -250,6 +251,12 @@ export function parseRouteVia(via: string | undefined): Array<{ lat: number; lng
     const [lat, lng] = pair.split(',').map(Number) as [number, number];
     return { lat, lng };
   }).filter((p) => Math.abs(p.lat) <= 90 && Math.abs(p.lng) <= 180);
+}
+
+/** Customer opts in to taking an ACCEPT at the current offered fare. */
+export class SetAutoAcceptDto {
+  @IsBoolean()
+  enabled!: boolean;
 }
 
 /** Customer raises the bid (must be above the current one; class max still applies). */

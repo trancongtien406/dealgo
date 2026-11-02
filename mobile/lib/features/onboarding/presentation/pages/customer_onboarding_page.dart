@@ -513,11 +513,11 @@ class _FloatingServicePill extends StatelessWidget {
           Container(
             width: 24,
             height: 24,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: DealGoColors.canvas,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               DealGoIcons.arrowRight,
               size: 13,
               color: DealGoColors.textSecondary,

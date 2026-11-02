@@ -21,6 +21,7 @@ void main() {
 
     final phoneBtn = find.byKey(const Key('auth-method-phone'));
     if (phoneBtn.evaluate().isNotEmpty) {
+      await acceptAuthLegal(tester);
       await tester.tap(phoneBtn);
       await tester.pumpAndSettle();
     }
@@ -181,6 +182,7 @@ void main() {
     await pumpDealGo(tester, client: FakeIdentityClient());
 
     expect(find.byKey(const Key('phone-field')), findsNothing);
+    await acceptAuthLegal(tester);
     await tester.tap(find.byKey(const Key('auth-method-phone')));
     await tester.pumpAndSettle();
 
@@ -195,12 +197,30 @@ void main() {
     expect(find.byKey(const Key('phone-submit-btn')), findsOneWidget);
   });
 
+  testWidgets('sign-in methods stay locked until terms are accepted', (
+    tester,
+  ) async {
+    await pumpDealGo(tester, client: FakeIdentityClient());
+
+    await tester.tap(find.byKey(const Key('auth-method-phone')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('phone-field')), findsNothing);
+    expect(find.byKey(const Key('auth-legal-consent-error')), findsOneWidget);
+    expect(find.byKey(const Key('auth-legal-terms')), findsOneWidget);
+    expect(find.byKey(const Key('auth-legal-privacy')), findsOneWidget);
+
+    await acceptAuthLegal(tester);
+    expect(find.byKey(const Key('auth-legal-consent-error')), findsNothing);
+  });
+
   testWidgets('passkey sign-in starts without asking for phone or email', (
     tester,
   ) async {
     final client = FakeIdentityClient(profile: customerProfile);
     await pumpDealGo(tester, client: client);
 
+    await acceptAuthLegal(tester);
     await tester.ensureVisible(find.byKey(const Key('auth-method-passkey')));
     expect(find.text('Tiếp tục với passkey'), findsOneWidget);
     await tester.tap(find.byKey(const Key('auth-method-passkey')));
@@ -219,6 +239,7 @@ void main() {
       ..authenticateFailure = PasskeyFailureKind.noCredentials;
     await pumpDealGo(tester, client: client, passkeyPlatform: passkeys);
 
+    await acceptAuthLegal(tester);
     await tester.ensureVisible(find.byKey(const Key('auth-method-passkey')));
     await tester.tap(find.byKey(const Key('auth-method-passkey')));
     await tester.pumpAndSettle();

@@ -1021,7 +1021,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(extra);
     await tester.pumpAndSettle();
-    expect(find.text('Chuẩn bị ~45 phút.'), findsOneWidget);
+    expect(find.text('Chuẩn bị ≈45 phút.'), findsOneWidget);
     await tester.tap(find.byKey(const Key('merchant-busy-save')));
     await tester.pumpAndSettle();
     expect(food.storeStatusCalls.single.$1, StoreServiceMode.busy);

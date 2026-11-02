@@ -346,6 +346,120 @@ const SUPPORT_EN: SupportContent = {
   ],
 };
 
+
+/** pt5u: "Quy chế sử dụng" for drivers and shops; seeded from the former static partner policy. */
+const REGULATIONS_VI: LegalContent = {
+  "badge": "Quy chế sử dụng",
+  "sections": [
+    {
+      "id": "notice",
+      "title": "Lưu ý",
+      "content": "Bản dự thảo đang được rà soát pháp lý. Nội dung có thể thay đổi trước khi chính thức áp dụng; khi có khác biệt, Điều khoản sử dụng và thông tin hiển thị trong ứng dụng được ưu tiên."
+    },
+    {
+      "id": "dang-ky",
+      "title": "1. Đăng ký và xác minh",
+      "content": "• Đối tác đăng ký trong ứng dụng DealGo bằng tài khoản của mình, sau đó gửi hồ sơ cửa hàng hoặc hồ sơ tài xế.\n• Tài xế phải hoàn tất xác minh danh tính và phương tiện (giấy tờ tùy thân, giấy phép lái xe, đăng ký xe phù hợp loại dịch vụ) trước khi nhận chuyến.\n• Cửa hàng phải hoàn tất xác minh thông tin kinh doanh và được DealGo duyệt trước khi hiển thị cho khách.\n• Thông tin khai báo phải chính xác và được cập nhật khi thay đổi. DealGo có thể yêu cầu bổ sung giấy tờ bất cứ lúc nào."
+    },
+    {
+      "id": "gia",
+      "title": "2. Giá và thương lượng",
+      "content": "• Chuyến xe: khách có thể đề xuất giá, tài xế chấp nhận hoặc trả giá trong ứng dụng. Giá đã được hai bên chấp nhận là giá của chuyến; tài xế không được thu thêm ngoài ứng dụng.\n• Đồ ăn: không thương lượng giá. Cửa hàng chịu trách nhiệm về giá món, tình trạng còn/hết món và thông tin món trên ứng dụng.\n• Phí giao hàng và các khoản phí hiển thị cho khách được tính theo cấu hình của nền tảng tại thời điểm đặt đơn."
+    },
+    {
+      "id": "phi-nen-tang",
+      "title": "3. Phí nền tảng (hoa hồng)",
+      "content": "• DealGo có thể áp dụng phí nền tảng theo phần trăm giá trị chuyến xe hoặc đơn hàng, cấu hình riêng cho từng loại dịch vụ và hiển thị trong ứng dụng đối tác.\n• Mức phí cụ thể và chu kỳ đối soát cho cửa hàng hiện CHƯA được công bố (đang chờ quyết định). DealGo sẽ thông báo trước khi áp dụng hoặc thay đổi mức phí."
+    },
+    {
+      "id": "huy",
+      "title": "4. Hủy chuyến / hủy đơn",
+      "content": "• Đối tác chỉ hủy khi có lý do chính đáng (ví dụ: không liên hệ được khách, sự cố phương tiện, hết món) và phải chọn lý do trong ứng dụng.\n• Hủy nhiều lần không lý do, nhận rồi bỏ chuyến/đơn hoặc yêu cầu khách tự hủy có thể dẫn đến hạn chế nhận việc."
+    },
+    {
+      "id": "thanh-toan",
+      "title": "5. Thanh toán và đối soát",
+      "content": "• Khách có thể thanh toán bằng tiền mặt hoặc trực tuyến (MoMo, ZaloPay, VNPay, thẻ) khi phương thức được bật.\n• Đơn tiền mặt: tài xế thu đúng số tiền hiển thị trong ứng dụng. Đơn trực tuyến: tài xế không thu thêm tiền của khách.\n• Ví DealGo hiện chưa được sử dụng. Khoản tiền đối tác nhận từ đơn trực tuyến được đối soát theo kỳ do nền tảng công bố."
+    },
+    {
+      "id": "ung-xu",
+      "title": "6. Ứng xử và an toàn",
+      "content": "• Lịch sự, đúng giờ, tuân thủ luật giao thông và quy định an toàn thực phẩm.\n• Chỉ liên lạc với khách qua chat/gọi trong ứng dụng cho mục đích hoàn thành chuyến/đơn; không quấy rối, không lôi kéo khách giao dịch ngoài ứng dụng.\n• Khách và đối tác có thể đánh giá lẫn nhau sau mỗi chuyến/đơn. Đánh giá được dùng để cải thiện chất lượng dịch vụ."
+    },
+    {
+      "id": "tam-khoa",
+      "title": "7. Tạm khóa và chấm dứt",
+      "content": "• DealGo có thể tạm khóa hoặc chấm dứt tài khoản đối tác khi: thông tin xác minh sai hoặc hết hạn, gian lận giá hoặc thanh toán, vi phạm an toàn, nhiều khiếu nại đã được xác minh, hoặc vi phạm pháp luật.\n• Đối tác được thông báo lý do và có thể liên hệ Hỗ trợ để giải trình."
+    },
+    {
+      "id": "du-lieu",
+      "title": "8. Dữ liệu cá nhân",
+      "content": "• Đối tác chỉ sử dụng thông tin của khách (tên, số điện thoại ẩn qua ứng dụng, địa chỉ) để hoàn thành chuyến/đơn và không lưu giữ, chia sẻ cho mục đích khác.\n• Dữ liệu của đối tác được xử lý theo Chính sách bảo mật của DealGo."
+    }
+  ]
+};
+const REGULATIONS_EN: LegalContent = {
+  "badge": "Regulations",
+  "sections": [
+    {
+      "id": "notice",
+      "title": "Notice",
+      "content": "Draft under legal review. Content may change before it takes effect; where it differs, the Terms of use and the information shown in the app prevail."
+    },
+    {
+      "id": "dang-ky",
+      "title": "1. Registration and verification",
+      "content": "• Partners register in the DealGo app with their account, then submit a store or driver profile.\n• Drivers must complete identity and vehicle verification (ID, driving licence, vehicle registration matching the service type) before accepting rides.\n• Stores must complete business verification and be approved by DealGo before they are shown to customers.\n• Information must be accurate and kept up to date. DealGo may request additional documents at any time."
+    },
+    {
+      "id": "gia",
+      "title": "2. Pricing and negotiation",
+      "content": "• Rides: customers may propose a price; drivers accept or counter in the app. The agreed price is the ride price; drivers must not charge extra outside the app.\n• Food: no negotiation. Stores are responsible for item prices, availability and item information in the app.\n• Delivery fees and other customer-facing fees follow the platform configuration at the time of ordering."
+    },
+    {
+      "id": "phi-nen-tang",
+      "title": "3. Platform fee (commission)",
+      "content": "• DealGo may charge a platform fee as a percentage of the ride or order value, configured per service and shown in the partner app.\n• Exact rates and the store settlement cycle are NOT published yet (pending decision). DealGo will give notice before applying or changing any fee."
+    },
+    {
+      "id": "huy",
+      "title": "4. Cancellations",
+      "content": "• Partners may cancel only for a valid reason (e.g. customer unreachable, vehicle issue, item sold out) selected in the app.\n• Repeated unjustified cancellations, abandoning accepted jobs, or asking customers to cancel may restrict access to new jobs."
+    },
+    {
+      "id": "thanh-toan",
+      "title": "5. Payment and settlement",
+      "content": "• Customers may pay in cash or online (MoMo, ZaloPay, VNPay, card) when the method is enabled.\n• Cash orders: drivers collect exactly the amount shown in the app. Online orders: drivers collect nothing from the customer.\n• The DealGo wallet is not in use. Partner earnings from online orders are settled on the cycle the platform publishes."
+    },
+    {
+      "id": "ung-xu",
+      "title": "6. Conduct and safety",
+      "content": "• Be courteous and punctual, follow traffic law and food safety rules.\n• Contact customers only through in-app chat/call to complete the job; no harassment and no moving transactions off the app.\n• Customers and partners can rate each other after each job; ratings are used to improve service quality."
+    },
+    {
+      "id": "tam-khoa",
+      "title": "7. Suspension and termination",
+      "content": "• DealGo may suspend or terminate a partner account for false or expired verification, price or payment fraud, safety violations, verified repeated complaints, or unlawful conduct.\n• Partners are told the reason and may contact Support to respond."
+    },
+    {
+      "id": "du-lieu",
+      "title": "8. Personal data",
+      "content": "• Partners use customer information only to complete the job and must not keep or share it for other purposes.\n• Partner data is processed under the DealGo Privacy policy."
+    }
+  ]
+};
+
+export const REGULATIONS_META = {
+  "vi": {
+    "title": "Quy chế sử dụng dành cho tài xế và cửa hàng",
+    "summary": "Quy định áp dụng cho quán ăn/cửa hàng (đối tác bán hàng) và tài xế (Bike, Car 4 chỗ, Car 7 chỗ) hoạt động trên DealGo tại Đà Nẵng. Khách hàng, đối tác và tài xế dùng chung một ứng dụng DealGo."
+  },
+  "en": {
+    "title": "Driver and store regulations",
+    "summary": "Rules for restaurants/stores (merchants) and drivers (Bike, Car 4-seat, Car 7-seat) on DealGo in Da Nang. Customers, merchants and drivers use the same DealGo app."
+  }
+};
+
 export const PUBLIC_PAGE_DEFAULTS: Record<PublicPageSlug, Record<PublicPageLocale, PublicPageDefault>> = {
   privacy: {
     vi: {
@@ -370,6 +484,10 @@ export const PUBLIC_PAGE_DEFAULTS: Record<PublicPageSlug, Record<PublicPageLocal
       summary: 'Rules for using DealGo Ride and Food.',
       content: TERMS_EN,
     },
+  },
+  regulations: {
+    vi: { ...REGULATIONS_META.vi, content: REGULATIONS_VI },
+    en: { ...REGULATIONS_META.en, content: REGULATIONS_EN },
   },
   support: {
     vi: { title: 'Trung tâm hỗ trợ', summary: 'Liên hệ DealGo khi bạn cần giúp đỡ.', content: SUPPORT_VI },

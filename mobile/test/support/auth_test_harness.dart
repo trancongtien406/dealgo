@@ -215,6 +215,7 @@ Future<void> submitPhone(WidgetTester tester, String national) async {
   final phoneOption = find.byKey(const Key('auth-method-phone'));
   if (phoneOption.evaluate().isNotEmpty &&
       find.byKey(const Key('phone-field')).evaluate().isEmpty) {
+    await acceptAuthLegal(tester);
     await tester.tap(phoneOption);
     await tester.pumpAndSettle();
   }
@@ -274,4 +275,14 @@ Future<void> chooseDeliveryAddress(WidgetTester tester) async {
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const Key('place-current-location')));
   await tester.pumpAndSettle();
+}
+
+/// Ticks the required terms/privacy checkbox on the sign-in method picker.
+Future<void> acceptAuthLegal(WidgetTester tester) async {
+  final box = find.byKey(const Key('auth-legal-consent'));
+  await tester.ensureVisible(box);
+  if (tester.widget<Checkbox>(box).value != true) {
+    await tester.tap(box);
+    await tester.pump();
+  }
 }

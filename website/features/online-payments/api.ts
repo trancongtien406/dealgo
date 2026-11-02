@@ -23,9 +23,16 @@ export async function fetchPaymentIntent(id: string): Promise<OpsPaymentIntentDe
   return envelope.data;
 }
 
-export async function refundPaymentIntent(input: { id: string; amountVnd: number; reason: string }): Promise<void> {
+export async function refundPaymentIntent(input: {
+  id: string;
+  amountVnd: number;
+  reason: string;
+  /** Stable per confirmed refund: a retry/double click replays instead of refunding twice. */
+  idempotencyKey: string;
+}): Promise<void> {
   await apiFetch<{ success: boolean }>(apiPaths.opsPaymentIntentRefund(input.id), {
     method: "POST",
+    headers: { "Idempotency-Key": input.idempotencyKey },
     body: { amountVnd: input.amountVnd, reason: input.reason },
   });
 }

@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 export interface MailSender {
-  sendEmailVerification(input: { email: string; verificationId: string; token: string }): Promise<void>;
+  /** 6-digit code proving a profile email address (added, changed or never verified). */
+  sendEmailVerification(input: EmailVerificationCodeMail): Promise<void>;
   /** DEC-PROD-045: 6-digit forgot-password code (the old link token is retired). */
   sendPasswordResetCode(input: PasswordResetCodeMail): Promise<void>;
   /** `purpose: 'activation'` verifies the email of an existing, never-verified account. */
@@ -10,7 +11,19 @@ export interface MailSender {
   sendSignupAccountExists(input: { email: string }): Promise<void>;
   /** Admin "send test email": proves the configured provider delivers. */
   sendTestEmail(input: { email: string }): Promise<void>;
+  /** t82u: terms/privacy changed notice (bulk, sent by the outbox relay in paced batches). */
+  sendPolicyUpdate(input: PolicyUpdateMail): Promise<void>;
 }
+
+export type PolicyUpdateMail = {
+  email: string;
+  /** e.g. "Điều khoản sử dụng". */
+  documentTitle: string;
+  version: number;
+  effectiveAt: Date | null;
+  changelog: string;
+  url: string;
+};
 
 export type MailFailureReason = 'auth_failed' | 'rejected' | 'rate_limited' | 'provider_unavailable' | 'suppressed';
 
@@ -25,10 +38,10 @@ export class MailDeliveryError extends Error {
   }
 }
 
-export type DeliveredMail = {
+export type EmailVerificationCodeMail = {
   email: string;
-  verificationId: string;
-  token: string;
+  code: string;
+  expiresAt: Date;
 };
 
 export type PasswordResetCodeMail = {
@@ -51,7 +64,7 @@ export type DeliveredSignupCode = SignupCodeMail;
 @Injectable()
 export class MockMailSender implements MailSender {
   private readonly logger = new Logger(MockMailSender.name);
-  readonly sent: DeliveredMail[] = [];
+  readonly sent: EmailVerificationCodeMail[] = [];
   readonly passwordResets: DeliveredPasswordReset[] = [];
   readonly signupCodes: DeliveredSignupCode[] = [];
   readonly signupAccountExists: string[] = [];
@@ -59,12 +72,12 @@ export class MockMailSender implements MailSender {
 
   constructor(private readonly nodeEnv: 'development' | 'test' | 'production') {}
 
-  async sendEmailVerification(input: { email: string; verificationId: string; token: string }): Promise<void> {
+  async sendEmailVerification(input: EmailVerificationCodeMail): Promise<void> {
     if (this.nodeEnv === 'production') {
       throw new Error('Email mock is not available in production');
     }
     this.sent.push(input);
-    this.logger.log(`Email mock to ${input.email} token=(redacted)`);
+    this.logger.log(`Email verification code mock to ${input.email} code=(redacted)`);
   }
 
   async sendPasswordResetCode(input: PasswordResetCodeMail): Promise<void> {
@@ -98,6 +111,17 @@ export class MockMailSender implements MailSender {
     this.testEmails.push(input.email);
     this.logger.log(`Test email mock to ${input.email}`);
   }
+
+  readonly policyUpdates: PolicyUpdateMail[] = [];
+
+  async sendPolicyUpdate(input: PolicyUpdateMail): Promise<void> {
+    if (this.nodeEnv === 'production') {
+      throw new Error('Email mock is not available in production');
+    }
+    this.policyUpdates.push(input);
+    const [local, domain] = input.email.split('@');
+    this.logger.log(`Policy update mock (v${input.version}) to ${domain ? `${(local ?? '').slice(0, 2)}***@${domain}` : '***'}`);
+  }
 }
 
 @Injectable()
@@ -119,6 +143,10 @@ export class UnavailableMailSender implements MailSender {
   }
 
   async sendTestEmail(): Promise<void> {
+    throw new Error('Email provider is not configured');
+  }
+
+  async sendPolicyUpdate(): Promise<void> {
     throw new Error('Email provider is not configured');
   }
 }

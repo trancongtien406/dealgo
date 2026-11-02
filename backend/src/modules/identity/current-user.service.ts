@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import type { AppEnv } from '../../platform/config/env.js';
 import { authError } from './auth-error.js';
 import { AuthMethodPolicyService } from './auth-method-policy.service.js';
-import { EmailVerificationService } from './email-verification.service.js';
+import { EmailVerificationService, type EmailVerificationView } from './email-verification.service.js';
 import { IDENTITY_REPOSITORY } from './identity.constants.js';
 import type {
   IdentityRepository,
@@ -40,7 +40,7 @@ export type UpdateMeInput = {
 };
 
 export type UpdateMeResult = CurrentUserResult & {
-  pendingEmailVerification?: { verificationId: string; expiresAt: string };
+  pendingEmailVerification?: EmailVerificationView;
 };
 
 @Injectable()
@@ -80,6 +80,11 @@ export class CurrentUserService {
 
     if (input.contactPhone !== undefined) {
       if (input.contactPhone === null) {
+        // Email/passkey accounts have no verified login phone. Dropping the
+        // contact number would reopen profile setup, so the only number stays.
+        if (!before.phone) {
+          throw authError(400, 'VALIDATION_ERROR', 'contactPhone must be a Vietnamese mobile number');
+        }
         profilePatch.contactPhone = null;
       } else {
         const phone = normalizeVnMobile(input.contactPhone);
@@ -118,12 +123,13 @@ export class CurrentUserService {
       await this.repository.updateUserProfile(userId, profilePatch);
     }
 
-    let pendingEmailVerification: { verificationId: string; expiresAt: string } | undefined;
+    // Only a new address starts a verification. Saving the profile with the current, still
+    // unverified address mails nothing; the app verifies it on demand via /auth/email/verifications.
+    let pendingEmailVerification: EmailVerificationView | undefined;
     if (input.email !== undefined) {
       const email = normalizeEmail(input.email);
       const current = await this.requireUser(userId);
-      const alreadyVerified = current.email === email && current.emailVerifiedAt !== null;
-      if (!alreadyVerified) {
+      if (current.email !== email) {
         pendingEmailVerification = await this.emailVerification.request(userId, email);
       }
     }

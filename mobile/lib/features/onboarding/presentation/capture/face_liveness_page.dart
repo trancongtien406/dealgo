@@ -14,6 +14,7 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/partner_documents.dart';
 import '../document_image_source.dart';
+import 'camera_cover_preview.dart';
 import 'capture_hint.dart';
 import 'capture_quality.dart';
 import 'liveness_cubit.dart';
@@ -119,6 +120,8 @@ class _FaceLivenessViewState extends State<_FaceLivenessView> {
       final face = faces.length == 1 ? faces.first : null;
       final size = _uprightSize(image);
       final box = face?.boundingBox;
+      // Only the cover-cropped part of the frame is visible in the oval.
+      final crop = coverCrop(size, _ovalAspect);
       context.read<LivenessCubit>().onSample(
         FaceSample(
           faceCount: faces.length,
@@ -128,10 +131,10 @@ class _FaceLivenessViewState extends State<_FaceLivenessView> {
           fit: box == null
               ? OvalFit.outside
               : ovalFitOf(
-                  left: box.left / size.width,
-                  top: box.top / size.height,
-                  width: box.width / size.width,
-                  height: box.height / size.height,
+                  left: (box.left / size.width - crop.left) / crop.width,
+                  top: (box.top / size.height - crop.top) / crop.height,
+                  width: box.width / size.width / crop.width,
+                  height: box.height / size.height / crop.height,
                 ),
         ),
       );
@@ -141,6 +144,8 @@ class _FaceLivenessViewState extends State<_FaceLivenessView> {
       _processing = false;
     }
   }
+
+  static const double _ovalAspect = 3 / 4;
 
   Size _uprightSize(CameraImage image) {
     final turned = (_camera?.sensorOrientation ?? 0) % 180 != 0;
@@ -304,11 +309,7 @@ class _FaceLivenessViewState extends State<_FaceLivenessView> {
       builder: (context, state) {
         return Scaffold(
           backgroundColor: Colors.black,
-          appBar: AppBar(
-            backgroundColor: Colors.black,
-            foregroundColor: Colors.white,
-            title: Text(l10n.kycLivenessTitle),
-          ),
+          appBar: captureAppBar(l10n.kycLivenessTitle),
           body: SafeArea(
             child: _failed
                 ? Center(
@@ -322,7 +323,8 @@ class _FaceLivenessViewState extends State<_FaceLivenessView> {
                       Expanded(
                         child: Center(
                           child: AspectRatio(
-                            aspectRatio: 3 / 4,
+                            key: const Key('liveness-oval'),
+                            aspectRatio: _ovalAspect,
                             child: DecoratedBox(
                               position: DecorationPosition.foreground,
                               decoration: ShapeDecoration(
@@ -339,7 +341,13 @@ class _FaceLivenessViewState extends State<_FaceLivenessView> {
                                 child:
                                     controller != null &&
                                         controller.value.isInitialized
-                                    ? CameraPreview(controller)
+                                    ? CameraCoverPreview(
+                                        previewSize: portraitPreviewSize(
+                                          controller.value.previewSize ??
+                                              const Size(640, 480),
+                                        ),
+                                        child: CameraPreview(controller),
+                                      )
                                     : const ColoredBox(color: Colors.black12),
                               ),
                             ),

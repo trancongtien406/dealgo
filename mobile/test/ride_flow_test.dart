@@ -226,12 +226,49 @@ void main() {
     final accept = find.byKey(const Key('ride-inline-accept-$_offerId'));
     expect(accept, findsOneWidget);
     expect(find.text('Chấp nhận'), findsOneWidget);
-    expect(find.byKey(const Key('ride-inline-raise-5000')), findsOneWidget);
+    expect(find.byKey(const Key('ride-inline-raise-10')), findsOneWidget);
     await tester.ensureVisible(accept);
     await tester.pumpAndSettle();
     await tester.tap(accept);
     await tester.pumpAndSettle();
     expect(rides.selectCalls.single.offerId, _offerId);
+  });
+
+  testWidgets('waiting for offers opens the sheet near full height', (
+    tester,
+  ) async {
+    final rides = _negotiatingClient(offers: [_offer(amountVnd: 45000)]);
+    await _openFare(tester, rides);
+    await tester.ensureVisible(find.byKey(const Key('ride-submit-fare')));
+    await tester.tap(find.byKey(const Key('ride-submit-fare')));
+    await tester.pumpAndSettle();
+
+    final sheet = tester.widget<DraggableScrollableSheet>(
+      find.descendant(
+        of: find.byKey(const Key('ride-matching-sheet')),
+        matching: find.byType(DraggableScrollableSheet),
+      ),
+    );
+    final screen = tester.getSize(find.byType(MaterialApp).first).height;
+    final top = tester
+        .getTopLeft(find.byKey(const Key('ride-matching-sheet')).last)
+        .dy;
+    final sheetBox = tester.getRect(
+      find
+          .descendant(
+            of: find.byKey(const Key('ride-matching-sheet')),
+            matching: find.byType(RideBottomSheet),
+          )
+          .first,
+    );
+    expect(top, 0); // the sheet's layout fills the page...
+    // ...and its visible card is expanded to the max size (not 0.46).
+    expect(sheetBox.height / screen, closeTo(sheet.maxChildSize, 0.02));
+    expect(sheet.maxChildSize, greaterThan(0.7));
+    expect(
+      find.byKey(const Key('ride-inline-accept-$_offerId')).hitTestable(),
+      findsOneWidget,
+    );
   });
 
   test(
@@ -319,6 +356,34 @@ void main() {
     );
     expect(paid.amount, '38.000đ');
     expect(find.text('Ưu đãi DEALGO10'), findsOneWidget);
+  });
+
+  testWidgets('a driver assigned elsewhere shows the taken state (RIDE-003)', (
+    tester,
+  ) async {
+    final offer = _offer(amountVnd: 42000);
+    final rides = _negotiatingClient(offers: [offer])
+      ..selectError = const ApiException(
+        statusCode: 409,
+        message: 'server text',
+        errorCode: 'RIDE_OFFER_DRIVER_UNAVAILABLE',
+      );
+    await _openFare(tester, rides);
+    await tester.ensureVisible(find.byKey(const Key('ride-submit-fare')));
+    await tester.tap(find.byKey(const Key('ride-submit-fare')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('ride-open-offers-from-wait')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('ride-open-offers-from-wait')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('ride-select-offer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('ride-offer-confirm')));
+    await tester.pumpAndSettle();
+    expect(find.text('Tài xế đã bận'), findsOneWidget);
+    expect(find.textContaining('server text'), findsNothing);
   });
 
   testWidgets('a voucher refused at selection is dropped and the offer stays', (
@@ -442,6 +507,9 @@ void main() {
         // A suggestion is only used when tapped.
         await tester.tap(find.byKey(const Key('ride-suggestion-0')));
         await tester.pumpAndSettle();
+        // Prices open on their own; back shows the kept destination.
+        await tester.tap(find.byKey(const Key('ride-fare-back')));
+        await tester.pumpAndSettle();
         expect(inDropoff(_airport.label), findsOneWidget);
       },
     );
@@ -459,6 +527,9 @@ void main() {
       await tester.tap(navLabel('Đặt'));
       await tester.pumpAndSettle();
       await tester.tap(find.text(_airport.name));
+      await tester.pumpAndSettle();
+      // Prices open by themselves; go back to the map, then leave it.
+      await tester.tap(find.byKey(const Key('ride-fare-back')));
       await tester.pumpAndSettle();
       expect(inDropoff(_airport.label), findsOneWidget);
 
@@ -486,6 +557,9 @@ void main() {
       await tester.pumpAndSettle();
       // The destination picker opens first (full screen, above the shell).
       await tester.tap(find.text(_airport.name));
+      await tester.pumpAndSettle();
+      // Prices open on their own; back to the map.
+      await tester.tap(find.byKey(const Key('ride-fare-back')));
       await tester.pumpAndSettle();
       expect(find.byType(DealGoTabBar), findsOneWidget);
       expect(find.byKey(const Key('ride-map-distance')), findsOneWidget);
@@ -592,13 +666,7 @@ void main() {
     await tester.tap(find.byKey(const Key('place-result-0')));
     await tester.pumpAndSettle();
 
-    // Map sheet → CTA → class+fare (inDrive confirm step, no silent skip).
-    expect(find.byKey(const Key('ride-open-route-overview')), findsOneWidget);
-    await tester.ensureVisible(
-      find.byKey(const Key('ride-open-route-overview')),
-    );
-    await tester.tap(find.byKey(const Key('ride-open-route-overview')));
-    await tester.pumpAndSettle();
+    // Destination chosen → class+fare opens automatically.
     expect(find.text('Đề xuất của bạn'), findsOneWidget);
     expect(find.byKey(const Key('ride-vehicle-bike')), findsOneWidget);
     expect(find.text('42.000đ'), findsWidgets);
@@ -724,11 +792,7 @@ Future<void> _openFare(WidgetTester tester, FakeRideClient rides) async {
   expect(find.text('Bạn muốn đi đâu?'), findsOneWidget);
   await tester.tap(find.text(_airport.name));
   await tester.pumpAndSettle();
-  // Map sheet with A/B — tap CTA to class+fare (no silent auto-advance).
-  expect(find.text('Chọn xe & đề xuất giá'), findsOneWidget);
-  await tester.ensureVisible(find.byKey(const Key('ride-open-route-overview')));
-  await tester.tap(find.byKey(const Key('ride-open-route-overview')));
-  await tester.pumpAndSettle();
+  // Destination chosen → class+fare opens automatically.
   // Sheet may start partially collapsed — drag up / ensureVisible.
   final fareSheet = find.text('Đề xuất của bạn');
   expect(fareSheet, findsOneWidget);

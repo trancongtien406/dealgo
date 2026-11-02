@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/config/api_base_url.dart';
 import '../../../../core/notifications/notification_router.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
@@ -20,13 +19,18 @@ import '../../../ride/presentation/utils/ride_vehicle_label.dart';
 import '../../../ride/presentation/widgets/ride_negotiation_ui.dart'
     show customerRatingText;
 import '../../../ride/domain/entities/ride_money.dart';
+import '../../../onboarding/presentation/cubit/driver_kyc_cubit.dart';
 import '../cubit/driver_duty_cubit.dart';
 import '../cubit/driver_feed_cubit.dart';
 import '../cubit/driver_services_cubit.dart';
 import 'driver_home_page.dart';
+import '../../../ride/presentation/cubit/vehicle_class_catalog_cubit.dart';
 import '../utils/driver_routes.dart';
+import '../utils/driver_service_icons.dart';
+import '../widgets/driver_service_strip.dart';
 import '../widgets/driver_widgets.dart';
 import '../widgets/driver_inline_quote.dart';
+import '../widgets/driver_job_distance.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/format/short_ref.dart';
 import '../../../../core/l10n/api_error_text.dart';
@@ -68,6 +72,8 @@ class _DriverJobsPageState extends State<DriverJobsPage> {
       _sync();
       if (mounted) {
         context.read<DriverServicesCubit>().load();
+        context.read<DriverKycCubit>().refresh();
+        context.read<VehicleClassCatalogCubit>().load();
       }
     });
   }
@@ -204,6 +210,9 @@ class _JobsOnline extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final l10n = AppLocalizations.of(context);
     final services = context.watch<DriverServicesCubit>().state.saved;
+    final vehicleClass = context.select<DriverKycCubit, String?>(
+      (cubit) => cubit.state.vehicleClassCode,
+    );
     final state = feed;
     final DriverFeedReady? ready = state is DriverFeedReady ? state : null;
     final DriverFeedFailed? failed = state is DriverFeedFailed ? state : null;
@@ -241,37 +250,21 @@ class _JobsOnline extends StatelessWidget {
         children: [
           DriverPanel(
             elevated: true,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l10n.driverServicesAreaSection,
-                        style: textTheme.bodySmall,
-                      ),
-                      const SizedBox(height: DealGoSpacing.s4),
-                      Text(
-                        driverServicesSummary(l10n, services),
-                        key: const Key('driver-jobs-services'),
-                        style: textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                TextButton(
-                  key: const Key('driver-jobs-open-services'),
-                  onPressed: () => context.push(DriverRoutes.services),
-                  child: Text(l10n.driverConfigure),
-                ),
-                DriverChip(
-                  label: l10n.driverOnlineBadge,
-                  tone: DriverChipTone.green,
-                ),
-              ],
+            padding: const EdgeInsets.fromLTRB(
+              DealGoSpacing.s12,
+              DealGoSpacing.s4,
+              DealGoSpacing.s4,
+              DealGoSpacing.s12,
+            ),
+            child: DriverServiceStrip(
+              key: const Key('driver-jobs-services'),
+              prefs: services,
+              vehicleClassCode: vehicleClass,
+              showStatus: true,
+              online: true,
+              settingsKey: const Key('driver-jobs-open-services'),
+              onOpenSettings: () => context.push(DriverRoutes.services),
+              pillKeyFor: (kind) => Key('driver-jobs-service-${kind.name}'),
             ),
           ),
           const SizedBox(height: DealGoSpacing.s12),
@@ -295,17 +288,20 @@ class _JobsOnline extends StatelessWidget {
           if (ready != null && ready.rides.isEmpty && ready.food.isEmpty)
             DealGoStateView(
               art: DealGoStateArt.noOrders,
-              title: services.rideEnabled || services.foodEnabled
+              title: driverEnabledServiceCount(services, vehicleClass) > 0
                   ? l10n.driverNoOpenRequests
                   : l10n.driverServicesNoneOn,
               compact: true,
             ),
           if (ready != null && ready.rides.isNotEmpty) ...[
-            Text(l10n.driverRidesAvailable, style: textTheme.titleMedium),
+            Text(
+              '${l10n.driverRidesAvailable} · ${ready.rides.length}',
+              style: textTheme.titleSmall,
+            ),
             const SizedBox(height: DealGoSpacing.s8),
             for (final ride in ready.rides) ...[
               _RideJobCard(ride: ride),
-              const SizedBox(height: DealGoSpacing.s12),
+              const SizedBox(height: DealGoSpacing.s8),
             ],
           ],
           if (ready != null && ready.food.isNotEmpty) ...[
@@ -344,6 +340,9 @@ class _JobsOnline extends StatelessWidget {
   }
 }
 
+/// Compact job card so 2+ fit per screen — one header line,
+/// pickup → drop-off on two ellipsized lines, customer price big with the
+/// reference small, rating inline, then the inline quote. Tap opens details.
 class _RideJobCard extends StatelessWidget {
   const _RideJobCard({required this.ride});
 
@@ -353,103 +352,191 @@ class _RideJobCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final l10n = AppLocalizations.of(context);
-    final photo = resolveMediaUrl(ride.imageUrl);
+    final muted = textTheme.bodySmall?.copyWith(
+      color: DealGoColors.textSecondary,
+    );
     return DriverPanel(
       elevated: true,
-      borderColor: DealGoColors.primary.withValues(alpha: 0.35),
+      padding: const EdgeInsets.fromLTRB(
+        DealGoSpacing.s12,
+        DealGoSpacing.s8,
+        DealGoSpacing.s12,
+        DealGoSpacing.s12,
+      ),
       child: InkWell(
         key: Key('driver-ride-${ride.id}'),
         onTap: () => context.push(DriverRoutes.ride(ride.id), extra: ride),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Ref and chips share one line when they fit and wrap on narrow
-            // phones; the ref never breaks mid-word or shrinks to nothing.
-            Wrap(
-              spacing: DealGoSpacing.s8,
-              runSpacing: DealGoSpacing.s8,
-              crossAxisAlignment: WrapCrossAlignment.center,
+            Row(
               children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (photo != null) ...[
-                      RideVehicleClassPhoto(
-                        imageUrl: ride.imageUrl,
-                        code: ride.vehicleClassCode,
-                        size: 32,
-                      ),
-                      const SizedBox(width: DealGoSpacing.s8),
-                    ],
-                    Flexible(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          l10n.rideRef(shortRef(ride.id)),
-                          key: Key('driver-ride-ref-${ride.id}'),
-                          style: textTheme.titleSmall,
-                          maxLines: 1,
-                          softWrap: false,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                DriverChip(
-                  label: rideVehicleClassLabel(l10n, ride.vehicleClassCode),
-                  tone: DriverChipTone.neutral,
-                ),
                 if (ride.isParcel)
-                  DriverChip(
-                    key: Key('driver-job-parcel-${ride.id}'),
-                    label: parcelBadgeText(
-                      l10n,
-                      ride.parcelSizeClass,
-                      ride.parcelWeightKg,
-                    ),
-                    tone: DriverChipTone.warning,
+                  const Icon(
+                    DriverServiceIcons.parcel,
+                    size: 16,
+                    color: DealGoColors.primary,
                   )
                 else
-                  DriverChip(
-                    label: AppLocalizations.of(context).driverRideChip,
-                    tone: DriverChipTone.green,
+                  DriverVehicleVisual(
+                    vehicleClassCode: ride.vehicleClassCode,
+                    imageUrl: ride.imageUrl,
+                    size: 16,
                   ),
+                const SizedBox(width: DealGoSpacing.s4),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    l10n.rideRef(shortRef(ride.id)),
+                    key: Key('driver-ride-ref-${ride.id}'),
+                    style: textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                    maxLines: 1,
+                    softWrap: false,
+                  ),
+                ),
+                const SizedBox(width: DealGoSpacing.s8),
+                Flexible(
+                  child: Text(
+                    ride.isParcel
+                        ? parcelBadgeText(
+                            l10n,
+                            ride.parcelSizeClass,
+                            ride.parcelWeightKg,
+                          )
+                        : rideVehicleClassName(context, ride.vehicleClassCode),
+                    key: ride.isParcel
+                        ? Key('driver-job-parcel-${ride.id}')
+                        : null,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: muted,
+                  ),
+                ),
+                if (ride.intercity) ...[
+                  const SizedBox(width: DealGoSpacing.s4),
+                  DriverChip(
+                    key: Key('driver-job-intercity-${ride.id}'),
+                    label: l10n.rideIntercity,
+                    tone: DriverChipTone.warning,
+                  ),
+                ],
               ],
             ),
-            const SizedBox(height: DealGoSpacing.s12),
-            Text(ride.pickup.label, style: textTheme.titleMedium),
-            Text(ride.dropoff.label, style: textTheme.bodySmall),
+            const SizedBox(height: DealGoSpacing.s8),
+            _RouteLine(
+              icon: DealGoIcons.pin,
+              color: DealGoColors.primary,
+              text: ride.pickup.label,
+              style: textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            _RouteLine(
+              icon: DealGoIcons.navigation,
+              color: DealGoColors.danger,
+              text: ride.dropoff.label,
+              style: textTheme.bodyMedium,
+            ),
             if (ride.stops.isNotEmpty)
               Text(
-                AppLocalizations.of(context).rideStopsCount(ride.stops.length),
+                l10n.rideStopsCount(ride.stops.length),
                 key: Key('driver-job-stops-${ride.id}'),
                 style: textTheme.labelSmall?.copyWith(
                   color: DealGoColors.amber,
                 ),
               ),
-            const SizedBox(height: DealGoSpacing.s12),
-            DriverMoneyRow(
-              label: AppLocalizations.of(context).driverCustomerFare,
-              value: formatRideVnd(ride.offeredFareVnd),
-              emphasize: true,
+            // t82u: trip length + how far the pickup is from me.
+            DriverJobDistanceRow(ride: ride),
+            const SizedBox(height: DealGoSpacing.s8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  formatRideVnd(ride.offeredFareVnd),
+                  key: Key('driver-job-fare-${ride.id}'),
+                  style: textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: DealGoColors.text,
+                  ),
+                ),
+                const SizedBox(width: DealGoSpacing.s8),
+                Flexible(
+                  child: Text(
+                    '${l10n.driverReferenceFare} ${formatRideVnd(ride.referenceFareVnd)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: muted,
+                  ),
+                ),
+                const SizedBox(width: DealGoSpacing.s8),
+                // Like inDrive, the rider's rating shows before the driver opens the request.
+                Row(
+                  key: Key('driver-open-customer-rating-${ride.id}'),
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      DealGoIcons.starFilled,
+                      size: 14,
+                      color: DealGoColors.amber,
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      customerRatingText(l10n, ride.customerRating),
+                      style: textTheme.labelSmall,
+                    ),
+                  ],
+                ),
+              ],
             ),
-            DriverMoneyRow(
-              label: AppLocalizations.of(context).driverReferenceFare,
-              value: formatRideVnd(ride.referenceFareVnd),
-            ),
-            // Like inDrive, the rider's rating shows before the driver opens the request.
-            DriverMoneyRow(
-              key: Key('driver-open-customer-rating-${ride.id}'),
-              label: l10n.driverCustomerRating,
-              value: customerRatingText(l10n, ride.customerRating),
-            ),
-            const SizedBox(height: DealGoSpacing.s12),
+            const SizedBox(height: DealGoSpacing.s8),
             DriverInlineQuote(
               key: ValueKey('job-quote-${ride.id}'),
               ride: ride,
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RouteLine extends StatelessWidget {
+  const _RouteLine({
+    required this.icon,
+    required this.color,
+    required this.text,
+    this.style,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String text;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 3),
+            child: Icon(icon, size: 14, color: color),
+          ),
+          const SizedBox(width: DealGoSpacing.s4),
+          Expanded(
+            child: Text(
+              text,
+              // t82u (owner): two lines so addresses read in full.
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: style,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -466,7 +553,7 @@ class _FoodJobCard extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return DriverPanel(
       elevated: true,
-      borderColor: DealGoColors.primary.withValues(alpha: 0.35),
+      padding: const EdgeInsets.all(DealGoSpacing.s12),
       child: InkWell(
         key: Key('driver-food-${job.id}'),
         onTap: () => context.push(DriverRoutes.food(job.id), extra: job),
@@ -481,9 +568,10 @@ class _FoodJobCard extends StatelessWidget {
                     style: textTheme.titleSmall,
                   ),
                 ),
-                DriverChip(
-                  label: l10n.driverServicesFoodTitle,
-                  tone: DriverChipTone.green,
+                const Icon(
+                  DriverServiceIcons.food,
+                  size: 16,
+                  color: DealGoColors.primary,
                 ),
               ],
             ),

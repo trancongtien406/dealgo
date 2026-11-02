@@ -58,6 +58,15 @@ export function driverActivityStatusTone(
 export function mapNestDriverToListItem(driver: NestOpsDriver): DriverListItem {
   const name = driver.displayName.trim() || "Tài xế";
   const grant = driver.grants.find((row) => row.role === "DRIVER");
+  const vehicleName =
+    driver.kycDetail?.vehicleBrand && driver.kycDetail?.vehicleModel
+      ? `${driver.kycDetail.vehicleBrand} ${driver.kycDetail.vehicleModel}`
+      : driver.kycDetail?.vehicleType || driver.profile?.vehicleType?.trim() || "—";
+  const plate =
+    driver.kycDetail?.vehiclePlate?.trim() ||
+    driver.profile?.vehiclePlate?.trim() ||
+    "—";
+
   return {
     code: driver.id,
     initials: personInitials(name) || "TX",
@@ -68,23 +77,43 @@ export function mapNestDriverToListItem(driver: NestOpsDriver): DriverListItem {
       lng: driver.presence?.lng,
     }),
     service: driverServiceLabel(driver.presence),
-    vehicle: driver.profile?.vehicleType?.trim() || "—",
-    vehicleKind: vehicleKindLabel(driver.profile?.vehicleType),
-    plate: driver.profile?.vehiclePlate?.trim() || "—",
+    vehicle: vehicleName,
+    vehicleKind: vehicleKindLabel(driver.kycDetail?.vehicleType || driver.profile?.vehicleType),
+    vehicleBrand: driver.kycDetail?.vehicleBrand || undefined,
+    vehicleModel: driver.kycDetail?.vehicleModel || undefined,
+    plate,
+    licenseClass: driver.kycDetail?.licenseClass || undefined,
+    licenseNumber: driver.kycDetail?.licenseNumber || undefined,
     kyc: kycFromGrant(grant?.status),
     activity: activityFromPresence(driver, grant?.status),
     rating:
-      driver.profile && driver.profile.ratingCount > 0
+      driver.stats?.ratingAverage ??
+      (driver.profile && driver.profile.ratingCount > 0
         ? driver.profile.ratingAverage
-        : null,
-    trips: countOrNull(driver.profile?.completedJobs),
-    finishedJobs: countOrNull(driver.profile?.finishedJobs),
+        : null),
+    trips:
+      driver.stats != null
+        ? driver.stats.completedRides + driver.stats.completedFoodOrders
+        : countOrNull(driver.profile?.completedJobs),
+    finishedJobs:
+      driver.stats != null
+        ? driver.stats.finishedJobs
+        : countOrNull(driver.profile?.finishedJobs),
     completionRate:
-      typeof driver.profile?.completionRate === "number" &&
+      driver.stats?.completionRate ??
+      (typeof driver.profile?.completionRate === "number" &&
       Number.isFinite(driver.profile.completionRate)
         ? driver.profile.completionRate
-        : null,
+        : null),
+    phone: driver.profile?.phoneMasked || driver.phone || "—",
+    phoneMasked: driver.profile?.phoneMasked || undefined,
+    email: driver.email || undefined,
+    createdAt: driver.createdAt,
     deletion: parseAccountDeletion(driver.deletion),
+    presence: driver.presence,
+    kycDetail: driver.kycDetail,
+    activeJob: driver.activeJob,
+    performance7d: driver.performance7d,
   };
 }
 

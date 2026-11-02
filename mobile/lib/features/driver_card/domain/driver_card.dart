@@ -7,8 +7,11 @@ class DriverCard {
     this.avatarUrl,
     this.vehiclePlate,
     this.vehicleType,
+    this.vehicleName,
     this.ratingAverage,
     this.ratingCount = 0,
+    this.completedTrips,
+    this.phone,
   });
 
   final String driverId;
@@ -16,12 +19,25 @@ class DriverCard {
   final String? avatarUrl;
   final String? vehiclePlate;
   final String? vehicleType;
+
+  /// t81u: declared make + model ("Honda Vision"); replaces the generic class.
+  final String? vehicleName;
   final double? ratingAverage;
   final int ratingCount;
 
-  /// "Xe máy · 43B1-678.90" — only the parts the driver actually declared.
+  /// t81u: lifetime completed rides/parcels + delivered food orders (null on old servers).
+  final int? completedTrips;
+
+  /// E.164; the server sends it only while the assigned job is running.
+  final String? phone;
+
+  /// "Honda Vision · 43B1-678.90" — the real vehicle when declared, else the
+  /// class ("Xe máy"); only the parts the driver actually declared.
   String? get vehicleLine {
-    final parts = [vehicleType, vehiclePlate].whereType<String>().toList();
+    final parts = [
+      vehicleName ?? vehicleType,
+      vehiclePlate,
+    ].whereType<String>().toList();
     return parts.isEmpty ? null : parts.join(' · ');
   }
 }
@@ -38,11 +54,21 @@ abstract interface class DriverCardRepository {
     String? offerId,
   });
 
-  /// Customer's profile name for the assigned driver ('' when unset).
+  /// The customer of a job, for its assigned driver.
   /// Throws `ApiException` (404 for anyone but the assigned driver).
-  Future<String> fetchCustomerName({
+  Future<CustomerCard> fetchCustomer({
     required String accessToken,
     required String jobId,
     bool isFood = false,
   });
+}
+
+/// What the assigned driver sees about the customer: profile name ('' when
+/// unset), avatar and phone (phone only while the job is running).
+class CustomerCard {
+  const CustomerCard({required this.displayName, this.avatarUrl, this.phone});
+
+  final String displayName;
+  final String? avatarUrl;
+  final String? phone;
 }

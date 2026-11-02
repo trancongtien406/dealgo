@@ -147,7 +147,7 @@ class DriverHeader extends StatelessWidget {
 class DriverPanel extends StatelessWidget {
   const DriverPanel({
     required this.child,
-    this.color = DealGoColors.card,
+    this.color,
     this.elevated = false,
     this.borderColor,
     this.padding = const EdgeInsets.all(DealGoSpacing.s16),
@@ -155,7 +155,7 @@ class DriverPanel extends StatelessWidget {
   });
 
   final Widget child;
-  final Color color;
+  final Color? color;
   final bool elevated;
   final Color? borderColor;
   final EdgeInsetsGeometry padding;
@@ -163,12 +163,13 @@ class DriverPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(DealGoRadius.card);
+    final fill = color ?? DealGoColors.card;
     final side =
         borderColor ??
-        (color == DealGoColors.card ? DealGoColors.border : Colors.transparent);
+        (fill == DealGoColors.card ? DealGoColors.border : Colors.transparent);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: color,
+        color: fill,
         borderRadius: radius,
         border: Border.all(color: side),
         boxShadow: elevated ? DealGoShadows.card : null,
@@ -309,7 +310,7 @@ class DriverMoneyRow extends StatelessWidget {
           // The label keeps at least 3/5 of the row: amounts are short, and a
           // long value ("Khách mới – chưa có đánh giá") wraps on its own side
           // instead of squeezing the label to "Đá".
-          Flexible(
+          Expanded(
             flex: 2,
             child: Text(
               value,

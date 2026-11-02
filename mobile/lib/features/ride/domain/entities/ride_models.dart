@@ -277,6 +277,10 @@ class RideView {
     this.stopFeeVnd = 0,
     this.waitFeeVnd = 0,
     this.serviceKind = 'RIDE',
+    this.autoAcceptOfferedFare = false,
+    this.viewingDriverCount = 0,
+    this.maxOfferedFareVnd,
+    this.fareHeadroomPercent,
   });
 
   final String id;
@@ -332,6 +336,18 @@ class RideView {
   /// `RIDE` or `PARCEL` (DEC-PROD-071): a parcel ride carries goods, not a passenger.
   final String serviceKind;
 
+  /// Server selects the first driver who accepts [offeredFareVnd].
+  final bool autoAcceptOfferedFare;
+
+  /// Drivers who currently have this request open. Zero outside the customer's wait.
+  final int viewingDriverCount;
+
+  /// Highest fare the server will accept on a raise (stepped ceiling).
+  final int? maxOfferedFareVnd;
+
+  /// Headroom above the current fare that still fits the bid band, split into three chips.
+  final int? fareHeadroomPercent;
+
   bool get isParcel => serviceKind == 'PARCEL';
 
   /// The stop the driver is heading to / waiting at, if any.
@@ -379,7 +395,27 @@ class OpenRide {
     this.serviceKind = 'RIDE',
     this.parcelSizeClass,
     this.parcelWeightKg,
+    this.pickupDistanceKm,
+    this.tripDistanceKm,
+    this.intercity = false,
+    this.maxCounterVnd,
+    this.counterHeadroomPercent,
   });
+
+  /// Straight-line km from the driver to pickup (server-computed).
+  final double? pickupDistanceKm;
+
+  /// t82u: route length pickup→drop-off (server, from the booking quote).
+  final double? tripDistanceKm;
+
+  /// t73u: Liên tỉnh (pickup region ≠ drop-off region).
+  final bool intercity;
+
+  /// Highest counter the server will store for this request.
+  final int? maxCounterVnd;
+
+  /// Headroom above the customer's fare that still fits the counter cap.
+  final int? counterHeadroomPercent;
 
   final String id;
   final String status;

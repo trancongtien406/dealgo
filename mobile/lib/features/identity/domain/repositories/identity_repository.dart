@@ -1,4 +1,5 @@
 import '../entities/auth_method_policy.dart';
+import '../entities/email_verification.dart';
 import '../entities/phone_challenge.dart';
 import '../entities/user_profile.dart';
 import '../entities/verified_session.dart';
@@ -61,6 +62,19 @@ abstract interface class IdentityRepository {
     String? contentBase64,
     String? dataUrl,
     String? contentType,
+  });
+
+  /// Mails a 6-digit code proving [email] for the signed-in account. Repeats
+  /// inside the resend cooldown return the live verification without a mail.
+  Future<EmailVerification> requestEmailVerification({
+    required String accessToken,
+    required String email,
+  });
+
+  /// Sets the verified address on the account; fails with `AUTH_CODE_*`.
+  Future<void> confirmEmailVerification({
+    required String verificationId,
+    required String code,
   });
 
   Future<Map<String, Object?>> passkeyAuthenticationOptions();

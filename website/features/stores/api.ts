@@ -1,6 +1,10 @@
-import { mapNestStoreToListItem } from "@/features/stores/mappers";
+import {
+  mapNestStoreToListItem,
+  mapNestStoreDetailToItem,
+} from "@/features/stores/mappers";
 import type {
   NestOpsStore,
+  NestOpsStoreDetail,
   NestOpsStorePage,
 } from "@/features/stores/nest-types";
 import type { StoreListItem } from "@/features/stores/types";
@@ -36,9 +40,9 @@ export async function fetchStoreByCode(
   try {
     const envelope = await apiFetch<{
       success: boolean;
-      data: NestOpsStore;
+      data: NestOpsStoreDetail;
     }>(apiPaths.opsStore(code));
-    return mapNestStoreToListItem(envelope.data);
+    return mapNestStoreDetailToItem(envelope.data);
   } catch (error) {
     if (isNotFound(error)) {
       return null;

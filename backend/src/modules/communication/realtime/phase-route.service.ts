@@ -26,7 +26,7 @@ function viaKeyOf(via: readonly Point[] | undefined): string {
 }
 
 /**
- * Server-side phase route (r25: no in-app navigation). ONE Directions leg per phase:
+ * Server-side phase route (DEC-PROD-035: no in-app navigation). ONE Directions leg per phase:
  * APPROACH = driver fix → pickup, TRIP = pickup → dropoff (same key as the ride's overview
  * route, so usually a RoutingService cache hit). The leg is cached in [PhaseRouteCache]
  * and re-looked-up only when the driver is farther than ROUTE_OFF_ROUTE_THRESHOLD_M from it

@@ -22,6 +22,7 @@ class PlaceFoodOrderParams {
     required this.items,
     required this.dropoff,
     required this.deliveryFareVnd,
+    this.deliveryOfferVnd,
     this.voucherCode,
     this.paymentMethod,
   });
@@ -32,6 +33,10 @@ class PlaceFoodOrderParams {
   final List<FoodOrderItem> items;
   final FoodDropoff dropoff;
   final int deliveryFareVnd;
+
+  /// Customer's delivery-fee offer (suggestion by default); the server checks
+  /// the bounds and drivers accept or counter it.
+  final int? deliveryOfferVnd;
 
   /// Optional voucher; the server re-checks and redeems it with the order.
   final String? voucherCode;

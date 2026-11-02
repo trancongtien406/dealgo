@@ -43,6 +43,7 @@ class FakeChatRepository implements ChatRepository {
 
   /// Bodies whose POST never completes (preview of "sending").
   final hangBodies = <String>{};
+  Object? listError;
   DateTime Function() clock = DateTime.now;
   var _seq = 0;
 
@@ -75,6 +76,7 @@ class FakeChatRepository implements ChatRepository {
     int limit = 50,
   }) async {
     listCalls += 1;
+    if (listError != null) throw listError!;
     return _page();
   }
 
@@ -88,6 +90,7 @@ class FakeChatRepository implements ChatRepository {
   }) async {
     foodShopFlags.add(shop);
     listCalls += 1;
+    if (listError != null) throw listError!;
     return _page();
   }
 
@@ -129,13 +132,13 @@ class FakeDriverCards implements DriverCardRepository {
   }
 
   @override
-  Future<String> fetchCustomerName({
+  Future<CustomerCard> fetchCustomer({
     required String accessToken,
     required String jobId,
     bool isFood = false,
   }) async {
     calls += 1;
-    return customerName;
+    return CustomerCard(displayName: customerName);
   }
 }
 

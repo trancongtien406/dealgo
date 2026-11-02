@@ -19,6 +19,7 @@ import { Prisma, type PrismaClient } from '../../generated/prisma/client.js';
 import { paymentFilterMatchers } from '../payment/ops-payment-filter.js';
 import {
   writeFoodChangeOutbox,
+  writeFoodFareOutbox,
   writeOpsActionOutbox,
   writeStatusOutbox,
 } from '../communication/outbox/outbox.write.js';
@@ -84,6 +85,11 @@ import type {
 import {
   FIXTURE_STORE_PIN,
   FOOD_CHANGE_EDITABLE_STATUSES,
+  counterCeilingVnd,
+  type FoodClaimFare,
+  type FoodDeliveryOfferView,
+  type RaiseFoodDeliveryFareInput,
+  type SubmitFoodDeliveryOfferInput,
   planFoodOrderChange,
   type FoodOrderChangeLine,
   type FoodOrderChangeResult,
@@ -152,6 +158,9 @@ type OrderRow = {
   failReasonCode?: string | null;
   failNote?: string | null;
   merchantCashVnd?: number | null;
+  suggestedDeliveryFareVnd?: number | null;
+  deliveryFareAgreedAt?: Date | null;
+  deliveryFareRaiseCount?: number;
   createdAt: Date;
   updatedAt: Date;
   store: {
@@ -630,6 +639,104 @@ export class PrismaFoodRepository implements FoodRepository {
     if (!store) {
       return null;
     }
+
+    let kybDetail: OpsStoreDetail['kybDetail'] = null;
+    let stats: OpsStoreDetail['stats'] = null;
+    let recentOrders: OpsStoreDetail['recentOrders'] = [];
+    let recentReviews: OpsStoreDetail['recentReviews'] = [];
+
+    try {
+      const [merchantApp, completedOrders, terminalOrders, ratingAgg, orders, reviews] = await Promise.all([
+        this.db.partnerApplication.findFirst({
+          where: { userId: store.ownerId, role: 'MERCHANT' },
+          orderBy: { updatedAt: 'desc' },
+        }),
+        this.db.foodOrder.count({
+          where: { storeId, status: 'DELIVERED' },
+        }),
+        this.db.foodOrder.count({
+          where: { storeId, status: { in: ['DELIVERED', 'CANCELLED', 'FAILED'] } },
+        }),
+        this.db.serviceRating.aggregate({
+          where: { storeId, storeStars: { not: null } },
+          _avg: { storeStars: true },
+          _count: { storeStars: true },
+        }),
+        this.db.foodOrder.findMany({
+          where: { storeId },
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+          include: { customer: { select: { displayName: true } } },
+        }),
+        this.db.serviceRating.findMany({
+          where: { storeId },
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+          include: { rater: { select: { displayName: true } } },
+        }),
+      ]);
+
+      if (merchantApp) {
+        const meta = (merchantApp.metadata as Record<string, any>) ?? {};
+        const docs = Array.isArray(merchantApp.documents) ? merchantApp.documents : [];
+        kybDetail = {
+          applicationId: merchantApp.id,
+          status: merchantApp.status,
+          representativeName: meta.representativeName || meta.fullName || '',
+          businessType: meta.businessType || '',
+          registrationSubject: meta.registrationSubject || '',
+          bankName: meta.bankName || '',
+          bankAccountNumber: meta.bankAccountNumber || '',
+          bankAccountHolder: meta.bankAccountHolder || '',
+          documentsWaived: meta.documentsWaived === true,
+          documentCount: docs.length,
+          submittedAt: merchantApp.submittedAt?.toISOString() ?? null,
+          reviewedAt: merchantApp.reviewedAt?.toISOString() ?? null,
+        };
+      }
+
+      const statusLabels: Record<string, string> = {
+        PLACED: 'Mới đặt',
+        PREPARING: 'Đang chuẩn bị',
+        READY: 'Sẵn sàng giao',
+        ASSIGNED: 'Đã gán tài xế',
+        PICKED_UP: 'Đang giao hàng',
+        DELIVERED: 'Đã giao hàng',
+        CANCELLED: 'Đã hủy',
+        FAILED: 'Giao thất bại',
+      };
+
+      stats = {
+        completedOrders,
+        cancelledOrders: terminalOrders - completedOrders,
+        totalOrders: terminalOrders,
+        completionRate: terminalOrders > 0 ? Math.round((completedOrders / terminalOrders) * 1000) / 1000 : null,
+        ratingAverage: ratingAgg._avg.storeStars ? Math.round(ratingAgg._avg.storeStars * 10) / 10 : null,
+        ratingCount: ratingAgg._count.storeStars ?? 0,
+      };
+
+      recentOrders = orders.map((o) => ({
+        id: o.id,
+        code: `FA-${o.id.slice(0, 8).toUpperCase()}`,
+        status: o.status,
+        statusLabel: statusLabels[o.status] ?? o.status,
+        totalVnd: o.totalVnd,
+        dropoffLabel: o.dropoffLabel,
+        customerName: o.customer?.displayName ?? 'Khách hàng',
+        createdAt: o.createdAt.toISOString(),
+      }));
+
+      recentReviews = reviews.map((r) => ({
+        id: r.id,
+        stars: r.storeStars ?? 5,
+        comment: r.comment ?? null,
+        raterName: r.rater?.displayName ?? 'Khách hàng',
+        createdAt: r.createdAt.toISOString(),
+      }));
+    } catch {
+      // Non-blocking
+    }
+
     return {
       ...acceptFromRow(store),
       ...effectiveServiceMode(store.serviceMode, store.serviceModeUntil),
@@ -644,9 +751,15 @@ export class PrismaFoodRepository implements FoodRepository {
       lat: store.lat,
       lng: store.lng,
       category: store.category,
+      serviceRegionCode: store.serviceRegionCode ?? null,
+      addressLabel: store.addressLabel ?? null,
       createdAt: store.createdAt,
       itemCount: store.items.length,
       items: store.items.map(prismaItemView),
+      kybDetail,
+      stats,
+      recentOrders,
+      recentReviews,
     };
   }
 
@@ -900,7 +1013,8 @@ export class PrismaFoodRepository implements FoodRepository {
           input.originalPriceVnd,
         ),
         available,
-        moderationStatus: available ? 'APPROVED' : 'PENDING',
+        // FOOD-001: every new dish waits for admin moderation before it can be ordered.
+        moderationStatus: 'PENDING',
         description: input.description ?? null,
         prepMinutes: input.prepMinutes ?? null,
         imageUrl: input.imageUrl ?? null,
@@ -1314,12 +1428,20 @@ export class PrismaFoodRepository implements FoodRepository {
     input: SetItemAvailabilityInput,
   ): Promise<StoreItemView> {
     const item = await this.requireOwnedItem(input.ownerId, input.itemId);
-    const updated = await this.db.foodItem.update({
-      where: { id: item.id },
-      data: {
-        available: input.available,
+    // FOOD-001: availability never changes moderation; only APPROVED items can go on sale.
+    // Conditional write so a concurrent admin reject cannot be raced back on sale.
+    const { count } = await this.db.foodItem.updateMany({
+      where: {
+        id: item.id,
         ...(input.available ? { moderationStatus: 'APPROVED' as const } : {}),
       },
+      data: { available: input.available },
+    });
+    if (count === 0) {
+      throw new FoodRuleError('FOOD_ITEM_NOT_APPROVED');
+    }
+    const updated = await this.db.foodItem.findUniqueOrThrow({
+      where: { id: item.id },
       include: itemOptionsInclude,
     });
     return prismaItemView(updated);
@@ -1626,7 +1748,10 @@ export class PrismaFoodRepository implements FoodRepository {
           }
         }
         const lines = snapshotFoodLines(
-          store.items.map(prismaItemView),
+          store.items.map((row) => ({
+            ...prismaItemView(row),
+            moderationStatus: row.moderationStatus,
+          })),
           input.items,
         );
         const subtotalVnd = lines.reduce(
@@ -1658,6 +1783,8 @@ export class PrismaFoodRepository implements FoodRepository {
             status: placementStatus(acceptSettings),
             prepMinutes: estimatedPrepMinutes,
             deliveryFareVnd: input.deliveryFareVnd,
+            suggestedDeliveryFareVnd:
+              input.suggestedDeliveryFareVnd ?? input.deliveryFareVnd,
             subtotalVnd,
             discountVnd,
             voucherCode: voucher?.code ?? null,
@@ -2147,6 +2274,7 @@ export class PrismaFoodRepository implements FoodRepository {
     driverId: string,
     maxConcurrentJobs = 1,
     early?: FoodEarlyClaim,
+    fare?: FoodClaimFare,
   ): Promise<FoodOrderView> {
     return this.db.$transaction(async (tx) => {
       // Serialize every job assignment for this driver (ride select / food claim).
@@ -2161,10 +2289,36 @@ export class PrismaFoodRepository implements FoodRepository {
           prepMinutes: true,
           createdAt: true,
           acceptedAt: true,
+          subtotalVnd: true,
+          discountVnd: true,
+          deliveryFareVnd: true,
         },
       });
-      if (!current) {
+      if (!current || (fare && current.customerId !== fare.customerId)) {
         throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
+      }
+      let selected: { id: string; amountVnd: number } | null = null;
+      if (fare) {
+        const offer = await tx.foodDeliveryOffer.findUnique({
+          where: { id: fare.offerId },
+        });
+        if (
+          !offer ||
+          offer.orderId !== orderId ||
+          offer.driverId !== driverId
+        ) {
+          throw new FoodRuleError('FOOD_OFFER_NOT_FOUND');
+        }
+        if (offer.status !== 'PENDING') {
+          // Lost a race (another driver claimed / offer closed): conflict, not missing.
+          throw new FoodRuleError(
+            current.assignedDriverId ? 'FOOD_ALREADY_ASSIGNED' : 'FOOD_STATUS_CONFLICT',
+          );
+        }
+        if (offer.expiresAt.getTime() <= fare.now.getTime()) {
+          throw new FoodRuleError('FOOD_OFFER_EXPIRED');
+        }
+        selected = { id: offer.id, amountVnd: offer.amountVnd };
       }
       if (current.customerId === driverId) {
         throw new FoodRuleError('FOOD_SELF_CLAIM');
@@ -2202,24 +2356,55 @@ export class PrismaFoodRepository implements FoodRepository {
 
       // Atomic claim: READY (or early-claimable PREPARING) + unassigned only — concurrent
       // drivers cannot both win.
+      // The fare guard makes a concurrent customer raise lose against this claim (or vice versa).
+      const agreedFare = selected?.amountVnd ?? current.deliveryFareVnd;
+      const fareData = {
+        deliveryFareVnd: agreedFare,
+        totalVnd: Math.max(
+          0,
+          current.subtotalVnd + agreedFare - current.discountVnd,
+        ),
+        deliveryFareAgreedAt: fare?.now ?? new Date(),
+      };
       const updated = await tx.foodOrder.updateMany({
         where: {
           id: orderId,
           status: isEarly ? 'PREPARING' : 'READY',
           assignedDriverId: null,
           customerId: { not: driverId },
+          deliveryFareVnd: current.deliveryFareVnd,
         },
         data: isEarly
-          ? { assignedDriverId: driverId }
-          : { status: 'ASSIGNED', assignedDriverId: driverId },
+          ? { assignedDriverId: driverId, ...fareData }
+          : { status: 'ASSIGNED', assignedDriverId: driverId, ...fareData },
       });
       if (updated.count === 1) {
+        if (selected) {
+          const won = await tx.foodDeliveryOffer.updateMany({
+            where: { id: selected.id, status: 'PENDING' },
+            data: { status: 'SELECTED' },
+          });
+          if (won.count !== 1) {
+            throw new FoodRuleError('FOOD_OFFER_NOT_FOUND');
+          }
+        }
+        // Drivers whose counter offer lost get a realtime hint (their offer screen closes).
+        const losing = await tx.foodDeliveryOffer.findMany({
+          where: { orderId, status: 'PENDING', driverId: { not: driverId } },
+          select: { driverId: true },
+        });
+        await tx.foodDeliveryOffer.updateMany({
+          where: { orderId, status: 'PENDING' },
+          data: { status: 'LOST' },
+        });
+        const lostDriverIds = [...new Set(losing.map((o) => o.driverId))];
         await this.writeFoodStatusOutbox(
           tx,
           orderId,
           isEarly ? 'PREPARING' : 'ASSIGNED',
           {
             assignedDriverId: driverId,
+            ...(lostDriverIds.length ? { lostDriverIds } : {}),
           },
         );
         const order = await this.findOrderIn(tx, orderId);
@@ -2239,6 +2424,188 @@ export class PrismaFoodRepository implements FoodRepository {
         throw new FoodRuleError('FOOD_ALREADY_ASSIGNED');
       }
       throw new FoodRuleError('FOOD_STATUS_CONFLICT');
+    });
+  }
+
+  async submitDeliveryOffer(
+    input: SubmitFoodDeliveryOfferInput,
+  ): Promise<FoodDeliveryOfferView> {
+    return this.db.$transaction(async (tx) => {
+      // Serialize with select / raise on the same order.
+      await tx.$queryRaw`SELECT 1 FROM "food_orders" WHERE "id" = ${input.orderId}::uuid FOR UPDATE`;
+      const order = await tx.foodOrder.findUnique({
+        where: { id: input.orderId },
+        select: {
+          customerId: true,
+          storeId: true,
+          status: true,
+          assignedDriverId: true,
+          deliveryFareVnd: true,
+          prepMinutes: true,
+          createdAt: true,
+          acceptedAt: true,
+        },
+      });
+      if (!order) {
+        throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
+      }
+      if (order.customerId === input.driverId) {
+        throw new FoodRuleError('FOOD_SELF_CLAIM');
+      }
+      if (order.assignedDriverId !== null || order.status === 'ASSIGNED') {
+        throw new FoodRuleError('FOOD_ALREADY_ASSIGNED');
+      }
+      if (order.status === 'PREPARING') {
+        const opensAt = earlyClaimOpensAt(order, input.early.leadMinutes);
+        if (!opensAt || opensAt.getTime() > input.early.now.getTime()) {
+          throw new FoodRuleError('FOOD_NOT_YET_CLAIMABLE');
+        }
+      } else if (order.status !== 'READY') {
+        throw new FoodRuleError('FOOD_STATUS_CONFLICT');
+      }
+      const ceiling = counterCeilingVnd(
+        order.deliveryFareVnd,
+        input.counterMaxPercent,
+        input.maxFareVnd,
+      );
+      if (
+        input.amountVnd <= order.deliveryFareVnd ||
+        input.amountVnd > ceiling
+      ) {
+        throw new FoodRuleError('FOOD_OFFER_AMOUNT_INVALID');
+      }
+      const existing = await tx.foodDeliveryOffer.findUnique({
+        where: {
+          orderId_driverId: {
+            orderId: input.orderId,
+            driverId: input.driverId,
+          },
+        },
+      });
+      let row;
+      if (existing) {
+        if (existing.status === 'SELECTED' || existing.status === 'LOST') {
+          throw new FoodRuleError('FOOD_STATUS_CONFLICT');
+        }
+        if (existing.editCount >= input.maxEdits) {
+          throw new FoodRuleError('FOOD_OFFER_EDIT_LIMIT');
+        }
+        row = await tx.foodDeliveryOffer.update({
+          where: { id: existing.id },
+          data: {
+            amountVnd: input.amountVnd,
+            status: 'PENDING',
+            expiresAt: input.expiresAt,
+            editCount: { increment: 1 },
+          },
+        });
+      } else {
+        row = await tx.foodDeliveryOffer.create({
+          data: {
+            orderId: input.orderId,
+            driverId: input.driverId,
+            amountVnd: input.amountVnd,
+            expiresAt: input.expiresAt,
+          },
+        });
+      }
+      await writeFoodFareOutbox(tx, {
+        orderId: input.orderId,
+        kind: 'COUNTER',
+        ref: `${row.id}:${row.editCount}`,
+        status: order.status,
+        storeId: order.storeId,
+        amountVnd: row.amountVnd,
+      });
+      return toOfferView(row);
+    });
+  }
+
+  async withdrawDeliveryOffer(
+    orderId: string,
+    driverId: string,
+  ): Promise<FoodDeliveryOfferView> {
+    return this.db.$transaction(async (tx) => {
+      const updated = await tx.foodDeliveryOffer.updateMany({
+        where: { orderId, driverId, status: 'PENDING' },
+        data: { status: 'WITHDRAWN' },
+      });
+      if (updated.count !== 1) {
+        throw new FoodRuleError('FOOD_OFFER_NOT_FOUND');
+      }
+      const row = await tx.foodDeliveryOffer.findUniqueOrThrow({
+        where: { orderId_driverId: { orderId, driverId } },
+      });
+      return toOfferView(row);
+    });
+  }
+
+  async listDeliveryOffers(orderId: string): Promise<FoodDeliveryOfferView[]> {
+    const rows = await this.db.foodDeliveryOffer.findMany({
+      where: { orderId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return rows.map(toOfferView);
+  }
+
+  async raiseDeliveryFare(
+    input: RaiseFoodDeliveryFareInput,
+  ): Promise<FoodOrderView> {
+    return this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT 1 FROM "food_orders" WHERE "id" = ${input.orderId}::uuid FOR UPDATE`;
+      const order = await tx.foodOrder.findUnique({
+        where: { id: input.orderId },
+        select: {
+          customerId: true,
+          storeId: true,
+          status: true,
+          assignedDriverId: true,
+          deliveryFareVnd: true,
+          deliveryFareRaiseCount: true,
+          subtotalVnd: true,
+          discountVnd: true,
+        },
+      });
+      if (!order || order.customerId !== input.customerId) {
+        throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
+      }
+      if (
+        order.assignedDriverId !== null ||
+        !['PLACED', 'PREPARING', 'READY'].includes(order.status)
+      ) {
+        throw new FoodRuleError('FOOD_FARE_LOCKED');
+      }
+      if (order.deliveryFareRaiseCount >= input.maxRaises) {
+        throw new FoodRuleError('FOOD_FARE_RAISE_LIMIT');
+      }
+      if (input.amountVnd <= order.deliveryFareVnd) {
+        throw new FoodRuleError('FOOD_OFFER_AMOUNT_INVALID');
+      }
+      const raiseCount = order.deliveryFareRaiseCount + 1;
+      await tx.foodOrder.update({
+        where: { id: input.orderId },
+        data: {
+          deliveryFareVnd: input.amountVnd,
+          totalVnd: Math.max(
+            0,
+            order.subtotalVnd + input.amountVnd - order.discountVnd,
+          ),
+          deliveryFareRaiseCount: raiseCount,
+        },
+      });
+      await writeFoodFareOutbox(tx, {
+        orderId: input.orderId,
+        kind: 'RAISED',
+        ref: String(raiseCount),
+        status: order.status,
+        storeId: order.storeId,
+        amountVnd: input.amountVnd,
+      });
+      const view = await this.findOrderIn(tx, input.orderId);
+      if (!view) {
+        throw new FoodRuleError('FOOD_ORDER_NOT_FOUND');
+      }
+      return view;
     });
   }
 
@@ -2300,7 +2667,7 @@ export class PrismaFoodRepository implements FoodRepository {
           assignedDriverId: driverId,
           status: current.status,
         },
-        data: { status: to, assignedDriverId: null },
+        data: { status: to, assignedDriverId: null, deliveryFareAgreedAt: null },
       });
       if (updated.count !== 1) {
         throw new FoodRuleError('FOOD_STATUS_CONFLICT');
@@ -3210,6 +3577,30 @@ function toSettlementView(row: {
   };
 }
 
+function toOfferView(row: {
+  id: string;
+  orderId: string;
+  driverId: string;
+  amountVnd: number;
+  status: FoodDeliveryOfferView['status'];
+  expiresAt: Date;
+  editCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}): FoodDeliveryOfferView {
+  return {
+    id: row.id,
+    orderId: row.orderId,
+    driverId: row.driverId,
+    amountVnd: row.amountVnd,
+    status: row.status,
+    expiresAt: row.expiresAt,
+    editCount: row.editCount,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
 function toView(order: OrderRow): FoodOrderView {
   return {
     id: order.id,
@@ -3256,6 +3647,10 @@ function toView(order: OrderRow): FoodOrderView {
     merchantCashVnd: order.merchantCashVnd ?? null,
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
+    suggestedDeliveryFareVnd:
+      order.suggestedDeliveryFareVnd ?? order.deliveryFareVnd,
+    deliveryFareAgreedAt: order.deliveryFareAgreedAt ?? null,
+    deliveryFareRaiseCount: order.deliveryFareRaiseCount ?? 0,
   };
 }
 

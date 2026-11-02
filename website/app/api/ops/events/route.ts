@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { openOpsUpstreamStream } from "@/lib/api/ops-upstream";
+import { relayUntilUpstreamEnds } from "@/lib/api/sse-relay";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
       { status: result.status, headers: { "Cache-Control": "no-store" } },
     );
   }
-  return new Response(result.upstream.body, {
+  return new Response(relayUntilUpstreamEnds(result.upstream.body), {
     status: 200,
     headers: {
       "Content-Type": "text/event-stream; charset=utf-8",

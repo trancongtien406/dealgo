@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import type { AppEnv } from '../config/env.js';
 import { DATABASE_PING, type DatabasePing } from '../database/database-ping.js';
 import { REDIS_PROBE, type RedisProbe } from './redis-ping.js';
+import { realtimeAdapterFellBack } from '../../modules/communication/realtime/redis-io-adapter.js';
 import {
   WORKER_HEARTBEAT_NAME,
   WORKER_HEARTBEAT_STORE,
@@ -41,6 +42,8 @@ export type ReadyReport = {
     database: DependencyCheck;
     redis: DependencyCheck;
   };
+  /** REL-002: present when the Socket.IO Redis adapter fell back to in-memory rooms. */
+  realtime?: 'memory_fallback';
   worker?: WorkerReport;
 };
 
@@ -106,10 +109,16 @@ export class HealthService {
     if (nodeEnv === 'production' && checks.redis === 'down') {
       return { status: 'not_ready', checks };
     }
+    const fellBack = realtimeAdapterFellBack();
+    if (nodeEnv === 'production' && fellBack) {
+      // REL-002: socket rooms would be process-local; take this node out of rotation.
+      return { status: 'not_ready', checks, realtime: 'memory_fallback' };
+    }
     const worker = await this.worker();
     return {
-      status: checks.redis === 'up' && workerHealthy(worker) ? 'ok' : 'degraded',
+      status: checks.redis === 'up' && !fellBack && workerHealthy(worker) ? 'ok' : 'degraded',
       checks,
+      ...(fellBack ? { realtime: 'memory_fallback' as const } : {}),
       ...(worker ? { worker } : {}),
     };
   }

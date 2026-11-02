@@ -70,7 +70,7 @@ class _DealGoSuccessMarkState extends State<DealGoSuccessMark>
   Widget build(BuildContext context) {
     final mark = DecoratedBox(
       key: const Key('dealgo-success-mark'),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: DealGoColors.greenSurface,
         shape: BoxShape.circle,
       ),

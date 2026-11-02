@@ -7,7 +7,9 @@ abstract final class PartnerSubmitError {
   static const sessionExpired = 'SESSION_EXPIRED';
   static const network = 'NETWORK';
   static const missingDocuments = 'PARTNER_DOCUMENTS_REQUIRED';
+  static const avatarRequired = 'PARTNER_AVATAR_REQUIRED';
   static const validation = 'VALIDATION_ERROR';
+  static const legalConsent = 'PARTNER_LEGAL_CONSENT_REQUIRED';
 }
 
 /// Local document picks plus what the server already stores.

@@ -18,16 +18,23 @@ import { statusInboxText } from '../inbox/inbox-text.js';
 import {
   notificationsFor,
   foodOrderChangeNotifications,
+  foodOrderFareNotifications,
   partnerStatusNotification,
   foodRequestNearbyNotification,
   rideUnassignedNotifications,
   type Participants,
   type RoleNotification,
 } from '../notification/notification-audience.js';
-import { FOOD_CHANGE_EVENT_PREFIX, RIDE_UNASSIGNED_EVENT } from './outbox.write.js';
+import {
+  FOOD_CHANGE_EVENT_PREFIX,
+  FOOD_FARE_EVENT_PREFIX,
+  isFoodSideEvent,
+  RIDE_UNASSIGNED_EVENT,
+} from './outbox.write.js';
 import { resolveNewJobAlert } from '../notification/new-job-alert.js';
 import { PlatformSettingsService } from '../../../platform/settings/platform-settings.service.js';
-import { OUTBOX_REPOSITORY } from './outbox.constants.js';
+import { OUTBOX_MAX_ATTEMPTS, OUTBOX_REPOSITORY, outboxBackoffMs } from './outbox.constants.js';
+import { outboxHandlerFor } from './outbox-handlers.js';
 import type { OutboxPendingRow, OutboxRepository } from './outbox.repository.js';
 
 const DEFAULT_BATCH = 50;
@@ -71,6 +78,18 @@ export class OutboxRelayService {
       });
 
       try {
+        const handler = outboxHandlerFor(row.aggregateType);
+        if (handler) {
+          await handler(row, now);
+          if (await this.outbox.markProcessed(row.id, now)) processed += 1;
+          continue;
+        }
+        if (row.aggregateType === 'LegalPolicy') {
+          // Never mark a mail batch processed without its handler (module not loaded here).
+          throw new Error('No outbox handler registered for LegalPolicy');
+        }
+        // Money first: a failed refund throws and the row is retried before anyone is notified.
+        await this.refundCancelledPrepayment(row);
         this.emitFanout(row, now);
         await this.emitDriverJob(row, now);
         await this.pushNotifications(row);
@@ -81,16 +100,39 @@ export class OutboxRelayService {
           processed += 1;
         }
       } catch (error) {
+        const message = error instanceof Error ? error.message : 'unknown';
+        // REL-001: bounded retries with exponential backoff, then dead-letter (kept for ops).
+        const deadLetter = row.attempts >= OUTBOX_MAX_ATTEMPTS;
         this.logger.error({
-          msg: 'outbox.relay_failed',
+          msg: deadLetter ? 'outbox.dead_lettered' : 'outbox.relay_failed',
           eventKey: row.eventKey,
           attempts: row.attempts,
-          error: error instanceof Error ? error.message : 'unknown',
+          error: message,
         });
-        await this.outbox.releaseLock(row.id).catch(() => undefined);
+        await this.outbox
+          .recordFailure(row.id, {
+            now,
+            deadLetter,
+            error: message,
+            nextAttemptAt: deadLetter ? null : new Date(now.getTime() + outboxBackoffMs(row.attempts)),
+          })
+          .catch(() => this.outbox.releaseLock(row.id).catch(() => undefined));
       }
     }
     return processed;
+  }
+
+  /** FOOD-002: a cancelled prepaid job is refunded in full (idempotent per intent). */
+  private async refundCancelledPrepayment(row: OutboxPendingRow): Promise<void> {
+    const status = statusFromPayload(row.payload);
+    if (!status || isFoodSideEvent(row.eventType)) {
+      return;
+    }
+    if (row.aggregateType === 'FoodOrder' && status === 'CANCELLED') {
+      await this.food?.refundCancelledPrepayment(row.aggregateId);
+    } else if (row.aggregateType === 'Ride' && (status === 'CANCELLED' || status === 'EXPIRED')) {
+      await this.rides?.refundCancelledPrepayment(row.aggregateId);
+    }
   }
 
   private emitFanout(row: OutboxPendingRow, now: Date): void {
@@ -126,7 +168,20 @@ export class OutboxRelayService {
       return;
     }
     const payload = toSnapshotPayload(row, now);
-    if (!payload || payload.status !== 'ASSIGNED' || !this.fanout?.emitUserSnapshot) {
+    if (!payload || !this.fanout?.emitUserSnapshot) {
+      return;
+    }
+    if (row.aggregateType === 'FoodOrder' && !isFoodSideEvent(row.eventType)) {
+      // Food claim/select: winner (also early claims still PREPARING) and drivers whose offer LOST.
+      const targets = foodDriverTargetsFromPayload(row.payload);
+      for (const id of targets) {
+        this.fanout.emitUserSnapshot(id, payload);
+      }
+      if (targets.length || payload.status !== 'ASSIGNED') {
+        return;
+      }
+    }
+    if (payload.status !== 'ASSIGNED') {
       return;
     }
     const roles = await this.resolveRoles(row.aggregateType, row.aggregateId);
@@ -191,6 +246,23 @@ export class OutboxRelayService {
           changeStatus: p.changeStatus,
           ...(typeof p.changeId === 'string' ? { changeId: p.changeId } : {}),
         });
+      }
+      return;
+    }
+    if (row.aggregateType === 'FoodOrder' && row.eventType.startsWith(FOOD_FARE_EVENT_PREFIX)) {
+      const p = row.payload as { fareEvent?: unknown; amountVnd?: unknown };
+      const roles = await this.resolveRoles(row.aggregateType, row.aggregateId);
+      if (roles && typeof p?.fareEvent === 'string') {
+        await this.deliver(
+          foodOrderFareNotifications(
+            row.aggregateId,
+            p.fareEvent,
+            typeof p.amountVnd === 'number' ? p.amountVnd : null,
+            roles,
+          ),
+          row,
+          { fareEvent: p.fareEvent },
+        );
       }
       return;
     }
@@ -267,7 +339,12 @@ export class OutboxRelayService {
   closeFoodRequest(row: OutboxPendingRow): void {
     if (row.aggregateType !== 'FoodOrder') return;
     const drivers = this.openFoodRequests.get(row.aggregateId);
-    if (!drivers || statusFromPayload(row.payload) === 'READY') return;
+    if (drivers && row.eventType === `${FOOD_FARE_EVENT_PREFIX}RAISED`) {
+      // Customer raised the delivery-fee offer: announced drivers refresh the card's fee.
+      this.fanout?.emitFoodRequest?.([...drivers], { orderId: row.aggregateId, at: new Date().toISOString() });
+      return;
+    }
+    if (!drivers || statusFromPayload(row.payload) === 'READY' || isFoodSideEvent(row.eventType)) return;
     this.openFoodRequests.delete(row.aggregateId);
     this.fanout?.emitFoodRequest?.([...drivers], { orderId: row.aggregateId, at: new Date().toISOString() });
   }
@@ -278,7 +355,7 @@ export class OutboxRelayService {
       !this.food ||
       row.aggregateType !== 'FoodOrder' ||
       statusFromPayload(row.payload) !== 'READY' ||
-      row.eventType.startsWith(FOOD_CHANGE_EVENT_PREFIX)
+      isFoodSideEvent(row.eventType)
     ) {
       return 0;
     }
@@ -358,7 +435,7 @@ export class OutboxRelayService {
         row.aggregateType === 'FoodOrder' &&
         n.role === 'MERCHANT' &&
         data.status === 'PLACED' &&
-        !row.eventType.startsWith(FOOD_CHANGE_EVENT_PREFIX);
+        !isFoodSideEvent(row.eventType);
       await this.push.send({
         userId: n.userId,
         title: n.title,
@@ -571,6 +648,26 @@ function storeIdFromPayload(payload: unknown): string | undefined {
   }
   const raw = (payload as Record<string, unknown>).storeId;
   return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
+}
+
+/** Assigned driver plus drivers whose food delivery offer was closed as LOST. */
+export function foodDriverTargetsFromPayload(payload: unknown): string[] {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return [];
+  }
+  const p = payload as Record<string, unknown>;
+  const ids = new Set<string>();
+  if (typeof p.assignedDriverId === 'string' && p.assignedDriverId) {
+    ids.add(p.assignedDriverId);
+  }
+  if (Array.isArray(p.lostDriverIds)) {
+    for (const id of p.lostDriverIds) {
+      if (typeof id === 'string' && id) {
+        ids.add(id);
+      }
+    }
+  }
+  return [...ids];
 }
 
 function unassignedFromPayload(

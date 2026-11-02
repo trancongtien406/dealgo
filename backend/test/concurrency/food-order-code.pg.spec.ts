@@ -54,6 +54,7 @@ describePg('food order codes (postgres)', () => {
       data: { ownerId: owner.id, name: `Codes ${tag}`, lat: 16.06, lng: 108.22, addressLabel: 'Quán' },
     });
     const item = await food.createItem({ ownerId: owner.id, name: 'Bún', priceVnd: 30_000 });
+    await db.foodItem.update({ where: { id: item.id }, data: { moderationStatus: 'APPROVED' } }); // FOOD-001
     const order = await food.place({
       customerId: customer.id,
       storeId: store.id,

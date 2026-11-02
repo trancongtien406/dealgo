@@ -6,6 +6,10 @@ Map<String, Object?> partnerApplicationBodyJson(
   return {
     'role': request.role,
     'metadata': request.metadata,
+    if (request.acceptedLegalDocuments.isNotEmpty)
+      'acceptedLegalDocuments': [
+        for (final doc in request.acceptedLegalDocuments) doc.toJson(),
+      ],
     if (request.documents.isNotEmpty)
       'documents': [
         for (final doc in request.documents)

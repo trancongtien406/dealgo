@@ -2,6 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { parseAsString, useQueryStates } from "nuqs";
 import {
+  fetchDriverActivities,
   fetchDriverByCode,
   fetchDrivers,
   type FetchDriversParams,
@@ -12,6 +13,8 @@ export const driversQueryKeys = {
   all: ["drivers"] as const,
   list: (filters: FetchDriversParams) => ["drivers", "list", filters] as const,
   detail: (code: string) => ["drivers", "detail", code] as const,
+  activities: (code: string, tab: string, page: number) =>
+    ["drivers", "activities", code, tab, page] as const,
 };
 
 export function useDriversFilters() {
@@ -45,5 +48,17 @@ export function useDriverDetailQuery(code: string) {
   return useQuery({
     queryKey: driversQueryKeys.detail(code),
     queryFn: () => fetchDriverByCode(code),
+  });
+}
+
+export function useDriverActivitiesQuery(
+  code: string,
+  tab: string,
+  page = 1,
+) {
+  return useQuery({
+    queryKey: driversQueryKeys.activities(code, tab, page),
+    queryFn: () => fetchDriverActivities({ code, tab, page, limit: 6 }),
+    enabled: Boolean(code),
   });
 }

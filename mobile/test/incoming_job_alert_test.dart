@@ -153,18 +153,23 @@ void main() {
     await feed(tester, [_ride('r1')]);
     expect(find.byKey(const Key('incoming-job-alert')), findsOneWidget);
     expect(find.text('Đồng ý 35.000đ'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('driver-inline-chip-10000-r1')));
+    // t73u: +10/20/30% amount chips (35.000 → 38.500/42.000/45.500 → 1.000đ).
+    await tester.tap(find.byKey(const Key('driver-inline-chip-20-r1')));
     await tester.pump();
-    expect(find.text('45.000đ'), findsOneWidget);
+    String amount() => tester
+        .widget<Text>(find.byKey(const Key('driver-inline-amount-r1')))
+        .data!;
+    expect(amount(), '42.000đ');
     await tester.tap(find.byKey(const Key('driver-inline-minus-r1')));
     await tester.pump();
-    expect(find.text('44.000đ'), findsOneWidget);
+    expect(amount(), '41.000đ');
+    expect(find.byKey(const Key('driver-inline-accept-r1')), findsOneWidget);
     await tester.tap(find.byKey(const Key('driver-inline-send-r1')));
     await tester.runAsync(() => Future<void>.delayed(Duration.zero));
     await tester.pump();
-    expect(client.offerCalls.single.amountVnd, 44000);
+    expect(client.offerCalls.single.amountVnd, 41000);
     await tester.pump();
     expect(find.byKey(const Key('incoming-job-alert')), findsNothing);
-    expect(driverSentQuotes.value['r1'], 44000);
+    expect(driverSentQuotes.value['r1'], 41000);
   });
 }

@@ -134,7 +134,7 @@ class _RolePickerPageState extends State<RolePickerPage> {
                       ],
                       if (onboardingRoles.isNotEmpty) ...[
                         const SizedBox(height: DealGoSpacing.s16),
-                        const Divider(height: 1, color: DealGoColors.border),
+                        Divider(height: 1, color: DealGoColors.border),
                         const SizedBox(height: DealGoSpacing.s16),
                         Text(
                           l10n.rolePickerPartnerSection,
@@ -216,7 +216,7 @@ class _RolePickerPageState extends State<RolePickerPage> {
             children: [
               Text(
                 AppLocalizations.of(context).rolePickerInfoTitle,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
                   color: DealGoColors.text,
@@ -440,7 +440,7 @@ class _RoleCard extends StatelessWidget {
                   ),
                 ],
               ),
-              child: const Icon(
+              child: Icon(
                 DealGoIcons.check,
                 size: 16,
                 color: DealGoColors.card,

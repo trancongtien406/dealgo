@@ -42,6 +42,12 @@ class _FoodCancelPageState extends State<FoodCancelPage> {
   }
 
   void _back() {
+    if (_submitted) {
+      // The order is gone. Pop would reopen its detail, which sits above the
+      // shell and has no bottom nav.
+      context.go('/customer/shop');
+      return;
+    }
     if (context.canPop()) {
       context.pop();
       return;

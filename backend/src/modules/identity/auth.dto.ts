@@ -28,9 +28,8 @@ export class EmailVerificationDto {
 
 export class ConfirmEmailDto {
   @IsString()
-  @MinLength(20)
-  @MaxLength(512)
-  token!: string;
+  @Matches(/^\d{6}$/)
+  code!: string;
 }
 
 export class PasswordResetRequestDto {
@@ -45,7 +44,7 @@ export class PasswordResetConfirmDto {
   code!: string;
 
   @IsString()
-  @MinLength(8)
+  @MinLength(6)
   @MaxLength(200)
   password!: string;
 }
@@ -72,7 +71,7 @@ export class EmailPasswordRegisterDto {
   email!: string;
 
   @IsString()
-  @MinLength(8)
+  @MinLength(6)
   @MaxLength(200)
   password!: string;
 
@@ -88,7 +87,7 @@ export class EmailPasswordLoginDto {
   email!: string;
 
   @IsString()
-  @MinLength(8)
+  @MinLength(6)
   @MaxLength(200)
   password!: string;
 }

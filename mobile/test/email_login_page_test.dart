@@ -19,6 +19,7 @@ void main() {
     await pumpDealGo(tester, client: client);
 
     expect(find.byKey(const Key('auth-method-email')), findsOneWidget);
+    await acceptAuthLegal(tester);
     await tester.tap(find.byKey(const Key('auth-method-email')));
     await tester.pumpAndSettle();
 
@@ -38,6 +39,7 @@ void main() {
     final client = FakeIdentityClient();
     await pumpDealGo(tester, client: client);
 
+    await acceptAuthLegal(tester);
     await tester.tap(find.byKey(const Key('auth-method-email')));
     await tester.pumpAndSettle();
 
@@ -64,7 +66,7 @@ void main() {
     await tester.enterText(find.byKey(const Key('password-field')), 'short');
     await tester.tap(find.byKey(const Key('email-submit-btn')));
     await tester.pump();
-    expect(find.text('Mật khẩu phải có ít nhất 8 ký tự'), findsOneWidget);
+    expect(find.text('Mật khẩu phải có ít nhất 6 ký tự'), findsOneWidget);
   });
 
   testWidgets('email register validates confirm password mismatch', (
@@ -76,6 +78,7 @@ void main() {
     final client = FakeIdentityClient();
     await pumpDealGo(tester, client: client);
 
+    await acceptAuthLegal(tester);
     await tester.tap(find.byKey(const Key('auth-method-email')));
     await tester.pumpAndSettle();
 
@@ -110,6 +113,7 @@ void main() {
     final client = FakeIdentityClient();
     await pumpDealGo(tester, client: client);
 
+    await acceptAuthLegal(tester);
     await tester.tap(find.byKey(const Key('auth-method-email')));
     await tester.pumpAndSettle();
 
@@ -133,6 +137,7 @@ void main() {
       completePostAuth: true,
     );
 
+    await acceptAuthLegal(tester);
     await tester.tap(find.byKey(const Key('auth-method-email')));
     await tester.pumpAndSettle();
 
@@ -195,6 +200,7 @@ void main() {
     final store = MemoryTokenStore();
     await pumpDealGo(tester, client: client, tokenStore: store);
 
+    await acceptAuthLegal(tester);
     await tester.tap(find.byKey(const Key('auth-method-email')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('email-tab-register')));
@@ -251,6 +257,7 @@ void main() {
       completePostAuth: true,
     );
 
+    await acceptAuthLegal(tester);
     await tester.tap(find.byKey(const Key('auth-method-email')));
     await tester.pumpAndSettle();
 
@@ -287,6 +294,7 @@ void main() {
         completePostAuth: true,
       );
 
+      await acceptAuthLegal(tester);
       await tester.tap(find.byKey(const Key('auth-method-email')));
       await tester.pumpAndSettle();
       await tester.enterText(
@@ -331,6 +339,7 @@ void main() {
       );
     await pumpDealGo(tester, client: client);
 
+    await acceptAuthLegal(tester);
     await tester.tap(find.byKey(const Key('auth-method-email')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('email-tab-register')));
@@ -373,6 +382,7 @@ void main() {
     final client = FakeIdentityClient(profile: customerProfile);
     await pumpDealGo(tester, client: client);
 
+    await acceptAuthLegal(tester);
     await tester.tap(find.byKey(const Key('auth-method-email')));
     await tester.pumpAndSettle();
 
@@ -400,6 +410,7 @@ void main() {
         ..seedEmailAccount('forgot@dealgo.vn', 'old-password');
       await pumpDealGo(tester, client: client);
 
+      await acceptAuthLegal(tester);
       await tester.tap(find.byKey(const Key('auth-method-email')));
       await tester.pumpAndSettle();
       await tester.enterText(
@@ -464,6 +475,7 @@ void main() {
         message: 'Too many reset codes for this email',
       );
     await pumpDealGo(tester, client: client);
+    await acceptAuthLegal(tester);
     await tester.tap(find.byKey(const Key('auth-method-email')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('email-forgot-password-btn')));

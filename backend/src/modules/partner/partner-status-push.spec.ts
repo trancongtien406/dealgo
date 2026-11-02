@@ -35,6 +35,7 @@ describe('partner status push', () => {
     const identity = new MemoryIdentityRepository();
     const { store } = createTestDocumentStore();
     const user = await identity.createUser({ email: 'p@dealgo.vn', phone: '+84988770001', displayName: 'P' });
+    await identity.updateUserProfile(user.id, { avatarUrl: 'https://cdn.example/p.png' });
     return { partners, user, service: new PartnerService(partners, identity, store) };
   };
 

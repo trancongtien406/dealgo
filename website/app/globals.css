@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* dark: utilities follow the .dark class set by ThemeProvider, not the OS. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --color-brand: #6d28d9;
   --color-canvas: #f8f8fd;

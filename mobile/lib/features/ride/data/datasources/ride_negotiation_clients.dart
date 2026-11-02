@@ -14,6 +14,14 @@ class DioRideNegotiationClient implements RideNegotiationClient {
   Options _bearer(String token) =>
       Options(headers: {'Authorization': 'Bearer $token'});
 
+  Future<void> _delete(String path, String token) async {
+    try {
+      await dio.delete<Object?>(path, options: _bearer(token));
+    } on DioException catch (error) {
+      throw apiExceptionFromDio(error);
+    }
+  }
+
   Future<Object?> _post(String path, String token, [Object? body]) async {
     try {
       final response = await dio.post<Object?>(
@@ -25,6 +33,33 @@ class DioRideNegotiationClient implements RideNegotiationClient {
     } on DioException catch (error) {
       throw apiExceptionFromDio(error);
     }
+  }
+
+  @override
+  Future<void> setAutoAccept({
+    required String accessToken,
+    required String rideId,
+    required bool enabled,
+  }) async {
+    await _post(ApiPaths.rideAutoAccept(rideId), accessToken, {
+      'enabled': enabled,
+    });
+  }
+
+  @override
+  Future<void> noteViewing({
+    required String accessToken,
+    required String rideId,
+  }) async {
+    await _post(ApiPaths.rideViewing(rideId), accessToken);
+  }
+
+  @override
+  Future<void> leaveViewing({
+    required String accessToken,
+    required String rideId,
+  }) async {
+    await _delete(ApiPaths.rideViewing(rideId), accessToken);
   }
 
   @override
@@ -160,6 +195,25 @@ class FakeRideNegotiationClient implements RideNegotiationClient {
       throw failure;
     }
   }
+
+  @override
+  Future<void> setAutoAccept({
+    required String accessToken,
+    required String rideId,
+    required bool enabled,
+  }) async => _record('setAutoAccept:$rideId:$enabled');
+
+  @override
+  Future<void> noteViewing({
+    required String accessToken,
+    required String rideId,
+  }) async => _record('noteViewing:$rideId');
+
+  @override
+  Future<void> leaveViewing({
+    required String accessToken,
+    required String rideId,
+  }) async => _record('leaveViewing:$rideId');
 
   @override
   Future<void> raiseFare({

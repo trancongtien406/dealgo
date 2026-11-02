@@ -36,4 +36,22 @@ export class OpsDriversController {
   get(@Param('id', ParseUUIDPipe) id: string) {
     return this.users.getDriver(id);
   }
+
+  @RequireOpsPermission('drivers.read')
+  @Get(':id/activities')
+  @ApiOperation({
+    summary: 'Ops driver activities by tab (rides, food orders, earnings)',
+  })
+  getActivities(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('tab') tab?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.users.getDriverActivities(id, {
+      tab,
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 10,
+    });
+  }
 }

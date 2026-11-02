@@ -161,6 +161,10 @@ export class RideZoneTariffService {
     return this.repo.findSnapshot(rideId);
   }
 
+  findSnapshots(rideIds: readonly string[]): Promise<Map<string, RidePricingSnapshot>> {
+    return this.repo.findSnapshots(rideIds);
+  }
+
   private async validateTarget(regionCodeRaw: string, classCodeRaw: string) {
     const regionCode = regionCodeRaw.trim().toUpperCase();
     if (!getServiceRegion(regionCode)) {

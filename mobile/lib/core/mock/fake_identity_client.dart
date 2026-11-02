@@ -2,6 +2,7 @@ import 'dart:async';
 
 import '../../features/identity/data/datasources/identity_remote_datasource.dart';
 import '../../features/identity/data/models/auth_method_policy_model.dart';
+import '../../features/identity/data/models/email_verification_model.dart';
 import '../../features/identity/data/models/phone_challenge_model.dart';
 import '../../features/identity/data/models/user_profile_model.dart';
 import '../../features/identity/data/models/verified_session_model.dart';
@@ -333,9 +334,11 @@ class FakeIdentityClient implements IdentityClient {
       'gender': gender,
     });
     final nextName = displayName?.trim() ?? profile.displayName;
+    if (email != null && _normalizeEmail(email) != profile.email) {
+      _startEmailVerification(_normalizeEmail(email));
+    }
     profile = profile.copyWith(
       displayName: nextName,
-      email: email ?? profile.email,
       dateOfBirth: dateOfBirth ?? profile.dateOfBirth,
       gender: gender ?? profile.gender,
       contactPhone: contactPhone ?? profile.contactPhone,
@@ -364,6 +367,65 @@ class FakeIdentityClient implements IdentityClient {
     final url = 'mock://avatar/${profile.id}/fake';
     profile = profile.copyWith(avatarUrl: url);
     return url;
+  }
+
+  /// Code the fake "emails" for every profile email verification.
+  static const emailVerificationCode = '135790';
+  final List<String> emailVerificationRequests = [];
+  final List<({String verificationId, String code})> emailVerificationConfirms =
+      [];
+  final Map<String, String> _pendingEmailVerifications = {};
+  ({String id, String email, DateTime sentAt})? _liveEmailVerification;
+  int _emailVerificationCount = 0;
+
+  ({String id, String email, DateTime sentAt}) _startEmailVerification(
+    String email,
+  ) {
+    final now = DateTime.now();
+    final live = _liveEmailVerification;
+    if (live != null &&
+        live.email == email &&
+        now.difference(live.sentAt) < const Duration(seconds: 60)) {
+      return live;
+    }
+    emailVerificationRequests.add(email);
+    final id = 'email-verification-${++_emailVerificationCount}';
+    _pendingEmailVerifications[id] = email;
+    return _liveEmailVerification = (id: id, email: email, sentAt: now);
+  }
+
+  @override
+  Future<EmailVerificationModel> requestEmailVerification({
+    required String accessToken,
+    required String email,
+  }) async {
+    final started = _startEmailVerification(_normalizeEmail(email));
+    return EmailVerificationModel(
+      verificationId: started.id,
+      expiresAt: started.sentAt.add(const Duration(minutes: 10)),
+      resendAvailableAt: started.sentAt.add(const Duration(seconds: 60)),
+    );
+  }
+
+  @override
+  Future<void> confirmEmailVerification({
+    required String verificationId,
+    required String code,
+  }) async {
+    emailVerificationConfirms.add((verificationId: verificationId, code: code));
+    final email = _pendingEmailVerifications[verificationId];
+    if (email == null || code != emailVerificationCode) {
+      throw const ApiException(
+        statusCode: 401,
+        message: 'Verification code is invalid',
+        errorCode: 'AUTH_CODE_INVALID',
+      );
+    }
+    _pendingEmailVerifications.remove(verificationId);
+    profile = profile.copyWith(
+      email: email,
+      emailVerifiedAt: DateTime.now().toUtc().toIso8601String(),
+    );
   }
 
   @override

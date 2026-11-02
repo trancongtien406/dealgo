@@ -179,6 +179,27 @@ void main() {
       },
     );
 
+    test('posts auto-accept and viewing heartbeats', () async {
+      final adapter = _RecordingAdapter({'ok': true});
+      final client = DioRideNegotiationClient(
+        dio: Dio(BaseOptions(baseUrl: 'http://api.test'))
+          ..httpClientAdapter = adapter,
+      );
+      await client.setAutoAccept(
+        accessToken: 'tok',
+        rideId: 'r1',
+        enabled: true,
+      );
+      await client.noteViewing(accessToken: 'tok', rideId: 'r1');
+      await client.leaveViewing(accessToken: 'tok', rideId: 'r1');
+      expect(adapter.requests.map((r) => '${r.method} ${r.path}'), [
+        'POST /v1/rides/r1/auto-accept',
+        'POST /v1/rides/r1/viewing',
+        'DELETE /v1/rides/r1/viewing',
+      ]);
+      expect(adapter.requests.first.data, {'enabled': true});
+    });
+
     test('reads the driver\'s customer rating (null when not rated)', () async {
       final rated = DioRideNegotiationClient(
         dio: Dio(BaseOptions(baseUrl: 'http://api.test'))
@@ -222,7 +243,7 @@ void main() {
 
       await tester.pumpWidget(_app(DriverRideDetailPage(ride: _openRide())));
       await tester.pumpAndSettle();
-      expect(find.text('Khách mới – chưa có đánh giá'), findsOneWidget);
+      expect(find.text('Chưa có đánh giá'), findsOneWidget);
     });
 
     testWidgets('driver cancel reason sheet returns the picked reason', (

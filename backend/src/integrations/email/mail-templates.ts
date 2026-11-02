@@ -1,4 +1,10 @@
-import type { MailSender, PasswordResetCodeMail, SignupCodeMail } from './mail-sender.js';
+import type {
+  EmailVerificationCodeMail,
+  MailSender,
+  PasswordResetCodeMail,
+  PolicyUpdateMail,
+  SignupCodeMail,
+} from './mail-sender.js';
 
 /**
  * Rendered transactional email: Vietnamese copy, one branded table layout (Gmail, Apple Mail,
@@ -68,7 +74,7 @@ function blockHtml(block: Block): string {
       // Digits in one text node (no per-digit cells) so copy, Apple Mail and iOS code
       // suggestions read the exact code; letter-spacing only spaces it visually.
       const code = escapeHtml(block.code);
-      // Long legacy tokens get a small, wrapping style; 6-digit codes the big one.
+      // Anything longer than a short code gets a small, wrapping style; 6-digit codes the big one.
       const long = block.code.length > 8;
       const codeStyle = long
         ? `font-family:${MONO};font-size:15px;line-height:22px;font-weight:600;letter-spacing:0;word-break:break-all;color:${MAIL_BRAND.purpleDark};`
@@ -196,16 +202,17 @@ function render(layout: Layout): RenderedMail {
 
 const NO_SHARE = '**Không chia sẻ mã này** với bất kỳ ai, kể cả người tự xưng là nhân viên DealGo. DealGo không bao giờ hỏi mã qua điện thoại hay tin nhắn.';
 
-/** Legacy link-token email verification (token is a long secret, so it stays out of the subject). */
-export function emailVerificationMail(input: { verificationId: string; token: string }): RenderedMail {
+export function emailVerificationMail(input: Omit<EmailVerificationCodeMail, 'email'>): RenderedMail {
+  const minutes = minutesUntil(input.expiresAt);
   return render({
-    subject: 'Xác minh email DealGo của bạn',
-    preheader: 'Dùng mã bên dưới để xác minh địa chỉ email trong ứng dụng DealGo.',
+    subject: `Mã xác minh email DealGo: ${input.code}`,
+    preheader: `${input.code} là mã xác minh email của bạn. Mã hết hạn sau ${minutes} phút.`,
     heading: 'Xác minh email của bạn',
     blocks: [
-      { kind: 'p', text: 'Nhập mã dưới đây trong ứng dụng DealGo để xác minh địa chỉ email.' },
-      { kind: 'code', code: input.token, caption: `Mã tham chiếu: ${input.verificationId}` },
+      { kind: 'p', text: 'Nhập mã sau trong ứng dụng DealGo để xác minh địa chỉ email cho tài khoản của bạn:' },
+      { kind: 'code', code: input.code, caption: `Mã có hiệu lực trong **${minutes} phút**.` },
       { kind: 'note', text: NO_SHARE },
+      { kind: 'p', text: 'Nếu bạn không thêm email này vào tài khoản DealGo, hãy bỏ qua email này.' },
     ],
     reason: 'Bạn nhận được email này vì địa chỉ này vừa được thêm vào một tài khoản DealGo.',
   });
@@ -283,11 +290,37 @@ export function testMail(): RenderedMail {
   });
 }
 
+export function policyUpdateMail(input: Omit<PolicyUpdateMail, 'email'>): RenderedMail {
+  const when = input.effectiveAt
+    ? input.effectiveAt.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })
+    : null;
+  const blocks: Block[] = [
+    {
+      kind: 'p',
+      text: `DealGo đã cập nhật **${input.documentTitle}** (phiên bản ${input.version})${when ? `, có hiệu lực từ **${when}**` : ''}.`,
+    },
+  ];
+  if (input.changelog.trim()) {
+    blocks.push({ kind: 'note', text: `Điểm thay đổi chính: ${input.changelog.trim()}` });
+  }
+  blocks.push(
+    { kind: 'p', text: 'Lần tới mở ứng dụng, bạn sẽ được yêu cầu xem và đồng ý với nội dung mới để tiếp tục sử dụng dịch vụ.' },
+    { kind: 'button', label: 'Xem nội dung đầy đủ', url: input.url },
+  );
+  return render({
+    subject: `DealGo cập nhật ${input.documentTitle}`,
+    preheader: `${input.documentTitle} phiên bản ${input.version}${when ? ` có hiệu lực từ ${when}` : ''}.`,
+    heading: `Cập nhật ${input.documentTitle}`,
+    blocks,
+    reason: 'Bạn nhận được email này vì bạn có tài khoản DealGo và điều khoản áp dụng cho bạn đã thay đổi.',
+  });
+}
+
 /** Shared MailSender implementation: subclasses only provide transport (SMTP, SES API, …). */
 export abstract class TemplatedMailSender implements MailSender {
   protected abstract transport(to: string, mail: RenderedMail, kind: string): Promise<void>;
 
-  async sendEmailVerification(input: { email: string; verificationId: string; token: string }): Promise<void> {
+  async sendEmailVerification(input: EmailVerificationCodeMail): Promise<void> {
     await this.transport(input.email, emailVerificationMail(input), 'verification');
   }
 
@@ -305,6 +338,10 @@ export abstract class TemplatedMailSender implements MailSender {
 
   async sendTestEmail(input: { email: string }): Promise<void> {
     await this.transport(input.email, testMail(), 'test');
+  }
+
+  async sendPolicyUpdate(input: PolicyUpdateMail): Promise<void> {
+    await this.transport(input.email, policyUpdateMail(input), 'policy_update');
   }
 }
 

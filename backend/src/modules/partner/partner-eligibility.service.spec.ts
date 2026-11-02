@@ -3,6 +3,7 @@ import { loadEnv, type AppEnv } from '../../platform/config/env.js';
 import { MemoryIdentityRepository } from '../identity/identity.repository.js';
 import { PartnerEligibilityService } from './partner-eligibility.service.js';
 import { MemoryPartnerRepository } from './partner.repository.js';
+import type { PlatformSettingsService } from '../../platform/settings/platform-settings.service.js';
 
 function configFor(
   nodeEnv: AppEnv['NODE_ENV'],
@@ -223,4 +224,53 @@ describe('PartnerEligibilityService', () => {
     await expect(gated.driverVehicleClassCode(user.id)).resolves.toBe('MOTORBIKE');
   });
 
+
+  it('t90u: admin setting decides the car-docs gate; a gated car driver is not dispatchable', async () => {
+    const identity = new MemoryIdentityRepository();
+    const partners = new MemoryPartnerRepository();
+    const user = await identity.createUser({ email: null, phone: '+84901110090', displayName: 'Car' });
+    await identity.insertGrant(user.id, 'DRIVER', 'ACTIVE');
+    await partners.upsertSubmit({
+      id: crypto.randomUUID(),
+      userId: user.id,
+      role: 'DRIVER',
+      metadata: { vehicleClassCode: 'CAR_4', documentsWaived: true },
+      documents: [],
+      now: new Date(),
+    });
+    await partners.review({
+      id: (await partners.findByUserAndRole(user.id, 'DRIVER'))!.id,
+      status: 'APPROVED',
+      reason: null,
+      metadata: { vehicleClassCode: 'CAR_4', documentsWaived: true },
+      reviewIssues: [],
+      reviewedBy: user.id,
+      now: new Date(),
+    });
+    let gate = true;
+    const settings = {
+      getBoolean: async (key: string) => (key === 'DRIVER_CAR_EXTRA_DOCS_REQUIRED' ? gate : false),
+    } as unknown as PlatformSettingsService;
+    // Env says off, but the admin setting wins.
+    const service = new PartnerEligibilityService(
+      identity,
+      partners,
+      configFor('development', { carExtraDocs: false }),
+      settings,
+    );
+    expect(await service.driverVehicleClassCode(user.id)).toBeNull();
+    expect(await service.driverDispatchEligible(user.id)).toBe(false);
+    await expect(service.requireEligibleDriver(user.id)).rejects.toMatchObject({
+      status: 403,
+      response: {
+        errorCode: 'PARTNER_KYC_REQUIRED',
+        details: { reason: 'CAR_DOCS_REQUIRED', missing: ['VEHICLE_INSURANCE'] },
+      },
+    });
+    gate = false;
+    expect(await service.driverVehicleClassCode(user.id)).toBe('CAR_4');
+    expect(await service.driverDispatchEligible(user.id)).toBe(true);
+    await expect(service.requireEligibleDriver(user.id)).resolves.toBeUndefined();
+  });
 });
+

@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/network/request_failure.dart';
+import '../../../active_job/presentation/active_job_cache.dart';
+import '../utils/ride_offline_snapshot.dart';
 import '../../../../core/realtime/snapshot_binding.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
 import '../../domain/entities/ride_models.dart';
@@ -48,11 +52,15 @@ final class RideTrackingOffline extends RideTrackingState {
 
 /// Owns snapshot subscription; invalidate always refreshes via REST GET.
 class RideTrackingCubit extends Cubit<RideTrackingState> {
-  RideTrackingCubit({required this._getRide, required this.realtime})
-    : super(const RideTrackingLoading());
+  RideTrackingCubit({
+    required this._getRide,
+    required this.realtime,
+    this._offlineCache,
+  }) : super(const RideTrackingLoading());
 
   final GetRide _getRide;
   final SnapshotRealtime realtime;
+  final ActiveJobCache? _offlineCache;
 
   SnapshotBinding? _binding;
   String? _rideId;
@@ -80,7 +88,8 @@ class RideTrackingCubit extends Cubit<RideTrackingState> {
   }
 
   Future<void> refresh() async {
-    if (_inFlight) {
+    // Realtime invalidations can arrive after the page closed the cubit.
+    if (isClosed || _inFlight) {
       return;
     }
     final rideId = _rideId;
@@ -107,6 +116,13 @@ class RideTrackingCubit extends Cubit<RideTrackingState> {
         return;
       }
       emit(RideTrackingReady(ride));
+      unawaited(
+        _offlineCache?.recordJob(
+          rideOfflineSnapshot(ride),
+          terminal: ride.status.isTerminal,
+          assignedDriverId: ride.assignedDriverId,
+        ),
+      );
     } catch (error) {
       if (isClosed) {
         return;

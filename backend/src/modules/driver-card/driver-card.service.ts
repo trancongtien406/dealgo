@@ -26,21 +26,55 @@ export type DriverCardView = {
   avatarUrl: string | null;
   vehiclePlate: string | null;
   vehicleType: string | null;
+  /** t81u: make + model from the approved KYC ("Honda", "Vision"); null when not declared. */
+  vehicleBrand: string | null;
+  vehicleModel: string | null;
+  /** "Honda Vision" — brand + model joined; null when neither was declared (client falls back to the class). */
+  vehicleName: string | null;
   ratingAverage: number | null;
   ratingCount: number;
+  /** t81u: lifetime rides/parcels COMPLETED + food orders DELIVERED (same rule as ops completedJobs). */
+  completedTrips: number;
+  /** Driver's phone for the customer of an in-progress assigned job; null on offers and finished jobs. */
+  phone: string | null;
 };
 
+/** t81u: "Honda" + "Vision" → "Honda Vision"; avoids "Honda Honda Vision" when the model repeats the brand. */
+export function vehicleDisplayName(brand: string | null, model: string | null): string | null {
+  if (!brand && !model) return null;
+  if (!brand) return model;
+  if (!model) return brand;
+  return model.toLowerCase().startsWith(brand.toLowerCase()) ? model : `${brand} ${model}`;
+}
+
 /**
- * What the assigned driver sees about the customer on the job: profile name and avatar only
- * (no phone; calls go through the masked voice/chat channels). Rating rides on the ride view.
+ * What the assigned driver sees about the customer on the job: profile name, avatar and phone
+ * (phone only while the job is in progress). Rating rides on the ride view.
  */
 export type CustomerCardView = {
   customerId: string;
   displayName: string;
   avatarUrl: string | null;
+  phone: string | null;
 };
 
-const CARD_FIELD_MAX = 40;
+const CARD_FIELD_MAX = 80;
+
+/**
+ * Customer and assigned driver may call each other directly only while the job is running;
+ * numbers stay hidden during bidding and once the job has finished.
+ */
+const PHONE_SHARED_STATUSES = new Set([
+  'ASSIGNED',
+  'DRIVER_EN_ROUTE',
+  'DRIVER_ARRIVED',
+  'IN_TRIP',
+  'PICKED_UP',
+]);
+
+export function phoneSharedFor(status: string): boolean {
+  return PHONE_SHARED_STATUSES.has(status);
+}
 
 /** Admin row enrichment: who a customer/driver id is, without credentials or full phone. */
 export type OpsPersonView = {
@@ -92,7 +126,7 @@ export class DriverCardService {
     if (!subject.driverId) {
       throw notFound('DRIVER_NOT_ASSIGNED', 'No driver assigned yet');
     }
-    return this.card(subject.driverId);
+    return this.card(subject.driverId, phoneSharedFor(subject.status));
   }
 
   /** Card of a driver who made an offer on the customer's negotiating ride (S010 offer list). */
@@ -117,7 +151,7 @@ export class DriverCardService {
     if (!subject.driverId) {
       throw notFound('DRIVER_NOT_ASSIGNED', 'No driver assigned yet');
     }
-    return this.card(subject.driverId);
+    return this.card(subject.driverId, phoneSharedFor(subject.status));
   }
 
   /** The customer of a ride, for its assigned driver only. */
@@ -126,7 +160,7 @@ export class DriverCardService {
     if (!subject || !subject.driverId || subject.driverId !== actorId) {
       throw notFound('RIDE_NOT_FOUND', 'Ride not found');
     }
-    return this.customerCard(subject.customerId);
+    return this.customerCard(subject.customerId, phoneSharedFor(subject.status));
   }
 
   /** The customer of a food order, for its assigned driver only. */
@@ -135,15 +169,17 @@ export class DriverCardService {
     if (!subject || !subject.driverId || subject.driverId !== actorId) {
       throw notFound('FOOD_ORDER_NOT_FOUND', 'Food order not found');
     }
-    return this.customerCard(subject.customerId);
+    return this.customerCard(subject.customerId, phoneSharedFor(subject.status));
   }
 
-  private async customerCard(customerId: string): Promise<CustomerCardView> {
+  private async customerCard(customerId: string, sharePhone: boolean): Promise<CustomerCardView> {
     const user = await this.identity.findUserById(customerId);
+    const phone = user?.phone ?? user?.contactPhone;
     return {
       customerId,
       displayName: cardText(user?.displayName) ?? '',
       avatarUrl: user?.avatarUrl ?? null,
+      phone: sharePhone ? cardText(phone) : null,
     };
   }
 
@@ -170,7 +206,7 @@ export class DriverCardService {
         return {
           id,
           displayName: cardText(user.displayName) ?? '',
-          phoneMasked: maskPhone(user.phone ?? null),
+          phoneMasked: maskPhone(user.phone ?? user.contactPhone ?? null),
           vehiclePlate: cardText(approved.vehiclePlate),
           vehicleType: cardText(approved.vehicleType),
           ratingAverage: summary.average,
@@ -184,21 +220,31 @@ export class DriverCardService {
     return rows.filter((row): row is OpsPersonView => row !== null);
   }
 
-  async card(driverId: string): Promise<DriverCardView> {
-    const [user, application, summary] = await Promise.all([
+  async card(driverId: string, sharePhone = false): Promise<DriverCardView> {
+    const [user, application, summary, rideCounts, foodCounts] = await Promise.all([
       this.identity.findUserById(driverId),
       this.partners.findByUserAndRole(driverId, 'DRIVER'),
       this.ratings.driverSummary(driverId),
+      this.rides.countFinishedForDrivers([driverId]),
+      this.food.countFinishedForDrivers([driverId]),
     ]);
     const approved = application?.status === 'APPROVED' ? application.metadata : {};
+    const jobs = mergeJobCounts(mergeJobCounts(new Map(), rideCounts), foodCounts);
+    const vehicleBrand = cardText(approved.vehicleBrand);
+    const vehicleModel = cardText(approved.vehicleModel);
     return {
       driverId,
       displayName: cardText(user?.displayName) ?? '',
       avatarUrl: user?.avatarUrl ?? null,
       vehiclePlate: cardText(approved.vehiclePlate),
       vehicleType: cardText(approved.vehicleType),
+      vehicleBrand,
+      vehicleModel,
+      vehicleName: vehicleDisplayName(vehicleBrand, vehicleModel),
       ratingAverage: summary.average,
       ratingCount: summary.count,
+      completedTrips: (jobs.get(driverId) ?? EMPTY_JOB_COUNTS).completed,
+      phone: sharePhone ? cardText(user?.phone ?? user?.contactPhone) : null,
     };
   }
 }

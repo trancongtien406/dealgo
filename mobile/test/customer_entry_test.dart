@@ -19,6 +19,7 @@ void main() {
         findsOneWidget,
       );
 
+      await acceptAuthLegal(tester);
       await tester.tap(find.byKey(const Key('auth-method-phone')));
       await tester.pumpAndSettle();
 

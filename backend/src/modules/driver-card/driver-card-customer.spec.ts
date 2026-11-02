@@ -23,6 +23,7 @@ describe('customer card for the assigned driver', () => {
       customerId: 'c1',
       displayName: 'Nguyễn Thị An',
       avatarUrl: null,
+      phone: null,
     });
     await expect(service().foodOrderCustomer('d1', 'o1')).resolves.toMatchObject({ displayName: 'Nguyễn Thị An' });
   });

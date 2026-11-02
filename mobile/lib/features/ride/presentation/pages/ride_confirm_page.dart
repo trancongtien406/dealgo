@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/config/api_base_url.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_success_mark.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../domain/entities/ride_money.dart';
 import '../../domain/entities/ride_models.dart';
-import '../utils/ride_vehicle_label.dart';
 import '../widgets/ride_widgets.dart';
+import '../../../driver_card/domain/driver_card.dart';
+import '../../../driver_card/presentation/driver_card_tile.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
@@ -211,38 +211,6 @@ class _FareChanged extends StatelessWidget {
   }
 }
 
-class _ConfirmedVehicle extends StatelessWidget {
-  const _ConfirmedVehicle({required this.code, this.imageUrl});
-
-  final String? code;
-  final String? imageUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    final photo = resolveMediaUrl(imageUrl);
-    return Row(
-      children: [
-        if (photo == null)
-          Icon(
-            rideVehicleClassIcon(code),
-            size: 16,
-            color: DealGoColors.textSecondary,
-          )
-        else
-          RideVehicleClassPhoto(imageUrl: imageUrl, code: code, size: 20),
-        const SizedBox(width: DealGoSpacing.s8),
-        Expanded(
-          child: Text(
-            rideVehicleClassLabel(AppLocalizations.of(context), code),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _Confirmed extends StatelessWidget {
   const _Confirmed({
     required this.ride,
@@ -256,10 +224,6 @@ class _Confirmed extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // RideView carries no driver display name; never surface the raw driver
-    // UUID to the customer — show the localized role label instead.
-    final driver = AppLocalizations.of(context).kycRoleBadge;
-    final initial = driver.isEmpty ? '?' : driver.substring(0, 1).toUpperCase();
     return Scaffold(
       backgroundColor: DealGoColors.canvas,
       body: SafeArea(
@@ -300,37 +264,12 @@ class _Confirmed extends StatelessWidget {
                   ),
                   const SizedBox(height: DealGoSpacing.s12),
                   RidePanel(
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: DealGoColors.subtlePurple,
-                          child: Text(
-                            initial,
-                            style: const TextStyle(
-                              color: DealGoColors.primary,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: DealGoSpacing.s12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                driver,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              _ConfirmedVehicle(
-                                code: ride.vehicleClassCode,
-                                imageUrl: ride.imageUrl,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                    child: DriverCardTile(
+                      key: const Key('ride-confirmed-driver'),
+                      job: DriverCardJob.ride,
+                      jobId: ride.id,
+                      accessToken: rideAccessToken(context) ?? '',
+                      assigned: ride.assignedDriverId != null,
                     ),
                   ),
                   const SizedBox(height: DealGoSpacing.s12),

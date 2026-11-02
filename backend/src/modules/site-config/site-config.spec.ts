@@ -29,10 +29,17 @@ describe('PUBLIC_SITE_CONFIG validation', () => {
     [{ googlePlayUrl: 'javascript:alert(1)' }],
     [{ socials: { zalo: 'https://zalo.me.evil.com/x' } }],
     [{ socials: { twitter: 'https://x.com/a' } }],
+    [{ socials: { messenger: 'https://www.facebook.com/dealgo' } }],
     [{ hotline: 'call me' }],
     [{ extra: 1 }],
   ])('rejects %j', (input) => {
     expect(() => normalizePublicSiteConfig(input)).toThrow();
+  });
+
+  it('accepts a Messenger chat link', () => {
+    expect(
+      normalizePublicSiteConfig({ socials: { messenger: 'https://m.me/dealgo' } }),
+    ).toEqual({ socials: { messenger: 'https://m.me/dealgo' } });
   });
 
   it('reads a broken stored value as empty', () => {

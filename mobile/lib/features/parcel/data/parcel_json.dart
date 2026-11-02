@@ -11,6 +11,18 @@ const _invalid = ApiException(
 );
 
 int _int(Object? v) => v is num ? v.round() : 0;
+
+int? _ceilingPercent(Map<String, Object?> data) {
+  final direct = data['bidCeilingPercent'];
+  if (direct is num) return direct.round();
+  final tariff = data['tariff'];
+  if (tariff is Map) {
+    final percent = tariff['bidCeilingPercent'];
+    if (percent is num) return percent.round();
+  }
+  return null;
+}
+
 double? _double(Object? v) => v is num ? v.toDouble() : null;
 String? _str(Object? v) => v is String && v.isNotEmpty ? v : null;
 
@@ -64,6 +76,8 @@ ParcelQuote parseParcelQuote(Map<String, Object?> data) {
         parcelSurchargeVnd: _int(m['parcelSurchargeVnd']),
         serviceFeeVnd: _int(m['parcelServiceFeeVnd']),
         returnFeeVnd: _int(m['parcelReturnFeeVnd']),
+        bidCeilingPercent: _ceilingPercent(m),
+        fareStepVnd: _int(m['fareStepVnd']) > 0 ? _int(m['fareStepVnd']) : 1000,
       ),
     );
   }

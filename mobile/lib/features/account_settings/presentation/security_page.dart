@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/design_system/components/dealgo_app_header.dart';
 import '../../../core/l10n/api_error_text.dart';
@@ -12,8 +11,9 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../core/config/app_env.dart';
 import '../../identity/domain/entities/auth_method_policy.dart';
+import '../../legal/legal_document_page.dart';
+import '../../legal/legal_documents.dart';
 import '../../identity/domain/entities/auth_state.dart';
 import '../../identity/domain/passkey_platform.dart';
 import '../../identity/presentation/auth_methods_store.dart';
@@ -153,10 +153,8 @@ class _SecurityPageState extends State<SecurityPage> {
                 _Row(
                   icon: DealGoIcons.document,
                   title: l10n.securityTerms,
-                  onTap: () => launchUrl(
-                    Uri.parse('https://$appLinkHost/terms'),
-                    mode: LaunchMode.externalApplication,
-                  ),
+                  onTap: () =>
+                      LegalDocumentPage.open(context, LegalSlug.terms),
                 ),
               ],
             ),

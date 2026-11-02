@@ -28,7 +28,7 @@ export const PUBLIC_ROUTES = [
   "/support",
   "/terms",
   "/privacy",
-  "/partner-policy",
+  "/regulations",
 ] as const;
 
 /** Schema.org graph for the landing page. No ratings or prices; store links and sameAs only when the admin set them. */

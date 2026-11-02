@@ -1,3 +1,4 @@
+import { DriverWorkloadService } from '../dispatch/driver-workload.service.js';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { resolvePersistenceRepository, PrismaModule, PrismaService } from '../../platform/database/index.js';
@@ -44,6 +45,7 @@ import { RoutingModule } from '../routing/index.js';
     MerchantSettlementOpsController,
   ],
   providers: [
+    DriverWorkloadService,
     FoodService,
     {
       provide: FOOD_REPOSITORY,

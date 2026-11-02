@@ -224,7 +224,9 @@ export function SettlementsBoard() {
                     Bảng tính quyết toán
                   </h3>
                   <p className="mt-2 text-sm text-muted">
-                    Chưa có dữ liệu đối tác.
+                    {lines.length > 0
+                      ? `Tổng hợp ${lines.length} đối tác trên trang hiện tại.`
+                      : "Chưa có dữ liệu đối tác."}
                   </p>
                   <dl className="mt-3 space-y-2 text-sm">
                     <div className="flex justify-between gap-3">

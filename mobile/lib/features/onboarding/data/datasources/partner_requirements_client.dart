@@ -9,13 +9,22 @@ abstract class PartnerRequirementsSource {
     required String accessToken,
     required String role,
   });
+
+  /// t90u: admin setting DRIVER_CAR_EXTRA_DOCS_REQUIRED — whether a car driver must
+  /// upload VEHICLE_INSURANCE (also in quick registration). Fails closed (true).
+  Future<bool> carExtraDocsRequired({required String accessToken});
 }
 
 /// Fixed answer — used by mock mode and tests so they never hit the network.
 class FixedPartnerRequirements implements PartnerRequirementsSource {
-  const FixedPartnerRequirements({this.required = true});
+  const FixedPartnerRequirements({this.required = true, this.carDocs = true});
 
   final bool required;
+  final bool carDocs;
+
+  @override
+  Future<bool> carExtraDocsRequired({required String accessToken}) async =>
+      carDocs;
 
   @override
   Future<bool> documentsRequired({
@@ -44,6 +53,23 @@ class PartnerRequirementsClient implements PartnerRequirementsSource {
       );
       final data = requireSuccessData(response.data);
       return data['documentsRequired'] != false;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  @override
+  Future<bool> carExtraDocsRequired({required String accessToken}) async {
+    try {
+      final response = await _dio.get<Object?>(
+        ApiPaths.partnerRequirements('DRIVER'),
+        queryParameters: const {'vehicleClassCode': 'CAR_4'},
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      );
+      final data = requireSuccessData(response.data);
+      final docs = data['requiredDocuments'];
+      if (docs is! List) return true;
+      return docs.contains('VEHICLE_INSURANCE');
     } catch (_) {
       return true;
     }

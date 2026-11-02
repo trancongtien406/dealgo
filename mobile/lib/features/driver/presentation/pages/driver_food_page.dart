@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +10,10 @@ import '../../../../core/maps/map_markers.dart';
 import '../../../../core/maps/map_port.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../food/presentation/widgets/food_fare_widgets.dart';
+import '../../../food/data/food_fare_negotiation.dart';
+import '../../../../core/realtime/realtime_refresh_watcher.dart';
+import '../../../../core/realtime/snapshot_realtime.dart';
 import '../../../food/domain/entities/food_models.dart';
 import '../../../live_location/domain/driver_location.dart';
 import '../../../live_location/presentation/server_phase_route.dart';
@@ -31,6 +37,44 @@ import '../../../../core/format/short_ref.dart';
 import '../../../../core/l10n/api_error_text.dart';
 import '../widgets/driver_contact_actions.dart';
 import '../widgets/job_customer_name.dart';
+
+/// Poll fallback for the open offer screen (socket hints are primary).
+const driverOfferPollInterval = Duration(seconds: 8);
+
+enum DriverOfferOutcome { open, selected, notChosen }
+
+/// What the driver's own offers say: chosen → assigned; lost or the fee was
+/// agreed with someone else → not chosen; otherwise still open.
+DriverOfferOutcome driverOfferOutcome(FoodDeliveryOffers offers) {
+  if (offers.offers.any((o) => o.status == FoodDeliveryOfferStatus.selected)) {
+    return DriverOfferOutcome.selected;
+  }
+  if (offers.offers.any((o) => o.status == FoodDeliveryOfferStatus.lost) ||
+      offers.agreed) {
+    return DriverOfferOutcome.notChosen;
+  }
+  return DriverOfferOutcome.open;
+}
+
+/// The job as the driver will run it once a counter is chosen: the agreed
+/// fee replaces the posted one and COD moves by the same difference.
+ReadyFoodJob withAgreedFare(ReadyFoodJob job, int agreedFareVnd) {
+  if (agreedFareVnd <= 0 || agreedFareVnd == job.deliveryFareVnd) return job;
+  return ReadyFoodJob(
+    id: job.id,
+    storeId: job.storeId,
+    deliveryFareVnd: agreedFareVnd,
+    subtotalVnd: job.subtotalVnd,
+    totalVnd: job.totalVnd - job.deliveryFareVnd + agreedFareVnd,
+    dropoff: job.dropoff,
+    lineCount: job.lineCount,
+    storeName: job.storeName,
+    storeAddress: job.storeAddress,
+    pickup: job.pickup,
+    route: job.route,
+    approachRoute: job.approachRoute,
+  );
+}
 
 enum _FoodPhase { offer, navigate, wait, pickup, deliver, complete }
 
@@ -71,13 +115,19 @@ class _DriverFoodDetailPageState extends State<_DriverFoodDetailView>
     with DriverActionRunner {
   var _claiming = false;
   var _taken = false;
+  var _notChosen = false;
   var _phase = _FoodPhase.offer;
   String? _error;
   ClaimedFoodDelivery? _claimed;
+  RealtimeRefreshWatcher? _watcher;
+  Timer? _poll;
 
   @override
   void initState() {
     super.initState();
+    if (widget.resumed == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _watchOffer());
+    }
     final resumed = widget.resumed;
     if (resumed != null) {
       _claimed = resumed;
@@ -89,6 +139,82 @@ class _DriverFoodDetailPageState extends State<_DriverFoodDetailView>
         }
       });
     }
+  }
+
+  /// While the offer screen is open, follow the order live: the server sends
+  /// a `snapshot` hint to this driver's private room on select / assign /
+  /// LOST; a poll is the fallback when the socket is down.
+  void _watchOffer() {
+    if (!mounted) return;
+    final token = driverAccessToken(context);
+    if (token == null || token.isEmpty) return;
+    SnapshotRealtime? realtime;
+    try {
+      realtime = context.read<SnapshotRealtime>();
+    } on ProviderNotFoundException {
+      realtime = null;
+    }
+    if (realtime != null) {
+      final watcher = RealtimeRefreshWatcher(
+        realtime: realtime,
+        rooms: const [],
+        refresh: _checkOffer,
+        matchesSnapshot: (hint) =>
+            hint.aggregateType == 'FoodOrder' &&
+            hint.aggregateId == widget.job.id,
+      );
+      _watcher = watcher;
+      unawaited(watcher.start(accessToken: token, initialRefresh: false));
+    }
+    _poll = Timer.periodic(driverOfferPollInterval, (_) => _checkOffer());
+  }
+
+  void _stopWatching() {
+    _poll?.cancel();
+    _poll = null;
+    final watcher = _watcher;
+    _watcher = null;
+    if (watcher != null) unawaited(watcher.stop());
+  }
+
+  ReadyFoodJob? _agreedJob;
+
+  Future<void> _checkOffer() async {
+    if (!mounted || _claimed != null || _taken || _claiming) return;
+    final client = maybeFoodFareClient(context);
+    final token = driverAccessToken(context);
+    if (client == null || token == null || token.isEmpty) return;
+    FoodDeliveryOffers offers;
+    try {
+      offers = await client.list(accessToken: token, orderId: widget.job.id);
+    } on ApiException {
+      return;
+    }
+    if (!mounted || _claimed != null || _taken) return;
+    switch (driverOfferOutcome(offers)) {
+      case DriverOfferOutcome.selected:
+        _stopWatching();
+        setState(() {
+          _claimed = ClaimedFoodDelivery(id: widget.job.id, status: 'ASSIGNED');
+          _agreedJob = withAgreedFare(widget.job, offers.deliveryFareVnd);
+          _phase = _FoodPhase.navigate;
+        });
+        ensureDriverOnDuty(context);
+      case DriverOfferOutcome.notChosen:
+        _stopWatching();
+        setState(() {
+          _taken = true;
+          _notChosen = true;
+        });
+      case DriverOfferOutcome.open:
+        break;
+    }
+  }
+
+  @override
+  void dispose() {
+    _stopWatching();
+    super.dispose();
   }
 
   Future<void> _claim() async {
@@ -220,11 +346,15 @@ class _DriverFoodDetailPageState extends State<_DriverFoodDetailView>
   @override
   Widget build(BuildContext context) {
     if (_taken) {
-      return _JobTaken(job: widget.job, onRefresh: _refreshFeed);
+      return _JobTaken(
+        job: widget.job,
+        onRefresh: _refreshFeed,
+        notChosen: _notChosen,
+      );
     }
     if (_phase != _FoodPhase.offer && _claimed != null) {
       return _FoodLifecycle(
-        job: widget.job,
+        job: _agreedJob ?? widget.job,
         claimed: _claimed!,
         phase: _phase,
         busy: actionBusy,
@@ -292,6 +422,12 @@ class _DriverFoodDetailPageState extends State<_DriverFoodDetailView>
                     label: l10n.driverFoodExpectedIncome,
                     value: l10n.driverFoodIncomePending,
                     emphasize: true,
+                  ),
+                  DriverFareCounterButton(
+                    orderId: job.id,
+                    customerOfferVnd: job.deliveryFareVnd,
+                    accessToken: driverAccessToken(context) ?? '',
+                    enabled: !_claiming,
                   ),
                 ],
               ),
@@ -587,15 +723,13 @@ class _FoodLifecycle extends StatelessWidget {
             // Same contact row as a ride: the customer may chat / call about the order.
             if (phase != _FoodPhase.offer && phase != _FoodPhase.complete) ...[
               DriverPanel(
-                child: Row(
-                  children: [
-                    const Icon(DealGoIcons.user, color: DealGoColors.primary),
-                    const SizedBox(width: DealGoSpacing.s12),
-                    Expanded(
-                      child: JobCustomerName(jobId: job.id, isFood: true),
-                    ),
-                    DriverContactActions(resourceId: job.id, isFood: true),
-                  ],
+                child: JobCustomerTile(
+                  jobId: job.id,
+                  isFood: true,
+                  trailing: DriverContactActions(
+                    resourceId: job.id,
+                    isFood: true,
+                  ),
                 ),
               ),
               const SizedBox(height: DealGoSpacing.s12),
@@ -670,9 +804,14 @@ class _FoodLifecycle extends StatelessWidget {
 }
 
 class _JobTaken extends StatelessWidget {
-  const _JobTaken({required this.job, required this.onRefresh});
+  const _JobTaken({
+    required this.job,
+    required this.onRefresh,
+    this.notChosen = false,
+  });
 
   final ReadyFoodJob job;
+  final bool notChosen;
   final Future<void> Function() onRefresh;
 
   @override
@@ -707,8 +846,12 @@ class _JobTaken extends StatelessWidget {
               icon: DealGoIcons.swapHoriz,
               iconColor: DealGoColors.amber,
               background: DealGoColors.amberSurface,
-              title: l10n.driverJobTakenTitle,
-              message: l10n.driverJobTakenBody,
+              title: notChosen
+                  ? l10n.driverOfferNotChosenTitle
+                  : l10n.driverJobTakenTitle,
+              message: notChosen
+                  ? l10n.driverOfferNotChosenBody
+                  : l10n.driverJobTakenBody,
             ),
             const SizedBox(height: DealGoSpacing.s24),
             DriverPanel(

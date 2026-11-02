@@ -145,7 +145,10 @@ export type EmailVerificationRecord = {
   email: string;
   tokenHash: string;
   expiresAt: Date;
+  attemptCount: number;
+  lastSentAt: Date;
   consumedAt: Date | null;
+  createdAt: Date;
 };
 
 export type EmailChallengePurpose = 'SIGNUP' | 'ACTIVATE_EXISTING';
@@ -262,6 +265,7 @@ export interface IdentityRepository {
     email: string | null;
     phone: string | null;
     displayName: string;
+    contactPhone?: string | null;
   }): Promise<UserRecord>;
   markPhoneVerified(userId: string, at: Date): Promise<UserRecord>;
   setEmailVerified(userId: string, email: string, at: Date): Promise<UserRecord>;
@@ -282,8 +286,12 @@ export interface IdentityRepository {
     email: string;
     tokenHash: string;
     expiresAt: Date;
+    sentAt: Date;
   }): Promise<EmailVerificationRecord>;
   findEmailVerification(id: string): Promise<EmailVerificationRecord | null>;
+  findLatestEmailVerification(userId: string): Promise<EmailVerificationRecord | null>;
+  countEmailVerificationsSince(userId: string, since: Date): Promise<number>;
+  recordFailedEmailVerificationAttempt(id: string): Promise<EmailVerificationRecord>;
   consumeEmailVerification(id: string, at: Date): Promise<boolean>;
 
   createEmailSignupChallenge(input: {
@@ -323,7 +331,7 @@ export interface IdentityRepository {
     email: string;
     displayName: string;
     passwordHash: string;
-    verifiedAt: Date;
+    verifiedAt: Date | null;
   }): Promise<UserRecord>;
 
   createPasswordReset(input: {
@@ -471,6 +479,7 @@ export class MemoryIdentityRepository implements IdentityRepository {
     email: string | null;
     phone: string | null;
     displayName: string;
+    contactPhone?: string | null;
   }): Promise<UserRecord> {
     if (input.phone && (await this.findUserByPhone(input.phone))) {
       throw new UniqueConflictError();
@@ -482,6 +491,7 @@ export class MemoryIdentityRepository implements IdentityRepository {
       id: randomUUID(),
       email: input.email,
       phone: input.phone,
+      contactPhone: input.contactPhone ?? null,
       displayName: input.displayName,
       dateOfBirth: null,
       gender: null,
@@ -580,6 +590,7 @@ export class MemoryIdentityRepository implements IdentityRepository {
     email: string;
     tokenHash: string;
     expiresAt: Date;
+    sentAt: Date;
   }): Promise<EmailVerificationRecord> {
     const verification: EmailVerificationRecord = {
       id: randomUUID(),
@@ -587,14 +598,40 @@ export class MemoryIdentityRepository implements IdentityRepository {
       email: input.email,
       tokenHash: input.tokenHash,
       expiresAt: input.expiresAt,
+      attemptCount: 0,
+      lastSentAt: input.sentAt,
       consumedAt: null,
+      createdAt: input.sentAt,
     };
     this.emailVerifications.set(verification.id, verification);
-    return verification;
+    return { ...verification };
   }
 
   async findEmailVerification(id: string): Promise<EmailVerificationRecord | null> {
-    return this.emailVerifications.get(id) ?? null;
+    const verification = this.emailVerifications.get(id);
+    return verification ? { ...verification } : null;
+  }
+
+  async findLatestEmailVerification(userId: string): Promise<EmailVerificationRecord | null> {
+    const latest = [...this.emailVerifications.values()]
+      .filter((verification) => verification.userId === userId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+    return latest ? { ...latest } : null;
+  }
+
+  async countEmailVerificationsSince(userId: string, since: Date): Promise<number> {
+    return [...this.emailVerifications.values()].filter(
+      (verification) => verification.userId === userId && verification.createdAt >= since,
+    ).length;
+  }
+
+  async recordFailedEmailVerificationAttempt(id: string): Promise<EmailVerificationRecord> {
+    const verification = this.emailVerifications.get(id);
+    if (!verification) {
+      throw new Error('Email verification not found');
+    }
+    verification.attemptCount += 1;
+    return { ...verification };
   }
 
   async consumeEmailVerification(id: string, at: Date): Promise<boolean> {
@@ -708,7 +745,7 @@ export class MemoryIdentityRepository implements IdentityRepository {
     email: string;
     displayName: string;
     passwordHash: string;
-    verifiedAt: Date;
+    verifiedAt: Date | null;
   }): Promise<UserRecord> {
     const user = await this.createUser({
       email: input.email,
@@ -1023,6 +1060,7 @@ export class MemoryIdentityRepository implements IdentityRepository {
         const matches =
           user.displayName.toLowerCase().includes(q) ||
           (user.phone?.toLowerCase().includes(q) ?? false) ||
+          (user.contactPhone?.toLowerCase().includes(q) ?? false) ||
           (user.email?.toLowerCase().includes(q) ?? false) ||
           user.id.toLowerCase().includes(q);
         if (!matches) {
@@ -1056,7 +1094,7 @@ export class MemoryIdentityRepository implements IdentityRepository {
       matched.push({
         id: user.id,
         email: user.email,
-        phone: user.phone,
+        phone: user.phone?.trim() || user.contactPhone?.trim() || null,
         displayName: user.displayName,
         phoneVerifiedAt: user.phoneVerifiedAt,
         emailVerifiedAt: user.emailVerifiedAt,
@@ -1095,7 +1133,7 @@ export class MemoryIdentityRepository implements IdentityRepository {
     return {
       id: user.id,
       email: user.email,
-      phone: user.phone,
+      phone: user.phone?.trim() || user.contactPhone?.trim() || null,
       displayName: user.displayName,
       phoneVerifiedAt: user.phoneVerifiedAt,
       emailVerifiedAt: user.emailVerifiedAt,

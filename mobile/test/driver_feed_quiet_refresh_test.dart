@@ -16,21 +16,24 @@ DriverFeedCubit _cubit(FakeDriverJobsClient client) {
 }
 
 void main() {
-  test('a quiet refresh (new-job hint) never flashes the loading state', () async {
-    final client = FakeDriverJobsClient();
-    final cubit = _cubit(client);
-    await cubit.sync(online: true, accessToken: 't');
-    expect(cubit.state, isA<DriverFeedReady>());
-    final seen = <DriverFeedState>[];
-    final sub = cubit.stream.listen(seen.add);
-    await cubit.sync(online: true, accessToken: 't', quiet: true);
-    await Future<void>.delayed(Duration.zero);
-    expect(seen.whereType<DriverFeedLoading>(), isEmpty);
-    expect(cubit.state, isA<DriverFeedReady>());
-    expect(client.openCalls.length, 2);
-    await sub.cancel();
-    await cubit.close();
-  });
+  test(
+    'a quiet refresh (new-job hint) never flashes the loading state',
+    () async {
+      final client = FakeDriverJobsClient();
+      final cubit = _cubit(client);
+      await cubit.sync(online: true, accessToken: 't');
+      expect(cubit.state, isA<DriverFeedReady>());
+      final seen = <DriverFeedState>[];
+      final sub = cubit.stream.listen(seen.add);
+      await cubit.sync(online: true, accessToken: 't', quiet: true);
+      await Future<void>.delayed(Duration.zero);
+      expect(seen.whereType<DriverFeedLoading>(), isEmpty);
+      expect(cubit.state, isA<DriverFeedReady>());
+      expect(client.openCalls.length, 2);
+      await sub.cancel();
+      await cubit.close();
+    },
+  );
 
   test('a failed quiet refresh keeps the list already on screen', () async {
     final client = FakeDriverJobsClient();

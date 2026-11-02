@@ -40,6 +40,7 @@ import {
   type DriverCancelInput,
   type NoShowInput,
   type RaiseFareInput,
+  type SetAutoAcceptInput,
   type RideOfferStatusName,
   type RideStatusName,
   type RideTimeoutPolicy,
@@ -146,6 +147,7 @@ export class PrismaRideRepository implements RideRepository {
         vehicleClassCode: true,
         expiresAt: true,
         routeVersion: true,
+        routeDistanceKm: true,
         stops: { orderBy: { seq: 'asc' }, select: { lat: true, lng: true, label: true } },
         _count: { select: { offers: true } },
       },
@@ -163,7 +165,18 @@ export class PrismaRideRepository implements RideRepository {
       offerCount: ride._count.offers,
       stops: ride.stops,
       routeVersion: ride.routeVersion,
+      routeDistanceKm: ride.routeDistanceKm,
     }));
+  }
+
+  async setRouteDistanceKm(rideId: string, km: number): Promise<void> {
+    if (!Number.isFinite(km) || km < 0) return;
+    await this.db.ride.updateMany({ where: { id: rideId }, data: { routeDistanceKm: Math.round(km * 100) / 100 } });
+  }
+
+  async routeDistanceKm(rideId: string): Promise<number | null> {
+    const row = await this.db.ride.findUnique({ where: { id: rideId }, select: { routeDistanceKm: true } });
+    return row?.routeDistanceKm ?? null;
   }
 
   async offer(input: OfferInput): Promise<RideSnapshot> {
@@ -184,6 +197,7 @@ export class PrismaRideRepository implements RideRepository {
 
   async select(input: SelectInput): Promise<RideSnapshot> {
     let outcome: Awaited<ReturnType<RideLedger['select']>>;
+    let withdrawnRideIds: string[] = [];
     try {
       outcome = await this.db.$transaction(async (tx) => {
         const priorSelection = await tx.rideSelection.findUnique({
@@ -262,6 +276,22 @@ export class PrismaRideRepository implements RideRepository {
           }
         }
         await this.persist(tx, ledger);
+        // RIDE-003: in the same transaction, the winner's PENDING offers elsewhere are withdrawn
+        // so no other customer can select a driver who is already assigned.
+        const winner = selected.ride?.assignedDriverId;
+        if (!priorSelection && winner && !selected.error) {
+          const others = await tx.rideOffer.findMany({
+            where: { driverId: winner, status: 'PENDING', rideId: { not: input.rideId } },
+            select: { id: true, rideId: true },
+          });
+          if (others.length > 0) {
+            await tx.rideOffer.updateMany({
+              where: { id: { in: others.map((o) => o.id) }, status: 'PENDING' },
+              data: { status: 'WITHDRAWN' },
+            });
+            withdrawnRideIds = [...new Set(others.map((o) => o.rideId))];
+          }
+        }
         return selected;
       });
     } catch (error) {
@@ -287,6 +317,9 @@ export class PrismaRideRepository implements RideRepository {
         return replay;
       }
       throw new RideRuleError(outcome.error ?? 'RIDE_NOT_FOUND');
+    }
+    if (withdrawnRideIds.length > 0) {
+      input.onOffersWithdrawn?.(withdrawnRideIds);
     }
     return outcome.ride;
   }
@@ -357,6 +390,10 @@ export class PrismaRideRepository implements RideRepository {
 
   raiseFare(input: RaiseFareInput): Promise<RideSnapshot> {
     return this.mutate(input.rideId, (ledger) => ledger.raiseFare(input));
+  }
+
+  setAutoAccept(input: SetAutoAcceptInput): Promise<RideSnapshot> {
+    return this.mutate(input.rideId, (ledger) => ledger.setAutoAccept(input));
   }
 
   declineOffer(input: DeclineOfferInput): Promise<RideSnapshot> {
@@ -1037,6 +1074,7 @@ export class PrismaRideRepository implements RideRepository {
       cancelReasonCode?: string | null;
       priorFeesVnd?: number;
       fareRaiseCount?: number;
+      autoAcceptOfferedFare?: boolean;
       repostOfRideId?: string | null;
       offers: Array<{
         id: string;
@@ -1090,6 +1128,7 @@ export class PrismaRideRepository implements RideRepository {
           cancelReasonCode: ride.cancelReasonCode ?? null,
           priorFeesVnd: ride.priorFeesVnd ?? 0,
           fareRaiseCount: ride.fareRaiseCount ?? 0,
+          autoAcceptOfferedFare: ride.autoAcceptOfferedFare ?? false,
           repostOfRideId: ride.repostOfRideId ?? null,
           stops: ride.stops ?? [],
           routeVersion: ride.routeVersion ?? 0,
@@ -1307,8 +1346,10 @@ function rideData(row: {
   stopFeeVnd: number;
   stopWaitFreeMinutes: number;
   stopWaitFeeVndPerMinute: number;
+  autoAcceptOfferedFare: boolean;
 }) {
   return {
+    autoAcceptOfferedFare: row.autoAcceptOfferedFare,
     stopCount: row.stops.length,
     routeVersion: row.routeVersion,
     stopFeeVnd: row.stopFeeVnd,
@@ -1366,6 +1407,7 @@ function ridePatch(row: {
   cancelReasonCode: string | null;
   priorFeesVnd: number;
   fareRaiseCount: number;
+  autoAcceptOfferedFare: boolean;
   stops: unknown[];
   routeVersion: number;
   stopFeeVnd: number;
@@ -1378,6 +1420,7 @@ function ridePatch(row: {
     waitFeeVnd: row.waitFeeVnd,
     assignedAt: row.assignedAt,
     fareRaiseCount: row.fareRaiseCount,
+    autoAcceptOfferedFare: row.autoAcceptOfferedFare,
     statusChangedAt: row.statusChangedAt,
     noShow: row.noShow,
     cancelReasonCode: row.cancelReasonCode,

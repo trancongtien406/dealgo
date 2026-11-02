@@ -26,6 +26,7 @@ function draftFrom(row: RideVehicleClassRow): Draft {
   return {
     name: row.name,
     seats: row.seats,
+    ...(row.kind ? { kind: row.kind } : {}),
     enabled: row.enabled,
     parcelEnabled: row.parcelEnabled ?? false,
     baseFareVnd: row.baseFareVnd,
@@ -296,6 +297,24 @@ export function VehicleClassesBoard() {
                     value={draft.name}
                     onChange={(name) => setDraft(setDrafts, row.code, draft, { name })}
                   />
+                  <label className="block text-sm text-ink">
+                    <span className="mb-1 block text-xs text-muted">
+                      Loại xe (giấy tờ, bằng lái, hoa hồng)
+                    </span>
+                    <select
+                      className="h-10 w-full rounded-xl border border-border bg-white px-3"
+                      value={draft.kind ?? ""}
+                      onChange={(event) =>
+                        setDraft(setDrafts, row.code, draft, {
+                          kind: event.target.value as "BIKE" | "CAR",
+                        })
+                      }
+                    >
+                      {!draft.kind ? <option value="">—</option> : null}
+                      <option value="BIKE">Xe máy (BIKE)</option>
+                      <option value="CAR">Ô tô (CAR)</option>
+                    </select>
+                  </label>
                   <NumberField
                     label="Số chỗ"
                     value={draft.seats}

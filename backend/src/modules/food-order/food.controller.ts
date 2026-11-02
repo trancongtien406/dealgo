@@ -9,6 +9,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Delete,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -29,6 +30,7 @@ import {
   ProposeFoodOrderChangeDto,
   RejectFoodOrderDto,
   ReleaseFoodOrderDto,
+  FoodDeliveryAmountDto,
 } from './food.dto.js';
 import { foodError } from './food.error.js';
 import { FoodService } from './food.service.js';
@@ -229,6 +231,52 @@ export class FoodController {
   @ApiOperation({ summary: 'Driver claims a READY order (→ ASSIGNED) or an early-claimable PREPARING one (stays PREPARING, assigned)' })
   claim(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
     return this.food.claim(actor, id);
+  }
+
+  @Get('orders/:id/delivery-offers')
+  @ApiOperation({ summary: 'Delivery-fee negotiation: fee mode (NEGOTIATE|FIXED), current offer, bounds and driver counters (drivers see only their own; none in FIXED)' })
+  listDeliveryOffers(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.food.listDeliveryOffers(actor, id);
+  }
+
+  @Post('orders/:id/delivery-offers')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Driver counters the customer delivery-fee offer (or edits their pending counter); 409 FOOD_FEE_NEGOTIATION_DISABLED when FOOD_DELIVERY_FEE_MODE=FIXED' })
+  counterDeliveryOffer(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: FoodDeliveryAmountDto,
+  ) {
+    return this.food.counterDeliveryOffer(actor, id, dto.amountVnd);
+  }
+
+  @Delete('orders/:id/delivery-offers/mine')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Driver withdraws their pending delivery-fee counter' })
+  withdrawDeliveryOffer(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.food.withdrawDeliveryOffer(actor, id);
+  }
+
+  @Post('orders/:id/delivery-offers/:offerId/select')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Customer selects a driver counter: assigns that driver at the agreed fee, other offers lose; 409 FOOD_FEE_NEGOTIATION_DISABLED in FIXED mode' })
+  selectDeliveryOffer(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('offerId', ParseUUIDPipe) offerId: string,
+  ) {
+    return this.food.selectDeliveryOffer(actor, id, offerId);
+  }
+
+  @Post('orders/:id/delivery-fare')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Customer raises their delivery-fee offer while no driver is assigned' })
+  raiseDeliveryFare(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: FoodDeliveryAmountDto,
+  ) {
+    return this.food.raiseDeliveryFare(actor, id, dto.amountVnd);
   }
 
   @Post('orders/:id/release')

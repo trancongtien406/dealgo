@@ -22,6 +22,16 @@ class DioHelpFaqRemoteDataSource implements HelpFaqRepository {
       throw apiExceptionFromDio(error);
     }
   }
+
+  @override
+  Future<Uri?> messengerUrl() async {
+    try {
+      final response = await dio.get<Object?>(ApiPaths.publicSiteConfig);
+      return messengerUrlFromSiteConfig(readSuccessPayload(response.data));
+    } on DioException catch (error) {
+      throw apiExceptionFromDio(error);
+    }
+  }
 }
 
 List<HelpFaq> decodeHelpFaqs(Object? data) => [
@@ -40,11 +50,15 @@ List<HelpFaq> decodeHelpFaqs(Object? data) => [
 
 /// Mock/test help desk; empty unless seeded so screens never show invented answers.
 class FakeHelpFaqRepository implements HelpFaqRepository {
-  FakeHelpFaqRepository({this.items = const [], this.error});
+  FakeHelpFaqRepository({this.items = const [], this.error, this.messenger});
 
   List<HelpFaq> items;
   Object? error;
+  Uri? messenger;
   final calls = <String>[];
+
+  @override
+  Future<Uri?> messengerUrl() async => messenger;
 
   @override
   Future<List<HelpFaq>> list({required String audience}) async {

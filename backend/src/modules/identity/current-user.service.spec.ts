@@ -107,6 +107,28 @@ describe('CurrentUserService', () => {
     expect(stored?.displayName).toBe('Tran Van B');
   });
 
+  it('saving the current unverified email mails nothing; a different address starts verification', async () => {
+    const repository = new MemoryIdentityRepository();
+    const user = await repository.createUser({ phone: null, email: 'lan@x.vn', displayName: 'Lan' });
+    const emailVerification = {
+      request: vi.fn().mockResolvedValue({
+        verificationId: 'ver-2',
+        expiresAt: '2026-11-02T12:10:00.000Z',
+        resendAvailableAt: '2026-11-02T12:01:00.000Z',
+      }),
+    };
+    const service = new CurrentUserService(repository, emailVerification as any, { get: vi.fn() } as any);
+
+    const same = await service.updateProfile(user.id, { displayName: 'Lan', email: ' Lan@X.vn ' });
+    expect(emailVerification.request).not.toHaveBeenCalled();
+    expect(same.pendingEmailVerification).toBeUndefined();
+
+    const changed = await service.updateProfile(user.id, { email: 'lan.new@x.vn' });
+    expect(emailVerification.request).toHaveBeenCalledWith(user.id, 'lan.new@x.vn');
+    expect(changed.pendingEmailVerification?.verificationId).toBe('ver-2');
+    expect(changed.email).toBe('lan@x.vn');
+  });
+
   describe('contact phone at profile completion (no OTP)', () => {
     const make = () => {
       const repository = new MemoryIdentityRepository();
@@ -128,10 +150,30 @@ describe('CurrentUserService', () => {
       expect(saved.phoneVerifiedAt).toBeNull();
     });
 
+    it('refuses to drop the only phone on an email or passkey account', async () => {
+      const { repository, service } = make();
+      const user = await repository.createUser({ phone: null, email: 'c@x.vn', displayName: 'Lan' });
+      await service.updateProfile(user.id, { contactPhone: '0901234567' });
+      await expect(service.updateProfile(user.id, { contactPhone: null })).rejects.toMatchObject({
+        response: expect.objectContaining({ errorCode: 'VALIDATION_ERROR' }),
+      });
+      expect((await service.getProfile(user.id)).contactPhone).toBe('+84901234567');
+    });
+
     it('rejects a non-Vietnamese or malformed number', async () => {
       const { repository, service } = make();
       const user = await repository.createUser({ phone: null, email: 'b@x.vn', displayName: 'B' });
-      for (const bad of ['12345', '+14155550100', '0212345678', '091234567']) {
+      for (const bad of [
+        '12345',
+        '+14155550100',
+        '0212345678',
+        '091234567',
+        '0301234567',
+        '0712345678',
+        '0801234567',
+        '0951234567',
+        '+840901234567',
+      ]) {
         await expect(service.updateProfile(user.id, { contactPhone: bad })).rejects.toMatchObject({
           response: expect.objectContaining({ errorCode: 'VALIDATION_ERROR' }),
         });

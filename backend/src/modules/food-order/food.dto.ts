@@ -192,6 +192,17 @@ export class PlaceFoodOrderDto {
   @IsInt()
   deliveryFareVnd?: number;
 
+  /**
+   * Customer's delivery-fee offer (default = server suggestion). Must be within
+   * [floor, FOOD_MAX_DELIVERY_VND] and a FOOD_FARE_STEP_VND multiple; drivers accept or counter.
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(10_000_000)
+  deliveryOfferVnd?: number;
+
   /** Optional voucher; re-validated and redeemed atomically with the order. */
   @IsOptional()
   @IsString()
@@ -778,4 +789,13 @@ export class DeliverFoodOrderDto {
   @IsOptional()
   @Matches(/^\d{4}$/, { message: 'deliveryCode must be 4 digits' })
   deliveryCode?: string;
+}
+
+/** Driver counter-offer or customer raise of the delivery fee (VND). */
+export class FoodDeliveryAmountDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(10_000_000)
+  amountVnd!: number;
 }

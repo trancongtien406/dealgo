@@ -5,8 +5,32 @@
 export const MOTORBIKE_CLASS_CODE = 'MOTORBIKE';
 
 /** Two-wheeler classes (MOTORBIKE, BIKE_*) use the bike fee/commission settings; others are cars. */
+/** RIDE-004/005: what a class physically is; drives car KYC docs, licence and commission. */
+export type VehicleKind = 'BIKE' | 'CAR';
+export const VEHICLE_KINDS: readonly VehicleKind[] = ['BIKE', 'CAR'];
+
+/** Kinds read from the catalog (refreshed whenever RideVehicleClassService loads it). */
+const catalogKinds = new Map<string, VehicleKind>();
+
+export function registerVehicleClassKinds(rows: ReadonlyArray<{ code: string; kind?: VehicleKind }>): void {
+  catalogKinds.clear();
+  for (const row of rows) {
+    catalogKinds.set(row.code.toUpperCase(), row.kind ?? legacyVehicleKind(row.code));
+  }
+}
+
+/** Backward compatibility for rows/codes without a stored kind (MOTORBIKE / CAR_4 / CAR_7). */
+export function legacyVehicleKind(code: string | null | undefined): VehicleKind {
+  return /^(MOTOR|BIKE)/i.test(code ?? MOTORBIKE_CLASS_CODE) ? 'BIKE' : 'CAR';
+}
+
+export function vehicleKindOf(code: string | null | undefined): VehicleKind {
+  const key = (code ?? MOTORBIKE_CLASS_CODE).trim().toUpperCase();
+  return catalogKinds.get(key) ?? legacyVehicleKind(key);
+}
+
 export function isBikeClass(vehicleClassCode: string | null | undefined): boolean {
-  return /^(MOTOR|BIKE)/i.test(vehicleClassCode ?? MOTORBIKE_CLASS_CODE);
+  return vehicleKindOf(vehicleClassCode) === 'BIKE';
 }
 
 const MAX_STORED_VND = 2_147_483_647;
@@ -26,6 +50,8 @@ export type RideVehicleClass = {
   imageUrl: string | null;
   /** DEC-PROD-071: bookable for parcel delivery (ops opt-in). */
   parcelEnabled: boolean;
+  /** RIDE-004: BIKE | CAR (missing → derived from the legacy code). */
+  kind?: VehicleKind;
   updatedByUserId: string | null;
 };
 
@@ -94,6 +120,44 @@ export function rideBidFloorVnd(referenceFareVnd: number, floorPercent: number):
   return roundUpToFareStep((referenceFareVnd * floorPercent) / 100);
 }
 
+/**
+ * Round up to the fare step. A raw percent of the reference often sits between
+ * two steps, and the bid ceiling is already rounded down, so rounding up can
+ * land one step past the band. When the submitted amount is still within one
+ * step of [capVnd], keep the cap. An amount a full step above the cap is left
+ * above it so the range check rejects it.
+ */
+export function stepFareWithinCap(amountVnd: number, capVnd: number): number {
+  if (!Number.isSafeInteger(amountVnd)) return amountVnd;
+  const up = roundUpToFareStep(amountVnd);
+  if (!Number.isFinite(capVnd) || up <= capVnd) return up;
+  if (amountVnd > capVnd + RIDE_FARE_ROUNDING_STEP_VND - 1) return up;
+  const kept = roundDownToFareStep(capVnd);
+  return kept > 0 ? kept : up;
+}
+
+/**
+ * Headroom the three suggestion chips may use: the configured max (ceiling − 100,
+ * or the counter max − 100), or less when the stepped cap leaves a smaller gap.
+ */
+export function fareHeadroomPercent(baseVnd: number, maxVnd: number, configuredPercent: number): number {
+  if (baseVnd <= 0 || maxVnd <= baseVnd || configuredPercent <= 0) return 0;
+  const fits = Math.floor(((maxVnd - baseVnd) * 100) / baseVnd);
+  return Math.min(configuredPercent, Math.max(0, fits));
+}
+
+/** Three slices of the headroom: max/3, 2×max/3, and max. 30 → 10, 20, 30. */
+export function fareRaisePercents(maxHeadroomPercent: number): number[] {
+  if (maxHeadroomPercent <= 0) return [];
+  const first = Math.round(maxHeadroomPercent / 3);
+  const second = Math.round((maxHeadroomPercent * 2) / 3);
+  const out: number[] = [];
+  for (const p of [first, second, maxHeadroomPercent]) {
+    if (p > 0 && (out.length === 0 || out[out.length - 1] !== p)) out.push(p);
+  }
+  return out;
+}
+
 export function quoteVehicleClassFare(input: {
   distanceKm: number;
   vehicle: VehicleClassFareInput;
@@ -139,7 +203,7 @@ export function vehicleClassCodeFromMetadata(
   const explicit = metadata.vehicleClassCode;
   if (typeof explicit === 'string' && explicit.trim()) {
     const code = explicit.trim().toUpperCase();
-    if (KNOWN_VEHICLE_CLASS_CODE_SET.has(code)) {
+    if (KNOWN_VEHICLE_CLASS_CODE_SET.has(code) || catalogKinds.has(code)) {
       return code;
     }
   }
@@ -154,7 +218,9 @@ function money(value: number): number {
 }
 
 export function isCarVehicleClassCode(code: string): boolean {
-  return code === 'CAR_4' || code === 'CAR_7';
+  const key = code.trim().toUpperCase();
+  const kind = catalogKinds.get(key);
+  return kind ? kind === 'CAR' : key === 'CAR_4' || key === 'CAR_7';
 }
 
 /**
@@ -196,6 +262,7 @@ export function defaultRideVehicleClasses(settings: {
       ...shared,
       ...DEFAULT_CLASS_TARIFF.MOTORBIKE,
       code: MOTORBIKE_CLASS_CODE,
+      kind: 'BIKE',
       name: 'Xe máy',
       seats: 1,
       sortOrder: 0,
@@ -205,6 +272,7 @@ export function defaultRideVehicleClasses(settings: {
       ...shared,
       ...DEFAULT_CLASS_TARIFF.CAR_4,
       code: 'CAR_4',
+      kind: 'CAR',
       name: 'Xe 4 chỗ',
       seats: 4,
       sortOrder: 1,
@@ -214,6 +282,7 @@ export function defaultRideVehicleClasses(settings: {
       ...shared,
       ...DEFAULT_CLASS_TARIFF.CAR_7,
       code: 'CAR_7',
+      kind: 'CAR',
       name: 'Xe 7 chỗ',
       seats: 7,
       sortOrder: 2,

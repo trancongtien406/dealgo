@@ -866,19 +866,6 @@ ShellRoute _merchantScopedShell() {
     routes: [
       _roleShell(merchantShellTabs),
       GoRoute(
-        path: '/merchant/orders/:orderId',
-        builder: (context, state) {
-          final order = _merchantOrder(context, state);
-          if (order == null) {
-            // A push tap can land here before the queue has loaded.
-            return MerchantOrderResumePage(
-              orderId: state.pathParameters['orderId'] ?? '',
-            );
-          }
-          return MerchantOrderPage(order: order);
-        },
-      ),
-      GoRoute(
         path: MerchantRoutes.acceptSettings,
         builder: (context, state) => const MerchantAcceptSettingsPage(),
       ),
@@ -960,6 +947,20 @@ StatefulShellRoute _roleShell(List<ShellTab> tabs) {
               path: tab.path,
               builder: (context, state) => ShellTabPage(tab: tab),
               routes: [
+                if (tab.kind == ShellTabKind.merchantOrders)
+                  GoRoute(
+                    path: ':orderId',
+                    builder: (context, state) {
+                      final order = _merchantOrder(context, state);
+                      if (order == null) {
+                        // A push tap can land here before the queue has loaded.
+                        return MerchantOrderResumePage(
+                          orderId: state.pathParameters['orderId'] ?? '',
+                        );
+                      }
+                      return MerchantOrderPage(order: order);
+                    },
+                  ),
                 if (tab.kind == ShellTabKind.account)
                   GoRoute(
                     path: 'notifications',

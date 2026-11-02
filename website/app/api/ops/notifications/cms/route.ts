@@ -1,5 +1,6 @@
 import { fetchOpsUpstream } from "@/lib/api/ops-upstream";
 import { jsonFromOpsUpstream } from "@/lib/api/ops-bff-response";
+import { assertSameOriginMutation } from "@/lib/api/ops-bff-guards";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -16,6 +17,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const csrf = assertSameOriginMutation(request);
+  if (csrf) {
+    return csrf;
+  }
   let body: unknown = {};
   try {
     body = await request.json();

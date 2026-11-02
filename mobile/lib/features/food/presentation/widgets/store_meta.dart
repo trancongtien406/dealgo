@@ -226,7 +226,7 @@ class StoreMetaLine extends StatelessWidget {
       TextSpan(
         children: [
           if (eta != null) ...[
-            const WidgetSpan(
+            WidgetSpan(
               alignment: PlaceholderAlignment.middle,
               child: Icon(
                 DealGoIcons.clock,

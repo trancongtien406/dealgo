@@ -84,6 +84,7 @@ model User {
   ownedStores                 FoodStore[]
   customerFoodOrders          FoodOrder[]                 @relation("CustomerFoodOrders")
   assignedFoodOrders          FoodOrder[]                 @relation("AssignedFoodOrders")
+  foodDeliveryOffers          FoodDeliveryOffer[]
   partnerApplications         PartnerApplication[]        @relation("ApplicantPartnerApplications")
   reviewedPartnerApplications PartnerApplication[]        @relation("ReviewedPartnerApplications")
   chatMessages                ChatMessage[]
@@ -192,16 +193,18 @@ model PhoneChallenge {
 }
 
 model EmailVerification {
-  id         String    @id @default(uuid()) @db.Uuid
-  userId     String    @db.Uuid
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  email      String
-  tokenHash  String
-  expiresAt  DateTime
-  consumedAt DateTime?
-  createdAt  DateTime  @default(now())
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @db.Uuid
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email        String
+  tokenHash    String
+  expiresAt    DateTime
+  attemptCount Int       @default(0)
+  lastSentAt   DateTime  @default(now())
+  consumedAt   DateTime?
+  createdAt    DateTime  @default(now())
 
-  @@index([userId])
+  @@index([userId, createdAt])
   @@map("email_verifications")
 }
 
@@ -416,11 +419,15 @@ model Ride {
   priorFeesVnd            Int               @default(0)
   /// Customer fare raises so far; each raise opens a new negotiation round.
   fareRaiseCount          Int               @default(0)
+  /// Customer opt-in: server selects the first live ACCEPT at offeredFareVnd.
+  autoAcceptOfferedFare   Boolean           @default(false)
   /// The EXPIRED ride this request re-posts (one-tap re-post).
   repostOfRideId          String?           @db.Uuid
   /// Multi-stop (feature-flagged). Intermediate stops live in ride_stops; pickup/dropoff above stay
   /// the first/last point so single-destination code keeps working. Bumped on every stop edit.
   routeVersion            Int               @default(0)
+  /// t82u: road distance pickup→stops→dropoff (km) priced at booking / last stop edit. Null = legacy row.
+  routeDistanceKm         Float?
   stopCount               Int               @default(0)
   /// Per-stop fee snapshot (already included in referenceFareVnd).
   stopFeeVnd              Int               @default(0)
@@ -473,25 +480,32 @@ model RideStop {
 
 /// Reference fare and bid window for one ride class. Ops-editable.
 /// Not an approved OPEN-003 tariff: the customer still bids inside the window.
+enum VehicleKind {
+  BIKE
+  CAR
+}
+
 model RideVehicleClass {
-  code            String   @id @db.VarChar(32)
-  name            String   @db.VarChar(80)
+  code            String      @id @db.VarChar(32)
+  name            String      @db.VarChar(80)
   seats           Int
-  enabled         Boolean  @default(true)
+  enabled         Boolean     @default(true)
   baseFareVnd     Int
   perKmVnd        Int
   perMinuteVnd    Int
   minFareVnd      Int
   maxFareVnd      Int
   assumedSpeedKmh Int
-  sortOrder       Int      @default(0)
+  sortOrder       Int         @default(0)
   /// Public path such as /v1/public/ride-vehicle-classes/MOTORBIKE/<file>.
-  imageUrl        String?  @db.VarChar(200)
+  imageUrl        String?     @db.VarChar(200)
   /// DEC-PROD-071: class can be booked for parcel delivery (off until ops enables it).
-  parcelEnabled   Boolean  @default(false)
-  updatedByUserId String?  @db.Uuid
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  parcelEnabled   Boolean     @default(false)
+  /// RIDE-004/005: BIKE | CAR; drives car KYC documents, licence and commission.
+  kind            VehicleKind @default(BIKE)
+  updatedByUserId String?     @db.Uuid
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   @@map("ride_vehicle_classes")
 }
@@ -800,7 +814,7 @@ model FoodItem {
   /// Completed (DELIVERED) line qty sum; refreshed on delivery.
   soldCount        Int                      @default(0)
   available        Boolean                  @default(true)
-  moderationStatus FoodItemModerationStatus @default(APPROVED)
+  moderationStatus FoodItemModerationStatus @default(PENDING)
   /// When the merchant submitted the item; the Ops catalog review date filter uses it.
   createdAt        DateTime                 @default(now())
   optionGroups     FoodOptionGroup[]
@@ -844,58 +858,66 @@ model FoodOption {
 
 // Partial unique index food_orders_one_open_per_customer is defined in SQL.
 model FoodOrder {
-  id                    String            @id @default(uuid()) @db.Uuid
-  customerId            String            @db.Uuid
-  customer              User              @relation("CustomerFoodOrders", fields: [customerId], references: [id], onDelete: Restrict)
-  storeId               String            @db.Uuid
-  store                 FoodStore         @relation(fields: [storeId], references: [id], onDelete: Restrict)
-  status                FoodOrderStatus
-  deliveryFareVnd       Int
-  subtotalVnd           Int
-  discountVnd           Int               @default(0)
-  voucherCode           String?           @db.VarChar(40)
+  id                       String              @id @default(uuid()) @db.Uuid
+  customerId               String              @db.Uuid
+  customer                 User                @relation("CustomerFoodOrders", fields: [customerId], references: [id], onDelete: Restrict)
+  storeId                  String              @db.Uuid
+  store                    FoodStore           @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  status                   FoodOrderStatus
+  /// Customer's current delivery-fee offer until a driver agrees, then the agreed fee.
+  deliveryFareVnd          Int
+  /// System suggestion shown at checkout (reference only, never charged by itself).
+  suggestedDeliveryFareVnd Int?
+  /// Set when a driver accepts the customer's offer or the customer selects a counter.
+  deliveryFareAgreedAt     DateTime?
+  /// Times the customer raised the offer while waiting for a driver.
+  deliveryFareRaiseCount   Int                 @default(0)
+  subtotalVnd              Int
+  discountVnd              Int                 @default(0)
+  voucherCode              String?             @db.VarChar(40)
   /// Who funds discountVnd, snapshotted from the campaign at placement (DEC-PROD-015).
-  voucherSponsor        PromotionSponsor?
-  totalVnd              Int
-  dropoffLat            Float
-  dropoffLng            Float
-  dropoffLabel          String            @db.VarChar(160)
+  voucherSponsor           PromotionSponsor?
+  totalVnd                 Int
+  dropoffLat               Float
+  dropoffLng               Float
+  dropoffLabel             String              @db.VarChar(160)
   /// Store pickup point snapshotted at placement (DEC-PROD-034); null when the store had no coordinates.
-  pickupLat             Float?
-  pickupLng             Float?
-  pickupLabel           String?           @db.VarChar(200)
-  serviceRegionCode     String?           @db.VarChar(8)
+  pickupLat                Float?
+  pickupLng                Float?
+  pickupLabel              String?             @db.VarChar(200)
+  serviceRegionCode        String?             @db.VarChar(8)
   /// Merchant decline reason (FOOD_REJECT_REASONS) and optional note; null unless the store rejected (DEC-PROD-021).
-  cancelReasonCode      String?           @db.VarChar(32)
-  cancelNote            String?           @db.VarChar(200)
-  cancelledBy           CancelActor?
+  cancelReasonCode         String?             @db.VarChar(32)
+  cancelNote               String?             @db.VarChar(200)
+  cancelledBy              CancelActor?
   /// DEC-PROD-036: server-issued delivery / handover codes.
-  codes                 FoodOrderCode[]
-  assignedDriverId      String?           @db.Uuid
-  assignedDriver        User?             @relation("AssignedFoodOrders", fields: [assignedDriverId], references: [id], onDelete: Restrict)
-  idempotencyKey        String            @db.VarChar(200)
+  codes                    FoodOrderCode[]
+  assignedDriverId         String?             @db.Uuid
+  assignedDriver           User?               @relation("AssignedFoodOrders", fields: [assignedDriverId], references: [id], onDelete: Restrict)
+  idempotencyKey           String              @db.VarChar(200)
   /// Prep estimate snapshotted at placement (store default + BUSY extra); null on legacy rows.
-  prepMinutes           Int?
+  prepMinutes              Int?
   /// Merchant accepted (PLACED→PREPARING); early driver assignment uses acceptedAt + prepMinutes.
-  acceptedAt            DateTime?
+  acceptedAt               DateTime?
   /// Merchant marked the order ready (unclaimed-ready timeout).
-  readyAt               DateTime?
+  readyAt                  DateTime?
   /// Driver picked the order up; failed delivery only after this.
-  pickedUpAt            DateTime?
-  failedAt              DateTime?
+  pickedUpAt               DateTime?
+  failedAt                 DateTime?
   /// FOOD_FAIL_REASONS code + note (ShopeeFood failed-order flow).
-  failReasonCode        String?           @db.VarChar(32)
-  failNote              String?           @db.VarChar(300)
+  failReasonCode           String?             @db.VarChar(32)
+  failNote                 String?             @db.VarChar(300)
   /// Cash the driver paid the merchant at pickup (subtotal − merchant-funded discount).
-  merchantCashVnd       Int?
+  merchantCashVnd          Int?
   /// Merchant commission snapshot at delivery (percent × 100, and VND).
-  merchantCommissionBps Int?
-  merchantCommissionVnd Int?
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
-  lines                 FoodOrderLine[]
-  changes               FoodOrderChange[]
-  chatThreads           ChatThread[]
+  merchantCommissionBps    Int?
+  merchantCommissionVnd    Int?
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+  lines                    FoodOrderLine[]
+  changes                  FoodOrderChange[]
+  deliveryOffers           FoodDeliveryOffer[]
+  chatThreads              ChatThread[]
 
   @@unique([customerId, idempotencyKey])
   @@index([storeId, status])
@@ -969,6 +991,8 @@ enum LedgerEntityType {
   DISPUTE
   /// One journal per online refund (multiple partial refunds per intent).
   PAYMENT_REFUND
+  /// One PSP capture journal per payment intent (several online payments per job).
+  PAYMENT_INTENT
 }
 
 enum LedgerJournalEvent {
@@ -1073,19 +1097,25 @@ model ChatMessage {
 
 // Transactional outbox skeleton (ADR-003). Relay fans out Socket.IO + push mock.
 model OutboxMessage {
-  id            String    @id @default(uuid()) @db.Uuid
-  eventKey      String    @unique @db.VarChar(200)
-  aggregateType String    @db.VarChar(64)
-  aggregateId   String    @db.Uuid
-  eventType     String    @db.VarChar(120)
-  payload       Json
-  createdAt     DateTime  @default(now())
-  processedAt   DateTime?
-  attempts      Int       @default(0)
-  lockedAt      DateTime?
+  id             String    @id @default(uuid()) @db.Uuid
+  eventKey       String    @unique @db.VarChar(200)
+  aggregateType  String    @db.VarChar(64)
+  aggregateId    String    @db.Uuid
+  eventType      String    @db.VarChar(120)
+  payload        Json
+  createdAt      DateTime  @default(now())
+  processedAt    DateTime?
+  attempts       Int       @default(0)
+  lockedAt       DateTime?
+  /// REL-001: earliest time the relay may retry after a failure (exponential backoff).
+  nextAttemptAt  DateTime?
+  /// REL-001: set once attempts reach the cap; the row is never claimed again.
+  deadLetteredAt DateTime?
+  lastError      String?   @db.Text
 
   @@index([processedAt, createdAt])
   @@index([processedAt, lockedAt])
+  @@index([deadLetteredAt])
   @@map("outbox_messages")
 }
 
@@ -1202,6 +1232,8 @@ model PaymentRefund {
   /// PENDING | SUCCEEDED | REJECTED
   status            String        @db.VarChar(16)
   requestId         String        @unique @db.VarChar(64)
+  /// Client-supplied key (ops Idempotency-Key): a retried/double-submitted refund returns the first one.
+  idempotencyKey    String?       @unique @db.VarChar(64)
   providerRefundRef String?       @db.VarChar(120)
   reason            String        @db.VarChar(200)
   actorUserId       String        @db.Uuid
@@ -2291,6 +2323,34 @@ model FoodOrderChange {
   @@map("food_order_changes")
 }
 
+enum FoodDeliveryOfferStatus {
+  PENDING
+  SELECTED
+  LOST
+  /// The driver withdrew a pending counter (may counter again while the order is open).
+  WITHDRAWN
+}
+
+/// Driver counter-offer on a food order's delivery fee (customer selects one).
+model FoodDeliveryOffer {
+  id        String                  @id @default(uuid()) @db.Uuid
+  orderId   String                  @db.Uuid
+  order     FoodOrder               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  driverId  String                  @db.Uuid
+  driver    User                    @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  amountVnd Int
+  status    FoodDeliveryOfferStatus @default(PENDING)
+  expiresAt DateTime
+  editCount Int                     @default(0)
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+
+  @@unique([orderId, driverId])
+  @@index([orderId, status])
+  @@index([driverId, status])
+  @@map("food_delivery_offers")
+}
+
 /// Merchant payout statement per store and ICT period (Ops records the payment).
 model MerchantSettlement {
   id                String   @id @default(uuid()) @db.Uuid
@@ -2309,4 +2369,51 @@ model MerchantSettlement {
   @@unique([storeId, periodStart, periodEnd])
   @@index([storeId, periodEnd(sort: Desc)])
   @@map("merchant_settlements")
+}
+
+/// t82u (DEC-PROD-090): a published legal document version users must accept (Grab/Be style).
+/// Points at an already-published PublicPage version — the legal text itself lives in public_pages.
+model LegalPolicyVersion {
+  id                String             @id @default(uuid()) @db.Uuid
+  /// PublicPage slug: terms | privacy.
+  slug              String             @db.VarChar(60)
+  /// PublicPage.version (vi) at publish time.
+  version           Int
+  title             String             @db.VarChar(200)
+  changelog         String             @db.VarChar(2000)
+  effectiveAt       DateTime?
+  /// Role names (CUSTOMER, DRIVER, MERCHANT) who must accept / get the email.
+  audienceRoles     String[]
+  requiresConsent   Boolean            @default(true)
+  publishedAt       DateTime           @default(now())
+  publishedByUserId String?            @db.Uuid
+  /// NONE | QUEUED | SENDING | SENT
+  emailStatus       String             @default("NONE") @db.VarChar(16)
+  emailQueuedAt     DateTime?
+  emailRecipients   Int?
+  emailSentCount    Int                @default(0)
+  emailFailedCount  Int                @default(0)
+  createdAt         DateTime           @default(now())
+  consents          UserLegalConsent[]
+
+  @@unique([slug, version])
+  @@index([publishedAt])
+  @@map("legal_policy_versions")
+}
+
+/// t82u: audit row for one user accepting one LegalPolicyVersion.
+model UserLegalConsent {
+  id              String             @id @default(uuid()) @db.Uuid
+  userId          String             @db.Uuid
+  policyVersionId String             @db.Uuid
+  policyVersion   LegalPolicyVersion @relation(fields: [policyVersionId], references: [id], onDelete: Cascade)
+  slug            String             @db.VarChar(60)
+  version         Int
+  acceptedAt      DateTime           @default(now())
+  ip              String?            @db.VarChar(64)
+  userAgent       String?            @db.VarChar(300)
+
+  @@unique([userId, policyVersionId])
+  @@index([userId])
+  @@map("user_legal_consents")
 }

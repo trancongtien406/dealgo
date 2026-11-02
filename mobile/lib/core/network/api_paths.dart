@@ -30,6 +30,13 @@ abstract final class ApiPaths {
     return '/v1/auth/email/password-resets/${Uri.encodeComponent(challengeId)}/confirm';
   }
 
+  /// Profile email: 6-digit code for an address of the signed-in account.
+  static const emailVerifications = '/v1/auth/email/verifications';
+
+  static String emailVerificationConfirm(String verificationId) {
+    return '/v1/auth/email/verifications/${Uri.encodeComponent(verificationId)}/confirm';
+  }
+
   static const passkeyRegistrationOptions =
       '/v1/auth/passkeys/registration/options';
   static const passkeyRegistrationVerify =
@@ -214,6 +221,10 @@ abstract final class ApiPaths {
   /// Negotiation/lifecycle commands.
   static String rideFare(String rideId) =>
       '/v1/rides/${Uri.encodeComponent(rideId)}/fare';
+  static String rideAutoAccept(String rideId) =>
+      '/v1/rides/${Uri.encodeComponent(rideId)}/auto-accept';
+  static String rideViewing(String rideId) =>
+      '/v1/rides/${Uri.encodeComponent(rideId)}/viewing';
   static String rideOfferDecline(String rideId) =>
       '/v1/rides/${Uri.encodeComponent(rideId)}/offers/decline';
   static String rideOfferWithdraw(String rideId) =>
@@ -302,6 +313,11 @@ abstract final class ApiPaths {
   static const foodQuote = '/v1/food/quote';
   static const supportTickets = '/v1/support/tickets';
   static const helpFaqs = '/v1/public/help/faqs';
+  static const publicSiteConfig = '/v1/public/site-config';
+  static String publicPage(String slug) =>
+      '/v1/public/pages/${Uri.encodeComponent(slug)}';
+  static const partnerApplicationLegalDocuments =
+      '/v1/public/legal-documents/partner-application';
   static const promotionsAvailable = '/v1/promotions/available';
   static const publicClientConfig = '/v1/public/client-config';
   static String rideShareLink(String rideId) =>

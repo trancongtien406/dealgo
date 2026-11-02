@@ -1,3 +1,4 @@
+import { isCarVehicleClassCode, vehicleKindOf } from '../ride-vehicle/ride-vehicle-class.js';
 export const PARTNER_REPOSITORY = Symbol('PARTNER_REPOSITORY');
 
 export const PARTNER_APPLICATION_ROLES = ['DRIVER', 'MERCHANT'] as const;
@@ -53,16 +54,22 @@ export const PARTNER_REQUIRED_DOCUMENTS = {
  * Covers both the 2024 Road Traffic Law classes (A1, A, B, C1, C, D1, D2, D) and older
  * cards still in circulation (A2, B1, B2, E). Ops still compares it with the photo.
  */
-export const LICENSE_CLASSES_FOR_VEHICLE: Record<string, readonly string[]> = {
-  MOTORBIKE: ['A1', 'A', 'A2'],
-  CAR_4: ['B', 'B1', 'B2', 'C1', 'C', 'D1', 'D2', 'D', 'E'],
-  CAR_7: ['B', 'B1', 'B2', 'C1', 'C', 'D1', 'D2', 'D', 'E'],
-};
+/** RIDE-005: licence classes per vehicle kind (the class's BIKE | CAR kind decides). */
+export const LICENSE_CLASSES_FOR_KIND = {
+  BIKE: ['A1', 'A', 'A2'],
+  CAR: ['B', 'B1', 'B2', 'C1', 'C', 'D1', 'D2', 'D', 'E'],
+} as const satisfies Record<'BIKE' | 'CAR', readonly string[]>;
+
+/** Allowed licence classes for a vehicle class code (any catalog class, via its kind). */
+export const LICENSE_CLASSES_FOR_VEHICLE: Record<string, readonly string[]> = new Proxy(
+  {},
+  { get: (_t, code) => (typeof code === 'string' ? LICENSE_CLASSES_FOR_KIND[vehicleKindOf(code)] : undefined) },
+);
 
 export function licenseClassCoversVehicle(licenseClass: unknown, vehicleClassCode: string): boolean {
   if (typeof licenseClass !== 'string') return false;
-  const allowed = LICENSE_CLASSES_FOR_VEHICLE[vehicleClassCode];
-  return !!allowed && allowed.includes(licenseClass.trim().toUpperCase());
+  const allowed: readonly string[] = LICENSE_CLASSES_FOR_KIND[vehicleKindOf(vehicleClassCode)];
+  return allowed.includes(licenseClass.trim().toUpperCase());
 }
 
 /**
@@ -106,7 +113,7 @@ export function requiredPartnerDocuments(
   if (
     opts?.carExtraDocsGate &&
     opts.vehicleClassCode &&
-    (opts.vehicleClassCode === 'CAR_4' || opts.vehicleClassCode === 'CAR_7')
+    isCarVehicleClassCode(opts.vehicleClassCode)
   ) {
     return [...base, ...PARTNER_DRIVER_CAR_EXTRA_DOCUMENTS];
   }

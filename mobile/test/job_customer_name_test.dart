@@ -12,18 +12,29 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// The arrived screen names the real customer, never a placeholder.
 void main() {
-  Future<void> pump(WidgetTester tester, AuthState auth, String name) async {
+  Future<void> pump(
+    WidgetTester tester,
+    AuthState auth,
+    String name, {
+    String? phone,
+  }) async {
     await tester.pumpWidget(
       MultiBlocProvider(
         providers: [BlocProvider<AuthCubit>(create: (_) => _Auth(auth))],
         child: RepositoryProvider<DriverCardRepository>.value(
-          value: FakeDriverCardRemoteDataSource(customerName: name),
+          value: FakeDriverCardRemoteDataSource(
+            customerName: name,
+            customerPhone: phone,
+          ),
           child: const MaterialApp(
             locale: Locale('vi'),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(
-              body: JobCustomerName(jobId: 'r1', subtitle: '4,8★ (12 lượt)'),
+              body: SizedBox(
+                width: 260,
+                child: JobCustomerTile(jobId: 'r1', subtitle: '4,8★ (12 lượt)'),
+              ),
             ),
           ),
         ),
@@ -37,6 +48,27 @@ void main() {
     expect(find.text('Nguyễn Thị An'), findsOneWidget);
     expect(find.text('Khách hàng'), findsNothing);
     expect(find.text('4,8★ (12 lượt)'), findsOneWidget);
+    expect(find.byKey(const Key('job-customer-avatar')), findsOneWidget);
+    expect(find.byKey(const Key('contact-phone-dial')), findsNothing);
+  });
+
+  testWidgets('long names wrap in full instead of being cut', (tester) async {
+    const long = 'Nguyễn Thị Phương Thảo Hoàng Bảo Ngọc';
+    await pump(tester, _signedIn, long);
+    final text = tester.widget<Text>(
+      find.byKey(const Key('job-customer-name')),
+    );
+    expect(text.data, long);
+    expect(text.overflow, isNot(TextOverflow.ellipsis));
+    expect(text.maxLines, isNull);
+  });
+
+  testWidgets('shows the phone with a dial button while the job runs', (
+    tester,
+  ) async {
+    await pump(tester, _signedIn, 'Nguyễn Thị An', phone: '+84901112222');
+    expect(find.text('0901 112 222'), findsOneWidget);
+    expect(find.byKey(const Key('contact-phone-dial')), findsOneWidget);
   });
 
   testWidgets('keeps the generic label when the name is empty', (tester) async {

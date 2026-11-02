@@ -148,7 +148,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
                 key: const Key('help-open-tickets'),
                 tooltip: l10n.helpMyTickets,
                 onPressed: _openTickets,
-                icon: const Icon(DealGoIcons.headset, color: DealGoColors.text),
+                icon: Icon(DealGoIcons.headset, color: DealGoColors.text),
               ),
             ),
             Expanded(
@@ -241,7 +241,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
                       onTap: _openTickets,
                       child: Row(
                         children: [
-                          const AccountToneIcon(
+                          AccountToneIcon(
                             icon: DealGoIcons.headset,
                             background: DealGoColors.subtlePurple,
                             foreground: DealGoColors.primary,
@@ -265,7 +265,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
                               ],
                             ),
                           ),
-                          const Icon(
+                          Icon(
                             DealGoIcons.chevronRight,
                             color: DealGoColors.textSecondary,
                           ),
@@ -440,29 +440,25 @@ class _TopicCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return DealGoCard(
-      onTap: () => onSelected(topic),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AccountToneIcon(
-            icon: icon,
-            background: DealGoColors.subtlePurple,
-            foreground: DealGoColors.primary,
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          Text(title, style: textTheme.titleMedium?.copyWith(fontSize: 16)),
-          if (selected) ...[
-            const SizedBox(height: DealGoSpacing.s8),
-            Text(
-              AppLocalizations.of(context).helpTopicSelected,
-              style: textTheme.labelSmall?.copyWith(
-                color: DealGoColors.primary,
-                fontWeight: FontWeight.w600,
-              ),
+    return Semantics(
+      selected: selected,
+      child: DealGoCard(
+        key: Key('help-topic-${topic.name}'),
+        onTap: () => onSelected(topic),
+        borderColor: selected ? DealGoColors.primary : null,
+        borderWidth: selected ? 1.5 : 1,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AccountToneIcon(
+              icon: icon,
+              background: DealGoColors.subtlePurple,
+              foreground: DealGoColors.primary,
             ),
+            const SizedBox(height: DealGoSpacing.s12),
+            Text(title, style: textTheme.titleMedium?.copyWith(fontSize: 16)),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -490,7 +486,7 @@ class _FaqCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const AccountToneIcon(
+              AccountToneIcon(
                 icon: DealGoIcons.help,
                 background: DealGoColors.subtlePurple,
                 foreground: DealGoColors.primary,

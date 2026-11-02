@@ -47,6 +47,7 @@ describe('food browse extras', () => {
       originalPriceVnd: 55_000,
     });
     expect(created.originalPriceVnd).toBe(55_000);
+    await food.setCatalogModeration(created.id, 'APPROVED');
     expect(created.addedAt).not.toBeNull();
     const raised = await food.updateItem({ ownerId: 'owner-1', itemId: created.id, priceVnd: 60_000 });
     expect(raised.originalPriceVnd).toBeNull();
@@ -70,5 +71,32 @@ describe('food browse extras', () => {
     await expect(place(1, 'k1')).rejects.toMatchObject({ code: 'FOOD_MIN_ORDER_NOT_MET' });
     const order = await place(2, 'k2');
     expect(order.subtotalVnd).toBe(100_000);
+  });
+});
+
+describe('catalog moderation gates sale (FOOD-001)', () => {
+  it('new items wait for approval, availability never self-approves, and only APPROVED dishes can be ordered', async () => {
+    const { MemoryFoodRepository } = await import('./food.repository.js');
+    const food = new MemoryFoodRepository();
+    const store = await food.createStore('owner-mod', 'Quán Duyệt', []);
+    const item = await food.createItem({ ownerId: 'owner-mod', name: 'Phở', priceVnd: 40_000 });
+    await expect(
+      food.setItemAvailability({ ownerId: 'owner-mod', itemId: item.id, available: true }),
+    ).rejects.toMatchObject({ code: 'FOOD_ITEM_NOT_APPROVED' });
+    await food.setCatalogModeration(item.id, 'REJECTED');
+    await expect(
+      food.setItemAvailability({ ownerId: 'owner-mod', itemId: item.id, available: true }),
+    ).rejects.toMatchObject({ code: 'FOOD_ITEM_NOT_APPROVED' });
+    // Turning a dish off is always allowed and keeps the moderation verdict.
+    const off = await food.setItemAvailability({ ownerId: 'owner-mod', itemId: item.id, available: false });
+    expect(off.available).toBe(false);
+    const { snapshotFoodLines } = await import('./food.repository.js');
+    const view = { ...item, available: true, moderationStatus: 'PENDING' };
+    expect(() => snapshotFoodLines([view], [{ itemId: item.id, quantity: 1 }])).toThrow();
+    expect(snapshotFoodLines([{ ...view, moderationStatus: 'APPROVED' }], [{ itemId: item.id, quantity: 1 }])).toHaveLength(1);
+    await food.setCatalogModeration(item.id, 'APPROVED');
+    const on = await food.setItemAvailability({ ownerId: 'owner-mod', itemId: item.id, available: true });
+    expect(on.available).toBe(true);
+    expect(store.id).toBeTruthy();
   });
 });

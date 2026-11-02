@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/config/app_env.dart';
+import '../../../../core/design_system/components/dealgo_haptics.dart';
 import '../../../../core/design_system/components/dealgo_icon_badge.dart';
 import '../../../../core/design_system/components/dealgo_pressable.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
@@ -35,6 +36,17 @@ class PhoneLoginPage extends StatefulWidget {
 
 class _PhoneLoginPageState extends State<PhoneLoginPage> {
   late final AuthMethodsStore _methods = context.read<AuthMethodsStore>();
+  bool _legalAccepted = false;
+  bool _legalError = false;
+
+  void _ifLegalAccepted(VoidCallback action) {
+    if (!_legalAccepted) {
+      DealGoHaptics.error();
+      setState(() => _legalError = true);
+      return;
+    }
+    action();
+  }
 
   @override
   void initState() {
@@ -132,7 +144,9 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
           label: l10n.authPhoneLabel,
           onTap: isPasskeyLoading
               ? null
-              : () => context.push(AuthRoutes.phoneLogin),
+              : () => _ifLegalAccepted(
+                  () => context.push(AuthRoutes.phoneLogin),
+                ),
         ),
       if (_methods.isEnabled(AuthMethodPolicy.email))
         _AuthMethodTile(
@@ -141,7 +155,9 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
           label: l10n.authEmailLabel,
           onTap: isPasskeyLoading
               ? null
-              : () => context.push(AuthRoutes.emailLogin),
+              : () => _ifLegalAccepted(
+                  () => context.push(AuthRoutes.emailLogin),
+                ),
         ),
       if (_methods.isEnabled(AuthMethodPolicy.passkey))
         _AuthMethodTile(
@@ -151,7 +167,9 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
           isLoading: isPasskeyLoading,
           onTap: isPasskeyLoading
               ? null
-              : () => unawaited(_continueWithPasskey(context)),
+              : () => _ifLegalAccepted(
+                  () => unawaited(_continueWithPasskey(context)),
+                ),
         ),
     ];
     if (tiles.isEmpty) {
@@ -232,9 +250,7 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
                             filterQuality: FilterQuality.high,
                             excludeFromSemantics: true,
                             errorBuilder: (context, error, stackTrace) =>
-                                const ColoredBox(
-                                  color: DealGoColors.subtlePurple,
-                                ),
+                                ColoredBox(color: DealGoColors.subtlePurple),
                           ),
                         ),
                       ),
@@ -287,7 +303,15 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
                       l10n,
                       isPasskeyLoading: authState is PhoneAuthPasskeySigningIn,
                     ),
-                    const AuthLegalFooter(),
+                    AuthLegalConsent(
+                      accepted: _legalAccepted,
+                      showError: _legalError,
+                      onChanged: (value) => setState(() {
+                        _legalAccepted = value;
+                        if (value) _legalError = false;
+                      }),
+                    ),
+                    const SizedBox(height: DealGoSpacing.s16),
                   ],
                 ),
               ),
@@ -366,7 +390,7 @@ class _AuthMethodTile extends StatelessWidget {
                 ),
               )
             else
-              const Icon(
+              Icon(
                 DealGoIcons.chevronRight,
                 color: DealGoColors.textTertiary,
                 size: 20,

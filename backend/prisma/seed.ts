@@ -700,7 +700,7 @@ async function ensureAuthPolicies(db: PrismaClient): Promise<number> {
 async function ensurePlatformSettings(db: PrismaClient): Promise<number> {
   const settings: Array<{ key: string; value: string; valueType: 'string' | 'number' | 'json' }> = [
     { key: 'DRIVER_SEARCH_RADIUS_KM', value: '5', valueType: 'number' },
-    { key: 'RIDE_OFFER_TTL_SECONDS', value: '30', valueType: 'number' },
+    { key: 'RIDE_OFFER_TTL_SECONDS', value: '20', valueType: 'number' },
     { key: 'RIDE_MIN_FARE_VND', value: '10000', valueType: 'number' },
     { key: 'RIDE_MAX_FARE_VND', value: '1000000', valueType: 'number' },
     { key: 'RIDE_REFERENCE_VND_PER_KM', value: '5000', valueType: 'number' },

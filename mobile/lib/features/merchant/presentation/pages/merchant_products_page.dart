@@ -386,7 +386,7 @@ class _ProductRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final imageUrl = resolveMediaUrl(item.imageUrl);
-    final fallback = const ColoredBox(
+    final fallback = ColoredBox(
       color: DealGoColors.subtlePurple,
       child: SizedBox(
         width: 56,

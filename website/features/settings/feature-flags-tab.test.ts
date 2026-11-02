@@ -22,6 +22,16 @@ describe("settings feature flags tab", () => {
     ]);
   });
 
+  it("offers the email verification switch as Bật / Tắt", () => {
+    const rows = [
+      { key: "AUTH_EMAIL_VERIFICATION_REQUIRED", value: "true" },
+      { key: "RIDE_MIN_FARE_VND", value: "15000" },
+    ];
+    expect(featureFlagRows(rows).map((r) => r.key)).toEqual([
+      "AUTH_EMAIL_VERIFICATION_REQUIRED",
+    ]);
+  });
+
   it("has no hard-coded demo flags in the board", () => {
     const src = readFileSync(
       path.resolve(__dirname, "components/settings-board.tsx"),

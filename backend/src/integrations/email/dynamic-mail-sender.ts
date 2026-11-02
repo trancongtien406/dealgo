@@ -11,8 +11,10 @@ import {
 import type { EmailSuppressionRepository } from './email-suppression.repository.js';
 import {
   MailDeliveryError,
+  type EmailVerificationCodeMail,
   type MailSender,
   type PasswordResetCodeMail,
+  type PolicyUpdateMail,
   type SignupCodeMail,
 } from './mail-sender.js';
 import { isMailSenderAvailable } from './mail-factory.js';
@@ -63,7 +65,7 @@ export class DynamicMailSender implements MailSender {
     };
   }
 
-  async sendEmailVerification(input: { email: string; verificationId: string; token: string }): Promise<void> {
+  async sendEmailVerification(input: EmailVerificationCodeMail): Promise<void> {
     await this.guard(input.email);
     await (await this.sender()).sendEmailVerification(input);
   }
@@ -86,6 +88,11 @@ export class DynamicMailSender implements MailSender {
   async sendTestEmail(input: { email: string }): Promise<void> {
     await this.guard(input.email);
     await (await this.sender()).sendTestEmail(input);
+  }
+
+  async sendPolicyUpdate(input: PolicyUpdateMail): Promise<void> {
+    await this.guard(input.email);
+    await (await this.sender()).sendPolicyUpdate(input);
   }
 
   private async guard(email: string): Promise<void> {

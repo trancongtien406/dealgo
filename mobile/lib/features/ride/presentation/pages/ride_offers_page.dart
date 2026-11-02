@@ -381,8 +381,11 @@ class _RideOffersPageState extends State<_RideOffersView> {
         });
         return;
       }
+      // RIDE-003: a driver assigned elsewhere answers RIDE_OFFER_DRIVER_UNAVAILABLE;
+      // same outcome for the customer as a taken offer: pick another one.
       if (error is ApiException &&
-          error.errorCode == 'RIDE_OFFER_UNAVAILABLE') {
+          (error.errorCode == 'RIDE_OFFER_UNAVAILABLE' ||
+              error.errorCode == 'RIDE_OFFER_DRIVER_UNAVAILABLE')) {
         setState(() {
           _busy = false;
           _block = OfferBlock.taken(amountVnd: chosen.amountVnd);
@@ -559,6 +562,8 @@ class _RideOffersPageState extends State<_RideOffersView> {
       context: context,
       currentFareVnd: ride.offeredFareVnd,
       formatVnd: formatRideVnd,
+      maxFareVnd: ride.maxOfferedFareVnd,
+      headroomPercent: ride.fareHeadroomPercent,
     );
     if (amount == null || !mounted) {
       return;
@@ -765,6 +770,10 @@ class _RideOffersPageState extends State<_RideOffersView> {
       onBack: _back,
       onSelectOffer: (id) => setState(() => _selectedOfferId = id),
       onConfirm: _select,
+      onAcceptOffer: (id) {
+        setState(() => _selectedOfferId = id);
+        unawaited(_select());
+      },
       onCancel: _cancel,
       onRaiseFare: negotiation == null ? null : () => _raiseFare(ride),
       onEditStops: _canEditStops(ride) ? () => _editStops(ride) : null,

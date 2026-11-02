@@ -8,6 +8,7 @@ import '../design_system/tokens/dealgo_tokens.dart';
 import 'map_lat_lng.dart';
 import 'map_port.dart';
 import 'map_style.dart';
+import 'map_zoom.dart';
 import 'tile_map_port.dart';
 
 /// Moves the camera of a [PinPickerMap] (search result, my location).
@@ -87,7 +88,7 @@ class _PinPickerMapState extends State<PinPickerMap> {
   void _moveTo(MapLatLng target, double? zoom) {
     if (widget.port is TileMapPort) {
       if (_ready) {
-        _map.move(LatLng(target.lat, target.lng), zoom ?? _map.camera.zoom);
+        _map.move(LatLng(target.lat, target.lng), clampMapZoom(zoom ?? _map.camera.zoom));
       } else {
         _pending = (target, zoom);
       }
@@ -104,7 +105,7 @@ class _PinPickerMapState extends State<PinPickerMap> {
     if (widget.port is TileMapPort) {
       if (_ready) {
         final camera = _map.camera;
-        _map.move(camera.center, (camera.zoom + delta).clamp(3, 19));
+        _map.move(camera.center, clampMapZoom(camera.zoom + delta));
       }
       return;
     }
@@ -138,9 +139,9 @@ class _PinPickerMapState extends State<PinPickerMap> {
               widget.initialCenter.lat,
               widget.initialCenter.lng,
             ),
-            initialZoom: widget.initialZoom,
-            minZoom: 3,
-            maxZoom: 19,
+            initialZoom: clampMapZoom(widget.initialZoom),
+            minZoom: kMapMinZoom,
+            maxZoom: kMapMaxZoom,
             backgroundColor: style == DealGoMapStyle.dark
                 ? const Color(0xFF1F2430)
                 : const Color(0xFFE7EEF5),

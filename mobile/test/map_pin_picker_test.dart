@@ -340,6 +340,10 @@ void main() {
     await tester.pumpAndSettle();
     // Back on the ride map with the pinned drop-off.
     expect(find.byKey(const Key('map-picker-confirm')), findsNothing);
+    // The pinned drop-off opens the prices on its own.
+    expect(find.byKey(const Key('ride-fare-back')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('ride-fare-back')));
+    await tester.pumpAndSettle();
     expect(find.textContaining('Gần Chợ Hàn'), findsWidgets);
     expect(find.byKey(const Key('ride-map-back')), findsOneWidget);
   });

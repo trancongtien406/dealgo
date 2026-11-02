@@ -8,6 +8,7 @@ class PlaceFoodOrderBody {
     required this.dropoffLng,
     required this.dropoffLabel,
     required this.deliveryFareVnd,
+    this.deliveryOfferVnd,
     this.voucherCode,
     this.paymentMethod,
   });
@@ -27,6 +28,7 @@ class PlaceFoodOrderBody {
       dropoffLng: request.dropoff.lng,
       dropoffLabel: request.dropoff.label,
       deliveryFareVnd: request.deliveryFareVnd,
+      deliveryOfferVnd: request.deliveryOfferVnd,
       voucherCode: request.voucherCode,
       paymentMethod: request.paymentMethod,
     );
@@ -38,6 +40,7 @@ class PlaceFoodOrderBody {
   final double dropoffLng;
   final String dropoffLabel;
   final int deliveryFareVnd;
+  final int? deliveryOfferVnd;
   final String? voucherCode;
   final String? paymentMethod;
 
@@ -47,6 +50,7 @@ class PlaceFoodOrderBody {
       'items': items,
       'dropoff': {'lat': dropoffLat, 'lng': dropoffLng, 'label': dropoffLabel},
       'deliveryFareVnd': deliveryFareVnd,
+      if (deliveryOfferVnd != null) 'deliveryOfferVnd': deliveryOfferVnd,
       if (voucherCode != null) 'voucherCode': voucherCode,
       if (paymentMethod != null) 'paymentMethod': paymentMethod,
     };

@@ -15,7 +15,6 @@ Future<String?> showDriverFoodCodeSheet(
   return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
-    showDragHandle: true,
     builder: (_) => _DriverFoodCodeSheet(delivery: delivery, error: error),
   );
 }
@@ -56,7 +55,7 @@ class _DriverFoodCodeSheetState extends State<_DriverFoodCodeSheet> {
       key: const Key('driver-food-code-sheet'),
       padding: EdgeInsets.fromLTRB(
         DealGoDimensions.pageGutter,
-        0,
+        DealGoSpacing.s20,
         DealGoDimensions.pageGutter,
         MediaQuery.viewInsetsOf(context).bottom + DealGoSpacing.s16,
       ),

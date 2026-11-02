@@ -1,5 +1,7 @@
 /** DEC-PROD-055: public pages served by Nest `/v1/public/pages/:slug`. */
-export const PUBLIC_PAGE_SLUGS = ["terms", "privacy", "support"] as const;
+export const PUBLIC_PAGE_SLUGS = ["terms", "privacy", "regulations", "support"] as const;
+/** Legal documents rendered by LegalPageView (everything except support). */
+export type LegalPageSlug = Exclude<PublicPageSlug, "support">;
 export type PublicPageSlug = (typeof PUBLIC_PAGE_SLUGS)[number];
 export const PUBLIC_PAGE_LOCALES = ["vi", "en"] as const;
 export type PublicPageLocale = (typeof PUBLIC_PAGE_LOCALES)[number];

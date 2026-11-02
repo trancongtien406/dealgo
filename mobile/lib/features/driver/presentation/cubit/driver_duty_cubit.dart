@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../live_location/domain/driver_location.dart';
 import '../../../live_location/presentation/driver_location_reporter.dart';
 import '../../../presence/domain/params/set_presence_params.dart';
 import '../../../presence/domain/usecases/set_presence.dart';
@@ -68,6 +69,9 @@ class DriverDutyCubit extends Cubit<bool> {
 
   /// DEC-PROD-031: reports the driver's position while online.
   final DriverLocationReporter? _reporter;
+
+  /// t82u: driver's last reported position while online (null offline/unknown).
+  DriverLocationFix? get lastFix => state ? _reporter?.lastFix : null;
 
   Future<void> connect() async {
     if (state) {

@@ -36,6 +36,7 @@ import {
 } from "../constants";
 import {
   BOOLEAN_SETTING_KEYS,
+  ENUM_SETTING_OPTIONS,
   categorizeSetting,
   getSettingIcon,
   validateSettingValue,
@@ -248,7 +249,7 @@ export function PlatformSettingsBoard() {
             })}
           </div>
 
-          <div className="flex items-center gap-1.5 text-xs">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
             <span className="text-muted font-medium mr-1">Nguồn:</span>
             {PLATFORM_SETTING_SOURCES.map((src) => {
               const isSelected = sourceFilter === src.id;
@@ -377,24 +378,30 @@ export function PlatformSettingsBoard() {
             return (
               <div
                 key={row.key}
-                className="flex flex-col justify-between rounded-2xl border border-border bg-white p-5 shadow-xs hover:border-brand/30 hover:shadow-sm transition-all"
+                className="flex min-w-0 flex-col justify-between rounded-2xl border border-border bg-white p-5 shadow-xs hover:border-brand/30 hover:shadow-sm transition-all"
               >
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex min-w-0 flex-1 items-center gap-2.5">
                       <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand/10 text-brand">
                         <OpsIcon name={icon} className="size-4" />
                       </span>
                       <div className="min-w-0">
-                        <h3 className="text-sm font-semibold text-ink truncate">
+                        <h3
+                          className="text-sm font-semibold text-ink truncate"
+                          title={row.label}
+                        >
                           {row.label}
                         </h3>
-                        <span className="font-mono text-xs text-muted block truncate">
+                        <span
+                          className="font-mono text-xs text-muted block truncate"
+                          title={row.key}
+                        >
                           {row.key}
                         </span>
                       </div>
                     </div>
-                    <div>
+                    <div className="shrink-0">
                       {row.source === "db" ? (
                         <StatusChip tone="brand">DB override</StatusChip>
                       ) : (
@@ -436,8 +443,8 @@ export function PlatformSettingsBoard() {
                   ) : null}
                 </div>
 
-                <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
-                  <span className="text-xs text-muted">
+                <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3">
+                  <span className="min-w-0 text-xs text-muted">
                     {row.updatedAt
                       ? `Cập nhật: ${formatOpsDate(row.updatedAt)}`
                       : "Mặc định từ hệ thống"}
@@ -445,7 +452,7 @@ export function PlatformSettingsBoard() {
                   <button
                     type="button"
                     onClick={() => openEdit(row)}
-                    className={`inline-flex items-center gap-1.5 rounded-xl border border-border bg-white px-3 py-1.5 text-xs font-semibold text-ink hover:bg-canvas hover:text-brand cursor-pointer transition-colors shadow-2xs ${focusRing}`}
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-border bg-white px-3 py-1.5 text-xs font-semibold text-ink hover:bg-canvas hover:text-brand cursor-pointer transition-colors shadow-2xs ${focusRing}`}
                   >
                     <OpsIcon name="sliders" className="size-3.5 text-muted" />
                     Chỉnh sửa
@@ -490,17 +497,20 @@ export function PlatformSettingsBoard() {
               <span className="text-xs font-semibold text-ink uppercase tracking-wide">
                 Giá trị tham số mới
               </span>
-              {BOOLEAN_SETTING_KEYS.has(draft.key) ? (
+              {BOOLEAN_SETTING_KEYS.has(draft.key) || ENUM_SETTING_OPTIONS[draft.key] ? (
                 <div
                   role="radiogroup"
                   aria-label="Giá trị tham số mới"
                   className="flex gap-2"
                 >
-                  {(
-                    [
-                      ["true", "Bật"],
-                      ["false", "Tắt"],
-                    ] as const
+                  {(ENUM_SETTING_OPTIONS[draft.key]
+                    ? ENUM_SETTING_OPTIONS[draft.key].map(
+                        (c) => [c.value, `${c.label} · ${c.labelEn}`] as const,
+                      )
+                    : ([
+                        ["true", "Bật"],
+                        ["false", "Tắt"],
+                      ] as const)
                   ).map(([value, label]) => (
                     <button
                       key={value}

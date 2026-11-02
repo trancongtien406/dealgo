@@ -107,7 +107,7 @@ class SupportAttachmentPicker extends StatelessWidget {
                         style: IconButton.styleFrom(
                           backgroundColor: DealGoColors.card,
                           foregroundColor: DealGoColors.text,
-                          side: const BorderSide(color: DealGoColors.border),
+                          side: BorderSide(color: DealGoColors.border),
                         ),
                         onPressed: enabled
                             ? () => onChanged([...picked]..removeAt(i))

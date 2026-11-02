@@ -10,9 +10,13 @@ import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../legal/legal_documents.dart';
+import '../../../legal/partner_legal_consent.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
 import '../../../pricing/domain/pricing.dart';
+import '../../../ride/presentation/cubit/vehicle_class_catalog_cubit.dart';
+import '../../../shell/presentation/account_routes.dart';
 import '../../domain/entities/partner_documents.dart';
 import '../../domain/entities/partner_onboarding.dart';
 import '../cubit/driver_kyc_cubit.dart';
@@ -106,7 +110,15 @@ class _DriverKycGatePageState extends State<DriverKycGatePage> {
     if (!mounted || _escaping) {
       return;
     }
-    final next = DriverKycRoutes.entryFromCubit(context.read<DriverKycCubit>());
+    final cubit = context.read<DriverKycCubit>();
+    // t90u: "Bổ sung giấy tờ" from a car-docs 403 reopens the vehicle step.
+    if (GoRouterState.of(context).uri.queryParameters['fix'] == 'car-docs') {
+      _didRedirect = true;
+      cubit.beginResubmit('VEHICLE');
+      context.go(DriverKycRoutes.steps);
+      return;
+    }
+    final next = DriverKycRoutes.entryFromCubit(cubit);
     if (next == DriverKycRoutes.root) {
       setState(() => _failed = true);
       return;
@@ -394,39 +406,43 @@ class DriverKycStepsPage extends StatelessWidget {
             }
             cubit.previousStep();
           },
-          footer: OnboardingContinueBar(
-            label: isReview
-                ? (state.issues.isEmpty
-                      ? l10n.kycSubmitCta
-                      : l10n.kycResubmitCta)
-                : l10n.partnerContinue,
-            enabled:
-                !state.submitting &&
-                switch (state.step) {
-                  DriverKycStep.services => state.canContinueServices,
-                  DriverKycStep.personal => state.canContinuePersonal,
-                  DriverKycStep.identity => state.canContinueIdentity,
-                  DriverKycStep.ocrConfirm => state.canContinueIdNumber,
-                  DriverKycStep.selfie => state.canContinueSelfie,
-                  DriverKycStep.license => state.canContinueLicense,
-                  DriverKycStep.vehicle => state.canContinueVehicleStep,
-                  DriverKycStep.bank => state.canContinueBank,
-                  DriverKycStep.review => state.canSubmit,
-                },
-            onPressed: () async {
-              if (isReview) {
-                await cubit.submit();
-                if (!context.mounted) {
+          footer: ValueListenableBuilder<List<AcceptedLegalDocument>?>(
+            valueListenable: cubit.legalConsent,
+            builder: (context, _, _) => OnboardingContinueBar(
+              label: isReview
+                  ? (state.issues.isEmpty
+                        ? l10n.kycSubmitCta
+                        : l10n.kycResubmitCta)
+                  : l10n.partnerContinue,
+              enabled:
+                  !state.submitting &&
+                  switch (state.step) {
+                    DriverKycStep.services => state.canContinueServices,
+                    DriverKycStep.personal => state.canContinuePersonal,
+                    DriverKycStep.identity => state.canContinueIdentity,
+                    DriverKycStep.ocrConfirm => state.canContinueIdNumber,
+                    DriverKycStep.selfie => state.canContinueSelfie,
+                    DriverKycStep.license => state.canContinueLicense,
+                    DriverKycStep.vehicle => state.canContinueVehicleStep,
+                    DriverKycStep.bank => state.canContinueBank,
+                    DriverKycStep.review =>
+                      state.canSubmit && cubit.legalConsent.value != null,
+                  },
+              onPressed: () async {
+                if (isReview) {
+                  await cubit.submit();
+                  if (!context.mounted) {
+                    return;
+                  }
+                  if (cubit.state.submitError == null &&
+                      cubit.state.status == PartnerApplicationStatus.pending) {
+                    context.go(DriverKycRoutes.status);
+                  }
                   return;
                 }
-                if (cubit.state.submitError == null &&
-                    cubit.state.status == PartnerApplicationStatus.pending) {
-                  context.go(DriverKycRoutes.status);
-                }
-                return;
-              }
-              cubit.nextStep();
-            },
+                cubit.nextStep();
+              },
+            ),
           ),
           body: ListView(
             padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
@@ -871,7 +887,7 @@ class _PersonalStep extends StatelessWidget {
             hint: 'dd/mm/yyyy',
             keyboardType: TextInputType.datetime,
             onChanged: cubit.setBirthDate,
-            trailing: const Icon(
+            trailing: Icon(
               DealGoIcons.calendar,
               size: 18,
               color: DealGoColors.textSecondary,
@@ -1034,30 +1050,14 @@ class _VehicleStepState extends State<_VehicleStep> {
     RideVehicleClassOption(code: 'CAR_7', name: 'Xe 7 chỗ', seats: 7),
   ];
 
-  List<RideVehicleClassOption> _classes = _fallback;
-
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadClasses());
-  }
-
-  Future<void> _loadClasses() async {
-    final auth = context.read<AuthCubit>().state;
-    if (auth is! AuthSignedIn) {
-      return;
-    }
-    try {
-      final classes = await context
-          .read<PricingRepository>()
-          .listVehicleClasses(accessToken: auth.tokens.accessToken);
-      if (!mounted || classes.isEmpty) {
-        return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<VehicleClassCatalogCubit>().load(force: true);
       }
-      setState(() => _classes = classes);
-    } catch (_) {
-      // Keep the built-in classes so registration can still name a vehicle.
-    }
+    });
   }
 
   @override
@@ -1065,6 +1065,9 @@ class _VehicleStepState extends State<_VehicleStep> {
     final l10n = AppLocalizations.of(context);
     final cubit = context.read<DriverKycCubit>();
     final state = widget.state;
+    final catalog = context.watch<VehicleClassCatalogCubit>().state;
+    // Built-in classes keep registration usable when the catalog is unreachable.
+    final classes = catalog.isEmpty ? _fallback : catalog;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1077,7 +1080,7 @@ class _VehicleStepState extends State<_VehicleStep> {
           spacing: DealGoSpacing.s8,
           runSpacing: DealGoSpacing.s8,
           children: [
-            for (final vehicle in _classes)
+            for (final vehicle in classes)
               ChoiceChip(
                 key: Key('kyc-vehicle-${vehicle.code}'),
                 label: _VehicleClassChipLabel(
@@ -1142,11 +1145,22 @@ class _VehicleStepState extends State<_VehicleStep> {
               key: const Key('kyc-license-class-mismatch'),
               message: l10n.kycLicenseClassMismatch(state.licenseClass),
             ),
-        ] else
+        ] else ...[
+          if (state.needsCarInsurance) ...[
+            _DocSlots(
+              state: state,
+              kinds: const [PartnerDocumentKind.vehicleInsurance],
+            ),
+            OnboardingInfoBanner(
+              key: const Key('kyc-quick-car-insurance'),
+              message: l10n.kycVehicleInsuranceNote,
+            ),
+          ],
           OnboardingInfoBanner(
             message: l10n.kycQuickModeBanner,
             icon: DealGoIcons.bolt,
           ),
+        ],
       ],
     );
   }
@@ -1185,9 +1199,60 @@ class _ReviewStep extends StatelessWidget {
       if (state.rideService) l10n.kycIntroRideTitle,
       if (state.foodService) l10n.kycIntroFoodTitle,
     ].join(', ');
+    final avatarUrl = context.select<AuthCubit, String?>(
+      (c) => switch (c.state) {
+        AuthSignedIn(:final profile) => profile.avatarUrl,
+        _ => null,
+      },
+    );
+    final avatar = resolveMediaUrl(avatarUrl);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        DealGoCard(
+          key: const Key('kyc-review-avatar'),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 26,
+                backgroundColor: DealGoColors.subtlePurple,
+                foregroundImage: avatar == null ? null : NetworkImage(avatar),
+                child: const Icon(
+                  DealGoIcons.user,
+                  color: DealGoColors.primary,
+                ),
+              ),
+              const SizedBox(width: DealGoSpacing.s12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l10n.kycReviewAvatar, style: textTheme.titleMedium),
+                    Text(
+                      avatar == null
+                          ? l10n.kycAvatarMissing
+                          : l10n.kycAvatarReady,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: avatar == null
+                            ? DealGoColors.danger
+                            : DealGoColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (avatar == null)
+                TextButton(
+                  key: const Key('kyc-add-avatar'),
+                  onPressed: () => context.push(
+                    AccountRoutes.editProfile('/customer/account'),
+                  ),
+                  child: Text(l10n.kycAvatarAdd),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: DealGoSpacing.s12),
         DealGoCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1253,6 +1318,8 @@ class _ReviewStep extends StatelessWidget {
               ? l10n.kycReviewNote
               : l10n.kycQuickModeBanner,
         ),
+        const SizedBox(height: DealGoSpacing.s16),
+        PartnerLegalConsent(consent: cubit.legalConsent),
       ],
     );
   }

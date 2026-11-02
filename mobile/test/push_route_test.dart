@@ -104,6 +104,10 @@ void main() {
         '/customer/food/orders/x1',
       );
       expect(
+        resolvePushLocation(d('FoodOrder', 'CANCELLED'), _c),
+        '/customer/shop',
+      );
+      expect(
         resolvePushLocation(d('FoodOrder', 'PLACED', role: 'MERCHANT'), _m),
         '/merchant/orders/x1',
       );

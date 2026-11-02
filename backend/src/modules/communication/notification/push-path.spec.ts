@@ -17,6 +17,8 @@ describe('push tap paths', () => {
 
   it('food: each role opens its own order page; a cancelled job sends partners to the list', () => {
     expect(pushPathFor({ aggregateType: 'FoodOrder', aggregateId: 'o1', role: 'CUSTOMER', status: 'PICKED_UP' })).toBe('/customer/food/orders/o1');
+    expect(pushPathFor({ aggregateType: 'FoodOrder', aggregateId: 'o1', role: 'CUSTOMER', status: 'CANCELLED' })).toBe('/customer/shop');
+    expect(pushPathFor({ aggregateType: 'FoodOrder', aggregateId: 'o1', role: 'CUSTOMER', status: 'REJECTED' })).toBe('/customer/shop');
     expect(pushPathFor({ aggregateType: 'FoodOrder', aggregateId: 'o1', role: 'MERCHANT', status: 'PLACED' })).toBe('/merchant/orders/o1');
     expect(pushPathFor({ aggregateType: 'FoodOrder', aggregateId: 'o1', role: 'MERCHANT', status: 'CANCELLED' })).toBe('/merchant/orders');
     expect(pushPathFor({ aggregateType: 'FoodOrder', aggregateId: 'o1', role: 'DRIVER', status: 'ASSIGNED' })).toBe('/driver/food/o1');

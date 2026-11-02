@@ -4,6 +4,7 @@ import 'package:dealgo/core/permissions/app_permission_service.dart';
 import 'package:dealgo/features/account_settings/presentation/edit_profile_page.dart';
 import 'package:dealgo/features/identity/data/repositories/identity_repository_impl.dart';
 import 'package:dealgo/features/identity/domain/entities/user_profile.dart';
+import 'package:dealgo/features/identity/domain/phone_input.dart';
 import 'package:dealgo/features/identity/domain/repositories/identity_repository.dart';
 import 'package:dealgo/features/identity/domain/usecases/fetch_me.dart';
 import 'package:dealgo/features/identity/presentation/cubit/auth_cubit.dart';
@@ -137,5 +138,84 @@ void main() {
     expect(find.byKey(const Key('phone-field')), findsNothing);
     expect(find.byKey(const Key('locked-phone-field')), findsOneWidget);
     expect(find.text('0911 111 111'), findsOneWidget);
+  });
+
+  // The OTP field animates its caret forever, so pumpAndSettle never settles
+  // while the sheet is open.
+  Future<void> pumpSheet(WidgetTester tester) async {
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+  }
+
+  Future<void> enterEmailCode(WidgetTester tester, String code) async {
+    await tester.enterText(
+      find.descendant(
+        of: find.byKey(const Key('email-verify-code')),
+        matching: find.byType(EditableText),
+      ),
+      code,
+    );
+    await pumpSheet(tester);
+  }
+
+  testWidgets('edit: saving the current unverified email mails nothing; '
+      'Verify asks for the 6-digit code', (tester) async {
+    final client = await _pump(
+      tester,
+      const EditProfilePage(),
+      contactPhone: '+84901234567',
+    );
+    await tester.tap(find.text('Lưu thay đổi'));
+    await tester.pumpAndSettle();
+    expect(client.updateMeCalls.single['email'], 'lan@dealgo.test');
+    expect(client.emailVerificationRequests, isEmpty);
+    expect(find.byKey(const Key('email-verify-code')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('email-verify-action')));
+    await pumpSheet(tester);
+    expect(client.emailVerificationRequests, ['lan@dealgo.test']);
+    expect(find.text('lan@dealgo.test'), findsWidgets);
+
+    await enterEmailCode(tester, FakeIdentityClient.emailVerificationCode);
+    expect(find.byKey(const Key('email-verify-code')), findsNothing);
+    // Queued behind the "profile saved" snack bar from the earlier save.
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('email-verified-snack')), findsOneWidget);
+    expect(client.profile.emailVerifiedAt, isNotNull);
+    expect(find.byKey(const Key('email-verify-action')), findsNothing);
+  });
+
+  testWidgets('edit: a new email is applied only after the right code', (
+    tester,
+  ) async {
+    final client = await _pump(
+      tester,
+      const EditProfilePage(),
+      contactPhone: '+84901234567',
+    );
+    await tester.enterText(
+      find.byKey(const Key('email-field')),
+      'Lan.New@dealgo.test',
+    );
+    await tester.pump();
+    expect(find.byKey(const Key('email-verify-action')), findsNothing);
+    await tester.tap(find.text('Lưu thay đổi'));
+    await pumpSheet(tester);
+
+    expect(client.emailVerificationRequests, ['lan.new@dealgo.test']);
+    expect(client.profile.email, 'lan@dealgo.test');
+    expect(find.byKey(const Key('email-verify-code')), findsOneWidget);
+
+    await enterEmailCode(tester, '000000');
+    expect(find.byKey(const Key('email-verify-error')), findsOneWidget);
+    expect(client.profile.email, 'lan@dealgo.test');
+
+    await enterEmailCode(tester, FakeIdentityClient.emailVerificationCode);
+    expect(find.byKey(const Key('email-verify-code')), findsNothing);
+    expect(client.profile.email, 'lan.new@dealgo.test');
+    expect(client.profile.emailVerifiedAt, isNotNull);
+    expect(client.emailVerificationRequests, hasLength(1));
   });
 }

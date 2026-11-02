@@ -7,6 +7,7 @@ import '../../../../core/config/api_base_url.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/network/api_error_l10n.dart';
+import '../../../../core/network/api_exception.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../driver_card/domain/driver_card.dart';
@@ -54,7 +55,7 @@ T? _tryRead<T>(BuildContext context) {
   }
 }
 
-/// Opens the ride / food-order chat (r25 redesign: one handle, compact header
+/// Opens the ride / food-order chat (one handle, compact header
 /// with call, grouped bubbles with time + send state, quick replies).
 Future<void> showTransactionChatSheet({
   required BuildContext context,
@@ -76,7 +77,6 @@ Future<void> showTransactionChatSheet({
     context: context,
     isScrollControlled: true,
     // The theme adds a drag handle to every sheet; this one draws its own.
-    showDragHandle: false,
     useSafeArea: false,
     backgroundColor: DealGoColors.card,
     shape: const RoundedRectangleBorder(
@@ -199,12 +199,15 @@ class _TransactionChatSheetState extends State<TransactionChatSheet> {
           avatarUrl: card.avatarUrl,
         );
       } else {
-        final name = await cards.fetchCustomerName(
+        final customer = await cards.fetchCustomer(
           accessToken: token,
           jobId: widget.resourceId,
           isFood: widget.kind.isFood,
         );
-        value = ChatCounterpart(name: name);
+        value = ChatCounterpart(
+          name: customer.displayName,
+          avatarUrl: customer.avatarUrl,
+        );
       }
       if (value.name.trim().isEmpty) return;
       _counterpartMemo[_memoKey] = value;
@@ -272,6 +275,12 @@ class _TransactionChatSheetState extends State<TransactionChatSheet> {
     final keyboard = media.viewInsets.bottom;
     final maxHeight = media.size.height - keyboard - media.padding.top - 8;
     final height = (media.size.height * 0.82).clamp(0.0, maxHeight);
+    final isWindowClosed = context.select<ChatCubit, bool>(
+      (cubit) =>
+          cubit.state.loadError is ApiException &&
+          (cubit.state.loadError as ApiException).errorCode ==
+              'CHAT_WINDOW_CLOSED',
+    );
     return Padding(
       padding: EdgeInsets.only(bottom: keyboard),
       child: SizedBox(
@@ -279,14 +288,14 @@ class _TransactionChatSheetState extends State<TransactionChatSheet> {
         height: height,
         child: Column(
           children: [
-            const _Handle(),
+            const SizedBox(height: DealGoSpacing.s8),
             _Header(
               viewer: widget.viewer,
               kind: widget.kind,
               counterpart: _counterpart,
-              onCall: widget.onCall,
+              onCall: isWindowClosed ? null : widget.onCall,
             ),
-            const Divider(height: 1, color: DealGoColors.divider),
+            Divider(height: 1, color: DealGoColors.divider),
             Expanded(
               child: ColoredBox(
                 color: DealGoColors.canvas,
@@ -316,41 +325,26 @@ class _TransactionChatSheetState extends State<TransactionChatSheet> {
                 ),
               ),
             ),
-            if (_quickReplies(l10n).isNotEmpty)
-              _QuickReplies(
-                replies: _quickReplies(l10n),
-                onTap: (text) => unawaited(_send(text)),
+            if (!isWindowClosed) ...[
+              if (_quickReplies(l10n).isNotEmpty)
+                _QuickReplies(
+                  replies: _quickReplies(l10n),
+                  onTap: (text) => unawaited(_send(text)),
+                ),
+              _Composer(
+                controller: _controller,
+                focus: _focus,
+                canSend: _hasText,
+                onSend: () => unawaited(_send()),
+                bottomInset: keyboard > 0 ? 0 : media.viewPadding.bottom,
               ),
-            _Composer(
-              controller: _controller,
-              focus: _focus,
-              canSend: _hasText,
-              onSend: () => unawaited(_send()),
-              bottomInset: keyboard > 0 ? 0 : media.viewPadding.bottom,
-            ),
+            ] else
+              SizedBox(height: media.viewPadding.bottom + DealGoSpacing.s16),
           ],
         ),
       ),
     );
   }
-}
-
-class _Handle extends StatelessWidget {
-  const _Handle();
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: DealGoSpacing.s8),
-    child: Container(
-      key: const Key('chat-handle'),
-      width: 36,
-      height: 4,
-      decoration: BoxDecoration(
-        color: DealGoColors.border,
-        borderRadius: BorderRadius.circular(DealGoRadius.pill),
-      ),
-    ),
-  );
 }
 
 class _Header extends StatelessWidget {
@@ -529,12 +523,29 @@ class _Timeline extends StatelessWidget {
       );
     }
     if (!state.loaded && state.loadError != null) {
+      final isWindowClosed = state.loadError is ApiException &&
+          (state.loadError as ApiException).errorCode == 'CHAT_WINDOW_CLOSED';
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(DealGoSpacing.s24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (isWindowClosed) ...[
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: DealGoColors.subtlePurple,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    DealGoIcons.chatBubbles,
+                    color: DealGoColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: DealGoSpacing.s12),
+              ],
               Text(
                 localizedFailureMessage(context, state.loadError!),
                 key: const Key('chat-load-error'),
@@ -543,13 +554,15 @@ class _Timeline extends StatelessWidget {
                   color: DealGoColors.textSecondary,
                 ),
               ),
-              const SizedBox(height: DealGoSpacing.s8),
-              TextButton(
-                key: const Key('chat-reload'),
-                onPressed: () =>
-                    context.read<ChatCubit>().load(accessToken: accessToken),
-                child: Text(l10n.actionRetry),
-              ),
+              if (!isWindowClosed) ...[
+                const SizedBox(height: DealGoSpacing.s8),
+                TextButton(
+                  key: const Key('chat-reload'),
+                  onPressed: () =>
+                      context.read<ChatCubit>().load(accessToken: accessToken),
+                  child: Text(l10n.actionRetry),
+                ),
+              ],
             ],
           ),
         ),
@@ -564,7 +577,7 @@ class _Timeline extends StatelessWidget {
             Container(
               width: 56,
               height: 56,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: DealGoColors.subtlePurple,
                 shape: BoxShape.circle,
               ),
@@ -798,22 +811,14 @@ class _Bubble extends StatelessWidget {
         case ChatDelivery.sending:
           children.addAll([
             const SizedBox(width: DealGoSpacing.s4),
-            const Icon(
-              DealGoIcons.clock,
-              size: 12,
-              color: DealGoColors.textTertiary,
-            ),
+            Icon(DealGoIcons.clock, size: 12, color: DealGoColors.textTertiary),
             const SizedBox(width: 2),
             Text(l10n.chatStatusSending, style: style),
           ]);
         case ChatDelivery.sent:
           children.addAll([
             const SizedBox(width: DealGoSpacing.s4),
-            const Icon(
-              DealGoIcons.check,
-              size: 12,
-              color: DealGoColors.textTertiary,
-            ),
+            Icon(DealGoIcons.check, size: 12, color: DealGoColors.textTertiary),
             const SizedBox(width: 2),
             Text(l10n.chatStatusSent, style: style),
           ]);

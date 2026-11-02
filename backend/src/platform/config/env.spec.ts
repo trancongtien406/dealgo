@@ -151,7 +151,7 @@ describe('loadEnv', () => {
   it('defaults ride fare bounds and offer TTL', () => {
     const env = loadEnv({});
 
-    expect(env.RIDE_OFFER_TTL_SECONDS).toBe(60);
+    expect(env.RIDE_OFFER_TTL_SECONDS).toBe(20);
     expect(env.RIDE_MIN_FARE_VND).toBe(10_000);
     expect(env.RIDE_MAX_FARE_VND).toBe(500_000);
     expect(env.RIDE_REFERENCE_VND_PER_KM).toBe(5_000);
