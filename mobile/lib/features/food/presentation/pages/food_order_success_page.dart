@@ -58,13 +58,12 @@ class FoodOrderSuccessPage extends StatelessWidget {
       return _FoodOrderSuccessView(args: args);
     }
     return BlocProvider(
-      create: (context) => FoodTrackingCubit(
-        getFoodOrder: getOrder!,
-        realtime: realtime!,
-      )..start(
-          orderId: args.order.id,
-          accessToken: currentAccessToken(context),
-        ),
+      create: (context) =>
+          FoodTrackingCubit(getFoodOrder: getOrder!, realtime: realtime!)
+            ..start(
+              orderId: args.order.id,
+              accessToken: currentAccessToken(context),
+            ),
       child: _LiveSuccess(args: args),
     );
   }
@@ -289,9 +288,9 @@ class _FoodOrderSuccessView extends StatelessWidget {
                           key: const Key('food-success-step-prep'),
                           label: liveStatus == 'PREPARING'
                               ? AppLocalizations.of(context)
-                                  .merchantStatusPreparing
+                                    .merchantStatusPreparing
                               : AppLocalizations.of(context)
-                                  .foodStepNotPreparing,
+                                    .foodStepNotPreparing,
                           tone: liveStatus == 'PREPARING'
                               ? FoodChipTone.purple
                               : FoodChipTone.neutral,

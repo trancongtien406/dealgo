@@ -144,10 +144,12 @@ class FoodOptionSelection {
     return FoodOptionSelection._(groups, {..._qty, group.id: next});
   }
 
-  bool get isComplete => groups.every((group) {
+  bool satisfies(FoodOptionGroup group) {
     final count = _groupTotal(group.id);
     return count >= group.minSelect && count <= group.maxSelect;
-  });
+  }
+
+  bool get isComplete => groups.every(satisfies);
 
   int get extrasVnd {
     var total = 0;
