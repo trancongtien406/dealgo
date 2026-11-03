@@ -3,8 +3,13 @@ import 'dart:async';
 import 'package:dealgo/core/mock/fake_food_client.dart';
 import 'package:dealgo/features/food/data/repositories/food_repository_impl.dart';
 import 'package:dealgo/features/food/domain/entities/food_models.dart';
+import 'package:dealgo/features/food/domain/entities/food_options.dart';
+import 'package:dealgo/features/food/presentation/cubit/food_cart_cubit.dart';
 import 'package:dealgo/features/food/presentation/cubit/food_search_cubit.dart';
+import 'package:dealgo/features/food/presentation/pages/food_item_options_page.dart';
+import 'package:dealgo/features/food/presentation/pages/food_search_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/auth_test_harness.dart';
@@ -65,12 +70,43 @@ Future<void> _search(WidgetTester tester, String q) async {
   await tester.pumpAndSettle();
 }
 
+const _sizeGroup = FoodOptionGroup(
+  id: 'g-size',
+  title: 'Chọn cỡ',
+  minSelect: 1,
+  maxSelect: 2,
+  choices: [
+    FoodOptionChoice(id: 'o-s', label: 'Vừa'),
+    FoodOptionChoice(id: 'o-l', label: 'Lớn', extraVnd: 5000),
+  ],
+);
+
+FoodMenuItem _bunItem({bool available = true}) => FoodMenuItem(
+  id: 'item-bun',
+  name: 'Bún bò',
+  priceVnd: 45000,
+  available: available,
+  imageUrl: null,
+  optionGroups: const [_sizeGroup],
+);
+
+FoodStoreDetail _bunStore({List<FoodMenuItem>? items}) {
+  return FoodStoreDetail(
+    id: 'store-1',
+    name: 'Bún Bò Huế',
+    items: items ?? [_bunItem()],
+    minOrderVnd: 100000,
+    estimatedPrepMinutes: 25,
+  );
+}
+
 void main() {
-  testWidgets('dish hits render above store results and open the item page', (
+  testWidgets('dish hits render above stores and open the real item page', (
     tester,
   ) async {
     _tall(tester);
     final food = FakeFoodClient()
+      ..details = {'store-1': _bunStore()}
       ..searchFoodHandler = (q) => FoodSearchResult(
         dishes: [
           dishHit(
@@ -108,8 +144,91 @@ void main() {
     await tester.ensureVisible(dish);
     await tester.tap(dish);
     await tester.pumpAndSettle();
+
     expect(find.byKey(const Key('food-item-qty')), findsOneWidget);
-    expect(find.text('Bún bò'), findsWidgets);
+    expect(find.text('Chọn cỡ'), findsOneWidget);
+    expect(find.byKey(const Key('food-options-missing')), findsOneWidget);
+
+    final option = find.byKey(const Key('food-option-o-l'));
+    await tester.scrollUntilVisible(
+      option,
+      120,
+      scrollable: find
+          .descendant(
+            of: find.byType(FoodItemOptionsPage),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await Scrollable.ensureVisible(tester.element(option), alignment: 0.5);
+    await tester.pumpAndSettle();
+    await tester.tap(option);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('food-options-missing')), findsNothing);
+    expect(find.textContaining('Lớn'), findsWidgets);
+
+    await tester.tap(find.byKey(const Key('food-options-add')));
+    await tester.pumpAndSettle();
+
+    final cart = BlocProvider.of<FoodCartCubit>(
+      tester.element(find.byType(FoodSearchPage)),
+    ).state;
+    expect(cart.lines.single.optionIds, ['o-l']);
+    expect(cart.minOrderVnd, 100000);
+  });
+
+  testWidgets('a hit absent from the store detail stays on the search page', (
+    tester,
+  ) async {
+    _tall(tester);
+    final food = FakeFoodClient()
+      ..details = {'store-1': _bunStore(items: const [])}
+      ..searchFoodHandler = (q) => FoodSearchResult(
+        dishes: [
+          dishHit(name: 'Bún bò', storeId: 'store-1', itemId: 'item-bun'),
+        ],
+        dishTotal: 1,
+        stores: [storeSummary(id: 'store-1', name: 'Bún Bò Huế')],
+        storeTotal: 1,
+      );
+
+    await pumpSignedIn(tester, profile: customerProfile, foodClient: food);
+    await _openSearch(tester);
+    await _search(tester, 'bún');
+    await tester.tap(find.byKey(const Key('food-dish-hit-item-bun')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Món này đã ngừng bán'), findsOneWidget);
+    expect(find.byKey(const Key('food-item-qty')), findsNothing);
+    expect(find.byKey(const Key('food-search-field')), findsOneWidget);
+  });
+
+  testWidgets('a hit whose dish is off sale stays on the search page', (
+    tester,
+  ) async {
+    _tall(tester);
+    final food = FakeFoodClient()
+      ..details = {
+        'store-1': _bunStore(items: [_bunItem(available: false)]),
+      }
+      ..searchFoodHandler = (q) => FoodSearchResult(
+        dishes: [
+          dishHit(name: 'Bún bò', storeId: 'store-1', itemId: 'item-bun'),
+        ],
+        dishTotal: 1,
+        stores: [storeSummary(id: 'store-1', name: 'Bún Bò Huế')],
+        storeTotal: 1,
+      );
+
+    await pumpSignedIn(tester, profile: customerProfile, foodClient: food);
+    await _openSearch(tester);
+    await _search(tester, 'bún');
+    await tester.tap(find.byKey(const Key('food-dish-hit-item-bun')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Món này đã ngừng bán'), findsOneWidget);
+    expect(find.byKey(const Key('food-item-qty')), findsNothing);
+    expect(find.byKey(const Key('food-search-field')), findsOneWidget);
   });
 
   testWidgets('no dish hits means no dish heading', (tester) async {

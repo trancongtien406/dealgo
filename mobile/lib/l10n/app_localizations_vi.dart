@@ -864,6 +864,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get foodSearchStores => 'Quán';
 
   @override
+  String get foodSearchDishUnavailable => 'Món này đã ngừng bán';
+
+  @override
   String get foodDeliverTo => 'Giao đến';
 
   @override

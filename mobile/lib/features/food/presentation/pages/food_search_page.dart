@@ -12,7 +12,9 @@ import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/food_models.dart';
+import '../../domain/params/get_food_store_params.dart';
 import '../../domain/repositories/food_repository.dart';
+import '../../domain/usecases/get_food_store.dart';
 import '../cubit/food_search_cubit.dart';
 import '../utils/food_routes.dart';
 import '../widgets/food_cart_bar.dart';
@@ -68,6 +70,7 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
   var _history = const <String>[];
   var _keywords = const <String>[];
   Timer? _debounce;
+  var _openingDish = false;
 
   /// Text the server was last asked for; while it matches the box the list
   /// is the server's answer for that keyword.
@@ -154,28 +157,41 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
     context.push(FoodRoutes.store(store.id));
   }
 
-  void _openDish(FoodDishHit hit) {
+  /// Resolves the real store before opening the item page: the hit carries no
+  /// option groups, minimum order or availability, so a synthetic store would
+  /// let customers configure a line the server later rejects.
+  Future<void> _openDish(FoodDishHit hit) async {
+    if (_openingDish) return;
+    _openingDish = true;
     _remember();
-    final item = FoodMenuItem(
-      id: hit.item.id,
-      name: hit.item.name,
-      priceVnd: hit.item.priceVnd,
-      available: hit.store.openNow,
-      originalPriceVnd: hit.item.originalPriceVnd,
-      imageUrl: hit.item.imageUrl,
-      soldCount: hit.item.soldCount,
-    );
-    final store = FoodStoreDetail(
-      id: hit.store.id,
-      name: hit.store.name,
-      items: [item],
-      estimatedPrepMinutes: hit.store.etaMinutes,
-      closedReason: hit.store.closedReason,
-    );
-    context.push(
-      FoodRoutes.itemOptions(storeId: store.id, itemId: item.id),
-      extra: FoodItemOptionsArgs(store: store, item: item),
-    );
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final l10n = AppLocalizations.of(context);
+    final token = currentAccessToken(context);
+    if (token == null || token.isEmpty) {
+      _openingDish = false;
+      messenger?.showSnackBar(SnackBar(content: Text(l10n.errorGeneric)));
+      return;
+    }
+    try {
+      final store = await context.read<GetFoodStore>()(
+        GetFoodStoreParams(accessToken: token, storeId: hit.store.id),
+      );
+      if (!mounted) return;
+      final item = store.items
+          .where((candidate) => candidate.id == hit.item.id)
+          .firstOrNull;
+      if (item == null || !item.available) {
+        messenger?.showSnackBar(
+          SnackBar(content: Text(l10n.foodSearchDishUnavailable)),
+        );
+        return;
+      }
+      openFoodItemOptions(context: context, store: store, item: item);
+    } catch (_) {
+      messenger?.showSnackBar(SnackBar(content: Text(l10n.errorGeneric)));
+    } finally {
+      _openingDish = false;
+    }
   }
 
   void _onKeywords(FoodSearchReady ready) {

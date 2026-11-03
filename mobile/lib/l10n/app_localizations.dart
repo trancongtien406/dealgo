@@ -1760,6 +1760,12 @@ abstract class AppLocalizations {
   /// **'Stores'**
   String get foodSearchStores;
 
+  /// No description provided for @foodSearchDishUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This dish is no longer sold'**
+  String get foodSearchDishUnavailable;
+
   /// No description provided for @foodDeliverTo.
   ///
   /// In en, this message translates to:

@@ -298,6 +298,7 @@
   "foodSearchEmpty": "No matching stores yet",
   "foodSearchDishes": "Dishes",
   "foodSearchStores": "Stores",
+  "foodSearchDishUnavailable": "This dish is no longer sold",
   "foodDeliverTo": "Deliver to",
   "foodFilterButton": "Filters",
   "foodFilterTitle": "Filter & sort",

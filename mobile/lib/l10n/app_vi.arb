@@ -298,6 +298,7 @@
   "foodSearchEmpty": "Chưa có quán khớp từ khóa",
   "foodSearchDishes": "Món ăn",
   "foodSearchStores": "Quán",
+  "foodSearchDishUnavailable": "Món này đã ngừng bán",
   "foodDeliverTo": "Giao đến",
   "foodFilterButton": "Bộ lọc",
   "foodFilterTitle": "Lọc & sắp xếp",
