@@ -224,7 +224,8 @@ export type StoreFeaturedItem = {
 /**
  * One "Món ăn kèm" card on the item page: same store, a different menu section.
  * Uncategorized dishes are skipped because they have no section that can differ
- * from the viewed dish.
+ * from the viewed dish; dishes with a required option group are skipped because
+ * the tile adds one plain unit that `priceOptionSelection` could never accept.
  */
 export type StoreItemSuggestion = StoreFeaturedItem & {
   available: boolean;
@@ -2142,7 +2143,9 @@ export class MemoryFoodRepository implements FoodRepository {
           (!query.moderationRequired || item.moderationStatus === 'APPROVED') &&
           !excludedIds.has(item.id) &&
           item.menuCategoryId !== null &&
-          !excludedCategories.has(item.menuCategoryId),
+          !excludedCategories.has(item.menuCategoryId) &&
+          // A tile adds one plain unit, so a required group could never be priced.
+          !item.optionGroups.some((group) => group.minSelect > 0),
       )
       .sort(
         (left, right) =>

@@ -100,6 +100,23 @@ describePg('food item suggestions (postgres)', () => {
     });
   }
 
+  function optionGroup(itemId: string, minSelect: number) {
+    return prisma.db()!.foodOptionGroup.create({
+      data: {
+        itemId,
+        name: `${tag} Size`,
+        minSelect,
+        maxSelect: 2,
+        options: {
+          create: [
+            { name: 'M', priceDeltaVnd: 0, position: 0 },
+            { name: 'L', priceDeltaVnd: 5_000, position: 1 },
+          ],
+        },
+      },
+    });
+  }
+
   function suggest(storeId: string, exclude: string[]) {
     return repo.listItemSuggestions({
       storeId,
@@ -108,6 +125,35 @@ describePg('food item suggestions (postgres)', () => {
       moderationRequired: true,
     });
   }
+
+  it('skips dishes that require a choice before they can be added plain', async () => {
+    const open = await store('Plain');
+    const mains = await category(open.id, 'Mains');
+    const drinks = await category(open.id, 'Drinks');
+    const viewed = await item(open.id, 'Viewed main', mains.id);
+    // Topping the list if the rule is missing: a plain tile cannot price a required group.
+    const bestSeller = await item(open.id, 'Best seller with sizes', drinks.id, {
+      soldCount: 99,
+    });
+    await optionGroup(bestSeller.id, 1);
+    const optional = await item(open.id, 'Optional topping drink', drinks.id, {
+      soldCount: 5,
+    });
+    await optionGroup(optional.id, 0);
+    const plain = await item(open.id, 'Plain drink', drinks.id, {
+      soldCount: 1,
+    });
+
+    const suggestions = await suggest(open.id, [viewed.id]);
+
+    expect(suggestions.map((entry) => entry.name)).toEqual([
+      `${tag} Optional topping drink`,
+      `${tag} Plain drink`,
+    ]);
+    expect(suggestions.map((entry) => entry.id)).not.toContain(bestSeller.id);
+    expect(suggestions.map((entry) => entry.id)).toContain(optional.id);
+    expect(suggestions.map((entry) => entry.id)).toContain(plain.id);
+  });
 
   it('returns other-category in-stock dishes, best sellers first, capped at six', async () => {
     const open = await store('Open');

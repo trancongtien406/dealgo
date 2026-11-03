@@ -716,6 +716,93 @@ describe('food order http', () => {
     expect(res.body.data).toEqual([]);
   });
 
+  it('skips dishes that cannot be added plain without choosing options', async () => {
+    const customer = await login();
+    const owner = await login();
+    await repository.insertGrant(owner.userId, 'MERCHANT', 'ACTIVE');
+    const foods = app.get(FOOD_REPOSITORY);
+    if (!(foods instanceof MemoryFoodRepository)) {
+      throw new Error('Expected the in-memory food repository');
+    }
+    const tag = `plain${Date.now().toString().slice(-6)}`;
+    const store = await createPinnedStore(foods, owner.userId, `Quán ${tag}`, [
+      { name: `Món chính ${tag}`, priceVnd: 50_000 },
+    ]);
+    const viewed = store.items[0]!;
+    const mains = await foods.createMenuCategory({
+      ownerId: owner.userId,
+      name: `Món chính ${tag}`,
+    });
+    const drinks = await foods.createMenuCategory({
+      ownerId: owner.userId,
+      name: `Đồ uống ${tag}`,
+    });
+    await foods.updateItem({
+      ownerId: owner.userId,
+      itemId: viewed.id,
+      menuCategoryId: mains.id,
+    });
+    const plain = await foods.createItem({
+      ownerId: owner.userId,
+      name: `Đồ uống thường ${tag}`,
+      priceVnd: 20_000,
+      moderationStatus: 'APPROVED',
+      menuCategoryId: drinks.id,
+    });
+    const optional = await foods.createItem({
+      ownerId: owner.userId,
+      name: `Đồ uống topping ${tag}`,
+      priceVnd: 25_000,
+      moderationStatus: 'APPROVED',
+      menuCategoryId: drinks.id,
+    });
+    await foods.replaceItemOptions({
+      ownerId: owner.userId,
+      itemId: optional.id,
+      groups: [
+        {
+          name: 'Topping',
+          minSelect: 0,
+          maxSelect: 2,
+          options: [{ name: 'Trân châu', priceDeltaVnd: 5_000 }],
+        },
+      ],
+    });
+    const required = await foods.createItem({
+      ownerId: owner.userId,
+      name: `Đồ uống chọn size ${tag}`,
+      priceVnd: 30_000,
+      moderationStatus: 'APPROVED',
+      menuCategoryId: drinks.id,
+    });
+    await foods.replaceItemOptions({
+      ownerId: owner.userId,
+      itemId: required.id,
+      groups: [
+        {
+          name: 'Kích cỡ',
+          minSelect: 1,
+          maxSelect: 1,
+          options: [{ name: 'M', priceDeltaVnd: 0 }],
+        },
+      ],
+    });
+
+    const res = await request(app.getHttpServer())
+      .get(`/v1/food/stores/${store.id}/suggestions`)
+      .query({ exclude: viewed.id })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    const items = res.body.data as Array<{ id: string; name: string }>;
+    expect(items.map((entry) => entry.id)).not.toContain(required.id);
+    expect(items.map((entry) => entry.name)).not.toContain(
+      `Đồ uống chọn size ${tag}`,
+    );
+    expect(items.map((entry) => entry.id)).toEqual(
+      expect.arrayContaining([plain.id, optional.id]),
+    );
+  });
+
   it('requires a customer session and uuid item ids to exclude', async () => {
     const customer = await login();
     const { storeId } = await oneItem(customer.token);

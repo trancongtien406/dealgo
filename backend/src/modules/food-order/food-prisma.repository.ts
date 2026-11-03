@@ -1314,6 +1314,8 @@ export class PrismaFoodRepository implements FoodRepository {
         menuCategoryId: excludedCategories.length
           ? { not: null, notIn: excludedCategories }
           : { not: null },
+        // A tile adds one plain unit, so a required group could never be priced.
+        optionGroups: { none: { minSelect: { gt: 0 } } },
       },
       orderBy: [{ soldCount: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
       take: query.limit,
