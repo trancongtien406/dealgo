@@ -125,7 +125,12 @@ class FoodStoreSummary {
     this.offers = const [],
     this.minOrderVnd = 0,
     this.featuredItems = const [],
+    this.closesAtToday,
   });
+
+  /// Closing time (`HH:mm`) of the shift taking orders now; null when closed
+  /// or when the store has no hours (DEC-PROD-027).
+  final String? closesAtToday;
 
   /// Smallest food subtotal the store accepts; 0 = no minimum.
   final int minOrderVnd;
@@ -220,6 +225,63 @@ class FoodFeaturedItem {
   final DateTime? addedAt;
 
   bool get isNew => foodItemIsNew(addedAt);
+}
+
+/// A dish hit in search results; only dishes of stores taking orders now are returned.
+class FoodDishHit {
+  const FoodDishHit({required this.item, required this.store});
+
+  final FoodFeaturedItem item;
+  final FoodDishHitStore store;
+}
+
+/// The store a search dish belongs to, with the same fee/ETA estimate as a browse card.
+class FoodDishHitStore {
+  const FoodDishHitStore({
+    required this.id,
+    required this.name,
+    required this.openNow,
+    this.distanceKm,
+    this.etaMinutes,
+    this.deliveryFeeFromVnd,
+    this.closedReason,
+  });
+
+  final String id;
+  final String name;
+
+  /// Straight-line distance from the customer; null without a GPS fix.
+  final double? distanceKm;
+
+  /// Prep + ride estimate; null without a GPS fix.
+  final int? etaMinutes;
+
+  /// Straight-line delivery fee estimate ("từ" price).
+  final int? deliveryFeeFromVnd;
+  final bool openNow;
+
+  /// Non-null when the store is paused or outside its hours.
+  final StoreClosedReason? closedReason;
+}
+
+/// One search response: dish hits first, then the stores matching the same keyword.
+class FoodSearchResult {
+  const FoodSearchResult({
+    required this.dishes,
+    required this.dishTotal,
+    required this.stores,
+    required this.storeTotal,
+  });
+
+  final List<FoodDishHit> dishes;
+
+  /// Server count for the dish section, independent of the page size.
+  final int dishTotal;
+
+  final List<FoodStoreSummary> stores;
+
+  /// Server count for the store section, independent of the page size.
+  final int storeTotal;
 }
 
 /// FOOD-001 — new dishes wait for Ops approval while item moderation is enabled.
@@ -428,7 +490,12 @@ class FoodStoreDetail {
     this.offers = const [],
     this.menuSections = const [],
     this.minOrderVnd = 0,
+    this.closesAtToday,
   });
+
+  /// Closing time (`HH:mm`) of the shift taking orders now; null when closed
+  /// or when the store has no hours (DEC-PROD-027).
+  final String? closesAtToday;
 
   /// Smallest food subtotal the store accepts; 0 = no minimum.
   final int minOrderVnd;
@@ -521,6 +588,7 @@ class FoodStoreDetail {
       offers: offers,
       menuSections: menuSections,
       minOrderVnd: minOrderVnd ?? this.minOrderVnd,
+      closesAtToday: closesAtToday,
       serviceMode: serviceMode ?? this.serviceMode,
       serviceModeUntil: clearServiceModeUntil
           ? null

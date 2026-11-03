@@ -84,6 +84,24 @@ abstract interface class FoodRemoteDataSource {
     int limit = 20,
   });
 
+  /// Dish hits above the stores matching the same keyword (`GET /v1/food/search`).
+  Future<FoodSearchResult> searchFood(
+    String accessToken, {
+    required String q,
+    double? lat,
+    double? lng,
+    String? sortBy,
+    int page = 1,
+    int limit = 20,
+  });
+
+  /// Up to 6 in-stock dishes from another menu category of the same store.
+  Future<List<FoodFeaturedItem>> listStoreSuggestions(
+    String accessToken,
+    String storeId, {
+    List<String> exclude = const [],
+  });
+
   Future<FoodStoreDetail> getStore(String accessToken, String storeId);
 
   /// Owner-scoped catalog (`GET /v1/food/merchant/catalog`).

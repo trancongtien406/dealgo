@@ -25,6 +25,8 @@ class FakeFoodClient implements FoodClient {
     this.orderError,
     this.catalogError,
     this.catalogWriteError,
+    this.searchFoodHandler,
+    this.suggestions = const [],
   });
 
   List<FoodStoreSummary> stores;
@@ -45,6 +47,14 @@ class FakeFoodClient implements FoodClient {
   Object? orderError;
   Object? catalogError;
   Object? catalogWriteError;
+
+  /// Overrides the search result; without it search returns no rows.
+  FoodSearchResult Function(String q)? searchFoodHandler;
+
+  /// Same-store dishes returned by [listStoreSuggestions].
+  List<FoodFeaturedItem> suggestions;
+  final List<String> searchQueries = [];
+  final List<({String storeId, List<String> exclude})> suggestionCalls = [];
   FoodOrderDetail Function(String orderId)? onGetOrder;
   final List<PlaceFoodRequest> placeCalls = [];
   final List<String> storeReads = [];
@@ -384,6 +394,39 @@ class FakeFoodClient implements FoodClient {
       page: page,
       limit: limit,
     );
+  }
+
+  @override
+  Future<FoodSearchResult> searchFood(
+    String accessToken, {
+    required String q,
+    double? lat,
+    double? lng,
+    String? sortBy,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    searchQueries.add(q);
+    final handler = searchFoodHandler;
+    if (handler != null) {
+      return handler(q);
+    }
+    return const FoodSearchResult(
+      dishes: [],
+      dishTotal: 0,
+      stores: [],
+      storeTotal: 0,
+    );
+  }
+
+  @override
+  Future<List<FoodFeaturedItem>> listStoreSuggestions(
+    String accessToken,
+    String storeId, {
+    List<String> exclude = const [],
+  }) async {
+    suggestionCalls.add((storeId: storeId, exclude: List.of(exclude)));
+    return List.of(suggestions);
   }
 
   @override

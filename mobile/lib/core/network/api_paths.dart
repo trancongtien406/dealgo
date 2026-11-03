@@ -123,8 +123,14 @@ abstract final class ApiPaths {
 
   static const foodStores = '/v1/food/stores';
 
+  static const foodSearch = '/v1/food/search';
+
   static String foodStore(String storeId) {
     return '/v1/food/stores/${Uri.encodeComponent(storeId)}';
+  }
+
+  static String foodStoreSuggestions(String storeId) {
+    return '${foodStore(storeId)}/suggestions';
   }
 
   static const foodOrders = '/v1/food/orders';

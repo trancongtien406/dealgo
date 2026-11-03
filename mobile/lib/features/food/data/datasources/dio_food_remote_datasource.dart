@@ -241,6 +241,57 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
   }
 
   @override
+  Future<FoodSearchResult> searchFood(
+    String accessToken, {
+    required String q,
+    double? lat,
+    double? lng,
+    String? sortBy,
+    int page = 1,
+    int limit = 20,
+  }) {
+    final hasGeo = lat != null && lng != null;
+    final sort = sortBy ?? (hasGeo ? 'distance' : null);
+    return _send(
+      () => dio.get<Object?>(
+        ApiPaths.foodSearch,
+        queryParameters: {
+          'q': q.trim(),
+          if (hasGeo) ...{'lat': lat, 'lng': lng},
+          'sort_by': ?sort,
+          // The search route rejects limit > 20 with a 400.
+          'page': page,
+          'limit': limit.clamp(1, 20),
+        },
+        options: _auth(accessToken),
+      ),
+      decodeFoodSearchResult,
+    );
+  }
+
+  @override
+  Future<List<FoodFeaturedItem>> listStoreSuggestions(
+    String accessToken,
+    String storeId, {
+    List<String> exclude = const [],
+  }) {
+    final excluded = [
+      for (final id in exclude)
+        if (id.trim().isNotEmpty) id.trim(),
+    ];
+    return _send(
+      () => dio.get<Object?>(
+        ApiPaths.foodStoreSuggestions(storeId),
+        queryParameters: {
+          if (excluded.isNotEmpty) 'exclude': excluded.join(','),
+        },
+        options: _auth(accessToken),
+      ),
+      decodeFoodItemSuggestions,
+    );
+  }
+
+  @override
   Future<FoodStoreDetail> getStore(String accessToken, String storeId) {
     return _send(
       () => dio.get<Object?>(
@@ -907,7 +958,10 @@ ClaimedFoodDelivery decodeClaimedFoodDelivery(Object? body) {
 
 List<FoodStoreSummary> decodeFoodStoreList(Object? body) {
   // Prefer paginated `{ items: [...] }`; keep bare array for older clients/tests.
-  final data = _successPayload(body);
+  return _decodeStoreRows(_successPayload(body));
+}
+
+List<FoodStoreSummary> _decodeStoreRows(Object? data) {
   final list = data is List
       ? data
       : (asJsonMap(data)?['items'] is List
@@ -939,6 +993,7 @@ List<FoodStoreSummary> decodeFoodStoreList(Object? body) {
           category: category is String && category.isNotEmpty ? category : null,
           distanceKm: distance is num ? distance.toDouble() : null,
           closedReason: StoreClosedReason.fromWire(map['closedReason']),
+          closesAtToday: _closesAtToday(map['closesAtToday']),
           imageUrl: map['imageUrl'] is String
               ? map['imageUrl'] as String
               : null,
@@ -967,18 +1022,136 @@ FoodStorePageResult decodeFoodStorePage(
 }) {
   final data = _successPayload(body);
   final map = asJsonMap(data);
-  final items = decodeFoodStoreList(body);
+  final items = _decodeStoreRows(data);
   final reported = _asInt(map?['total']);
   return FoodStorePageResult(
     items: items,
-    total: reported == null || reported < items.length ? items.length : reported,
+    total: reported == null || reported < items.length
+        ? items.length
+        : reported,
     page: page,
     limit: limit,
   );
 }
 
+/// Accepts the API envelope or the bare `{dishes, stores}` payload.
+FoodSearchResult decodeFoodSearchResult(Object? body) {
+  final root = asJsonMap(body);
+  if (root == null) {
+    throw const ApiException(
+      statusCode: 0,
+      message: 'Invalid response',
+      errorCode: 'INVALID_RESPONSE',
+    );
+  }
+  final data = root.containsKey('success')
+      ? asJsonMap(_successPayload(root))
+      : root;
+  if (data == null) {
+    throw const ApiException(
+      statusCode: 200,
+      message: 'Invalid response',
+      errorCode: 'INVALID_RESPONSE',
+    );
+  }
+  final dishSection = asJsonMap(data['dishes']);
+  final storeSection = asJsonMap(data['stores']);
+  final dishes = _decodeDishHits(dishSection?['items']);
+  final stores = storeSection == null
+      ? const <FoodStoreSummary>[]
+      : _decodeStoreRows(storeSection);
+  final dishReported = _asInt(dishSection?['total']);
+  final storeReported = _asInt(storeSection?['total']);
+  return FoodSearchResult(
+    dishes: dishes,
+    dishTotal: dishReported == null || dishReported < dishes.length
+        ? dishes.length
+        : dishReported,
+    stores: stores,
+    storeTotal: storeReported == null || storeReported < stores.length
+        ? stores.length
+        : storeReported,
+  );
+}
+
+List<FoodDishHit> _decodeDishHits(Object? raw) {
+  if (raw is! List) return const [];
+  final hits = <FoodDishHit>[];
+  for (final row in raw) {
+    final map = asJsonMap(row);
+    if (map == null) continue;
+    final item = _dishHitItem(map['item']);
+    final store = _dishHitStore(map['store']);
+    if (item == null || store == null) continue;
+    hits.add(FoodDishHit(item: item, store: store));
+  }
+  return List.unmodifiable(hits);
+}
+
+FoodFeaturedItem? _dishHitItem(Object? raw) {
+  final map = asJsonMap(raw);
+  if (map == null) return null;
+  final id = map['id'];
+  final name = map['name'];
+  final price = _asInt(map['priceVnd']);
+  if (id is! String || id.isEmpty || name is! String || name.isEmpty) {
+    return null;
+  }
+  if (price == null) return null;
+  final image = map['imageUrl'];
+  return FoodFeaturedItem(
+    id: id,
+    name: name,
+    priceVnd: price,
+    originalPriceVnd: _shownOriginalPrice(price, map['originalPriceVnd']),
+    imageUrl: image is String && image.isNotEmpty ? image : null,
+    soldCount: _asInt(map['soldCount']) ?? 0,
+  );
+}
+
+FoodDishHitStore? _dishHitStore(Object? raw) {
+  final map = asJsonMap(raw);
+  if (map == null) return null;
+  final id = map['id'];
+  final name = map['name'];
+  if (id is! String || id.isEmpty || name is! String || name.isEmpty) {
+    return null;
+  }
+  final distance = map['distanceKm'];
+  final closedReason = StoreClosedReason.fromWire(map['closedReason']);
+  final openNow = map['openNow'];
+  return FoodDishHitStore(
+    id: id,
+    name: name,
+    distanceKm: distance is num ? distance.toDouble() : null,
+    etaMinutes: _asInt(map['etaMinutes']),
+    deliveryFeeFromVnd: _asInt(map['deliveryFeeFromVnd']),
+    openNow: openNow is bool ? openNow : closedReason == null,
+    closedReason: closedReason,
+  );
+}
+
+/// `GET /v1/food/stores/:id/suggestions` — a bare array of same-store dishes.
+List<FoodFeaturedItem> decodeFoodItemSuggestions(Object? body) {
+  final data = _successPayload(body);
+  if (data is! List) {
+    throw const ApiException(
+      statusCode: 200,
+      message: 'Invalid response',
+      errorCode: 'INVALID_RESPONSE',
+    );
+  }
+  return _decodeFeaturedItems(data);
+}
+
 DateTime? _asLocalTime(Object? raw) =>
     raw is String ? DateTime.tryParse(raw)?.toLocal() : null;
+
+/// Closing time is a Vietnam local `HH:mm`; anything else is treated as unknown.
+final _closesAtTodayPattern = RegExp(r'^\d{2}:\d{2}$');
+
+String? _closesAtToday(Object? raw) =>
+    raw is String && _closesAtTodayPattern.hasMatch(raw) ? raw : null;
 
 /// Strike-through price only while it is above the selling price.
 int? _shownOriginalPrice(int price, Object? raw) {
@@ -1127,6 +1300,7 @@ FoodStoreDetail decodeFoodStoreDetail(Object? body) {
     offers: decodeStoreOffers(data['offers']),
     menuSections: _decodeMenuSections(data['menuSections']),
     minOrderVnd: _asInt(data['minOrderVnd']) ?? 0,
+    closesAtToday: _closesAtToday(data['closesAtToday']),
   );
 }
 

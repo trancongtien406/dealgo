@@ -33,6 +33,36 @@ class FoodRepositoryImpl implements FoodRepository {
   }
 
   @override
+  Future<FoodSearchResult> searchFood(
+    String accessToken, {
+    required String q,
+    double? lat,
+    double? lng,
+    String? sortBy,
+    int page = 1,
+    int limit = 20,
+  }) {
+    return _remote.searchFood(
+      accessToken,
+      q: q,
+      lat: lat,
+      lng: lng,
+      sortBy: sortBy,
+      page: page,
+      limit: limit,
+    );
+  }
+
+  @override
+  Future<List<FoodFeaturedItem>> listStoreSuggestions(
+    String accessToken,
+    String storeId, {
+    List<String> exclude = const [],
+  }) {
+    return _remote.listStoreSuggestions(accessToken, storeId, exclude: exclude);
+  }
+
+  @override
   Future<FoodStoreDetail> getStore(String accessToken, String storeId) {
     return _remote.getStore(accessToken, storeId);
   }
