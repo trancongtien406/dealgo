@@ -146,4 +146,46 @@ describe('closesAtToday (DEC-PROD-027)', () => {
     const mondayLate = new Date('2026-11-02T18:00:00.000Z');
     expect(closesAtToday(schedule, mondayLate)).toBe('02:00');
   });
+
+  it('returns null when configured hours do not cover right now', () => {
+    const schedule = {
+      hoursConfigured: true,
+      lastOrderMinutes: 0,
+      hours: [{ weekday, opensMinute: 8 * 60, closesMinute: 10 * 60 }],
+      closures: [],
+    };
+    // 10:00 Vietnam is the first minute outside the shift.
+    expect(withinSchedule(schedule, mondayTen)).toBe(false);
+    expect(closesAtToday(schedule, mondayTen)).toBeNull();
+    // 09:00 Vietnam is still inside it, so the closing time is reported.
+    expect(closesAtToday(schedule, new Date('2026-11-02T02:00:00.000Z'))).toBe('10:00');
+  });
+
+  it('keeps an overnight shift alive when today is a closed day', () => {
+    const schedule = {
+      hoursConfigured: true,
+      lastOrderMinutes: 0,
+      hours: [{ weekday, opensMinute: 18 * 60, closesMinute: 2 * 60 }],
+      // Tuesday 2026-11-03 is closed, but Monday's shift started before the closure.
+      closures: [{ date: '2026-11-03', note: 'Nghỉ' }],
+    };
+    const afterMidnight = new Date('2026-11-02T18:00:00.000Z'); // 01:00 Tuesday Vietnam
+    expect(withinSchedule(schedule, afterMidnight)).toBe(true);
+    expect(closesAtToday(schedule, afterMidnight)).toBe('02:00');
+  });
+
+  it('takes the shift that closes first when two shifts overlap', () => {
+    const schedule = {
+      hoursConfigured: true,
+      lastOrderMinutes: 0,
+      hours: [
+        { weekday, opensMinute: 18 * 60, closesMinute: 2 * 60 },
+        { weekday: 2, opensMinute: 0, closesMinute: 24 * 60 },
+      ],
+      closures: [],
+    };
+    const afterMidnight = new Date('2026-11-02T18:00:00.000Z'); // 01:00 Tuesday Vietnam
+    expect(withinSchedule(schedule, afterMidnight)).toBe(true);
+    expect(closesAtToday(schedule, afterMidnight)).toBe('02:00');
+  });
 });

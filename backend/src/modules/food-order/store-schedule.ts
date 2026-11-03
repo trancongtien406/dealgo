@@ -77,32 +77,64 @@ export function shiftOrderEnd(
   return (isOvernight(row) ? row.closesMinute + 1440 : row.closesMinute) - lastOrderMinutes;
 }
 
+/**
+ * Minutes from today's local midnight at which `row` stops serving — or null when it is not
+ * serving now. The single definition shared by the availability gate and the closing time, so
+ * the two can never disagree. An overnight shift that started yesterday closes in the early
+ * hours of today, and keeps serving past midnight even when today is a closed day; a shift
+ * that starts today and runs past midnight closes tomorrow.
+ */
+function shiftCloseOffset(
+  row: WeeklyHourRow,
+  today: VnClock,
+  yesterday: VnClock,
+  lastOrderMinutes: number,
+  closedOn: (date: string) => boolean,
+): number | null {
+  const ends = shiftOrderEnd(row, lastOrderMinutes);
+  if (
+    row.weekday === today.weekday &&
+    !closedOn(today.date) &&
+    row.opensMinute <= today.minute &&
+    today.minute < ends
+  ) {
+    return isOvernight(row) ? row.closesMinute + 1440 : row.closesMinute;
+  }
+  if (
+    row.weekday === yesterday.weekday &&
+    isOvernight(row) &&
+    !closedOn(yesterday.date) &&
+    today.minute + 1440 < ends
+  ) {
+    return row.closesMinute;
+  }
+  return null;
+}
+
+function closedOnDate(schedule: StoreSchedule): (date: string) => boolean {
+  return (date) => schedule.closures.some((closure) => closure.date === date);
+}
+
 /** Whether the schedule accepts a new order at `now` (closures, weekly hours, cut-off). */
 export function withinSchedule(schedule: StoreSchedule, now: Date): boolean {
   const today = vnClock(now);
   const yesterday = vnClock(new Date(now.getTime() - 24 * 60 * 60 * 1000));
-  const closedOn = (date: string) => schedule.closures.some((closure) => closure.date === date);
+  const closedOn = closedOnDate(schedule);
   if (!schedule.hoursConfigured) {
     return !closedOn(today.date);
   }
   const last = schedule.lastOrderMinutes;
   return schedule.hours.some(
-    (row) =>
-      (row.weekday === today.weekday &&
-        !closedOn(today.date) &&
-        row.opensMinute <= today.minute &&
-        today.minute < shiftOrderEnd(row, last)) ||
-      (row.weekday === yesterday.weekday &&
-        isOvernight(row) &&
-        !closedOn(yesterday.date) &&
-        today.minute + 1440 < shiftOrderEnd(row, last)),
+    (row) => shiftCloseOffset(row, today, yesterday, last, closedOn) !== null,
   );
 }
 
 /**
  * Closing time (HH:mm, Vietnam local) of the shift that is taking orders right now.
- * Null when the store has no hours, is closed, or is closed for the whole day — a
- * card must never print "Mở đến …" for a store that is not open.
+ * Null when no shift is serving — the store has no hours, is closed, or is closed for the
+ * whole day — so a card never prints "Mở đến …" for a store that is not open. Two rows can
+ * serve the same instant (yesterday's overnight shift and today's opening); the shift that
+ * closes first wins, matching the SQL tie-break.
  */
 export function closesAtToday(
   schedule: StoreSchedule,
@@ -110,21 +142,21 @@ export function closesAtToday(
 ): string | null {
   const today = vnClock(now);
   const yesterday = vnClock(new Date(now.getTime() - 24 * 60 * 60 * 1000));
-  const closedOn = (date: string) =>
-    schedule.closures.some((closure) => closure.date === date);
-  if (closedOn(today.date) || (schedule.hoursConfigured && !withinSchedule(schedule, now))) {
-    return null;
+  const closedOn = closedOnDate(schedule);
+  let earliest: number | null = null;
+  for (const row of schedule.hours) {
+    const closes = shiftCloseOffset(
+      row,
+      today,
+      yesterday,
+      schedule.lastOrderMinutes,
+      closedOn,
+    );
+    if (closes !== null && (earliest === null || closes < earliest)) {
+      earliest = closes;
+    }
   }
-  const shift = schedule.hours.find(
-    (row) =>
-      (row.weekday === today.weekday &&
-        row.opensMinute <= today.minute &&
-        today.minute < shiftOrderEnd(row, schedule.lastOrderMinutes)) ||
-      (row.weekday === yesterday.weekday &&
-        isOvernight(row) &&
-        today.minute + 1440 < shiftOrderEnd(row, schedule.lastOrderMinutes)),
-  );
-  return shift ? formatClock(shift.closesMinute % 1440) : null;
+  return earliest === null ? null : formatClock(earliest % 1440);
 }
 
 export function storeAvailability(

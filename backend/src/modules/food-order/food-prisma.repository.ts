@@ -361,6 +361,7 @@ export class PrismaFoodRepository implements FoodRepository {
         FROM "food_store_hours" h
         WHERE h."storeId" = s."id"
           AND ${takingOrdersShiftSql(now)}
+        ORDER BY ${shiftCloseOffsetSql(now)} ASC
         LIMIT 1
       ) shift_today ON TRUE
       WHERE ${whereSql}
@@ -3477,6 +3478,23 @@ function storeClosedOn(date: string): Prisma.Sql {
     )`;
 }
 
+/** Minute a shift closes, counted from its start day's midnight (SQL twin of isOvernight). */
+function shiftClosesMinuteSql(): Prisma.Sql {
+  return Prisma.sql`(CASE WHEN h."closesMinute" < h."opensMinute"
+    THEN h."closesMinute" + 1440 ELSE h."closesMinute" END)`;
+}
+
+/**
+ * Minutes from today's midnight at which a matching row stops serving — the SQL twin of
+ * shiftCloseOffset(), used only to break the multi-row tie deterministically.
+ */
+function shiftCloseOffsetSql(now: Date): Prisma.Sql {
+  const today = vnClock(now);
+  return Prisma.sql`(h."closesMinute" + (CASE
+    WHEN h."weekday" = ${today.weekday} AND h."closesMinute" < h."opensMinute"
+    THEN 1440 ELSE 0 END))`;
+}
+
 /** The weekly shift taking orders at `now`; SQL twin of the closesAtToday() lookup. */
 function takingOrdersShiftSql(now: Date): Prisma.Sql {
   const today = vnClock(now);
@@ -3486,14 +3504,13 @@ function takingOrdersShiftSql(now: Date): Prisma.Sql {
       h."weekday" = ${today.weekday}
       AND NOT ${storeClosedOn(today.date)}
       AND h."opensMinute" <= ${today.minute}
-      AND ${today.minute} < (CASE WHEN h."closesMinute" < h."opensMinute"
-        THEN h."closesMinute" + 1440 ELSE h."closesMinute" END) - s."lastOrderMinutes"
+      AND ${today.minute} < ${shiftClosesMinuteSql()} - s."lastOrderMinutes"
     )
     OR (
       h."weekday" = ${yesterday.weekday}
       AND h."closesMinute" < h."opensMinute"
       AND NOT ${storeClosedOn(yesterday.date)}
-      AND ${today.minute + 1440} < h."closesMinute" + 1440 - s."lastOrderMinutes"
+      AND ${today.minute + 1440} < ${shiftClosesMinuteSql()} - s."lastOrderMinutes"
     )
   )`;
 }
