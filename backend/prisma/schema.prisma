@@ -885,6 +885,10 @@ model FoodOrder {
   pickupLat                Float?
   pickupLng                Float?
   pickupLabel              String?             @db.VarChar(200)
+  /// Customer note for the store / driver; null = none.
+  note                     String?             @db.VarChar(300)
+  /// Cutlery requested with this order.
+  utensils                 Boolean             @default(true)
   serviceRegionCode        String?             @db.VarChar(8)
   /// Merchant decline reason (FOOD_REJECT_REASONS) and optional note; null unless the store rejected (DEC-PROD-021).
   cancelReasonCode         String?             @db.VarChar(32)
@@ -966,6 +970,8 @@ model FoodOrderLine {
   imageUrl     String?   @db.VarChar(400)
   /// Snapshot of chosen options [{optionId, groupName, name, priceDeltaVnd}] (DEC-PROD-033).
   options      Json      @default("[]")
+  /// Customer note for this line ("ít cay, không hành"); null = none.
+  note         String?   @db.VarChar(200)
 
   @@index([orderId])
   @@map("food_order_lines")
