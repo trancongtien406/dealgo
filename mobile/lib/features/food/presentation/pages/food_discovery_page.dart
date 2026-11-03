@@ -84,6 +84,8 @@ class _FoodDiscoveryViewState extends State<_FoodDiscoveryView> {
     final position = _scroll.position;
     if (position.maxScrollExtent <= 0) return;
     if (position.pixels < position.maxScrollExtent - 400) return;
+    final discovery = context.read<FoodDiscoveryCubit>().state;
+    if (discovery is FoodDiscoveryReady && discovery.loadMoreFailed) return;
     context.read<FoodDiscoveryCubit>().loadMore();
   }
 

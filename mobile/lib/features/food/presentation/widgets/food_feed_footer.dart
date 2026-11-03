@@ -39,7 +39,7 @@ class FoodFeedFooter extends StatelessWidget {
         ),
       );
     }
-    if (ready.hasMore) {
+    if (ready.hasMore || ready.isRefreshing) {
       return const SizedBox.shrink();
     }
     return Padding(

@@ -1,3 +1,4 @@
+import 'package:dealgo/core/network/api_exception.dart';
 import 'package:dealgo/features/food/domain/entities/food_models.dart';
 import 'package:dealgo/features/food/presentation/widgets/food_store_card.dart';
 import 'package:dealgo/features/rating/data/rating_remote_datasource.dart';
@@ -13,6 +14,45 @@ List<FoodStoreSummary> _manyStores(int count) => [
   for (var i = 0; i < count; i++)
     FoodStoreSummary(id: 'store-$i', name: 'Quán $i', category: 'noodles'),
 ];
+
+class _FailingSecondPageFoodClient extends FakeFoodClient {
+  _FailingSecondPageFoodClient({required super.stores});
+
+  var failedRequests = 0;
+
+  @override
+  Future<FoodStorePageResult> listStores(
+    String accessToken, {
+    double? lat,
+    double? lng,
+    String? search,
+    String? sortBy,
+    int? maxKm,
+    String? category,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    if (page > 1) {
+      failedRequests += 1;
+      throw const ApiException(
+        statusCode: 503,
+        message: 'unavailable',
+        errorCode: 'TEST_UNAVAILABLE',
+      );
+    }
+    return super.listStores(
+      accessToken,
+      lat: lat,
+      lng: lng,
+      search: search,
+      sortBy: sortBy,
+      maxKm: maxKm,
+      category: category,
+      page: page,
+      limit: limit,
+    );
+  }
+}
 
 Future<void> _pump(WidgetTester tester, FakeFoodClient food) async {
   tester.view.physicalSize = const Size(1170, 2532);
@@ -63,5 +103,30 @@ void main() {
 
     expect(find.byKey(const Key('food-feed-end')), findsOneWidget);
     expect(food.storePages.where((page) => page > 1), isEmpty);
+  });
+
+  testWidgets('a failed page is retried only from the retry button', (
+    tester,
+  ) async {
+    final food = _FailingSecondPageFoodClient(stores: _manyStores(25));
+    await _pump(tester, food);
+
+    final feed = find.byType(CustomScrollView).first;
+    for (var i = 0; i < 8 && food.failedRequests == 0; i++) {
+      await tester.drag(feed, const Offset(0, -1200));
+      await tester.pumpAndSettle();
+    }
+    expect(food.failedRequests, 1);
+    expect(find.byKey(const Key('food-feed-retry')), findsOneWidget);
+
+    await tester.drag(feed, const Offset(0, 600));
+    await tester.pumpAndSettle();
+    await tester.drag(feed, const Offset(0, -600));
+    await tester.pumpAndSettle();
+    expect(food.failedRequests, 1);
+
+    await tester.tap(find.byKey(const Key('food-feed-retry')));
+    await tester.pumpAndSettle();
+    expect(food.failedRequests, 2);
   });
 }
