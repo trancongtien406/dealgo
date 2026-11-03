@@ -944,6 +944,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get foodItemDetailTitle => 'Item details';
 
   @override
+  String foodDishPhotoCount(int index, int total) {
+    return 'Photo $index/$total';
+  }
+
+  @override
   String get foodItemOptionsChoose => 'Choose options';
 
   @override

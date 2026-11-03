@@ -1916,6 +1916,12 @@ abstract class AppLocalizations {
   /// **'Item details'**
   String get foodItemDetailTitle;
 
+  /// No description provided for @foodDishPhotoCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo {index}/{total}'**
+  String foodDishPhotoCount(int index, int total);
+
   /// No description provided for @foodItemOptionsChoose.
   ///
   /// In en, this message translates to:

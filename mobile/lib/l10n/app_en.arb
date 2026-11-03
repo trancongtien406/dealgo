@@ -338,6 +338,17 @@
   "foodItemOptionsRequired": "Required",
   "foodItemOptionsOptional": "Optional",
   "foodItemDetailTitle": "Item details",
+  "foodDishPhotoCount": "Photo {index}/{total}",
+  "@foodDishPhotoCount": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "foodItemOptionsChoose": "Choose options",
   "foodItemOptionsChooseRequired": "Choose options",
   "foodItemOptionsMissingRequired": "Choose {groups}",

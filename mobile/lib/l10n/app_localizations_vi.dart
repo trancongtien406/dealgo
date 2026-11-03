@@ -946,6 +946,11 @@ class AppLocalizationsVi extends AppLocalizations {
   String get foodItemDetailTitle => 'Chi tiết món';
 
   @override
+  String foodDishPhotoCount(int index, int total) {
+    return 'Ảnh $index/$total';
+  }
+
+  @override
   String get foodItemOptionsChoose => 'Tùy chọn';
 
   @override

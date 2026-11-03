@@ -338,6 +338,17 @@
   "foodItemOptionsRequired": "Bắt buộc",
   "foodItemOptionsOptional": "Tùy chọn",
   "foodItemDetailTitle": "Chi tiết món",
+  "foodDishPhotoCount": "Ảnh {index}/{total}",
+  "@foodDishPhotoCount": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "foodItemOptionsChoose": "Tùy chọn",
   "foodItemOptionsChooseRequired": "Chọn tùy chọn",
   "foodItemOptionsMissingRequired": "Chọn {groups}",
