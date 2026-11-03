@@ -66,6 +66,7 @@ import {
   FOOD_STORE_BROWSE_MAX_LIMIT,
   type ListFoodStoresQueryDto,
   type SearchFoodDto,
+  type StoreDetailQueryDto,
   type CreateFoodItemDto,
   type ReplaceFoodItemOptionsDto,
   type OpsCatalogModerationQueryDto,
@@ -325,6 +326,13 @@ type StatsDay = {
   salesVnd: number;
 };
 
+type FoodFareSettings = {
+  minVnd: number;
+  maxVnd: number;
+  perKm: number;
+  stepVnd: number;
+};
+
 /** Browse inputs resolved once per request: paging window, sort/radius and fare settings. */
 type StoreBrowseContext = {
   page: number;
@@ -332,7 +340,7 @@ type StoreBrowseContext = {
   sortBy: 'name' | 'createdAt' | 'distance' | 'rating';
   radiusKm: number;
   minRatingCount: number;
-  fare: { minVnd: number; maxVnd: number; perKm: number; stepVnd: number };
+  fare: FoodFareSettings;
 };
 
 export type MerchantStatsView = {
@@ -360,6 +368,11 @@ export type MerchantQueueOrder = Omit<
 };
 
 export type PublicStoreDetail = Omit<StoreDetail, 'acceptSettings'> & {
+  /**
+   * Straight-line "from" fare to this store, quoted exactly like the browse card at the
+   * request's lat/lng; null without a customer position or store coordinates.
+   */
+  deliveryFeeFromVnd: number | null;
   /** Live store offers (applies only at this store), best first. */
   offers: StoreOffer[];
   /** Named menu sections in merchant order; items point at them via menuCategoryId. */
@@ -494,28 +507,29 @@ export class FoodService {
       query.sort_by === 'distance' && !hasGeo
         ? 'createdAt'
         : (query.sort_by ?? 'createdAt');
-    const [radiusKm, minRatingCount, feeMinVnd, feeMaxVnd, feePerKm, fareStepVnd] =
-      await Promise.all([
-        this.browseRadiusKm(query),
-        this.settings.getNumber('RATING_STORE_MIN_COUNT'),
-        this.settings.getNumber('FOOD_MIN_DELIVERY_VND'),
-        this.settings.getNumber('FOOD_MAX_DELIVERY_VND'),
-        this.settings.getNumber('FOOD_DELIVERY_VND_PER_KM'),
-        this.settings.getNumber('FOOD_FARE_STEP_VND'),
-      ]);
+    const [radiusKm, minRatingCount, fare] = await Promise.all([
+      this.browseRadiusKm(query),
+      this.settings.getNumber('RATING_STORE_MIN_COUNT'),
+      this.foodFare(),
+    ]);
     return {
       page: normalizePage(query.page),
       limit: normalizeLimit(query.limit, maxLimit),
       sortBy,
       radiusKm,
       minRatingCount,
-      fare: {
-        minVnd: feeMinVnd,
-        maxVnd: feeMaxVnd,
-        perKm: feePerKm,
-        stepVnd: fareStepVnd,
-      },
+      fare,
     };
+  }
+
+  private async foodFare(): Promise<FoodFareSettings> {
+    const [minVnd, maxVnd, perKm, stepVnd] = await Promise.all([
+      this.settings.getNumber('FOOD_MIN_DELIVERY_VND'),
+      this.settings.getNumber('FOOD_MAX_DELIVERY_VND'),
+      this.settings.getNumber('FOOD_DELIVERY_VND_PER_KM'),
+      this.settings.getNumber('FOOD_FARE_STEP_VND'),
+    ]);
+    return { minVnd, maxVnd, perKm, stepVnd };
   }
 
   private async buildStorePage(
@@ -570,15 +584,7 @@ export class FoodService {
             ? null
             : store.estimatedPrepMinutes +
               Math.ceil(store.distanceKm * BROWSE_MINUTES_PER_KM),
-        deliveryFeeFromVnd:
-          store.distanceKm === null
-            ? null
-            : clampToFoodFareSteps(
-                quoteReferenceFareVnd(store.distanceKm, fare.perKm, fare.minVnd),
-                fare.minVnd,
-                fare.maxVnd,
-                fare.stepVnd,
-              ),
+        deliveryFeeFromVnd: storeDeliveryFeeFromVnd(store.distanceKm, fare),
         offers: offers.get(store.id) ?? [],
         minOrderVnd: store.minOrderVnd ?? 0,
         featuredItems: featured.get(store.id) ?? [],
@@ -639,15 +645,10 @@ export class FoodService {
                 ? null
                 : hit.item.prepMinutes +
                   Math.ceil(hit.store.distanceKm * BROWSE_MINUTES_PER_KM),
-            deliveryFeeFromVnd:
-              hit.store.distanceKm === null
-                ? null
-                : clampToFoodFareSteps(
-                    quoteReferenceFareVnd(hit.store.distanceKm, fare.perKm, fare.minVnd),
-                    fare.minVnd,
-                    fare.maxVnd,
-                    fare.stepVnd,
-                  ),
+            deliveryFeeFromVnd: storeDeliveryFeeFromVnd(
+              hit.store.distanceKm,
+              fare,
+            ),
           },
         })),
       },
@@ -671,6 +672,7 @@ export class FoodService {
   async getStore(
     actor: RequestActor,
     storeId: string,
+    query: StoreDetailQueryDto = {},
   ): Promise<PublicStoreDetail> {
     await this.requireActiveCustomer(actor.userId);
     await this.ensureSandboxFixtureCatalog();
@@ -678,6 +680,10 @@ export class FoodService {
     if (!store) {
       throw foodError(404, 'FOOD_STORE_NOT_FOUND', 'Store not found');
     }
+    const deliveryFeeFromVnd = await this.detailDeliveryFeeFromVnd(
+      store,
+      query,
+    );
     // Capacity and accept mode are the merchant's business; customers only see the prep estimate.
     const { acceptSettings: _acceptSettings, ...publicStore } = store;
     const offers = this.promotions
@@ -698,7 +704,30 @@ export class FoodService {
       store.id,
       moderationRequired,
     );
-    return { ...publicStore, items, offers, menuSections };
+    return { ...publicStore, deliveryFeeFromVnd, items, offers, menuSections };
+  }
+
+  /**
+   * The hero's "from" fee is the browse card's quote at the same position: same
+   * straight-line distance and fare settings, so both reads of one store agree.
+   */
+  private async detailDeliveryFeeFromVnd(
+    store: StoreDetail,
+    query: StoreDetailQueryDto,
+  ): Promise<number | null> {
+    if (
+      query.lat === undefined ||
+      query.lng === undefined ||
+      store.lat === null ||
+      store.lng === null
+    ) {
+      return null;
+    }
+    const distanceKm = haversineKm(
+      { lat: query.lat, lng: query.lng },
+      { lat: store.lat, lng: store.lng },
+    );
+    return storeDeliveryFeeFromVnd(distanceKm, await this.foodFare());
   }
 
   /** Dishes beside the viewed one; one suggestion alone reads as noise, so it is hidden. */
@@ -3141,6 +3170,24 @@ export function clampToFoodFareSteps(
   const hi = Math.max(lo, Math.floor(maxVnd / step) * step);
   const stepped = Math.ceil(Math.max(amountVnd, minVnd) / step) * step;
   return Math.min(hi, Math.max(lo, stepped));
+}
+
+/**
+ * Browse card and store detail both quote the "from" fee through this function:
+ * straight-line reference fare first, then the platform fare steps.
+ */
+function storeDeliveryFeeFromVnd(
+  distanceKm: number | null,
+  fare: FoodFareSettings,
+): number | null {
+  return distanceKm === null
+    ? null
+    : clampToFoodFareSteps(
+        quoteReferenceFareVnd(distanceKm, fare.perKm, fare.minVnd),
+        fare.minVnd,
+        fare.maxVnd,
+        fare.stepVnd,
+      );
 }
 
 /** Commission in whole VND (rounded half up), never above the subtotal. */

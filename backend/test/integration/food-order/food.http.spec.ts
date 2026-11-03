@@ -267,6 +267,54 @@ describe('food order http', () => {
     expect(detail.body.data).toHaveProperty('closesAtToday');
   });
 
+  it('quotes the store detail delivery fee like the browse card', async () => {
+    const customer = await login();
+    const owner = await login();
+    await repository.insertGrant(owner.userId, 'MERCHANT', 'ACTIVE');
+    const foods = app.get(FOOD_REPOSITORY);
+    if (!(foods instanceof MemoryFoodRepository)) {
+      throw new Error('Expected the in-memory food repository');
+    }
+    const tag = `fee${Date.now().toString().slice(-6)}`;
+    const store = await createPinnedStore(foods, owner.userId, `Quán ${tag}`, [
+      { name: `Cơm gà ${tag}`, priceVnd: 45_000 },
+    ]);
+    const detailUrl = `/v1/food/stores/${store.id}`;
+
+    const withoutPosition = await request(app.getHttpServer())
+      .get(detailUrl)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    expect(withoutPosition.body.data).toHaveProperty('deliveryFeeFromVnd', null);
+
+    await request(app.getHttpServer())
+      .get(detailUrl)
+      .query({ lat: 16.077 })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(400);
+
+    // ~2.5 km north of the store pin: above FOOD_MIN_DELIVERY_VND, inside the browse radius.
+    const at = { lat: 16.077, lng: 108.2022 };
+    const detail = await request(app.getHttpServer())
+      .get(detailUrl)
+      .query(at)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    const fee = detail.body.data.deliveryFeeFromVnd as number;
+    expect(Number.isInteger(fee)).toBe(true);
+    expect(fee).toBeGreaterThan(5_000);
+
+    const browse = await request(app.getHttpServer())
+      .get('/v1/food/stores')
+      .query({ ...at, search: tag, limit: 20 })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    const card = (
+      browse.body.data.items as { id: string; deliveryFeeFromVnd: number | null }[]
+    ).find((entry) => entry.id === store.id);
+    expect(card?.deliveryFeeFromVnd).toBe(fee);
+  });
+
   it('searches dishes and stores in one call, dishes first (P3)', async () => {
     const customer = await login();
     const owner = await login();

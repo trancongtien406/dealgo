@@ -659,6 +659,32 @@ export class ListFoodStoresQueryDto {
   max_km?: number;
 }
 
+/**
+ * Optional customer position on the store detail, so the hero's "from" fee is
+ * quoted the same way as the browse card (same lat/lng pair rules).
+ */
+export class StoreDetailQueryDto {
+  @ValidateIf(
+    (query: StoreDetailQueryDto) =>
+      query.lng !== undefined || query.lat !== undefined,
+  )
+  @Type(() => Number)
+  @IsNumber({ allowInfinity: false, allowNaN: false })
+  @Min(-90)
+  @Max(90)
+  lat?: number;
+
+  @ValidateIf(
+    (query: StoreDetailQueryDto) =>
+      query.lat !== undefined || query.lng !== undefined,
+  )
+  @Type(() => Number)
+  @IsNumber({ allowInfinity: false, allowNaN: false })
+  @Min(-180)
+  @Max(180)
+  lng?: number;
+}
+
 export const FOOD_SEARCH_MAX_LIMIT = 20;
 
 /** Dish search keeps the browse filters; the dish keyword is `q` (the browse keyword stays `search`). */
