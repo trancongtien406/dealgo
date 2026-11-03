@@ -334,6 +334,7 @@
     }
   },
   "foodItemOptionsTitle": "Item options",
+  "foodItemAddonsTitle": "Add-ons",
   "foodItemOptionsNoGroups": "No options for this item.",
   "foodItemOptionsTotal": "Total",
   "foodItemOptionsAdd": "Add to cart",

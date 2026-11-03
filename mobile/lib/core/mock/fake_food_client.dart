@@ -27,6 +27,7 @@ class FakeFoodClient implements FoodClient {
     this.catalogWriteError,
     this.searchFoodHandler,
     this.suggestions = const [],
+    this.suggestionsError,
   });
 
   List<FoodStoreSummary> stores;
@@ -53,6 +54,9 @@ class FakeFoodClient implements FoodClient {
 
   /// Same-store dishes returned by [listStoreSuggestions].
   List<FoodFeaturedItem> suggestions;
+
+  /// Thrown by [listStoreSuggestions] when set.
+  Object? suggestionsError;
   final List<String> searchQueries = [];
   final List<String?> searchSorts = [];
   final List<int> searchPages = [];
@@ -440,6 +444,10 @@ class FakeFoodClient implements FoodClient {
         if (id.trim().isNotEmpty) id.trim(),
     ];
     suggestionCalls.add((storeId: storeId, exclude: excluded));
+    final error = suggestionsError;
+    if (error != null) {
+      throw error;
+    }
     return List.unmodifiable(suggestions);
   }
 

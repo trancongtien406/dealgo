@@ -934,6 +934,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get foodItemOptionsTitle => 'Tùy chọn món ăn';
 
   @override
+  String get foodItemAddonsTitle => 'Món ăn kèm';
+
+  @override
   String get foodItemOptionsNoGroups => 'Món này chưa có tùy chọn.';
 
   @override

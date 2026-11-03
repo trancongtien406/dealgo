@@ -932,6 +932,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get foodItemOptionsTitle => 'Item options';
 
   @override
+  String get foodItemAddonsTitle => 'Add-ons';
+
+  @override
   String get foodItemOptionsNoGroups => 'No options for this item.';
 
   @override

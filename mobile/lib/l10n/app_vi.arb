@@ -334,6 +334,7 @@
     }
   },
   "foodItemOptionsTitle": "Tùy chọn món ăn",
+  "foodItemAddonsTitle": "Món ăn kèm",
   "foodItemOptionsNoGroups": "Món này chưa có tùy chọn.",
   "foodItemOptionsTotal": "Tổng cộng",
   "foodItemOptionsAdd": "Thêm vào giỏ hàng",

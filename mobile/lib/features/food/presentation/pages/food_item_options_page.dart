@@ -14,6 +14,7 @@ import '../utils/food_maps.dart';
 import '../utils/food_routes.dart';
 import '../widgets/food_cart_bar.dart';
 import '../widgets/food_dish_gallery.dart';
+import '../widgets/food_item_addons.dart';
 import '../widgets/food_widgets.dart';
 import '../widgets/food_badges.dart';
 import '../widgets/food_category_tile.dart';
@@ -352,6 +353,10 @@ class _FoodItemOptionsPageState extends State<FoodItemOptionsPage> {
                       onOpenMaps: () => _openMaps(context),
                     ),
                   ],
+                  FoodItemAddons(
+                    store: widget.args.store,
+                    excludeItemId: item.id,
+                  ),
                 ],
               ),
             ),

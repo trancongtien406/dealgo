@@ -1892,6 +1892,12 @@ abstract class AppLocalizations {
   /// **'Item options'**
   String get foodItemOptionsTitle;
 
+  /// No description provided for @foodItemAddonsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add-ons'**
+  String get foodItemAddonsTitle;
+
   /// No description provided for @foodItemOptionsNoGroups.
   ///
   /// In en, this message translates to:
