@@ -149,6 +149,9 @@ FoodCartState? foodCartFromDraft(Map<String, Object?> m) {
     if (qty < 1) continue;
     final options = raw['optionIds'];
     final note = raw['note'];
+    final trimmedNote = note is String
+        ? clampFoodNote(note, foodLineNoteMax)
+        : '';
     lines.add(
       FoodCartLine(
         itemId: itemId,
@@ -158,7 +161,7 @@ FoodCartState? foodCartFromDraft(Map<String, Object?> m) {
         catalogItemId: raw['catalogItemId'] as String?,
         optionIds: options is List ? options.whereType<String>().toList() : [],
         imageUrl: raw['imageUrl'] as String?,
-        note: note is String && note.trim().isNotEmpty ? note.trim() : null,
+        note: trimmedNote.isEmpty ? null : trimmedNote,
       ),
     );
   }
@@ -182,7 +185,7 @@ FoodCartState? foodCartFromDraft(Map<String, Object?> m) {
     minOrderVnd: (m['minOrderVnd'] as int?) ?? 0,
     prepMinutes: m['prepMinutes'] as int?,
     storeDistanceKm: asDouble(m['storeDistanceKm']),
-    note: note is String ? note.trim() : '',
+    note: note is String ? clampFoodNote(note, foodOrderNoteMax) : '',
     utensils: utensils is bool ? utensils : true,
   );
 }

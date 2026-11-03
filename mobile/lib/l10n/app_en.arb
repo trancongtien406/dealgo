@@ -1132,6 +1132,7 @@
   "foodUtensilsNo": "No",
   "foodCartUpsellTitle": "Add more to your meal",
   "foodNoteSaved": "Note saved",
+  "foodNoteCleared": "Note cleared",
   "foodLineNoteClear": "Clear note",
   "foodCartLineRemove": "Remove item",
   "driverOtpLocked": "Too many wrong codes. Contact support to continue this ride.",

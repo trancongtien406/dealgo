@@ -2667,6 +2667,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get foodNoteSaved => 'Note saved';
 
   @override
+  String get foodNoteCleared => 'Note cleared';
+
+  @override
   String get foodLineNoteClear => 'Clear note';
 
   @override

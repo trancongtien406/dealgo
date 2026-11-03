@@ -2648,6 +2648,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get foodNoteSaved => 'Đã lưu ghi chú';
 
   @override
+  String get foodNoteCleared => 'Đã xóa ghi chú';
+
+  @override
   String get foodLineNoteClear => 'Xoá ghi chú';
 
   @override

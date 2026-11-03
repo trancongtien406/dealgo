@@ -1,5 +1,6 @@
 import 'package:dealgo/features/food/domain/entities/food_models.dart';
 import 'package:dealgo/features/food/presentation/cubit/food_cart_cubit.dart';
+import 'package:dealgo/features/food/presentation/food_cart_draft.dart';
 import 'package:dealgo/features/food/presentation/pages/food_cart_page.dart';
 import 'package:dealgo/features/food/presentation/utils/food_routes.dart';
 import 'package:dealgo/features/food/presentation/widgets/food_cart_upsell.dart';
@@ -152,6 +153,65 @@ void main() {
     expect(cart.state.lines.single.note, isNull);
     expect(find.text('"ít cay"'), findsNothing);
     await _flushDraft(tester);
+  });
+
+  testWidgets('clearing a note confirms the removal instead of a save', (
+    tester,
+  ) async {
+    await _openCart(tester, _client(const [_mainDish]));
+
+    await tester.tap(find.byKey(const Key('food-cart-line-main')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('food-line-note-field')),
+      'ít cay',
+    );
+    await tester.tap(find.byKey(const Key('food-line-note-save')));
+    await tester.pumpAndSettle();
+    expect(find.text('Đã lưu ghi chú'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('food-cart-line-main')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('food-line-note-clear')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Đã xóa ghi chú'), findsOneWidget);
+    await _flushDraft(tester);
+  });
+
+  test('cubit clamps notes to the server limits', () {
+    final cart = FoodCartCubit()
+      ..addItem(storeId: _storeId, storeName: 'Quán Cơm', item: _mainDish);
+
+    cart.setNote('a' * 400);
+    expect(cart.state.note.length, foodOrderNoteMax);
+
+    cart.setLineNote(_mainDish.id, 'b' * 300);
+    expect(cart.state.lines.single.note?.length, foodLineNoteMax);
+
+    cart.setLineNote(_mainDish.id, '   ');
+    expect(cart.state.lines.single.note, isNull);
+  });
+
+  test('a draft with an oversized note is clamped on restore', () {
+    final state = foodCartFromDraft({
+      'storeId': _storeId,
+      'storeName': 'Quán Cơm',
+      'idempotencyKey': 'key',
+      'note': 'a' * 400,
+      'lines': [
+        {
+          'itemId': 'main',
+          'name': 'Cơm gà',
+          'unitPriceVnd': 45000,
+          'quantity': 1,
+          'note': 'b' * 300,
+        },
+      ],
+    });
+
+    expect(state?.note.length, foodOrderNoteMax);
+    expect(state?.lines.single.note?.length, foodLineNoteMax);
   });
 
   testWidgets('the line still changes quantity and can be removed', (

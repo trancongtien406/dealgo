@@ -5126,6 +5126,12 @@ abstract class AppLocalizations {
   /// **'Note saved'**
   String get foodNoteSaved;
 
+  /// No description provided for @foodNoteCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Note cleared'**
+  String get foodNoteCleared;
+
   /// No description provided for @foodLineNoteClear.
   ///
   /// In en, this message translates to:

@@ -12,9 +12,6 @@ import '../../domain/entities/food_money.dart';
 import '../cubit/food_cart_cubit.dart';
 import 'food_widgets.dart';
 
-const int foodOrderNoteMax = 300;
-const int foodLineNoteMax = 200;
-
 /// One cart line: tap the name/note area to edit the dish note, or use the
 /// stepper and the remove button under it.
 class FoodCartLineTile extends StatelessWidget {
@@ -51,42 +48,45 @@ class FoodCartLineTile extends StatelessWidget {
                   key: Key('food-cart-line-${line.itemId}'),
                   onTap: onEditNote,
                   borderRadius: BorderRadius.circular(DealGoRadius.input),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: DealGoSpacing.s4,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          line.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: DealGoType.body(textTheme).copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: DealGoColors.text,
-                          ),
-                        ),
-                        if (note != null && note.isNotEmpty)
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 44),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: DealGoSpacing.s4,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            '"$note"',
-                            key: Key('food-cart-line-note-${line.itemId}'),
-                            maxLines: 1,
+                            line.name,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: DealGoType.meta(textTheme).copyWith(
-                              color: DealGoColors.textSecondary,
-                              fontStyle: FontStyle.italic,
+                            style: DealGoType.body(textTheme).copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: DealGoColors.text,
                             ),
                           ),
-                        Text(
-                          l10n.foodLineQtyPrice(
-                            line.quantity,
-                            formatVnd(line.unitPriceVnd),
+                          if (note != null && note.isNotEmpty)
+                            Text(
+                              '"$note"',
+                              key: Key('food-cart-line-note-${line.itemId}'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: DealGoType.meta(textTheme).copyWith(
+                                color: DealGoColors.textSecondary,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          Text(
+                            l10n.foodLineQtyPrice(
+                              line.quantity,
+                              formatVnd(line.unitPriceVnd),
+                            ),
+                            style: DealGoType.meta(textTheme)
+                                .copyWith(color: DealGoColors.textSecondary),
                           ),
-                          style: DealGoType.meta(textTheme)
-                              .copyWith(color: DealGoColors.textSecondary),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -296,9 +296,14 @@ Future<void> editFoodCartLineNote(
     return;
   }
   cubit.setLineNote(line.itemId, result.note);
+  final cleared = (result.note ?? '').trim().isEmpty;
   messenger
     ?..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(l10n.foodNoteSaved)));
+    ..showSnackBar(
+      SnackBar(
+        content: Text(cleared ? l10n.foodNoteCleared : l10n.foodNoteSaved),
+      ),
+    );
 }
 
 class _FoodLineNoteSheet extends StatefulWidget {
@@ -334,7 +339,7 @@ class _FoodLineNoteSheetState extends State<_FoodLineNoteSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(
             DealGoDimensions.pageGutter,
             DealGoSpacing.s16,

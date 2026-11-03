@@ -59,7 +59,8 @@ class FoodCartUpsellStrip extends StatefulWidget {
 class _FoodCartUpsellStripState extends State<FoodCartUpsellStrip> {
   FoodStoreDetail? _store;
   String? _requestedStoreId;
-  var _loading = false;
+  String? _loadingStoreId;
+  var _reloadWhenDone = false;
 
   @override
   void initState() {
@@ -68,8 +69,17 @@ class _FoodCartUpsellStripState extends State<FoodCartUpsellStrip> {
   }
 
   Future<void> _load() async {
-    final storeId = context.read<FoodCartCubit>().state.storeId;
-    if (storeId == null || storeId.isEmpty || _loading) {
+    final cart = context.read<FoodCartCubit>().state;
+    final storeId = cart.storeId;
+    if (storeId == null || storeId.isEmpty || cart.lines.isEmpty) {
+      return;
+    }
+    if (storeId == _requestedStoreId &&
+        (_store != null || _loadingStoreId != null)) {
+      return;
+    }
+    if (_loadingStoreId != null) {
+      _reloadWhenDone = true;
       return;
     }
     final token = currentAccessToken(context);
@@ -77,7 +87,7 @@ class _FoodCartUpsellStripState extends State<FoodCartUpsellStrip> {
       return;
     }
     _requestedStoreId = storeId;
-    _loading = true;
+    _loadingStoreId = storeId;
     try {
       final store = await context.read<GetFoodStore>()(
         GetFoodStoreParams(accessToken: token, storeId: storeId),
@@ -87,7 +97,7 @@ class _FoodCartUpsellStripState extends State<FoodCartUpsellStrip> {
       }
       setState(() {
         _store = store;
-        _loading = false;
+        _loadingStoreId = null;
       });
     } catch (_) {
       if (!mounted) {
@@ -95,8 +105,19 @@ class _FoodCartUpsellStripState extends State<FoodCartUpsellStrip> {
       }
       setState(() {
         _store = null;
-        _loading = false;
+        _loadingStoreId = null;
       });
+    }
+    if (!mounted) {
+      return;
+    }
+    final current = context.read<FoodCartCubit>().state.storeId;
+    if (_reloadWhenDone || current != storeId) {
+      _reloadWhenDone = false;
+      if (current != storeId) {
+        _requestedStoreId = null;
+      }
+      await _load();
     }
   }
 

@@ -433,7 +433,7 @@ class FoodCartCubit extends Cubit<FoodCartState> {
 
   /// Order-level note; blank (or whitespace) clears it.
   void setNote(String note) {
-    final text = note.trim();
+    final text = clampFoodNote(note, foodOrderNoteMax);
     if (text == state.note) {
       return;
     }
@@ -447,15 +447,15 @@ class FoodCartCubit extends Cubit<FoodCartState> {
     emit(state.copyWith(utensils: utensils));
   }
 
-  /// Sets the note of the line whose key is [itemId] (same identity as
+  /// Sets the note of the line whose key is [lineId] (same identity as
   /// [setQuantity]); blank or null clears it.
-  void setLineNote(String itemId, String? note) {
-    final index = state.lines.indexWhere((line) => line.itemId == itemId);
+  void setLineNote(String lineId, String? note) {
+    final index = state.lines.indexWhere((line) => line.itemId == lineId);
     if (index < 0) {
       return;
     }
-    final text = note?.trim();
-    final next = text == null || text.isEmpty ? null : text;
+    final text = clampFoodNote(note, foodLineNoteMax);
+    final next = text.isEmpty ? null : text;
     final lines = [...state.lines];
     final current = lines[index];
     if (current.note == next) {
@@ -792,4 +792,14 @@ String createFoodIdempotencyKey() {
   final time = DateTime.now().microsecondsSinceEpoch.toRadixString(16);
   final salt = identityHashCode(Object()).toUnsigned(32).toRadixString(16);
   return 'food-$time-$salt';
+}
+
+const int foodOrderNoteMax = 300;
+const int foodLineNoteMax = 200;
+
+/// Notes are user text that the server rejects beyond its column width; clamp
+/// here so a restored draft or a pasted blob can never make checkout invalid.
+String clampFoodNote(String? note, int max) {
+  final text = note?.trim() ?? '';
+  return text.length <= max ? text : text.substring(0, max);
 }
