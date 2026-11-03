@@ -16,12 +16,19 @@ final class FoodDiscoveryLoading extends FoodDiscoveryState {
 }
 
 final class FoodDiscoveryReady extends FoodDiscoveryState {
-  const FoodDiscoveryReady(this.stores, {this.ratings = const {}});
+  const FoodDiscoveryReady(
+    this.stores, {
+    this.ratings = const {},
+    this.isRefreshing = false,
+  });
 
   final List<FoodStoreSummary> stores;
 
   /// Real store ratings by store id; empty until loaded (or if unavailable).
   final Map<String, StoreRating> ratings;
+
+  /// A newer request is in flight; the current stores stay on screen.
+  final bool isRefreshing;
 }
 
 final class FoodDiscoveryFailed extends FoodDiscoveryState {
@@ -44,29 +51,51 @@ class FoodDiscoveryCubit extends Cubit<FoodDiscoveryState> {
   final LocationService? _location;
   var _generation = 0;
 
-  Future<void> load(String? accessToken, {String? search}) async {
+  Future<void> load(
+    String? accessToken, {
+    String? search,
+    double? lat,
+    double? lng,
+    String? sortBy,
+    int? maxKm,
+  }) async {
     final generation = ++_generation;
     final token = accessToken?.trim() ?? '';
     if (token.isEmpty) {
       emit(FoodDiscoveryFailed(UiMessage((l10n) => l10n.errorUnauthorized)));
       return;
     }
-    emit(const FoodDiscoveryLoading());
+    final previous = state;
+    if (previous is FoodDiscoveryReady) {
+      emit(
+        FoodDiscoveryReady(
+          previous.stores,
+          ratings: previous.ratings,
+          isRefreshing: true,
+        ),
+      );
+    } else {
+      emit(const FoodDiscoveryLoading());
+    }
     try {
-      final fix = await _position();
+      final fix = lat != null && lng != null
+          ? (lat: lat, lng: lng)
+          : await _position();
       if (isClosed || generation != _generation) {
         return;
       }
-      final stores = await _listFoodStores(
+      final page = await _listFoodStores(
         token,
         lat: fix?.lat,
         lng: fix?.lng,
         search: search,
+        sortBy: sortBy,
+        maxKm: maxKm,
       );
       if (isClosed || generation != _generation) {
         return;
       }
-      final ready = List<FoodStoreSummary>.unmodifiable(stores);
+      final ready = List<FoodStoreSummary>.unmodifiable(page.items);
       emit(FoodDiscoveryReady(ready));
       await _loadRatings(token, ready, generation);
     } on ApiException catch (error) {

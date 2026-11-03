@@ -72,11 +72,16 @@ abstract interface class FoodRemoteDataSource {
     required String orderId,
   });
 
-  Future<List<FoodStoreSummary>> listStores(
+  Future<FoodStorePageResult> listStores(
     String accessToken, {
     double? lat,
     double? lng,
     String? search,
+    String? sortBy,
+    int? maxKm,
+    String? category,
+    int page = 1,
+    int limit = 20,
   });
 
   Future<FoodStoreDetail> getStore(String accessToken, String storeId);

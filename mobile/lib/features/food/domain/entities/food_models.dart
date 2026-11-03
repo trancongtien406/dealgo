@@ -157,6 +157,8 @@ class FoodStoreSummary {
   /// Non-null when the store is paused or outside its hours; lists sort these last.
   final StoreClosedReason? closedReason;
 
+  bool get openNow => closedReason == null;
+
   /// Catalog category code from the backend (e.g. `pho`, `cafe`); may be null.
   final String? category;
 
@@ -165,6 +167,24 @@ class FoodStoreSummary {
 
   /// Cover thumb from first menu item with a photo (DEC-PROD-041).
   final String? imageUrl;
+}
+
+/// One page of store browse results. [total] is the server count for the
+/// current filter, so [hasMore] stays correct even when rows are de-duplicated.
+class FoodStorePageResult {
+  const FoodStorePageResult({
+    required this.items,
+    required this.total,
+    required this.page,
+    required this.limit,
+  });
+
+  final List<FoodStoreSummary> items;
+  final int total;
+  final int page;
+  final int limit;
+
+  bool get hasMore => page * limit < total;
 }
 
 /// How long a dish counts as "Mới" after the merchant adds it.
@@ -202,12 +222,33 @@ class FoodFeaturedItem {
   bool get isNew => foodItemIsNew(addedAt);
 }
 
+/// FOOD-001 — new dishes wait for Ops approval while item moderation is enabled.
+enum FoodItemModeration {
+  pending('PENDING'),
+  approved('APPROVED'),
+  rejected('REJECTED');
+
+  const FoodItemModeration(this.wire);
+
+  final String wire;
+
+  static FoodItemModeration fromWire(Object? raw) {
+    for (final value in values) {
+      if (value.wire == raw) {
+        return value;
+      }
+    }
+    return FoodItemModeration.approved;
+  }
+}
+
 class FoodMenuItem {
   const FoodMenuItem({
     required this.id,
     required this.name,
     required this.priceVnd,
     required this.available,
+    this.moderation = FoodItemModeration.approved,
     this.description,
     this.prepMinutes,
     this.imageUrl,
@@ -223,6 +264,12 @@ class FoodMenuItem {
   final String name;
   final int priceVnd;
   final bool available;
+
+  /// FOOD-001: with item moderation on, a new dish stays PENDING until Ops approves it.
+  final FoodItemModeration moderation;
+
+  /// Customers only see and order APPROVED dishes; a PENDING/REJECTED dish is not on sale.
+  bool get onSale => available && moderation == FoodItemModeration.approved;
 
   /// List price shown struck through; null unless above [priceVnd].
   final int? originalPriceVnd;
@@ -273,6 +320,7 @@ class FoodMenuItem {
       name: name ?? this.name,
       priceVnd: priceVnd ?? this.priceVnd,
       available: available ?? this.available,
+      moderation: moderation,
       description: clearDescription ? null : (description ?? this.description),
       prepMinutes: clearPrepMinutes ? null : (prepMinutes ?? this.prepMinutes),
       imageUrl: clearImageUrl ? null : (imageUrl ?? this.imageUrl),
@@ -430,6 +478,9 @@ class FoodStoreDetail {
   final DateTime? serviceModeUntil;
 
   bool get isPaused => serviceMode == StoreServiceMode.paused;
+
+  /// A paused store keeps its menu visible but refuses new lines.
+  bool get canOrder => openNow && !isPaused;
 
   FoodStoreDetail copyWith({
     StoreServiceMode? serviceMode,

@@ -6,17 +6,27 @@ class ListFoodStores {
 
   final FoodRepository _repository;
 
-  Future<List<FoodStoreSummary>> call(
+  Future<FoodStorePageResult> call(
     String accessToken, {
     double? lat,
     double? lng,
     String? search,
+    String? sortBy,
+    int? maxKm,
+    String? category,
+    int page = 1,
+    int limit = 20,
   }) {
     return _repository.listStores(
       accessToken,
       lat: lat,
       lng: lng,
       search: search,
+      sortBy: sortBy,
+      maxKm: maxKm,
+      category: category,
+      page: page,
+      limit: limit,
     );
   }
 }

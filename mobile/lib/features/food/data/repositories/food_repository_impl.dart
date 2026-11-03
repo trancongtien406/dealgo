@@ -8,13 +8,28 @@ class FoodRepositoryImpl implements FoodRepository {
   final FoodRemoteDataSource _remote;
 
   @override
-  Future<List<FoodStoreSummary>> listStores(
+  Future<FoodStorePageResult> listStores(
     String accessToken, {
     double? lat,
     double? lng,
     String? search,
+    String? sortBy,
+    int? maxKm,
+    String? category,
+    int page = 1,
+    int limit = 20,
   }) {
-    return _remote.listStores(accessToken, lat: lat, lng: lng, search: search);
+    return _remote.listStores(
+      accessToken,
+      lat: lat,
+      lng: lng,
+      search: search,
+      sortBy: sortBy,
+      maxKm: maxKm,
+      category: category,
+      page: page,
+      limit: limit,
+    );
   }
 
   @override

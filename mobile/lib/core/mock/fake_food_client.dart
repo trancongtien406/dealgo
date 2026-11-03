@@ -54,6 +54,11 @@ class FakeFoodClient implements FoodClient {
 
   /// One entry per listStores call: whether a GPS fix was sent.
   final List<bool> storeListGeo = [];
+  final List<String?> storeSorts = [];
+  final List<int?> storeMaxKms = [];
+  final List<int> storePages = [];
+  final List<int> storeLimits = [];
+  final List<String?> storeCategories = [];
   final List<String> readyCalls = [];
   final List<String> claimCalls = [];
   final List<({String orderId, FoodDeliveryAction action})> advanceCalls = [];
@@ -342,20 +347,43 @@ class FakeFoodClient implements FoodClient {
   }
 
   @override
-  Future<List<FoodStoreSummary>> listStores(
+  Future<FoodStorePageResult> listStores(
     String accessToken, {
     double? lat,
     double? lng,
     String? search,
+    String? sortBy,
+    int? maxKm,
+    String? category,
+    int page = 1,
+    int limit = 20,
   }) async {
     storeListGeo.add(lat != null && lng != null);
     storeSearches.add(search);
+    storeSorts.add(sortBy);
+    storeMaxKms.add(maxKm);
+    storePages.add(page);
+    storeLimits.add(limit);
+    storeCategories.add(category);
+
     final q = search?.trim().toLowerCase() ?? '';
-    if (q.isEmpty) return stores;
-    return [
+    final code = category?.trim().toLowerCase() ?? '';
+    final filtered = [
       for (final store in stores)
-        if (store.name.toLowerCase().contains(q)) store,
+        if ((q.isEmpty || store.name.toLowerCase().contains(q)) &&
+            (code.isEmpty || store.category?.toLowerCase() == code))
+          store,
     ];
+    final start = (page - 1) * limit;
+    final items = start >= filtered.length
+        ? const <FoodStoreSummary>[]
+        : filtered.sublist(start, (start + limit).clamp(0, filtered.length));
+    return FoodStorePageResult(
+      items: items,
+      total: filtered.length,
+      page: page,
+      limit: limit,
+    );
   }
 
   @override

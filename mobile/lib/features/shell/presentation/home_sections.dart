@@ -184,7 +184,8 @@ class _StoreRowState extends State<StoreRow> {
     final token = homeAccessToken(context);
     if (token == null) return;
     try {
-      final stores = (await context.read<ListFoodStores>()(token))
+      final stores = (await context.read<ListFoodStores>()(token, limit: 6))
+          .items
           .take(6)
           .toList(growable: false);
       if (!mounted || stores.isEmpty) return;

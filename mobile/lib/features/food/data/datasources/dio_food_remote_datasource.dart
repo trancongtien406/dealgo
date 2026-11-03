@@ -206,25 +206,37 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
   }
 
   @override
-  Future<List<FoodStoreSummary>> listStores(
+  Future<FoodStorePageResult> listStores(
     String accessToken, {
     double? lat,
     double? lng,
     String? search,
+    String? sortBy,
+    int? maxKm,
+    String? category,
+    int page = 1,
+    int limit = 20,
   }) {
     final hasGeo = lat != null && lng != null;
+    final sort = sortBy ?? (hasGeo ? 'distance' : null);
+    final trimmedCategory = category?.trim() ?? '';
     return _send(
       () => dio.get<Object?>(
         ApiPaths.foodStores,
         queryParameters: {
-          if (hasGeo) ...{'lat': lat, 'lng': lng, 'sort_by': 'distance'},
+          if (hasGeo) ...{'lat': lat, 'lng': lng},
+          'sort_by': ?sort,
+          if (maxKm != null && maxKm > 0) 'max_km': maxKm,
           // QA C3 — name search runs on the server, not on the loaded page.
           if (search != null && search.trim().isNotEmpty)
             'search': search.trim(),
+          if (trimmedCategory.isNotEmpty) 'category': trimmedCategory,
+          'page': page,
+          'limit': limit,
         },
         options: _auth(accessToken),
       ),
-      decodeFoodStoreList,
+      (body) => decodeFoodStorePage(body, page: page, limit: limit),
     );
   }
 
@@ -946,6 +958,23 @@ List<FoodStoreSummary> decodeFoodStoreList(Object? body) {
   return List.unmodifiable(stores);
 }
 
+FoodStorePageResult decodeFoodStorePage(
+  Object? body, {
+  required int page,
+  required int limit,
+}) {
+  final data = _successPayload(body);
+  final map = asJsonMap(data);
+  final items = decodeFoodStoreList(body);
+  final reported = _asInt(map?['total']);
+  return FoodStorePageResult(
+    items: items,
+    total: reported == null || reported < items.length ? items.length : reported,
+    page: page,
+    limit: limit,
+  );
+}
+
 DateTime? _asLocalTime(Object? raw) =>
     raw is String ? DateTime.tryParse(raw)?.toLocal() : null;
 
@@ -1192,6 +1221,7 @@ FoodMenuItem? _menuItem(Object? raw) {
     name: itemName,
     priceVnd: price,
     available: available,
+    moderation: FoodItemModeration.fromWire(map['moderationStatus']),
     description: map['description'] is String
         ? map['description'] as String
         : null,
