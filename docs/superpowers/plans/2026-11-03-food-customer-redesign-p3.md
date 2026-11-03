@@ -214,7 +214,7 @@ expect(detail.body).toHaveProperty('closesAtToday');
 - [ ] **Step 7: Run backend gates and commit**
 
 ```bash
-cd backend && npx prisma validate && npm run build && npm test -- --run store-schedule food.http
+cd backend && npx prisma validate && npm run build && npx vitest run src/modules/food-order/store-schedule.spec.ts
 git add backend/src/modules/food-order/store-schedule.ts backend/src/modules/food-order/store-schedule.spec.ts \
   backend/src/modules/food-order/food.repository.ts backend/src/modules/food-order/food-prisma.repository.ts \
   backend/src/modules/food-order/food.service.ts backend/test/integration/food-order/food.http.spec.ts
@@ -269,7 +269,13 @@ it('searches dishes and stores, dishes first, without leaking closed stores', as
     );
     expect(hit.item.priceVnd).toBeGreaterThan(0);
   }
-  expect(res.body.stores.items.every((s: any) => !s.isDishOnly)).toBe(true);
+  expect(res.body.stores.items.length).toBeLessThanOrEqual(5);
+  for (const store of res.body.stores.items) {
+    expect(store).toEqual(
+      expect.objectContaining({ id: expect.any(String), name: expect.any(String) }),
+    );
+    expect(store).toHaveProperty('closesAtToday');
+  }
 });
 
 it('search requires q and caps limit', async () => {
@@ -281,7 +287,7 @@ it('search requires q and caps limit', async () => {
 - [ ] **Step 2: Run it to verify it fails**
 
 ```bash
-cd backend && npm run test:e2e -- --runFood food.http -t "searches dishes"
+cd backend && npm run test:e2e -- test/integration/food-order/food.http.spec.ts -t "searches dishes"
 ```
 Expected: 404 (route does not exist).
 
@@ -336,7 +342,7 @@ Memory repository: filter `StoredItem`s by name across stores, skip `available =
 - [ ] **Step 5: Run the integration test**
 
 ```bash
-cd backend && npm run test:e2e -- --runFood food.http -t "searches dishes"
+cd backend && npm run test:e2e -- test/integration/food-order/food.http.spec.ts -t "searches dishes"
 ```
 Expected: PASS.
 
@@ -374,16 +380,17 @@ it('suggests other-category dishes for the item page', async () => {
   const res = await api.get(`/v1/food/stores/${storeId}/suggestions?exclude=${item.id}`);
   expect(res.status).toBe(200);
   expect(res.body.length).toBeLessThanOrEqual(6);
+  expect(res.body.length === 0 || res.body.length >= 2).toBe(true);
   for (const suggestion of res.body) {
     expect(suggestion.id).not.toBe(item.id);
     expect(suggestion.available).not.toBe(false);
+    expect(suggestion.menuCategoryId).not.toBe(item.menuCategoryId);
   }
-  const single = await api.get(`/v1/food/stores/${storeId}/suggestions?exclude=${item.id}`);
-  if (single.body.length === 1) expect(single.body).toEqual([]);
 });
 ```
 
-- [ ] **Step 2: Run to verify failure** — `npm run test:e2e -- --runFood food.http -t "suggests other-category"` → 404.
+- [ ] **Step 2: Run to verify failure** —
+  `npm run test:e2e -- test/integration/food-order/food.http.spec.ts -t "suggests other-category"` → 404.
 
 - [ ] **Step 3: Implement**
 
@@ -403,7 +410,7 @@ returns `[]` when the result has fewer than 2 entries.
 - [ ] **Step 4: Test + commit**
 
 ```bash
-cd backend && npm run build && npm run test:e2e -- --runFood food.http -t "suggests other-category"
+cd backend && npm run build && npm run test:e2e -- test/integration/food-order/food.http.spec.ts -t "suggests other-category"
 git add backend/src/modules/food-order/food.dto.ts backend/src/modules/food-order/food.controller.ts \
   backend/src/modules/food-order/food.service.ts backend/src/modules/food-order/food.repository.ts \
   backend/src/modules/food-order/food-prisma.repository.ts backend/test/integration/food-order/food.http.spec.ts
@@ -607,8 +614,7 @@ git commit -m "feat(food): show dish results in search"
 **Files:**
 - Modify: `mobile/lib/features/food/presentation/widgets/store_meta.dart`
 - Modify: `mobile/lib/features/food/presentation/widgets/food_store_card.dart`
-- Modify: `mobile/lib/features/food/presentation/pages/store/` hero widget (find it with
-  `rg -l "store-hero|trust" mobile/lib/features/food/presentation/pages/store`)
+- Modify: `mobile/lib/features/food/presentation/pages/store/store_hero.dart`
 - Modify: `mobile/lib/features/food/presentation/pages/food_category_page.dart`
 - Modify: `mobile/lib/l10n/app_vi.arb`, `mobile/lib/l10n/app_en.arb`
 - Test: `mobile/test/features/food/food_store_trust_test.dart`
@@ -802,7 +808,7 @@ git commit -m "feat(food): suggest accompanying dishes on the item page"
 
 ```bash
 cd mobile && flutter analyze && flutter test test/features/food
-cd ../backend && npm run build && npm test -- --run food
+cd ../backend && npm run build && npx vitest run food
 git add docs/10-ai-execution/screen-inventory.md \
   docs/superpowers/specs/2026-11-03-food-customer-redesign-design.md
 git add -p docs/00-governance/decisions-and-assumptions.md
