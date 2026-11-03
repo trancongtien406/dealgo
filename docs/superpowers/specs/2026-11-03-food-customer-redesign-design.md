@@ -2,7 +2,7 @@
 doc_id: DG-SPEC-FOOD-CX-001
 title: "DealGo — Thiết kế lại trải nghiệm Food (Customer)"
 version: "1.0.0"
-status: "P2_IMPLEMENTED"
+status: "P3_IMPLEMENTED"
 owner: "UI/UX Lead + Product Owner"
 created_at: "2026-11-03"
 related:
@@ -24,7 +24,7 @@ decisions_respected:
 
 # Thiết kế lại trải nghiệm Food (Customer)
 
-> **Trạng thái:** `DRAFT_FOR_REVIEW`. Tài liệu này đặc tả giao diện và hợp đồng dữ liệu; các mức phí, thời gian và chính sách vẫn thuộc `OPEN-*` hiện hành. Không có con số phí nào trong tài liệu này là chính sách production.
+> **Trạng thái:** `P3_IMPLEMENTED` (P1–P3). Tài liệu này đặc tả giao diện và hợp đồng dữ liệu; các mức phí, thời gian và chính sách vẫn thuộc `OPEN-*` hiện hành. Không có con số phí nào trong tài liệu này là chính sách production.
 
 ## 1. Vấn đề
 
@@ -399,7 +399,8 @@ Migration: `20261103120000_food_order_notes` — chỉ `ADD COLUMN`, cột nulla
 |---|---|---|
 | `GET` | `/v1/food/stores` | Không đổi shape; **client** gửi `page`/`limit` và đọc `total` |
 | `GET` | `/v1/food/stores` | Thêm `closesAtToday: "22:00" \| null` vào mỗi item (tính từ `food_store_hours` + `lastOrderMinutes`) |
-| `GET` | `/v1/food/search?q&lat&lng&page&limit` | **Mới**: `{ dishes: PageResult<DishHit>, stores: PageResult<StoreBrowseItem> }` |
+| `GET` | `/v1/food/stores/:id` | Thêm `closesAtToday` cùng nguồn với dòng browse và `deliveryFeeFromVnd` nullable khi request có toạ độ |
+| `GET` | `/v1/food/search?q&lat&lng&page&limit&sort_by` | **Mới**: `{ dishes: PageResult<DishHit>, stores: PageResult<StoreBrowseItem> }` |
 | `GET` | `/v1/food/stores/:id/suggestions?exclude=<ids>` | **Mới (P3)**: tối đa 6 món cùng quán, khác nhóm, còn bán |
 | `POST` | `/v1/food/orders` | `note?`, `utensils?`, mỗi line `note?` |
 | `GET` | `/v1/food/orders/:id`, `/orders`, merchant/driver/ops view | Trả `note`, `utensils`, line `note` |
@@ -532,10 +533,10 @@ Mỗi phase phải chạy được độc lập và không phá client cũ.
 |---|---|---|---|
 | `FOOD-CX-OD-01` | Dụng cụ ăn uống mặc định Có hay Không | Product + Ops | Có (`utensils = true`) — **implemented with default, vẫn OPEN** |
 | `FOOD-CX-OD-02` | Giới hạn ký tự ghi chú (200/300) và có kiểm duyệt nội dung không | Product + Trust | 200 ký tự món, 300 ký tự đơn, không kiểm duyệt tự động ở MVP — **implemented as default, vẫn OPEN** |
-| `FOOD-CX-OD-03` | Upsell tính ở server hay client | Tech | Client ở P2 (từ `store.items`), server ở P3 — **implemented as default, vẫn OPEN** |
-| `FOOD-CX-OD-04` | Shape cuối của endpoint search (gộp vào `stores` hay tách) | Tech | Tách endpoint để phân trang độc lập |
+| `FOOD-CX-OD-03` | Upsell tính ở server hay client | Tech | Client ở giỏ P2 (từ `store.items`), server ở P3 cho món ăn kèm (`/v1/food/stores/:id/suggestions`) — **implemented as default, vẫn OPEN** |
+| `FOOD-CX-OD-04` | Shape cuối của endpoint search (gộp vào `stores` hay tách) | Tech | Một endpoint `GET /v1/food/search` trả `{ dishes, stores }`, mỗi nhóm phân trang riêng — **implemented as default, vẫn OPEN** |
 | `FOOD-CX-OD-05` | Có hiển thị số quán đang mở ở header không | Product | Không, chỉ ETA (tránh số liệu sai khi phân trang) |
-| `FOOD-CX-OD-06` | Voucher wall lấy "mã khả dụng" hay "mã đã lưu" | Product | Mã khả dụng cho dịch vụ FOOD (`/v1/promotions/available`) |
+| `FOOD-CX-OD-06` | Voucher wall lấy "mã khả dụng" hay "mã đã lưu" | Product | Mã khả dụng cho dịch vụ FOOD (`/v1/promotions/available`) — **implemented as default, vẫn OPEN** |
 
 ### 15.1. Đã triển khai ở P2 (2026-11-03)
 
@@ -545,6 +546,41 @@ Mỗi phase phải chạy được độc lập và không phá client cũ.
 - Khối phí giao hiển thị đúng `NEGOTIATE` (stepper + gợi ý counter) và `FIXED` (không stepper).
 - `FOOD-CX-OD-01/02/03` vẫn OPEN: code dùng đúng mặc định ở bảng trên, đổi được bằng migration
   và client mà không phải backfill dữ liệu cũ.
+
+### 15.2. Đã triển khai ở P3 (2026-11-03)
+
+- `closesAtToday: "HH:mm" | null` trên `GET /v1/food/stores` và `GET /v1/food/stores/:id` là giờ
+  đóng của ca đang nhận đơn; `null` khi quán không có giờ hoặc không ca nào đang nhận. Giá trị khớp
+  `openNow`: dòng đóng cửa của hôm nay không che ca qua đêm bắt đầu từ hôm trước; ca đóng 24:00 trả
+  `"00:00"`.
+- `GET /v1/food/search?q&lat&lng&page&limit&sort_by` trả `{ dishes, stores }`. `q` cắt khoảng
+  trắng, dài 1–120; `limit` > 20 trả 400. Hit món chỉ gồm món còn bán + `APPROVED` và loại quán
+  tạm dừng/đóng; nhóm quán giữ hành vi browse, vẫn có quán đóng kèm `closedReason`. Không có GPS →
+  `distanceKm`/`etaMinutes`/`deliveryFeeFromVnd` null. Từ khoá search được che trong access log và
+  error body. So khớp là ILIKE thuần, **không bỏ dấu**, nên `bun bo` không khớp `Bún bò` — ghi nhận
+  là hạn chế đã biết, chưa phải hành vi đã chốt.
+- `GET /v1/food/stores/:id/suggestions?exclude=<ids>` trả tối đa 6 món còn bán + `APPROVED` ở nhóm
+  menu khác, bán chạy trước; `[]` khi có dưới 2 món phù hợp; món không có nhóm không bao giờ được
+  gợi ý; store id không tồn tại trả `200 []`.
+- `GET /v1/food/stores/:id` trả thêm `deliveryFeeFromVnd` nullable, cùng nguồn với dòng browse khi
+  request có toạ độ.
+- Tìm kiếm: nhóm `Món ăn` trên nhóm `Quán`, ẩn khi không có hit món; bấm món mở thẳng màn món; chip
+  từ khoá lấy từ tên món nổi bật khi ô nhập trống; debounce 350 ms; dừng phân trang khi một trang
+  không thêm dòng mới. Card quán trong kết quả search không có rating và không có số kết quả vì
+  payload không mang rating — quyết định phạm vi có chủ đích, không phải thiếu dữ liệu.
+- Card quán hiện `Mở đến HH:mm`; hero quán có trust strip `Mở đến` và `Phí giao từ` chỉ khi server
+  cung cấp; hero ẩn phí khi request chi tiết không có vị trí (trang chờ tối đa 1,5 s để lấy vị trí).
+- Empty state danh mục: chỉ hiện `DealGo chưa giao tới khu vực này` khi request có toạ độ **và**
+  không lọc danh mục; còn lại hiện `Chưa có quán trong danh mục này`.
+- Khám phá: voucher wall (tối đa 3 voucher FOOD dùng được, ẩn khi không có hoặc lỗi) và dải
+  `Đặt lại đơn quen` (đơn hoàn tất mới nhất, dùng chung `reorderIntoCart`); skeleton của hai khối
+  cao bằng nội dung đã tải.
+- Chi tiết món: khối `Món ăn kèm` tối đa 6 món gợi ý cùng quán, ẩn khi dưới 2 hoặc lỗi; `+` thêm
+  một đơn vị không kèm tuỳ chọn.
+- `FOOD-CX-OD-04` (shape search) và `FOOD-CX-OD-06` (nguồn voucher wall) chạy theo mặc định ở bảng
+  trên và **vẫn OPEN**; `FOOD-CX-OD-03` chuyển sang server cho món ăn kèm ở P3, vẫn **OPEN**. Tìm
+  kiếm bỏ dấu, rating trên card search và tín hiệu vùng phục vụ phía server vẫn là backlog, không
+  phải quyết định đã chốt.
 
 ## 16. Phụ lục bằng chứng
 

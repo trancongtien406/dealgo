@@ -549,6 +549,7 @@ Status: `DRAFT` (2026-11-03, P2 của spec `docs/superpowers/specs/2026-11-03-fo
 | Khối phí giao | `DRAFT` | Checkout chỉ hiển thị phí giao do máy chủ trả trong báo giá. `NEGOTIATE`: khách tăng/giảm trong khoảng server cho phép kèm gợi ý giá tài xế có thể nhận. `FIXED`: chỉ nhãn phí cố định, không có stepper. App không hardcode sàn/trần. |
 | Bề mặt đọc | `DRAFT` | Ghi chú hiện ở hoá đơn (C036/C037), theo dõi đơn (C033), phiếu bếp quán (M016, trạng thái PLACED/PREPARING) và job tài xế (D026). Nội dung người dùng: render dạng text, không log, không đưa vào analytics. |
 | Bằng chứng | `DRAFT` | Migration `20261103120000_food_order_notes` (additive); `food.dto.ts`/`food.service.ts`/`food*.repository.ts`; mobile `food_cart_cubit.dart`, `food_checkout_extras.dart`, `food_order_extras.dart`; test `food_cart_notes_test.dart`, `food_checkout_extras_test.dart`, `food_fare_negotiation_test.dart`, `food_order_extras_read_test.dart`. |
+| Bằng chứng (P3) | `DRAFT` | `closesAtToday` trên browse + chi tiết quán; `GET /v1/food/search` trả `{ dishes, stores }` (bỏ dấu chưa hỗ trợ, từ khoá được che trong log/error); `GET /v1/food/stores/:id/suggestions` cho khối món ăn kèm; voucher wall và dải đặt lại đơn ở Khám phá; test `food_search_dishes_test.dart`, `food_store_trust_test.dart`, `food_item_addons_test.dart`, `food_discovery_wall_test.dart`, `food-browse-extras.spec.ts`. `FOOD-CX-OD-03` chuyển phần món ăn kèm sang server; `FOOD-CX-OD-04/06` vẫn **OPEN** với mặc định đã ghi trong spec. |
 
 ### 5.2. Quyết định đã bị thay thế
 
@@ -969,6 +970,7 @@ Phân cấp này **tương thích** `BLOCKER-L0..L2` trong `scope-release-plan.m
 
 | Date | Version | Status | Changes |
 |---|---|---|---|
+| 2026-11-03 | 0.4.19 | `DRAFT` | `DEC-PROD-072` (P3 của spec Food Customer): `closesAtToday` trên browse + chi tiết quán, `GET /v1/food/search` trả `{ dishes, stores }`, `GET /v1/food/stores/:id/suggestions` cho món ăn kèm, voucher wall + đặt lại đơn ở Khám phá; `FOOD-CX-OD-04/06` vẫn `OPEN` và đang chạy với mặc định đã ghi; tìm kiếm bỏ dấu và rating trên card search vẫn là backlog. |
 | 2026-11-03 | 0.4.18 | `DRAFT` | Thêm `DEC-PROD-072`: ghi chú đơn (≤300)/ghi chú món (≤200), dụng cụ ăn uống, upsell trong giỏ và khối phí giao NEGOTIATE/FIXED theo P2 của spec Food Customer; `FOOD-CX-OD-01/02/03` vẫn `OPEN` và đang chạy với mặc định đã ghi. |
 | 2026-10-30 | 0.4.17 | `DRAFT` | `DEC-PROD-070` (t61u): OCR trên máy (ML Kit) điền sẵn form + `ocrPrefilled/ocrEdited` trên Admin; tự động duyệt KYC/KYB (`KYC_AUTO_APPROVE_DRIVER/MERCHANT`, tắt mặc định, audit `KYC_AUTO_APPROVE`); hộ nhỏ nộp cam kết ATTP; lý do + mục từ chối trong socket; ghi chú theo mục khi từ chối; bypass mặc định false; seed nhân sự mẫu DEV. |
 | 2026-10-30 | 0.4.16 | `DRAFT` | `DEC-PROD-070` (t60u): cửa hàng bắt buộc giấy ATTP (`FOOD_SAFETY_CERT`); hạng bằng lái phải phủ hạng xe (`PARTNER_LICENSE_CLASS_MISMATCH`); kết quả kiểm thử duyệt tay trên web. |
