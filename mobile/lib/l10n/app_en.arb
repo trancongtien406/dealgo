@@ -287,7 +287,36 @@
   "foodSearchFilterAll": "All",
   "foodSearchFilterNear": "Near me",
   "foodSearchSuggestions": "Search suggestions",
+  "foodSearchResults": "{count} results",
+  "@foodSearchResults": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "foodSearchEmpty": "No matching stores yet",
+  "foodDeliverTo": "Deliver to",
+  "foodFilterButton": "Filters",
+  "foodFilterTitle": "Filter & sort",
+  "foodFilterSort": "Sort by",
+  "foodFilterNear": "Nearest",
+  "foodFilterRating": "Top rated",
+  "foodFilterDistance": "Distance",
+  "foodFilterAnyDistance": "Any distance",
+  "foodFilterKm": "Within {km} km",
+  "@foodFilterKm": {
+    "placeholders": {
+      "km": {
+        "type": "int"
+      }
+    }
+  },
+  "foodFilterOpenNow": "Open now",
+  "foodFilterOffers": "Has offers",
+  "foodFilterApply": "Apply",
+  "foodFilterReset": "Reset",
+  "foodFilterClear": "Clear filters",
   "foodSearchHistory": "Search history",
   "foodSearchClearHistory": "Clear all",
   "foodCategoryTitle": "Restaurants & categories",
@@ -308,6 +337,48 @@
   "foodItemOptionsAdd": "Add to cart",
   "foodItemOptionsRequired": "Required",
   "foodItemOptionsOptional": "Optional",
+  "foodItemDetailTitle": "Item details",
+  "foodItemOptionsChoose": "Choose options",
+  "foodItemOptionsChooseRequired": "Choose options",
+  "foodItemOptionsMissingRequired": "Choose {groups}",
+  "@foodItemOptionsMissingRequired": {
+    "placeholders": {
+      "groups": {
+        "type": "String"
+      }
+    }
+  },
+  "foodItemOptionsFree": "Free",
+  "foodItemQuantity": "Quantity",
+  "foodItemSelectedOptions": "Selected: {options}",
+  "@foodItemSelectedOptions": {
+    "placeholders": {
+      "options": {
+        "type": "String"
+      }
+    }
+  },
+  "foodItemInfoTitle": "Item details",
+  "foodItemInStore": "At {store}",
+  "@foodItemInStore": {
+    "placeholders": {
+      "store": {
+        "type": "String"
+      }
+    }
+  },
+  "foodStoreDirections": "Directions",
+  "foodStoreOpenInMaps": "Open in Google Maps",
+  "foodStoreMapOpenFailed": "Couldn't open the map.",
+  "foodStoreMenuSections": "Menu categories",
+  "foodItemOptionsMaxReached": "Maximum {count} selected",
+  "@foodItemOptionsMaxReached": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "foodInvoiceTitle": "Order receipt",
   "foodInvoiceDelivered": "Delivered successfully",
   "foodInvoiceOrderId": "Order",
@@ -1315,6 +1386,14 @@
       }
     }
   },
+  "foodStoreSectionCount": "{count} items",
+  "@foodStoreSectionCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "foodStoreReviewsHidden": "{count} reviews — the score appears once there are more",
   "@foodStoreReviewsHidden": {
     "placeholders": {
@@ -2290,6 +2369,8 @@
   "merchantPriceInvalid": "Invalid price",
   "merchantItemOnSale": "On sale",
   "merchantItemSoldOut": "Sold out",
+  "merchantItemPendingReview": "Pending review",
+  "merchantItemRejected": "Rejected",
   "foodOrderSentTitle": "Order sent",
   "foodOrderPlaced": "Order placed",
   "foodOrderPlacedSub": "Waiting for store",
@@ -3871,8 +3952,6 @@
   "partnerErrorLegalConsent": "The Terms of use or Privacy policy was just updated. Please review and accept again.",
   "foodFareSuggested": "Suggested delivery fee",
   "foodFareYourOffer": "Your offer",
-  "foodFareHint": "The delivery fee is only a suggestion. Drivers can accept your offer or propose another one for you to choose; the fee is fixed once a driver takes the order.",
-  "foodFareHintFixed": "The delivery fee is only a suggestion; you can raise or lower it. Drivers accept exactly the fee you choose; it is fixed once a driver takes the order.",
   "foodFareFixedWaiting": "Drivers can only accept the fee you offered. If it's taking a while, raise the fee to make the order more attractive.",
   "driverFareFixed": "This order uses a fixed fee: you can only accept the customer's price.",
   "foodFareDecrease": "Lower the fee",
@@ -3938,5 +4017,89 @@
   },
   "driverFareCounterSent": "Offer sent. Waiting for the customer.",
   "driverFareCounterFailed": "Could not send the offer.",
-  "merchantFareAgreed": "Delivery fee (agreed)"
+  "merchantFareAgreed": "Delivery fee (agreed)",
+  "driverCreditTitle": "Prepaid balance",
+  "driverCreditSubtitle": "Covers platform fees only. It cannot be withdrawn or transferred.",
+  "driverCreditBalance": "Prepaid credit",
+  "driverCreditOwes": "Fee debt",
+  "driverCreditBlocked": "Fee debt is over the limit. You will not receive new jobs until you top up.",
+  "driverCreditNearLimit": "Fee debt is close to the limit. Top up to keep receiving jobs.",
+  "driverCreditDisabled": "Top-up is not open yet. Please try again later.",
+  "driverCreditAmount": "Top-up amount",
+  "driverCreditAmountRange": "From {min} to {max}",
+  "@driverCreditAmountRange": {
+    "placeholders": {
+      "min": {
+        "type": "String"
+      },
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "driverCreditTopUp": "Top up",
+  "driverCreditPending": "Waiting for payment",
+  "driverCreditRemaining": "{amount} left",
+  "@driverCreditRemaining": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "driverCreditOpenCheckout": "Open the payment page",
+  "driverCreditCancelTopUp": "Cancel this top-up",
+  "driverCreditChecking": "Checking payment…",
+  "driverCreditPaidHint": "Paid. The amount is now in your prepaid balance.",
+  "driverCreditRecent": "Recent top-ups",
+  "driverCreditEmpty": "No top-ups yet.",
+  "driverCreditLoading": "Loading balance…",
+  "driverCreditCardTitle": "Top up fees",
+  "driverCreditCardBody": "Keep your fee debt at zero so you keep receiving jobs.",
+  "driverCreditStatusPending": "Pending",
+  "driverCreditStatusPaid": "Credited",
+  "driverCreditStatusExpired": "Expired",
+  "driverCreditStatusCancelled": "Cancelled",
+  "driverCreditStatusRefundPending": "Refund pending",
+  "driverCreditStatusRefunded": "Refunded",
+  "driverCreditStatusFailed": "Failed",
+  "driverCreditErrorGeneric": "Could not top up. Please try again.",
+  "driverCreditErrorPending": "You already have a top-up waiting for payment.",
+  "driverCreditErrorDailyLimit": "Today's top-up limit has been reached.",
+  "driverCreditErrorCreditLimit": "Prepaid balance limit has been reached.",
+  "driverCreditErrorAmount": "The amount is outside the allowed range.",
+  "driverCreditErrorKyc": "An approved KYC is required before topping up.",
+  "driverCreditErrorDisabled": "Top-up is not open yet.",
+  "driverCreditErrorProvider": "The payment provider is not available right now.",
+  "driverCreditScanHint": "Open your banking app and scan this QR code. The amount is filled in for you.",
+  "driverCreditOrderCode": "Order code",
+  "driverCreditExpiresIn": "Expires in {time}",
+  "@driverCreditExpiresIn": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "driverCreditDetailTitle": "Top-up detail",
+  "driverCreditCopyCode": "Copy order code",
+  "driverCreditCopied": "Order code copied.",
+  "driverCreditPaymentReceived": "Payment received",
+  "driverCreditPaymentReceivedBody": "{amount} has been added to your prepaid balance.",
+  "@driverCreditPaymentReceivedBody": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "driverCreditLinkExpired": "This payment link is no longer valid.",
+  "driverCreditCreateNew": "Create a new top-up",
+  "driverCreditAppliedFees": "Applied to fees",
+  "driverCreditRefundedAmount": "Refunded",
+  "driverCreditMethod": "Payment method",
+  "driverCreditCreatedAt": "Created",
+  "driverCreditPaidAt": "Paid at",
+  "driverCreditClose": "Close",
+  "driverCreditWaitingBank": "The balance updates automatically once your bank confirms."
 }

@@ -287,7 +287,36 @@
   "foodSearchFilterAll": "Tất cả",
   "foodSearchFilterNear": "Gần tôi",
   "foodSearchSuggestions": "Gợi ý tìm kiếm",
+  "foodSearchResults": "{count} kết quả",
+  "@foodSearchResults": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "foodSearchEmpty": "Chưa có quán khớp từ khóa",
+  "foodDeliverTo": "Giao đến",
+  "foodFilterButton": "Bộ lọc",
+  "foodFilterTitle": "Lọc & sắp xếp",
+  "foodFilterSort": "Sắp xếp",
+  "foodFilterNear": "Gần nhất",
+  "foodFilterRating": "Đánh giá cao",
+  "foodFilterDistance": "Khoảng cách",
+  "foodFilterAnyDistance": "Mọi khoảng cách",
+  "foodFilterKm": "Trong {km} km",
+  "@foodFilterKm": {
+    "placeholders": {
+      "km": {
+        "type": "int"
+      }
+    }
+  },
+  "foodFilterOpenNow": "Đang mở cửa",
+  "foodFilterOffers": "Có ưu đãi",
+  "foodFilterApply": "Áp dụng",
+  "foodFilterReset": "Đặt lại",
+  "foodFilterClear": "Xóa lọc",
   "foodSearchHistory": "Lịch sử tìm kiếm",
   "foodSearchClearHistory": "Xóa tất cả",
   "foodCategoryTitle": "Quán ăn & danh mục",
@@ -308,6 +337,48 @@
   "foodItemOptionsAdd": "Thêm vào giỏ hàng",
   "foodItemOptionsRequired": "Bắt buộc",
   "foodItemOptionsOptional": "Tùy chọn",
+  "foodItemDetailTitle": "Chi tiết món",
+  "foodItemOptionsChoose": "Tùy chọn",
+  "foodItemOptionsChooseRequired": "Chọn tùy chọn",
+  "foodItemOptionsMissingRequired": "Chọn {groups}",
+  "@foodItemOptionsMissingRequired": {
+    "placeholders": {
+      "groups": {
+        "type": "String"
+      }
+    }
+  },
+  "foodItemOptionsFree": "Miễn phí",
+  "foodItemQuantity": "Số lượng",
+  "foodItemSelectedOptions": "Đã chọn: {options}",
+  "@foodItemSelectedOptions": {
+    "placeholders": {
+      "options": {
+        "type": "String"
+      }
+    }
+  },
+  "foodItemInfoTitle": "Thông tin món",
+  "foodItemInStore": "Tại {store}",
+  "@foodItemInStore": {
+    "placeholders": {
+      "store": {
+        "type": "String"
+      }
+    }
+  },
+  "foodStoreDirections": "Chỉ đường",
+  "foodStoreOpenInMaps": "Mở Google Maps",
+  "foodStoreMapOpenFailed": "Không mở được bản đồ.",
+  "foodStoreMenuSections": "Danh mục món",
+  "foodItemOptionsMaxReached": "Đã chọn tối đa {count}",
+  "@foodItemOptionsMaxReached": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "foodInvoiceTitle": "Biên nhận đơn hàng",
   "foodInvoiceDelivered": "Đã giao thành công",
   "foodInvoiceOrderId": "Đơn",
@@ -1015,6 +1086,7 @@
   "foodStoreInfoPayment": "Thanh toán",
   "foodStoreInfoPaymentCod": "Tiền mặt khi nhận hàng",
   "foodStoreMenuCount": "Thực đơn · {count} món",
+  "foodStoreSectionCount": "{count} món",
   "foodStoreReviewsHidden": "{count} đánh giá — điểm sẽ hiện khi quán có thêm đánh giá",
   "foodStoreReviewsSummary": "{average} ★ · {count} đánh giá",
   "homeVoucherBadge": "DealGo Voucher",
@@ -1632,6 +1704,8 @@
   "merchantPriceInvalid": "Giá không hợp lệ",
   "merchantItemOnSale": "Đang bán",
   "merchantItemSoldOut": "Tạm hết",
+  "merchantItemPendingReview": "Chờ duyệt",
+  "merchantItemRejected": "Bị từ chối",
   "foodOrderSentTitle": "Đã gửi đơn hàng",
   "foodOrderPlaced": "Đặt hàng thành công",
   "foodOrderPlacedSub": "Chờ quán xác nhận",
@@ -2540,8 +2614,6 @@
   "partnerErrorLegalConsent": "Quy chế sử dụng hoặc Chính sách bảo mật vừa được cập nhật. Vui lòng đọc và đồng ý lại.",
   "foodFareSuggested": "Phí giao gợi ý",
   "foodFareYourOffer": "Bạn đề nghị",
-  "foodFareHint": "Phí giao chỉ là gợi ý. Tài xế có thể nhận giá bạn đề nghị hoặc đề xuất giá khác để bạn chọn; phí được chốt khi có tài xế nhận.",
-  "foodFareHintFixed": "Phí giao chỉ là gợi ý, bạn có thể tăng/giảm. Tài xế sẽ nhận đúng mức phí bạn chọn; phí được chốt khi có tài xế nhận.",
   "foodFareFixedWaiting": "Tài xế chỉ có thể nhận đúng mức phí bạn đưa ra. Nếu chờ lâu, hãy tăng phí để đơn hấp dẫn hơn.",
   "driverFareFixed": "Đơn này áp dụng giá cố định: bạn chỉ có thể nhận đúng phí khách đưa ra.",
   "foodFareDecrease": "Giảm phí giao",
@@ -2565,5 +2637,72 @@
   "driverFareCounterSend": "Gửi đề xuất {amount}",
   "driverFareCounterSent": "Đã gửi đề xuất. Chờ khách chọn.",
   "driverFareCounterFailed": "Chưa gửi được đề xuất.",
-  "merchantFareAgreed": "Phí giao (đã thoả thuận)"
+  "merchantFareAgreed": "Phí giao (đã thoả thuận)",
+  "driverCreditTitle": "Số dư tạm ứng",
+  "driverCreditSubtitle": "Chỉ dùng để trừ phí nền tảng. Không rút và không chuyển cho người khác.",
+  "driverCreditBalance": "Số dư tạm ứng",
+  "driverCreditOwes": "Công nợ phí",
+  "driverCreditBlocked": "Công nợ phí đã vượt hạn mức. Bạn sẽ không nhận được chuyến mới cho đến khi nạp thêm.",
+  "driverCreditNearLimit": "Công nợ phí sắp chạm hạn mức. Nạp thêm để tiếp tục nhận chuyến.",
+  "driverCreditDisabled": "Tính năng nạp tiền chưa mở. Vui lòng thử lại sau.",
+  "driverCreditAmount": "Số tiền nạp",
+  "driverCreditAmountRange": "Từ {min} đến {max}",
+  "driverCreditTopUp": "Nạp tiền",
+  "driverCreditPending": "Đang chờ thanh toán",
+  "driverCreditRemaining": "Còn {amount}",
+  "driverCreditOpenCheckout": "Mở trang thanh toán",
+  "driverCreditCancelTopUp": "Huỷ lệnh nạp này",
+  "driverCreditChecking": "Đang kiểm tra thanh toán…",
+  "driverCreditPaidHint": "Đã thanh toán. Số tiền đã vào số dư tạm ứng.",
+  "driverCreditRecent": "Lịch sử nạp tiền",
+  "driverCreditEmpty": "Chưa có lần nạp nào.",
+  "driverCreditLoading": "Đang tải số dư…",
+  "driverCreditCardTitle": "Nạp phí",
+  "driverCreditCardBody": "Giữ công nợ phí ở mức 0 để tiếp tục nhận chuyến.",
+  "driverCreditStatusPending": "Chờ thanh toán",
+  "driverCreditStatusPaid": "Đã cộng",
+  "driverCreditStatusExpired": "Hết hạn",
+  "driverCreditStatusCancelled": "Đã huỷ",
+  "driverCreditStatusRefundPending": "Đang hoàn tiền",
+  "driverCreditStatusRefunded": "Đã hoàn tiền",
+  "driverCreditStatusFailed": "Thất bại",
+  "driverCreditErrorGeneric": "Chưa nạp được tiền. Vui lòng thử lại.",
+  "driverCreditErrorPending": "Bạn đang có một lệnh nạp chờ thanh toán.",
+  "driverCreditErrorDailyLimit": "Đã đạt hạn mức nạp trong ngày.",
+  "driverCreditErrorCreditLimit": "Đã đạt hạn mức số dư tạm ứng.",
+  "driverCreditErrorAmount": "Số tiền nằm ngoài khoảng cho phép.",
+  "driverCreditErrorKyc": "Cần hồ sơ KYC đã duyệt trước khi nạp tiền.",
+  "driverCreditErrorDisabled": "Tính năng nạp tiền chưa mở.",
+  "driverCreditErrorProvider": "Cổng thanh toán hiện không khả dụng.",
+  "driverCreditScanHint": "Mở app ngân hàng và quét mã QR này. Số tiền đã được điền sẵn.",
+  "driverCreditOrderCode": "Mã đơn",
+  "driverCreditExpiresIn": "Còn {time}",
+  "@driverCreditExpiresIn": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "driverCreditDetailTitle": "Chi tiết lệnh nạp",
+  "driverCreditCopyCode": "Sao chép mã đơn",
+  "driverCreditCopied": "Đã sao chép mã đơn.",
+  "driverCreditPaymentReceived": "Đã nhận thanh toán",
+  "driverCreditPaymentReceivedBody": "Đã cộng {amount} vào số dư tạm ứng.",
+  "@driverCreditPaymentReceivedBody": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "driverCreditLinkExpired": "Lệnh thanh toán này không còn hiệu lực.",
+  "driverCreditCreateNew": "Tạo lệnh nạp mới",
+  "driverCreditAppliedFees": "Đã cấn trừ phí",
+  "driverCreditRefundedAmount": "Đã hoàn",
+  "driverCreditMethod": "Phương thức thanh toán",
+  "driverCreditCreatedAt": "Tạo lúc",
+  "driverCreditPaidAt": "Thanh toán lúc",
+  "driverCreditClose": "Đóng",
+  "driverCreditWaitingBank": "Số dư tự cập nhật khi ngân hàng xác nhận."
 }

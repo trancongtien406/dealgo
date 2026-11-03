@@ -848,7 +848,56 @@ class AppLocalizationsEn extends AppLocalizations {
   String get foodSearchSuggestions => 'Search suggestions';
 
   @override
+  String foodSearchResults(int count) {
+    return '$count results';
+  }
+
+  @override
   String get foodSearchEmpty => 'No matching stores yet';
+
+  @override
+  String get foodDeliverTo => 'Deliver to';
+
+  @override
+  String get foodFilterButton => 'Filters';
+
+  @override
+  String get foodFilterTitle => 'Filter & sort';
+
+  @override
+  String get foodFilterSort => 'Sort by';
+
+  @override
+  String get foodFilterNear => 'Nearest';
+
+  @override
+  String get foodFilterRating => 'Top rated';
+
+  @override
+  String get foodFilterDistance => 'Distance';
+
+  @override
+  String get foodFilterAnyDistance => 'Any distance';
+
+  @override
+  String foodFilterKm(int km) {
+    return 'Within $km km';
+  }
+
+  @override
+  String get foodFilterOpenNow => 'Open now';
+
+  @override
+  String get foodFilterOffers => 'Has offers';
+
+  @override
+  String get foodFilterApply => 'Apply';
+
+  @override
+  String get foodFilterReset => 'Reset';
+
+  @override
+  String get foodFilterClear => 'Clear filters';
 
   @override
   String get foodSearchHistory => 'Search history';
@@ -890,6 +939,56 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get foodItemOptionsOptional => 'Optional';
+
+  @override
+  String get foodItemDetailTitle => 'Item details';
+
+  @override
+  String get foodItemOptionsChoose => 'Choose options';
+
+  @override
+  String get foodItemOptionsChooseRequired => 'Choose options';
+
+  @override
+  String foodItemOptionsMissingRequired(String groups) {
+    return 'Choose $groups';
+  }
+
+  @override
+  String get foodItemOptionsFree => 'Free';
+
+  @override
+  String get foodItemQuantity => 'Quantity';
+
+  @override
+  String foodItemSelectedOptions(String options) {
+    return 'Selected: $options';
+  }
+
+  @override
+  String get foodItemInfoTitle => 'Item details';
+
+  @override
+  String foodItemInStore(String store) {
+    return 'At $store';
+  }
+
+  @override
+  String get foodStoreDirections => 'Directions';
+
+  @override
+  String get foodStoreOpenInMaps => 'Open in Google Maps';
+
+  @override
+  String get foodStoreMapOpenFailed => 'Couldn\'t open the map.';
+
+  @override
+  String get foodStoreMenuSections => 'Menu categories';
+
+  @override
+  String foodItemOptionsMaxReached(int count) {
+    return 'Maximum $count selected';
+  }
 
   @override
   String get foodInvoiceTitle => 'Order receipt';
@@ -3036,6 +3135,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String foodStoreSectionCount(int count) {
+    return '$count items';
+  }
+
+  @override
   String foodStoreReviewsHidden(int count) {
     return '$count reviews — the score appears once there are more';
   }
@@ -4995,6 +5099,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get merchantItemSoldOut => 'Sold out';
+
+  @override
+  String get merchantItemPendingReview => 'Pending review';
+
+  @override
+  String get merchantItemRejected => 'Rejected';
 
   @override
   String get foodOrderSentTitle => 'Order sent';
@@ -7871,14 +7981,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get foodFareYourOffer => 'Your offer';
 
   @override
-  String get foodFareHint =>
-      'The delivery fee is only a suggestion. Drivers can accept your offer or propose another one for you to choose; the fee is fixed once a driver takes the order.';
-
-  @override
-  String get foodFareHintFixed =>
-      'The delivery fee is only a suggestion; you can raise or lower it. Drivers accept exactly the fee you choose; it is fixed once a driver takes the order.';
-
-  @override
   String get foodFareFixedWaiting =>
       'Drivers can only accept the fee you offered. If it\'s taking a while, raise the fee to make the order more attractive.';
 
@@ -7965,4 +8067,185 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get merchantFareAgreed => 'Delivery fee (agreed)';
+
+  @override
+  String get driverCreditTitle => 'Prepaid balance';
+
+  @override
+  String get driverCreditSubtitle =>
+      'Covers platform fees only. It cannot be withdrawn or transferred.';
+
+  @override
+  String get driverCreditBalance => 'Prepaid credit';
+
+  @override
+  String get driverCreditOwes => 'Fee debt';
+
+  @override
+  String get driverCreditBlocked =>
+      'Fee debt is over the limit. You will not receive new jobs until you top up.';
+
+  @override
+  String get driverCreditNearLimit =>
+      'Fee debt is close to the limit. Top up to keep receiving jobs.';
+
+  @override
+  String get driverCreditDisabled =>
+      'Top-up is not open yet. Please try again later.';
+
+  @override
+  String get driverCreditAmount => 'Top-up amount';
+
+  @override
+  String driverCreditAmountRange(String min, String max) {
+    return 'From $min to $max';
+  }
+
+  @override
+  String get driverCreditTopUp => 'Top up';
+
+  @override
+  String get driverCreditPending => 'Waiting for payment';
+
+  @override
+  String driverCreditRemaining(String amount) {
+    return '$amount left';
+  }
+
+  @override
+  String get driverCreditOpenCheckout => 'Open the payment page';
+
+  @override
+  String get driverCreditCancelTopUp => 'Cancel this top-up';
+
+  @override
+  String get driverCreditChecking => 'Checking payment…';
+
+  @override
+  String get driverCreditPaidHint =>
+      'Paid. The amount is now in your prepaid balance.';
+
+  @override
+  String get driverCreditRecent => 'Recent top-ups';
+
+  @override
+  String get driverCreditEmpty => 'No top-ups yet.';
+
+  @override
+  String get driverCreditLoading => 'Loading balance…';
+
+  @override
+  String get driverCreditCardTitle => 'Top up fees';
+
+  @override
+  String get driverCreditCardBody =>
+      'Keep your fee debt at zero so you keep receiving jobs.';
+
+  @override
+  String get driverCreditStatusPending => 'Pending';
+
+  @override
+  String get driverCreditStatusPaid => 'Credited';
+
+  @override
+  String get driverCreditStatusExpired => 'Expired';
+
+  @override
+  String get driverCreditStatusCancelled => 'Cancelled';
+
+  @override
+  String get driverCreditStatusRefundPending => 'Refund pending';
+
+  @override
+  String get driverCreditStatusRefunded => 'Refunded';
+
+  @override
+  String get driverCreditStatusFailed => 'Failed';
+
+  @override
+  String get driverCreditErrorGeneric => 'Could not top up. Please try again.';
+
+  @override
+  String get driverCreditErrorPending =>
+      'You already have a top-up waiting for payment.';
+
+  @override
+  String get driverCreditErrorDailyLimit =>
+      'Today\'s top-up limit has been reached.';
+
+  @override
+  String get driverCreditErrorCreditLimit =>
+      'Prepaid balance limit has been reached.';
+
+  @override
+  String get driverCreditErrorAmount =>
+      'The amount is outside the allowed range.';
+
+  @override
+  String get driverCreditErrorKyc =>
+      'An approved KYC is required before topping up.';
+
+  @override
+  String get driverCreditErrorDisabled => 'Top-up is not open yet.';
+
+  @override
+  String get driverCreditErrorProvider =>
+      'The payment provider is not available right now.';
+
+  @override
+  String get driverCreditScanHint =>
+      'Open your banking app and scan this QR code. The amount is filled in for you.';
+
+  @override
+  String get driverCreditOrderCode => 'Order code';
+
+  @override
+  String driverCreditExpiresIn(String time) {
+    return 'Expires in $time';
+  }
+
+  @override
+  String get driverCreditDetailTitle => 'Top-up detail';
+
+  @override
+  String get driverCreditCopyCode => 'Copy order code';
+
+  @override
+  String get driverCreditCopied => 'Order code copied.';
+
+  @override
+  String get driverCreditPaymentReceived => 'Payment received';
+
+  @override
+  String driverCreditPaymentReceivedBody(String amount) {
+    return '$amount has been added to your prepaid balance.';
+  }
+
+  @override
+  String get driverCreditLinkExpired => 'This payment link is no longer valid.';
+
+  @override
+  String get driverCreditCreateNew => 'Create a new top-up';
+
+  @override
+  String get driverCreditAppliedFees => 'Applied to fees';
+
+  @override
+  String get driverCreditRefundedAmount => 'Refunded';
+
+  @override
+  String get driverCreditMethod => 'Payment method';
+
+  @override
+  String get driverCreditCreatedAt => 'Created';
+
+  @override
+  String get driverCreditPaidAt => 'Paid at';
+
+  @override
+  String get driverCreditClose => 'Close';
+
+  @override
+  String get driverCreditWaitingBank =>
+      'The balance updates automatically once your bank confirms.';
 }
