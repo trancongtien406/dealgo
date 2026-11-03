@@ -153,6 +153,8 @@ type OrderRow = {
   cancelReasonCode: string | null;
   cancelNote: string | null;
   cancelledBy?: CancelActorName | null;
+  note: string | null;
+  utensils: boolean;
   prepMinutes: number | null;
   pickedUpAt?: Date | null;
   failReasonCode?: string | null;
@@ -178,6 +180,7 @@ type OrderRow = {
     unitPriceVnd: number;
     quantity: number;
     imageUrl: string | null;
+    note: string | null;
     options: Prisma.JsonValue;
   }[];
 };
@@ -228,6 +231,7 @@ export class PrismaFoodRepository implements FoodRepository {
               name: item.name,
               priceVnd: item.priceVnd,
               available: true,
+              moderationStatus: 'APPROVED',
             })),
           },
         },
@@ -1013,8 +1017,7 @@ export class PrismaFoodRepository implements FoodRepository {
           input.originalPriceVnd,
         ),
         available,
-        // FOOD-001: every new dish waits for admin moderation before it can be ordered.
-        moderationStatus: 'PENDING',
+        moderationStatus: input.moderationStatus ?? 'PENDING',
         description: input.description ?? null,
         prepMinutes: input.prepMinutes ?? null,
         imageUrl: input.imageUrl ?? null,
@@ -1142,9 +1145,15 @@ export class PrismaFoodRepository implements FoodRepository {
 
   async listStoreMenuSections(
     storeId: string,
+    approvedOnly = true,
   ): Promise<import('./food.repository.js').StoreMenuSection[]> {
     return this.db.foodMenuCategory.findMany({
-      where: { storeId, items: { some: {} } },
+      where: {
+        storeId,
+        items: {
+          some: approvedOnly ? { moderationStatus: 'APPROVED' } : {},
+        },
+      },
       orderBy: [{ position: 'asc' }, { name: 'asc' }],
       select: { id: true, name: true },
     });
@@ -1753,6 +1762,7 @@ export class PrismaFoodRepository implements FoodRepository {
             moderationStatus: row.moderationStatus,
           })),
           input.items,
+          input.requireApprovedItems ?? true,
         );
         const subtotalVnd = lines.reduce(
           (sum, line) => sum + line.unitPriceVnd * line.quantity,
@@ -1811,6 +1821,8 @@ export class PrismaFoodRepository implements FoodRepository {
               label: input.dropoff.label,
               fallback: store.serviceRegionCode,
             }),
+            note: input.note ?? null,
+            utensils: input.utensils ?? true,
             idempotencyKey: input.idempotencyKey,
             lines: {
               create: lines.map((line) => ({
@@ -1820,6 +1832,7 @@ export class PrismaFoodRepository implements FoodRepository {
                 unitPriceVnd: line.unitPriceVnd,
                 quantity: line.quantity,
                 imageUrl: line.imageUrl,
+                note: line.note,
                 options: line.options as Prisma.InputJsonValue,
               })),
             },
@@ -3331,6 +3344,7 @@ type ItemRow = {
   originalPriceVnd?: number | null;
   createdAt?: Date;
   available: boolean;
+  moderationStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
   description?: string | null;
   prepMinutes?: number | null;
   imageUrl?: string | null;
@@ -3373,6 +3387,7 @@ function prismaItemView(item: ItemRow): StoreItemView {
     originalPriceVnd: shownOriginalPrice(item.priceVnd, item.originalPriceVnd),
     available: item.available,
     addedAt: item.createdAt ? item.createdAt.toISOString() : null,
+    moderationStatus: item.moderationStatus,
     description: item.description ?? null,
     prepMinutes: item.prepMinutes ?? null,
     imageUrl: item.imageUrl ?? null,
@@ -3626,6 +3641,8 @@ function toView(order: OrderRow): FoodOrderView {
     assignedDriverId: order.assignedDriverId,
     cancelReason: toCancelReason(order.cancelReasonCode, order.cancelNote),
     cancelledBy: order.cancelledBy ?? null,
+    note: order.note ?? null,
+    utensils: order.utensils ?? true,
     lines: order.lines.map((line) => ({
       id: line.id,
       itemId: line.itemId,
@@ -3633,6 +3650,7 @@ function toView(order: OrderRow): FoodOrderView {
       unitPriceVnd: line.unitPriceVnd,
       quantity: line.quantity,
       imageUrl: line.imageUrl ?? null,
+      note: line.note ?? null,
       options: parseLineOptions(line.options),
     })),
     prepMinutes: order.prepMinutes ?? null,

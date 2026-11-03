@@ -102,6 +102,13 @@ export class FoodLineDto {
   @ArrayMaxSize(50)
   @IsUUID('all', { each: true })
   optionIds?: string[];
+
+  /** Customer note for this line ("ít cay, không hành"); blank = none. */
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MaxLength(200)
+  note?: string;
 }
 
 export class FoodOptionDto {
@@ -215,6 +222,18 @@ export class PlaceFoodOrderDto {
   @IsOptional()
   @IsIn(PAYMENT_METHOD_CODES as unknown as string[])
   paymentMethod?: (typeof PAYMENT_METHOD_CODES)[number];
+
+  /** Customer note for the store / driver; blank = none. */
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MaxLength(300)
+  note?: string;
+
+  /** Cutlery requested with this order (server default true). */
+  @IsOptional()
+  @IsBoolean()
+  utensils?: boolean;
 }
 
 export class CreateFoodItemDto {

@@ -75,6 +75,8 @@ export type FoodLineView = {
   quantity: number;
   /** Cover image snapshotted at placement (DEC-PROD-043). */
   imageUrl: string | null;
+  /** Customer note for the kitchen; null = none. */
+  note: string | null;
   /** Chosen options snapshotted at placement (DEC-PROD-033); [] when none. */
   options: FoodLineOption[];
 };
@@ -150,6 +152,8 @@ export type StoreItemView = {
   optionGroups: FoodOptionGroupView[];
   /** When the dish was added (ISO); the app marks recent ones as new. */
   addedAt: string | null;
+  /** Merchant/ops views only; customer payloads drop unapproved dishes instead. */
+  moderationStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
 };
 
 /** A dish surfaced on browse cards: the store's best sellers and its newest dish. */
@@ -377,6 +381,10 @@ export type FoodOrderView = {
   cancelReason: FoodCancelReason | null;
   /** DEC-PROD-035: who cancelled (null unless CANCELLED). */
   cancelledBy: CancelActorName | null;
+  /** Customer note for the store / driver; null = none. */
+  note: string | null;
+  /** Cutlery requested with this order. */
+  utensils: boolean;
   lines: FoodLineView[];
   /** Kitchen estimate snapshotted at placement (DEC-PROD-028); null on legacy orders. */
   prepMinutes: number | null;
@@ -539,6 +547,8 @@ export type CreateCatalogItemInput = {
   priceVnd: number;
   originalPriceVnd?: number | null;
   available?: boolean;
+  /** Set by the service: PENDING unless item moderation is disabled. */
+  moderationStatus?: 'PENDING' | 'APPROVED';
   description?: string | null;
   prepMinutes?: number | null;
   imageUrl?: string | null;
@@ -698,6 +708,8 @@ export type PlaceFoodLineInput = {
   itemId: string;
   quantity: number;
   optionIds?: string[];
+  /** Customer note for this line; blank/whitespace-only is normalized to null upstream. */
+  note?: string | null;
 };
 
 export type PlaceFoodInput = {
@@ -708,6 +720,12 @@ export type PlaceFoodInput = {
   dropoff: { lat: number; lng: number; label: string };
   /** Customer's delivery-fee offer (validated by the service against the suggestion). */
   deliveryFareVnd: number;
+  /** Customer note for the store / driver; null = none. */
+  note?: string | null;
+  /** Cutlery requested with this order; omitted falls back to the column default. */
+  utensils?: boolean;
+  /** When false, items skip the moderation gate (platform setting FOOD_ITEM_MODERATION_ENABLED off). */
+  requireApprovedItems?: boolean;
   /** System suggestion shown at checkout (reference only). */
   suggestedDeliveryFareVnd?: number;
   /** Re-validated and redeemed in the same unit of work as the order. */
@@ -758,7 +776,7 @@ export interface FoodRepository {
   ): Promise<StoreDetail>;
   listMenuCategories(ownerId: string): Promise<MenuCategoryView[]>;
   /** Customer menu sections of a store, in merchant order (empty sections omitted). */
-  listStoreMenuSections(storeId: string): Promise<StoreMenuSection[]>;
+  listStoreMenuSections(storeId: string, approvedOnly?: boolean): Promise<StoreMenuSection[]>;
   /** Approved, available dishes for browse cards, picked per store with pickFeaturedItems. */
   listFeaturedItems(
     storeIds: string[],
@@ -1387,7 +1405,11 @@ export class MemoryFoodRepository implements FoodRepository {
     if (atCapacity(acceptSettings, active)) {
       throw new FoodRuleError('FOOD_STORE_AT_CAPACITY');
     }
-    const lines = this.snapshotLines(input.storeId, input.items);
+    const lines = this.snapshotLines(
+      input.storeId,
+      input.items,
+      input.requireApprovedItems ?? true,
+    );
     const subtotalVnd = lines.reduce(
       (sum, line) => sum + line.unitPriceVnd * line.quantity,
       0,
@@ -1451,6 +1473,8 @@ export class MemoryFoodRepository implements FoodRepository {
       assignedDriverId: null,
       cancelReason: null,
       cancelledBy: null,
+      note: input.note ?? null,
+      utensils: input.utensils ?? true,
       lines,
       prepMinutes: estimatedPrepMinutes,
       estimatedReadyAt: estimatedReadyAt(placedAt, estimatedPrepMinutes),
@@ -1850,8 +1874,7 @@ export class MemoryFoodRepository implements FoodRepository {
       priceVnd: input.priceVnd,
       originalPriceVnd: input.originalPriceVnd ?? null,
       available,
-      // FOOD-001: every new dish waits for admin moderation before it can be ordered.
-      moderationStatus: 'PENDING',
+      moderationStatus: input.moderationStatus ?? 'PENDING',
       createdAt: this.nextItemCreatedAt(),
       description: input.description ?? null,
       prepMinutes: input.prepMinutes ?? null,
@@ -1940,10 +1963,17 @@ export class MemoryFoodRepository implements FoodRepository {
     return byStore;
   }
 
-  async listStoreMenuSections(storeId: string): Promise<StoreMenuSection[]> {
+  async listStoreMenuSections(
+    storeId: string,
+    approvedOnly = true,
+  ): Promise<StoreMenuSection[]> {
     const used = new Set(
       this.items
-        .filter((e) => e.storeId === storeId)
+        .filter(
+          (e) =>
+            e.storeId === storeId &&
+            (!approvedOnly || e.moderationStatus === 'APPROVED'),
+        )
         .map((e) => e.menuCategoryId ?? null),
     );
     return (this.menuCategories.get(storeId) ?? [])
@@ -2894,12 +2924,14 @@ export class MemoryFoodRepository implements FoodRepository {
   private snapshotLines(
     storeId: string,
     requested: PlaceFoodLineInput[],
+    requireApprovedItems = true,
   ): FoodLineView[] {
     return snapshotFoodLines(
       this.items
         .filter((entry) => entry.storeId === storeId)
         .map((entry) => ({ ...memoryItemView(entry), moderationStatus: entry.moderationStatus })),
       requested,
+      requireApprovedItems,
     );
   }
 }
@@ -2969,6 +3001,7 @@ function memoryItemView(item: StoredItem): StoreItemView {
     originalPriceVnd: shownOriginalPrice(item.priceVnd, item.originalPriceVnd),
     available: item.available,
     addedAt: item.createdAt ? item.createdAt.toISOString() : null,
+    moderationStatus: item.moderationStatus,
     description: item.description ?? null,
     prepMinutes: item.prepMinutes ?? null,
     imageUrl: item.imageUrl ?? null,
@@ -2998,6 +3031,7 @@ export function snapshotFoodLines(
     > & { moderationStatus: string }
   >,
   requested: PlaceFoodLineInput[],
+  requireApprovedItems = true,
 ): FoodLineView[] {
   const seen = new Set<string>();
   return requested.map((line) => {
@@ -3007,7 +3041,11 @@ export function snapshotFoodLines(
     }
     seen.add(key);
     const item = catalog.find((entry) => entry.id === line.itemId);
-    if (!item || !item.available || item.moderationStatus !== 'APPROVED') {
+    if (
+      !item ||
+      !item.available ||
+      (requireApprovedItems && item.moderationStatus !== 'APPROVED')
+    ) {
       throw new FoodRuleError('FOOD_ITEM_UNAVAILABLE');
     }
     const priced = priceOptionSelection(
@@ -3021,6 +3059,7 @@ export function snapshotFoodLines(
       unitPriceVnd: item.priceVnd + priced.deltaVnd,
       quantity: line.quantity,
       imageUrl: item.imageUrl ?? null,
+      note: line.note ?? null,
       options: priced.options,
     };
   });
@@ -3056,6 +3095,8 @@ function copyOrder(order: StoredOrder): FoodOrderView {
     assignedDriverId: order.assignedDriverId,
     cancelReason: order.cancelReason ? { ...order.cancelReason } : null,
     cancelledBy: order.cancelledBy ?? null,
+    note: order.note ?? null,
+    utensils: order.utensils ?? true,
     lines: order.lines.map((line) => ({
       ...line,
       options: line.options.map((option) => ({ ...option })),

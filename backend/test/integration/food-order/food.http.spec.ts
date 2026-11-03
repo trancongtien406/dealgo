@@ -144,6 +144,64 @@ describe('food order http', () => {
     expect(replay.body.data.subtotalVnd).toBe(145_000);
   });
 
+  it('carries order and line notes through placement', async () => {
+    const customer = await login();
+    const { storeId, itemId } = await oneItem(customer.token);
+    const placed = await request(app.getHttpServer())
+      .post('/v1/food/orders')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .set('Idempotency-Key', 'idem-food-notes-1')
+      .send({
+        storeId,
+        items: [{ itemId, quantity: 1, note: '  Ít cay, không hành  ' }],
+        dropoff,
+        deliveryFareVnd: 15_000,
+        note: '  Gọi trước khi tới  ',
+        utensils: false,
+      })
+      .expect(200);
+    expect(placed.body.data.note).toBe('Gọi trước khi tới');
+    expect(placed.body.data.utensils).toBe(false);
+    expect(placed.body.data.lines[0].note).toBe('Ít cay, không hành');
+
+    const detail = await request(app.getHttpServer())
+      .get(`/v1/food/orders/${placed.body.data.id}`)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    expect(detail.body.data.note).toBe('Gọi trước khi tới');
+    expect(detail.body.data.utensils).toBe(false);
+    expect(detail.body.data.lines[0].note).toBe('Ít cay, không hành');
+
+    const list = await request(app.getHttpServer())
+      .get('/v1/food/orders')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    const row = (
+      list.body.data.items as Array<{ id: string; note: string | null }>
+    ).find((order) => order.id === placed.body.data.id);
+    expect(row?.note).toBe('Gọi trước khi tới');
+  });
+
+  it('stores a whitespace-only note as null and keeps cutlery on by default', async () => {
+    const customer = await login();
+    const { storeId, itemId } = await oneItem(customer.token);
+    const placed = await request(app.getHttpServer())
+      .post('/v1/food/orders')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .set('Idempotency-Key', 'idem-food-notes-2')
+      .send({
+        storeId,
+        items: [{ itemId, quantity: 1, note: '   ' }],
+        dropoff,
+        deliveryFareVnd: 15_000,
+        note: ' \n ',
+      })
+      .expect(200);
+    expect(placed.body.data.note).toBeNull();
+    expect(placed.body.data.utensils).toBe(true);
+    expect(placed.body.data.lines[0].note).toBeNull();
+  });
+
   it('paginates store browse and rejects invalid query params', async () => {
     const customer = await login();
     const page = await request(app.getHttpServer())

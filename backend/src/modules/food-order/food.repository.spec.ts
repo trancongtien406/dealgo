@@ -149,4 +149,58 @@ describe('MemoryFoodRepository', () => {
       expect(reassigned.auditId).toBeDefined();
     });
   });
+
+  describe('order notes and cutlery', () => {
+    const dropoff = { lat: 10.7769, lng: 106.7009, label: 'Ben Thanh, D1' };
+
+    it('reads back the order note, cutlery choice and line notes', async () => {
+      const { repo, store } = await makeStoreAndItems();
+
+      const placed = await repo.place({
+        customerId: 'cust-note',
+        storeId: store.id,
+        idempotencyKey: 'food-note-1',
+        deliveryFareVnd: 15_000,
+        note: 'Gọi trước khi tới',
+        utensils: false,
+        items: [
+          { itemId: store.items[0].id, quantity: 1, note: 'Ít cay, không hành' },
+          { itemId: store.items[1].id, quantity: 1 },
+        ],
+        dropoff,
+      });
+
+      expect(placed.note).toBe('Gọi trước khi tới');
+      expect(placed.utensils).toBe(false);
+      expect(placed.lines.map((line) => line.note)).toEqual([
+        'Ít cay, không hành',
+        null,
+      ]);
+
+      const read = await repo.findOrder(placed.id);
+      expect(read?.note).toBe('Gọi trước khi tới');
+      expect(read?.utensils).toBe(false);
+      expect(read?.lines.map((line) => line.note)).toEqual([
+        'Ít cay, không hành',
+        null,
+      ]);
+    });
+
+    it('defaults cutlery to yes and the order note to null', async () => {
+      const { repo, store } = await makeStoreAndItems();
+
+      const placed = await repo.place({
+        customerId: 'cust-note-default',
+        storeId: store.id,
+        idempotencyKey: 'food-note-2',
+        deliveryFareVnd: 15_000,
+        items: [{ itemId: store.items[0].id, quantity: 1 }],
+        dropoff,
+      });
+
+      expect(placed.note).toBeNull();
+      expect(placed.utensils).toBe(true);
+      expect(placed.lines[0].note).toBeNull();
+    });
+  });
 });

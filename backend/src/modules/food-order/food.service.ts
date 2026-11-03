@@ -464,12 +464,14 @@ export class FoodService {
       query.max_km !== undefined
         ? Math.min(query.max_km, settingRadiusKm)
         : settingRadiusKm;
-    const [minRatingCount, feeMin, feeMax, feePerKm] = await Promise.all([
-      this.settings.getNumber('RATING_STORE_MIN_COUNT'),
-      this.settings.getNumber('FOOD_MIN_DELIVERY_VND'),
-      this.settings.getNumber('FOOD_MAX_DELIVERY_VND'),
-      this.settings.getNumber('FOOD_DELIVERY_VND_PER_KM'),
-    ]);
+    const [minRatingCount, feeMin, feeMax, feePerKm, feeStep] =
+      await Promise.all([
+        this.settings.getNumber('RATING_STORE_MIN_COUNT'),
+        this.settings.getNumber('FOOD_MIN_DELIVERY_VND'),
+        this.settings.getNumber('FOOD_MAX_DELIVERY_VND'),
+        this.settings.getNumber('FOOD_DELIVERY_VND_PER_KM'),
+        this.settings.getNumber('FOOD_FARE_STEP_VND'),
+      ]);
     const result = await this.food.listStores({
       page,
       limit,
@@ -519,12 +521,11 @@ export class FoodService {
         deliveryFeeFromVnd:
           store.distanceKm === null
             ? null
-            : Math.min(
+            : clampToFoodFareSteps(
+                quoteReferenceFareVnd(store.distanceKm, feePerKm, feeMin),
+                feeMin,
                 feeMax,
-                Math.max(
-                  feeMin,
-                  quoteReferenceFareVnd(store.distanceKm, feePerKm, feeMin),
-                ),
+                feeStep,
               ),
         offers: offers.get(store.id) ?? [],
         minOrderVnd: store.minOrderVnd ?? 0,
@@ -552,8 +553,21 @@ export class FoodService {
       ? ((await this.promotions.storeOffers([store.id], 10)).get(store.id) ??
         [])
       : [];
-    const menuSections = await this.food.listStoreMenuSections(store.id);
-    return { ...publicStore, offers, menuSections };
+    const moderationRequired = await this.itemModerationRequired();
+    const items = store.items
+      .filter(
+        (item) => !moderationRequired || item.moderationStatus === 'APPROVED',
+      )
+      .map((item) => {
+        const copy = { ...item };
+        delete copy.moderationStatus;
+        return copy;
+      });
+    const menuSections = await this.food.listStoreMenuSections(
+      store.id,
+      moderationRequired,
+    );
+    return { ...publicStore, items, offers, menuSections };
   }
 
   /** The signed-in merchant's store id (store offers, review replies). */
@@ -589,6 +603,7 @@ export class FoodService {
   ): Promise<StoreItemView> {
     await this.requireActiveRole(actor.userId, 'MERCHANT');
     await this.ownedStore(actor.userId);
+    const moderationRequired = await this.itemModerationRequired();
     return this.unwrapCatalog(() =>
       this.food.createItem({
         ownerId: actor.userId,
@@ -599,6 +614,7 @@ export class FoodService {
           dto.originalPriceVnd,
         ),
         available: dto.available,
+        moderationStatus: moderationRequired ? 'PENDING' : 'APPROVED',
         description: dto.description,
         prepMinutes: dto.prepMinutes,
         imageUrl: dto.imageUrl,
@@ -950,16 +966,25 @@ export class FoodService {
             dto.deliveryOfferVnd,
             suggestedDeliveryFareVnd,
           );
+    const requireApprovedItems = await this.itemModerationRequired();
     const order = await this.unwrap(() =>
       this.food.place({
         suggestedDeliveryFareVnd,
         customerId: actor.userId,
         storeId: dto.storeId,
         idempotencyKey,
-        items: dto.items,
+        items: dto.items.map((line) => ({
+          itemId: line.itemId,
+          quantity: line.quantity,
+          optionIds: line.optionIds,
+          note: optionalFoodNote(line.note),
+        })),
         dropoff: dto.dropoff,
         deliveryFareVnd,
         voucherCode: dto.voucherCode?.trim() || undefined,
+        note: optionalFoodNote(dto.note),
+        utensils: dto.utensils ?? true,
+        requireApprovedItems,
       }),
     );
     if (this.checkout && paymentMethod !== 'CASH') {
@@ -2650,6 +2675,10 @@ export class FoodService {
     return false;
   }
 
+  private async itemModerationRequired(): Promise<boolean> {
+    return this.settings.getBoolean('FOOD_ITEM_MODERATION_ENABLED');
+  }
+
   /**
    * Sandbox-only demo seed when the catalog DB is empty.
    * Production never auto-creates stores or merchants.
@@ -2851,12 +2880,15 @@ export class FoodService {
     storeId: string,
     dropoff: { lat: number; lng: number },
   ): Promise<number> {
-    const minimum = await this.settings.getNumber('FOOD_MIN_DELIVERY_VND');
-    const maximum = await this.settings.getNumber('FOOD_MAX_DELIVERY_VND');
-    const perKm = await this.settings.getNumber('FOOD_DELIVERY_VND_PER_KM');
+    const [minimum, maximum, perKm, step] = await Promise.all([
+      this.settings.getNumber('FOOD_MIN_DELIVERY_VND'),
+      this.settings.getNumber('FOOD_MAX_DELIVERY_VND'),
+      this.settings.getNumber('FOOD_DELIVERY_VND_PER_KM'),
+      this.settings.getNumber('FOOD_FARE_STEP_VND'),
+    ]);
     const store = await this.food.findStore(storeId);
     if (!store || store.lat == null || store.lng == null) {
-      return minimum;
+      return clampToFoodFareSteps(minimum, minimum, maximum, step);
     }
     const distanceKm = await resolveRouteDistanceKm(
       this.maps,
@@ -2864,7 +2896,7 @@ export class FoodService {
       { lat: dropoff.lat, lng: dropoff.lng },
     );
     const quoted = quoteReferenceFareVnd(distanceKm, perKm, minimum);
-    return Math.min(maximum, Math.max(minimum, quoted));
+    return clampToFoodFareSteps(quoted, minimum, maximum, step);
   }
 
   /** Soft MapsPort probe at place; failures do not block checkout. */
@@ -2945,6 +2977,24 @@ export class FoodService {
   }
 }
 
+/**
+ * Food delivery fares are shown and settled in whole FOOD_FARE_STEP_VND
+ * multiples, so customers and drivers never see amounts like 12.340đ.
+ * Mirrors the ride fare rounding (`roundUpToFareStep`).
+ */
+export function clampToFoodFareSteps(
+  amountVnd: number,
+  minVnd: number,
+  maxVnd: number,
+  stepVnd: number,
+): number {
+  const step = Math.max(1, stepVnd);
+  const lo = Math.min(maxVnd, Math.ceil(minVnd / step) * step);
+  const hi = Math.max(lo, Math.floor(maxVnd / step) * step);
+  const stepped = Math.ceil(Math.max(amountVnd, minVnd) / step) * step;
+  return Math.min(hi, Math.max(lo, stepped));
+}
+
 /** Commission in whole VND (rounded half up), never above the subtotal. */
 export function merchantCommissionVnd(
   subtotalVnd: number,
@@ -3008,6 +3058,12 @@ export function publishOffer(
     createdAt: offer.createdAt.toISOString(),
     updatedAt: offer.updatedAt.toISOString(),
   };
+}
+
+/** Whitespace-only customer notes carry no meaning and are stored as null. */
+function optionalFoodNote(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 }
 
 function publish(order: FoodOrderView): PublicFoodOrder {
