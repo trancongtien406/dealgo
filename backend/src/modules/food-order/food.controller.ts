@@ -28,6 +28,7 @@ import {
   PlaceFoodOrderDto,
   QuoteFoodDeliveryDto,
   SearchFoodDto,
+  SuggestFoodItemsDto,
   ProposeFoodOrderChangeDto,
   RejectFoodOrderDto,
   ReleaseFoodOrderDto,
@@ -63,6 +64,19 @@ export class FoodController {
   @ApiOperation({ summary: 'Get store catalog' })
   getStore(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
     return this.food.getStore(actor, id);
+  }
+
+  @Get('stores/:id/suggestions')
+  @ApiOperation({
+    summary:
+      'Up to 6 in-stock dishes from the same store in another menu category (item page)',
+  })
+  suggestItems(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: SuggestFoodItemsDto,
+  ) {
+    return this.food.suggestItems(actor, id, query.exclude ?? []);
   }
 
   @Post('quote')

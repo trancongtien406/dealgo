@@ -221,6 +221,25 @@ export type StoreFeaturedItem = {
   addedAt: string;
 };
 
+/**
+ * One "Món ăn kèm" card on the item page: same store, a different menu section.
+ * Uncategorized dishes are skipped because they have no section that can differ
+ * from the viewed dish.
+ */
+export type StoreItemSuggestion = StoreFeaturedItem & {
+  available: boolean;
+  menuCategoryId: string | null;
+};
+
+export type ItemSuggestionsQuery = {
+  storeId: string;
+  /** Item ids to leave out; their menu categories are skipped too. */
+  exclude: string[];
+  limit: number;
+  /** Drop PENDING/REJECTED dishes while FOOD_ITEM_MODERATION_ENABLED is on. */
+  moderationRequired: boolean;
+};
+
 /** Best sellers (sold > 0) first, then the newest dish when it is not already listed. */
 export const STORE_FEATURED_BEST_SELLERS = 2;
 
@@ -838,6 +857,8 @@ export interface FoodRepository {
   listFeaturedItems(
     storeIds: string[],
   ): Promise<Map<string, StoreFeaturedItem[]>>;
+  /** In-stock dishes in a menu category other than the excluded items' (item page). */
+  listItemSuggestions(query: ItemSuggestionsQuery): Promise<StoreItemSuggestion[]>;
   createMenuCategory(input: {
     ownerId: string;
     name: string;
@@ -2095,6 +2116,56 @@ export class MemoryFoodRepository implements FoodRepository {
       if (picked.length > 0) byStore.set(storeId, picked);
     }
     return byStore;
+  }
+
+  async listItemSuggestions(
+    query: ItemSuggestionsQuery,
+  ): Promise<StoreItemSuggestion[]> {
+    const store = this.stores.find((entry) => entry.id === query.storeId);
+    if (!store || !memoryAvailability(store).openNow) {
+      return [];
+    }
+    const excludedIds = new Set(query.exclude);
+    const excludedCategories = new Set(
+      this.items
+        .filter(
+          (item) => item.storeId === store.id && excludedIds.has(item.id),
+        )
+        .map((item) => item.menuCategoryId)
+        .filter((categoryId): categoryId is string => categoryId !== null),
+    );
+    return this.items
+      .filter(
+        (item) =>
+          item.storeId === store.id &&
+          item.available &&
+          (!query.moderationRequired || item.moderationStatus === 'APPROVED') &&
+          !excludedIds.has(item.id) &&
+          item.menuCategoryId !== null &&
+          !excludedCategories.has(item.menuCategoryId),
+      )
+      .sort(
+        (left, right) =>
+          (right.soldCount ?? 0) - (left.soldCount ?? 0) ||
+          (right.createdAt ?? this.seededAt).getTime() -
+            (left.createdAt ?? this.seededAt).getTime() ||
+          left.id.localeCompare(right.id),
+      )
+      .slice(0, query.limit)
+      .map((item) => ({
+        id: item.id,
+        name: item.name,
+        priceVnd: item.priceVnd,
+        originalPriceVnd: shownOriginalPrice(
+          item.priceVnd,
+          item.originalPriceVnd,
+        ),
+        imageUrl: item.imageUrl,
+        soldCount: item.soldCount ?? 0,
+        addedAt: (item.createdAt ?? this.seededAt).toISOString(),
+        available: item.available,
+        menuCategoryId: item.menuCategoryId,
+      }));
   }
 
   async listStoreMenuSections(

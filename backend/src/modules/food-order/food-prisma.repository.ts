@@ -77,6 +77,8 @@ import type {
   StoreBrowsePage,
   DishSearchPage,
   DishSearchQuery,
+  ItemSuggestionsQuery,
+  StoreItemSuggestion,
   StoreDetail,
   StoreItemView,
   UpdateCatalogItemInput,
@@ -1263,6 +1265,84 @@ export class PrismaFoodRepository implements FoodRepository {
       byStore.set(storeId, pickFeaturedItems(list));
     }
     return byStore;
+  }
+
+  async listItemSuggestions(
+    query: ItemSuggestionsQuery,
+  ): Promise<StoreItemSuggestion[]> {
+    const store = await this.db.foodStore.findUnique({
+      where: { id: query.storeId },
+      select: {
+        serviceMode: true,
+        serviceModeUntil: true,
+        hoursConfigured: true,
+        lastOrderMinutes: true,
+        hours: true,
+        closures: true,
+      },
+    });
+    if (!store) {
+      return [];
+    }
+    const availability = storeAvailability(
+      store.serviceMode,
+      store.serviceModeUntil,
+      scheduleFromRow(store),
+      new Date(),
+    );
+    if (!availability.openNow) {
+      return [];
+    }
+
+    const excludedCategories = query.exclude.length
+      ? (
+          await this.db.foodItem.findMany({
+            where: { storeId: query.storeId, id: { in: query.exclude } },
+            select: { menuCategoryId: true },
+          })
+        )
+          .map((row) => row.menuCategoryId)
+          .filter((categoryId): categoryId is string => categoryId !== null)
+      : [];
+
+    const rows = await this.db.foodItem.findMany({
+      where: {
+        storeId: query.storeId,
+        ...(query.exclude.length ? { id: { notIn: query.exclude } } : {}),
+        available: true,
+        ...(query.moderationRequired ? { moderationStatus: 'APPROVED' } : {}),
+        menuCategoryId: excludedCategories.length
+          ? { not: null, notIn: excludedCategories }
+          : { not: null },
+      },
+      orderBy: [{ soldCount: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
+      take: query.limit,
+      select: {
+        id: true,
+        name: true,
+        priceVnd: true,
+        originalPriceVnd: true,
+        imageUrl: true,
+        soldCount: true,
+        createdAt: true,
+        available: true,
+        menuCategoryId: true,
+      },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      priceVnd: row.priceVnd,
+      originalPriceVnd: shownOriginalPrice(
+        row.priceVnd,
+        row.originalPriceVnd,
+      ),
+      imageUrl: row.imageUrl,
+      soldCount: row.soldCount,
+      addedAt: row.createdAt.toISOString(),
+      available: row.available,
+      menuCategoryId: row.menuCategoryId,
+    }));
   }
 
   async listStoreMenuSections(

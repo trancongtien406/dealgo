@@ -510,6 +510,179 @@ describe('food order http', () => {
     ).toEqual([names[0]]);
   });
 
+  it('suggests other-category dishes for the item page', async () => {
+    const customer = await login();
+    const { storeId, itemId } = await oneItem(customer.token);
+    const menu = await request(app.getHttpServer())
+      .get(`/v1/food/stores/${storeId}`)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    const item = (
+      menu.body.data.items as Array<{
+        id: string;
+        available: boolean;
+        menuCategoryId: string | null;
+      }>
+    ).find((entry) => entry.id === itemId)!;
+
+    const res = await request(app.getHttpServer())
+      .get(`/v1/food/stores/${storeId}/suggestions`)
+      .query({ exclude: item.id })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    const suggestions = res.body.data as Array<{
+      id: string;
+      available: boolean;
+      menuCategoryId: string | null;
+    }>;
+    expect(suggestions.length).toBeLessThanOrEqual(6);
+    expect(suggestions.length === 0 || suggestions.length >= 2).toBe(true);
+    for (const suggestion of suggestions) {
+      expect(suggestion.id).not.toBe(item.id);
+      expect(suggestion.available).not.toBe(false);
+      expect(suggestion.menuCategoryId).not.toBe(item.menuCategoryId);
+    }
+  });
+
+  it('suggests in-stock other-category dishes only, best sellers capped at six', async () => {
+    const customer = await login();
+    const owner = await login();
+    await repository.insertGrant(owner.userId, 'MERCHANT', 'ACTIVE');
+    const foods = app.get(FOOD_REPOSITORY);
+    if (!(foods instanceof MemoryFoodRepository)) {
+      throw new Error('Expected the in-memory food repository');
+    }
+    const tag = `suggest${Date.now().toString().slice(-6)}`;
+    const store = await createPinnedStore(foods, owner.userId, `Quán ${tag}`, [
+      { name: `Món chính ${tag}`, priceVnd: 50_000 },
+    ]);
+    const viewed = store.items[0]!;
+    const mains = await foods.createMenuCategory({
+      ownerId: owner.userId,
+      name: `Món chính ${tag}`,
+    });
+    const drinks = await foods.createMenuCategory({
+      ownerId: owner.userId,
+      name: `Đồ uống ${tag}`,
+    });
+    await foods.updateItem({
+      ownerId: owner.userId,
+      itemId: viewed.id,
+      menuCategoryId: mains.id,
+    });
+    const sameCategory = await foods.createItem({
+      ownerId: owner.userId,
+      name: `Món chính hai ${tag}`,
+      priceVnd: 45_000,
+      moderationStatus: 'APPROVED',
+      menuCategoryId: mains.id,
+    });
+    await foods.createItem({
+      ownerId: owner.userId,
+      name: `Đồ uống hết hàng ${tag}`,
+      priceVnd: 20_000,
+      available: false,
+      moderationStatus: 'APPROVED',
+      menuCategoryId: drinks.id,
+    });
+    await foods.createItem({
+      ownerId: owner.userId,
+      name: `Đồ uống chờ duyệt ${tag}`,
+      priceVnd: 20_000,
+      moderationStatus: 'PENDING',
+      menuCategoryId: drinks.id,
+    });
+    const suggested: string[] = [];
+    for (let index = 0; index < 7; index += 1) {
+      const created = await foods.createItem({
+        ownerId: owner.userId,
+        name: `Đồ uống ${index} ${tag}`,
+        priceVnd: 20_000,
+        moderationStatus: 'APPROVED',
+        menuCategoryId: drinks.id,
+      });
+      suggested.push(created.id);
+    }
+
+    const res = await request(app.getHttpServer())
+      .get(`/v1/food/stores/${store.id}/suggestions`)
+      .query({ exclude: viewed.id })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    const items = res.body.data as Array<{
+      id: string;
+      available: boolean;
+      menuCategoryId: string | null;
+    }>;
+    expect(items).toHaveLength(6);
+    expect(items.map((entry) => entry.id)).toEqual(
+      suggested.slice(-6).reverse(),
+    );
+    expect(items.map((entry) => entry.id)).not.toContain(viewed.id);
+    expect(items.map((entry) => entry.id)).not.toContain(sameCategory.id);
+    for (const entry of items) {
+      expect(entry.menuCategoryId).toBe(drinks.id);
+      expect(entry.available).toBe(true);
+    }
+  });
+
+  it('hides the suggestion block when fewer than two dishes qualify', async () => {
+    const customer = await login();
+    const owner = await login();
+    await repository.insertGrant(owner.userId, 'MERCHANT', 'ACTIVE');
+    const foods = app.get(FOOD_REPOSITORY);
+    if (!(foods instanceof MemoryFoodRepository)) {
+      throw new Error('Expected the in-memory food repository');
+    }
+    const tag = `lonely${Date.now().toString().slice(-6)}`;
+    const store = await createPinnedStore(foods, owner.userId, `Quán ${tag}`, [
+      { name: `Món chính ${tag}`, priceVnd: 50_000 },
+    ]);
+    const viewed = store.items[0]!;
+    const mains = await foods.createMenuCategory({
+      ownerId: owner.userId,
+      name: `Món chính ${tag}`,
+    });
+    const drinks = await foods.createMenuCategory({
+      ownerId: owner.userId,
+      name: `Đồ uống ${tag}`,
+    });
+    await foods.updateItem({
+      ownerId: owner.userId,
+      itemId: viewed.id,
+      menuCategoryId: mains.id,
+    });
+    await foods.createItem({
+      ownerId: owner.userId,
+      name: `Đồ uống duy nhất ${tag}`,
+      priceVnd: 20_000,
+      moderationStatus: 'APPROVED',
+      menuCategoryId: drinks.id,
+    });
+
+    const res = await request(app.getHttpServer())
+      .get(`/v1/food/stores/${store.id}/suggestions`)
+      .query({ exclude: viewed.id })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    expect(res.body.data).toEqual([]);
+  });
+
+  it('requires a customer session and uuid item ids to exclude', async () => {
+    const customer = await login();
+    const { storeId } = await oneItem(customer.token);
+
+    await request(app.getHttpServer())
+      .get(`/v1/food/stores/${storeId}/suggestions`)
+      .expect(401);
+
+    await request(app.getHttpServer())
+      .get(`/v1/food/stores/${storeId}/suggestions`)
+      .query({ exclude: 'not-an-item-id' })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(400);
+  });
+
   it('quotes the delivery fare that placement charges', async () => {
     const customer = await login();
     const { storeId, itemId } = await oneItem(customer.token);

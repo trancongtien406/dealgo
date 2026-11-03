@@ -678,6 +678,27 @@ export class SearchFoodDto extends ListFoodStoresQueryDto {
   limit?: number = undefined;
 }
 
+export class SuggestFoodItemsDto {
+  /** Item ids to leave out, comma-separated in the query string; their categories are skipped too. */
+  @IsOptional()
+  @Transform(({ value }) => {
+    const list: unknown = Array.isArray(value)
+      ? value
+      : typeof value === 'string'
+        ? value.split(',')
+        : value;
+    return Array.isArray(list)
+      ? list
+          .map((entry) => (typeof entry === 'string' ? entry.trim() : entry))
+          .filter(Boolean)
+      : list;
+  })
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsUUID('all', { each: true })
+  exclude?: string[];
+}
+
 export class OpsPageQueryDto extends OpsDateRangeQueryDto {
   @IsOptional()
   @Type(() => Number)

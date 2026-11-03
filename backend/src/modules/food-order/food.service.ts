@@ -124,6 +124,7 @@ import type {
   StoreItemView,
   StoreMenuSection,
   StoreFeaturedItem,
+  StoreItemSuggestion,
   FoodOrderChangeView,
   FoodDeliveryOfferView,
 } from './food.repository.js';
@@ -174,6 +175,9 @@ function checkedOriginalPrice(
 
 /** City ride speed used for the browse ETA (min per km ≈ 20 km/h). */
 const BROWSE_MINUTES_PER_KM = 3;
+
+const FOOD_ITEM_SUGGESTION_LIMIT = 6;
+const FOOD_ITEM_SUGGESTION_MIN = 2;
 
 export type OpsStoreListItem = {
   id: string;
@@ -695,6 +699,23 @@ export class FoodService {
       moderationRequired,
     );
     return { ...publicStore, items, offers, menuSections };
+  }
+
+  /** Dishes beside the viewed one; one suggestion alone reads as noise, so it is hidden. */
+  async suggestItems(
+    actor: RequestActor,
+    storeId: string,
+    exclude: string[],
+  ): Promise<StoreItemSuggestion[]> {
+    await this.requireActiveCustomer(actor.userId);
+    const moderationRequired = await this.itemModerationRequired();
+    const items = await this.food.listItemSuggestions({
+      storeId,
+      exclude,
+      limit: FOOD_ITEM_SUGGESTION_LIMIT,
+      moderationRequired,
+    });
+    return items.length < FOOD_ITEM_SUGGESTION_MIN ? [] : items;
   }
 
   /** The signed-in merchant's store id (store offers, review replies). */
