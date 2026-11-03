@@ -2639,6 +2639,40 @@ class AppLocalizationsEn extends AppLocalizations {
       'Couldn\'t get the delivery fee. Check your connection and try again.';
 
   @override
+  String get foodOrderNoteLabel => 'Note for the store / driver';
+
+  @override
+  String get foodOrderNoteHint =>
+      'E.g. less spicy, no onion, leave at the door…';
+
+  @override
+  String get foodLineNoteLabel => 'Note for this dish';
+
+  @override
+  String get foodLineNoteHint => 'E.g. less ice, no sugar…';
+
+  @override
+  String get foodUtensilsLabel => 'Cutlery';
+
+  @override
+  String get foodUtensilsYes => 'Yes';
+
+  @override
+  String get foodUtensilsNo => 'No';
+
+  @override
+  String get foodCartUpsellTitle => 'Add more to your meal';
+
+  @override
+  String get foodNoteSaved => 'Note saved';
+
+  @override
+  String get foodLineNoteClear => 'Clear note';
+
+  @override
+  String get foodCartLineRemove => 'Remove item';
+
+  @override
   String get driverOtpLocked =>
       'Too many wrong codes. Contact support to continue this ride.';
 

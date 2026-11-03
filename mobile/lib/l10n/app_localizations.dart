@@ -5072,6 +5072,72 @@ abstract class AppLocalizations {
   /// **'Couldn\'t get the delivery fee. Check your connection and try again.'**
   String get foodFareQuoteError;
 
+  /// No description provided for @foodOrderNoteLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Note for the store / driver'**
+  String get foodOrderNoteLabel;
+
+  /// No description provided for @foodOrderNoteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'E.g. less spicy, no onion, leave at the door…'**
+  String get foodOrderNoteHint;
+
+  /// No description provided for @foodLineNoteLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Note for this dish'**
+  String get foodLineNoteLabel;
+
+  /// No description provided for @foodLineNoteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'E.g. less ice, no sugar…'**
+  String get foodLineNoteHint;
+
+  /// No description provided for @foodUtensilsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cutlery'**
+  String get foodUtensilsLabel;
+
+  /// No description provided for @foodUtensilsYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get foodUtensilsYes;
+
+  /// No description provided for @foodUtensilsNo.
+  ///
+  /// In en, this message translates to:
+  /// **'No'**
+  String get foodUtensilsNo;
+
+  /// No description provided for @foodCartUpsellTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add more to your meal'**
+  String get foodCartUpsellTitle;
+
+  /// No description provided for @foodNoteSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Note saved'**
+  String get foodNoteSaved;
+
+  /// No description provided for @foodLineNoteClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear note'**
+  String get foodLineNoteClear;
+
+  /// No description provided for @foodCartLineRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove item'**
+  String get foodCartLineRemove;
+
   /// No description provided for @driverOtpLocked.
   ///
   /// In en, this message translates to:

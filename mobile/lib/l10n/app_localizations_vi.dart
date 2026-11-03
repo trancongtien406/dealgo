@@ -2621,6 +2621,39 @@ class AppLocalizationsVi extends AppLocalizations {
       'Chưa tính được phí giao. Kiểm tra kết nối và thử lại.';
 
   @override
+  String get foodOrderNoteLabel => 'Ghi chú cho quán / tài xế';
+
+  @override
+  String get foodOrderNoteHint => 'Ví dụ: ít cay, không hành, giao trước cửa…';
+
+  @override
+  String get foodLineNoteLabel => 'Ghi chú cho món này';
+
+  @override
+  String get foodLineNoteHint => 'Ví dụ: ít đá, không đường…';
+
+  @override
+  String get foodUtensilsLabel => 'Dụng cụ ăn uống';
+
+  @override
+  String get foodUtensilsYes => 'Có';
+
+  @override
+  String get foodUtensilsNo => 'Không';
+
+  @override
+  String get foodCartUpsellTitle => 'Mua thêm cho đủ bữa';
+
+  @override
+  String get foodNoteSaved => 'Đã lưu ghi chú';
+
+  @override
+  String get foodLineNoteClear => 'Xoá ghi chú';
+
+  @override
+  String get foodCartLineRemove => 'Xoá món';
+
+  @override
   String get driverOtpLocked =>
       'Nhập sai quá nhiều lần. Liên hệ hỗ trợ để tiếp tục chuyến.';
 
