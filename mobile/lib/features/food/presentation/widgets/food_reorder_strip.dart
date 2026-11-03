@@ -18,6 +18,10 @@ import 'food_category_tile.dart';
 import 'food_reorder_button.dart';
 import 'food_widgets.dart';
 
+const _coverSize = 56.0;
+const _actionPlaceholderWidth = 68.0;
+const _actionPlaceholderHeight = 32.0;
+
 /// "Đặt lại đơn quen": the last finished food order, ready to refill the cart.
 ///
 /// Hides when the customer has no finished order and on any load failure; the
@@ -43,20 +47,16 @@ class _FoodReorderStripState extends State<FoodReorderStrip> {
   }
 
   Future<void> _load() async {
-    final token = currentAccessToken(context);
-    if (token == null) {
-      setState(() => _loading = false);
-      return;
-    }
-    final listHistory = context.read<ListFoodHistory>();
-    final getOrder = context.read<GetFoodOrder>();
     try {
+      final token = currentAccessToken(context);
+      final listHistory = context.read<ListFoodHistory>();
+      final getOrder = context.read<GetFoodOrder>();
+      if (token == null) {
+        return;
+      }
       final history = await listHistory(token);
       final latest = _latestFinished(history);
       if (latest == null) {
-        if (mounted) {
-          setState(() => _loading = false);
-        }
         return;
       }
       final order = await getOrder(
@@ -66,17 +66,15 @@ class _FoodReorderStripState extends State<FoodReorderStrip> {
         return;
       }
       setState(() {
-        _order = order.storeId != null && order.lines.isNotEmpty
-            ? order
-            : null;
-        _loading = false;
+        _order = order.storeId != null && order.lines.isNotEmpty ? order : null;
       });
     } on Object {
       if (mounted) {
-        setState(() {
-          _order = null;
-          _loading = false;
-        });
+        setState(() => _order = null);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
       }
     }
   }
@@ -146,8 +144,8 @@ class _FoodReorderStripState extends State<FoodReorderStrip> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(DealGoRadius.small),
                     child: SizedBox(
-                      width: 56,
-                      height: 56,
+                      width: _coverSize,
+                      height: _coverSize,
                       child: Image.asset(
                         foodStoreCoverImage,
                         fit: BoxFit.cover,
@@ -211,26 +209,83 @@ class _StripSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.only(bottom: DealGoSpacing.s16),
-      child: DealGoShimmer(
-        child: Row(
-          children: [
-            DealGoSkeletonBox(width: 56, height: 56, radius: 10),
-            SizedBox(width: DealGoSpacing.s12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  DealGoSkeletonBox(width: 160, height: 14),
-                  SizedBox(height: DealGoSpacing.s8),
-                  DealGoSkeletonBox(width: 110, height: 12),
-                ],
+    final l10n = AppLocalizations.of(context);
+    return Padding(
+      key: const Key('food-reorder-strip-skeleton'),
+      padding: const EdgeInsets.only(bottom: DealGoSpacing.s16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SkeletonTitle(title: l10n.foodReorderTitle),
+          const SizedBox(height: DealGoSpacing.s12),
+          Material(
+            color: DealGoColors.card,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(DealGoRadius.button),
+              side: BorderSide(color: DealGoColors.border),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Padding(
+              padding: const EdgeInsets.all(DealGoSpacing.s12),
+              child: DealGoShimmer(
+                child: Row(
+                  children: [
+                    const DealGoSkeletonBox(
+                      width: _coverSize,
+                      height: _coverSize,
+                      radius: DealGoRadius.small,
+                    ),
+                    const SizedBox(width: DealGoSpacing.s12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          DealGoSkeletonBox(width: 160, height: 14),
+                          SizedBox(height: DealGoSpacing.s8),
+                          DealGoSkeletonBox(width: 110, height: 12),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: DealGoSpacing.s8),
+                    const DealGoSkeletonBox(
+                      width: _actionPlaceholderWidth,
+                      height: _actionPlaceholderHeight,
+                      radius: DealGoRadius.button,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+/// Reproduces the loaded title row's height without showing its text, so the
+/// feed does not shift when the skeleton is replaced by the real strip.
+class _SkeletonTitle extends StatelessWidget {
+  const _SkeletonTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.centerLeft,
+      children: [
+        Visibility(
+          visible: false,
+          maintainSize: true,
+          maintainAnimation: true,
+          maintainState: true,
+          child: ExcludeSemantics(
+            child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+          ),
+        ),
+        const DealGoShimmer(child: DealGoSkeletonBox(width: 140, height: 18)),
+      ],
     );
   }
 }

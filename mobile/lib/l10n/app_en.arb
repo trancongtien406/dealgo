@@ -4147,7 +4147,7 @@
   "foodVoucherWallTitle": "Today's offers",
   "foodVoucherWallSeeAll": "See all",
   "foodReorderTitle": "Order again",
-  "foodReorderStripItems": "{count} items · {total}",
+  "foodReorderStripItems": "{count, plural, =1{1 item} other{{count} items}} · {total}",
   "@foodReorderStripItems": {
     "placeholders": {
       "count": {

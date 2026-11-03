@@ -7,16 +7,18 @@ import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_voucher_ticket.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/motion/dealgo_motion_widgets.dart';
-import '../../../../core/motion/dealgo_sheet.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../promotion/domain/entities/available_voucher.dart';
 import '../../../promotion/domain/entities/voucher_quote.dart';
 import '../../../promotion/domain/usecases/list_available_vouchers.dart';
 import '../../../promotion/presentation/widgets/food_voucher_picker_sheet.dart';
 import '../../domain/entities/food_money.dart';
-import '../cubit/food_cart_cubit.dart';
 import '../utils/food_routes.dart';
 import 'food_widgets.dart';
+
+const _ticketWidth = 286.0;
+const _ticketHeight = 132.0;
+const _headerHeight = DealGoDimensions.minTapTarget;
 
 /// Discovery voucher wall: the three most useful FOOD vouchers still on offer.
 ///
@@ -41,19 +43,16 @@ class _FoodVoucherWallState extends State<FoodVoucherWall> {
   }
 
   Future<void> _load() async {
-    final token = currentAccessToken(context);
-    if (token == null) {
-      setState(() => _vouchers = const []);
-      return;
-    }
     try {
-      final available = await context.read<ListAvailableVouchers>()(
+      final token = currentAccessToken(context);
+      final loader = context.read<ListAvailableVouchers>();
+      if (token == null) {
+        return;
+      }
+      final available = await loader(
         accessToken: token,
         service: VoucherService.food,
       );
-      if (!mounted) {
-        return;
-      }
       final now = DateTime.now();
       final usable = [
         for (final voucher in available)
@@ -63,6 +62,9 @@ class _FoodVoucherWallState extends State<FoodVoucherWall> {
                   voucher.service == VoucherService.food))
             voucher,
       ];
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _vouchers = usable.take(_maxVouchers).toList(growable: false);
       });
@@ -70,37 +72,15 @@ class _FoodVoucherWallState extends State<FoodVoucherWall> {
       if (mounted) {
         setState(() => _vouchers = const []);
       }
+    } finally {
+      if (mounted && _vouchers == null) {
+        setState(() => _vouchers = const []);
+      }
     }
   }
 
   Future<void> _openList() async {
-    final token = currentAccessToken(context);
-    if (token == null) {
-      return;
-    }
-    final cart = context.read<FoodCartCubit>();
-    final vouchers = context.read<ListAvailableVouchers>();
-    if (cart.state.lines.isEmpty) {
-      await context.push(FoodRoutes.vouchers);
-      return;
-    }
-    final code = await showDealGoSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => FoodVoucherPickerSheet(
-        selectedCode: cart.state.voucherCode,
-        orderAmountVnd: cart.state.subtotalVnd,
-        deliveryFeeVnd: cart.state.offeredDeliveryFareVnd ?? 0,
-        load: () => vouchers(
-          accessToken: token,
-          service: VoucherService.food,
-        ),
-      ),
-    );
-    if (!mounted || code == null || code.isEmpty) {
-      return;
-    }
-    cart.applyVoucher(code: code);
+    await context.push(FoodRoutes.vouchers);
   }
 
   @override
@@ -124,7 +104,7 @@ class _FoodVoucherWallState extends State<FoodVoucherWall> {
           const _WallSkeleton()
         else
           SizedBox(
-            height: 132,
+            height: _ticketHeight,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               clipBehavior: Clip.none,
@@ -136,11 +116,8 @@ class _FoodVoucherWallState extends State<FoodVoucherWall> {
                 return DealGoStaggerIn(
                   index: index,
                   child: SizedBox(
-                    width: 286,
-                    child: _VoucherTicket(
-                      voucher: voucher,
-                      onTap: _openList,
-                    ),
+                    width: _ticketWidth,
+                    child: _VoucherTicket(voucher: voucher, onTap: _openList),
                   ),
                 );
               },
@@ -174,9 +151,8 @@ class _WallHeader extends StatelessWidget {
           onPressed: onSeeAll,
           style: TextButton.styleFrom(
             foregroundColor: DealGoColors.primary,
-            padding: const EdgeInsets.symmetric(horizontal: DealGoSpacing.s8),
-            minimumSize: Size.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: const EdgeInsets.symmetric(horizontal: DealGoSpacing.s12),
+            minimumSize: const Size(_headerHeight, _headerHeight),
           ),
           child: Text(seeAll),
         ),
@@ -220,34 +196,51 @@ class _WallSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 132,
-      child: DealGoShimmer(
-        child: Row(
-          children: [
-            SizedBox(
-              width: 286,
-              child: Material(
-                color: DealGoColors.card,
-                child: const Padding(
-                  padding: EdgeInsets.all(DealGoSpacing.s12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      DealGoSkeletonBox(width: 120, height: 18),
-                      SizedBox(height: DealGoSpacing.s8),
-                      DealGoSkeletonBox(width: 180, height: 12),
-                      SizedBox(height: DealGoSpacing.s8),
-                      DealGoSkeletonBox(width: 140, height: 12),
-                    ],
+    return Column(
+      key: const Key('food-voucher-wall-skeleton'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(
+          height: _headerHeight,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: DealGoShimmer(
+              child: DealGoSkeletonBox(width: 140, height: 18),
+            ),
+          ),
+        ),
+        const SizedBox(height: DealGoSpacing.s12),
+        SizedBox(
+          height: _ticketHeight,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: SizedBox(
+              width: _ticketWidth,
+              child: DealGoShimmer(
+                child: Material(
+                  color: DealGoColors.card,
+                  borderRadius: BorderRadius.circular(DealGoRadius.button),
+                  child: const Padding(
+                    padding: EdgeInsets.all(DealGoSpacing.s12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        DealGoSkeletonBox(width: 120, height: 18),
+                        SizedBox(height: DealGoSpacing.s8),
+                        DealGoSkeletonBox(width: 180, height: 12),
+                        SizedBox(height: DealGoSpacing.s8),
+                        DealGoSkeletonBox(width: 140, height: 12),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ],
+          ),
         ),
-      ),
+        const SizedBox(height: DealGoSpacing.s16),
+      ],
     );
   }
 }

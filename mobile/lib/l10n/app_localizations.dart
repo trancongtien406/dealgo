@@ -15365,7 +15365,7 @@ abstract class AppLocalizations {
   /// No description provided for @foodReorderStripItems.
   ///
   /// In en, this message translates to:
-  /// **'{count} items · {total}'**
+  /// **'{count, plural, =1{1 item} other{{count} items}} · {total}'**
   String foodReorderStripItems(int count, String total);
 }
 
