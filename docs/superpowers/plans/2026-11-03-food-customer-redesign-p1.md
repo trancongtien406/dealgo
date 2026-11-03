@@ -22,6 +22,7 @@
 - **File size:** every new or rewritten file ≤ 500 lines; after Task 8 `food_store_page.dart` must be ≤ 500 lines.
 - **Quality gate per task:** `flutter analyze` reports no issues for touched files and the listed tests pass. Never report PASS without running the command.
 - Accessibility floor: tap targets ≥ `DealGoDimensions.minTapTarget` (48), no colour-only state, honour `MediaQuery.disableAnimationsOf(context)`.
+- **Staging:** the working tree also holds unrelated in-progress work. Stage only the exact files named in the task's commit step; never `git add -A`, `git add test`, or `git add lib`.
 
 ## Scope Note
 
@@ -497,7 +498,13 @@ Expected: PASS and `No issues found!`
 - [ ] **Step 8: Commit**
 
 ```bash
-git add lib/features/food lib/features/shell/presentation/home_sections.dart \
+git add lib/features/food/domain/entities/food_models.dart \
+  lib/features/food/domain/repositories/food_repository.dart \
+  lib/features/food/domain/usecases/list_food_stores.dart \
+  lib/features/food/data/datasources/food_remote_datasource.dart \
+  lib/features/food/data/datasources/dio_food_remote_datasource.dart \
+  lib/features/food/data/repositories/food_repository_impl.dart \
+  lib/features/shell/presentation/home_sections.dart \
   lib/core/mock/fake_food_client.dart \
   test/features/food/food_store_page_decode_test.dart test/qa_customer_fixes_test.dart
 git commit -m "feat(food): page the store browse contract"
@@ -1302,8 +1309,14 @@ Expected: PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add lib/features/food/presentation/widgets lib/features/food/presentation/pages \
-  lib/features/shell/presentation/home_sections.dart test
+git add lib/features/food/presentation/widgets/food_store_card.dart \
+  lib/features/food/presentation/widgets/food_badges.dart \
+  lib/features/food/presentation/widgets/store_meta.dart \
+  lib/features/food/presentation/pages/food_discovery_page.dart \
+  lib/features/food/presentation/pages/food_category_page.dart \
+  lib/features/food/presentation/pages/food_search_page.dart \
+  lib/features/shell/presentation/home_sections.dart \
+  test/features/food/food_store_card_test.dart test/merchant_flow_test.dart
 git commit -m "refactor(food): unify store cards and meta line"
 ```
 
@@ -1865,7 +1878,14 @@ Expected: PASS.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add lib/features/food/presentation lib/l10n test/features/food/food_discovery_feed_test.dart
+git add lib/features/food/presentation/pages/food_discovery_page.dart \
+  lib/features/food/presentation/widgets/food_feed_footer.dart \
+  lib/l10n/app_vi.arb lib/l10n/app_en.arb \
+  lib/l10n/app_localizations.dart lib/l10n/app_localizations_en.dart \
+  lib/l10n/app_localizations_vi.dart \
+  test/features/food/food_discovery_feed_test.dart \
+  test/food_real_data_test.dart test/food_flow_test.dart \
+  test/ui_b_mock_depth_test.dart
 git commit -m "feat(food): make discovery a paginated vertical feed"
 ```
 
@@ -2068,7 +2088,9 @@ Expected: PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add lib/features/food/presentation/pages test/features/food/food_category_paging_test.dart
+git add lib/features/food/presentation/pages/food_category_page.dart \
+  lib/features/food/presentation/pages/food_search_page.dart \
+  test/features/food/food_category_paging_test.dart
 git commit -m "feat(food): page category and search results"
 ```
 
@@ -2369,7 +2391,13 @@ Expected: PASS.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add lib/features/food/presentation lib/l10n test/features/food/food_dish_gallery_test.dart
+git add lib/features/food/presentation/widgets/food_dish_gallery.dart \
+  lib/features/food/presentation/pages/food_item_options_page.dart \
+  lib/features/food/presentation/pages/food_store_page.dart \
+  lib/l10n/app_vi.arb lib/l10n/app_en.arb \
+  lib/l10n/app_localizations.dart lib/l10n/app_localizations_en.dart \
+  lib/l10n/app_localizations_vi.dart \
+  test/features/food/food_dish_gallery_test.dart
 git commit -m "feat(food): show the dish photo gallery"
 ```
 
@@ -2446,7 +2474,8 @@ Expected: `food_store_page.dart` ≤ 500 lines, every part ≤ 500 lines, `No is
 - [ ] **Step 4: Commit**
 
 ```bash
-git add lib/features/food/presentation/pages
+git add lib/features/food/presentation/pages/food_store_page.dart \
+  lib/features/food/presentation/pages/store
 git commit -m "refactor(food): split store page into part files"
 ```
 
