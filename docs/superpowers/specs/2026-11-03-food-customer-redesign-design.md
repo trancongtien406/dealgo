@@ -2,7 +2,7 @@
 doc_id: DG-SPEC-FOOD-CX-001
 title: "DealGo — Thiết kế lại trải nghiệm Food (Customer)"
 version: "1.0.0"
-status: "P1_IMPLEMENTED"
+status: "P2_IMPLEMENTED"
 owner: "UI/UX Lead + Product Owner"
 created_at: "2026-11-03"
 related:
@@ -530,12 +530,21 @@ Mỗi phase phải chạy được độc lập và không phá client cũ.
 
 | ID | Câu hỏi | Owner | Mặc định đề xuất |
 |---|---|---|---|
-| `FOOD-CX-OD-01` | Dụng cụ ăn uống mặc định Có hay Không | Product + Ops | Có (`utensils = true`) |
-| `FOOD-CX-OD-02` | Giới hạn ký tự ghi chú (200/300) và có kiểm duyệt nội dung không | Product + Trust | 200 ký tự món, 300 ký tự đơn, không kiểm duyệt tự động ở MVP |
-| `FOOD-CX-OD-03` | Upsell tính ở server hay client | Tech | Client ở P2 (từ `store.items`), server ở P3 |
+| `FOOD-CX-OD-01` | Dụng cụ ăn uống mặc định Có hay Không | Product + Ops | Có (`utensils = true`) — **implemented with default, vẫn OPEN** |
+| `FOOD-CX-OD-02` | Giới hạn ký tự ghi chú (200/300) và có kiểm duyệt nội dung không | Product + Trust | 200 ký tự món, 300 ký tự đơn, không kiểm duyệt tự động ở MVP — **implemented as default, vẫn OPEN** |
+| `FOOD-CX-OD-03` | Upsell tính ở server hay client | Tech | Client ở P2 (từ `store.items`), server ở P3 — **implemented as default, vẫn OPEN** |
 | `FOOD-CX-OD-04` | Shape cuối của endpoint search (gộp vào `stores` hay tách) | Tech | Tách endpoint để phân trang độc lập |
 | `FOOD-CX-OD-05` | Có hiển thị số quán đang mở ở header không | Product | Không, chỉ ETA (tránh số liệu sai khi phân trang) |
 | `FOOD-CX-OD-06` | Voucher wall lấy "mã khả dụng" hay "mã đã lưu" | Product | Mã khả dụng cho dịch vụ FOOD (`/v1/promotions/available`) |
+
+### 15.1. Đã triển khai ở P2 (2026-11-03)
+
+- Ghi chú đơn (≤300 ký tự), ghi chú từng món (≤200 ký tự) và lựa chọn dụng cụ ăn uống đi trọn
+  giỏ → checkout → `POST /v1/food/orders` → hoá đơn, phiếu bếp, job tài xế và tracking của khách.
+- Upsell strip trong giỏ đọc `store.items` đã tải, không gọi endpoint mới.
+- Khối phí giao hiển thị đúng `NEGOTIATE` (stepper + gợi ý counter) và `FIXED` (không stepper).
+- `FOOD-CX-OD-01/02/03` vẫn OPEN: code dùng đúng mặc định ở bảng trên, đổi được bằng migration
+  và client mà không phải backfill dữ liệu cũ.
 
 ## 16. Phụ lục bằng chứng
 

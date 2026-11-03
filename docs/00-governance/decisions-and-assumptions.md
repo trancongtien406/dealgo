@@ -84,6 +84,7 @@ related_decisions:
   - DEC-PROD-069
   - DEC-PROD-070
   - DEC-PROD-071
+  - DEC-PROD-072
   - OPEN-001
   - OPEN-002
   - OPEN-003
@@ -535,6 +536,20 @@ Status: `DRAFT` (t58u, 2026-10-30). Yêu cầu chủ dự án (t58u): "thêm tí
 | COD tiền hàng | `OPEN` | Checkout hiện chỉ có `CASH` (intent `COD`) = trả **cước** bằng tiền mặt; không có thu hộ giá trị hàng → chưa làm. |
 | Xe tải/van, nhiều điểm, hẹn giờ, bảo hiểm | `OPEN` | Ngoài phạm vi bản này. |
 
+#### `DEC-PROD-072` — Ghi chú đơn, dụng cụ ăn uống và upsell trong giỏ Food
+
+Status: `DRAFT` (2026-11-03, P2 của spec `docs/superpowers/specs/2026-11-03-food-customer-redesign-design.md`).
+
+| Mục | Status | Quy tắc |
+|---|---|---|
+| Ghi chú món | `DRAFT` | `food_order_lines.note` ≤ 200 ký tự, tuỳ chọn. Nhập trong giỏ/checkout, gửi trong `items[].note`, trả lại ở mọi view đọc (hoá đơn, phiếu bếp, job tài xế). App cắt về giới hạn trước khi gửi để không mất dữ liệu người dùng đã nhập khi máy chủ từ chối. |
+| Ghi chú đơn | `DRAFT` | `food_orders.note` ≤ 300 ký tự, tuỳ chọn; gửi trong `note` của `POST /v1/food/orders`, trả ở order detail, danh sách của khách và phiếu bếp. Trùng `FOOD-CX-OD-02` (giới hạn ký tự + không kiểm duyệt nội dung ở MVP) — vẫn **OPEN**, đang dùng mặc định này. |
+| Dụng cụ ăn uống | `DRAFT` | `food_orders.utensils` mặc định `true`, khách chọn Có/Không ở giỏ và xem lại ở checkout; client luôn gửi giá trị của mình nên đổi mặc định sau này không phải backfill. Trùng `FOOD-CX-OD-01` — vẫn **OPEN**, đang chạy với mặc định `true`. |
+| Upsell trong giỏ | `DRAFT` | Tối đa 6 món còn bán từ `store.items` đã tải, bỏ món đã có trong giỏ và món thuộc nhóm đã chọn; bấm là thêm 1 đơn vị. Thuần client ở P2 (`FOOD-CX-OD-03` **OPEN**; server hoá ở P3). |
+| Khối phí giao | `DRAFT` | Checkout chỉ hiển thị phí giao do máy chủ trả trong báo giá. `NEGOTIATE`: khách tăng/giảm trong khoảng server cho phép kèm gợi ý giá tài xế có thể nhận. `FIXED`: chỉ nhãn phí cố định, không có stepper. App không hardcode sàn/trần. |
+| Bề mặt đọc | `DRAFT` | Ghi chú hiện ở hoá đơn (C036/C037), theo dõi đơn (C033), phiếu bếp quán (M016, trạng thái PLACED/PREPARING) và job tài xế (D026). Nội dung người dùng: render dạng text, không log, không đưa vào analytics. |
+| Bằng chứng | `DRAFT` | Migration `20261103120000_food_order_notes` (additive); `food.dto.ts`/`food.service.ts`/`food*.repository.ts`; mobile `food_cart_cubit.dart`, `food_checkout_extras.dart`, `food_order_extras.dart`; test `food_cart_notes_test.dart`, `food_checkout_extras_test.dart`, `food_fare_negotiation_test.dart`, `food_order_extras_read_test.dart`. |
+
 ### 5.2. Quyết định đã bị thay thế
 
 Giữ lại để truy vết; **không** dùng làm quy tắc hiện hành.
@@ -954,6 +969,7 @@ Phân cấp này **tương thích** `BLOCKER-L0..L2` trong `scope-release-plan.m
 
 | Date | Version | Status | Changes |
 |---|---|---|---|
+| 2026-11-03 | 0.4.18 | `DRAFT` | Thêm `DEC-PROD-072`: ghi chú đơn (≤300)/ghi chú món (≤200), dụng cụ ăn uống, upsell trong giỏ và khối phí giao NEGOTIATE/FIXED theo P2 của spec Food Customer; `FOOD-CX-OD-01/02/03` vẫn `OPEN` và đang chạy với mặc định đã ghi. |
 | 2026-10-30 | 0.4.17 | `DRAFT` | `DEC-PROD-070` (t61u): OCR trên máy (ML Kit) điền sẵn form + `ocrPrefilled/ocrEdited` trên Admin; tự động duyệt KYC/KYB (`KYC_AUTO_APPROVE_DRIVER/MERCHANT`, tắt mặc định, audit `KYC_AUTO_APPROVE`); hộ nhỏ nộp cam kết ATTP; lý do + mục từ chối trong socket; ghi chú theo mục khi từ chối; bypass mặc định false; seed nhân sự mẫu DEV. |
 | 2026-10-30 | 0.4.16 | `DRAFT` | `DEC-PROD-070` (t60u): cửa hàng bắt buộc giấy ATTP (`FOOD_SAFETY_CERT`); hạng bằng lái phải phủ hạng xe (`PARTNER_LICENSE_CLASS_MISMATCH`); kết quả kiểm thử duyệt tay trên web. |
 | 2026-10-30 | 0.4.15 | `DRAFT` | `DEC-PROD-071` (t59u): thanh toán giao hàng như checkout (bật/tắt theo `PARCEL`, người nhận trả → tiền mặt), phí dịch vụ + phí hoàn hàng Admin sửa, không xe tải/van, FOOD chỉ xe máy (fail closed); COD tiền hàng vẫn `OPEN`. |
