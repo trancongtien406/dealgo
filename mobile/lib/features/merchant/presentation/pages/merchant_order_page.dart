@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../utils/merchant_kitchen_lines.dart';
+import '../widgets/merchant_kitchen_line_row.dart';
 import '../widgets/merchant_order_change_sheet.dart';
 import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
@@ -14,7 +15,6 @@ import '../../domain/usecases/accept_merchant_order.dart';
 import '../../domain/usecases/get_merchant_order.dart';
 import '../../domain/usecases/mark_merchant_order_ready.dart';
 import '../../domain/usecases/reject_merchant_order.dart';
-import '../../../food/presentation/widgets/food_category_tile.dart';
 import '../../../food/presentation/widgets/food_order_extras.dart';
 import '../../../food/presentation/widgets/food_reject_reason.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
@@ -360,55 +360,7 @@ class _Detail extends StatelessWidget {
                   ),
                   for (final line in lines) ...[
                     const SizedBox(height: DealGoSpacing.s8),
-                    Row(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(
-                            DealGoRadius.small,
-                          ),
-                          child: Image.asset(
-                            foodPlaceholderImage,
-                            width: 44,
-                            height: 44,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        const SizedBox(width: DealGoSpacing.s12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(line.name, style: textTheme.titleMedium),
-                              if (line.options.isNotEmpty)
-                                Text(
-                                  line.options,
-                                  key: const Key('merchant-line-options'),
-                                  style: textTheme.bodySmall?.copyWith(
-                                    color: DealGoColors.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              if ((line.note ?? '').trim().isNotEmpty)
-                                FoodLineNoteText(line.note!),
-                              Text(
-                                l10n.merchantLineQty(
-                                  line.qty,
-                                  formatVnd(line.unitPriceVnd),
-                                ),
-                                style: textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: DealGoSpacing.s8),
-                        Text(
-                          formatVnd(line.unitPriceVnd * line.qty),
-                          style: textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
+                    MerchantKitchenLineRow(line: line),
                   ],
                 ],
               ),
@@ -433,55 +385,7 @@ class _Detail extends StatelessWidget {
                   ),
                   for (final line in lines) ...[
                     const SizedBox(height: DealGoSpacing.s8),
-                    Row(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(
-                            DealGoRadius.small,
-                          ),
-                          child: Image.asset(
-                            foodPlaceholderImage,
-                            width: 44,
-                            height: 44,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        const SizedBox(width: DealGoSpacing.s12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(line.name, style: textTheme.titleMedium),
-                              if (line.options.isNotEmpty)
-                                Text(
-                                  line.options,
-                                  key: const Key('merchant-line-options'),
-                                  style: textTheme.bodySmall?.copyWith(
-                                    color: DealGoColors.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              if ((line.note ?? '').trim().isNotEmpty)
-                                FoodLineNoteText(line.note!),
-                              Text(
-                                l10n.merchantLineQty(
-                                  line.qty,
-                                  formatVnd(line.unitPriceVnd),
-                                ),
-                                style: textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: DealGoSpacing.s8),
-                        Text(
-                          formatVnd(line.unitPriceVnd * line.qty),
-                          style: textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
+                    MerchantKitchenLineRow(line: line),
                   ],
                 ],
               ),
