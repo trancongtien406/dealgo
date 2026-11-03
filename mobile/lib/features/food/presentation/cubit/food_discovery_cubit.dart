@@ -30,8 +30,9 @@ final class FoodDiscoveryReady extends FoodDiscoveryState {
   final List<FoodStoreSummary> stores;
 
   /// Whether the load had customer coordinates to browse from: the chosen
-  /// drop-off first, else a device fix. Without them the server browses a
-  /// zero-radius area, so an empty list may mean "out of area".
+  /// drop-off first, else a device fix. The radius filter only applies with
+  /// an origin, so this distinguishes an empty *unfiltered* feed (no stores
+  /// deliver here) from an empty catalogue/category result.
   final bool hasLocation;
 
   /// Real store ratings by store id; empty until loaded (or if unavailable).

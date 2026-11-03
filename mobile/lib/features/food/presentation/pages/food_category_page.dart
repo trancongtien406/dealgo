@@ -99,12 +99,13 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
     );
   }
 
-  /// Empty results blame distance only when distance can explain them: the
-  /// load had no GPS fix, or the unfiltered nearby feed found nothing at all.
+  /// The radius filter only applies when the request has an origin, so
+  /// coordinates plus an empty *unfiltered* feed is the one case that means
+  /// "out of coverage"; everything else is simply an empty catalogue/category.
   String _emptyTitle(AppLocalizations l10n, FoodDiscoveryState discovery) {
     final ready = discovery is FoodDiscoveryReady ? discovery : null;
     final outOfArea =
-        ready != null && (!ready.hasLocation || widget.categoryCode == null);
+        ready != null && ready.hasLocation && widget.categoryCode == null;
     return outOfArea
         ? l10n.foodEmptyOutOfArea
         : l10n.foodEmptyNoStoresInCategory;

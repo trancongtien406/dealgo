@@ -95,6 +95,12 @@ const double _menuCompactImageWidth = 88;
 /// Vertical category list beside the menu items.
 const double _menuRailWidth = 108;
 
+/// How long the detail read waits for a position before going out without one.
+const Duration _preReadLocationWait = Duration(milliseconds: 1500);
+
+/// Upper bound for the location read on the post-load distance path.
+const Duration _locationWait = Duration(seconds: 5);
+
 class _FoodStorePageState extends State<_FoodStoreView> {
   final TextEditingController _query = TextEditingController();
   FoodStoreDetail? _store;
@@ -134,9 +140,10 @@ class _FoodStorePageState extends State<_FoodStoreView> {
       _failure = null;
     });
     try {
-      // Resolved before the read: the server quotes the hero's "from" fee at
-      // this position, so the origin must travel with the request.
-      final origin = await _customerOrigin();
+      // The store read needs the origin for the server-side "from" fee, but a
+      // slow fix must not hold the page empty: after this cap the read goes
+      // out without coordinates and the fee stays null.
+      final origin = await _customerOrigin(timeout: _preReadLocationWait);
       if (!mounted) {
         return;
       }
@@ -155,6 +162,9 @@ class _FoodStorePageState extends State<_FoodStoreView> {
       });
       unawaited(_loadReviews(token));
       _locate(store, origin);
+      if (origin == null) {
+        unawaited(_locateAfterLoad(store));
+      }
     } on ApiException catch (error) {
       if (!mounted) {
         return;
@@ -176,7 +186,9 @@ class _FoodStorePageState extends State<_FoodStoreView> {
 
   /// Chosen delivery address first, then the device fix; null when neither is
   /// available (no distance, no quoted "from" fee).
-  Future<({double lat, double lng})?> _customerOrigin() async {
+  Future<({double lat, double lng})?> _customerOrigin({
+    Duration timeout = _locationWait,
+  }) async {
     final dropoff = context.read<FoodCartCubit>().state;
     final dropoffLat = dropoff.dropoffLat;
     final dropoffLng = dropoff.dropoffLng;
@@ -187,12 +199,20 @@ class _FoodStorePageState extends State<_FoodStoreView> {
       final position = await context
           .read<LocationService>()
           .quietPosition()
-          .timeout(const Duration(seconds: 5));
+          .timeout(timeout);
       if (position == null) return null;
       return (lat: position.latitude, lng: position.longitude);
     } on Object {
       return null;
     }
+  }
+
+  /// The pre-read cap may have expired; this second, longer attempt only fills
+  /// the distance the page can still show without refetching the store.
+  Future<void> _locateAfterLoad(FoodStoreDetail store) async {
+    final origin = await _customerOrigin();
+    if (!mounted || origin == null) return;
+    _locate(store, origin);
   }
 
   /// Straight-line distance from [origin] to the store, when both are known.

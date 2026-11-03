@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:dealgo/core/design_system/tokens/dealgo_tokens.dart';
 import 'package:dealgo/core/location/location_service.dart';
 import 'package:dealgo/core/mock/fake_food_client.dart';
 import 'package:dealgo/features/food/domain/entities/food_models.dart';
@@ -10,6 +13,7 @@ import 'package:dealgo/features/food/presentation/widgets/store_meta.dart';
 import 'package:dealgo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../support/auth_test_harness.dart';
@@ -25,10 +29,7 @@ Widget foodTestApp(Widget child) {
   );
 }
 
-FakeFoodClient _storeClient({
-  String? closesAtToday,
-  int? deliveryFeeFromVnd,
-}) {
+FakeFoodClient _storeClient({String? closesAtToday, int? deliveryFeeFromVnd}) {
   return FakeFoodClient(
     stores: const [FoodStoreSummary(id: 'store-1', name: 'Bún Bò Huế')],
     details: {
@@ -127,11 +128,7 @@ void main() {
   testWidgets('hero shows the quoted fee beside the closing time', (
     tester,
   ) async {
-    await _openStore(
-      tester,
-      closesAtToday: '22:00',
-      deliveryFeeFromVnd: 15000,
-    );
+    await _openStore(tester, closesAtToday: '22:00', deliveryFeeFromVnd: 15000);
     expect(find.text('Mở đến 22:00 · Phí giao từ 15.000đ'), findsOneWidget);
   });
 
@@ -187,14 +184,49 @@ void main() {
     expect(find.byKey(const Key('store-trust-strip')), findsNothing);
   });
 
-  testWidgets(
-    'category empty state talks about distance when there is no fix',
-    (tester) async {
-      await _openCategory(tester, location: FakeLocationService.denied());
-      expect(find.byKey(const Key('food-category-empty')), findsOneWidget);
-      expect(find.text('DealGo chưa giao tới khu vực này'), findsOneWidget);
-    },
-  );
+  testWidgets('detail read drops a slow fix and hides the fee', (tester) async {
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final client = _storeClient(closesAtToday: '22:00');
+    await pumpSignedIn(
+      tester,
+      profile: customerProfile,
+      foodClient: client,
+      locationOverride: _StalledLocation(),
+    );
+    GoRouter.of(tester.element(find.byType(Scaffold).first))
+        .push(FoodRoutes.store('store-1'));
+    await tester.pump();
+    expect(client.storeReads, isEmpty);
+
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(client.storeReads, ['store-1']);
+    expect(client.storeReadGeo, [false]);
+    expect(find.text('Mở đến 22:00'), findsOneWidget);
+    expect(find.textContaining('Phí giao'), findsNothing);
+
+    // Drain the longer post-load location attempt (distance only).
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('unfiltered empty feed with coordinates blames the area', (
+    tester,
+  ) async {
+    await _openCategory(tester);
+    expect(find.byKey(const Key('food-category-empty')), findsOneWidget);
+    expect(find.text('DealGo chưa giao tới khu vực này'), findsOneWidget);
+  });
+
+  testWidgets('unfiltered empty feed without coordinates names the catalogue', (
+    tester,
+  ) async {
+    await _openCategory(tester, location: FakeLocationService.denied());
+    expect(find.byKey(const Key('food-category-empty')), findsOneWidget);
+    expect(find.text('Chưa có quán trong danh mục này'), findsOneWidget);
+  });
 
   testWidgets('category empty state names the category when a fix exists', (
     tester,
@@ -204,7 +236,7 @@ void main() {
     expect(find.text('Chưa có quán trong danh mục này'), findsOneWidget);
   });
 
-  testWidgets('filtered category without a fix still blames the area', (
+  testWidgets('filtered category without coordinates names the catalogue', (
     tester,
   ) async {
     await _openCategory(
@@ -213,28 +245,31 @@ void main() {
       location: FakeLocationService.denied(),
     );
     expect(find.byKey(const Key('food-category-empty')), findsOneWidget);
-    expect(find.text('DealGo chưa giao tới khu vực này'), findsOneWidget);
+    expect(find.text('Chưa có quán trong danh mục này'), findsOneWidget);
   });
 
-  test('discovery hasLocation reflects the coordinates it browsed with', () async {
-    final withoutFix = FoodDiscoveryCubit(
-      listFoodStores: ListFoodStores(_EmptyFoodRepo()),
-      location: FakeLocationService.denied(),
-    );
-    await withoutFix.load('tok');
-    expect((withoutFix.state as FoodDiscoveryReady).hasLocation, isFalse);
+  test(
+    'discovery hasLocation reflects the coordinates it browsed with',
+    () async {
+      final withoutFix = FoodDiscoveryCubit(
+        listFoodStores: ListFoodStores(_EmptyFoodRepo()),
+        location: FakeLocationService.denied(),
+      );
+      await withoutFix.load('tok');
+      expect((withoutFix.state as FoodDiscoveryReady).hasLocation, isFalse);
 
-    final withFix = FoodDiscoveryCubit(
-      listFoodStores: ListFoodStores(_EmptyFoodRepo()),
-    );
-    await withFix.load('tok', lat: testPickupLat, lng: testPickupLng);
-    expect((withFix.state as FoodDiscoveryReady).hasLocation, isTrue);
+      final withFix = FoodDiscoveryCubit(
+        listFoodStores: ListFoodStores(_EmptyFoodRepo()),
+      );
+      await withFix.load('tok', lat: testPickupLat, lng: testPickupLng);
+      expect((withFix.state as FoodDiscoveryReady).hasLocation, isTrue);
 
-    await withoutFix.close();
-    await withFix.close();
-  });
+      await withoutFix.close();
+      await withFix.close();
+    },
+  );
 
-  testWidgets('feed card fits 360 px with long name and full meta', (
+  testWidgets('feed card fits a 360 px phone inside the list gutter', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(360, 800);
@@ -250,17 +285,24 @@ void main() {
     );
     await tester.pumpWidget(
       foodTestApp(
-        Center(
-          child: SizedBox(
-            width: 360,
-            child: FoodStoreCard(store: store, onTap: () {}),
+        ListView(
+          padding: const EdgeInsets.symmetric(
+            horizontal: DealGoDimensions.pageGutter,
           ),
+          children: [FoodStoreCard(store: store, onTap: () {})],
         ),
       ),
     );
     expect(tester.takeException(), isNull);
     expect(find.byKey(const Key('store-open-until-store-1')), findsOneWidget);
   });
+}
+
+class _StalledLocation extends FakeLocationService {
+  final _pending = Completer<Position?>();
+
+  @override
+  Future<Position?> quietPosition() => _pending.future;
 }
 
 class _EmptyFoodRepo implements FoodRepository {
