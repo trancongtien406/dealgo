@@ -66,11 +66,11 @@ related:
 | C019 | Đặt xe theo lịch | — | DEFERRED | P2 scheduled booking |
 | C020 | Thêm / đổi điểm dừng | — | DEFERRED | P2 multi-stop |
 | C021 | Chi tiết chuyến đặt trước | — | DEFERRED | P2 with C019 |
-| C022 | Khám phá đồ ăn | `/customer/shop` | LIVE | Image-only categories + stores from Nest; store cards show rating (count), km, ETA, fee or green "Miễn phí giao", offer pill, min order, featured dish with struck-through original price |
-| C023 | Tìm kiếm quán / món | `/customer/food/search` | LIVE | |
-| C024 | Kết quả danh mục | `/customer/food/category?category=<code>` | LIVE | Categories from `GET /v1/public/food-categories` (DEC-PROD-067) |
-| C025 | Chi tiết quán & menu | `/customer/food/stores/:storeId` | LIVE | Open/closed/busy from store settings; hero + logo, address, today's hours, rating/ETA/sold chips, min order, "Khách khen" tags, merchant cover + description, ticket-style offers strip with "Dùng"/"Đã dùng" and "Xem tất cả" sheet, floating cart bar (count, total, shortfall/saving, "Xem giỏ hàng"), pinned tabs, menu section chips, best sellers, "Bán chạy"/"Mới" badges, original price struck through, in-store search (DEC-PROD-068) |
-| C026 | Chi tiết món & tùy chọn | `/customer/food/stores/:storeId/items/:itemId` | LIVE | Real option groups/prices (DEC-PROD-033); cart bar above the add button when the cart has items (DEC-PROD-068) |
+| C022 | Khám phá đồ ăn | `/customer/shop` | LIVE | Vertical paginated feed (`page`/`limit`, load-more, retry, end label); store cards show rating (count), km, ETA, fee or green "Miễn phí giao", offer pill, min order, up to two signature dishes; offers strip, deals, new dishes, top-rated |
+| C023 | Tìm kiếm quán / món | `/customer/food/search` | LIVE | Server search over store and dish names; sort by gần / mới nhất / đánh giá; paginated results |
+| C024 | Kết quả danh mục | `/customer/food/category?category=<code>` | LIVE | `category` filtered on the server (DEC-PROD-067); paginated with load-more |
+| C025 | Chi tiết quán & menu | `/customer/food/stores/:storeId` | LIVE | Open/closed/busy from store settings; hero + logo, address, today's hours, rating/ETA/sold chips, min order, "Khách khen" tags, merchant cover + description, ticket-style offers strip with "Dùng"/"Đã dùng" and "Xem tất cả" sheet, floating cart bar, pinned tabs, menu section chips, best sellers, "Bán chạy"/"Mới" badges, original price struck through, in-store search (DEC-PROD-068); rows flag multi-photo dishes; split into `store/` part files (≤ 500 lines each) |
+| C026 | Chi tiết món & tùy chọn | `/customer/food/stores/:storeId/items/:itemId` | LIVE | Real option groups/prices (DEC-PROD-033); dish photo gallery with "Ảnh n/tổng" counter; cart bar above the add button when the cart has items (DEC-PROD-068) |
 | C027 | Giỏ hàng | `/customer/food/cart` | LIVE | Lines keyed by options; ETA; min-order shortfall blocks checkout (DEC-PROD-068) |
 | C028 | Checkout đơn đồ ăn (Golden) | `/customer/food/checkout` | LIVE | Server pricing, voucher code, COD; offline/repriced/submitting states |
 | C029 | Chọn voucher | `/customer/account/vouchers` + checkout "Ưu đãi của tôi" sheet | LIVE | List from `GET /v1/promotions/available` (FOOD) plus the store's offers; ticket cards with full conditions, best pick, estimated saving and "Dùng"/"Đã dùng"; code field kept |

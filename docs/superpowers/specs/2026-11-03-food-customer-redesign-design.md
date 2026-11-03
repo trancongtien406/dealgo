@@ -2,7 +2,7 @@
 doc_id: DG-SPEC-FOOD-CX-001
 title: "DealGo — Thiết kế lại trải nghiệm Food (Customer)"
 version: "1.0.0"
-status: "DRAFT_FOR_REVIEW"
+status: "P1_IMPLEMENTED"
 owner: "UI/UX Lead + Product Owner"
 created_at: "2026-11-03"
 related:
