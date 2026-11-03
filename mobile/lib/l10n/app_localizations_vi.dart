@@ -8287,4 +8287,18 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get driverCreditWaitingBank =>
       'Số dư tự cập nhật khi ngân hàng xác nhận.';
+
+  @override
+  String get foodVoucherWallTitle => 'Ưu đãi hôm nay';
+
+  @override
+  String get foodVoucherWallSeeAll => 'Xem tất cả';
+
+  @override
+  String get foodReorderTitle => 'Đặt lại đơn quen';
+
+  @override
+  String foodReorderStripItems(int count, String total) {
+    return '$count món · $total';
+  }
 }

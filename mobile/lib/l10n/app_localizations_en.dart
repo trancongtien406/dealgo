@@ -8330,4 +8330,18 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get driverCreditWaitingBank =>
       'The balance updates automatically once your bank confirms.';
+
+  @override
+  String get foodVoucherWallTitle => 'Today\'s offers';
+
+  @override
+  String get foodVoucherWallSeeAll => 'See all';
+
+  @override
+  String get foodReorderTitle => 'Order again';
+
+  @override
+  String foodReorderStripItems(int count, String total) {
+    return '$count items · $total';
+  }
 }

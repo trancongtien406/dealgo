@@ -15343,6 +15343,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The balance updates automatically once your bank confirms.'**
   String get driverCreditWaitingBank;
+
+  /// No description provided for @foodVoucherWallTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s offers'**
+  String get foodVoucherWallTitle;
+
+  /// No description provided for @foodVoucherWallSeeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'See all'**
+  String get foodVoucherWallSeeAll;
+
+  /// No description provided for @foodReorderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order again'**
+  String get foodReorderTitle;
+
+  /// No description provided for @foodReorderStripItems.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} items · {total}'**
+  String foodReorderStripItems(int count, String total);
 }
 
 class _AppLocalizationsDelegate

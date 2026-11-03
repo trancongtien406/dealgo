@@ -82,6 +82,7 @@ import '../features/food/domain/usecases/cancel_food_order.dart';
 import '../features/food/domain/usecases/get_food_order.dart';
 import '../features/promotion/data/datasources/promotion_remote_datasource.dart';
 import '../features/promotion/data/repositories/promotion_repository_impl.dart';
+import '../features/promotion/domain/repositories/promotion_repository.dart';
 import '../features/promotion/domain/usecases/list_available_vouchers.dart';
 import '../features/promotion/domain/usecases/validate_voucher.dart';
 import '../features/support/data/help_faq_remote_datasource.dart';
@@ -339,6 +340,7 @@ class DealGoDependencies {
     MerchantStatsRepository? merchantStats,
     DriverLocationRepository? driverLocation,
     AuthMethodsCache? authMethodsCache,
+    PromotionRepository? promotions,
   }) {
     final locator = GetIt.asNewInstance();
     _registerGraph(
@@ -381,6 +383,7 @@ class DealGoDependencies {
       partnerRequirements: partnerRequirements,
       merchantStats: merchantStats,
       driverLocation: driverLocation,
+      promotions: promotions,
     );
 
     // Process-wide locator for `getIt<T>()` outside the widget tree.
@@ -426,6 +429,7 @@ class DealGoDependencies {
       partnerRequirements: partnerRequirements,
       merchantStats: merchantStats,
       driverLocation: driverLocation,
+      promotions: promotions,
       skipLeafServices: true,
     );
 
@@ -501,6 +505,7 @@ class DealGoDependencies {
     PartnerRequirementsSource? partnerRequirements,
     MerchantStatsRepository? merchantStats,
     DriverLocationRepository? driverLocation,
+    PromotionRepository? promotions,
   }) {
     if (locationOverride != null) {
       if (locator.isRegistered<LocationService>()) {
@@ -617,11 +622,13 @@ class DealGoDependencies {
                     : const NoopAnalytics()));
     }
 
-    final promotionRepository = PromotionRepositoryImpl(
-      useOverrides || useMockData
-          ? FakePromotionRemoteDataSource()
-          : DioPromotionRemoteDataSource(dio: dio),
-    );
+    final promotionRepository =
+        promotions ??
+        PromotionRepositoryImpl(
+          useOverrides || useMockData
+              ? FakePromotionRemoteDataSource()
+              : DioPromotionRemoteDataSource(dio: dio),
+        );
     final addressBookRepository =
         addressBook ??
         (useOverrides

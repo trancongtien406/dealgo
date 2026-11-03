@@ -4143,5 +4143,19 @@
   "driverCreditCreatedAt": "Created",
   "driverCreditPaidAt": "Paid at",
   "driverCreditClose": "Close",
-  "driverCreditWaitingBank": "The balance updates automatically once your bank confirms."
+  "driverCreditWaitingBank": "The balance updates automatically once your bank confirms.",
+  "foodVoucherWallTitle": "Today's offers",
+  "foodVoucherWallSeeAll": "See all",
+  "foodReorderTitle": "Order again",
+  "foodReorderStripItems": "{count} items · {total}",
+  "@foodReorderStripItems": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  }
 }

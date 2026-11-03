@@ -30,6 +30,8 @@ import '../widgets/food_category_tile.dart';
 import '../widgets/food_badges.dart';
 import '../widgets/food_store_card.dart';
 import '../widgets/food_filter_sheet.dart';
+import '../widgets/food_reorder_strip.dart';
+import '../widgets/food_voucher_wall.dart';
 import '../widgets/food_feed_footer.dart';
 import '../widgets/store_meta.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
@@ -231,6 +233,8 @@ class _FoodDiscoveryViewState extends State<_FoodDiscoveryView> {
                       empty: _FoodBanner(onExplore: _scrollToStores),
                     ),
                     const SizedBox(height: DealGoSpacing.s16),
+                    const FoodVoucherWall(),
+                    const FoodReorderStrip(),
                     _CategoryStrip(
                       selected: null,
                       onSelected: (code) =>

@@ -2739,5 +2739,9 @@
   "driverCreditCreatedAt": "Tạo lúc",
   "driverCreditPaidAt": "Thanh toán lúc",
   "driverCreditClose": "Đóng",
-  "driverCreditWaitingBank": "Số dư tự cập nhật khi ngân hàng xác nhận."
+  "driverCreditWaitingBank": "Số dư tự cập nhật khi ngân hàng xác nhận.",
+  "foodVoucherWallTitle": "Ưu đãi hôm nay",
+  "foodVoucherWallSeeAll": "Xem tất cả",
+  "foodReorderTitle": "Đặt lại đơn quen",
+  "foodReorderStripItems": "{count} món · {total}"
 }

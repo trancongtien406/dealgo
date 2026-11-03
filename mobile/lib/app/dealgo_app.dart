@@ -6,6 +6,8 @@ import '../core/app_gate/app_gate_host.dart';
 
 import 'dart:async';
 
+import '../features/activity/data/datasources/history_remote_datasource.dart';
+import '../features/promotion/domain/repositories/promotion_repository.dart';
 import '../features/ride/domain/stops/ride_stops_client.dart';
 import '../features/places/data/place_history_cache.dart';
 import '../features/onboarding/data/datasources/partner_requirements_client.dart';
@@ -80,6 +82,8 @@ class DealGoApp extends StatefulWidget {
     this.tokenStore,
     this.passkeyPlatform,
     this.foodClient,
+    this.promotions,
+    this.historyClient,
     this.merchantOrdersClient,
     this.rideClient,
     this.rideStopsClient,
@@ -118,6 +122,8 @@ class DealGoApp extends StatefulWidget {
   final PasskeyPlatform? passkeyPlatform;
   final TokenStore? tokenStore;
   final FoodClient? foodClient;
+  final PromotionRepository? promotions;
+  final HistoryClient? historyClient;
   final MerchantOrdersClient? merchantOrdersClient;
   final RideClient? rideClient;
 
@@ -190,6 +196,8 @@ class _DealGoAppState extends State<DealGoApp> with WidgetsBindingObserver {
       tokenStore: widget.tokenStore,
       passkeyPlatform: widget.passkeyPlatform,
       foodClient: widget.foodClient,
+      promotions: widget.promotions,
+      historyClient: widget.historyClient,
       merchantOrdersClient: widget.merchantOrdersClient,
       rideClient: widget.rideClient,
       rideStopsClient: widget.rideStopsClient,
