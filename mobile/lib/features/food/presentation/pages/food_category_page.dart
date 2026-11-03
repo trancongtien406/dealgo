@@ -209,14 +209,11 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
                               l10n.foodCategoryAroundYou,
                               style: textTheme.titleMedium,
                             ),
-                            Text(
-                              l10n.foodCategoryAroundHint(
-                                discovery is FoodDiscoveryReady
-                                    ? discovery.total
-                                    : 0,
+                            if (discovery is FoodDiscoveryReady)
+                              Text(
+                                l10n.foodCategoryAroundHint(discovery.total),
+                                style: textTheme.bodySmall,
                               ),
-                              style: textTheme.bodySmall,
-                            ),
                           ],
                         ),
                       ),

@@ -28,6 +28,8 @@ import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
 
 /// C023 — dedicated food search (suggestions, history, popular keywords).
+const _initialSort = 'distance';
+
 class FoodSearchPage extends StatelessWidget {
   const FoodSearchPage({this.initialQuery = '', super.key});
 
@@ -47,6 +49,7 @@ class FoodSearchPage extends StatelessWidget {
             search: initialQuery.trim(),
             lat: origin.lat,
             lng: origin.lng,
+            sortBy: _initialSort,
           ),
       child: _FoodSearchView(initialQuery: initialQuery),
     );
@@ -67,7 +70,7 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
   late final TextEditingController _query = TextEditingController(
     text: widget.initialQuery,
   );
-  String _sortBy = 'distance';
+  String _sortBy = _initialSort;
   var _history = const <String>[];
   Timer? _debounce;
 
@@ -112,6 +115,8 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
     final position = _scroll.position;
     if (position.maxScrollExtent <= 0) return;
     if (position.pixels < position.maxScrollExtent - 400) return;
+    final q = _query.text.trim().toLowerCase();
+    if (q.isEmpty || q != _serverQuery) return;
     final discovery = context.read<FoodDiscoveryCubit>().state;
     if (discovery is FoodDiscoveryReady && discovery.loadMoreFailed) return;
     context.read<FoodDiscoveryCubit>().loadMore();
@@ -283,19 +288,19 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
                       ),
                       const SizedBox(height: DealGoSpacing.s12),
                     ],
-                    if (q.isNotEmpty && q == _serverQuery)
+                    if (matches.isEmpty)
+                      DealGoStateView(
+                        art: DealGoStateArt.noSearch,
+                        title: l10n.foodSearchEmpty,
+                        compact: true,
+                      )
+                    else if (q.isNotEmpty && q == _serverQuery)
                       FoodFeedFooter(
                         state: discovery is FoodDiscoveryReady
                             ? discovery
                             : null,
                         onRetry: () =>
                             context.read<FoodDiscoveryCubit>().loadMore(),
-                      ),
-                    if (matches.isEmpty)
-                      DealGoStateView(
-                        art: DealGoStateArt.noSearch,
-                        title: l10n.foodSearchEmpty,
-                        compact: true,
                       ),
                   ],
                   const SizedBox(height: DealGoSpacing.s8),

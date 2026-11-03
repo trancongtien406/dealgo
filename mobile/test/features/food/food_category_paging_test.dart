@@ -21,6 +21,25 @@ FakeFoodClient _client() => FakeFoodClient(
   ],
 );
 
+FakeFoodClient _manyNoodles(int count) => FakeFoodClient(
+  stores: [
+    for (var i = 0; i < count; i++)
+      FoodStoreSummary(id: 'n$i', name: 'Quán bún $i', category: 'noodles'),
+  ],
+);
+
+Future<void> _dragUntilPage(
+  WidgetTester tester,
+  Finder list,
+  List<int> pages,
+  int page,
+) async {
+  for (var i = 0; i < 10 && !pages.contains(page); i++) {
+    await tester.drag(list, const Offset(0, -1200));
+    await tester.pumpAndSettle();
+  }
+}
+
 void _tall(WidgetTester tester) {
   tester.view.physicalSize = const Size(1170, 2532);
   tester.view.devicePixelRatio = 3;
@@ -96,5 +115,90 @@ void main() {
 
     expect(food.storeSorts.last, 'rating');
     expect(food.storeSearches.last, 'bún');
+  });
+
+  testWidgets('the category feed loads page 2 with the same filter', (
+    tester,
+  ) async {
+    _tall(tester);
+    final food = _manyNoodles(25);
+
+    await pumpSignedIn(
+      tester,
+      profile: customerProfile,
+      foodClient: food,
+      ratings: FakeRatingRemoteDataSource(),
+      locationOverride: FakeLocationService(),
+    );
+    await _go(tester, '/customer/food/category?category=noodles');
+
+    expect(food.storePages.where((page) => page > 1), isEmpty);
+
+    await _dragUntilPage(
+      tester,
+      find.byType(ListView).first,
+      food.storePages,
+      2,
+    );
+
+    expect(food.storePages, contains(2));
+    expect(food.storeCategories.last, 'noodles');
+    expect(food.storeSorts.last, 'distance');
+    expect(food.storeLimits.last, 20);
+  });
+
+  testWidgets('the search feed loads page 2 with the query intact', (
+    tester,
+  ) async {
+    _tall(tester);
+    final food = _manyNoodles(25);
+
+    await pumpSignedIn(
+      tester,
+      profile: customerProfile,
+      foodClient: food,
+      ratings: FakeRatingRemoteDataSource(),
+      locationOverride: FakeLocationService(),
+    );
+    await _go(tester, '/customer/food/search');
+
+    await tester.enterText(find.byKey(const Key('food-search-field')), 'bún');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    expect(food.storePages.where((page) => page > 1), isEmpty);
+
+    await _dragUntilPage(
+      tester,
+      find.byType(ListView).last,
+      food.storePages,
+      2,
+    );
+
+    expect(food.storePages, contains(2));
+    expect(food.storeSearches.last, 'bún');
+    expect(food.storeSorts.last, 'distance');
+  });
+
+  testWidgets('a query without matches shows the empty state, not a footer', (
+    tester,
+  ) async {
+    _tall(tester);
+    final food = _client();
+
+    await pumpSignedIn(
+      tester,
+      profile: customerProfile,
+      foodClient: food,
+      ratings: FakeRatingRemoteDataSource(),
+      locationOverride: FakeLocationService(),
+    );
+    await _go(tester, '/customer/food/search');
+
+    await tester.enterText(find.byKey(const Key('food-search-field')), 'zzz');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('food-feed-end')), findsNothing);
+    expect(find.byKey(const Key('food-feed-retry')), findsNothing);
   });
 }
