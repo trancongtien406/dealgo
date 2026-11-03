@@ -503,6 +503,7 @@ export class FoodService {
         serviceMode: store.serviceMode,
         openNow: store.openNow,
         closedReason: store.closedReason,
+        closesAtToday: store.closesAtToday,
         imageUrl: store.imageUrl,
         logoUrl: store.logoUrl ?? null,
         rating: {

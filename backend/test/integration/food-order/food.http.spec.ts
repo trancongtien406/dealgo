@@ -215,6 +215,18 @@ describe('food order http', () => {
       total: expect.any(Number),
     });
     expect(Array.isArray(page.body.data.items)).toBe(true);
+    for (const store of page.body.data.items as {
+      openNow: boolean;
+      closesAtToday: string | null;
+    }[]) {
+      expect(store).toHaveProperty('closesAtToday');
+      if (store.closesAtToday !== null) {
+        expect(store.closesAtToday).toMatch(/^\d{2}:\d{2}$/);
+      }
+      if (!store.openNow) {
+        expect(store.closesAtToday).toBeNull();
+      }
+    }
     expect(page.body.data.items[0]).toMatchObject({
       id: expect.any(String),
       name: 'Bún Bò Huế',
@@ -247,6 +259,12 @@ describe('food order http', () => {
       .query({ lat: 10.77 })
       .set('Authorization', `Bearer ${customer.token}`)
       .expect(400);
+
+    const detail = await request(app.getHttpServer())
+      .get(`/v1/food/stores/${page.body.data.items[0].id}`)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    expect(detail.body.data).toHaveProperty('closesAtToday');
   });
 
   it('quotes the delivery fare that placement charges', async () => {
@@ -1779,6 +1797,7 @@ describe('food order http', () => {
     expect(listed[index]).toMatchObject({
       openNow: false,
       closedReason: 'CLOSED',
+      closesAtToday: null,
     });
     // Sorted by name it would be first; closed stores go after every open one.
     expect(listed.slice(0, index).every((entry) => entry.openNow)).toBe(true);
@@ -1801,6 +1820,7 @@ describe('food order http', () => {
       lastOrderMinutes: 0,
     }).expect(200);
     expect(holiday.body.data.openNow).toBe(false);
+    expect(holiday.body.data.closesAtToday).toBeNull();
 
     const open = await hours({
       weekly: allDays.map((weekday) => ({
@@ -1812,6 +1832,17 @@ describe('food order http', () => {
       lastOrderMinutes: 0,
     }).expect(200);
     expect(open.body.data).toMatchObject({ openNow: true, closedReason: null });
+    expect(open.body.data.closesAtToday).toBe('00:00');
+    const openList = await request(app.getHttpServer())
+      .get('/v1/food/stores')
+      .query({ search: 'Aaa Giờ Mở Cửa', limit: 5 })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    expect(openList.body.data.items[0]).toMatchObject({
+      id: store.id,
+      openNow: true,
+      closesAtToday: '00:00',
+    });
     const accepted = await place(
       customer.token,
       'idem-food-hours-2',

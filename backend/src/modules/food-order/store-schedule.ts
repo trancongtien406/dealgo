@@ -99,6 +99,34 @@ export function withinSchedule(schedule: StoreSchedule, now: Date): boolean {
   );
 }
 
+/**
+ * Closing time (HH:mm, Vietnam local) of the shift that is taking orders right now.
+ * Null when the store has no hours, is closed, or is closed for the whole day — a
+ * card must never print "Mở đến …" for a store that is not open.
+ */
+export function closesAtToday(
+  schedule: StoreSchedule,
+  now: Date = new Date(),
+): string | null {
+  const today = vnClock(now);
+  const yesterday = vnClock(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+  const closedOn = (date: string) =>
+    schedule.closures.some((closure) => closure.date === date);
+  if (closedOn(today.date) || (schedule.hoursConfigured && !withinSchedule(schedule, now))) {
+    return null;
+  }
+  const shift = schedule.hours.find(
+    (row) =>
+      (row.weekday === today.weekday &&
+        row.opensMinute <= today.minute &&
+        today.minute < shiftOrderEnd(row, schedule.lastOrderMinutes)) ||
+      (row.weekday === yesterday.weekday &&
+        isOvernight(row) &&
+        today.minute + 1440 < shiftOrderEnd(row, schedule.lastOrderMinutes)),
+  );
+  return shift ? formatClock(shift.closesMinute % 1440) : null;
+}
+
 export function storeAvailability(
   mode: StoreServiceMode | null | undefined,
   until: Date | null | undefined,

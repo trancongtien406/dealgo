@@ -38,6 +38,8 @@ import {
   type StoreAcceptMode,
 } from './store-accept.js';
 import {
+  closesAtToday,
+  formatClock,
   scheduleView,
   storeAvailability,
   vnClock,
@@ -308,6 +310,7 @@ export class PrismaFoodRepository implements FoodRepository {
         serviceMode: StoreServiceMode;
         serviceModeUntil: Date | null;
         open_now: boolean;
+        closes_minute: number | null;
         distance_km: number | null;
         imageUrl: string | null;
         logoUrl: string | null;
@@ -329,6 +332,7 @@ export class PrismaFoodRepository implements FoodRepository {
         s."serviceMode"::text AS "serviceMode",
         s."serviceModeUntil",
         ${openSql} AS open_now,
+        shift_today.closes_minute,
         ${distanceSql} AS distance_km,
         COALESCE(s."coverUrl", cover."imageUrl") AS "imageUrl",
         s."logoUrl",
@@ -352,6 +356,13 @@ export class PrismaFoodRepository implements FoodRepository {
         ORDER BY i."available" DESC, i."id" ASC
         LIMIT 1
       ) cover ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT h."closesMinute" AS closes_minute
+        FROM "food_store_hours" h
+        WHERE h."storeId" = s."id"
+          AND ${takingOrdersShiftSql(now)}
+        LIMIT 1
+      ) shift_today ON TRUE
       WHERE ${whereSql}
       ORDER BY open_now DESC, ${orderSql}
       LIMIT ${query.limit}
@@ -382,6 +393,10 @@ export class PrismaFoodRepository implements FoodRepository {
             : mode === 'PAUSED'
               ? 'PAUSED'
               : 'CLOSED',
+          closesAtToday:
+            row.open_now && row.closes_minute !== null
+              ? formatClock(row.closes_minute % 1440)
+              : null,
           imageUrl: row.imageUrl,
           logoUrl: row.logoUrl,
           minOrderVnd: Number(row.minOrderVnd ?? 0),
@@ -3442,34 +3457,43 @@ function scheduleFromRow(store: {
 /** SQL twin of storeAvailability().openNow for list ordering (DEC-PROD-027/029). */
 function openNowSql(now: Date): Prisma.Sql {
   const today = vnClock(now);
-  const yesterday = vnClock(new Date(now.getTime() - 24 * 60 * 60 * 1000));
-  const closedOn = (date: string) => Prisma.sql`EXISTS (
-      SELECT 1 FROM "food_store_closures" c
-      WHERE c."storeId" = s."id" AND c."date" = ${date}::date
-    )`;
   return Prisma.sql`(
     NOT (s."serviceMode" = 'PAUSED' AND (s."serviceModeUntil" IS NULL OR s."serviceModeUntil" > ${now}))
     AND (
-      (NOT s."hoursConfigured" AND NOT ${closedOn(today.date)})
+      (NOT s."hoursConfigured" AND NOT ${storeClosedOn(today.date)})
       OR (s."hoursConfigured" AND EXISTS (
         SELECT 1 FROM "food_store_hours" h
         WHERE h."storeId" = s."id"
-          AND (
-            (
-              h."weekday" = ${today.weekday}
-              AND NOT ${closedOn(today.date)}
-              AND h."opensMinute" <= ${today.minute}
-              AND ${today.minute} < (CASE WHEN h."closesMinute" < h."opensMinute"
-                THEN h."closesMinute" + 1440 ELSE h."closesMinute" END) - s."lastOrderMinutes"
-            )
-            OR (
-              h."weekday" = ${yesterday.weekday}
-              AND h."closesMinute" < h."opensMinute"
-              AND NOT ${closedOn(yesterday.date)}
-              AND ${today.minute + 1440} < h."closesMinute" + 1440 - s."lastOrderMinutes"
-            )
-          )
+          AND ${takingOrdersShiftSql(now)}
       ))
+    )
+  )`;
+}
+
+function storeClosedOn(date: string): Prisma.Sql {
+  return Prisma.sql`EXISTS (
+      SELECT 1 FROM "food_store_closures" c
+      WHERE c."storeId" = s."id" AND c."date" = ${date}::date
+    )`;
+}
+
+/** The weekly shift taking orders at `now`; SQL twin of the closesAtToday() lookup. */
+function takingOrdersShiftSql(now: Date): Prisma.Sql {
+  const today = vnClock(now);
+  const yesterday = vnClock(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+  return Prisma.sql`(
+    (
+      h."weekday" = ${today.weekday}
+      AND NOT ${storeClosedOn(today.date)}
+      AND h."opensMinute" <= ${today.minute}
+      AND ${today.minute} < (CASE WHEN h."closesMinute" < h."opensMinute"
+        THEN h."closesMinute" + 1440 ELSE h."closesMinute" END) - s."lastOrderMinutes"
+    )
+    OR (
+      h."weekday" = ${yesterday.weekday}
+      AND h."closesMinute" < h."opensMinute"
+      AND NOT ${storeClosedOn(yesterday.date)}
+      AND ${today.minute + 1440} < h."closesMinute" + 1440 - s."lastOrderMinutes"
     )
   )`;
 }
@@ -3518,10 +3542,18 @@ function toStoreDetail(store: {
   items: ItemRow[];
 }): StoreDetail {
   const schedule = scheduleFromRow(store);
+  const now = new Date();
+  const availability = storeAvailability(
+    store.serviceMode,
+    store.serviceModeUntil,
+    schedule,
+    now,
+  );
   return {
     ...acceptFromRow(store),
     ...effectiveServiceMode(store.serviceMode, store.serviceModeUntil),
-    ...storeAvailability(store.serviceMode, store.serviceModeUntil, schedule),
+    ...availability,
+    closesAtToday: availability.openNow ? closesAtToday(schedule, now) : null,
     schedule: scheduleView(schedule),
     id: store.id,
     name: store.name,

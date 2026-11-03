@@ -1,4 +1,10 @@
-import { normalizeSchedule, storeAvailability, vnClock, withinSchedule } from './store-schedule.js';
+import {
+  closesAtToday,
+  normalizeSchedule,
+  storeAvailability,
+  vnClock,
+  withinSchedule,
+} from './store-schedule.js';
 
 const weekdays = (opensAt: string, closesAt: string) =>
   [1, 2, 3, 4, 5, 6].map((weekday) => ({ weekday, opensAt, closesAt }));
@@ -90,5 +96,54 @@ describe('store schedule (DEC-PROD-027)', () => {
     const satOff = { ...schedule, closures: [{ date: '2026-10-24', note: null }] };
     expect(withinSchedule(satOff, new Date('2026-10-23T17:10:00.000Z'))).toBe(true); // Friday's shift
     expect(withinSchedule(satOff, new Date('2026-10-24T03:00:00.000Z'))).toBe(false);
+  });
+});
+
+describe('closesAtToday (DEC-PROD-027)', () => {
+  const weekday = 1; // Monday
+  const mondayTen = new Date('2026-11-02T03:00:00.000Z'); // 10:00 Vietnam
+
+  it('returns the closing time of the shift taking orders', () => {
+    const schedule = {
+      hoursConfigured: true,
+      lastOrderMinutes: 30,
+      hours: [{ weekday, opensMinute: 8 * 60, closesMinute: 22 * 60 }],
+      closures: [],
+    };
+    expect(closesAtToday(schedule, mondayTen)).toBe('22:00');
+  });
+
+  it('returns null without hours, when closed, or on a closure date', () => {
+    const alwaysOpen = { hoursConfigured: false, lastOrderMinutes: 0, hours: [], closures: [] };
+    expect(closesAtToday(alwaysOpen, mondayTen)).toBeNull();
+    expect(
+      closesAtToday(
+        { hoursConfigured: true, lastOrderMinutes: 0, hours: [], closures: [] },
+        mondayTen,
+      ),
+    ).toBeNull();
+    expect(
+      closesAtToday(
+        {
+          hoursConfigured: true,
+          lastOrderMinutes: 0,
+          hours: [{ weekday, opensMinute: 8 * 60, closesMinute: 22 * 60 }],
+          closures: [{ date: '2026-11-02', note: null }],
+        },
+        mondayTen,
+      ),
+    ).toBeNull();
+  });
+
+  it('reports the next morning for an overnight shift', () => {
+    const schedule = {
+      hoursConfigured: true,
+      lastOrderMinutes: 0,
+      hours: [{ weekday, opensMinute: 18 * 60, closesMinute: 2 * 60 }],
+      closures: [],
+    };
+    // 2026-11-02T18:00Z = 01:00 Tuesday Vietnam, inside Monday's 18:00–02:00 shift.
+    const mondayLate = new Date('2026-11-02T18:00:00.000Z');
+    expect(closesAtToday(schedule, mondayLate)).toBe('02:00');
   });
 });

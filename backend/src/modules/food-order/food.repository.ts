@@ -31,6 +31,7 @@ import {
 } from './store-service-mode.js';
 import {
   ALWAYS_OPEN,
+  closesAtToday,
   scheduleView,
   storeAvailability,
   type StoreAvailability,
@@ -105,6 +106,8 @@ export type StoreBrowseItem = StoreListItem &
     createdAt: Date;
     distanceKm: number | null;
     serviceMode: StoreServiceMode;
+    /** Closing time (HH:mm) of the shift taking orders now; null when not open (DEC-PROD-027). */
+    closesAtToday: string | null;
     /** Cover thumb: first available menu item imageUrl (DEC-PROD-041). */
     imageUrl: string | null;
     /** Default prep + BUSY extra right now. */
@@ -215,6 +218,8 @@ export type StoreDetail = StoreListItem &
   StoreAvailability & {
     /** M023 weekly hours / closed days / cut-off (DEC-PROD-027). */
     schedule: StoreScheduleView;
+    /** Closing time (HH:mm) of the shift taking orders now; null when not open (DEC-PROD-027). */
+    closesAtToday: string | null;
     /** M022 intake settings (DEC-PROD-028); stripped from the customer payload. */
     acceptSettings: StoreAcceptSettings;
     /** Default prep + BUSY extra right now; what customers see as the kitchen time. */
@@ -1031,6 +1036,16 @@ function memoryAvailability(
     now,
   );
 }
+
+function closesAtTodayWhenOpen(
+  store: StoredStore,
+  availability: StoreAvailability,
+  now: Date,
+): string | null {
+  return availability.openNow
+    ? closesAtToday(store.schedule ?? ALWAYS_OPEN, now)
+    : null;
+}
 type StoredItem = Omit<StoreItemView, 'addedAt' | 'originalPriceVnd'> & {
   originalPriceVnd?: number | null;
   storeId: string;
@@ -1240,21 +1255,25 @@ export class MemoryFoodRepository implements FoodRepository {
 
     const total = filtered.length;
     const start = pageOffset(query.page, query.limit);
-    const items = filtered.slice(start, start + query.limit).map((entry) => ({
-      ...toStoreListItem(entry.store),
-      ...open.get(entry.store.id)!,
-      serviceMode: effectiveServiceMode(
-        entry.store.serviceMode,
-        entry.store.serviceModeUntil,
-      ).serviceMode,
-      createdAt: entry.store.createdAt,
-      distanceKm: entry.distanceKm,
-      imageUrl:
-        entry.store.coverUrl ?? coverImageForStore(this.items, entry.store.id),
-      estimatedPrepMinutes: memoryAccept(entry.store).estimatedPrepMinutes,
-      ratingAverage: null,
-      ratingCount: 0,
-    }));
+    const items = filtered.slice(start, start + query.limit).map((entry) => {
+      const availability = open.get(entry.store.id)!;
+      return {
+        ...toStoreListItem(entry.store),
+        ...availability,
+        closesAtToday: closesAtTodayWhenOpen(entry.store, availability, now),
+        serviceMode: effectiveServiceMode(
+          entry.store.serviceMode,
+          entry.store.serviceModeUntil,
+        ).serviceMode,
+        createdAt: entry.store.createdAt,
+        distanceKm: entry.distanceKm,
+        imageUrl:
+          entry.store.coverUrl ?? coverImageForStore(this.items, entry.store.id),
+        estimatedPrepMinutes: memoryAccept(entry.store).estimatedPrepMinutes,
+        ratingAverage: null,
+        ratingCount: 0,
+      };
+    });
     return { items, total };
   }
 
@@ -1342,10 +1361,13 @@ export class MemoryFoodRepository implements FoodRepository {
     if (!store) {
       return null;
     }
+    const now = new Date();
+    const availability = memoryAvailability(store, now);
     return {
       ...toStoreListItem(store),
       ...effectiveServiceMode(store.serviceMode, store.serviceModeUntil),
-      ...memoryAvailability(store),
+      ...availability,
+      closesAtToday: closesAtTodayWhenOpen(store, availability, now),
       schedule: scheduleView(store.schedule ?? ALWAYS_OPEN),
       ...memoryAccept(store),
       addressLabel: store.addressLabel ?? null,
@@ -1718,6 +1740,7 @@ export class MemoryFoodRepository implements FoodRepository {
       serviceModeUntil: null,
       openNow: true,
       closedReason: null,
+      closesAtToday: null,
       schedule: scheduleView(ALWAYS_OPEN),
       ...memoryAccept({
         id: storeId,
