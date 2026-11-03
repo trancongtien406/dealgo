@@ -99,6 +99,17 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
     );
   }
 
+  /// Empty results blame distance only when distance can explain them: the
+  /// load had no GPS fix, or the unfiltered nearby feed found nothing at all.
+  String _emptyTitle(AppLocalizations l10n, FoodDiscoveryState discovery) {
+    final ready = discovery is FoodDiscoveryReady ? discovery : null;
+    final outOfArea =
+        ready != null && (!ready.hasLocation || widget.categoryCode == null);
+    return outOfArea
+        ? l10n.foodEmptyOutOfArea
+        : l10n.foodEmptyNoStoresInCategory;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -243,7 +254,7 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
                     DealGoStateView(
                       key: const Key('food-category-empty'),
                       art: DealGoStateArt.noSearch,
-                      title: l10n.foodCategoryEmpty,
+                      title: _emptyTitle(l10n, discovery),
                       compact: true,
                     )
                   else

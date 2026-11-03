@@ -24,9 +24,14 @@ final class FoodDiscoveryReady extends FoodDiscoveryState {
     this.hasMore = false,
     this.total = 0,
     this.loadMoreFailed = false,
+    this.hasLocation = true,
   });
 
   final List<FoodStoreSummary> stores;
+
+  /// Whether the load sent a GPS fix, so an empty list can be blamed on
+  /// distance; without a fix the server browses a zero-radius area.
+  final bool hasLocation;
 
   /// Real store ratings by store id; empty until loaded (or if unavailable).
   final Map<String, StoreRating> ratings;
@@ -54,6 +59,7 @@ final class FoodDiscoveryReady extends FoodDiscoveryState {
     bool? hasMore,
     int? total,
     bool? loadMoreFailed,
+    bool? hasLocation,
   }) {
     return FoodDiscoveryReady(
       stores ?? this.stores,
@@ -63,6 +69,7 @@ final class FoodDiscoveryReady extends FoodDiscoveryState {
       hasMore: hasMore ?? this.hasMore,
       total: total ?? this.total,
       loadMoreFailed: loadMoreFailed ?? this.loadMoreFailed,
+      hasLocation: hasLocation ?? this.hasLocation,
     );
   }
 }
@@ -152,6 +159,7 @@ class FoodDiscoveryCubit extends Cubit<FoodDiscoveryState> {
           List.unmodifiable(page.items),
           total: page.total,
           hasMore: page.hasMore,
+          hasLocation: fix != null,
         ),
       );
       await _loadRatings(token, generation);
@@ -204,6 +212,7 @@ class FoodDiscoveryCubit extends Cubit<FoodDiscoveryState> {
           ratings: current.ratings,
           total: page.total,
           hasMore: page.hasMore,
+          hasLocation: current.hasLocation,
         ),
       );
       await _loadRatings(token, generation);

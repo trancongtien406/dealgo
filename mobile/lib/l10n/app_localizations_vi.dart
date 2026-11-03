@@ -3125,6 +3125,12 @@ class AppLocalizationsVi extends AppLocalizations {
   String get foodCategoryEmpty => 'Chưa có quán thuộc danh mục này.';
 
   @override
+  String get foodEmptyNoStoresInCategory => 'Chưa có quán trong danh mục này';
+
+  @override
+  String get foodEmptyOutOfArea => 'DealGo chưa giao tới khu vực này';
+
+  @override
   String get foodStoreTitle => 'Chi tiết quán';
 
   @override
@@ -6852,6 +6858,11 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String foodStoreFeeFrom(String fee) {
     return 'Phí giao từ $fee';
+  }
+
+  @override
+  String foodStoreOpenUntil(String time) {
+    return 'Mở đến $time';
   }
 
   @override

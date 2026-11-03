@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/design_system/tokens/dealgo_type_scale.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../driver_card/presentation/driver_card_tile.dart';
 import '../../../rating/domain/service_rating.dart';
@@ -154,6 +155,45 @@ class StoreOfferBadge extends StatelessWidget {
   }
 }
 
+/// Hero trust strip: "Mở đến 22:00 · Phí giao từ 15.000 ₫".
+///
+/// Every item needs server data, so a missing one is skipped and the strip is
+/// gone when both are missing. No verified badge: the API exposes no public
+/// KYB flag to back one.
+class StoreTrustStrip extends StatelessWidget {
+  const StoreTrustStrip({this.closesAtToday, this.feeFromVnd, super.key});
+
+  /// Closing time (`HH:mm`) of the shift taking orders now; null when the store
+  /// is closed or has no hours. Never derived on the client.
+  final String? closesAtToday;
+
+  /// "From" delivery fee quoted by the server; null when there is none.
+  final int? feeFromVnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final closesAt = closesAtToday;
+    final fee = feeFromVnd;
+    if (closesAt == null && fee == null) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context);
+    final items = [
+      if (closesAt != null) l10n.foodStoreOpenUntil(closesAt),
+      if (fee != null)
+        fee == 0
+            ? l10n.foodStoreFeeFree
+            : l10n.foodStoreFeeFrom(formatVnd(fee)),
+    ];
+    return Padding(
+      padding: const EdgeInsets.only(top: DealGoSpacing.s8),
+      child: Text(
+        items.join(' · '),
+        key: const Key('store-trust-strip'),
+        style: DealGoType.meta(Theme.of(context).textTheme),
+      ),
+    );
+  }
+}
+
 /// Lines under a store name: closed label · rating · category · distance,
 /// then ETA and the "from" delivery fee — each only when real. Text wraps
 /// instead of truncating.
@@ -181,8 +221,13 @@ class FoodMetaLine extends StatelessWidget {
     };
     final eta = store.etaMinutes;
     final fee = store.deliveryFeeFromVnd;
-    final hasFirst =
+    final closesAt = store.closesAtToday;
+    final openUntil = closesAt == null
+        ? null
+        : l10n.foodStoreOpenUntil(closesAt);
+    final hasOtherFirst =
         ratingText != null || rest.isNotEmpty || closedLabel != null;
+    final hasFirst = hasOtherFirst || openUntil != null;
     if (!hasFirst && eta == null && fee == null) {
       return const SizedBox.shrink();
     }
@@ -216,6 +261,17 @@ class FoodMetaLine extends StatelessWidget {
             if (rest.isNotEmpty) const TextSpan(text: ' · '),
           ],
           TextSpan(text: rest.join(' · ')),
+          if (openUntil != null) ...[
+            if (hasOtherFirst) const TextSpan(text: ' · '),
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: Text(
+                openUntil,
+                key: Key('store-open-until-${store.id}'),
+                style: DealGoType.meta(Theme.of(context).textTheme),
+              ),
+            ),
+          ],
         ],
       ),
       key: Key('store-meta-${store.id}'),

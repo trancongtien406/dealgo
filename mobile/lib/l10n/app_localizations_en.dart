@@ -3147,6 +3147,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get foodCategoryEmpty => 'No restaurants in this category yet.';
 
   @override
+  String get foodEmptyNoStoresInCategory => 'No stores in this category yet';
+
+  @override
+  String get foodEmptyOutOfArea => 'DealGo does not deliver here yet';
+
+  @override
   String get foodStoreTitle => 'Store details';
 
   @override
@@ -6888,6 +6894,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String foodStoreFeeFrom(String fee) {
     return 'Delivery from $fee';
+  }
+
+  @override
+  String foodStoreOpenUntil(String time) {
+    return 'Open until $time';
   }
 
   @override

@@ -6002,6 +6002,18 @@ abstract class AppLocalizations {
   /// **'No restaurants in this category yet.'**
   String get foodCategoryEmpty;
 
+  /// No description provided for @foodEmptyNoStoresInCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'No stores in this category yet'**
+  String get foodEmptyNoStoresInCategory;
+
+  /// No description provided for @foodEmptyOutOfArea.
+  ///
+  /// In en, this message translates to:
+  /// **'DealGo does not deliver here yet'**
+  String get foodEmptyOutOfArea;
+
   /// No description provided for @foodStoreTitle.
   ///
   /// In en, this message translates to:
@@ -12811,6 +12823,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delivery from {fee}'**
   String foodStoreFeeFrom(String fee);
+
+  /// No description provided for @foodStoreOpenUntil.
+  ///
+  /// In en, this message translates to:
+  /// **'Open until {time}'**
+  String foodStoreOpenUntil(String time);
 
   /// No description provided for @foodOffersNearTitle.
   ///

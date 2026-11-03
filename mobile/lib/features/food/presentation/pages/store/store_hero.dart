@@ -15,37 +15,43 @@ class _Hero extends StatelessWidget {
     final cover =
         store.coverUrl ?? (gallery.isNotEmpty ? gallery.first : store.logoUrl);
     final logo = resolveMediaUrl(store.logoUrl);
-    return Stack(
-      clipBehavior: Clip.none,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        FoodCoverImage(
-          key: const Key('food-store-cover'),
-          imageUrl: cover,
-          aspectRatio: 2,
-          placeholderAsset: foodStoreCoverImage,
-        ),
-        if (logo != null && logo.isNotEmpty)
-          Positioned(
-            left: DealGoSpacing.s12,
-            bottom: DealGoSpacing.s12,
-            child: Container(
-              key: const Key('food-store-logo'),
-              width: 56,
-              height: 56,
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                color: DealGoColors.card,
-                borderRadius: BorderRadius.circular(DealGoRadius.input),
-                border: Border.all(color: Colors.white, width: 2),
-                boxShadow: DealGoShadows.card,
-              ),
-              child: DealGoNetworkImage(
-                logo,
-                fit: BoxFit.cover,
-                fallback: const SizedBox.shrink(),
-              ),
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            FoodCoverImage(
+              key: const Key('food-store-cover'),
+              imageUrl: cover,
+              aspectRatio: 2,
+              placeholderAsset: foodStoreCoverImage,
             ),
-          ),
+            if (logo != null && logo.isNotEmpty)
+              Positioned(
+                left: DealGoSpacing.s12,
+                bottom: DealGoSpacing.s12,
+                child: Container(
+                  key: const Key('food-store-logo'),
+                  width: 56,
+                  height: 56,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: DealGoColors.card,
+                    borderRadius: BorderRadius.circular(DealGoRadius.input),
+                    border: Border.all(color: Colors.white, width: 2),
+                    boxShadow: DealGoShadows.card,
+                  ),
+                  child: DealGoNetworkImage(
+                    logo,
+                    fit: BoxFit.cover,
+                    fallback: const SizedBox.shrink(),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        StoreTrustStrip(closesAtToday: store.closesAtToday),
       ],
     );
   }

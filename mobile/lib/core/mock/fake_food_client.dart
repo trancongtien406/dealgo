@@ -1024,6 +1024,7 @@ FoodStoreSummary storeSummary({
   int? deliveryFeeFromVnd,
   StoreClosedReason? closedReason,
   List<FoodFeaturedItem> featuredItems = const [],
+  String? closesAtToday,
 }) {
   return FoodStoreSummary(
     id: id,
@@ -1034,5 +1035,6 @@ FoodStoreSummary storeSummary({
     deliveryFeeFromVnd: deliveryFeeFromVnd,
     closedReason: closedReason,
     featuredItems: featuredItems,
+    closesAtToday: closesAtToday,
   );
 }
