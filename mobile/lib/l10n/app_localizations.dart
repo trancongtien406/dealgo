@@ -5996,12 +5996,6 @@ abstract class AppLocalizations {
   /// **'See all →'**
   String get foodSeeAll;
 
-  /// No description provided for @foodCategoryEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'No restaurants in this category yet.'**
-  String get foodCategoryEmpty;
-
   /// No description provided for @foodEmptyNoStoresInCategory.
   ///
   /// In en, this message translates to:

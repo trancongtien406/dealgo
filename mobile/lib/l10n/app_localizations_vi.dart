@@ -3122,9 +3122,6 @@ class AppLocalizationsVi extends AppLocalizations {
   String get foodSeeAll => 'Xem tất cả →';
 
   @override
-  String get foodCategoryEmpty => 'Chưa có quán thuộc danh mục này.';
-
-  @override
   String get foodEmptyNoStoresInCategory => 'Chưa có quán trong danh mục này';
 
   @override

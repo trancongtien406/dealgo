@@ -62,6 +62,9 @@ class FakeFoodClient implements FoodClient {
   final List<PlaceFoodRequest> placeCalls = [];
   final List<String> storeReads = [];
 
+  /// One entry per getStore call: whether customer coordinates were sent.
+  final List<bool> storeReadGeo = [];
+
   /// One entry per listStores call: the server search text sent (or null).
   final List<String?> storeSearches = [];
 
@@ -441,8 +444,14 @@ class FakeFoodClient implements FoodClient {
   }
 
   @override
-  Future<FoodStoreDetail> getStore(String accessToken, String storeId) async {
+  Future<FoodStoreDetail> getStore(
+    String accessToken,
+    String storeId, {
+    double? lat,
+    double? lng,
+  }) async {
     storeReads.add(storeId);
+    storeReadGeo.add(lat != null && lng != null);
     final detail = details[storeId];
     if (detail == null) {
       throw const ApiException(

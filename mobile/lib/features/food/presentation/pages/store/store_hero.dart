@@ -51,7 +51,10 @@ class _Hero extends StatelessWidget {
               ),
           ],
         ),
-        StoreTrustStrip(closesAtToday: store.closesAtToday),
+        StoreTrustStrip(
+          closesAtToday: store.closesAtToday,
+          feeFromVnd: store.deliveryFeeFromVnd,
+        ),
       ],
     );
   }

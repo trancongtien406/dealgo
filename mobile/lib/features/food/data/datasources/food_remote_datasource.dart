@@ -102,7 +102,14 @@ abstract interface class FoodRemoteDataSource {
     List<String> exclude = const [],
   });
 
-  Future<FoodStoreDetail> getStore(String accessToken, String storeId);
+  /// [lat]/[lng] are the customer position, so the server can quote the
+  /// "from" delivery fee exactly as it does on the browse card.
+  Future<FoodStoreDetail> getStore(
+    String accessToken,
+    String storeId, {
+    double? lat,
+    double? lng,
+  });
 
   /// Owner-scoped catalog (`GET /v1/food/merchant/catalog`).
   Future<FoodStoreDetail> getMerchantCatalog(String accessToken);

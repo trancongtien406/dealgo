@@ -3144,9 +3144,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get foodSeeAll => 'See all →';
 
   @override
-  String get foodCategoryEmpty => 'No restaurants in this category yet.';
-
-  @override
   String get foodEmptyNoStoresInCategory => 'No stores in this category yet';
 
   @override

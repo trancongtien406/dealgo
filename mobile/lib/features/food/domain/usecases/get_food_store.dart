@@ -8,6 +8,11 @@ class GetFoodStore {
   final FoodRepository _repository;
 
   Future<FoodStoreDetail> call(GetFoodStoreParams params) {
-    return _repository.getStore(params.accessToken, params.storeId);
+    return _repository.getStore(
+      params.accessToken,
+      params.storeId,
+      lat: params.lat,
+      lng: params.lng,
+    );
   }
 }

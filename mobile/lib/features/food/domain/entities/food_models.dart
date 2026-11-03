@@ -491,11 +491,16 @@ class FoodStoreDetail {
     this.menuSections = const [],
     this.minOrderVnd = 0,
     this.closesAtToday,
+    this.deliveryFeeFromVnd,
   });
 
   /// Closing time (`HH:mm`) of the shift taking orders now; null when closed
   /// or when the store has no hours (DEC-PROD-027).
   final String? closesAtToday;
+
+  /// Straight-line "from" delivery fee quoted at the request's customer
+  /// position; null without one or without store coordinates.
+  final int? deliveryFeeFromVnd;
 
   /// Smallest food subtotal the store accepts; 0 = no minimum.
   final int minOrderVnd;
@@ -589,6 +594,7 @@ class FoodStoreDetail {
       menuSections: menuSections,
       minOrderVnd: minOrderVnd ?? this.minOrderVnd,
       closesAtToday: closesAtToday,
+      deliveryFeeFromVnd: deliveryFeeFromVnd,
       serviceMode: serviceMode ?? this.serviceMode,
       serviceModeUntil: clearServiceModeUntil
           ? null

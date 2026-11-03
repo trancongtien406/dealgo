@@ -1391,7 +1391,6 @@
   },
   "foodSearchGroups": "Categories",
   "foodSeeAll": "See all →",
-  "foodCategoryEmpty": "No restaurants in this category yet.",
   "foodEmptyNoStoresInCategory": "No stores in this category yet",
   "foodEmptyOutOfArea": "DealGo does not deliver here yet",
   "foodStoreTitle": "Store details",

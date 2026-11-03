@@ -12,9 +12,16 @@ class FoodStoreCubit extends Cubit<int> {
   Future<FoodStoreDetail> load({
     required String accessToken,
     required String storeId,
+    double? lat,
+    double? lng,
   }) {
     return _getFoodStore(
-      GetFoodStoreParams(accessToken: accessToken, storeId: storeId),
+      GetFoodStoreParams(
+        accessToken: accessToken,
+        storeId: storeId,
+        lat: lat,
+        lng: lng,
+      ),
     );
   }
 }

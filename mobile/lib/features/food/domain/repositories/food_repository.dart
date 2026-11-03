@@ -32,7 +32,12 @@ abstract interface class FoodRepository {
     List<String> exclude = const [],
   });
 
-  Future<FoodStoreDetail> getStore(String accessToken, String storeId);
+  Future<FoodStoreDetail> getStore(
+    String accessToken,
+    String storeId, {
+    double? lat,
+    double? lng,
+  });
 
   Future<PlacedFoodOrder> placeOrder(PlaceFoodOrderParams request);
 

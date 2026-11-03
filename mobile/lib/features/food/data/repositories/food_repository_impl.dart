@@ -63,8 +63,13 @@ class FoodRepositoryImpl implements FoodRepository {
   }
 
   @override
-  Future<FoodStoreDetail> getStore(String accessToken, String storeId) {
-    return _remote.getStore(accessToken, storeId);
+  Future<FoodStoreDetail> getStore(
+    String accessToken,
+    String storeId, {
+    double? lat,
+    double? lng,
+  }) {
+    return _remote.getStore(accessToken, storeId, lat: lat, lng: lng);
   }
 
   @override

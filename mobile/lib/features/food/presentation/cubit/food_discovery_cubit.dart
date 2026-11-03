@@ -29,8 +29,9 @@ final class FoodDiscoveryReady extends FoodDiscoveryState {
 
   final List<FoodStoreSummary> stores;
 
-  /// Whether the load sent a GPS fix, so an empty list can be blamed on
-  /// distance; without a fix the server browses a zero-radius area.
+  /// Whether the load had customer coordinates to browse from: the chosen
+  /// drop-off first, else a device fix. Without them the server browses a
+  /// zero-radius area, so an empty list may mean "out of area".
   final bool hasLocation;
 
   /// Real store ratings by store id; empty until loaded (or if unavailable).

@@ -291,10 +291,19 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
   }
 
   @override
-  Future<FoodStoreDetail> getStore(String accessToken, String storeId) {
+  Future<FoodStoreDetail> getStore(
+    String accessToken,
+    String storeId, {
+    double? lat,
+    double? lng,
+  }) {
+    final hasGeo = lat != null && lng != null;
     return _send(
       () => dio.get<Object?>(
         ApiPaths.foodStore(storeId),
+        queryParameters: {
+          if (hasGeo) ...{'lat': lat, 'lng': lng},
+        },
         options: _auth(accessToken),
       ),
       decodeFoodStoreDetail,
@@ -1305,6 +1314,7 @@ FoodStoreDetail decodeFoodStoreDetail(Object? body) {
     menuSections: _decodeMenuSections(data['menuSections']),
     minOrderVnd: _asInt(data['minOrderVnd']) ?? 0,
     closesAtToday: _closesAtToday(data['closesAtToday']),
+    deliveryFeeFromVnd: _asInt(data['deliveryFeeFromVnd']),
   );
 }
 

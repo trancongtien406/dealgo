@@ -134,9 +134,17 @@ class _FoodStorePageState extends State<_FoodStoreView> {
       _failure = null;
     });
     try {
+      // Resolved before the read: the server quotes the hero's "from" fee at
+      // this position, so the origin must travel with the request.
+      final origin = await _customerOrigin();
+      if (!mounted) {
+        return;
+      }
       final store = await context.read<FoodStoreCubit>().load(
         accessToken: token,
         storeId: widget.storeId,
+        lat: origin?.lat,
+        lng: origin?.lng,
       );
       if (!mounted) {
         return;
@@ -146,7 +154,7 @@ class _FoodStorePageState extends State<_FoodStoreView> {
         _loading = false;
       });
       unawaited(_loadReviews(token));
-      unawaited(_locate(store));
+      _locate(store, origin);
     } on ApiException catch (error) {
       if (!mounted) {
         return;
@@ -166,31 +174,34 @@ class _FoodStorePageState extends State<_FoodStoreView> {
     }
   }
 
-  /// Straight-line distance from the chosen delivery address, falling back to
-  /// the device fix when no address has been picked yet.
-  Future<void> _locate(FoodStoreDetail store) async {
+  /// Chosen delivery address first, then the device fix; null when neither is
+  /// available (no distance, no quoted "from" fee).
+  Future<({double lat, double lng})?> _customerOrigin() async {
+    final dropoff = context.read<FoodCartCubit>().state;
+    final dropoffLat = dropoff.dropoffLat;
+    final dropoffLng = dropoff.dropoffLng;
+    if (dropoffLat != null && dropoffLng != null) {
+      return (lat: dropoffLat, lng: dropoffLng);
+    }
+    try {
+      final position = await context
+          .read<LocationService>()
+          .quietPosition()
+          .timeout(const Duration(seconds: 5));
+      if (position == null) return null;
+      return (lat: position.latitude, lng: position.longitude);
+    } on Object {
+      return null;
+    }
+  }
+
+  /// Straight-line distance from [origin] to the store, when both are known.
+  void _locate(FoodStoreDetail store, ({double lat, double lng})? origin) {
     final lat = store.lat;
     final lng = store.lng;
-    if (lat == null || lng == null) return;
-    final dropoff = context.read<FoodCartCubit>().state;
-    var originLat = dropoff.dropoffLat;
-    var originLng = dropoff.dropoffLng;
-    if (originLat == null || originLng == null) {
-      try {
-        final position = await context
-            .read<LocationService>()
-            .quietPosition()
-            .timeout(const Duration(seconds: 5));
-        if (position == null) return;
-        originLat = position.latitude;
-        originLng = position.longitude;
-      } on Object {
-        return;
-      }
-    }
-    if (!mounted) return;
+    if (lat == null || lng == null || origin == null) return;
     final km =
-        Geolocator.distanceBetween(originLat, originLng, lat, lng) / 1000;
+        Geolocator.distanceBetween(origin.lat, origin.lng, lat, lng) / 1000;
     setState(() => _distanceKm = km);
     context.read<FoodCartCubit>().setStoreDistance(widget.storeId, km);
   }
