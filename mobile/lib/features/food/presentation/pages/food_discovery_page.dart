@@ -3,16 +3,17 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/config/api_base_url.dart';
+import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/components/dealgo_haptics.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/design_system/tokens/dealgo_type_scale.dart';
 import '../../../../core/motion/dealgo_motion_widgets.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../home_banner/presentation/home_banner_carousel.dart';
 import '../../../identity/domain/entities/app_role.dart';
 import '../../../identity/presentation/widgets/auth_widgets.dart';
 import '../../../places/presentation/place_picker_page.dart';
-import '../../../ride/presentation/cubit/ride_destination.dart';
 import '../../domain/entities/food_category.dart';
 import '../../domain/entities/food_models.dart';
 import '../../domain/entities/food_money.dart';
@@ -27,6 +28,7 @@ import '../widgets/food_widgets.dart';
 import '../food_categories_store.dart';
 import '../widgets/food_category_tile.dart';
 import '../widgets/food_badges.dart';
+import '../widgets/food_filter_sheet.dart';
 import '../widgets/store_meta.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/l10n/ui_message.dart';
@@ -39,12 +41,13 @@ class FoodDiscoveryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final origin = foodCartOrigin(context);
     return BlocProvider(
       create: (context) => FoodDiscoveryCubit(
         listFoodStores: context.read<ListFoodStores>(),
         ratings: context.read<RatingRepository>(),
         location: context.read<LocationService>(),
-      )..load(currentAccessToken(context)),
+      )..load(currentAccessToken(context), lat: origin.lat, lng: origin.lng),
       child: const _FoodDiscoveryView(),
     );
   }
@@ -60,7 +63,7 @@ class _FoodDiscoveryView extends StatefulWidget {
 class _FoodDiscoveryViewState extends State<_FoodDiscoveryView> {
   final ScrollController _scroll = ScrollController();
   final GlobalKey _storesKey = GlobalKey();
-  String? _category;
+  var _filters = const FoodFilters();
 
   @override
   void dispose() {
@@ -69,7 +72,36 @@ class _FoodDiscoveryViewState extends State<_FoodDiscoveryView> {
   }
 
   void _reload() {
-    context.read<FoodDiscoveryCubit>().load(currentAccessToken(context));
+    final origin = foodCartOrigin(context);
+    context.read<FoodDiscoveryCubit>().load(
+      currentAccessToken(context),
+      lat: origin.lat,
+      lng: origin.lng,
+      sortBy: _filters.sortBy,
+      maxKm: _filters.maxKm,
+    );
+  }
+
+  Future<void> _pickAddress() async {
+    final place = await pickPlace(context, PlacePickPurpose.delivery);
+    if (place == null || !mounted) {
+      return;
+    }
+    context.read<FoodCartCubit>().setDropoff(
+      label: place.label,
+      lat: place.lat,
+      lng: place.lng,
+    );
+    _reload();
+  }
+
+  Future<void> _openFilters() async {
+    final next = await showFoodFilterSheet(context: context, current: _filters);
+    if (next == null || !mounted || next == _filters) {
+      return;
+    }
+    setState(() => _filters = next);
+    _reload();
   }
 
   void _openStore(FoodStoreSummary store) {
@@ -94,10 +126,16 @@ class _FoodDiscoveryViewState extends State<_FoodDiscoveryView> {
   @override
   Widget build(BuildContext context) {
     final discovery = context.watch<FoodDiscoveryCubit>().state;
-    final stores = switch (discovery) {
+    final allStores = switch (discovery) {
       FoodDiscoveryReady(:final stores) => stores,
       _ => const <FoodStoreSummary>[],
     };
+    final stores = [
+      for (final store in allStores)
+        if ((!_filters.openNow || store.openNow) &&
+            (!_filters.offersOnly || store.offers.isNotEmpty))
+          store,
+    ];
     final fetched = switch (discovery) {
       FoodDiscoveryReady(:final ratings) => ratings,
       _ => const <String, StoreRating>{},
@@ -126,6 +164,8 @@ class _FoodDiscoveryViewState extends State<_FoodDiscoveryView> {
         if (dish.item.isNew) dish,
     ];
     final loading = discovery is FoodDiscoveryLoading;
+    final refreshing =
+        discovery is FoodDiscoveryReady && discovery.isRefreshing;
     final error = discovery is FoodDiscoveryFailed ? discovery.message : null;
     // One swipeable row on this page. The rest open from "Xem tất cả".
     final visible = stores.take(8).toList(growable: false);
@@ -149,41 +189,65 @@ class _FoodDiscoveryViewState extends State<_FoodDiscoveryView> {
               ),
             ),
             children: [
-              const _DiscoveryHeader(),
+              _DiscoveryHeader(onPickAddress: _pickAddress),
               const SizedBox(height: DealGoSpacing.s16),
-              InkWell(
-                onTap: () => context.push(FoodRoutes.search),
-                borderRadius: BorderRadius.circular(DealGoRadius.button),
-                child: InputDecorator(
-                  decoration: InputDecoration(
-                    hintText: l10n.foodDiscoverySearchHint,
-                    hintStyle: Theme.of(context).textTheme.bodyMedium
-                        ?.copyWith(color: DealGoColors.textSecondary),
-                    filled: true,
-                    fillColor: DealGoColors.card,
-                    prefixIcon: const Icon(
-                      DealGoIcons.search,
-                      color: DealGoColors.primary,
-                    ),
-                    suffixIcon: const Icon(
-                      DealGoIcons.filter,
-                      color: DealGoColors.primary,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      vertical: DealGoSpacing.s12,
-                    ),
-                    enabledBorder: OutlineInputBorder(
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => context.push(FoodRoutes.search),
                       borderRadius: BorderRadius.circular(DealGoRadius.button),
-                      borderSide: BorderSide(color: DealGoColors.border),
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          hintText: l10n.foodDiscoverySearchHint,
+                          hintStyle: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: DealGoColors.textSecondary),
+                          filled: true,
+                          fillColor: DealGoColors.card,
+                          prefixIcon: const Icon(
+                            DealGoIcons.search,
+                            color: DealGoColors.primary,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: DealGoSpacing.s12,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(
+                              DealGoRadius.button,
+                            ),
+                            borderSide: BorderSide(color: DealGoColors.border),
+                          ),
+                        ),
+                        child: Text(
+                          l10n.foodDiscoverySearchHint,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: DealGoColors.textSecondary),
+                        ),
+                      ),
                     ),
                   ),
-                  child: Text(
-                    l10n.foodDiscoverySearchHint,
-                    style: Theme.of(context).textTheme.bodyMedium
-                        ?.copyWith(color: DealGoColors.textSecondary),
+                  const SizedBox(width: DealGoSpacing.s8),
+                  _FilterButton(
+                    active: !_filters.isDefault,
+                    onTap: _openFilters,
                   ),
-                ),
+                ],
               ),
+              if (refreshing) ...[
+                const SizedBox(height: DealGoSpacing.s8),
+                const LinearProgressIndicator(minHeight: 2),
+              ],
+              if (!_filters.isDefault) ...[
+                const SizedBox(height: DealGoSpacing.s8),
+                _ActiveFilterSummary(
+                  filters: _filters,
+                  onEdit: _openFilters,
+                  onClear: () {
+                    setState(() => _filters = const FoodFilters());
+                    _reload();
+                  },
+                ),
+              ],
               const SizedBox(height: DealGoSpacing.s16),
               HomeBannerCarousel(
                 role: AppRole.customer,
@@ -193,11 +257,8 @@ class _FoodDiscoveryViewState extends State<_FoodDiscoveryView> {
               ),
               const SizedBox(height: DealGoSpacing.s16),
               _CategoryStrip(
-                selected: _category,
-                onSelected: (code) {
-                  setState(() => _category = code);
-                  context.push(FoodRoutes.categoryOf(code));
-                },
+                selected: null,
+                onSelected: (code) => context.push(FoodRoutes.categoryOf(code)),
               ),
               if (offerStores.isNotEmpty) ...[
                 const SizedBox(height: DealGoSpacing.s16),
@@ -292,14 +353,16 @@ List<FoodStoreSummary> _popularThisWeek(
 }
 
 class _DiscoveryHeader extends StatelessWidget {
-  const _DiscoveryHeader();
+  const _DiscoveryHeader({required this.onPickAddress});
+
+  final VoidCallback onPickAddress;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         const Expanded(child: DealGoWordmark()),
-        const _LocationChip(),
+        _LocationChip(onTap: onPickAddress),
         const SizedBox(width: DealGoSpacing.s8),
         const _DiscoveryAvatar(),
       ],
@@ -335,56 +398,67 @@ class _DiscoveryAvatar extends StatelessWidget {
 }
 
 class _LocationChip extends StatelessWidget {
-  const _LocationChip();
+  const _LocationChip({required this.onTap});
 
-  Future<void> _pick(BuildContext context) async {
-    final place = await pickPlace(context, PlacePickPurpose.pickup);
-    if (place == null || !context.mounted) {
-      return;
-    }
-    context.read<RideDestinationCubit>().choose(place);
-    context.go('/customer/book');
-  }
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Material(
-      color: DealGoColors.card,
-      shape: StadiumBorder(side: BorderSide(color: DealGoColors.border)),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => _pick(context),
-        child: Semantics(
-          button: true,
-          label: l10n.homeCitySample,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: DealGoSpacing.s8,
-              vertical: DealGoSpacing.s8,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  DealGoIcons.pinFilled,
-                  color: DealGoColors.primary,
-                  size: 16,
-                ),
-                const SizedBox(width: 2),
-                Text(
-                  l10n.homeCitySample,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: DealGoColors.text,
-                    fontWeight: FontWeight.w700,
+    final address = context.select<FoodCartCubit, String>(
+      (cart) => cart.state.dropoffLabel.trim(),
+    );
+    final chosen = address.isNotEmpty;
+    final label = chosen ? address : l10n.foodDeliverTo;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 150),
+      child: Material(
+        color: chosen ? DealGoColors.card : DealGoColors.subtlePurple,
+        shape: StadiumBorder(
+          side: BorderSide(
+            color: chosen ? DealGoColors.border : Colors.transparent,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Semantics(
+            button: true,
+            label: '${l10n.foodDeliverTo} $label',
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: DealGoSpacing.s8,
+                vertical: DealGoSpacing.s8,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    DealGoIcons.pinFilled,
+                    color: DealGoColors.primary,
+                    size: 16,
                   ),
-                ),
-                Icon(
-                  DealGoIcons.expandMore,
-                  size: 16,
-                  color: DealGoColors.textSecondary,
-                ),
-              ],
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: chosen
+                            ? DealGoColors.text
+                            : DealGoColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    DealGoIcons.expandMore,
+                    size: 16,
+                    color: DealGoColors.textSecondary,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -518,6 +592,108 @@ class _CategoryStrip extends StatelessWidget {
             const SizedBox(width: DealGoSpacing.s8),
         itemBuilder: (context, index) => children[index],
       ),
+    );
+  }
+}
+
+class _FilterButton extends StatelessWidget {
+  const _FilterButton({required this.active, required this.onTap});
+
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Material(
+      color: active ? DealGoColors.primary : DealGoColors.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(DealGoRadius.button),
+        side: BorderSide(
+          color: active ? DealGoColors.primary : DealGoColors.border,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: const Key('food-discovery-filter'),
+        onTap: onTap,
+        child: Semantics(
+          button: true,
+          label: l10n.foodFilterButton,
+          child: SizedBox(
+            width: 52,
+            height: 52,
+            child: Icon(
+              DealGoIcons.filter,
+              color: active ? Colors.white : DealGoColors.primary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActiveFilterSummary extends StatelessWidget {
+  const _ActiveFilterSummary({
+    required this.filters,
+    required this.onEdit,
+    required this.onClear,
+  });
+
+  final FoodFilters filters;
+  final VoidCallback onEdit;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final km = filters.maxKm;
+    return Wrap(
+      spacing: DealGoSpacing.s8,
+      runSpacing: DealGoSpacing.s8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        if (filters.sortBy == 'rating')
+          DealGoChip(
+            label: l10n.foodFilterRating,
+            tone: DealGoChipTone.brand,
+            selected: true,
+            onTap: onEdit,
+          ),
+        if (km != null)
+          DealGoChip(
+            label: l10n.foodFilterKm(km),
+            tone: DealGoChipTone.brand,
+            selected: true,
+            onTap: onEdit,
+          ),
+        if (filters.openNow)
+          DealGoChip(
+            label: l10n.foodFilterOpenNow,
+            tone: DealGoChipTone.success,
+            selected: true,
+            onTap: onEdit,
+          ),
+        if (filters.offersOnly)
+          DealGoChip(
+            label: l10n.foodFilterOffers,
+            tone: DealGoChipTone.promo,
+            selected: true,
+            onTap: onEdit,
+          ),
+        TextButton(
+          key: const Key('food-filter-clear'),
+          onPressed: onClear,
+          child: Text(
+            l10n.foodFilterClear,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: DealGoColors.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -686,8 +862,7 @@ class _StoreTile extends StatelessWidget {
                   children: [
                     Text(
                       store.name,
-                      style: Theme.of(context).textTheme.titleMedium
-                          ?.copyWith(fontSize: 15),
+                      style: DealGoType.subtitle(Theme.of(context).textTheme),
                     ),
                     const SizedBox(height: DealGoSpacing.s4),
                     StoreMetaLine(store: store, rating: rating),
@@ -751,10 +926,7 @@ class _WideStoreCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        store.name,
-                        style: textTheme.titleMedium?.copyWith(fontSize: 16),
-                      ),
+                      Text(store.name, style: DealGoType.subtitle(textTheme)),
                       const SizedBox(height: DealGoSpacing.s4),
                       StoreMetaLine(store: store, rating: rating),
                       if (store.offers.isNotEmpty || store.minOrderVnd > 0) ...[

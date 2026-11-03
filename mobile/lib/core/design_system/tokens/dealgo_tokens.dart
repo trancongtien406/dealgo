@@ -173,6 +173,21 @@ abstract final class DealGoDimensions {
   static const double headerHeight = 56;
 }
 
+abstract final class DealGoDensity {
+  /// Between blocks inside one screen.
+  static const double blockGap = 20;
+
+  /// Between blocks that change subject.
+  static const double groupGap = 24;
+
+  static const double cardPad = 12;
+
+  /// Menu row and store row floor.
+  static const double rowMinHeight = 96;
+
+  static const double metaGap = 4;
+}
+
 abstract final class DealGoTypography {
   static const String fontFamily = 'BeVietnamPro';
 }
