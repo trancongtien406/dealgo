@@ -419,25 +419,95 @@ describe('food order http', () => {
     expect(paused).toMatchObject({ openNow: false, closedReason: 'PAUSED' });
   });
 
-  it('requires q and caps the food search limit', async () => {
+  it('rejects a missing or blank q, an unauthenticated caller and any limit above 20', async () => {
     const customer = await login();
+    const keyword = 'bí-mật-khách-hàng';
+
     await request(app.getHttpServer())
       .get('/v1/food/search')
-      .set('Authorization', `Bearer ${customer.token}`)
-      .expect(400);
-    await request(app.getHttpServer())
-      .get('/v1/food/search')
-      .query({ q: 'a', limit: 999 })
       .set('Authorization', `Bearer ${customer.token}`)
       .expect(400);
 
-    const capped = await request(app.getHttpServer())
+    await request(app.getHttpServer())
       .get('/v1/food/search')
-      .query({ q: 'bún', limit: 50 })
+      .query({ q: '   ' })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .get('/v1/food/search')
+      .query({ q: keyword })
+      .expect(401);
+
+    for (const limit of [21, 999]) {
+      const rejected = await request(app.getHttpServer())
+        .get('/v1/food/search')
+        .query({ q: keyword, limit })
+        .set('Authorization', `Bearer ${customer.token}`)
+        .expect(400);
+      expect(rejected.body).toMatchObject({ success: false, statusCode: 400 });
+      expect(rejected.body.path).toBe('/v1/food/search');
+      expect(JSON.stringify(rejected.body)).not.toContain(keyword);
+    }
+
+    const atCap = await request(app.getHttpServer())
+      .get('/v1/food/search')
+      .query({ q: 'bún', limit: 20 })
       .set('Authorization', `Bearer ${customer.token}`)
       .expect(200);
-    expect(capped.body.data.dishes).toMatchObject({ page: 1, limit: 20 });
-    expect(capped.body.data.stores).toMatchObject({ page: 1, limit: 20 });
+    expect(atCap.body.data.dishes).toMatchObject({ page: 1, limit: 20 });
+    expect(atCap.body.data.stores).toMatchObject({ page: 1, limit: 20 });
+  });
+
+  it('reads the browse settings once per search request', async () => {
+    const customer = await login();
+    const spy = vi.spyOn(PlatformSettingsService.prototype, 'getNumber');
+    let keys: string[] = [];
+    try {
+      await request(app.getHttpServer())
+        .get('/v1/food/search')
+        .query({ q: 'bún' })
+        .set('Authorization', `Bearer ${customer.token}`)
+        .expect(200);
+      keys = spy.mock.calls.map(([key]) => key);
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(keys.filter((key) => key === 'RATING_STORE_MIN_COUNT')).toHaveLength(1);
+    expect(keys.filter((key) => key === 'FOOD_MIN_DELIVERY_VND')).toHaveLength(1);
+    expect(keys.filter((key) => key === 'FOOD_FARE_STEP_VND')).toHaveLength(1);
+  });
+
+  it('reports the full dish total even when the page is shorter', async () => {
+    const customer = await login();
+    const owner = await login();
+    await repository.insertGrant(owner.userId, 'MERCHANT', 'ACTIVE');
+    const foods = app.get(FOOD_REPOSITORY);
+    if (!(foods instanceof MemoryFoodRepository)) {
+      throw new Error('Expected the in-memory food repository');
+    }
+    const tag = `paged${Date.now().toString().slice(-6)}`;
+    const names = [`Món ${tag} a`, `Món ${tag} b`, `Món ${tag} c`];
+    await createPinnedStore(
+      foods,
+      owner.userId,
+      `Quán ${tag}`,
+      names.map((name) => ({ name, priceVnd: 30_000 })),
+    );
+
+    const res = await request(app.getHttpServer())
+      .get('/v1/food/search')
+      .query({ q: tag, limit: 1 })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+
+    expect(res.body.data.dishes).toMatchObject({ page: 1, limit: 1, total: 3 });
+    expect(
+      (res.body.data.dishes.items as { item: { name: string } }[]).map(
+        (entry) => entry.item.name,
+      ),
+    ).toEqual([names[0]]);
   });
 
   it('quotes the delivery fare that placement charges', async () => {
@@ -1286,7 +1356,7 @@ describe('food order http', () => {
 
     const listed = await request(app.getHttpServer())
       .get('/v1/ops/catalog/moderation')
-      .query({ status: 'APPROVED' })
+      .query({ status: 'APPROVED', q: 'Chè đậu' })
       .set('Authorization', `Bearer ${ops.body.data.accessToken}`)
       .expect(200);
     expect(

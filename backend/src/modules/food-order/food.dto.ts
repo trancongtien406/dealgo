@@ -668,6 +668,14 @@ export class SearchFoodDto extends ListFoodStoresQueryDto {
   @MinLength(1)
   @MaxLength(120)
   q!: string;
+
+  /** Search pages cap at 20 rather than the browse cap; the initializer lets TS accept the narrower redeclaration. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(FOOD_SEARCH_MAX_LIMIT)
+  limit?: number = undefined;
 }
 
 export class OpsPageQueryDto extends OpsDateRangeQueryDto {

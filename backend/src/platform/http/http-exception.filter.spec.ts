@@ -6,6 +6,11 @@ import {
 } from '@nestjs/common';
 import { HttpExceptionFilter } from './http-exception.filter.js';
 
+const sentry = vi.hoisted(() => ({ captureServerError: vi.fn() }));
+vi.mock('../observability/sentry.js', () => ({
+  captureServerError: sentry.captureServerError,
+}));
+
 function createHost(path: string, requestIdHeader?: string) {
   const json = vi.fn();
   const status = vi.fn().mockReturnValue({ json });
@@ -79,6 +84,23 @@ describe('HttpExceptionFilter', () => {
         message: 'name must be a string',
         errorCode: 'VALIDATION_ERROR',
         path: '/orders',
+      }),
+    );
+  });
+
+  it('keeps keyword query params out of the error body and the Sentry context', () => {
+    const { host, json } = createHost('/v1/food/search?q=b%C3%AD-m%E1%BA%ADt&limit=999');
+    const error = new Error('boom');
+
+    filter.catch(error, host);
+
+    const body = json.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(body.path).toBe('/v1/food/search');
+    expect(JSON.stringify(body)).not.toContain('b%C3%AD-m%E1%BA%ADt');
+    expect(sentry.captureServerError).toHaveBeenCalledWith(
+      error,
+      expect.objectContaining({
+        path: '/v1/food/search?q=[redacted]&limit=999',
       }),
     );
   });

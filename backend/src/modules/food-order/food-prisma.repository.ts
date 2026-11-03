@@ -45,7 +45,11 @@ import {
   vnClock,
   type StoreSchedule,
 } from './store-schedule.js';
-import { pickFeaturedItems, shownOriginalPrice } from './food.repository.js';
+import {
+  likePattern,
+  pickFeaturedItems,
+  shownOriginalPrice,
+} from './food.repository.js';
 import type {
   StoreFeaturedItem,
   CatalogItemInput,
@@ -412,7 +416,7 @@ export class PrismaFoodRepository implements FoodRepository {
     const hasGeo = query.lat !== undefined && query.lng !== undefined;
     const skip = (query.page - 1) * query.limit;
     const now = new Date();
-    const like = '%' + query.q.trim() + '%';
+    const like = likePattern(query.q.trim());
     const distanceSql = hasGeo
       ? distanceKmSql(query.lat!, query.lng!)
       : Prisma.sql`NULL::double precision`;
@@ -420,7 +424,7 @@ export class PrismaFoodRepository implements FoodRepository {
     const filters: Prisma.Sql[] = [
       Prisma.sql`i."available" = TRUE`,
       Prisma.sql`i."moderationStatus" = 'APPROVED'`,
-      Prisma.sql`i."name" ILIKE ${like}`,
+      Prisma.sql`i."name" ILIKE ${like} ESCAPE '\\'`,
       Prisma.sql`s."lat" IS NOT NULL`,
       Prisma.sql`s."lng" IS NOT NULL`,
       openSql,

@@ -321,6 +321,16 @@ type StatsDay = {
   salesVnd: number;
 };
 
+/** Browse inputs resolved once per request: paging window, sort/radius and fare settings. */
+type StoreBrowseContext = {
+  page: number;
+  limit: number;
+  sortBy: 'name' | 'createdAt' | 'distance' | 'rating';
+  radiusKm: number;
+  minRatingCount: number;
+  fare: { minVnd: number; maxVnd: number; perKm: number; stepVnd: number };
+};
+
 export type MerchantStatsView = {
   timezone: 'Asia/Ho_Chi_Minh';
   days: number;
@@ -461,22 +471,54 @@ export class FoodService {
   ): Promise<PageResult<PublicStoreBrowseItem>> {
     await this.requireActiveCustomer(actor.userId);
     await this.ensureSandboxFixtureCatalog();
-    const page = normalizePage(query.page);
-    const limit = normalizeLimit(query.limit, FOOD_STORE_BROWSE_MAX_LIMIT);
+    return this.buildStorePage(
+      query,
+      await this.browseContext(query, FOOD_STORE_BROWSE_MAX_LIMIT),
+    );
+  }
+
+  /**
+   * Page/sort/radius plus the platform settings both browse and search price cards with,
+   * computed once per request so search does not re-read the same keys for the store list.
+   */
+  private async browseContext(
+    query: ListFoodStoresQueryDto,
+    maxLimit: number,
+  ): Promise<StoreBrowseContext> {
     const hasGeo = query.lat !== undefined && query.lng !== undefined;
     const sortBy =
       query.sort_by === 'distance' && !hasGeo
         ? 'createdAt'
         : (query.sort_by ?? 'createdAt');
-    const radiusKm = await this.browseRadiusKm(query);
-    const [minRatingCount, feeMin, feeMax, feePerKm, feeStep] =
+    const [radiusKm, minRatingCount, feeMinVnd, feeMaxVnd, feePerKm, fareStepVnd] =
       await Promise.all([
+        this.browseRadiusKm(query),
         this.settings.getNumber('RATING_STORE_MIN_COUNT'),
         this.settings.getNumber('FOOD_MIN_DELIVERY_VND'),
         this.settings.getNumber('FOOD_MAX_DELIVERY_VND'),
         this.settings.getNumber('FOOD_DELIVERY_VND_PER_KM'),
         this.settings.getNumber('FOOD_FARE_STEP_VND'),
       ]);
+    return {
+      page: normalizePage(query.page),
+      limit: normalizeLimit(query.limit, maxLimit),
+      sortBy,
+      radiusKm,
+      minRatingCount,
+      fare: {
+        minVnd: feeMinVnd,
+        maxVnd: feeMaxVnd,
+        perKm: feePerKm,
+        stepVnd: fareStepVnd,
+      },
+    };
+  }
+
+  private async buildStorePage(
+    query: ListFoodStoresQueryDto,
+    context: StoreBrowseContext,
+  ): Promise<PageResult<PublicStoreBrowseItem>> {
+    const { page, limit, sortBy, radiusKm, minRatingCount, fare } = context;
     const result = await this.food.listStores({
       page,
       limit,
@@ -528,10 +570,10 @@ export class FoodService {
           store.distanceKm === null
             ? null
             : clampToFoodFareSteps(
-                quoteReferenceFareVnd(store.distanceKm, feePerKm, feeMin),
-                feeMin,
-                feeMax,
-                feeStep,
+                quoteReferenceFareVnd(store.distanceKm, fare.perKm, fare.minVnd),
+                fare.minVnd,
+                fare.maxVnd,
+                fare.stepVnd,
               ),
         offers: offers.get(store.id) ?? [],
         minOrderVnd: store.minOrderVnd ?? 0,
@@ -556,15 +598,8 @@ export class FoodService {
   }> {
     await this.requireActiveCustomer(actor.userId);
     await this.ensureSandboxFixtureCatalog();
-    const page = normalizePage(query.page);
-    const limit = normalizeLimit(query.limit, FOOD_SEARCH_MAX_LIMIT);
-    const radiusKm = await this.browseRadiusKm(query);
-    const [feeMin, feeMax, feePerKm, feeStep] = await Promise.all([
-      this.settings.getNumber('FOOD_MIN_DELIVERY_VND'),
-      this.settings.getNumber('FOOD_MAX_DELIVERY_VND'),
-      this.settings.getNumber('FOOD_DELIVERY_VND_PER_KM'),
-      this.settings.getNumber('FOOD_FARE_STEP_VND'),
-    ]);
+    const context = await this.browseContext(query, FOOD_SEARCH_MAX_LIMIT);
+    const { page, limit, radiusKm, fare } = context;
     const [dishes, stores] = await Promise.all([
       this.food.searchDishes({
         q: query.q,
@@ -574,16 +609,17 @@ export class FoodService {
         lng: query.lng,
         radiusKm,
       }),
-      this.listStores(actor, {
-        page,
-        limit,
-        search: query.q,
-        category: query.category,
-        lat: query.lat,
-        lng: query.lng,
-        sort_by: query.sort_by,
-        max_km: query.max_km,
-      }),
+      this.buildStorePage(
+        {
+          search: query.q,
+          category: query.category,
+          lat: query.lat,
+          lng: query.lng,
+          sort_by: query.sort_by,
+          max_km: query.max_km,
+        },
+        context,
+      ),
     ]);
     return {
       dishes: {
@@ -603,10 +639,10 @@ export class FoodService {
               hit.store.distanceKm === null
                 ? null
                 : clampToFoodFareSteps(
-                    quoteReferenceFareVnd(hit.store.distanceKm, feePerKm, feeMin),
-                    feeMin,
-                    feeMax,
-                    feeStep,
+                    quoteReferenceFareVnd(hit.store.distanceKm, fare.perKm, fare.minVnd),
+                    fare.minVnd,
+                    fare.maxVnd,
+                    fare.stepVnd,
                   ),
           },
         })),

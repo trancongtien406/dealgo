@@ -2,6 +2,11 @@ import morgan from 'morgan';
 import { Logger } from '@nestjs/common';
 import type { Request, Response, RequestHandler } from 'express';
 import { REQUEST_ID_HEADER, type RequestWithId } from '../http/request-id.js';
+import { redactUrl } from './redact-url.js';
+
+// Morgan's built-in `:url` token writes the raw query string into the access log,
+// which would persist the customer's search keyword; log the masked URL instead.
+morgan.token('url', (req: Request) => redactUrl(req.originalUrl || req.url || ''));
 
 export function createMorganMiddleware(customLogger?: Logger): RequestHandler {
   const logger = customLogger ?? new Logger('HTTP');

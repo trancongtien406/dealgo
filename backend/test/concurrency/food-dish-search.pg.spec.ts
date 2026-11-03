@@ -106,22 +106,23 @@ describePg('food dish search (postgres)', () => {
 
   it('lists approved in-stock dishes of open stores, best sellers first', async () => {
     const open = await store('Open');
-    const bun = await item(open.id, `Bún bò ${tag}`, { soldCount: 5 });
-    const cha = await item(open.id, `Bún chả ${tag}`, {
+    const cha = await item(open.id, `Bun cha ${tag}`, {
       soldCount: 9,
       prepMinutes: 7,
     });
-    await item(open.id, `Trà đá ${tag}`, { soldCount: 2 });
+    const bo = await item(open.id, `Bun bo ${tag}`, { soldCount: 5 });
+    await item(open.id, `Bun rieu ${tag}`, { soldCount: 5 });
 
     const page = await search(tag);
     expect(page.total).toBe(3);
-    expect(page.items.map((hit) => hit.item.id)).toEqual([
-      cha.id,
-      bun.id,
-      expect.any(String),
+    // soldCount DESC, then name ASC: the 5-sold tie breaks by name, not by insertion.
+    expect(page.items.map((hit) => hit.item.name)).toEqual([
+      `Bun cha ${tag}`,
+      `Bun bo ${tag}`,
+      `Bun rieu ${tag}`,
     ]);
     expect(page.items[0]).toMatchObject({
-      item: { name: `Bún chả ${tag}`, priceVnd: 45_000, prepMinutes: 7 },
+      item: { id: cha.id, name: `Bun cha ${tag}`, priceVnd: 45_000, prepMinutes: 7 },
       store: {
         id: open.id,
         name: `${tag} Open`,
@@ -131,7 +132,7 @@ describePg('food dish search (postgres)', () => {
     });
     // The store default prep fills in for a dish without its own estimate.
     expect(
-      page.items.find((hit) => hit.item.id === bun.id)?.item.prepMinutes,
+      page.items.find((hit) => hit.item.id === bo.id)?.item.prepMinutes,
     ).toBe(15);
     expect(page.items[0]!.store.distanceKm).toBeGreaterThan(0);
 
@@ -237,5 +238,63 @@ describePg('food dish search (postgres)', () => {
     expect(memoryPage.total).toBe(2);
     expect(memoryPage.total).toBe(sql.total);
     expect(pairs(memoryPage.items)).toEqual(pairs(sql.items));
+  });
+
+  it('matches % and _ in the keyword literally, like the in-memory twin', async () => {
+    const open = await store('Wild');
+    const percentLiteral = await item(open.id, `Com 100% ${tag}`, {
+      soldCount: 1,
+    });
+    await item(open.id, `Com 100x ${tag}`, { soldCount: 2 });
+    const underscoreLiteral = await item(open.id, `Pho_${tag}`);
+    await item(open.id, `PhoX${tag}`);
+
+    const percent = await search(`100% ${tag}`);
+    expect(percent.total).toBe(1);
+    expect(percent.items.map((hit) => hit.item.id)).toEqual([
+      percentLiteral.id,
+    ]);
+
+    const underscore = await search(`Pho_${tag}`);
+    expect(underscore.total).toBe(1);
+    expect(underscore.items.map((hit) => hit.item.id)).toEqual([
+      underscoreLiteral.id,
+    ]);
+
+    const memory = new MemoryFoodRepository();
+    const owner = `memory-wild-${tag}`;
+    await memory.createStore(owner, `${tag} Wild`, [
+      { name: `Com 100% ${tag}`, priceVnd: 45_000 },
+      { name: `Com 100x ${tag}`, priceVnd: 45_000 },
+      { name: `Pho_${tag}`, priceVnd: 45_000 },
+      { name: `PhoX${tag}`, priceVnd: 45_000 },
+    ]);
+    await memory.updateStoreLocation({ ownerId: owner, ...PIN });
+    const memoryStore = await memory.findStoreByOwner(owner);
+    for (const dish of memoryStore!.items) {
+      await memory.setCatalogModeration(dish.id, 'APPROVED');
+    }
+
+    const memoryPercent = await memory.searchDishes({
+      q: `100% ${tag}`,
+      page: 1,
+      limit: 10,
+      ...ORIGIN,
+      radiusKm: 10,
+    });
+    expect(memoryPercent.items.map((hit) => hit.item.name)).toEqual([
+      `Com 100% ${tag}`,
+    ]);
+
+    const memoryUnderscore = await memory.searchDishes({
+      q: `Pho_${tag}`,
+      page: 1,
+      limit: 10,
+      ...ORIGIN,
+      radiusKm: 10,
+    });
+    expect(memoryUnderscore.items.map((hit) => hit.item.name)).toEqual([
+      `Pho_${tag}`,
+    ]);
   });
 });

@@ -160,6 +160,19 @@ export type DishSearchPage = {
   total: number;
 };
 
+/**
+ * Wraps `text` for a SQL `ILIKE ... ESCAPE '\'` pattern: `%`, `_` and `\` inside the
+ * keyword match literally, as they do for the in-memory repository's `includes`.
+ */
+export function likePattern(text: string): string {
+  return `%${text.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+}
+
+/** Code-point ordering, so the in-memory tie-break matches Postgres `ORDER BY ... ASC`. */
+function compareText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 export type ListFoodStoresQuery = {
   page: number;
   limit: number;
@@ -1343,8 +1356,8 @@ export class MemoryFoodRepository implements FoodRepository {
     hits.sort(
       (left, right) =>
         right.item.soldCount - left.item.soldCount ||
-        left.item.name.localeCompare(right.item.name) ||
-        left.item.id.localeCompare(right.item.id),
+        compareText(left.item.name, right.item.name) ||
+        compareText(left.item.id, right.item.id),
     );
     const start = pageOffset(query.page, query.limit);
     return {
