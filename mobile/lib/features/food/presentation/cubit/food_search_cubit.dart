@@ -30,6 +30,8 @@ final class FoodSearchReady extends FoodSearchState {
     this.isRefreshing = false,
     this.loadingMore = false,
     this.loadMoreFailed = false,
+    this.dishesExhausted = false,
+    this.storesExhausted = false,
   });
 
   final List<FoodDishHit> dishes;
@@ -46,8 +48,13 @@ final class FoodSearchReady extends FoodSearchState {
   /// The last [FoodSearchCubit.loadMore] failed; rows above stay usable.
   final bool loadMoreFailed;
 
-  bool get hasMoreDishes => dishes.length < dishTotal;
-  bool get hasMoreStores => stores.length < storeTotal;
+  /// A page returned only rows already seen, so the server would keep
+  /// repeating them; totals alone must not keep the list paginating.
+  final bool dishesExhausted;
+  final bool storesExhausted;
+
+  bool get hasMoreDishes => !dishesExhausted && dishes.length < dishTotal;
+  bool get hasMoreStores => !storesExhausted && stores.length < storeTotal;
   bool get hasMore => hasMoreDishes || hasMoreStores;
 
   FoodSearchReady copyWith({
@@ -59,6 +66,8 @@ final class FoodSearchReady extends FoodSearchState {
     bool? isRefreshing,
     bool? loadingMore,
     bool? loadMoreFailed,
+    bool? dishesExhausted,
+    bool? storesExhausted,
   }) {
     return FoodSearchReady(
       dishes: dishes ?? this.dishes,
@@ -69,6 +78,8 @@ final class FoodSearchReady extends FoodSearchState {
       isRefreshing: isRefreshing ?? this.isRefreshing,
       loadingMore: loadingMore ?? this.loadingMore,
       loadMoreFailed: loadMoreFailed ?? this.loadMoreFailed,
+      dishesExhausted: dishesExhausted ?? this.dishesExhausted,
+      storesExhausted: storesExhausted ?? this.storesExhausted,
     );
   }
 }
@@ -180,13 +191,19 @@ class FoodSearchCubit extends Cubit<FoodSearchState> {
         return;
       }
       _page = next;
+      final dishes = _mergeDishes(current.dishes, page.dishes);
+      final stores = _mergeStores(current.stores, page.stores);
       emit(
         FoodSearchReady(
-          dishes: List.unmodifiable(_mergeDishes(current.dishes, page.dishes)),
-          stores: List.unmodifiable(_mergeStores(current.stores, page.stores)),
+          dishes: List.unmodifiable(dishes),
+          stores: List.unmodifiable(stores),
           dishTotal: page.dishTotal,
           storeTotal: page.storeTotal,
           page: next,
+          dishesExhausted:
+              current.dishesExhausted || dishes.length == current.dishes.length,
+          storesExhausted:
+              current.storesExhausted || stores.length == current.stores.length,
         ),
       );
     } on ApiException {

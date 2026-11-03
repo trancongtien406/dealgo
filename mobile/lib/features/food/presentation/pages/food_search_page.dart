@@ -188,7 +188,10 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
       }
       if (names.length >= _maxKeywords) break;
     }
-    if (names.isEmpty) return;
+    if (names.isEmpty) {
+      if (_keywords.isNotEmpty) setState(() => _keywords = const []);
+      return;
+    }
     setState(() => _keywords = List.unmodifiable(names));
   }
 
