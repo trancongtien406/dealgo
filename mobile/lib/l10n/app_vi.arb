@@ -296,6 +296,8 @@
     }
   },
   "foodSearchEmpty": "Chưa có quán khớp từ khóa",
+  "foodSearchDishes": "Món ăn",
+  "foodSearchStores": "Quán",
   "foodDeliverTo": "Giao đến",
   "foodFilterButton": "Bộ lọc",
   "foodFilterTitle": "Lọc & sắp xếp",

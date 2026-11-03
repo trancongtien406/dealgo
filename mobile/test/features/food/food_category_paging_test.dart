@@ -28,6 +28,37 @@ FakeFoodClient _manyNoodles(int count) => FakeFoodClient(
   ],
 );
 
+/// Search pages over the client's stores, which the default fake does not.
+class _PagedSearchFoodClient extends FakeFoodClient {
+  _PagedSearchFoodClient({required super.stores});
+
+  @override
+  Future<FoodSearchResult> searchFood(
+    String accessToken, {
+    required String q,
+    double? lat,
+    double? lng,
+    String? sortBy,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    searchQueries.add(q.trim());
+    searchSorts.add(sortBy);
+    searchPages.add(page);
+    searchLimits.add(limit);
+    final start = (page - 1) * limit;
+    final items = start >= stores.length
+        ? const <FoodStoreSummary>[]
+        : stores.sublist(start, (start + limit).clamp(0, stores.length));
+    return FoodSearchResult(
+      dishes: const [],
+      dishTotal: 0,
+      stores: items,
+      storeTotal: stores.length,
+    );
+  }
+}
+
 Future<void> _dragUntilPage(
   WidgetTester tester,
   Finder list,
@@ -107,14 +138,14 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
 
-    expect(food.storeSearches.last, 'bún');
-    expect(food.storeSorts.last, 'distance');
+    expect(food.searchQueries.last, 'bún');
+    expect(food.searchSorts.last, 'distance');
 
     await tester.tap(find.byKey(const Key('food-search-sort-rating')));
     await tester.pumpAndSettle();
 
-    expect(food.storeSorts.last, 'rating');
-    expect(food.storeSearches.last, 'bún');
+    expect(food.searchSorts.last, 'rating');
+    expect(food.searchQueries.last, 'bún');
   });
 
   testWidgets('the category feed loads page 2 with the same filter', (
@@ -151,7 +182,7 @@ void main() {
     tester,
   ) async {
     _tall(tester);
-    final food = _manyNoodles(25);
+    final food = _PagedSearchFoodClient(stores: _manyNoodles(25).stores);
 
     await pumpSignedIn(
       tester,
@@ -165,18 +196,19 @@ void main() {
     await tester.enterText(find.byKey(const Key('food-search-field')), 'bún');
     await tester.pump(const Duration(milliseconds: 400));
     await tester.pumpAndSettle();
-    expect(food.storePages.where((page) => page > 1), isEmpty);
+    expect(food.searchPages.where((page) => page > 1), isEmpty);
 
     await _dragUntilPage(
       tester,
       find.byType(ListView).last,
-      food.storePages,
+      food.searchPages,
       2,
     );
 
-    expect(food.storePages, contains(2));
-    expect(food.storeSearches.last, 'bún');
-    expect(food.storeSorts.last, 'distance');
+    expect(food.searchPages, contains(2));
+    expect(food.searchQueries.last, 'bún');
+    expect(food.searchSorts.last, 'distance');
+    expect(food.searchLimits.last, 20);
   });
 
   testWidgets('a query without matches shows the empty state, not a footer', (

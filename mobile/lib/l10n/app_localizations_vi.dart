@@ -858,6 +858,12 @@ class AppLocalizationsVi extends AppLocalizations {
   String get foodSearchEmpty => 'Chưa có quán khớp từ khóa';
 
   @override
+  String get foodSearchDishes => 'Món ăn';
+
+  @override
+  String get foodSearchStores => 'Quán';
+
+  @override
   String get foodDeliverTo => 'Giao đến';
 
   @override

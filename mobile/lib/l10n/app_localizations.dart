@@ -1748,6 +1748,18 @@ abstract class AppLocalizations {
   /// **'No matching stores yet'**
   String get foodSearchEmpty;
 
+  /// No description provided for @foodSearchDishes.
+  ///
+  /// In en, this message translates to:
+  /// **'Dishes'**
+  String get foodSearchDishes;
+
+  /// No description provided for @foodSearchStores.
+  ///
+  /// In en, this message translates to:
+  /// **'Stores'**
+  String get foodSearchStores;
+
   /// No description provided for @foodDeliverTo.
   ///
   /// In en, this message translates to:

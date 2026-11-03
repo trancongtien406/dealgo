@@ -54,6 +54,9 @@ class FakeFoodClient implements FoodClient {
   /// Same-store dishes returned by [listStoreSuggestions].
   List<FoodFeaturedItem> suggestions;
   final List<String> searchQueries = [];
+  final List<String?> searchSorts = [];
+  final List<int> searchPages = [];
+  final List<int> searchLimits = [];
   final List<({String storeId, List<String> exclude})> suggestionCalls = [];
   FoodOrderDetail Function(String orderId)? onGetOrder;
   final List<PlaceFoodRequest> placeCalls = [];
@@ -408,6 +411,9 @@ class FakeFoodClient implements FoodClient {
   }) async {
     final trimmed = q.trim();
     searchQueries.add(trimmed);
+    searchSorts.add(sortBy);
+    searchPages.add(page);
+    searchLimits.add(limit);
     final handler = searchFoodHandler;
     if (handler != null) {
       return handler(trimmed);
@@ -975,4 +981,58 @@ class FakeFoodClient implements FoodClient {
       return item.copyWith(clearImageUrl: true);
     });
   }
+}
+
+FoodDishHit dishHit({
+  required String name,
+  required String storeId,
+  required String itemId,
+  int priceVnd = 45000,
+  int? originalPriceVnd,
+  String storeName = 'Quán',
+  double? distanceKm,
+  int? etaMinutes,
+  int? deliveryFeeFromVnd,
+  bool openNow = true,
+  StoreClosedReason? closedReason,
+}) {
+  return FoodDishHit(
+    item: FoodFeaturedItem(
+      id: itemId,
+      name: name,
+      priceVnd: priceVnd,
+      originalPriceVnd: originalPriceVnd,
+    ),
+    store: FoodDishHitStore(
+      id: storeId,
+      name: storeName,
+      distanceKm: distanceKm,
+      etaMinutes: etaMinutes,
+      deliveryFeeFromVnd: deliveryFeeFromVnd,
+      openNow: openNow,
+      closedReason: closedReason,
+    ),
+  );
+}
+
+FoodStoreSummary storeSummary({
+  required String id,
+  required String name,
+  String? category,
+  double? distanceKm,
+  int? etaMinutes,
+  int? deliveryFeeFromVnd,
+  StoreClosedReason? closedReason,
+  List<FoodFeaturedItem> featuredItems = const [],
+}) {
+  return FoodStoreSummary(
+    id: id,
+    name: name,
+    category: category,
+    distanceKm: distanceKm,
+    etaMinutes: etaMinutes,
+    deliveryFeeFromVnd: deliveryFeeFromVnd,
+    closedReason: closedReason,
+    featuredItems: featuredItems,
+  );
 }

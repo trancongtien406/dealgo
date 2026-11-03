@@ -856,6 +856,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get foodSearchEmpty => 'No matching stores yet';
 
   @override
+  String get foodSearchDishes => 'Dishes';
+
+  @override
+  String get foodSearchStores => 'Stores';
+
+  @override
   String get foodDeliverTo => 'Deliver to';
 
   @override

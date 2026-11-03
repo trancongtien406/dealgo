@@ -296,6 +296,8 @@
     }
   },
   "foodSearchEmpty": "No matching stores yet",
+  "foodSearchDishes": "Dishes",
+  "foodSearchStores": "Stores",
   "foodDeliverTo": "Deliver to",
   "foodFilterButton": "Filters",
   "foodFilterTitle": "Filter & sort",

@@ -672,6 +672,7 @@ class _SearchRow extends StatelessWidget {
       children: [
         Expanded(
           child: InkWell(
+            key: const Key('food-search-entry'),
             onTap: onOpenSearch,
             borderRadius: BorderRadius.circular(DealGoRadius.button),
             child: InputDecorator(

@@ -5,20 +5,42 @@ import '../../../../core/design_system/tokens/dealgo_type_scale.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../cubit/food_discovery_cubit.dart';
 
-/// Bottom of a paginated store list: spinner, retry, or the end label.
+/// Bottom of a paginated list: spinner, retry, or the end label.
 class FoodFeedFooter extends StatelessWidget {
-  const FoodFeedFooter({required this.state, required this.onRetry, super.key});
+  FoodFeedFooter({
+    required FoodDiscoveryReady? state,
+    required this.onRetry,
+    super.key,
+  }) : hasRows = state != null && state.stores.isNotEmpty,
+       isLoadingMore = state?.isLoadingMore ?? false,
+       loadMoreFailed = state?.loadMoreFailed ?? false,
+       hasMore = state?.hasMore ?? false,
+       isRefreshing = state?.isRefreshing ?? false;
 
-  final FoodDiscoveryReady? state;
+  /// Same footer for lists outside [FoodDiscoveryReady] (e.g. search results).
+  const FoodFeedFooter.paged({
+    required this.hasRows,
+    required this.isLoadingMore,
+    required this.loadMoreFailed,
+    required this.hasMore,
+    required this.isRefreshing,
+    required this.onRetry,
+    super.key,
+  });
+
+  final bool hasRows;
+  final bool isLoadingMore;
+  final bool loadMoreFailed;
+  final bool hasMore;
+  final bool isRefreshing;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    final ready = state;
-    if (ready == null || ready.stores.isEmpty) {
+    if (!hasRows) {
       return const SizedBox.shrink();
     }
-    if (ready.isLoadingMore) {
+    if (isLoadingMore) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: DealGoSpacing.s12),
         child: Center(
@@ -30,7 +52,7 @@ class FoodFeedFooter extends StatelessWidget {
         ),
       );
     }
-    if (ready.loadMoreFailed) {
+    if (loadMoreFailed) {
       return Center(
         child: TextButton(
           key: const Key('food-feed-retry'),
@@ -39,7 +61,7 @@ class FoodFeedFooter extends StatelessWidget {
         ),
       );
     }
-    if (ready.hasMore || ready.isRefreshing) {
+    if (hasMore || isRefreshing) {
       return const SizedBox.shrink();
     }
     return Padding(

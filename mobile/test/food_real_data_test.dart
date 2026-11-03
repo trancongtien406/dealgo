@@ -211,16 +211,20 @@ void main() {
     expect(find.byKey(const Key('food-category-empty')), findsOneWidget);
   });
 
-  testWidgets('search shows every match and sorts on the server', (
+  testWidgets('search shows dishes above stores and sorts on the server', (
     tester,
   ) async {
     _tall(tester);
-    final food = FakeFoodClient(
-      stores: [
-        for (var i = 1; i <= 5; i++)
-          FoodStoreSummary(id: 's$i', name: 'Quán $i', category: 'rice'),
-      ],
-    );
+    final food = FakeFoodClient()
+      ..searchFoodHandler = (q) => FoodSearchResult(
+        dishes: [dishHit(name: 'Bún bò', storeId: 's1', itemId: 'item-bun')],
+        dishTotal: 1,
+        stores: [
+          for (var i = 1; i <= 5; i++)
+            storeSummary(id: 's$i', name: 'Quán $i', category: 'rice'),
+        ],
+        storeTotal: 5,
+      );
     await pumpSignedIn(
       tester,
       profile: customerProfile,
@@ -228,13 +232,14 @@ void main() {
       ratings: _ratings(),
     );
     await _go(tester, '/customer/food/search?q=qu%C3%A1n');
-    expect(find.byKey(const Key('food-search-heading')), findsOneWidget);
-    expect(find.text('5 kết quả'), findsOneWidget);
+    expect(find.byKey(const Key('food-dish-hits')), findsOneWidget);
+    expect(find.text('Món ăn'), findsOneWidget);
+    expect(find.text('Quán'), findsWidgets);
     expect(find.text('Quán 5'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('food-search-sort-rating')));
     await tester.pumpAndSettle();
-    expect(food.storeSorts.last, 'rating');
+    expect(food.searchSorts.last, 'rating');
   });
 
   test('search history keeps the 5 latest unique queries', () async {
