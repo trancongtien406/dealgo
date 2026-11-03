@@ -1718,17 +1718,17 @@ abstract class AppLocalizations {
   /// **'bun bo'**
   String get foodSearchHint;
 
-  /// No description provided for @foodSearchFilterAll.
-  ///
-  /// In en, this message translates to:
-  /// **'All'**
-  String get foodSearchFilterAll;
-
   /// No description provided for @foodSearchFilterNear.
   ///
   /// In en, this message translates to:
   /// **'Near me'**
   String get foodSearchFilterNear;
+
+  /// No description provided for @foodSearchSortRelevance.
+  ///
+  /// In en, this message translates to:
+  /// **'Best match'**
+  String get foodSearchSortRelevance;
 
   /// No description provided for @foodSearchSuggestions.
   ///

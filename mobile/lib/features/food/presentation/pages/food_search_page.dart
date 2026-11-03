@@ -18,6 +18,7 @@ import '../../../rating/domain/service_rating.dart';
 import '../cubit/food_discovery_cubit.dart';
 import '../utils/food_routes.dart';
 import '../widgets/food_cart_bar.dart';
+import '../widgets/food_feed_footer.dart';
 import '../widgets/food_widgets.dart';
 import '../widgets/food_store_card.dart';
 import '../food_categories_store.dart';
@@ -46,7 +47,6 @@ class FoodSearchPage extends StatelessWidget {
             search: initialQuery.trim(),
             lat: origin.lat,
             lng: origin.lng,
-            sortBy: 'distance',
           ),
       child: _FoodSearchView(initialQuery: initialQuery),
     );
@@ -63,10 +63,13 @@ class _FoodSearchView extends StatefulWidget {
 }
 
 class _FoodSearchViewState extends State<_FoodSearchView> {
+  final ScrollController _scroll = ScrollController();
   late final TextEditingController _query = TextEditingController(
     text: widget.initialQuery,
   );
-  var _sortBy = 'distance';
+
+  /// Null = let the server rank a text query by relevance.
+  String? _sortBy;
   var _history = const <String>[];
   Timer? _debounce;
 
@@ -100,15 +103,26 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
     });
   }
 
-  void _setSort(String sortBy) {
+  void _setSort(String? sortBy) {
     if (_sortBy == sortBy) return;
     setState(() => _sortBy = sortBy);
     _loadStores(_query.text.trim());
   }
 
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    if (position.maxScrollExtent <= 0) return;
+    if (position.pixels < position.maxScrollExtent - 400) return;
+    final discovery = context.read<FoodDiscoveryCubit>().state;
+    if (discovery is FoodDiscoveryReady && discovery.loadMoreFailed) return;
+    context.read<FoodDiscoveryCubit>().loadMore();
+  }
+
   @override
   void initState() {
     super.initState();
+    _scroll.addListener(_onScroll);
     FoodSearchHistory.load().then((items) {
       if (mounted) setState(() => _history = items);
     });
@@ -127,6 +141,8 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _scroll.removeListener(_onScroll);
+    _scroll.dispose();
     _query.dispose();
     super.dispose();
   }
@@ -206,12 +222,13 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
                   horizontal: DealGoDimensions.pageGutter,
                 ),
                 children: [
-                  for (final entry in [
+                  for (final entry in <(String?, String)>[
+                    (null, l10n.foodSearchSortRelevance),
                     ('distance', l10n.foodSearchFilterNear),
                     ('rating', l10n.foodCategorySortRating),
                   ]) ...[
                     DealGoChip(
-                      key: Key('food-search-sort-${entry.$1}'),
+                      key: Key('food-search-sort-${entry.$1 ?? 'relevance'}'),
                       label: entry.$2,
                       selected: _sortBy == entry.$1,
                       tone: DealGoChipTone.brand,
@@ -224,6 +241,7 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
             ),
             Expanded(
               child: ListView(
+                controller: _scroll,
                 padding: const EdgeInsets.fromLTRB(
                   DealGoDimensions.pageGutter,
                   DealGoSpacing.s16,
@@ -239,7 +257,11 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
                   Text(
                     q.isEmpty
                         ? l10n.foodSearchSuggestions
-                        : l10n.foodSearchResults(matches.length),
+                        : l10n.foodSearchResults(
+                            q == _serverQuery && discovery is FoodDiscoveryReady
+                                ? discovery.total
+                                : matches.length,
+                          ),
                     key: const Key('food-search-heading'),
                     style: textTheme.titleMedium,
                   ),
@@ -263,6 +285,14 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
                       ),
                       const SizedBox(height: DealGoSpacing.s12),
                     ],
+                    if (q.isNotEmpty && q == _serverQuery)
+                      FoodFeedFooter(
+                        state: discovery is FoodDiscoveryReady
+                            ? discovery
+                            : null,
+                        onRetry: () =>
+                            context.read<FoodDiscoveryCubit>().loadMore(),
+                      ),
                     if (matches.isEmpty)
                       DealGoStateView(
                         art: DealGoStateArt.noSearch,

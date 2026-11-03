@@ -284,8 +284,8 @@
   "rideShareTrip": "Share trip",
   "foodSearchTitle": "Find dishes & stores",
   "foodSearchHint": "bun bo",
-  "foodSearchFilterAll": "All",
   "foodSearchFilterNear": "Near me",
+  "foodSearchSortRelevance": "Best match",
   "foodSearchSuggestions": "Search suggestions",
   "foodSearchResults": "{count} results",
   "@foodSearchResults": {

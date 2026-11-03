@@ -284,8 +284,8 @@
   "rideShareTrip": "Chia sẻ chuyến đi",
   "foodSearchTitle": "Tìm món & cửa hàng",
   "foodSearchHint": "bún bò",
-  "foodSearchFilterAll": "Tất cả",
   "foodSearchFilterNear": "Gần tôi",
+  "foodSearchSortRelevance": "Phù hợp",
   "foodSearchSuggestions": "Gợi ý tìm kiếm",
   "foodSearchResults": "{count} kết quả",
   "@foodSearchResults": {

@@ -15,6 +15,7 @@ import '../../../rating/domain/service_rating.dart';
 import '../cubit/food_discovery_cubit.dart';
 import '../utils/food_routes.dart';
 import '../widgets/food_cart_bar.dart';
+import '../widgets/food_feed_footer.dart';
 import '../widgets/food_widgets.dart';
 import '../widgets/food_store_card.dart';
 import '../food_categories_store.dart';
@@ -42,6 +43,7 @@ class FoodCategoryPage extends StatelessWidget {
             lat: origin.lat,
             lng: origin.lng,
             sortBy: 'distance',
+            category: categoryCode,
           ),
       child: _FoodCategoryView(categoryCode: categoryCode),
     );
@@ -58,7 +60,31 @@ class _FoodCategoryView extends StatefulWidget {
 }
 
 class _FoodCategoryViewState extends State<_FoodCategoryView> {
+  final ScrollController _scroll = ScrollController();
   var _sort = 'near';
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scroll.removeListener(_onScroll);
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    if (position.maxScrollExtent <= 0) return;
+    if (position.pixels < position.maxScrollExtent - 400) return;
+    final discovery = context.read<FoodDiscoveryCubit>().state;
+    if (discovery is FoodDiscoveryReady && discovery.loadMoreFailed) return;
+    context.read<FoodDiscoveryCubit>().loadMore();
+  }
 
   void _setSort(String sort) {
     if (_sort == sort) return;
@@ -69,6 +95,7 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
       lat: origin.lat,
       lng: origin.lng,
       sortBy: sort == 'rating' ? 'rating' : 'distance',
+      category: widget.categoryCode,
     );
   }
 
@@ -81,15 +108,8 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
       FoodDiscoveryReady(:final ratings) => ratings,
       _ => const <String, StoreRating>{},
     };
-    final code = widget.categoryCode?.trim().toLowerCase();
     final stores = switch (discovery) {
-      FoodDiscoveryReady(:final stores) => [
-        for (final store in stores)
-          if (code == null ||
-              code.isEmpty ||
-              store.category?.toLowerCase() == code)
-            store,
-      ],
+      FoodDiscoveryReady(:final stores) => stores,
       _ => <FoodStoreSummary>[],
     };
     final loading = discovery is FoodDiscoveryLoading;
@@ -164,8 +184,14 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
                 ],
               ),
             ),
+            if (discovery is FoodDiscoveryReady && discovery.isRefreshing)
+              const Padding(
+                padding: EdgeInsets.only(top: DealGoSpacing.s8),
+                child: LinearProgressIndicator(minHeight: 2),
+              ),
             Expanded(
               child: ListView(
+                controller: _scroll,
                 padding: const EdgeInsets.fromLTRB(
                   DealGoDimensions.pageGutter,
                   DealGoSpacing.s16,
@@ -184,7 +210,11 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
                               style: textTheme.titleMedium,
                             ),
                             Text(
-                              l10n.foodCategoryAroundHint(stores.length),
+                              l10n.foodCategoryAroundHint(
+                                discovery is FoodDiscoveryReady
+                                    ? discovery.total
+                                    : 0,
+                              ),
                               style: textTheme.bodySmall,
                             ),
                           ],
@@ -196,9 +226,16 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
                   if (discovery is FoodDiscoveryFailed)
                     DealGoStateView.failure(
                       context,
-                      onRetry: () => context.read<FoodDiscoveryCubit>().load(
-                        currentAccessToken(context),
-                      ),
+                      onRetry: () {
+                        final origin = foodCartOrigin(context);
+                        context.read<FoodDiscoveryCubit>().load(
+                          currentAccessToken(context),
+                          lat: origin.lat,
+                          lng: origin.lng,
+                          sortBy: _sort == 'rating' ? 'rating' : 'distance',
+                          category: widget.categoryCode,
+                        );
+                      },
                       cause: discovery.message.error,
                       message: discovery.message.resolve(l10n),
                       compact: true,
@@ -225,6 +262,11 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
                       ),
                       const SizedBox(height: DealGoSpacing.s12),
                     ],
+                  FoodFeedFooter(
+                    state: discovery is FoodDiscoveryReady ? discovery : null,
+                    onRetry: () =>
+                        context.read<FoodDiscoveryCubit>().loadMore(),
+                  ),
                 ],
               ),
             ),

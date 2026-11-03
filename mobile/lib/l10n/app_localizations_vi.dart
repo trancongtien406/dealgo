@@ -841,10 +841,10 @@ class AppLocalizationsVi extends AppLocalizations {
   String get foodSearchHint => 'bún bò';
 
   @override
-  String get foodSearchFilterAll => 'Tất cả';
+  String get foodSearchFilterNear => 'Gần tôi';
 
   @override
-  String get foodSearchFilterNear => 'Gần tôi';
+  String get foodSearchSortRelevance => 'Phù hợp';
 
   @override
   String get foodSearchSuggestions => 'Gợi ý tìm kiếm';

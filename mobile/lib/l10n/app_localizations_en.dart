@@ -839,10 +839,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get foodSearchHint => 'bun bo';
 
   @override
-  String get foodSearchFilterAll => 'All';
+  String get foodSearchFilterNear => 'Near me';
 
   @override
-  String get foodSearchFilterNear => 'Near me';
+  String get foodSearchSortRelevance => 'Best match';
 
   @override
   String get foodSearchSuggestions => 'Search suggestions';
