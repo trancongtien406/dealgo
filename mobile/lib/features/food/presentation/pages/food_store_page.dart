@@ -30,6 +30,7 @@ import 'food_item_options_page.dart';
 import '../cubit/food_store_cubit.dart';
 import '../widgets/food_widgets.dart';
 import '../widgets/food_badges.dart';
+import '../widgets/food_dish_gallery.dart';
 import '../widgets/food_category_tile.dart';
 import '../food_categories_store.dart';
 import '../widgets/food_cart_bar.dart';
@@ -1954,6 +1955,10 @@ class _MenuItem extends StatelessWidget {
   /// Full-height dish photo; only items that open the options page fly it.
   Widget _photo(BuildContext context, AppLocalizations l10n) {
     final resolved = resolveMediaUrl(item.imageUrl);
+    final photoCount = foodDishGalleryImages(
+      imageUrls: item.imageUrls,
+      fallbackImageUrl: item.imageUrl,
+    ).length;
     final placeholder = Image.asset(
       foodDishFallbackImage(store.category),
       fit: BoxFit.cover,
@@ -1987,7 +1992,7 @@ class _MenuItem extends StatelessWidget {
               ),
             ),
           ),
-        if (item.imageUrls.length > 1)
+        if (photoCount > 1)
           Positioned(
             top: DealGoSpacing.s6,
             right: DealGoSpacing.s6,
@@ -2011,7 +2016,7 @@ class _MenuItem extends StatelessWidget {
                     ),
                     const SizedBox(width: DealGoSpacing.s2),
                     Text(
-                      '${item.imageUrls.length}',
+                      '$photoCount',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,

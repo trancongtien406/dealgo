@@ -1,8 +1,28 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/config/api_base_url.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import 'food_widgets.dart';
+
+/// Cover first, then the gallery, without blank or repeated photos.
+///
+/// Returns the values as given (trimmed) so callers keep the original URLs;
+/// deduplication runs on the resolved form, because the same photo can arrive
+/// as a relative path on the cover and as an absolute URL in the gallery.
+List<String> foodDishGalleryImages({
+  required List<String> imageUrls,
+  String? fallbackImageUrl,
+}) {
+  final seen = <String>{};
+  final images = <String>[];
+  for (final url in [?fallbackImageUrl, ...imageUrls]) {
+    final value = url.trim();
+    if (value.isEmpty) continue;
+    if (seen.add(resolveMediaUrl(value) ?? value)) images.add(value);
+  }
+  return images;
+}
 
 /// Swipeable dish photos with a photo counter. A single photo keeps the
 /// plain cover so short menus do not get a dead-end pager.
@@ -28,13 +48,23 @@ class _FoodDishGalleryState extends State<FoodDishGallery> {
   final PageController _controller = PageController();
   var _index = 0;
 
-  /// Cover first, then the gallery, without blank or repeated entries.
-  List<String> get _images {
-    final seen = <String>{};
-    return [
-      for (final url in [?widget.fallbackImageUrl, ...widget.imageUrls])
-        if (url.trim().isNotEmpty && seen.add(url.trim())) url.trim(),
-    ];
+  List<String> get _images => foodDishGalleryImages(
+    imageUrls: widget.imageUrls,
+    fallbackImageUrl: widget.fallbackImageUrl,
+  );
+
+  @override
+  void didUpdateWidget(FoodDishGallery oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncIndex();
+  }
+
+  /// The page count changes when another dish is picked; a stale index would
+  /// print a counter the pager can never reach.
+  void _syncIndex() {
+    if (_index < _images.length) return;
+    _index = 0;
+    if (_controller.hasClients) _controller.jumpToPage(0);
   }
 
   @override
@@ -53,6 +83,7 @@ class _FoodDishGalleryState extends State<FoodDishGallery> {
         placeholderAsset: widget.placeholderAsset,
       );
     }
+    final index = _index.clamp(0, images.length - 1);
     return AspectRatio(
       aspectRatio: widget.aspectRatio,
       child: ClipRRect(
@@ -85,10 +116,8 @@ class _FoodDishGalleryState extends State<FoodDishGallery> {
                     vertical: DealGoSpacing.s4,
                   ),
                   child: Text(
-                    AppLocalizations.of(context).foodDishPhotoCount(
-                      _index + 1,
-                      images.length,
-                    ),
+                    AppLocalizations.of(context)
+                        .foodDishPhotoCount(index + 1, images.length),
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,

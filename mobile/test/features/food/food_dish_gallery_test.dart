@@ -1,3 +1,4 @@
+import 'package:dealgo/core/config/api_base_url.dart';
 import 'package:dealgo/features/food/presentation/widgets/food_dish_gallery.dart';
 import 'package:dealgo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -62,5 +63,48 @@ void main() {
     );
 
     expect(find.byKey(const Key('food-dish-gallery')), findsNothing);
+  });
+
+  testWidgets('a shrunken gallery never prints an unreachable counter', (
+    tester,
+  ) async {
+    final urls = ValueNotifier<List<String>>(['a.jpg', 'b.jpg', 'c.jpg']);
+    addTearDown(urls.dispose);
+    await _pump(
+      tester,
+      ValueListenableBuilder<List<String>>(
+        valueListenable: urls,
+        builder: (context, value, _) => FoodDishGallery(
+          imageUrls: value,
+          fallbackImageUrl: null,
+          placeholderAsset: 'assets/images/food_dish.jpg',
+        ),
+      ),
+    );
+
+    await tester.drag(
+      find.byKey(const Key('food-dish-gallery')),
+      const Offset(-400, 0),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Ảnh 2/3'), findsOneWidget);
+
+    urls.value = ['a.jpg'];
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('food-dish-gallery')), findsNothing);
+
+    urls.value = ['a.jpg', 'b.jpg', 'c.jpg'];
+    await tester.pumpAndSettle();
+    expect(find.text('Ảnh 1/3'), findsOneWidget);
+  });
+
+  test('a cover repeated as an absolute URL is one photo', () {
+    final absolute = resolveMediaUrl('/media/a.jpg')!;
+    final images = foodDishGalleryImages(
+      imageUrls: [absolute, 'b.jpg', 'b.jpg'],
+      fallbackImageUrl: '/media/a.jpg',
+    );
+
+    expect(images, ['/media/a.jpg', 'b.jpg']);
   });
 }
