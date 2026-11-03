@@ -406,10 +406,11 @@ class FakeFoodClient implements FoodClient {
     int page = 1,
     int limit = 20,
   }) async {
-    searchQueries.add(q);
+    final trimmed = q.trim();
+    searchQueries.add(trimmed);
     final handler = searchFoodHandler;
     if (handler != null) {
-      return handler(q);
+      return handler(trimmed);
     }
     return const FoodSearchResult(
       dishes: [],
@@ -425,8 +426,12 @@ class FakeFoodClient implements FoodClient {
     String storeId, {
     List<String> exclude = const [],
   }) async {
-    suggestionCalls.add((storeId: storeId, exclude: List.of(exclude)));
-    return List.of(suggestions);
+    final excluded = [
+      for (final id in exclude)
+        if (id.trim().isNotEmpty) id.trim(),
+    ];
+    suggestionCalls.add((storeId: storeId, exclude: excluded));
+    return List.unmodifiable(suggestions);
   }
 
   @override

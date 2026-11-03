@@ -1,6 +1,40 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:dealgo/core/mock/fake_food_client.dart';
 import 'package:dealgo/core/network/api_exception.dart';
 import 'package:dealgo/features/food/data/datasources/dio_food_remote_datasource.dart';
+import 'package:dealgo/features/food/domain/entities/food_models.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+class _SearchAdapter implements HttpClientAdapter {
+  static const _searchPayload = {
+    'dishes': {'items': <Object?>[], 'page': 1, 'limit': 20, 'total': 0},
+    'stores': {'items': <Object?>[], 'page': 1, 'limit': 20, 'total': 0},
+  };
+
+  final requests = <RequestOptions>[];
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    requests.add(options);
+    return ResponseBody.fromString(
+      jsonEncode({'success': true, 'data': _searchPayload}),
+      200,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
 
 void main() {
   test('decodes closesAtToday and dish search hits', () {
@@ -183,5 +217,122 @@ void main() {
     expect(suggestions.single.soldCount, 30);
     expect(suggestions.single.originalPriceVnd, isNull);
     expect(suggestions.single.imageUrl, '/v1/public/menu-items/item-9/a.jpg');
+  });
+
+  test('searchFood forwards sortBy only when the caller sets it', () async {
+    final adapter = _SearchAdapter();
+    final source = DioFoodRemoteDataSource(
+      dio: Dio(BaseOptions(baseUrl: 'https://api.test'))
+        ..httpClientAdapter = adapter,
+    );
+
+    await source.searchFood('tok', q: '  bún bò  ', lat: 16.05, lng: 108.2);
+    await source.searchFood(
+      'tok',
+      q: 'bún bò',
+      lat: 16.05,
+      lng: 108.2,
+      sortBy: 'rating',
+    );
+
+    final defaulted = adapter.requests.first.queryParameters;
+    expect(defaulted.containsKey('sort_by'), isFalse);
+    expect(defaulted['q'], 'bún bò');
+    expect(defaulted['lat'], 16.05);
+    expect(defaulted['lng'], 108.2);
+    expect(adapter.requests.last.queryParameters['sort_by'], 'rating');
+  });
+
+  test('treats a search section without items as empty', () {
+    final emptySections = decodeFoodSearchResult({
+      'dishes': <String, Object?>{},
+      'stores': <String, Object?>{},
+    });
+    expect(emptySections.dishes, isEmpty);
+    expect(emptySections.stores, isEmpty);
+    expect(emptySections.dishTotal, 0);
+    expect(emptySections.storeTotal, 0);
+
+    final absentSections = decodeFoodSearchResult(<String, Object?>{});
+    expect(absentSections.dishes, isEmpty);
+    expect(absentSections.stores, isEmpty);
+    expect(absentSections.dishTotal, 0);
+    expect(absentSections.storeTotal, 0);
+
+    final missingTotals = decodeFoodSearchResult({
+      'dishes': {
+        'items': [
+          {
+            'item': {'id': 'item-1', 'name': 'Bún bò', 'priceVnd': 45000},
+            'store': {'id': 'store-1', 'name': 'Bún Bò Huế'},
+          },
+        ],
+      },
+      'stores': {
+        'items': [
+          {'id': 'store-1', 'name': 'Bún Bò Huế'},
+        ],
+      },
+    });
+    expect(missingTotals.dishTotal, 1);
+    expect(missingTotals.storeTotal, 1);
+  });
+
+  test('store list endpoints stay strict about a missing items array', () {
+    expect(
+      () => decodeFoodStoreList({
+        'success': true,
+        'data': {'total': 0},
+      }),
+      throwsA(
+        isA<ApiException>().having(
+          (error) => error.errorCode,
+          'errorCode',
+          'INVALID_RESPONSE',
+        ),
+      ),
+    );
+    expect(
+      () => decodeFoodStorePage(
+        {
+          'success': true,
+          'data': {'total': 0},
+        },
+        page: 1,
+        limit: 20,
+      ),
+      throwsA(
+        isA<ApiException>().having(
+          (error) => error.errorCode,
+          'errorCode',
+          'INVALID_RESPONSE',
+        ),
+      ),
+    );
+  });
+
+  test('fake search mirrors the datasource trimming and exclusions', () async {
+    final fake = FakeFoodClient(
+      suggestions: const [
+        FoodFeaturedItem(id: 'item-9', name: 'Chả giò', priceVnd: 25000),
+      ],
+    );
+
+    await fake.searchFood('tok', q: '  bún bò  ');
+    expect(fake.searchQueries, ['bún bò']);
+
+    final suggestions = await fake.listStoreSuggestions(
+      'tok',
+      'store-1',
+      exclude: [' item-1 ', '', '   '],
+    );
+    expect(fake.suggestionCalls.single.exclude, ['item-1']);
+    expect(suggestions.single.id, 'item-9');
+    expect(
+      () => suggestions.add(
+        const FoodFeaturedItem(id: 'x', name: 'X', priceVnd: 1),
+      ),
+      throwsUnsupportedError,
+    );
   });
 }

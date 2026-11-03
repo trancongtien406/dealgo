@@ -251,14 +251,13 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
     int limit = 20,
   }) {
     final hasGeo = lat != null && lng != null;
-    final sort = sortBy ?? (hasGeo ? 'distance' : null);
     return _send(
       () => dio.get<Object?>(
         ApiPaths.foodSearch,
         queryParameters: {
           'q': q.trim(),
           if (hasGeo) ...{'lat': lat, 'lng': lng},
-          'sort_by': ?sort,
+          'sort_by': ?sortBy,
           // The search route rejects limit > 20 with a 400.
           'page': page,
           'limit': limit.clamp(1, 20),
@@ -1057,9 +1056,7 @@ FoodSearchResult decodeFoodSearchResult(Object? body) {
   final dishSection = asJsonMap(data['dishes']);
   final storeSection = asJsonMap(data['stores']);
   final dishes = _decodeDishHits(dishSection?['items']);
-  final stores = storeSection == null
-      ? const <FoodStoreSummary>[]
-      : _decodeStoreRows(storeSection);
+  final stores = _decodeSearchStoreSection(data['stores']);
   final dishReported = _asInt(dishSection?['total']);
   final storeReported = _asInt(storeSection?['total']);
   return FoodSearchResult(
@@ -1072,6 +1069,13 @@ FoodSearchResult decodeFoodSearchResult(Object? body) {
         ? stores.length
         : storeReported,
   );
+}
+
+/// A search section is optional: an absent section or one without `items`
+/// means the server sent no rows for it.
+List<FoodStoreSummary> _decodeSearchStoreSection(Object? raw) {
+  final rows = raw is List ? raw : asJsonMap(raw)?['items'];
+  return rows is List ? _decodeStoreRows(rows) : const [];
 }
 
 List<FoodDishHit> _decodeDishHits(Object? raw) {
