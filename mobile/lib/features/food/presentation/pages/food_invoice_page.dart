@@ -15,6 +15,7 @@ import '../../domain/entities/food_models.dart';
 import '../../domain/entities/food_money.dart';
 import '../../domain/usecases/get_food_order.dart';
 import '../cubit/food_tracking_cubit.dart';
+import '../widgets/food_order_extras.dart';
 import '../widgets/food_widgets.dart';
 import '../utils/food_routes.dart';
 import 'food_tracking_page.dart' show foodTrackingTitle;
@@ -203,6 +204,10 @@ class _FoodInvoiceView extends StatelessWidget {
                                                         .textSecondary,
                                                   ),
                                             ),
+                                          if ((line.note ?? '')
+                                              .trim()
+                                              .isNotEmpty)
+                                            FoodLineNoteText(line.note!),
                                           Text(
                                             'x${line.quantity} · ${formatVnd(line.unitPriceVnd)}',
                                             style: textTheme.bodySmall,
@@ -223,6 +228,19 @@ class _FoodInvoiceView extends StatelessWidget {
                           ],
                         ),
                       ),
+                      if ((current.note ?? '').trim().isNotEmpty ||
+                          !current.utensils)
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            top: DealGoSpacing.s12,
+                          ),
+                          child: FoodPanel(
+                            child: FoodOrderExtrasBlock(
+                              note: current.note,
+                              utensils: current.utensils,
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: DealGoSpacing.s12),
                       FoodPanel(
                         color: DealGoColors.subtlePurple,

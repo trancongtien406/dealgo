@@ -729,6 +729,8 @@ ReadyFoodJob? _readyJob(Object? raw) {
       fallbackLabel: cleanAddress ?? cleanName ?? '',
     ),
     route: RouteGeometry.tryParse(map['route']),
+    note: _asNote(map['note']),
+    utensils: map['utensils'] is bool ? map['utensils'] as bool : true,
   );
 }
 

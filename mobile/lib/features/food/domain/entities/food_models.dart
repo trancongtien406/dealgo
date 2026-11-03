@@ -593,10 +593,18 @@ class ReadyFoodJob {
     this.pickup,
     this.route,
     this.approachRoute,
+    this.note,
+    this.utensils = true,
   });
 
   final String id;
   final String storeId;
+
+  /// Customer note for the store and courier; null = none.
+  final String? note;
+
+  /// Whether the customer asked for cutlery.
+  final bool utensils;
 
   /// DEC-PROD-031 rev 3 (DRAFT): driver→store leg snapshot (assigned only).
   final RouteGeometry? approachRoute;
