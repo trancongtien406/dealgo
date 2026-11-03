@@ -285,7 +285,7 @@
   "foodSearchTitle": "Tìm món & cửa hàng",
   "foodSearchHint": "bún bò",
   "foodSearchFilterNear": "Gần tôi",
-  "foodSearchSortRelevance": "Phù hợp",
+  "foodSearchSortNewest": "Mới nhất",
   "foodSearchSuggestions": "Gợi ý tìm kiếm",
   "foodSearchResults": "{count} kết quả",
   "@foodSearchResults": {

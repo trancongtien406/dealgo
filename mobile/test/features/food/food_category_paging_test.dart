@@ -69,7 +69,7 @@ void main() {
     expect(food.storeCategories.last, 'noodles');
   });
 
-  testWidgets('search defaults to relevance and keeps the query on sort', (
+  testWidgets('search keeps the query and sends the chosen sort', (
     tester,
   ) async {
     _tall(tester);
@@ -89,12 +89,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(food.storeSearches.last, 'bún');
-    expect(food.storeSorts.last, isNull);
+    expect(food.storeSorts.last, 'distance');
 
-    await tester.tap(find.byKey(const Key('food-search-sort-distance')));
+    await tester.tap(find.byKey(const Key('food-search-sort-rating')));
     await tester.pumpAndSettle();
 
-    expect(food.storeSorts.last, 'distance');
+    expect(food.storeSorts.last, 'rating');
     expect(food.storeSearches.last, 'bún');
   });
 }

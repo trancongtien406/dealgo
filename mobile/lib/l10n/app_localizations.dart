@@ -1724,11 +1724,11 @@ abstract class AppLocalizations {
   /// **'Near me'**
   String get foodSearchFilterNear;
 
-  /// No description provided for @foodSearchSortRelevance.
+  /// No description provided for @foodSearchSortNewest.
   ///
   /// In en, this message translates to:
-  /// **'Best match'**
-  String get foodSearchSortRelevance;
+  /// **'Newest'**
+  String get foodSearchSortNewest;
 
   /// No description provided for @foodSearchSuggestions.
   ///

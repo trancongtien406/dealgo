@@ -67,9 +67,7 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
   late final TextEditingController _query = TextEditingController(
     text: widget.initialQuery,
   );
-
-  /// Null = let the server rank a text query by relevance.
-  String? _sortBy;
+  String _sortBy = 'distance';
   var _history = const <String>[];
   Timer? _debounce;
 
@@ -103,7 +101,7 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
     });
   }
 
-  void _setSort(String? sortBy) {
+  void _setSort(String sortBy) {
     if (_sortBy == sortBy) return;
     setState(() => _sortBy = sortBy);
     _loadStores(_query.text.trim());
@@ -222,13 +220,13 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
                   horizontal: DealGoDimensions.pageGutter,
                 ),
                 children: [
-                  for (final entry in <(String?, String)>[
-                    (null, l10n.foodSearchSortRelevance),
+                  for (final entry in [
                     ('distance', l10n.foodSearchFilterNear),
+                    ('createdAt', l10n.foodSearchSortNewest),
                     ('rating', l10n.foodCategorySortRating),
                   ]) ...[
                     DealGoChip(
-                      key: Key('food-search-sort-${entry.$1 ?? 'relevance'}'),
+                      key: Key('food-search-sort-${entry.$1}'),
                       label: entry.$2,
                       selected: _sortBy == entry.$1,
                       tone: DealGoChipTone.brand,

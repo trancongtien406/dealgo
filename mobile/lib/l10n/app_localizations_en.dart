@@ -842,7 +842,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get foodSearchFilterNear => 'Near me';
 
   @override
-  String get foodSearchSortRelevance => 'Best match';
+  String get foodSearchSortNewest => 'Newest';
 
   @override
   String get foodSearchSuggestions => 'Search suggestions';

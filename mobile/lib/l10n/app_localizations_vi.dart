@@ -844,7 +844,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get foodSearchFilterNear => 'Gần tôi';
 
   @override
-  String get foodSearchSortRelevance => 'Phù hợp';
+  String get foodSearchSortNewest => 'Mới nhất';
 
   @override
   String get foodSearchSuggestions => 'Gợi ý tìm kiếm';

@@ -285,7 +285,7 @@
   "foodSearchTitle": "Find dishes & stores",
   "foodSearchHint": "bun bo",
   "foodSearchFilterNear": "Near me",
-  "foodSearchSortRelevance": "Best match",
+  "foodSearchSortNewest": "Newest",
   "foodSearchSuggestions": "Search suggestions",
   "foodSearchResults": "{count} results",
   "@foodSearchResults": {
