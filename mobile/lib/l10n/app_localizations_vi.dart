@@ -3035,6 +3035,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get foodDiscoverySearchHint => 'Tìm quán, món ăn, đồ uống';
 
   @override
+  String get foodFeedEndOfList => 'Bạn đã xem hết quán quanh đây';
+
+  @override
   String get foodStoreBestsellers => 'Món bán chạy';
 
   @override

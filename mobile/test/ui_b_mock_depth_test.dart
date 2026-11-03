@@ -167,8 +167,7 @@ void main() {
     );
     await tester.tap(navLabel('Mua'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('food-store-card-store-bun-bo')));
-    await tester.pumpAndSettle();
+    await tapFoodStoreCard(tester, 'store-bun-bo');
     await tester.tap(find.byKey(const Key('food-add-item-bun')));
     await tester.pumpAndSettle();
     final optionsAdd = find.byKey(const Key('food-options-add'));
@@ -186,4 +185,15 @@ void main() {
     expect(find.text('Đặt hàng thành công'), findsOneWidget);
     expect(find.byKey(const Key('food-track-order')), findsOneWidget);
   });
+}
+
+Future<void> tapFoodStoreCard(WidgetTester tester, String storeId) async {
+  final card = find.byKey(Key('food-store-card-$storeId'));
+  await tester.scrollUntilVisible(
+    card,
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.tap(card);
+  await tester.pumpAndSettle();
 }

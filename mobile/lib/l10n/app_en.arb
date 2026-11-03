@@ -1347,6 +1347,7 @@
     }
   },
   "foodDiscoverySearchHint": "Search restaurants, dishes, drinks",
+  "foodFeedEndOfList": "You have seen every store nearby",
   "foodStoreBestsellers": "Best sellers",
   "foodStorePrepChip": "≈{minutes} min",
   "@foodStorePrepChip": {

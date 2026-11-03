@@ -1054,6 +1054,7 @@
   "storeRatingValue": "{rating} ({count})",
   "storeDistance": "{km} km",
   "foodDiscoverySearchHint": "Tìm quán, món ăn, đồ uống",
+  "foodFeedEndOfList": "Bạn đã xem hết quán quanh đây",
   "foodStoreBestsellers": "Món bán chạy",
   "foodStorePrepChip": "Khoảng {minutes} phút",
   "@foodStorePrepChip": {

@@ -154,7 +154,7 @@ void main() {
       findsWidgets,
     );
 
-    await tester.tap(find.byKey(const Key('food-store-card-$_storeId')));
+    await tapFoodStoreCard(tester, _storeId);
     await tester.pumpAndSettle();
     expect(find.text('Chi tiết quán'), findsOneWidget);
     expect(find.text('Bún bò đặc biệt'), findsOneWidget);
@@ -353,8 +353,7 @@ Future<void> _openCheckout(WidgetTester tester, FakeFoodClient food) async {
   );
   await tester.tap(navLabel('Mua'));
   await tester.pumpAndSettle();
-  await tester.tap(find.byKey(const Key('food-store-card-$_storeId')));
-  await tester.pumpAndSettle();
+  await tapFoodStoreCard(tester, _storeId);
   await tester.tap(find.byKey(const Key('food-add-$_bunId')));
   await tester.pumpAndSettle();
   final optionsAdd = find.byKey(const Key('food-options-add'));
@@ -367,4 +366,15 @@ Future<void> _openCheckout(WidgetTester tester, FakeFoodClient food) async {
   await chooseDeliveryAddress(tester);
   expect(find.text('60.000đ'), findsWidgets);
   expect(find.text('25.000đ'), findsWidgets);
+}
+
+Future<void> tapFoodStoreCard(WidgetTester tester, String storeId) async {
+  final card = find.byKey(Key('food-store-card-$storeId'));
+  await tester.scrollUntilVisible(
+    card,
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.tap(card);
+  await tester.pumpAndSettle();
 }

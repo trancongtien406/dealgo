@@ -3056,6 +3056,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get foodDiscoverySearchHint => 'Search restaurants, dishes, drinks';
 
   @override
+  String get foodFeedEndOfList => 'You have seen every store nearby';
+
+  @override
   String get foodStoreBestsellers => 'Best sellers';
 
   @override

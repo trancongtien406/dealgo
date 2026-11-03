@@ -5834,6 +5834,12 @@ abstract class AppLocalizations {
   /// **'Search restaurants, dishes, drinks'**
   String get foodDiscoverySearchHint;
 
+  /// No description provided for @foodFeedEndOfList.
+  ///
+  /// In en, this message translates to:
+  /// **'You have seen every store nearby'**
+  String get foodFeedEndOfList;
+
   /// No description provided for @foodStoreBestsellers.
   ///
   /// In en, this message translates to:
