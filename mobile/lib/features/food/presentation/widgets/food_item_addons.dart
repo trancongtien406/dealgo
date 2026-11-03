@@ -46,6 +46,10 @@ class FoodItemAddons extends StatefulWidget {
 class _FoodItemAddonsState extends State<FoodItemAddons> {
   List<FoodFeaturedItem> _items = const [];
 
+  /// Bumped on every load so a slow reply for a superseded dish is dropped
+  /// instead of repainting the strip for the dish that replaced it.
+  var _generation = 0;
+
   @override
   void initState() {
     super.initState();
@@ -63,6 +67,7 @@ class _FoodItemAddonsState extends State<FoodItemAddons> {
   }
 
   Future<void> _load() async {
+    final generation = ++_generation;
     try {
       final token = currentAccessToken(context);
       if (token == null) {
@@ -74,16 +79,17 @@ class _FoodItemAddonsState extends State<FoodItemAddons> {
         widget.store.id,
         exclude: [widget.excludeItemId],
       );
-      if (!mounted) {
+      if (!mounted || generation != _generation) {
         return;
       }
       setState(() {
         _items = suggestions.take(foodItemAddonsMax).toList(growable: false);
       });
     } on Object {
-      if (mounted) {
-        setState(() => _items = const []);
+      if (!mounted || generation != _generation) {
+        return;
       }
+      setState(() => _items = const []);
     }
   }
 
@@ -200,15 +206,21 @@ class _AddonTile extends StatelessWidget {
                     color: DealGoColors.primary,
                     shape: const CircleBorder(),
                     clipBehavior: Clip.antiAlias,
-                    child: Tooltip(
-                      message: l10n.foodAddToCart,
-                      child: InkWell(
-                        key: Key('food-addon-add-${item.id}'),
-                        onTap: onAdd,
-                        child: const Icon(
-                          DealGoIcons.add,
-                          size: 20,
-                          color: Colors.white,
+                    child: Semantics(
+                      button: true,
+                      label: '${l10n.foodAddToCart}: ${item.name}',
+                      onTap: onAdd,
+                      excludeSemantics: true,
+                      child: Tooltip(
+                        message: l10n.foodAddToCart,
+                        child: InkWell(
+                          key: Key('food-addon-add-${item.id}'),
+                          onTap: onAdd,
+                          child: const Icon(
+                            DealGoIcons.add,
+                            size: 20,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
