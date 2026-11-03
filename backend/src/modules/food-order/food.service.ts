@@ -62,8 +62,10 @@ import {
   type FoodRejectReason,
 } from './food.constants.js';
 import {
+  FOOD_SEARCH_MAX_LIMIT,
   FOOD_STORE_BROWSE_MAX_LIMIT,
   type ListFoodStoresQueryDto,
+  type SearchFoodDto,
   type CreateFoodItemDto,
   type ReplaceFoodItemOptionsDto,
   type OpsCatalogModerationQueryDto,
@@ -106,6 +108,7 @@ import type {
   FoodDriverHistoryWindow,
   FoodOrderView,
   FoodRepository,
+  DishHit,
   OpsCatalogModerationPage,
   OpsFoodInterveneResult,
   OpsStoreDetail,
@@ -144,6 +147,14 @@ export type PublicStoreBrowseItem = Omit<
   minOrderVnd: number;
   /** Best sellers then the newest dish (pickFeaturedItems); [] for a store without approved dishes. */
   featuredItems: StoreFeaturedItem[];
+};
+
+/** A dish hit as sent to clients: the store carries the same estimated fee/ETA as a browse card. */
+export type PublicDishHit = Omit<DishHit, 'store'> & {
+  store: DishHit['store'] & {
+    etaMinutes: number | null;
+    deliveryFeeFromVnd: number | null;
+  };
 };
 
 /** A list price must sit above the selling price to be shown struck through. */
@@ -457,13 +468,7 @@ export class FoodService {
       query.sort_by === 'distance' && !hasGeo
         ? 'createdAt'
         : (query.sort_by ?? 'createdAt');
-    const settingRadiusKm = hasGeo
-      ? await this.settings.getNumber('DRIVER_SEARCH_RADIUS_KM')
-      : 0;
-    const radiusKm =
-      query.max_km !== undefined
-        ? Math.min(query.max_km, settingRadiusKm)
-        : settingRadiusKm;
+    const radiusKm = await this.browseRadiusKm(query);
     const [minRatingCount, feeMin, feeMax, feePerKm, feeStep] =
       await Promise.all([
         this.settings.getNumber('RATING_STORE_MIN_COUNT'),
@@ -536,6 +541,91 @@ export class FoodService {
       limit,
       total: result.total,
     };
+  }
+
+  /**
+   * One round trip for the search screen: dishes whose name matches `q` above the
+   * stores matching the same keyword (store name or any of its dish names).
+   */
+  async searchFood(
+    actor: RequestActor,
+    query: SearchFoodDto,
+  ): Promise<{
+    dishes: PageResult<PublicDishHit>;
+    stores: PageResult<PublicStoreBrowseItem>;
+  }> {
+    await this.requireActiveCustomer(actor.userId);
+    await this.ensureSandboxFixtureCatalog();
+    const page = normalizePage(query.page);
+    const limit = normalizeLimit(query.limit, FOOD_SEARCH_MAX_LIMIT);
+    const radiusKm = await this.browseRadiusKm(query);
+    const [feeMin, feeMax, feePerKm, feeStep] = await Promise.all([
+      this.settings.getNumber('FOOD_MIN_DELIVERY_VND'),
+      this.settings.getNumber('FOOD_MAX_DELIVERY_VND'),
+      this.settings.getNumber('FOOD_DELIVERY_VND_PER_KM'),
+      this.settings.getNumber('FOOD_FARE_STEP_VND'),
+    ]);
+    const [dishes, stores] = await Promise.all([
+      this.food.searchDishes({
+        q: query.q,
+        page,
+        limit,
+        lat: query.lat,
+        lng: query.lng,
+        radiusKm,
+      }),
+      this.listStores(actor, {
+        page,
+        limit,
+        search: query.q,
+        category: query.category,
+        lat: query.lat,
+        lng: query.lng,
+        sort_by: query.sort_by,
+        max_km: query.max_km,
+      }),
+    ]);
+    return {
+      dishes: {
+        page,
+        limit,
+        total: dishes.total,
+        items: dishes.items.map((hit) => ({
+          item: hit.item,
+          store: {
+            ...hit.store,
+            etaMinutes:
+              hit.store.distanceKm === null
+                ? null
+                : hit.item.prepMinutes +
+                  Math.ceil(hit.store.distanceKm * BROWSE_MINUTES_PER_KM),
+            deliveryFeeFromVnd:
+              hit.store.distanceKm === null
+                ? null
+                : clampToFoodFareSteps(
+                    quoteReferenceFareVnd(hit.store.distanceKm, feePerKm, feeMin),
+                    feeMin,
+                    feeMax,
+                    feeStep,
+                  ),
+          },
+        })),
+      },
+      stores,
+    };
+  }
+
+  /** Browse/search radius: the platform limit, optionally narrowed by max_km. */
+  private async browseRadiusKm(query: ListFoodStoresQueryDto): Promise<number> {
+    if (query.lat === undefined || query.lng === undefined) {
+      return 0;
+    }
+    const settingRadiusKm = await this.settings.getNumber(
+      'DRIVER_SEARCH_RADIUS_KM',
+    );
+    return query.max_km !== undefined
+      ? Math.min(query.max_km, settingRadiusKm)
+      : settingRadiusKm;
   }
 
   async getStore(

@@ -27,6 +27,7 @@ import {
   PickupFoodOrderDto,
   PlaceFoodOrderDto,
   QuoteFoodDeliveryDto,
+  SearchFoodDto,
   ProposeFoodOrderChangeDto,
   RejectFoodOrderDto,
   ReleaseFoodOrderDto,
@@ -50,6 +51,12 @@ export class FoodController {
   })
   listStores(@CurrentActor() actor: RequestActor, @Query() query: ListFoodStoresQueryDto) {
     return this.food.listStores(actor, query);
+  }
+
+  @Get('search')
+  @ApiOperation({ summary: 'Search dishes and stores by dish name (dishes first)' })
+  searchFood(@CurrentActor() actor: RequestActor, @Query() query: SearchFoodDto) {
+    return this.food.searchFood(actor, query);
   }
 
   @Get('stores/:id')

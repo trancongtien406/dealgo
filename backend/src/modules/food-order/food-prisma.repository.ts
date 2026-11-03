@@ -71,6 +71,8 @@ import type {
   SetItemAvailabilityInput,
   ListFoodStoresQuery,
   StoreBrowsePage,
+  DishSearchPage,
+  DishSearchQuery,
   StoreDetail,
   StoreItemView,
   UpdateCatalogItemInput,
@@ -251,13 +253,7 @@ export class PrismaFoodRepository implements FoodRepository {
     const now = new Date();
 
     const distanceSql = hasGeo
-      ? Prisma.sql`(
-      6371 * 2 * ASIN(LEAST(1, SQRT(
-        POWER(SIN(RADIANS(${query.lat!} - s."lat") / 2), 2)
-        + COS(RADIANS(${query.lat!})) * COS(RADIANS(s."lat"))
-          * POWER(SIN(RADIANS(${query.lng!} - s."lng") / 2), 2)
-      )))
-    )`
+      ? distanceKmSql(query.lat!, query.lng!)
       : Prisma.sql`NULL::double precision`;
 
     // A store without coordinates cannot take delivery orders, so it is not listed.
@@ -407,6 +403,112 @@ export class PrismaFoodRepository implements FoodRepository {
           ratingCount: Number(row.rating_count ?? 0),
           ratingAverage:
             row.rating_avg === null ? null : Number(row.rating_avg),
+        };
+      }),
+    };
+  }
+
+  async searchDishes(query: DishSearchQuery): Promise<DishSearchPage> {
+    const hasGeo = query.lat !== undefined && query.lng !== undefined;
+    const skip = (query.page - 1) * query.limit;
+    const now = new Date();
+    const like = '%' + query.q.trim() + '%';
+    const distanceSql = hasGeo
+      ? distanceKmSql(query.lat!, query.lng!)
+      : Prisma.sql`NULL::double precision`;
+    const openSql = openNowSql(now);
+    const filters: Prisma.Sql[] = [
+      Prisma.sql`i."available" = TRUE`,
+      Prisma.sql`i."moderationStatus" = 'APPROVED'`,
+      Prisma.sql`i."name" ILIKE ${like}`,
+      Prisma.sql`s."lat" IS NOT NULL`,
+      Prisma.sql`s."lng" IS NOT NULL`,
+      openSql,
+    ];
+    if (hasGeo) {
+      filters.push(Prisma.sql`${distanceSql} <= ${query.radiusKm}`);
+    }
+    const whereSql = Prisma.join(filters, ' AND ');
+
+    const countRows = await this.db.$queryRaw<Array<{ total: bigint }>>`
+      SELECT COUNT(*)::bigint AS total
+      FROM "food_items" i
+      JOIN "food_stores" s ON s."id" = i."storeId"
+      WHERE ${whereSql}
+    `;
+    const total = Number(countRows[0]?.total ?? 0);
+
+    const rows = await this.db.$queryRaw<
+      Array<{
+        id: string;
+        name: string;
+        priceVnd: number;
+        originalPriceVnd: number | null;
+        imageUrl: string | null;
+        soldCount: number;
+        prepMinutes: number;
+        storeId: string;
+        storeName: string;
+        serviceMode: StoreServiceMode;
+        serviceModeUntil: Date | null;
+        open_now: boolean;
+        distance_km: number | null;
+      }>
+    >`
+      SELECT
+        i."id",
+        i."name",
+        i."priceVnd",
+        i."originalPriceVnd",
+        i."imageUrl",
+        i."soldCount",
+        COALESCE(i."prepMinutes", s."defaultPrepMinutes") AS "prepMinutes",
+        s."id" AS "storeId",
+        s."name" AS "storeName",
+        s."serviceMode"::text AS "serviceMode",
+        s."serviceModeUntil",
+        ${openSql} AS open_now,
+        ${distanceSql} AS distance_km
+      FROM "food_items" i
+      JOIN "food_stores" s ON s."id" = i."storeId"
+      WHERE ${whereSql}
+      ORDER BY i."soldCount" DESC, i."name" ASC, i."id" ASC
+      LIMIT ${query.limit}
+      OFFSET ${skip}
+    `;
+
+    return {
+      total,
+      items: rows.map((row) => {
+        const mode = effectiveServiceMode(
+          row.serviceMode,
+          row.serviceModeUntil,
+          now,
+        ).serviceMode;
+        return {
+          item: {
+            id: row.id,
+            name: row.name,
+            priceVnd: row.priceVnd,
+            originalPriceVnd: shownOriginalPrice(
+              row.priceVnd,
+              row.originalPriceVnd,
+            ),
+            imageUrl: row.imageUrl,
+            soldCount: row.soldCount,
+            prepMinutes: row.prepMinutes,
+          },
+          store: {
+            id: row.storeId,
+            name: row.storeName,
+            distanceKm: row.distance_km === null ? null : Number(row.distance_km),
+            openNow: row.open_now,
+            closedReason: row.open_now
+              ? null
+              : mode === 'PAUSED'
+                ? 'PAUSED'
+                : 'CLOSED',
+          },
         };
       }),
     };
@@ -3453,6 +3555,17 @@ function scheduleFromRow(store: {
       note: row.note,
     })),
   };
+}
+
+/** SQL twin of haversineKm() from a fixed origin; the caller aliases food_stores as `s`. */
+function distanceKmSql(lat: number, lng: number): Prisma.Sql {
+  return Prisma.sql`(
+      6371 * 2 * ASIN(LEAST(1, SQRT(
+        POWER(SIN(RADIANS(${lat} - s."lat") / 2), 2)
+        + COS(RADIANS(${lat})) * COS(RADIANS(s."lat"))
+          * POWER(SIN(RADIANS(${lng} - s."lng") / 2), 2)
+      )))
+    )`;
 }
 
 /** SQL twin of storeAvailability().openNow for list ordering (DEC-PROD-027/029). */

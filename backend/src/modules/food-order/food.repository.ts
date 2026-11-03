@@ -122,6 +122,44 @@ export type StoreBrowsePage = {
   total: number;
 };
 
+export type DishSearchQuery = {
+  q: string;
+  page: number;
+  limit: number;
+  lat?: number;
+  lng?: number;
+  /** Only stores within this many km; ignored without lat/lng. */
+  radiusKm: number;
+};
+
+/**
+ * A dish above the store section. Only dishes from stores taking orders now are
+ * surfaced: a dish hit opens the item page, so a closed store would be a dead end.
+ */
+export type DishHit = {
+  item: {
+    id: string;
+    name: string;
+    priceVnd: number;
+    originalPriceVnd: number | null;
+    imageUrl: string | null;
+    soldCount: number;
+    prepMinutes: number;
+  };
+  store: {
+    id: string;
+    name: string;
+    distanceKm: number | null;
+    openNow: boolean;
+    closedReason: 'PAUSED' | 'CLOSED' | null;
+  };
+};
+
+export type DishSearchPage = {
+  items: DishHit[];
+  total: number;
+};
+
 export type ListFoodStoresQuery = {
   page: number;
   limit: number;
@@ -741,6 +779,7 @@ export interface FoodRepository {
   hasStore(): Promise<boolean>;
   createFixtureStore(ownerId: string, items: CatalogItemInput[]): Promise<void>;
   listStores(query: ListFoodStoresQuery): Promise<StoreBrowsePage>;
+  searchDishes(query: DishSearchQuery): Promise<DishSearchPage>;
   listStoresPage(
     page: number,
     limit: number,
@@ -1275,6 +1314,65 @@ export class MemoryFoodRepository implements FoodRepository {
       };
     });
     return { items, total };
+  }
+
+  async searchDishes(query: DishSearchQuery): Promise<DishSearchPage> {
+    const needle = query.q.trim().toLowerCase();
+    const hasGeo = query.lat !== undefined && query.lng !== undefined;
+    const origin = hasGeo ? { lat: query.lat!, lng: query.lng! } : null;
+    const now = new Date();
+    const hits: Array<{
+      item: StoredItem;
+      store: StoredStore;
+      distanceKm: number | null;
+      availability: StoreAvailability;
+    }> = [];
+    for (const item of this.items) {
+      if (!item.available || item.moderationStatus !== 'APPROVED') continue;
+      if (!item.name.toLowerCase().includes(needle)) continue;
+      const store = this.stores.find((entry) => entry.id === item.storeId);
+      if (!store || store.lat === null || store.lng === null) continue;
+      const availability = memoryAvailability(store, now);
+      if (!availability.openNow) continue;
+      const distanceKm = origin
+        ? haversineKm(origin, { lat: store.lat, lng: store.lng })
+        : null;
+      if (distanceKm !== null && distanceKm > query.radiusKm) continue;
+      hits.push({ item, store, distanceKm, availability });
+    }
+    hits.sort(
+      (left, right) =>
+        right.item.soldCount - left.item.soldCount ||
+        left.item.name.localeCompare(right.item.name) ||
+        left.item.id.localeCompare(right.item.id),
+    );
+    const start = pageOffset(query.page, query.limit);
+    return {
+      total: hits.length,
+      items: hits.slice(start, start + query.limit).map((hit) => ({
+        item: {
+          id: hit.item.id,
+          name: hit.item.name,
+          priceVnd: hit.item.priceVnd,
+          originalPriceVnd: shownOriginalPrice(
+            hit.item.priceVnd,
+            hit.item.originalPriceVnd,
+          ),
+          imageUrl: hit.item.imageUrl,
+          soldCount: hit.item.soldCount,
+          prepMinutes:
+            hit.item.prepMinutes ??
+            (hit.store.accept ?? acceptSettingsFromRow({})).defaultPrepMinutes,
+        },
+        store: {
+          id: hit.store.id,
+          name: hit.store.name,
+          distanceKm: hit.distanceKm,
+          openNow: hit.availability.openNow,
+          closedReason: hit.availability.closedReason,
+        },
+      })),
+    };
   }
 
   async listStoresPage(

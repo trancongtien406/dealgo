@@ -267,6 +267,179 @@ describe('food order http', () => {
     expect(detail.body.data).toHaveProperty('closesAtToday');
   });
 
+  it('searches dishes and stores in one call, dishes first (P3)', async () => {
+    const customer = await login();
+    const owner = await login();
+    await repository.insertGrant(owner.userId, 'MERCHANT', 'ACTIVE');
+    const foods = app.get(FOOD_REPOSITORY);
+    if (!(foods instanceof MemoryFoodRepository)) {
+      throw new Error('Expected the in-memory food repository');
+    }
+    const tag = `dish${Date.now().toString().slice(-6)}`;
+    const store = await createPinnedStore(foods, owner.userId, `Quán ${tag}`, [
+      { name: `Bún bò ${tag}`, priceVnd: 55_000 },
+      { name: `Trà đào ${tag}`, priceVnd: 30_000 },
+    ]);
+    const q = `bún bò ${tag}`;
+    const dish = store.items.find((item) => item.name === `Bún bò ${tag}`);
+
+    const res = await request(app.getHttpServer())
+      .get('/v1/food/search')
+      .query({ q, lat: 16.05, lng: 108.2, limit: 5 })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+
+    const dishes = res.body.data.dishes as {
+      page: number;
+      limit: number;
+      total: number;
+      items: {
+        item: {
+          id: string;
+          name: string;
+          priceVnd: number;
+          originalPriceVnd: number | null;
+          imageUrl: string | null;
+          soldCount: number;
+          prepMinutes: number;
+        };
+        store: {
+          id: string;
+          name: string;
+          distanceKm: number | null;
+          etaMinutes: number | null;
+          deliveryFeeFromVnd: number | null;
+          openNow: boolean;
+          closedReason: string | null;
+        };
+      }[];
+    };
+    expect(dishes).toMatchObject({ page: 1, limit: 5, total: 1 });
+    const hit = dishes.items[0]!;
+    expect(hit.item.name.toLowerCase()).toContain('bún');
+    expect(hit.item).toMatchObject({
+      id: dish!.id,
+      priceVnd: 55_000,
+      originalPriceVnd: null,
+      imageUrl: null,
+      soldCount: 0,
+      prepMinutes: 15,
+    });
+    expect(hit.store).toMatchObject({
+      id: store.id,
+      name: `Quán ${tag}`,
+      openNow: true,
+      closedReason: null,
+    });
+    expect(hit.store.distanceKm).toBeGreaterThan(0);
+    expect(hit.store.etaMinutes).toBeGreaterThan(0);
+    expect(hit.store.deliveryFeeFromVnd).toBeGreaterThan(0);
+
+    const stores = res.body.data.stores as {
+      page: number;
+      limit: number;
+      total: number;
+      items: { id: string; name: string; closesAtToday: string | null }[];
+    };
+    expect(stores).toMatchObject({ page: 1, limit: 5 });
+    expect(stores.items.length).toBeLessThanOrEqual(5);
+    expect(stores.items.map((entry) => entry.id)).toContain(store.id);
+    for (const entry of stores.items) {
+      expect(entry).toEqual(
+        expect.objectContaining({ id: expect.any(String), name: expect.any(String) }),
+      );
+      expect(entry).toHaveProperty('closesAtToday');
+    }
+  });
+
+  it('omits paused stores and unavailable or unapproved dishes from dish hits', async () => {
+    const customer = await login();
+    const openOwner = await login();
+    const closedOwner = await login();
+    await repository.insertGrant(openOwner.userId, 'MERCHANT', 'ACTIVE');
+    await repository.insertGrant(closedOwner.userId, 'MERCHANT', 'ACTIVE');
+    const foods = app.get(FOOD_REPOSITORY);
+    if (!(foods instanceof MemoryFoodRepository)) {
+      throw new Error('Expected the in-memory food repository');
+    }
+    const tag = `closed${Date.now().toString().slice(-6)}`;
+    const q = `bún chả ${tag}`;
+    const openStore = await createPinnedStore(
+      foods,
+      openOwner.userId,
+      `Quán Mở ${tag}`,
+      [{ name: `Bún chả ${tag}`, priceVnd: 45_000 }],
+    );
+    await foods.createItem({
+      ownerId: openOwner.userId,
+      name: `Bún chả ${tag} hết hàng`,
+      priceVnd: 45_000,
+      available: false,
+      moderationStatus: 'APPROVED',
+    });
+    await foods.createItem({
+      ownerId: openOwner.userId,
+      name: `Bún chả ${tag} chờ duyệt`,
+      priceVnd: 45_000,
+    });
+    const closedStore = await createPinnedStore(
+      foods,
+      closedOwner.userId,
+      `Quán Đóng ${tag}`,
+      [{ name: `Bún chả ${tag} đặc biệt`, priceVnd: 50_000 }],
+    );
+    await foods.updateStoreServiceMode({
+      ownerId: closedOwner.userId,
+      mode: 'PAUSED',
+      until: null,
+    });
+
+    const res = await request(app.getHttpServer())
+      .get('/v1/food/search')
+      .query({ q, lat: 16.05, lng: 108.2, limit: 5 })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+
+    const hits = res.body.data.dishes.items as {
+      item: { name: string };
+      store: { id: string; openNow: boolean; closedReason: string | null };
+    }[];
+    expect(hits.map((entry) => entry.item.name)).toEqual([`Bún chả ${tag}`]);
+    expect(hits[0]!.store).toMatchObject({ openNow: true, closedReason: null });
+    expect(hits[0]!.store.id).toBe(openStore.id);
+
+    // Browse still lists the paused store with its label; only the dish section hides it.
+    const paused = (
+      res.body.data.stores.items as {
+        id: string;
+        openNow: boolean;
+        closedReason: string | null;
+      }[]
+    ).find((entry) => entry.id === closedStore.id);
+    expect(paused).toMatchObject({ openNow: false, closedReason: 'PAUSED' });
+  });
+
+  it('requires q and caps the food search limit', async () => {
+    const customer = await login();
+    await request(app.getHttpServer())
+      .get('/v1/food/search')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(400);
+    await request(app.getHttpServer())
+      .get('/v1/food/search')
+      .query({ q: 'a', limit: 999 })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(400);
+
+    const capped = await request(app.getHttpServer())
+      .get('/v1/food/search')
+      .query({ q: 'bún', limit: 50 })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    expect(capped.body.data.dishes).toMatchObject({ page: 1, limit: 20 });
+    expect(capped.body.data.stores).toMatchObject({ page: 1, limit: 20 });
+  });
+
   it('quotes the delivery fare that placement charges', async () => {
     const customer = await login();
     const { storeId, itemId } = await oneItem(customer.token);

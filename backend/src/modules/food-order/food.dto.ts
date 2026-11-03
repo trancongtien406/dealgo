@@ -659,6 +659,17 @@ export class ListFoodStoresQueryDto {
   max_km?: number;
 }
 
+export const FOOD_SEARCH_MAX_LIMIT = 20;
+
+/** Dish search keeps the browse filters; the dish keyword is `q` (the browse keyword stays `search`). */
+export class SearchFoodDto extends ListFoodStoresQueryDto {
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  q!: string;
+}
+
 export class OpsPageQueryDto extends OpsDateRangeQueryDto {
   @IsOptional()
   @Type(() => Number)
