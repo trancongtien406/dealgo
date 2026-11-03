@@ -202,6 +202,8 @@ class PlacedFoodOrderModel {
     required this.lines,
     this.discountVnd = 0,
     this.voucherCode,
+    this.note,
+    this.utensils = true,
   });
 
   final String id;
@@ -212,6 +214,8 @@ class PlacedFoodOrderModel {
   final List<FoodOrderLine> lines;
   final int discountVnd;
   final String? voucherCode;
+  final String? note;
+  final bool utensils;
 
   factory PlacedFoodOrderModel.fromEntity(PlacedFoodOrder order) {
     return PlacedFoodOrderModel(
@@ -223,6 +227,8 @@ class PlacedFoodOrderModel {
       lines: order.lines,
       discountVnd: order.discountVnd,
       voucherCode: order.voucherCode,
+      note: order.note,
+      utensils: order.utensils,
     );
   }
 
@@ -236,6 +242,8 @@ class PlacedFoodOrderModel {
       lines: lines,
       discountVnd: discountVnd,
       voucherCode: voucherCode,
+      note: note,
+      utensils: utensils,
     );
   }
 }

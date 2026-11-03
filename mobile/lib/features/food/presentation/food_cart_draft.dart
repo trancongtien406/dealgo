@@ -113,6 +113,7 @@ Map<String, Object?> foodCartToDraft(FoodCartState s) => {
         'catalogItemId': l.catalogItemId,
         'optionIds': l.optionIds,
         'imageUrl': l.imageUrl,
+        'note': l.note,
       },
   ],
   'deliveryFareVnd': s.deliveryFareVnd,
@@ -125,6 +126,8 @@ Map<String, Object?> foodCartToDraft(FoodCartState s) => {
   'minOrderVnd': s.minOrderVnd,
   'prepMinutes': s.prepMinutes,
   'storeDistanceKm': s.storeDistanceKm,
+  'note': s.note,
+  'utensils': s.utensils,
 };
 
 FoodCartState? foodCartFromDraft(Map<String, Object?> m) {
@@ -145,6 +148,7 @@ FoodCartState? foodCartFromDraft(Map<String, Object?> m) {
     }
     if (qty < 1) continue;
     final options = raw['optionIds'];
+    final note = raw['note'];
     lines.add(
       FoodCartLine(
         itemId: itemId,
@@ -154,6 +158,7 @@ FoodCartState? foodCartFromDraft(Map<String, Object?> m) {
         catalogItemId: raw['catalogItemId'] as String?,
         optionIds: options is List ? options.whereType<String>().toList() : [],
         imageUrl: raw['imageUrl'] as String?,
+        note: note is String && note.trim().isNotEmpty ? note.trim() : null,
       ),
     );
   }
@@ -161,6 +166,8 @@ FoodCartState? foodCartFromDraft(Map<String, Object?> m) {
     return null;
   }
   double? asDouble(Object? v) => v is num ? v.toDouble() : null;
+  final note = m['note'];
+  final utensils = m['utensils'];
   return FoodCartState(
     storeId: m['storeId'] as String?,
     storeName: m['storeName'] as String?,
@@ -175,5 +182,7 @@ FoodCartState? foodCartFromDraft(Map<String, Object?> m) {
     minOrderVnd: (m['minOrderVnd'] as int?) ?? 0,
     prepMinutes: m['prepMinutes'] as int?,
     storeDistanceKm: asDouble(m['storeDistanceKm']),
+    note: note is String ? note.trim() : '',
+    utensils: utensils is bool ? utensils : true,
   );
 }

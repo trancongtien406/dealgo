@@ -15,6 +15,7 @@ class FoodCartLine {
     this.catalogItemId,
     this.optionIds = const [],
     this.imageUrl,
+    this.note,
   });
 
   final String itemId;
@@ -27,6 +28,9 @@ class FoodCartLine {
   final List<String> optionIds;
   final String? imageUrl;
 
+  /// Customer note for this line; null = none. Not part of the line identity.
+  final String? note;
+
   String get placeItemId => catalogItemId ?? itemId;
 
   int get lineTotalVnd => unitPriceVnd * quantity;
@@ -36,6 +40,8 @@ class FoodCartLine {
     int? unitPriceVnd,
     int? quantity,
     String? imageUrl,
+    String? note,
+    bool clearNote = false,
   }) {
     return FoodCartLine(
       itemId: itemId,
@@ -45,6 +51,7 @@ class FoodCartLine {
       catalogItemId: catalogItemId,
       optionIds: optionIds,
       imageUrl: imageUrl ?? this.imageUrl,
+      note: clearNote ? null : note ?? this.note,
     );
   }
 
@@ -95,6 +102,8 @@ class FoodCartState {
     this.minOrderVnd = 0,
     this.prepMinutes,
     this.storeDistanceKm,
+    this.note = '',
+    this.utensils = true,
   });
 
   factory FoodCartState.initial() {
@@ -150,6 +159,12 @@ class FoodCartState {
   final int? prepMinutes;
   final double? storeDistanceKm;
 
+  /// Customer note to the store and driver; blank = none.
+  final String note;
+
+  /// Cutlery requested for this order; sent with the order.
+  final bool utensils;
+
   /// Same estimate as the store list: prep + 3 min per km.
   int? get etaMinutes {
     final prep = prepMinutes;
@@ -202,10 +217,14 @@ class FoodCartState {
     int? minOrderVnd,
     int? prepMinutes,
     double? storeDistanceKm,
+    String? note,
+    bool? utensils,
   }) {
     // Any change to what is being bought invalidates the quoted discount.
+    // A note-only edit leaves the lines equal, so the voucher can stay.
+    final linesChanged = lines != null && !_sameLines(this.lines, lines);
     final dropVoucher =
-        clearVoucher || clearStore || lines != null || idempotencyKey != null;
+        clearVoucher || clearStore || linesChanged || idempotencyKey != null;
     // The delivery quote depends on the store; another store needs a new one.
     final storeChanged =
         clearStore || (storeId != null && storeId != this.storeId);
@@ -239,6 +258,8 @@ class FoodCartState {
       storeDistanceKm: clearStore
           ? null
           : storeDistanceKm ?? (storeChanged ? null : this.storeDistanceKm),
+      note: clearStore || storeChanged ? '' : note ?? this.note,
+      utensils: clearStore || storeChanged ? true : utensils ?? this.utensils,
     );
   }
 
@@ -259,7 +280,10 @@ class FoodCartState {
         other.voucherDiscountVnd == voucherDiscountVnd &&
         other.minOrderVnd == minOrderVnd &&
         other.prepMinutes == prepMinutes &&
-        other.storeDistanceKm == storeDistanceKm;
+        other.storeDistanceKm == storeDistanceKm &&
+        other.note == note &&
+        other.utensils == utensils &&
+        _sameLineNotes(other.lines, lines);
   }
 
   @override
@@ -277,6 +301,9 @@ class FoodCartState {
     minOrderVnd,
     prepMinutes,
     storeDistanceKm,
+    note,
+    utensils,
+    Object.hashAll(lines.map((line) => line.note)),
   );
 }
 
@@ -286,6 +313,18 @@ bool _sameLines(List<FoodCartLine> left, List<FoodCartLine> right) {
   }
   for (var index = 0; index < left.length; index++) {
     if (left[index] != right[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool _sameLineNotes(List<FoodCartLine> left, List<FoodCartLine> right) {
+  if (left.length != right.length) {
+    return false;
+  }
+  for (var index = 0; index < left.length; index++) {
+    if (left[index].note != right[index].note) {
       return false;
     }
   }
@@ -390,6 +429,42 @@ class FoodCartCubit extends Cubit<FoodCartState> {
       return;
     }
     emit(state.copyWith(storeDistanceKm: km));
+  }
+
+  /// Order-level note; blank (or whitespace) clears it.
+  void setNote(String note) {
+    final text = note.trim();
+    if (text == state.note) {
+      return;
+    }
+    emit(state.copyWith(note: text));
+  }
+
+  void setUtensils(bool utensils) {
+    if (utensils == state.utensils) {
+      return;
+    }
+    emit(state.copyWith(utensils: utensils));
+  }
+
+  /// Sets the note of the line whose key is [itemId] (same identity as
+  /// [setQuantity]); blank or null clears it.
+  void setLineNote(String itemId, String? note) {
+    final index = state.lines.indexWhere((line) => line.itemId == itemId);
+    if (index < 0) {
+      return;
+    }
+    final text = note?.trim();
+    final next = text == null || text.isEmpty ? null : text;
+    final lines = [...state.lines];
+    final current = lines[index];
+    if (current.note == next) {
+      return;
+    }
+    lines[index] = next == null
+        ? current.copyWith(clearNote: true)
+        : current.copyWith(note: next);
+    emit(state.copyWith(lines: List.unmodifiable(lines)));
   }
 
   void setQuantity(String itemId, int quantity) {
@@ -507,6 +582,8 @@ class FoodCartCubit extends Cubit<FoodCartState> {
         minOrderVnd: state.minOrderVnd,
         prepMinutes: state.prepMinutes,
         storeDistanceKm: state.storeDistanceKm,
+        note: state.note,
+        utensils: state.utensils,
       ),
     );
   }

@@ -710,6 +710,7 @@ class CheckoutHeldAttempt {
               itemId: line.placeItemId,
               quantity: line.quantity,
               optionIds: line.optionIds,
+              note: line.note,
             ),
         ],
         dropoff: FoodDropoff(
@@ -725,6 +726,8 @@ class CheckoutHeldAttempt {
             : cart.offeredDeliveryFareVnd,
         voucherCode: cart.voucherCode,
         paymentMethod: paymentMethod,
+        note: cart.note,
+        utensils: cart.utensils,
       ),
     );
   }

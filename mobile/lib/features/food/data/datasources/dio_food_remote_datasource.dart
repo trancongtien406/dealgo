@@ -1246,6 +1246,9 @@ FoodMenuItem? _menuItem(Object? raw) {
 String? _fourDigits(Object? value) =>
     value is String && RegExp(r'^\d{4}$').hasMatch(value) ? value : null;
 
+String? _asNote(Object? value) =>
+    value is String && value.trim().isNotEmpty ? value : null;
+
 FoodOrderDetail decodeFoodOrderDetail(Object? body) {
   final data = asJsonMap(_successPayload(body));
   if (data == null) {
@@ -1307,6 +1310,8 @@ FoodOrderDetail decodeFoodOrderDetail(Object? body) {
     route: RouteGeometry.tryParse(data['route']),
     approachRoute: RouteGeometry.tryParse(data['approachRoute']),
     pendingChange: decodeFoodOrderChange(data['pendingChange']),
+    note: _asNote(data['note']),
+    utensils: data['utensils'] is bool ? data['utensils'] as bool : true,
   );
 }
 
@@ -1347,6 +1352,8 @@ PlacedFoodOrder decodePlacedFoodOrder(Object? body) {
         ? data['voucherCode'] as String
         : null,
     lines: _decodeLines(data['lines']),
+    note: _asNote(data['note']),
+    utensils: data['utensils'] is bool ? data['utensils'] as bool : true,
   );
 }
 
@@ -1379,6 +1386,7 @@ List<FoodOrderLine> _decodeLines(Object? raw) {
               ? map['imageUrl'] as String
               : null,
           options: decodeFoodLineOptions(map['options']),
+          note: _asNote(map['note']),
         ),
       );
     }

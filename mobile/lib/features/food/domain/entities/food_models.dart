@@ -550,6 +550,7 @@ class FoodOrderLine {
     required this.quantity,
     this.imageUrl,
     this.options = const [],
+    this.note,
   });
 
   /// Server line id (the store edits a line by id); null on old fakes.
@@ -566,6 +567,9 @@ class FoodOrderLine {
 
   /// Options the customer chose, snapshotted at placement.
   final List<FoodLineOption> options;
+
+  /// Customer note for this line ("ít cay, không hành"); null = none.
+  final String? note;
 
   /// "Size: L · Topping: Trân châu" for receipts and kitchen tickets.
   String get optionsSummary => options
@@ -773,6 +777,8 @@ class FoodOrderDetail {
     this.route,
     this.approachRoute,
     this.pendingChange,
+    this.note,
+    this.utensils = true,
   });
 
   /// Store edit waiting for the customer's answer (customer/store only).
@@ -813,6 +819,12 @@ class FoodOrderDetail {
   /// DEC-PROD-031 rev 3 (DRAFT): driver→store leg while ASSIGNED.
   final RouteGeometry? approachRoute;
 
+  /// Customer note to the store and driver; null = none.
+  final String? note;
+
+  /// Whether cutlery was requested; the server defaults to true.
+  final bool utensils;
+
   FoodTrackingStage get stage => foodTrackingStage(status);
 }
 
@@ -826,6 +838,8 @@ class PlacedFoodOrder {
     required this.lines,
     this.discountVnd = 0,
     this.voucherCode,
+    this.note,
+    this.utensils = true,
   });
 
   final String id;
@@ -838,6 +852,12 @@ class PlacedFoodOrder {
   final String? voucherCode;
   final int totalVnd;
   final List<FoodOrderLine> lines;
+
+  /// Customer note to the store and driver; null = none.
+  final String? note;
+
+  /// Whether cutlery was requested; the server defaults to true.
+  final bool utensils;
 }
 
 /// Why a store edited an order (backend FOOD_ORDER_CHANGE_REASONS).

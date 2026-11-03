@@ -18,7 +18,9 @@ import 'package:dealgo/features/merchant/presentation/pages/merchant_item_varian
 import 'package:dealgo/features/merchant/presentation/utils/merchant_kitchen_lines.dart';
 import 'package:dealgo/features/merchant/presentation/utils/merchant_routes.dart';
 import 'package:dealgo/features/pricing/data/pricing_remote_datasource.dart';
+import 'package:dealgo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
@@ -215,6 +217,96 @@ void main() {
       expect(json.containsKey('subtotalVnd'), isFalse);
     });
 
+    test('place body sends utensils always and notes only when non-blank', () {
+      final plain = PlaceFoodOrderBody.fromParams(
+        const PlaceFoodOrderParams(
+          accessToken: 't',
+          idempotencyKey: 'k',
+          storeId: 'store-tea',
+          items: [
+            FoodOrderItem(itemId: 'item-a', quantity: 1, note: 'Ít cay'),
+            FoodOrderItem(itemId: 'item-b', quantity: 1, note: '   '),
+          ],
+          dropoff: FoodDropoff(lat: 16, lng: 108, label: 'Nhà'),
+          deliveryFareVnd: 15000,
+        ),
+      ).toJson();
+      expect(plain['utensils'], isTrue);
+      expect(plain.containsKey('note'), isFalse);
+      final plainItems = plain['items']! as List;
+      expect(plainItems[0], {
+        'itemId': 'item-a',
+        'quantity': 1,
+        'note': 'Ít cay',
+      });
+      expect(plainItems[1], {'itemId': 'item-b', 'quantity': 1});
+
+      final noted = PlaceFoodOrderBody.fromParams(
+        const PlaceFoodOrderParams(
+          accessToken: 't',
+          idempotencyKey: 'k',
+          storeId: 'store-tea',
+          items: [FoodOrderItem(itemId: 'item-a', quantity: 1)],
+          dropoff: FoodDropoff(lat: 16, lng: 108, label: 'Nhà'),
+          deliveryFareVnd: 15000,
+          note: 'Gọi trước 10 phút',
+          utensils: false,
+        ),
+      ).toJson();
+      expect(noted['note'], 'Gọi trước 10 phút');
+      expect(noted['utensils'], isFalse);
+    });
+
+    test('read views decode notes and treat a missing utensils as true', () {
+      final detail = decodeFoodOrderDetail({
+        'success': true,
+        'data': {
+          'id': 'o1',
+          'status': 'PLACED',
+          'subtotalVnd': 30000,
+          'deliveryFareVnd': 10000,
+          'totalVnd': 40000,
+          'dropoff': {'lat': 16, 'lng': 108, 'label': 'Nhà'},
+          'note': 'Ít cay',
+          'utensils': false,
+          'lines': [
+            {
+              'itemId': 'item-a',
+              'name': 'Bún',
+              'unitPriceVnd': 30000,
+              'quantity': 1,
+              'note': 'Không hành',
+            },
+          ],
+        },
+      });
+      expect(detail.note, 'Ít cay');
+      expect(detail.utensils, isFalse);
+      expect(detail.lines.single.note, 'Không hành');
+
+      final placed = decodePlacedFoodOrder({
+        'success': true,
+        'data': {
+          'id': 'o2',
+          'status': 'PLACED',
+          'subtotalVnd': 30000,
+          'deliveryFareVnd': 10000,
+          'totalVnd': 40000,
+          'lines': [
+            {
+              'itemId': 'item-a',
+              'name': 'Bún',
+              'unitPriceVnd': 30000,
+              'quantity': 1,
+            },
+          ],
+        },
+      });
+      expect(placed.note, isNull);
+      expect(placed.utensils, isTrue);
+      expect(placed.lines.single.note, isNull);
+    });
+
     test('kitchen ticket lists the chosen options per line', () {
       const line = FoodOrderLine(
         itemId: 'item-tea',
@@ -272,6 +364,46 @@ void main() {
         );
       expect(cart.state.lines, hasLength(2));
       expect(cart.state.lines.map((l) => l.placeItemId).toSet(), {'item-tea'});
+    });
+
+    test('line note targets one line and a blank note clears it', () {
+      final large = foodCartLineId('item-tea', const ['o-l']);
+      final medium = foodCartLineId('item-tea', const ['o-m']);
+      final cart = cartWithLarge()
+        ..addConfiguredItem(
+          storeId: 'store-tea',
+          storeName: 'Trà Sữa',
+          lineId: medium,
+          name: 'Trà sữa',
+          unitPriceVnd: 45000,
+          catalogItemId: 'item-tea',
+          optionIds: const ['o-m'],
+        )
+        ..setLineNote(large, 'Ít đá')
+        ..setLineNote(medium, 'Nhiều đá');
+      String? noteOf(String lineId) =>
+          cart.state.lines.firstWhere((l) => l.itemId == lineId).note;
+      expect(noteOf(large), 'Ít đá');
+      expect(noteOf(medium), 'Nhiều đá');
+      cart.setLineNote(large, '   ');
+      expect(noteOf(large), isNull);
+      expect(noteOf(medium), 'Nhiều đá');
+    });
+
+    test('adding the same configured item keeps its line note', () {
+      final large = foodCartLineId('item-tea', const ['o-l']);
+      final cart = cartWithLarge()..setLineNote(large, 'Ít đá');
+      cart.addConfiguredItem(
+        storeId: 'store-tea',
+        storeName: 'Trà Sữa',
+        lineId: large,
+        name: 'Trà sữa',
+        unitPriceVnd: 55000,
+        catalogItemId: 'item-tea',
+        optionIds: const ['o-l'],
+      );
+      expect(cart.state.lines.single.quantity, 2);
+      expect(cart.state.lines.single.note, 'Ít đá');
     });
 
     test('catalog refresh re-prices options and drops stale choices', () {
@@ -530,7 +662,11 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(card);
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.byKey(const Key('food-add-item-tea')));
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('food-add-item-tea')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('food-add-item-tea')));
       await tester.pumpAndSettle();
@@ -577,6 +713,60 @@ void main() {
       expect(placed.optionIds.toSet(), {'o-l', 'o-tc'});
     },
   );
+
+  testWidgets('a missing required group blocks add and is called out', (
+    tester,
+  ) async {
+    const group = FoodOptionGroup(
+      id: 'g-size',
+      title: 'Chọn size',
+      minSelect: 1,
+      maxSelect: 2,
+      choices: [
+        FoodOptionChoice(id: 'o-s', label: 'S'),
+        FoodOptionChoice(id: 'o-l', label: 'L'),
+      ],
+    );
+    const item = FoodMenuItem(
+      id: 'item',
+      name: 'Trà đào',
+      priceVnd: 20000,
+      available: true,
+      optionGroups: [group],
+    );
+    const store = FoodStoreDetail(id: 'store', name: 'Quán', items: [item]);
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('vi'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: BlocProvider(
+          create: (_) => FoodCartCubit(),
+          child: const FoodItemOptionsPage(
+            args: FoodItemOptionsArgs(store: store, item: item),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    DealGoPrimaryButton addButton() =>
+        tester.widget(find.byKey(const Key('food-options-add')));
+    expect(find.byKey(const Key('food-options-missing')), findsOneWidget);
+    expect(addButton().enabled, isFalse);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('food-option-o-s')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Miễn phí'), findsWidgets);
+    await tester.tap(find.byKey(const Key('food-option-o-s')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('food-options-missing')), findsNothing);
+    expect(addButton().enabled, isTrue);
+  });
 
   test('option maxQuantity stepper and delta with multiplicity', () {
     const groups = [

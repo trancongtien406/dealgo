@@ -5,6 +5,7 @@ class FoodOrderItem {
     required this.itemId,
     required this.quantity,
     this.optionIds = const [],
+    this.note,
   });
 
   final String itemId;
@@ -12,6 +13,9 @@ class FoodOrderItem {
 
   /// DEC-PROD-033 — chosen option ids; the server validates and prices them.
   final List<String> optionIds;
+
+  /// Customer note for this line (≤200); blank is not sent.
+  final String? note;
 }
 
 class PlaceFoodOrderParams {
@@ -25,6 +29,8 @@ class PlaceFoodOrderParams {
     this.deliveryOfferVnd,
     this.voucherCode,
     this.paymentMethod,
+    this.note,
+    this.utensils = true,
   });
 
   final String accessToken;
@@ -43,6 +49,12 @@ class PlaceFoodOrderParams {
 
   /// Payment method code (CASH, MOMO, …); the server re-checks availability.
   final String? paymentMethod;
+
+  /// Customer note to the store and driver (≤300); blank is not sent.
+  final String? note;
+
+  /// Cutlery request; always sent, true when the customer did not choose.
+  final bool utensils;
 }
 
 /// Backward-compatible alias for existing tests and call sites.
