@@ -157,8 +157,8 @@ class StoreOfferBadge extends StatelessWidget {
 /// Lines under a store name: closed label · rating · category · distance,
 /// then ETA and the "from" delivery fee — each only when real. Text wraps
 /// instead of truncating.
-class StoreMetaLine extends StatelessWidget {
-  const StoreMetaLine({required this.store, this.rating, super.key});
+class FoodMetaLine extends StatelessWidget {
+  const FoodMetaLine({required this.store, this.rating, super.key});
 
   final FoodStoreSummary store;
   final StoreRating? rating;

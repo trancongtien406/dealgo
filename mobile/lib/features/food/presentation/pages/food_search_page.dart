@@ -19,7 +19,7 @@ import '../cubit/food_discovery_cubit.dart';
 import '../utils/food_routes.dart';
 import '../widgets/food_cart_bar.dart';
 import '../widgets/food_widgets.dart';
-import '../widgets/food_badges.dart';
+import '../widgets/food_store_card.dart';
 import '../food_categories_store.dart';
 import '../widgets/food_category_tile.dart';
 import '../../data/food_search_history.dart';
@@ -34,12 +34,20 @@ class FoodSearchPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final origin = foodCartOrigin(context);
     return BlocProvider(
-      create: (context) => FoodDiscoveryCubit(
-        listFoodStores: context.read<ListFoodStores>(),
-        ratings: context.read<RatingRepository>(),
-        location: context.read<LocationService>(),
-      )..load(currentAccessToken(context), search: initialQuery.trim()),
+      create: (context) =>
+          FoodDiscoveryCubit(
+            listFoodStores: context.read<ListFoodStores>(),
+            ratings: context.read<RatingRepository>(),
+            location: context.read<LocationService>(),
+          )..load(
+            currentAccessToken(context),
+            search: initialQuery.trim(),
+            lat: origin.lat,
+            lng: origin.lng,
+            sortBy: 'distance',
+          ),
       child: _FoodSearchView(initialQuery: initialQuery),
     );
   }
@@ -58,13 +66,26 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
   late final TextEditingController _query = TextEditingController(
     text: widget.initialQuery,
   );
-  var _filter = 'all';
+  var _sortBy = 'distance';
   var _history = const <String>[];
   Timer? _debounce;
 
   /// Text the server was last asked for; while it matches the box the list
   /// is the server's answer (name, dish, category), not a local filter.
   late String _serverQuery = widget.initialQuery.trim().toLowerCase();
+
+  void _loadStores(String search) {
+    final origin = foodCartOrigin(context);
+    unawaited(
+      context.read<FoodDiscoveryCubit>().load(
+        currentAccessToken(context),
+        search: search,
+        lat: origin.lat,
+        lng: origin.lng,
+        sortBy: _sortBy,
+      ),
+    );
+  }
 
   /// QA C3 — search the whole catalog on the server (debounced).
   void _onQueryChanged() {
@@ -75,13 +96,14 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
       final q = _query.text.trim();
       if (q.toLowerCase() == _serverQuery) return;
       _serverQuery = q.toLowerCase();
-      unawaited(
-        context.read<FoodDiscoveryCubit>().load(
-          currentAccessToken(context),
-          search: q,
-        ),
-      );
+      _loadStores(q);
     });
+  }
+
+  void _setSort(String sortBy) {
+    if (_sortBy == sortBy) return;
+    setState(() => _sortBy = sortBy);
+    _loadStores(_query.text.trim());
   }
 
   @override
@@ -140,20 +162,6 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
                 false))
           store,
     ];
-    if (_filter == 'near') {
-      matches.sort(
-        (a, b) => (a.distanceKm ?? double.infinity).compareTo(
-          b.distanceKm ?? double.infinity,
-        ),
-      );
-    } else if (_filter == 'rating') {
-      matches.sort(
-        (a, b) => (ratings[b.id]?.average ?? -1).compareTo(
-          ratings[a.id]?.average ?? -1,
-        ),
-      );
-    }
-
     return Scaffold(
       // The body's SafeArea sits above the bar while the cart has items.
       extendBody: true,
@@ -199,15 +207,15 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
                 ),
                 children: [
                   for (final entry in [
-                    ('all', l10n.foodSearchFilterAll),
-                    ('near', l10n.foodSearchFilterNear),
+                    ('distance', l10n.foodSearchFilterNear),
                     ('rating', l10n.foodCategorySortRating),
                   ]) ...[
                     DealGoChip(
+                      key: Key('food-search-sort-${entry.$1}'),
                       label: entry.$2,
-                      selected: _filter == entry.$1,
+                      selected: _sortBy == entry.$1,
                       tone: DealGoChipTone.brand,
-                      onTap: () => setState(() => _filter = entry.$1),
+                      onTap: () => _setSort(entry.$1),
                     ),
                     const SizedBox(width: DealGoSpacing.s8),
                   ],
@@ -223,17 +231,23 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
                   DealGoSpacing.s24,
                 ),
                 children: [
+                  if (discovery is FoodDiscoveryReady && discovery.isRefreshing)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: DealGoSpacing.s12),
+                      child: LinearProgressIndicator(minHeight: 2),
+                    ),
                   Text(
-                    l10n.foodSearchSuggestions,
+                    q.isEmpty
+                        ? l10n.foodSearchSuggestions
+                        : l10n.foodSearchResults(matches.length),
+                    key: const Key('food-search-heading'),
                     style: textTheme.titleMedium,
                   ),
                   const SizedBox(height: DealGoSpacing.s12),
                   if (discovery is FoodDiscoveryFailed)
                     DealGoStateView.failure(
                       context,
-                      onRetry: () => context.read<FoodDiscoveryCubit>().load(
-                        currentAccessToken(context),
-                      ),
+                      onRetry: () => _loadStores(_query.text.trim()),
                       cause: discovery.message.error,
                       message: discovery.message.resolve(l10n),
                       compact: true,
@@ -241,7 +255,7 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
                   else if (discovery is FoodDiscoveryLoading)
                     const DealGoSkeletonList(itemCount: 3)
                   else ...[
-                    for (final store in matches.take(4)) ...[
+                    for (final store in matches) ...[
                       _ResultCard(
                         store: store,
                         rating: ratings[store.id],
@@ -257,7 +271,7 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
                       ),
                   ],
                   const SizedBox(height: DealGoSpacing.s8),
-                  if (_history.isNotEmpty) ...[
+                  if (q.isEmpty && _history.isNotEmpty) ...[
                     Row(
                       children: [
                         Expanded(
@@ -298,32 +312,34 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
                         _onQueryChanged();
                       },
                     ),
-                  const SizedBox(height: DealGoSpacing.s12),
-                  Text(l10n.foodSearchGroups, style: textTheme.titleMedium),
-                  const SizedBox(height: DealGoSpacing.s12),
-                  Wrap(
-                    spacing: DealGoSpacing.s8,
-                    runSpacing: DealGoSpacing.s8,
-                    children: [
-                      for (final category
-                          in maybeFoodCategories(context)?.items ??
-                              const <FoodCategory>[])
-                        DealGoChip(
-                          key: Key('food-search-category-${category.code}'),
-                          label: category.name(
-                            Localizations.localeOf(context).languageCode,
+                  if (q.isEmpty) ...[
+                    const SizedBox(height: DealGoSpacing.s12),
+                    Text(l10n.foodSearchGroups, style: textTheme.titleMedium),
+                    const SizedBox(height: DealGoSpacing.s12),
+                    Wrap(
+                      spacing: DealGoSpacing.s8,
+                      runSpacing: DealGoSpacing.s8,
+                      children: [
+                        for (final category
+                            in maybeFoodCategories(context)?.items ??
+                                const <FoodCategory>[])
+                          DealGoChip(
+                            key: Key('food-search-category-${category.code}'),
+                            label: category.name(
+                              Localizations.localeOf(context).languageCode,
+                            ),
+                            tone: DealGoChipTone.neutral,
+                            leading: FoodCategoryAvatar(
+                              category: category,
+                              size: 20,
+                            ),
+                            onTap: () => context.push(
+                              FoodRoutes.categoryOf(category.code),
+                            ),
                           ),
-                          tone: DealGoChipTone.neutral,
-                          leading: FoodCategoryAvatar(
-                            category: category,
-                            size: 20,
-                          ),
-                          onTap: () => context.push(
-                            FoodRoutes.categoryOf(category.code),
-                          ),
-                        ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -343,6 +359,6 @@ class _ResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FoodStoreListCard(store: store, rating: rating, onTap: onTap);
+    return FoodStoreCard(store: store, rating: rating, onTap: onTap);
   }
 }

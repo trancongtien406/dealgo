@@ -302,7 +302,7 @@ class _StoreCard extends StatelessWidget {
                       style: textTheme.titleMedium?.copyWith(fontSize: 14),
                     ),
                     const SizedBox(height: DealGoSpacing.s4),
-                    StoreMetaLine(store: store, rating: rating),
+                    FoodMetaLine(store: store, rating: rating),
                   ],
                 ),
               ),

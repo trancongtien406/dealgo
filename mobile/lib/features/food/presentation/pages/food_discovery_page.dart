@@ -7,7 +7,6 @@ import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/components/dealgo_haptics.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
-import '../../../../core/design_system/tokens/dealgo_type_scale.dart';
 import '../../../../core/motion/dealgo_motion_widgets.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../home_banner/presentation/home_banner_carousel.dart';
@@ -28,6 +27,7 @@ import '../widgets/food_widgets.dart';
 import '../food_categories_store.dart';
 import '../widgets/food_category_tile.dart';
 import '../widgets/food_badges.dart';
+import '../widgets/food_store_card.dart';
 import '../widgets/food_filter_sheet.dart';
 import '../widgets/store_meta.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
@@ -811,74 +811,12 @@ class _StoreTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final card = DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(DealGoRadius.button),
-        boxShadow: DealGoShadows.card,
-      ),
-      child: Material(
-        color: DealGoColors.card,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(DealGoRadius.button),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () {
-            DealGoHaptics.tap();
-            onTap();
-          },
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AspectRatio(
-                aspectRatio: 2,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _StoreCover(imageUrl: store.imageUrl),
-                    if (store.offers.isNotEmpty)
-                      Positioned(
-                        left: DealGoSpacing.s8,
-                        top: DealGoSpacing.s8,
-                        child: StoreOfferBadge(
-                          key: Key('food-store-offer-${store.id}'),
-                          offer: store.offers.first,
-                          compact: true,
-                        ),
-                      ),
-                    if (store.logoUrl != null)
-                      Positioned(
-                        left: DealGoSpacing.s8,
-                        bottom: DealGoSpacing.s8,
-                        child: _StoreLogo(url: store.logoUrl!),
-                      ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(DealGoSpacing.s12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      store.name,
-                      style: DealGoType.subtitle(Theme.of(context).textTheme),
-                    ),
-                    const SizedBox(height: DealGoSpacing.s4),
-                    StoreMetaLine(store: store, rating: rating),
-                    if (store.minOrderVnd > 0) ...[
-                      const SizedBox(height: DealGoSpacing.s8),
-                      FoodStoreBadges(store: store, showOffer: false),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return FoodStoreCard(
+      store: store,
+      rating: rating,
+      variant: FoodStoreCardVariant.compact,
+      onTap: onTap,
     );
-    return DealGoPressScale(child: card);
   }
 }
 
@@ -891,58 +829,12 @@ class _WideStoreCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final card = DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(DealGoRadius.button),
-        boxShadow: DealGoShadows.card,
-      ),
-      child: Material(
-        color: DealGoColors.card,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(DealGoRadius.button),
-          side: BorderSide(color: DealGoColors.border),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () {
-            DealGoHaptics.tap();
-            onTap();
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(DealGoSpacing.s12),
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(DealGoRadius.input),
-                  child: SizedBox(
-                    width: 84,
-                    height: 84,
-                    child: _StoreCover(imageUrl: store.imageUrl),
-                  ),
-                ),
-                const SizedBox(width: DealGoSpacing.s12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(store.name, style: DealGoType.subtitle(textTheme)),
-                      const SizedBox(height: DealGoSpacing.s4),
-                      StoreMetaLine(store: store, rating: rating),
-                      if (store.offers.isNotEmpty || store.minOrderVnd > 0) ...[
-                        const SizedBox(height: DealGoSpacing.s8),
-                        FoodStoreBadges(store: store),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return FoodStoreCard(
+      store: store,
+      rating: rating,
+      variant: FoodStoreCardVariant.compact,
+      onTap: onTap,
     );
-    return DealGoPressScale(child: card);
   }
 }
 
@@ -971,33 +863,6 @@ class _StoreCover extends StatelessWidget {
       width: double.infinity,
       height: double.infinity,
       fallback: placeholder,
-    );
-  }
-}
-
-class _StoreLogo extends StatelessWidget {
-  const _StoreLogo({required this.url});
-
-  final String url;
-
-  @override
-  Widget build(BuildContext context) {
-    final resolved = resolveMediaUrl(url);
-    if (resolved == null || resolved.isEmpty) return const SizedBox.shrink();
-    return Container(
-      width: 32,
-      height: 32,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: DealGoColors.card,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2),
-      ),
-      child: DealGoNetworkImage(
-        resolved,
-        fit: BoxFit.cover,
-        fallback: const SizedBox.shrink(),
-      ),
     );
   }
 }

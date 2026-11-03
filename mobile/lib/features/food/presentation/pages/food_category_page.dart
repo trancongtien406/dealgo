@@ -16,7 +16,7 @@ import '../cubit/food_discovery_cubit.dart';
 import '../utils/food_routes.dart';
 import '../widgets/food_cart_bar.dart';
 import '../widgets/food_widgets.dart';
-import '../widgets/food_badges.dart';
+import '../widgets/food_store_card.dart';
 import '../food_categories_store.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
@@ -30,12 +30,19 @@ class FoodCategoryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final origin = foodCartOrigin(context);
     return BlocProvider(
-      create: (context) => FoodDiscoveryCubit(
-        listFoodStores: context.read<ListFoodStores>(),
-        ratings: context.read<RatingRepository>(),
-        location: context.read<LocationService>(),
-      )..load(currentAccessToken(context)),
+      create: (context) =>
+          FoodDiscoveryCubit(
+            listFoodStores: context.read<ListFoodStores>(),
+            ratings: context.read<RatingRepository>(),
+            location: context.read<LocationService>(),
+          )..load(
+            currentAccessToken(context),
+            lat: origin.lat,
+            lng: origin.lng,
+            sortBy: 'distance',
+          ),
       child: _FoodCategoryView(categoryCode: categoryCode),
     );
   }
@@ -52,6 +59,18 @@ class _FoodCategoryView extends StatefulWidget {
 
 class _FoodCategoryViewState extends State<_FoodCategoryView> {
   var _sort = 'near';
+
+  void _setSort(String sort) {
+    if (_sort == sort) return;
+    setState(() => _sort = sort);
+    final origin = foodCartOrigin(context);
+    context.read<FoodDiscoveryCubit>().load(
+      currentAccessToken(context),
+      lat: origin.lat,
+      lng: origin.lng,
+      sortBy: sort == 'rating' ? 'rating' : 'distance',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,19 +92,6 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
       ],
       _ => <FoodStoreSummary>[],
     };
-    if (_sort == 'rating') {
-      stores.sort(
-        (a, b) => (ratings[b.id]?.average ?? -1).compareTo(
-          ratings[a.id]?.average ?? -1,
-        ),
-      );
-    } else {
-      stores.sort(
-        (a, b) => (a.distanceKm ?? double.infinity).compareTo(
-          b.distanceKm ?? double.infinity,
-        ),
-      );
-    }
     final loading = discovery is FoodDiscoveryLoading;
     final title =
         foodCategoryLabel(context, widget.categoryCode) ??
@@ -151,7 +157,7 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
                       label: entry.$2,
                       selected: _sort == entry.$1,
                       tone: DealGoChipTone.brand,
-                      onTap: () => setState(() => _sort = entry.$1),
+                      onTap: () => _setSort(entry.$1),
                     ),
                     const SizedBox(width: DealGoSpacing.s8),
                   ],
@@ -238,6 +244,6 @@ class _StoreRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FoodStoreListCard(store: store, rating: rating, onTap: onTap);
+    return FoodStoreCard(store: store, rating: rating, onTap: onTap);
   }
 }

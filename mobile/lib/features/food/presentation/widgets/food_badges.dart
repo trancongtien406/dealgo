@@ -5,9 +5,6 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/food_models.dart';
 import '../../domain/entities/food_money.dart';
-import '../../../rating/domain/service_rating.dart';
-import 'food_category_tile.dart';
-import 'food_widgets.dart';
 import 'store_meta.dart';
 
 /// Small rounded label used for dish and store badges.
@@ -287,99 +284,4 @@ Set<String> foodBestSellerIds(List<FoodMenuItem> items) {
       if (item.soldCount > 0) item,
   ]..sort((a, b) => b.soldCount.compareTo(a.soldCount));
   return {for (final item in sold.take(3)) item.id};
-}
-
-/// Store row for category and search results: photo, meta, promo pills and
-/// up to two signature dishes with their prices.
-class FoodStoreListCard extends StatelessWidget {
-  const FoodStoreListCard({
-    required this.store,
-    required this.onTap,
-    this.rating,
-    super.key,
-  });
-
-  final FoodStoreSummary store;
-  final StoreRating? rating;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final dishes = store.featuredItems.take(2).toList(growable: false);
-    final closed = store.closedReason != null;
-    return Material(
-      color: DealGoColors.card,
-      borderRadius: BorderRadius.circular(DealGoRadius.card),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(DealGoRadius.card),
-            boxShadow: DealGoShadows.card,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(DealGoSpacing.s12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Opacity(
-                  opacity: closed ? 0.5 : 1,
-                  child: FoodThumb(
-                    size: 88,
-                    imageUrl: store.imageUrl,
-                    placeholderAsset: foodDishFallbackImage(store.category),
-                  ),
-                ),
-                const SizedBox(width: DealGoSpacing.s12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(store.name, style: textTheme.titleMedium),
-                      const SizedBox(height: DealGoSpacing.s4),
-                      StoreMetaLine(store: store, rating: rating),
-                      if (store.offers.isNotEmpty || store.minOrderVnd > 0) ...[
-                        const SizedBox(height: DealGoSpacing.s8),
-                        FoodStoreBadges(store: store),
-                      ],
-                      if (dishes.isNotEmpty) ...[
-                        const SizedBox(height: DealGoSpacing.s8),
-                        for (final dish in dishes)
-                          Padding(
-                            padding: const EdgeInsets.only(
-                              top: DealGoSpacing.s4,
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    dish.name,
-                                    style: textTheme.bodySmall?.copyWith(
-                                      color: DealGoColors.text,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: DealGoSpacing.s8),
-                                FoodPriceText(
-                                  priceVnd: dish.priceVnd,
-                                  originalPriceVnd: dish.originalPriceVnd,
-                                  size: 12,
-                                  showPercent: false,
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

@@ -1088,7 +1088,7 @@ void main() {
         home: const Scaffold(
           body: Column(
             children: [
-              StoreMetaLine(
+              FoodMetaLine(
                 store: FoodStoreSummary(
                   id: 's1',
                   name: 'A',
@@ -1096,14 +1096,14 @@ void main() {
                   closedReason: StoreClosedReason.closed,
                 ),
               ),
-              StoreMetaLine(
+              FoodMetaLine(
                 store: FoodStoreSummary(
                   id: 's2',
                   name: 'B',
                   closedReason: StoreClosedReason.paused,
                 ),
               ),
-              StoreMetaLine(
+              FoodMetaLine(
                 store: FoodStoreSummary(id: 's3', name: 'C'),
               ),
             ],
