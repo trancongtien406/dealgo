@@ -21,6 +21,7 @@ import '../../../promotion/domain/usecases/list_available_vouchers.dart';
 import '../../../promotion/presentation/widgets/food_voucher_picker_sheet.dart';
 import '../../../promotion/presentation/widgets/voucher_field.dart';
 import '../cubit/food_cart_cubit.dart';
+import 'food_checkout_extras.dart';
 import 'food_dropoff_tile.dart';
 import 'food_fare_widgets.dart';
 import 'food_widgets.dart';
@@ -239,6 +240,7 @@ class _Receipt extends StatelessWidget {
                 unit: line.unitPriceVnd,
                 total: line.lineTotalVnd,
                 options: '',
+                note: line.note,
               ),
           ]
         : [
@@ -249,6 +251,7 @@ class _Receipt extends StatelessWidget {
                 unit: line.unitPriceVnd,
                 total: line.lineTotalVnd,
                 options: line.optionsSummary,
+                note: line.note,
               ),
           ];
     final shownLines = lines.isEmpty && order == null ? lines : lines;
@@ -349,6 +352,7 @@ class _Receipt extends StatelessWidget {
                   unitPriceVnd: line.unit,
                   lineTotalVnd: line.total,
                   options: line.options,
+                  note: line.note,
                 ),
             ],
           ),
@@ -361,10 +365,14 @@ class _Receipt extends StatelessWidget {
             storeId: cart.storeId,
             initialCode: cart.voucherCode,
           ),
-          if (cart.deliveryQuote?.negotiable ?? false) ...[
+          if (cart.deliveryQuote != null) ...[
             const SizedBox(height: DealGoSpacing.s16),
             const FoodFareOfferPanel(),
           ],
+        ],
+        if (order == null && !placed) ...[
+          const SizedBox(height: DealGoSpacing.s16),
+          const FoodCheckoutExtrasPanel(),
         ],
         const SizedBox(height: DealGoSpacing.s16),
         FoodPanel(

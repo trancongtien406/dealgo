@@ -80,9 +80,12 @@ class FoodDeliveryOffers {
       (maxFareRaises - raiseCount).clamp(0, maxFareRaises).toInt();
 
   /// Next raise amount (one step), or null when no raise is allowed.
+  /// Snaps up to the fare-step grid so an odd suggestion (e.g. 15.400đ)
+  /// still produces an amount the server accepts.
   int? get nextRaiseVnd {
     if (agreed || raisesLeft == 0) return null;
-    final next = deliveryFareVnd + fareStepVnd;
+    final step = fareStepVnd < 1 ? 1 : fareStepVnd;
+    final next = ((deliveryFareVnd ~/ step) + 1) * step;
     return next > maxOfferVnd ? null : next;
   }
 

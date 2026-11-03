@@ -2651,6 +2651,29 @@ class AppLocalizationsVi extends AppLocalizations {
   String get foodNoteCleared => 'Đã xóa ghi chú';
 
   @override
+  String get foodCheckoutExtrasTitle => 'Ghi chú & dụng cụ';
+
+  @override
+  String get foodCheckoutNoteEmpty => 'Chưa có ghi chú cho quán hoặc tài xế';
+
+  @override
+  String get foodCheckoutNoteAdd => 'Thêm';
+
+  @override
+  String get foodCheckoutNoteEdit => 'Sửa';
+
+  @override
+  String get foodFareFixedLabel => 'Phí giao cố định';
+
+  @override
+  String get foodFareFixedHint =>
+      'Mức phí này do DealGo quy định cho quãng đường, không thương lượng.';
+
+  @override
+  String get foodFareNegotiationHint =>
+      'Tài xế có thể nhận đúng mức này hoặc trả giá cao hơn.';
+
+  @override
   String get foodLineNoteClear => 'Xoá ghi chú';
 
   @override

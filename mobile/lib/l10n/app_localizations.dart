@@ -5132,6 +5132,48 @@ abstract class AppLocalizations {
   /// **'Note cleared'**
   String get foodNoteCleared;
 
+  /// No description provided for @foodCheckoutExtrasTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes & cutlery'**
+  String get foodCheckoutExtrasTitle;
+
+  /// No description provided for @foodCheckoutNoteEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No note for the store or driver yet'**
+  String get foodCheckoutNoteEmpty;
+
+  /// No description provided for @foodCheckoutNoteAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get foodCheckoutNoteAdd;
+
+  /// No description provided for @foodCheckoutNoteEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get foodCheckoutNoteEdit;
+
+  /// No description provided for @foodFareFixedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed delivery fee'**
+  String get foodFareFixedLabel;
+
+  /// No description provided for @foodFareFixedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'DealGo sets this fee for the distance; it is not negotiable.'**
+  String get foodFareFixedHint;
+
+  /// No description provided for @foodFareNegotiationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The driver can accept this amount or counter with a higher fee.'**
+  String get foodFareNegotiationHint;
+
   /// No description provided for @foodLineNoteClear.
   ///
   /// In en, this message translates to:

@@ -7,6 +7,7 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
 import '../../domain/entities/food_money.dart';
+import '../cubit/food_cart_cubit.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../../core/design_system/components/dealgo_network_image.dart';
 
@@ -16,6 +17,12 @@ String? currentAccessToken(BuildContext context) {
     return null;
   }
   return auth.tokens.accessToken;
+}
+
+/// The customer's chosen delivery address, when they have one.
+({double? lat, double? lng}) foodCartOrigin(BuildContext context) {
+  final cart = context.read<FoodCartCubit>().state;
+  return (lat: cart.dropoffLat, lng: cart.dropoffLng);
 }
 
 class FoodPanel extends StatelessWidget {
@@ -344,6 +351,7 @@ class FoodLineSummary extends StatelessWidget {
     required this.unitPriceVnd,
     required this.lineTotalVnd,
     this.options = '',
+    this.note,
     this.imageUrl,
     super.key,
   });
@@ -355,6 +363,9 @@ class FoodLineSummary extends StatelessWidget {
 
   /// Chosen options from the placed order (DEC-PROD-033); empty = none.
   final String options;
+
+  /// Customer note for this line; null = none.
+  final String? note;
   final String? imageUrl;
 
   @override
@@ -383,6 +394,14 @@ class FoodLineSummary extends StatelessWidget {
                     options,
                     style: textTheme.bodySmall?.copyWith(
                       color: DealGoColors.textSecondary,
+                    ),
+                  ),
+                if (note != null && note!.trim().isNotEmpty)
+                  Text(
+                    '"${note!.trim()}"',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: DealGoColors.textSecondary,
+                      fontStyle: FontStyle.italic,
                     ),
                   ),
                 Text(

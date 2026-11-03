@@ -2670,6 +2670,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get foodNoteCleared => 'Note cleared';
 
   @override
+  String get foodCheckoutExtrasTitle => 'Notes & cutlery';
+
+  @override
+  String get foodCheckoutNoteEmpty => 'No note for the store or driver yet';
+
+  @override
+  String get foodCheckoutNoteAdd => 'Add';
+
+  @override
+  String get foodCheckoutNoteEdit => 'Edit';
+
+  @override
+  String get foodFareFixedLabel => 'Fixed delivery fee';
+
+  @override
+  String get foodFareFixedHint =>
+      'DealGo sets this fee for the distance; it is not negotiable.';
+
+  @override
+  String get foodFareNegotiationHint =>
+      'The driver can accept this amount or counter with a higher fee.';
+
+  @override
   String get foodLineNoteClear => 'Clear note';
 
   @override

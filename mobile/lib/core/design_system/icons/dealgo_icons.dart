@@ -10,6 +10,7 @@ abstract final class DealGoIcons {
   static const IconData add = LucideIcons.plus;
   static const IconData addCircle = LucideIcons.circlePlus;
   static const IconData addPhoto = LucideIcons.imagePlus;
+  static const IconData note = LucideIcons.messageSquareText;
   static const IconData alert = LucideIcons.circleAlert;
   static const IconData arrowLeft = LucideIcons.arrowLeft;
   static const IconData arrowRight = LucideIcons.arrowRight;
