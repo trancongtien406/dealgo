@@ -25,7 +25,7 @@ class DevicePasskeyPlatform implements PasskeyPlatform {
     );
     final response = await _authenticator.authenticate(request);
     return _asObjectMap(response.toJson());
-  });
+  }, preferImmediatelyAvailable: preferImmediatelyAvailable);
 
   @override
   Future<Map<String, Object?>> register(Map<String, Object?> options) => _guard(
@@ -38,13 +38,21 @@ class DevicePasskeyPlatform implements PasskeyPlatform {
 
   /// Maps plugin errors to [PasskeyPlatformException] so callers can stay calm on cancel.
   Future<Map<String, Object?>> _guard(
-    Future<Map<String, Object?>> Function() ceremony,
-  ) async {
+    Future<Map<String, Object?>> Function() ceremony, {
+    bool preferImmediatelyAvailable = false,
+  }) async {
     try {
       return await ceremony();
     } on NoCredentialsAvailableException {
       throw const PasskeyPlatformException(PasskeyFailureKind.noCredentials);
     } on PasskeyAuthCancelledException {
+      // preferImmediatelyAvailable presents no UI to the user. On iOS (especially
+      // on localized non-English devices or older iOS versions) and Android, the
+      // system returns .canceled when no credentials are saved for this RP.
+      // Since no UI was shown, the user did not cancel. It means no credentials exist.
+      if (preferImmediatelyAvailable) {
+        throw const PasskeyPlatformException(PasskeyFailureKind.noCredentials);
+      }
       throw const PasskeyPlatformException(PasskeyFailureKind.cancelled);
     } on ExcludeCredentialsCanNotBeRegisteredException {
       throw const PasskeyPlatformException(
