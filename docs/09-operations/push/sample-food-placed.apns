@@ -1,5 +1,5 @@
 {
-  "Simulator Target Bundle": "com.trancongtien.dealgo",
+  "Simulator Target Bundle": "dealgo.nguyengoctien.com",
   "aps": {
     "alert": { "title": "DealGo", "body": "Đơn mới #BE9B — Cơm Tấm Ba Ghiền" },
     "sound": "default"
