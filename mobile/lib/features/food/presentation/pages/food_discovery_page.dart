@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/config/api_base_url.dart';
+import '../../../../core/design_system/components/dealgo_profile_avatar.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/components/dealgo_haptics.dart';
@@ -12,6 +13,7 @@ import '../../../../core/motion/dealgo_motion_widgets.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../home_banner/presentation/home_banner_carousel.dart';
 import '../../../identity/domain/entities/app_role.dart';
+import '../../../identity/presentation/cubit/auth_cubit.dart';
 import '../../../identity/presentation/widgets/auth_widgets.dart';
 import '../../../places/presentation/place_picker_page.dart';
 import '../../domain/entities/food_category.dart';
@@ -438,22 +440,30 @@ class _DiscoveryAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Material(
-      color: DealGoColors.subtlePurple,
-      shape: const CircleBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.go('/customer/account'),
-        child: SizedBox(
-          width: 36,
-          height: 36,
-          child: Icon(
-            DealGoIcons.user,
-            color: DealGoColors.primary,
-            size: 20,
+    final avatarUrl = accountAvatarUrl(context.watch<AuthCubit>().state);
+    return SizedBox(
+      width: 36,
+      height: 36,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          DealGoProfileAvatar(
+            key: const Key('food-discovery-avatar'),
+            avatarUrl: avatarUrl,
+            size: 36,
             semanticLabel: l10n.accountTitle,
           ),
-        ),
+          // The ripple sits above the opaque photo, not beneath it.
+          Material(
+            color: Colors.transparent,
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => context.go('/customer/account'),
+              child: const SizedBox.expand(),
+            ),
+          ),
+        ],
       ),
     );
   }

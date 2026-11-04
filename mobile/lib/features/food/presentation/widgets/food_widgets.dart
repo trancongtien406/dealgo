@@ -19,6 +19,10 @@ String? currentAccessToken(BuildContext context) {
   return auth.tokens.accessToken;
 }
 
+/// Resolved avatar URL of the signed-in account, or null when signed out.
+String? accountAvatarUrl(AuthState auth) =>
+    auth is AuthSignedIn ? resolveMediaUrl(auth.profile.avatarUrl) : null;
+
 /// The customer's chosen delivery address, when they have one.
 ({double? lat, double? lng}) foodCartOrigin(BuildContext context) {
   final cart = context.read<FoodCartCubit>().state;

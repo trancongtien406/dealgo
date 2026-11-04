@@ -7,6 +7,7 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 import '../../../../core/design_system/components/dealgo_bottom_bar.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../../core/design_system/components/dealgo_profile_avatar.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
@@ -291,10 +292,10 @@ class _Receipt extends StatelessWidget {
               const SizedBox(height: DealGoSpacing.s12),
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: DealGoColors.subtlePurple,
-                    child: Icon(DealGoIcons.user, color: DealGoColors.primary),
+                  DealGoProfileAvatar(
+                    key: const Key('food-checkout-avatar'),
+                    avatarUrl: accountAvatarUrl(profile),
+                    size: 40,
                   ),
                   const SizedBox(width: DealGoSpacing.s12),
                   Expanded(
