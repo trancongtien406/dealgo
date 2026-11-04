@@ -256,6 +256,7 @@
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 				C19BE2AC4CCEF45F80843912 /* [CP] Embed Pods Frameworks */,
 				349B9340AA53C9E486BB9645 /* [CP] Copy Pods Resources */,
+				9740EEB71CF901F6004384FD /* [DealGo] Generate Missing Framework dSYMs */,
 			);
 			buildRules = (
 			);
@@ -444,6 +445,26 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		9740EEB71CF901F6004384FD /* [DealGo] Generate Missing Framework dSYMs */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "[DealGo] Generate Missing Framework dSYMs";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"$PROJECT_DIR/scripts/generate_framework_dsyms.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
