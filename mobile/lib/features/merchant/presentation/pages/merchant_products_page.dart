@@ -11,11 +11,14 @@ import '../../../../core/design_system/components/dealgo_segmented_control.dart'
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/components/dealgo_text_field.dart';
+import '../../../../core/format/text_case.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_models.dart';
 import '../../../food/presentation/widgets/food_badges.dart';
 import '../../../food/presentation/widgets/food_category_tile.dart';
+import '../../domain/entities/merchant_menu_models.dart';
+import '../../domain/repositories/merchant_orders_repository.dart';
 import '../../domain/usecases/create_merchant_catalog_item.dart';
 import '../../domain/usecases/get_merchant_catalog.dart';
 import '../../domain/usecases/set_merchant_item_availability.dart';
@@ -129,11 +132,22 @@ Future<void> _showAddItemDialog(BuildContext context, bool busy) async {
   if (busy) return;
   final cubit = context.read<MerchantCatalogCubit>();
   final token = merchantAccessToken(context);
+  List<MerchantMenuCategory> categories = const [];
+  if (token != null && token.isNotEmpty) {
+    try {
+      categories = await context
+          .read<MerchantOrdersRepository>()
+          .listMenuCategories(token);
+    } on Object {
+      categories = const [];
+    }
+  }
+  if (!context.mounted) return;
   // The dialog owns its controllers: disposing them here while the route was
   // still animating out crashed the app on Save.
-  final result = await showDialog<({String name, String price})>(
+  final result = await showDialog<_NewItemDraft>(
     context: context,
-    builder: (_) => const MerchantAddItemDialog(),
+    builder: (_) => MerchantAddItemDialog(categories: categories),
   );
   if (result == null || !context.mounted) {
     return;
@@ -151,12 +165,25 @@ Future<void> _showAddItemDialog(BuildContext context, bool busy) async {
     accessToken: token,
     name: result.name,
     priceVnd: price,
+    description: result.description,
+    prepMinutes: result.prepMinutes,
+    menuCategoryId: result.categoryId,
   );
 }
 
+typedef _NewItemDraft = ({
+  String name,
+  String price,
+  String? description,
+  int? prepMinutes,
+  String? categoryId,
+});
+
 @visibleForTesting
 class MerchantAddItemDialog extends StatefulWidget {
-  const MerchantAddItemDialog({super.key});
+  const MerchantAddItemDialog({super.key, this.categories = const []});
+
+  final List<MerchantMenuCategory> categories;
 
   @override
   State<MerchantAddItemDialog> createState() => _MerchantAddItemDialogState();
@@ -165,11 +192,16 @@ class MerchantAddItemDialog extends StatefulWidget {
 class _MerchantAddItemDialogState extends State<MerchantAddItemDialog> {
   final _name = TextEditingController();
   final _price = TextEditingController();
+  final _description = TextEditingController();
+  final _prep = TextEditingController();
+  String? _categoryId;
 
   @override
   void dispose() {
     _name.dispose();
     _price.dispose();
+    _description.dispose();
+    _prep.dispose();
     super.dispose();
   }
 
@@ -178,25 +210,64 @@ class _MerchantAddItemDialogState extends State<MerchantAddItemDialog> {
     final l10n = AppLocalizations.of(context);
     return AlertDialog(
       title: Text(l10n.merchantAddItem),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DealGoTextField(
-            label: l10n.merchantItemName,
-            fieldKey: const Key('merchant-catalog-name'),
-            controller: _name,
-            textInputAction: TextInputAction.next,
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          DealGoTextField(
-            label: l10n.merchantItemPrice,
-            fieldKey: const Key('merchant-catalog-price'),
-            controller: _price,
-            hint: '45000',
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          ),
-        ],
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DealGoTextField(
+              label: l10n.merchantItemName,
+              fieldKey: const Key('merchant-catalog-name'),
+              controller: _name,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: DealGoSpacing.s12),
+            DealGoTextField(
+              label: l10n.merchantItemPrice,
+              fieldKey: const Key('merchant-catalog-price'),
+              controller: _price,
+              hint: '45000',
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            ),
+            const SizedBox(height: DealGoSpacing.s12),
+            DealGoTextField(
+              label: l10n.merchantItemDescription,
+              fieldKey: const Key('merchant-catalog-description'),
+              controller: _description,
+              maxLines: 2,
+            ),
+            const SizedBox(height: DealGoSpacing.s12),
+            DealGoTextField(
+              label: l10n.merchantItemPrep,
+              fieldKey: const Key('merchant-catalog-prep'),
+              controller: _prep,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            ),
+            if (widget.categories.isNotEmpty) ...[
+              const SizedBox(height: DealGoSpacing.s12),
+              DropdownButtonFormField<String?>(
+                key: const Key('merchant-catalog-category'),
+                initialValue: _categoryId,
+                decoration: InputDecoration(
+                  labelText: l10n.merchantItemCategory,
+                ),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('—'),
+                  ),
+                  for (final cat in widget.categories)
+                    DropdownMenuItem(
+                      value: cat.id,
+                      child: Text(capitalizeFirstLetter(cat.name)),
+                    ),
+                ],
+                onChanged: (value) => setState(() => _categoryId = value),
+              ),
+            ],
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -207,7 +278,14 @@ class _MerchantAddItemDialogState extends State<MerchantAddItemDialog> {
           key: const Key('merchant-catalog-create'),
           onPressed: () {
             FocusScope.of(context).unfocus();
-            Navigator.of(context).pop((name: _name.text, price: _price.text));
+            final description = _description.text.trim();
+            Navigator.of(context).pop<_NewItemDraft>((
+              name: _name.text,
+              price: _price.text,
+              description: description.isEmpty ? null : description,
+              prepMinutes: int.tryParse(_prep.text.trim()),
+              categoryId: _categoryId,
+            ));
           },
           child: Text(l10n.actionSave),
         ),
@@ -248,8 +326,8 @@ class _CatalogBodyState extends State<_CatalogBody> {
     return [
       for (final item in widget.store.items)
         if ((_filter == _ProductFilter.all) ||
-            (_filter == _ProductFilter.onSale && item.available) ||
-            (_filter == _ProductFilter.hidden && !item.available))
+            (_filter == _ProductFilter.onSale && item.onSale) ||
+            (_filter == _ProductFilter.hidden && !item.onSale))
           if (q.isEmpty ||
               item.name.toLowerCase().contains(q) ||
               (item.description?.toLowerCase().contains(q) ?? false))
@@ -260,7 +338,7 @@ class _CatalogBodyState extends State<_CatalogBody> {
   @override
   Widget build(BuildContext context) {
     final catalog = widget.store.items;
-    final available = catalog.where((item) => item.available).length;
+    final available = catalog.where((item) => item.onSale).length;
     final hidden = catalog.length - available;
     final l10n = AppLocalizations.of(context);
     final textTheme = widget.textTheme;
@@ -487,17 +565,27 @@ class _ProductRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 DealGoChip(
-                  label: item.available
-                      ? AppLocalizations.of(context).merchantItemOnSale
-                      : AppLocalizations.of(context).merchantItemSoldOut,
-                  tone: item.available
-                      ? DealGoChipTone.success
-                      : DealGoChipTone.neutral,
+                  label: switch (item.moderation) {
+                    FoodItemModeration.pending =>
+                      AppLocalizations.of(context).merchantItemPendingReview,
+                    FoodItemModeration.rejected =>
+                      AppLocalizations.of(context).merchantItemRejected,
+                    FoodItemModeration.approved => item.available
+                        ? AppLocalizations.of(context).merchantItemOnSale
+                        : AppLocalizations.of(context).merchantItemSoldOut,
+                  },
+                  tone: switch (item.moderation) {
+                    FoodItemModeration.pending => DealGoChipTone.warning,
+                    FoodItemModeration.rejected => DealGoChipTone.danger,
+                    FoodItemModeration.approved => item.available
+                        ? DealGoChipTone.success
+                        : DealGoChipTone.neutral,
+                  },
                 ),
                 Switch(
                   key: Key('merchant-catalog-available-${item.id}'),
-                  value: item.available,
-                  onChanged: enabled
+                  value: item.onSale,
+                  onChanged: enabled && item.moderation == FoodItemModeration.approved
                       ? (value) => context
                             .read<MerchantCatalogCubit>()
                             .setAvailability(

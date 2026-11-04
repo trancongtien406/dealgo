@@ -25,6 +25,9 @@ class FakeFoodClient implements FoodClient {
     this.orderError,
     this.catalogError,
     this.catalogWriteError,
+    this.searchFoodHandler,
+    this.suggestions = const [],
+    this.suggestionsError,
   });
 
   List<FoodStoreSummary> stores;
@@ -45,15 +48,37 @@ class FakeFoodClient implements FoodClient {
   Object? orderError;
   Object? catalogError;
   Object? catalogWriteError;
+
+  /// Overrides the search result; without it search returns no rows.
+  FoodSearchResult Function(String q)? searchFoodHandler;
+
+  /// Same-store dishes returned by [listStoreSuggestions].
+  List<FoodFeaturedItem> suggestions;
+
+  /// Thrown by [listStoreSuggestions] when set.
+  Object? suggestionsError;
+  final List<String> searchQueries = [];
+  final List<String?> searchSorts = [];
+  final List<int> searchPages = [];
+  final List<int> searchLimits = [];
+  final List<({String storeId, List<String> exclude})> suggestionCalls = [];
   FoodOrderDetail Function(String orderId)? onGetOrder;
   final List<PlaceFoodRequest> placeCalls = [];
   final List<String> storeReads = [];
+
+  /// One entry per getStore call: whether customer coordinates were sent.
+  final List<bool> storeReadGeo = [];
 
   /// One entry per listStores call: the server search text sent (or null).
   final List<String?> storeSearches = [];
 
   /// One entry per listStores call: whether a GPS fix was sent.
   final List<bool> storeListGeo = [];
+  final List<String?> storeSorts = [];
+  final List<int?> storeMaxKms = [];
+  final List<int> storePages = [];
+  final List<int> storeLimits = [];
+  final List<String?> storeCategories = [];
   final List<String> readyCalls = [];
   final List<String> claimCalls = [];
   final List<({String orderId, FoodDeliveryAction action})> advanceCalls = [];
@@ -342,25 +367,99 @@ class FakeFoodClient implements FoodClient {
   }
 
   @override
-  Future<List<FoodStoreSummary>> listStores(
+  Future<FoodStorePageResult> listStores(
     String accessToken, {
     double? lat,
     double? lng,
     String? search,
+    String? sortBy,
+    int? maxKm,
+    String? category,
+    int page = 1,
+    int limit = 20,
   }) async {
     storeListGeo.add(lat != null && lng != null);
     storeSearches.add(search);
+    storeSorts.add(sortBy);
+    storeMaxKms.add(maxKm);
+    storePages.add(page);
+    storeLimits.add(limit);
+    storeCategories.add(category);
+
     final q = search?.trim().toLowerCase() ?? '';
-    if (q.isEmpty) return stores;
-    return [
+    final code = category?.trim().toLowerCase() ?? '';
+    final filtered = [
       for (final store in stores)
-        if (store.name.toLowerCase().contains(q)) store,
+        if ((q.isEmpty || store.name.toLowerCase().contains(q)) &&
+            (code.isEmpty || store.category?.toLowerCase() == code))
+          store,
     ];
+    final start = (page - 1) * limit;
+    final items = start >= filtered.length
+        ? const <FoodStoreSummary>[]
+        : filtered.sublist(start, (start + limit).clamp(0, filtered.length));
+    return FoodStorePageResult(
+      items: items,
+      total: filtered.length,
+      page: page,
+      limit: limit,
+    );
   }
 
   @override
-  Future<FoodStoreDetail> getStore(String accessToken, String storeId) async {
+  Future<FoodSearchResult> searchFood(
+    String accessToken, {
+    required String q,
+    double? lat,
+    double? lng,
+    String? sortBy,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final trimmed = q.trim();
+    searchQueries.add(trimmed);
+    searchSorts.add(sortBy);
+    searchPages.add(page);
+    searchLimits.add(limit);
+    final handler = searchFoodHandler;
+    if (handler != null) {
+      return handler(trimmed);
+    }
+    return const FoodSearchResult(
+      dishes: [],
+      dishTotal: 0,
+      stores: [],
+      storeTotal: 0,
+    );
+  }
+
+  @override
+  Future<List<FoodFeaturedItem>> listStoreSuggestions(
+    String accessToken,
+    String storeId, {
+    List<String> exclude = const [],
+  }) async {
+    final excluded = [
+      for (final id in exclude)
+        if (id.trim().isNotEmpty) id.trim(),
+    ];
+    suggestionCalls.add((storeId: storeId, exclude: excluded));
+    final error = suggestionsError;
+    if (error != null) {
+      throw error;
+    }
+    return List.unmodifiable(suggestions);
+  }
+
+  @override
+  Future<FoodStoreDetail> getStore(
+    String accessToken,
+    String storeId, {
+    double? lat,
+    double? lng,
+  }) async {
     storeReads.add(storeId);
+    storeReadGeo.add(lat != null && lng != null);
     final detail = details[storeId];
     if (detail == null) {
       throw const ApiException(
@@ -536,6 +635,9 @@ class FakeFoodClient implements FoodClient {
     required String name,
     required int priceVnd,
     bool? available,
+    String? description,
+    int? prepMinutes,
+    String? menuCategoryId,
   }) async {
     createItemCalls.add((name: name, priceVnd: priceVnd, available: available));
     final error = catalogWriteError;
@@ -548,12 +650,13 @@ class FakeFoodClient implements FoodClient {
       name: name,
       priceVnd: priceVnd,
       available: available ?? true,
+      description: description,
+      prepMinutes: prepMinutes,
+      menuCategoryId: menuCategoryId,
     );
     details = {
       ...details,
-      store.id: FoodStoreDetail(
-        id: store.id,
-        name: store.name,
+      store.id: store.copyWith(
         items: List.unmodifiable([...store.items, item]),
       ),
     };
@@ -729,11 +832,7 @@ class FakeFoodClient implements FoodClient {
     }
     details = {
       ...details,
-      store.id: FoodStoreDetail(
-        id: store.id,
-        name: store.name,
-        items: List.unmodifiable(nextItems),
-      ),
+      store.id: store.copyWith(items: List.unmodifiable(nextItems)),
     };
     return updated;
   }
@@ -899,4 +998,60 @@ class FakeFoodClient implements FoodClient {
       return item.copyWith(clearImageUrl: true);
     });
   }
+}
+
+FoodDishHit dishHit({
+  required String name,
+  required String storeId,
+  required String itemId,
+  int priceVnd = 45000,
+  int? originalPriceVnd,
+  String storeName = 'Quán',
+  double? distanceKm,
+  int? etaMinutes,
+  int? deliveryFeeFromVnd,
+  bool openNow = true,
+  StoreClosedReason? closedReason,
+}) {
+  return FoodDishHit(
+    item: FoodFeaturedItem(
+      id: itemId,
+      name: name,
+      priceVnd: priceVnd,
+      originalPriceVnd: originalPriceVnd,
+    ),
+    store: FoodDishHitStore(
+      id: storeId,
+      name: storeName,
+      distanceKm: distanceKm,
+      etaMinutes: etaMinutes,
+      deliveryFeeFromVnd: deliveryFeeFromVnd,
+      openNow: openNow,
+      closedReason: closedReason,
+    ),
+  );
+}
+
+FoodStoreSummary storeSummary({
+  required String id,
+  required String name,
+  String? category,
+  double? distanceKm,
+  int? etaMinutes,
+  int? deliveryFeeFromVnd,
+  StoreClosedReason? closedReason,
+  List<FoodFeaturedItem> featuredItems = const [],
+  String? closesAtToday,
+}) {
+  return FoodStoreSummary(
+    id: id,
+    name: name,
+    category: category,
+    distanceKm: distanceKm,
+    etaMinutes: etaMinutes,
+    deliveryFeeFromVnd: deliveryFeeFromVnd,
+    closedReason: closedReason,
+    featuredItems: featuredItems,
+    closesAtToday: closesAtToday,
+  );
 }

@@ -16,14 +16,24 @@ import 'package:flutter_test/flutter_test.dart';
 class _FoodRepo implements FoodRepository {
   final searches = <String?>[];
   @override
-  Future<List<FoodStoreSummary>> listStores(
+  Future<FoodStorePageResult> listStores(
     String accessToken, {
     double? lat,
     double? lng,
     String? search,
+    String? sortBy,
+    int? maxKm,
+    String? category,
+    int page = 1,
+    int limit = 20,
   }) async {
     searches.add(search);
-    return const [];
+    return FoodStorePageResult(
+      items: const [],
+      total: 0,
+      page: page,
+      limit: limit,
+    );
   }
 
   @override

@@ -2,14 +2,42 @@ import '../entities/food_models.dart';
 import '../params/place_food_order_params.dart';
 
 abstract interface class FoodRepository {
-  Future<List<FoodStoreSummary>> listStores(
+  Future<FoodStorePageResult> listStores(
     String accessToken, {
     double? lat,
     double? lng,
     String? search,
+    String? sortBy,
+    int? maxKm,
+    String? category,
+    int page = 1,
+    int limit = 20,
   });
 
-  Future<FoodStoreDetail> getStore(String accessToken, String storeId);
+  /// Dish hits above the stores matching the same keyword (`GET /v1/food/search`).
+  Future<FoodSearchResult> searchFood(
+    String accessToken, {
+    required String q,
+    double? lat,
+    double? lng,
+    String? sortBy,
+    int page = 1,
+    int limit = 20,
+  });
+
+  /// Up to 6 in-stock dishes from another menu category of the same store.
+  Future<List<FoodFeaturedItem>> listStoreSuggestions(
+    String accessToken,
+    String storeId, {
+    List<String> exclude = const [],
+  });
+
+  Future<FoodStoreDetail> getStore(
+    String accessToken,
+    String storeId, {
+    double? lat,
+    double? lng,
+  });
 
   Future<PlacedFoodOrder> placeOrder(PlaceFoodOrderParams request);
 

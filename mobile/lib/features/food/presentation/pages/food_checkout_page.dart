@@ -269,21 +269,19 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
                 },
                 onBack: submitting ? () {} : null,
               ),
-              Expanded(child: CheckoutBody(phase: phase)),
-              if (phase is CheckoutEditing)
-                Container(
-                  color: DealGoColors.card,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: DealGoDimensions.pageGutter,
-                    vertical: DealGoSpacing.s8,
-                  ),
-                  child: PaymentMethodTile(
-                    service: 'FOOD',
-                    selected: _payment.code,
-                    enabled: !_busy,
-                    onChanged: (m) => setState(() => _payment = m),
-                  ),
+              Expanded(
+                child: CheckoutBody(
+                  phase: phase,
+                  paymentTile: phase is CheckoutEditing
+                      ? PaymentMethodTile(
+                          service: 'FOOD',
+                          selected: _payment.code,
+                          enabled: !_busy,
+                          onChanged: (m) => setState(() => _payment = m),
+                        )
+                      : null,
                 ),
+              ),
             ],
           ),
         ),

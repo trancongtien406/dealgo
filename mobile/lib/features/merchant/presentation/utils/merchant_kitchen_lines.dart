@@ -8,6 +8,7 @@ class MerchantKitchenLine {
     required this.qty,
     required this.unitPriceVnd,
     this.options = '',
+    this.note,
   });
 
   /// Server line id — needed to edit the order.
@@ -18,6 +19,9 @@ class MerchantKitchenLine {
 
   /// Chosen options for the cook, e.g. "Size: L · Topping: Trân châu" (DEC-PROD-033).
   final String options;
+
+  /// Customer note for this dish ("ít cay, không hành"); null = none.
+  final String? note;
 }
 
 /// Builds kitchen display lines from an order detail returned by the API.
@@ -34,6 +38,7 @@ List<MerchantKitchenLine> kitchenLinesFromDetail(FoodOrderDetail detail) {
         qty: lines[i].quantity,
         unitPriceVnd: lines[i].unitPriceVnd,
         options: lines[i].optionsSummary,
+        note: lines[i].note,
       ),
   ];
 }

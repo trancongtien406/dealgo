@@ -2,6 +2,7 @@ import type { ConfigService } from '@nestjs/config';
 import type { AppEnv } from '../../../platform/config/env.js';
 import {
   MomoAdapter,
+  PayosAdapter,
   StubPaymentAdapter,
   VnpayAdapter,
   ZalopayAdapter,
@@ -29,6 +30,10 @@ export type PaymentGatewayEnv = Partial<
     | 'ZALOPAY_KEY1'
     | 'ZALOPAY_KEY2'
     | 'ZALOPAY_ENDPOINT'
+    | 'PAYOS_CLIENT_ID'
+    | 'PAYOS_API_KEY'
+    | 'PAYOS_CHECKSUM_KEY'
+    | 'PAYOS_ENDPOINT'
   >
 >;
 
@@ -61,6 +66,12 @@ export function buildPaymentAdapters(env: PaymentGatewayEnv, http?: HttpPost): P
       },
       http,
     ),
+    payos: new PayosAdapter({
+      clientId: env.PAYOS_CLIENT_ID,
+      apiKey: env.PAYOS_API_KEY,
+      checksumKey: env.PAYOS_CHECKSUM_KEY,
+      endpoint: env.PAYOS_ENDPOINT,
+    }),
     shopeepay: new StubPaymentAdapter(
       'shopeepay',
       ['SHOPEEPAY_CLIENT_ID', 'SHOPEEPAY_SECRET_KEY', 'SHOPEEPAY_MERCHANT_EXT_ID', 'SHOPEEPAY_ENDPOINT'],
@@ -68,7 +79,6 @@ export function buildPaymentAdapters(env: PaymentGatewayEnv, http?: HttpPost): P
     ),
     card: new StubPaymentAdapter('card', ['CARD_GATEWAY_MERCHANT_ID', 'CARD_GATEWAY_SECRET'], 'International card'),
     applepay: new StubPaymentAdapter('applepay', ['APPLE_PAY_MERCHANT_ID'], 'Apple Pay'),
-    wallet: new StubPaymentAdapter('wallet', [], 'DealGo wallet'),
   };
 }
 
@@ -88,5 +98,9 @@ export function paymentAdaptersFromConfig(config: ConfigService<AppEnv, true>): 
     ZALOPAY_KEY1: get('ZALOPAY_KEY1'),
     ZALOPAY_KEY2: get('ZALOPAY_KEY2'),
     ZALOPAY_ENDPOINT: get('ZALOPAY_ENDPOINT'),
+    PAYOS_CLIENT_ID: get('PAYOS_CLIENT_ID'),
+    PAYOS_API_KEY: get('PAYOS_API_KEY'),
+    PAYOS_CHECKSUM_KEY: get('PAYOS_CHECKSUM_KEY'),
+    PAYOS_ENDPOINT: get('PAYOS_ENDPOINT'),
   });
 }

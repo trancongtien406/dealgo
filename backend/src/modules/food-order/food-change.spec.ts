@@ -32,8 +32,8 @@ describe('Merchant edits an order, customer confirms', () => {
       discountVnd: 80_000,
       deliveryFareVnd: 15_000,
       lines: [
-        { id: 'a', itemId: 'i1', name: 'Phở', unitPriceVnd: 50_000, quantity: 2, imageUrl: null, options: [] },
-        { id: 'b', itemId: 'i2', name: 'Trà', unitPriceVnd: 5_000, quantity: 1, imageUrl: null, options: [] },
+        { id: 'a', itemId: 'i1', name: 'Phở', unitPriceVnd: 50_000, quantity: 2, imageUrl: null, note: null, options: [] },
+        { id: 'b', itemId: 'i2', name: 'Trà', unitPriceVnd: 5_000, quantity: 1, imageUrl: null, note: null, options: [] },
       ],
     };
     expect(planFoodOrderChange(order, [{ lineId: 'a', toQuantity: 1 }])).toMatchObject({

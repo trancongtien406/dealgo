@@ -91,7 +91,7 @@ describe('mail templates', () => {
     expect(mail.text).toContain('482913');
     expect(mail.text).toContain('10 phút');
     expect(mail.html).toContain('>482913</span>');
-    expect(mail.html).toContain('https://dealgo.trancongtien.com/apple-icon.png');
+    expect(mail.html).toContain('https://dealgo.laptrinhapp.com/apple-icon.png');
     expect(mail.html).toContain('lang="vi"');
     expect(mail.text).not.toMatch(/<[a-z]/i);
   });

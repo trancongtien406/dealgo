@@ -142,6 +142,13 @@ export const apiPaths = {
     `/api/ops/users/${encodeURIComponent(id)}/driver-payments`,
   opsUserFeeSettlement: (id: string) =>
     `/api/ops/users/${encodeURIComponent(id)}/fee-settlements`,
+  opsDriverCreditTopUps: () => "/api/ops/driver-credit/top-ups",
+  opsDriverCreditSummary: () => "/api/ops/driver-credit/summary",
+  opsDriverCreditReconcile: () => "/api/ops/driver-credit/reconcile",
+  opsDriverCreditTopUpReconcile: (id: string) =>
+    `/api/ops/driver-credit/top-ups/${encodeURIComponent(id)}/reconcile`,
+  opsDriverCreditTopUpRefund: (id: string) =>
+    `/api/ops/driver-credit/top-ups/${encodeURIComponent(id)}/refund`,
   opsZones: () => "/api/ops/zones",
   opsPlacesSearch: () => "/api/ops/places/search",
   opsZonesRules: () => "/api/ops/zones/rules",

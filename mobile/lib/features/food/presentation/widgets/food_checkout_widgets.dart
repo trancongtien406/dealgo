@@ -7,6 +7,7 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 import '../../../../core/design_system/components/dealgo_bottom_bar.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../../core/design_system/components/dealgo_profile_avatar.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
@@ -21,6 +22,7 @@ import '../../../promotion/domain/usecases/list_available_vouchers.dart';
 import '../../../promotion/presentation/widgets/food_voucher_picker_sheet.dart';
 import '../../../promotion/presentation/widgets/voucher_field.dart';
 import '../cubit/food_cart_cubit.dart';
+import 'food_checkout_extras.dart';
 import 'food_dropoff_tile.dart';
 import 'food_fare_widgets.dart';
 import 'food_widgets.dart';
@@ -30,9 +32,12 @@ import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 
 class CheckoutBody extends StatelessWidget {
-  const CheckoutBody({required this.phase, super.key});
+  const CheckoutBody({required this.phase, this.paymentTile, super.key});
 
   final CheckoutPhase phase;
+
+  /// Method picker rendered inside the payment card while editing.
+  final Widget? paymentTile;
 
   @override
   Widget build(BuildContext context) {
@@ -41,8 +46,11 @@ class CheckoutBody extends StatelessWidget {
       CheckoutOffline(:final attempt) => _OfflineBody(attempt: attempt),
       final CheckoutRepriced repriced => _RepricedBody(phase: repriced),
       CheckoutPlaced(:final order) => _Receipt(order: order, placed: true),
-      CheckoutRejected(:final message) => _EditingOrEmpty(notice: message),
-      CheckoutEditing() => const _EditingOrEmpty(),
+      CheckoutRejected(:final message) => _EditingOrEmpty(
+        notice: message,
+        paymentTile: paymentTile,
+      ),
+      CheckoutEditing() => _EditingOrEmpty(paymentTile: paymentTile),
     };
   }
 }
@@ -86,9 +94,10 @@ class CheckoutActions extends StatelessWidget {
 }
 
 class _EditingOrEmpty extends StatelessWidget {
-  const _EditingOrEmpty({this.notice});
+  const _EditingOrEmpty({this.notice, this.paymentTile});
 
   final String? notice;
+  final Widget? paymentTile;
 
   @override
   Widget build(BuildContext context) {
@@ -96,7 +105,7 @@ class _EditingOrEmpty extends StatelessWidget {
     if (cart.lines.isEmpty) {
       return _EmptyCheckoutBody(notice: notice);
     }
-    return _Receipt(notice: notice);
+    return _Receipt(notice: notice, paymentTile: paymentTile);
   }
 }
 
@@ -217,11 +226,19 @@ void _backToMenu(BuildContext context) {
 }
 
 class _Receipt extends StatelessWidget {
-  const _Receipt({this.order, this.notice, this.placed = false});
+  const _Receipt({
+    this.order,
+    this.notice,
+    this.placed = false,
+    this.paymentTile,
+  });
 
   final PlacedFoodOrder? order;
   final String? notice;
   final bool placed;
+
+  /// Method picker shown inside the payment card while the order is editable.
+  final Widget? paymentTile;
 
   @override
   Widget build(BuildContext context) {
@@ -239,6 +256,8 @@ class _Receipt extends StatelessWidget {
                 unit: line.unitPriceVnd,
                 total: line.lineTotalVnd,
                 options: '',
+                note: line.note,
+                imageUrl: line.imageUrl,
               ),
           ]
         : [
@@ -249,9 +268,10 @@ class _Receipt extends StatelessWidget {
                 unit: line.unitPriceVnd,
                 total: line.lineTotalVnd,
                 options: line.optionsSummary,
+                note: line.note,
+                imageUrl: line.imageUrl,
               ),
           ];
-    final shownLines = lines.isEmpty && order == null ? lines : lines;
     final textTheme = Theme.of(context).textTheme;
     final profile = context.watch<AuthCubit>().state;
     final recipient = checkoutRecipientLine(
@@ -259,6 +279,10 @@ class _Receipt extends StatelessWidget {
       phone: profile is AuthSignedIn ? profile.profile.phone : null,
       fallback: AppLocalizations.of(context).checkoutRecipient,
     );
+    final itemCount = order == null
+        ? cart.itemCount
+        : order!.lines.fold<int>(0, (sum, line) => sum + line.quantity);
+    final l10n = AppLocalizations.of(context);
     return ListView(
       key: const Key('food-checkout-scroll'),
       // The sticky CTA (Scaffold extendBody) sits over the list; its height
@@ -275,23 +299,24 @@ class _Receipt extends StatelessWidget {
       children: [
         if (notice != null) ...[
           FoodNote(message: notice!, tone: FoodNoteTone.danger),
-          const SizedBox(height: DealGoSpacing.s16),
+          const SizedBox(height: DealGoSpacing.s12),
         ],
+        _OrderStoreStrip(
+          storeName: cart.storeName ?? '',
+          itemCount: itemCount,
+          etaMinutes: order == null && !placed ? cart.etaMinutes : null,
+        ),
+        const SizedBox(height: DealGoSpacing.s12),
         FoodPanel(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                AppLocalizations.of(context).checkoutRecipientAddress,
-                style: textTheme.titleMedium,
-              ),
-              const SizedBox(height: DealGoSpacing.s12),
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: DealGoColors.subtlePurple,
-                    child: Icon(DealGoIcons.user, color: DealGoColors.primary),
+                  DealGoProfileAvatar(
+                    key: const Key('food-checkout-avatar'),
+                    avatarUrl: accountAvatarUrl(profile),
+                    size: 44,
                   ),
                   const SizedBox(width: DealGoSpacing.s12),
                   Expanded(
@@ -300,22 +325,31 @@ class _Receipt extends StatelessWidget {
                       children: [
                         Text(
                           recipient,
-                          style: textTheme.bodyMedium?.copyWith(
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w700,
                             color: DealGoColors.text,
                           ),
                         ),
-                        // Merged cart + checkout: the address (and its
-                        // server-quoted fee) is edited right here.
-                        if (order == null && !placed)
-                          const FoodDropoffTile()
-                        else
-                          Text(cart.dropoffLabel, style: textTheme.bodySmall),
+                        if (order != null || placed)
+                          Text(
+                            cart.dropoffLabel,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.bodySmall,
+                          ),
                       ],
                     ),
                   ),
                 ],
               ),
+              // Merged cart + checkout: the address (and its server-quoted
+              // fee) is edited right here.
+              if (order == null && !placed) ...[
+                const Divider(height: DealGoSpacing.s24),
+                const FoodDropoffTile(),
+              ],
             ],
           ),
         ),
@@ -323,122 +357,262 @@ class _Receipt extends StatelessWidget {
           const SizedBox(height: DealGoSpacing.s12),
           FoodEtaLine(minutes: cart.etaMinutes!),
         ],
-        const SizedBox(height: DealGoSpacing.s16),
+        const SizedBox(height: DealGoSpacing.s12),
         FoodPanel(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                AppLocalizations.of(context).checkoutItems,
-                style: textTheme.titleMedium,
-              ),
-              if ((cart.storeName ?? '').isNotEmpty) ...[
-                const SizedBox(height: DealGoSpacing.s8),
-                Text(
-                  cart.storeName!,
-                  style: textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: DealGoColors.text,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.checkoutYourOrder,
+                      style: textTheme.titleMedium,
+                    ),
                   ),
+                  FoodPill(
+                    label: l10n.checkoutItemCount(itemCount),
+                    foreground: DealGoColors.primary,
+                    background: DealGoColors.subtlePurple,
+                  ),
+                ],
+              ),
+              const SizedBox(height: DealGoSpacing.s4),
+              for (var i = 0; i < lines.length; i++) ...[
+                if (i > 0) const Divider(height: 1),
+                FoodLineSummary(
+                  name: lines[i].name,
+                  quantity: lines[i].quantity,
+                  unitPriceVnd: lines[i].unit,
+                  lineTotalVnd: lines[i].total,
+                  options: lines[i].options,
+                  note: lines[i].note,
+                  imageUrl: lines[i].imageUrl,
                 ),
               ],
-              for (final line in shownLines)
-                FoodLineSummary(
-                  name: line.name,
-                  quantity: line.quantity,
-                  unitPriceVnd: line.unit,
-                  lineTotalVnd: line.total,
-                  options: line.options,
-                ),
             ],
           ),
         ),
         if (order == null && !placed) ...[
-          const SizedBox(height: DealGoSpacing.s16),
+          const SizedBox(height: DealGoSpacing.s12),
           _CheckoutVoucherPanel(
             subtotal: subtotal,
             delivery: delivery,
             storeId: cart.storeId,
             initialCode: cart.voucherCode,
           ),
-          if (cart.deliveryQuote?.negotiable ?? false) ...[
-            const SizedBox(height: DealGoSpacing.s16),
+          if (cart.deliveryQuote != null) ...[
+            const SizedBox(height: DealGoSpacing.s12),
             const FoodFareOfferPanel(),
           ],
+          const SizedBox(height: DealGoSpacing.s12),
+          const FoodCheckoutExtrasPanel(),
         ],
-        const SizedBox(height: DealGoSpacing.s16),
-        FoodPanel(
-          color: DealGoColors.subtlePurple,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                AppLocalizations.of(context).checkoutTotalSection,
-                style: textTheme.titleMedium,
-              ),
-              const SizedBox(height: DealGoSpacing.s8),
-              FoodMoneyRow(
-                label: AppLocalizations.of(context).checkoutSubtotal,
-                amount: formatVnd(subtotal),
-              ),
-              FoodMoneyRow(
-                label: AppLocalizations.of(context).checkoutDeliveryFee,
-                amount: formatVnd(delivery),
-              ),
-              FoodMoneyRow(
-                label: AppLocalizations.of(context).checkoutDiscount,
-                amount: discount > 0 ? '-${formatVnd(discount)}' : formatVnd(0),
-              ),
-              const Divider(height: 24),
-              FoodMoneyRow(
-                label: AppLocalizations.of(context).checkoutCodTotal,
-                amount: formatVnd(total),
-                emphasize: true,
-              ),
-            ],
-          ),
+        const SizedBox(height: DealGoSpacing.s12),
+        _BillCard(
+          subtotalVnd: subtotal,
+          deliveryVnd: delivery,
+          discountVnd: discount,
+          totalVnd: total,
         ),
-        const SizedBox(height: DealGoSpacing.s16),
-        FoodPanel(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                AppLocalizations.of(context).checkoutPayment,
-                style: textTheme.titleMedium,
-              ),
-              const SizedBox(height: DealGoSpacing.s8),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: DealGoColors.amberSurface,
-                  borderRadius: BorderRadius.all(Radius.circular(999)),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: DealGoSpacing.s12,
-                    vertical: DealGoSpacing.s4,
-                  ),
-                  child: Text(
-                    AppLocalizations.of(context).checkoutCodUncollected,
-                    style: const TextStyle(
-                      color: DealGoColors.warning,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: DealGoSpacing.s8),
-              Text(
-                placed
-                    ? AppLocalizations.of(context).checkoutPlacedNote
-                    : AppLocalizations.of(context).checkoutPayLaterNote,
-                style: textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ),
+        const SizedBox(height: DealGoSpacing.s12),
+        _PaymentCard(paymentTile: paymentTile, placed: placed),
       ],
+    );
+  }
+}
+
+class _OrderStoreStrip extends StatelessWidget {
+  const _OrderStoreStrip({
+    required this.storeName,
+    required this.itemCount,
+    this.etaMinutes,
+  });
+
+  final String storeName;
+  final int itemCount;
+  final int? etaMinutes;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    final name = storeName.trim();
+    return FoodPanel(
+      padding: const EdgeInsets.all(DealGoSpacing.s12),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: DealGoColors.subtlePurple,
+              borderRadius: BorderRadius.circular(DealGoRadius.input),
+            ),
+            child: const Icon(
+              DealGoIcons.store,
+              size: 22,
+              color: DealGoColors.primary,
+            ),
+          ),
+          const SizedBox(width: DealGoSpacing.s12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name.isEmpty ? l10n.checkoutTitle : name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: DealGoColors.text,
+                  ),
+                ),
+                const SizedBox(height: DealGoSpacing.s2),
+                Text(
+                  [
+                    l10n.checkoutItemCount(itemCount),
+                    if (etaMinutes != null) l10n.checkoutEtaChip(etaMinutes!),
+                  ].join(' · '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: DealGoColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BillCard extends StatelessWidget {
+  const _BillCard({
+    required this.subtotalVnd,
+    required this.deliveryVnd,
+    required this.discountVnd,
+    required this.totalVnd,
+  });
+
+  final int subtotalVnd;
+  final int deliveryVnd;
+  final int discountVnd;
+  final int totalVnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    return FoodPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l10n.checkoutTotalSection, style: textTheme.titleMedium),
+          const SizedBox(height: DealGoSpacing.s4),
+          FoodMoneyRow(
+            label: l10n.checkoutSubtotal,
+            amount: formatVnd(subtotalVnd),
+          ),
+          FoodMoneyRow(
+            label: l10n.checkoutDeliveryFee,
+            amount: formatVnd(deliveryVnd),
+          ),
+          if (discountVnd > 0)
+            FoodMoneyRow(
+              label: l10n.checkoutDiscount,
+              amount: '-${formatVnd(discountVnd)}',
+            ),
+          const Divider(height: DealGoSpacing.s24),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.checkoutCodTotal,
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: DealGoColors.text,
+                  ),
+                ),
+              ),
+              Text(
+                formatVnd(totalVnd),
+                key: const Key('food-checkout-total'),
+                style: textTheme.headlineSmall?.copyWith(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: DealGoColors.primary,
+                ),
+              ),
+            ],
+          ),
+          if (discountVnd > 0) ...[
+            const SizedBox(height: DealGoSpacing.s6),
+            Row(
+              children: [
+                const Icon(
+                  DealGoIcons.success,
+                  size: 15,
+                  color: DealGoColors.brandGreen,
+                ),
+                const SizedBox(width: DealGoSpacing.s4),
+                Text(
+                  l10n.checkoutYouSave(formatVnd(discountVnd)),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: DealGoColors.brandGreen,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PaymentCard extends StatelessWidget {
+  const _PaymentCard({this.paymentTile, required this.placed});
+
+  final Widget? paymentTile;
+  final bool placed;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    final tile = paymentTile;
+    return FoodPanel(
+      key: const Key('food-checkout-payment'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l10n.checkoutPayment, style: textTheme.titleMedium),
+          const SizedBox(height: DealGoSpacing.s8),
+          if (tile != null)
+            tile
+          else ...[
+            FoodPill(
+              label: l10n.checkoutCodUncollected,
+              foreground: DealGoColors.warning,
+              background: DealGoColors.amberSurface,
+            ),
+            const SizedBox(height: DealGoSpacing.s8),
+            Text(
+              placed ? l10n.checkoutPlacedNote : l10n.checkoutPayLaterNote,
+              style: textTheme.bodySmall?.copyWith(
+                color: DealGoColors.textSecondary,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -710,6 +884,7 @@ class CheckoutHeldAttempt {
               itemId: line.placeItemId,
               quantity: line.quantity,
               optionIds: line.optionIds,
+              note: line.note,
             ),
         ],
         dropoff: FoodDropoff(
@@ -725,6 +900,8 @@ class CheckoutHeldAttempt {
             : cart.offeredDeliveryFareVnd,
         voucherCode: cart.voucherCode,
         paymentMethod: paymentMethod,
+        note: cart.note,
+        utensils: cart.utensils,
       ),
     );
   }
@@ -858,15 +1035,41 @@ class _CheckoutVoucherPanelState extends State<_CheckoutVoucherPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(l10n.voucherLabel, style: textTheme.titleMedium),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              key: const Key('checkout-voucher-picker'),
-              onPressed: _openList,
-              child: Text(l10n.accountVouchers),
-            ),
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: DealGoColors.subtlePurple,
+                  borderRadius: BorderRadius.circular(DealGoRadius.input),
+                ),
+                child: const Icon(
+                  DealGoIcons.voucher,
+                  size: 17,
+                  color: DealGoColors.primary,
+                ),
+              ),
+              const SizedBox(width: DealGoSpacing.s8),
+              Expanded(
+                child: Text(l10n.voucherLabel, style: textTheme.titleMedium),
+              ),
+              TextButton(
+                key: const Key('checkout-voucher-picker'),
+                onPressed: _openList,
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(0, 32),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: DealGoSpacing.s8,
+                  ),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(l10n.accountVouchers),
+              ),
+            ],
           ),
+          const SizedBox(height: DealGoSpacing.s8),
           VoucherField(
             service: VoucherService.food,
             orderAmountVnd: widget.subtotal,

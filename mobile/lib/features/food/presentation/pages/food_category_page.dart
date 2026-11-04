@@ -15,8 +15,9 @@ import '../../../rating/domain/service_rating.dart';
 import '../cubit/food_discovery_cubit.dart';
 import '../utils/food_routes.dart';
 import '../widgets/food_cart_bar.dart';
+import '../widgets/food_feed_footer.dart';
 import '../widgets/food_widgets.dart';
-import '../widgets/food_badges.dart';
+import '../widgets/food_store_card.dart';
 import '../food_categories_store.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
@@ -30,12 +31,20 @@ class FoodCategoryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final origin = foodCartOrigin(context);
     return BlocProvider(
-      create: (context) => FoodDiscoveryCubit(
-        listFoodStores: context.read<ListFoodStores>(),
-        ratings: context.read<RatingRepository>(),
-        location: context.read<LocationService>(),
-      )..load(currentAccessToken(context)),
+      create: (context) =>
+          FoodDiscoveryCubit(
+            listFoodStores: context.read<ListFoodStores>(),
+            ratings: context.read<RatingRepository>(),
+            location: context.read<LocationService>(),
+          )..load(
+            currentAccessToken(context),
+            lat: origin.lat,
+            lng: origin.lng,
+            sortBy: 'distance',
+            category: categoryCode,
+          ),
       child: _FoodCategoryView(categoryCode: categoryCode),
     );
   }
@@ -51,7 +60,56 @@ class _FoodCategoryView extends StatefulWidget {
 }
 
 class _FoodCategoryViewState extends State<_FoodCategoryView> {
+  final ScrollController _scroll = ScrollController();
   var _sort = 'near';
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scroll.removeListener(_onScroll);
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    if (position.maxScrollExtent <= 0) return;
+    if (position.pixels < position.maxScrollExtent - 400) return;
+    final discovery = context.read<FoodDiscoveryCubit>().state;
+    if (discovery is FoodDiscoveryReady && discovery.loadMoreFailed) return;
+    context.read<FoodDiscoveryCubit>().loadMore();
+  }
+
+  void _setSort(String sort) {
+    if (_sort == sort) return;
+    setState(() => _sort = sort);
+    final origin = foodCartOrigin(context);
+    context.read<FoodDiscoveryCubit>().load(
+      currentAccessToken(context),
+      lat: origin.lat,
+      lng: origin.lng,
+      sortBy: sort == 'rating' ? 'rating' : 'distance',
+      category: widget.categoryCode,
+    );
+  }
+
+  /// The radius filter only applies when the request has an origin, so
+  /// coordinates plus an empty *unfiltered* feed is the one case that means
+  /// "out of coverage"; everything else is simply an empty catalogue/category.
+  String _emptyTitle(AppLocalizations l10n, FoodDiscoveryState discovery) {
+    final ready = discovery is FoodDiscoveryReady ? discovery : null;
+    final outOfArea =
+        ready != null && ready.hasLocation && widget.categoryCode == null;
+    return outOfArea
+        ? l10n.foodEmptyOutOfArea
+        : l10n.foodEmptyNoStoresInCategory;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,30 +120,10 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
       FoodDiscoveryReady(:final ratings) => ratings,
       _ => const <String, StoreRating>{},
     };
-    final code = widget.categoryCode?.trim().toLowerCase();
     final stores = switch (discovery) {
-      FoodDiscoveryReady(:final stores) => [
-        for (final store in stores)
-          if (code == null ||
-              code.isEmpty ||
-              store.category?.toLowerCase() == code)
-            store,
-      ],
+      FoodDiscoveryReady(:final stores) => stores,
       _ => <FoodStoreSummary>[],
     };
-    if (_sort == 'rating') {
-      stores.sort(
-        (a, b) => (ratings[b.id]?.average ?? -1).compareTo(
-          ratings[a.id]?.average ?? -1,
-        ),
-      );
-    } else {
-      stores.sort(
-        (a, b) => (a.distanceKm ?? double.infinity).compareTo(
-          b.distanceKm ?? double.infinity,
-        ),
-      );
-    }
     final loading = discovery is FoodDiscoveryLoading;
     final title =
         foodCategoryLabel(context, widget.categoryCode) ??
@@ -151,15 +189,21 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
                       label: entry.$2,
                       selected: _sort == entry.$1,
                       tone: DealGoChipTone.brand,
-                      onTap: () => setState(() => _sort = entry.$1),
+                      onTap: () => _setSort(entry.$1),
                     ),
                     const SizedBox(width: DealGoSpacing.s8),
                   ],
                 ],
               ),
             ),
+            if (discovery is FoodDiscoveryReady && discovery.isRefreshing)
+              const Padding(
+                padding: EdgeInsets.only(top: DealGoSpacing.s8),
+                child: LinearProgressIndicator(minHeight: 2),
+              ),
             Expanded(
               child: ListView(
+                controller: _scroll,
                 padding: const EdgeInsets.fromLTRB(
                   DealGoDimensions.pageGutter,
                   DealGoSpacing.s16,
@@ -177,10 +221,11 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
                               l10n.foodCategoryAroundYou,
                               style: textTheme.titleMedium,
                             ),
-                            Text(
-                              l10n.foodCategoryAroundHint(stores.length),
-                              style: textTheme.bodySmall,
-                            ),
+                            if (discovery is FoodDiscoveryReady)
+                              Text(
+                                l10n.foodCategoryAroundHint(discovery.total),
+                                style: textTheme.bodySmall,
+                              ),
                           ],
                         ),
                       ),
@@ -190,9 +235,16 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
                   if (discovery is FoodDiscoveryFailed)
                     DealGoStateView.failure(
                       context,
-                      onRetry: () => context.read<FoodDiscoveryCubit>().load(
-                        currentAccessToken(context),
-                      ),
+                      onRetry: () {
+                        final origin = foodCartOrigin(context);
+                        context.read<FoodDiscoveryCubit>().load(
+                          currentAccessToken(context),
+                          lat: origin.lat,
+                          lng: origin.lng,
+                          sortBy: _sort == 'rating' ? 'rating' : 'distance',
+                          category: widget.categoryCode,
+                        );
+                      },
                       cause: discovery.message.error,
                       message: discovery.message.resolve(l10n),
                       compact: true,
@@ -203,7 +255,7 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
                     DealGoStateView(
                       key: const Key('food-category-empty'),
                       art: DealGoStateArt.noSearch,
-                      title: l10n.foodCategoryEmpty,
+                      title: _emptyTitle(l10n, discovery),
                       compact: true,
                     )
                   else
@@ -219,6 +271,11 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
                       ),
                       const SizedBox(height: DealGoSpacing.s12),
                     ],
+                  FoodFeedFooter(
+                    state: discovery is FoodDiscoveryReady ? discovery : null,
+                    onRetry: () =>
+                        context.read<FoodDiscoveryCubit>().loadMore(),
+                  ),
                 ],
               ),
             ),
@@ -238,6 +295,6 @@ class _StoreRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FoodStoreListCard(store: store, rating: rating, onTap: onTap);
+    return FoodStoreCard(store: store, rating: rating, onTap: onTap);
   }
 }

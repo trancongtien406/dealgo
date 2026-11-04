@@ -37,6 +37,20 @@ int voucherEstimatedSaving(
   return capped.clamp(0, ceiling < 0 ? 0 : ceiling);
 }
 
+/// Ticket stub headline shared by the checkout picker and the discovery wall.
+String voucherHeadlineLabel(
+  AppLocalizations l10n,
+  AvailableVoucher voucher,
+) => switch (voucher.kind) {
+  VoucherDiscountKind.percentage => l10n.voucherPercent(voucher.discountValue),
+  VoucherDiscountKind.fixedAmount => l10n.voucherFixed(
+    meta.shortVnd(voucher.discountValue),
+  ),
+  VoucherDiscountKind.deliveryDiscount => l10n.voucherDelivery(
+    meta.shortVnd(voucher.discountValue),
+  ),
+};
+
 /// Available food vouchers (`GET /v1/promotions/available`) as coupon cards:
 /// estimated saving, unmet minimum, and the best pick first. Picking a code
 /// returns it to checkout; the field still asks the server to price it.
@@ -249,17 +263,7 @@ class _CouponCard extends StatelessWidget {
     return DealGoPressScale(
       child: DealGoVoucherTicket(
         tapKey: Key('checkout-voucher-${voucher.code}'),
-        headline: switch (voucher.kind) {
-          VoucherDiscountKind.percentage => l10n.voucherPercent(
-            voucher.discountValue,
-          ),
-          VoucherDiscountKind.fixedAmount => l10n.voucherFixed(
-            meta.shortVnd(voucher.discountValue),
-          ),
-          VoucherDiscountKind.deliveryDiscount => l10n.voucherDelivery(
-            meta.shortVnd(voucher.discountValue),
-          ),
-        },
+        headline: voucherHeadlineLabel(l10n, voucher),
         caption: voucher.code,
         title: voucher.name,
         conditions: [

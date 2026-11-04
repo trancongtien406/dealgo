@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { verifyVnpaySecureHash, formatVnpDate } from '../vnpay-payment.port.js';
 import { MomoAdapter, momoCreateRawSignature } from './momo.adapter.js';
 import { VnpayAdapter, vnpayRefundHashInput } from './vnpay.adapter.js';
+import { PayosAdapter, payosSignature } from './payos.adapter.js';
 import { ZalopayAdapter, zalopayCreateMacInput } from './zalopay.adapter.js';
 import { StubPaymentAdapter } from './stub.adapters.js';
 import type { HttpPost } from './payment-adapter.js';
@@ -168,6 +169,113 @@ describe('VnpayAdapter', () => {
     expect(b.vnp_TransactionType).toBe('03');
     expect(b.vnp_SecureHash).toBe(createHmac('sha512', 'hs_test').update(vnpayRefundHashInput(b)).digest('hex'));
     expect(vnpayRefundHashInput(b).split('|')).toHaveLength(13);
+  });
+});
+
+describe('PayosAdapter', () => {
+  const payosCfg = {
+    clientId: 'client_test',
+    apiKey: 'api_test',
+    checksumKey: 'checksum_test',
+    endpoint: 'https://api-merchant.payos.vn',
+  };
+  const payosReq = {
+    ...req,
+    orderRef: '1000000001',
+    orderInfo: 'DG 1000000001',
+    returnUrl: 'https://api.example.test/v1/payments/driver-credit/return/payos?orderCode=1000000001',
+    cancelUrl: 'https://api.example.test/v1/payments/driver-credit/return/payos?orderCode=1000000001&cancelled=1',
+  };
+
+  function payosHttp(response: Record<string, unknown>) {
+    const calls: { method: string; url: string; body: Record<string, unknown> | null }[] = [];
+    const http = async (method: 'GET' | 'POST', url: string, _headers: Record<string, string>, body: Record<string, unknown> | null) => {
+      calls.push({ method, url, body });
+      return response;
+    };
+    return { calls, http };
+  }
+
+  it('creates a payment request with the numeric order code and a sorted-field signature', async () => {
+    const { calls, http } = payosHttp({
+      code: '00',
+      data: { checkoutUrl: 'https://pay.payos.vn/web/abc', qrCode: 'data:image/png;base64,x', orderCode: 1000000001 },
+    });
+    const out = await new PayosAdapter(payosCfg, http).create(payosReq);
+
+    expect(out.providerRef).toBe('1000000001');
+    expect(out.paymentUrl).toBe('https://pay.payos.vn/web/abc');
+    expect(out.qrCode).toBe('data:image/png;base64,x');
+    const body = calls[0]!.body!;
+    expect(calls[0]!.url).toBe('https://api-merchant.payos.vn/v2/payment-requests');
+    expect(body.orderCode).toBe(1000000001);
+    expect(String(body.description).length).toBeLessThanOrEqual(25);
+    expect(body.signature).toBe(
+      payosSignature(
+        {
+          amount: payosReq.amountVnd,
+          cancelUrl: payosReq.cancelUrl,
+          description: body.description as string,
+          orderCode: 1000000001,
+          returnUrl: payosReq.returnUrl,
+        },
+        payosCfg.checksumKey,
+      ),
+    );
+  });
+
+  it('accepts a callback only when the signature covers the data payload', () => {
+    const adapter = new PayosAdapter(payosCfg);
+    const data = {
+      orderCode: 1000000001,
+      amount: 100000,
+      code: '00',
+      desc: 'Thanh cong',
+      reference: 'TF240101123456',
+      transactionDateTime: '2026-11-03T14:00:00+07:00',
+    };
+    const payload = {
+      code: '00',
+      desc: 'success',
+      success: true,
+      data,
+      signature: payosSignature(data, payosCfg.checksumKey),
+    };
+    const ok = adapter.verifyCallback(payload);
+    expect(ok).toMatchObject({
+      valid: true,
+      providerRef: '1000000001',
+      success: true,
+      amountVnd: 100_000,
+      providerTransId: 'TF240101123456',
+    });
+
+    const tampered = adapter.verifyCallback({ ...payload, data: { ...data, amount: 1 } });
+    expect(tampered.valid).toBe(false);
+  });
+
+  it('is not configured without merchant credentials and refuses to create', async () => {
+    const adapter = new PayosAdapter({});
+    expect(adapter.isConfigured()).toBe(false);
+    await expect(adapter.create(payosReq)).rejects.toThrow(/not configured/);
+  });
+
+  it('rejects refunds: unused credit goes back by Ops bank transfer', async () => {
+    const adapter = new PayosAdapter(payosCfg);
+    const result = await adapter.refund({
+      providerRef: '1000000001',
+      providerTransId: 'TF240101123456',
+      providerPayDate: null,
+      amountVnd: 50_000,
+      capturedAmountVnd: 100_000,
+      reason: 'ket thuc hop dong',
+      requestId: 'RF1',
+      actorRef: 'ops-1',
+      clientIp: '1.1.1.1',
+      now,
+    });
+    expect(result.status).toBe('REJECTED');
+    expect(result.message).toMatch(/manual/i);
   });
 });
 

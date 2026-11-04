@@ -3,6 +3,7 @@ export const PAYMENT_REPOSITORY = Symbol('PAYMENT_REPOSITORY');
 export const CHECKOUT_REPOSITORY = Symbol('CHECKOUT_REPOSITORY');
 
 export type PaymentEntityTypeName = 'RIDE' | 'FOOD_ORDER';
+/** Mirrors the Prisma PaymentMethod enum. DEALGO_WALLET is kept only for historical rows; the method is not offered. */
 export type PaymentMethodName =
   | 'COD'
   | 'VNPAY'
@@ -30,4 +31,5 @@ export type PaymentProviderName =
   | 'shopeepay'
   | 'card'
   | 'applepay'
+  | 'payos'
   | 'wallet';

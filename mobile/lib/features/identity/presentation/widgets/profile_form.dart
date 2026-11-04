@@ -154,11 +154,9 @@ class _ProfileFormState extends State<ProfileForm> {
   }
 
   Future<void> _pickAvatar() async {
-    final service = widget.permissionService ?? _maybe<AppPermissionService>();
-    if (service != null) {
-      final photosOk = await service.ensurePhotos();
-      if (!photosOk) await service.ensureCamera();
-    }
+    // No media permission: image_picker opens the system picker (Android SAF /
+    // iOS PHPicker), which grants access to just the chosen file. Asking for
+    // READ_MEDIA_IMAGES would be an over-broad Play declaration (B2).
     if (!mounted) return;
     final picked = await _avatarSource.pickFromGallery();
     if (picked == null || !mounted) return;

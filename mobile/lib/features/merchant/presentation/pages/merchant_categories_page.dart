@@ -7,6 +7,7 @@ import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/format/text_case.dart';
 import '../../../../core/l10n/api_error_text.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../l10n/app_localizations.dart';
@@ -287,7 +288,7 @@ class _MerchantCategoriesPageState extends State<MerchantCategoriesPage> {
                                     index: index,
                                     child: const Icon(Icons.drag_handle),
                                   ),
-                                  title: Text(cat.name),
+                                  title: Text(capitalizeFirstLetter(cat.name)),
                                   subtitle: Text(
                                     l10n.merchantCategoriesItemsOnSale(
                                       '${cat.itemCount}',

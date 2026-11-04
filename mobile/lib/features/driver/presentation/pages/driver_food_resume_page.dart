@@ -120,4 +120,6 @@ ReadyFoodJob readyJobFromOrder(FoodOrderDetail order) => ReadyFoodJob(
   totalVnd: order.totalVnd,
   dropoff: order.dropoff,
   lineCount: order.lines.fold<int>(0, (sum, line) => sum + line.quantity),
+  note: order.note,
+  utensils: order.utensils,
 );

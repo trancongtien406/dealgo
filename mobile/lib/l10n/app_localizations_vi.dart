@@ -841,16 +841,74 @@ class AppLocalizationsVi extends AppLocalizations {
   String get foodSearchHint => 'bún bò';
 
   @override
-  String get foodSearchFilterAll => 'Tất cả';
+  String get foodSearchFilterNear => 'Gần tôi';
 
   @override
-  String get foodSearchFilterNear => 'Gần tôi';
+  String get foodSearchSortNewest => 'Mới nhất';
 
   @override
   String get foodSearchSuggestions => 'Gợi ý tìm kiếm';
 
   @override
+  String foodSearchResults(int count) {
+    return '$count kết quả';
+  }
+
+  @override
   String get foodSearchEmpty => 'Chưa có quán khớp từ khóa';
+
+  @override
+  String get foodSearchDishes => 'Món ăn';
+
+  @override
+  String get foodSearchStores => 'Quán';
+
+  @override
+  String get foodSearchDishUnavailable => 'Món này đã ngừng bán';
+
+  @override
+  String get foodDeliverTo => 'Giao đến';
+
+  @override
+  String get foodFilterButton => 'Bộ lọc';
+
+  @override
+  String get foodFilterTitle => 'Lọc & sắp xếp';
+
+  @override
+  String get foodFilterSort => 'Sắp xếp';
+
+  @override
+  String get foodFilterNear => 'Gần nhất';
+
+  @override
+  String get foodFilterRating => 'Đánh giá cao';
+
+  @override
+  String get foodFilterDistance => 'Khoảng cách';
+
+  @override
+  String get foodFilterAnyDistance => 'Mọi khoảng cách';
+
+  @override
+  String foodFilterKm(int km) {
+    return 'Trong $km km';
+  }
+
+  @override
+  String get foodFilterOpenNow => 'Đang mở cửa';
+
+  @override
+  String get foodFilterOffers => 'Có ưu đãi';
+
+  @override
+  String get foodFilterApply => 'Áp dụng';
+
+  @override
+  String get foodFilterReset => 'Đặt lại';
+
+  @override
+  String get foodFilterClear => 'Xóa lọc';
 
   @override
   String get foodSearchHistory => 'Lịch sử tìm kiếm';
@@ -879,6 +937,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get foodItemOptionsTitle => 'Tùy chọn món ăn';
 
   @override
+  String get foodItemAddonsTitle => 'Món ăn kèm';
+
+  @override
   String get foodItemOptionsNoGroups => 'Món này chưa có tùy chọn.';
 
   @override
@@ -892,6 +953,61 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get foodItemOptionsOptional => 'Tùy chọn';
+
+  @override
+  String get foodItemDetailTitle => 'Chi tiết món';
+
+  @override
+  String foodDishPhotoCount(int index, int total) {
+    return 'Ảnh $index/$total';
+  }
+
+  @override
+  String get foodItemOptionsChoose => 'Tùy chọn';
+
+  @override
+  String get foodItemOptionsChooseRequired => 'Chọn tùy chọn';
+
+  @override
+  String foodItemOptionsMissingRequired(String groups) {
+    return 'Chọn $groups';
+  }
+
+  @override
+  String get foodItemOptionsFree => 'Miễn phí';
+
+  @override
+  String get foodItemQuantity => 'Số lượng';
+
+  @override
+  String foodItemSelectedOptions(String options) {
+    return 'Đã chọn: $options';
+  }
+
+  @override
+  String get foodItemInfoTitle => 'Thông tin món';
+
+  @override
+  String foodItemInStore(String store) {
+    return 'Tại $store';
+  }
+
+  @override
+  String get foodStoreDirections => 'Chỉ đường';
+
+  @override
+  String get foodStoreOpenInMaps => 'Mở Google Maps';
+
+  @override
+  String get foodStoreMapOpenFailed => 'Không mở được bản đồ.';
+
+  @override
+  String get foodStoreMenuSections => 'Danh mục món';
+
+  @override
+  String foodItemOptionsMaxReached(int count) {
+    return 'Đã chọn tối đa $count';
+  }
 
   @override
   String get foodInvoiceTitle => 'Biên nhận đơn hàng';
@@ -1754,6 +1870,24 @@ class AppLocalizationsVi extends AppLocalizations {
   String get checkoutRecipientAddress => 'Người nhận và địa chỉ';
 
   @override
+  String get checkoutYourOrder => 'Đơn của bạn';
+
+  @override
+  String checkoutEtaChip(int minutes) {
+    return 'Giao trong ~$minutes phút';
+  }
+
+  @override
+  String checkoutItemCount(int count) {
+    return '$count món';
+  }
+
+  @override
+  String checkoutYouSave(String amount) {
+    return 'Tiết kiệm $amount';
+  }
+
+  @override
   String get checkoutItems => 'Danh sách món';
 
   @override
@@ -2517,6 +2651,65 @@ class AppLocalizationsVi extends AppLocalizations {
       'Chưa tính được phí giao. Kiểm tra kết nối và thử lại.';
 
   @override
+  String get foodOrderNoteLabel => 'Ghi chú cho quán / tài xế';
+
+  @override
+  String get foodOrderNoteHint => 'Ví dụ: ít cay, không hành, giao trước cửa…';
+
+  @override
+  String get foodLineNoteLabel => 'Ghi chú cho món này';
+
+  @override
+  String get foodLineNoteHint => 'Ví dụ: ít đá, không đường…';
+
+  @override
+  String get foodUtensilsLabel => 'Dụng cụ ăn uống';
+
+  @override
+  String get foodUtensilsYes => 'Có';
+
+  @override
+  String get foodUtensilsNo => 'Không';
+
+  @override
+  String get foodCartUpsellTitle => 'Mua thêm cho đủ bữa';
+
+  @override
+  String get foodNoteSaved => 'Đã lưu ghi chú';
+
+  @override
+  String get foodNoteCleared => 'Đã xóa ghi chú';
+
+  @override
+  String get foodCheckoutExtrasTitle => 'Ghi chú & dụng cụ';
+
+  @override
+  String get foodCheckoutNoteEmpty => 'Chưa có ghi chú cho quán hoặc tài xế';
+
+  @override
+  String get foodCheckoutNoteAdd => 'Thêm';
+
+  @override
+  String get foodCheckoutNoteEdit => 'Sửa';
+
+  @override
+  String get foodFareFixedLabel => 'Phí giao cố định';
+
+  @override
+  String get foodFareFixedHint =>
+      'Mức phí này do DealGo quy định cho quãng đường, không thương lượng.';
+
+  @override
+  String get foodFareNegotiationHint =>
+      'Tài xế có thể nhận đúng mức này hoặc trả giá cao hơn.';
+
+  @override
+  String get foodLineNoteClear => 'Xoá ghi chú';
+
+  @override
+  String get foodCartLineRemove => 'Xoá món';
+
+  @override
   String get driverOtpLocked =>
       'Nhập sai quá nhiều lần. Liên hệ hỗ trợ để tiếp tục chuyến.';
 
@@ -2936,11 +3129,19 @@ class AppLocalizationsVi extends AppLocalizations {
   String get foodDiscoverySearchHint => 'Tìm quán, món ăn, đồ uống';
 
   @override
+  String get foodFeedEndOfList => 'Bạn đã xem hết quán quanh đây';
+
+  @override
   String get foodStoreBestsellers => 'Món bán chạy';
 
   @override
   String foodStorePrepChip(int minutes) {
     return 'Khoảng $minutes phút';
+  }
+
+  @override
+  String foodStorePrepShort(int minutes) {
+    return '$minutes phút';
   }
 
   @override
@@ -2950,7 +3151,10 @@ class AppLocalizationsVi extends AppLocalizations {
   String get foodSeeAll => 'Xem tất cả →';
 
   @override
-  String get foodCategoryEmpty => 'Chưa có quán thuộc danh mục này.';
+  String get foodEmptyNoStoresInCategory => 'Chưa có quán trong danh mục này';
+
+  @override
+  String get foodEmptyOutOfArea => 'DealGo chưa giao tới khu vực này';
 
   @override
   String get foodStoreTitle => 'Chi tiết quán';
@@ -3012,6 +3216,11 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String foodStoreMenuCount(int count) {
     return 'Thực đơn · $count món';
+  }
+
+  @override
+  String foodStoreSectionCount(int count) {
+    return '$count món';
   }
 
   @override
@@ -4967,6 +5176,12 @@ class AppLocalizationsVi extends AppLocalizations {
   String get merchantItemSoldOut => 'Tạm hết';
 
   @override
+  String get merchantItemPendingReview => 'Chờ duyệt';
+
+  @override
+  String get merchantItemRejected => 'Bị từ chối';
+
+  @override
   String get foodOrderSentTitle => 'Đã gửi đơn hàng';
 
   @override
@@ -6672,6 +6887,11 @@ class AppLocalizationsVi extends AppLocalizations {
   }
 
   @override
+  String foodStoreOpenUntil(String time) {
+    return 'Mở đến $time';
+  }
+
+  @override
   String get foodOffersNearTitle => 'Ưu đãi quanh bạn';
 
   @override
@@ -6709,6 +6929,11 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String foodItemSold(int count) {
     return 'Đã bán $count';
+  }
+
+  @override
+  String foodItemOptionsCount(int count) {
+    return '$count tuỳ chọn';
   }
 
   @override
@@ -7830,14 +8055,6 @@ class AppLocalizationsVi extends AppLocalizations {
   String get foodFareYourOffer => 'Bạn đề nghị';
 
   @override
-  String get foodFareHint =>
-      'Phí giao chỉ là gợi ý. Tài xế có thể nhận giá bạn đề nghị hoặc đề xuất giá khác để bạn chọn; phí được chốt khi có tài xế nhận.';
-
-  @override
-  String get foodFareHintFixed =>
-      'Phí giao chỉ là gợi ý, bạn có thể tăng/giảm. Tài xế sẽ nhận đúng mức phí bạn chọn; phí được chốt khi có tài xế nhận.';
-
-  @override
   String get foodFareFixedWaiting =>
       'Tài xế chỉ có thể nhận đúng mức phí bạn đưa ra. Nếu chờ lâu, hãy tăng phí để đơn hấp dẫn hơn.';
 
@@ -7924,4 +8141,198 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get merchantFareAgreed => 'Phí giao (đã thoả thuận)';
+
+  @override
+  String get driverCreditTitle => 'Số dư tạm ứng';
+
+  @override
+  String get driverCreditSubtitle =>
+      'Chỉ dùng để trừ phí nền tảng. Không rút và không chuyển cho người khác.';
+
+  @override
+  String get driverCreditBalance => 'Số dư tạm ứng';
+
+  @override
+  String get driverCreditOwes => 'Công nợ phí';
+
+  @override
+  String get driverCreditBlocked =>
+      'Công nợ phí đã vượt hạn mức. Bạn sẽ không nhận được chuyến mới cho đến khi nạp thêm.';
+
+  @override
+  String get driverCreditNearLimit =>
+      'Công nợ phí sắp chạm hạn mức. Nạp thêm để tiếp tục nhận chuyến.';
+
+  @override
+  String get driverCreditDisabled =>
+      'Tính năng nạp tiền chưa mở. Vui lòng thử lại sau.';
+
+  @override
+  String get driverCreditAmount => 'Số tiền nạp';
+
+  @override
+  String driverCreditAmountRange(String min, String max) {
+    return 'Từ $min đến $max';
+  }
+
+  @override
+  String get driverCreditTopUp => 'Nạp tiền';
+
+  @override
+  String get driverCreditPending => 'Đang chờ thanh toán';
+
+  @override
+  String driverCreditRemaining(String amount) {
+    return 'Còn $amount';
+  }
+
+  @override
+  String get driverCreditOpenCheckout => 'Mở trang thanh toán';
+
+  @override
+  String get driverCreditCancelTopUp => 'Huỷ lệnh nạp này';
+
+  @override
+  String get driverCreditChecking => 'Đang kiểm tra thanh toán…';
+
+  @override
+  String get driverCreditPaidHint =>
+      'Đã thanh toán. Số tiền đã vào số dư tạm ứng.';
+
+  @override
+  String get driverCreditRecent => 'Lịch sử nạp tiền';
+
+  @override
+  String get driverCreditEmpty => 'Chưa có lần nạp nào.';
+
+  @override
+  String get driverCreditLoading => 'Đang tải số dư…';
+
+  @override
+  String get driverCreditCardTitle => 'Nạp phí';
+
+  @override
+  String get driverCreditCardBody =>
+      'Giữ công nợ phí ở mức 0 để tiếp tục nhận chuyến.';
+
+  @override
+  String get driverCreditStatusPending => 'Chờ thanh toán';
+
+  @override
+  String get driverCreditStatusPaid => 'Đã cộng';
+
+  @override
+  String get driverCreditStatusExpired => 'Hết hạn';
+
+  @override
+  String get driverCreditStatusCancelled => 'Đã huỷ';
+
+  @override
+  String get driverCreditStatusRefundPending => 'Đang hoàn tiền';
+
+  @override
+  String get driverCreditStatusRefunded => 'Đã hoàn tiền';
+
+  @override
+  String get driverCreditStatusFailed => 'Thất bại';
+
+  @override
+  String get driverCreditErrorGeneric =>
+      'Chưa nạp được tiền. Vui lòng thử lại.';
+
+  @override
+  String get driverCreditErrorPending =>
+      'Bạn đang có một lệnh nạp chờ thanh toán.';
+
+  @override
+  String get driverCreditErrorDailyLimit => 'Đã đạt hạn mức nạp trong ngày.';
+
+  @override
+  String get driverCreditErrorCreditLimit => 'Đã đạt hạn mức số dư tạm ứng.';
+
+  @override
+  String get driverCreditErrorAmount => 'Số tiền nằm ngoài khoảng cho phép.';
+
+  @override
+  String get driverCreditErrorKyc =>
+      'Cần hồ sơ KYC đã duyệt trước khi nạp tiền.';
+
+  @override
+  String get driverCreditErrorDisabled => 'Tính năng nạp tiền chưa mở.';
+
+  @override
+  String get driverCreditErrorProvider =>
+      'Cổng thanh toán hiện không khả dụng.';
+
+  @override
+  String get driverCreditScanHint =>
+      'Mở app ngân hàng và quét mã QR này. Số tiền đã được điền sẵn.';
+
+  @override
+  String get driverCreditOrderCode => 'Mã đơn';
+
+  @override
+  String driverCreditExpiresIn(String time) {
+    return 'Còn $time';
+  }
+
+  @override
+  String get driverCreditDetailTitle => 'Chi tiết lệnh nạp';
+
+  @override
+  String get driverCreditCopyCode => 'Sao chép mã đơn';
+
+  @override
+  String get driverCreditCopied => 'Đã sao chép mã đơn.';
+
+  @override
+  String get driverCreditPaymentReceived => 'Đã nhận thanh toán';
+
+  @override
+  String driverCreditPaymentReceivedBody(String amount) {
+    return 'Đã cộng $amount vào số dư tạm ứng.';
+  }
+
+  @override
+  String get driverCreditLinkExpired =>
+      'Lệnh thanh toán này không còn hiệu lực.';
+
+  @override
+  String get driverCreditCreateNew => 'Tạo lệnh nạp mới';
+
+  @override
+  String get driverCreditAppliedFees => 'Đã cấn trừ phí';
+
+  @override
+  String get driverCreditRefundedAmount => 'Đã hoàn';
+
+  @override
+  String get driverCreditMethod => 'Phương thức thanh toán';
+
+  @override
+  String get driverCreditCreatedAt => 'Tạo lúc';
+
+  @override
+  String get driverCreditPaidAt => 'Thanh toán lúc';
+
+  @override
+  String get driverCreditClose => 'Đóng';
+
+  @override
+  String get driverCreditWaitingBank =>
+      'Số dư tự cập nhật khi ngân hàng xác nhận.';
+
+  @override
+  String get foodVoucherWallTitle => 'Ưu đãi hôm nay';
+
+  @override
+  String get foodVoucherWallSeeAll => 'Xem tất cả';
+
+  @override
+  String get foodReorderTitle => 'Đặt lại đơn quen';
+
+  @override
+  String foodReorderStripItems(int count, String total) {
+    return '$count món · $total';
+  }
 }

@@ -28,6 +28,7 @@ import '../../features/driver/presentation/pages/driver_job_failed_page.dart';
 import '../../features/driver/presentation/pages/driver_passenger_otp_page.dart';
 import '../../features/driver/presentation/pages/driver_ride_page.dart';
 import '../../features/driver/presentation/pages/driver_services_page.dart';
+import '../../features/driver_credit/presentation/pages/driver_credit_page.dart';
 import '../../features/driver/presentation/utils/driver_routes.dart';
 import '../../features/driver/presentation/widgets/driver_widgets.dart';
 import '../../features/food/domain/entities/food_models.dart';
@@ -449,6 +450,22 @@ GoRouter createAppRouter({
       GoRoute(
         path: PaymentRoutes.returnPath,
         parentNavigatorKey: rootNavigatorKey,
+        redirect: (context, state) {
+          final q = state.uri.queryParameters;
+          if (q['kind'] != 'driver-credit') {
+            return null;
+          }
+          final query = <String, String>{};
+          final topUpId = q['topUpId'];
+          if (topUpId != null && topUpId.isNotEmpty) {
+            query['topUpId'] = topUpId;
+          }
+          final status = q['status'];
+          if (status != null) {
+            query['status'] = status;
+          }
+          return Uri(path: DriverRoutes.credit, queryParameters: query).toString();
+        },
         pageBuilder: (context, state) {
           final q = state.uri.queryParameters;
           final entityType = q['entityType'] == 'RIDE' ? 'RIDE' : 'FOOD_ORDER';
@@ -741,6 +758,12 @@ ShellRoute _driverScopedShell() {
       GoRoute(
         path: DriverRoutes.services,
         builder: (context, state) => const DriverServicesPage(),
+      ),
+      GoRoute(
+        path: DriverRoutes.credit,
+        builder: (context, state) => DriverCreditPage(
+          initialTopUpId: state.uri.queryParameters['topUpId'],
+        ),
       ),
       GoRoute(
         path: '/driver/rides/:rideId',

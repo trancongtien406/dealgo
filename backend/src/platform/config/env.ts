@@ -82,6 +82,7 @@ const envSchema = z.object({
   PORT: positiveInt(3001),
   DATABASE_URL: optionalString,
   DATABASE_POOL_MAX: positiveInt(10),
+  DATABASE_CONNECT_TIMEOUT_MS: positiveInt(10_000),
   REDIS_URL: optionalString,
   JWT_ACCESS_SECRET: optionalString,
   // Access default 1h; refresh remains ~14d. Ops Admin BFF also refreshes on 401.
@@ -209,6 +210,8 @@ const envSchema = z.object({
   APNS_ENV: optionalString,
   APNS_SANDBOX: optionalBoolean,
   PAYMENT_PROVIDER: optionalString,
+  /** payOS (default) or VNPAY for driver prepayments; independent from job checkout. */
+  DRIVER_TOP_UP_PROVIDER: optionalString,
   VNPAY_TMN_CODE: optionalString,
   VNPAY_HASH_SECRET: optionalString,
   VNPAY_URL: optionalString,
@@ -228,6 +231,12 @@ const envSchema = z.object({
   ZALOPAY_KEY2: optionalString,
   // sandbox: https://sb-openapi.zalopay.vn
   ZALOPAY_ENDPOINT: optionalString,
+  // payOS payment links (A2A VietQR). Money settles to the merchant bank account; no payouts.
+  PAYOS_CLIENT_ID: optionalString,
+  PAYOS_API_KEY: optionalString,
+  PAYOS_CHECKSUM_KEY: optionalString,
+  // https://api-merchant.payos.vn (default)
+  PAYOS_ENDPOINT: optionalString,
   SHOPEEPAY_CLIENT_ID: optionalString,
   SHOPEEPAY_SECRET_KEY: optionalString,
   SHOPEEPAY_MERCHANT_EXT_ID: optionalString,

@@ -1,7 +1,9 @@
+import 'package:dealgo/core/design_system/tokens/dealgo_tokens.dart';
 import 'package:dealgo/features/food/domain/entities/food_models.dart';
 import 'package:dealgo/features/food/domain/entities/food_money.dart';
 import 'package:dealgo/features/food/presentation/cubit/food_cart_cubit.dart';
 import 'package:dealgo/features/food/presentation/pages/food_checkout_page.dart';
+import 'package:dealgo/features/food/presentation/utils/food_maps.dart';
 import 'package:dealgo/features/promotion/domain/entities/available_voucher.dart';
 import 'package:dealgo/features/promotion/domain/entities/voucher_quote.dart';
 import 'package:dealgo/features/promotion/presentation/widgets/food_voucher_picker_sheet.dart';
@@ -83,6 +85,32 @@ FakeFoodClient _client() => FakeFoodClient(
   },
 );
 
+FakeFoodClient _longMenuClient() {
+  final base = _client();
+  base.details[_id] = base.details[_id]!.copyWith(
+    items: [
+      for (var index = 1; index <= 6; index++)
+        FoodMenuItem(
+          id: 'c$index',
+          name: 'Món cơm số $index',
+          priceVnd: 40000 + index * 1000,
+          available: true,
+          soldCount: 10,
+          menuCategoryId: 'sec-com',
+        ),
+      for (var index = 1; index <= 4; index++)
+        FoodMenuItem(
+          id: 'd$index',
+          name: 'Đồ uống số $index',
+          priceVnd: 15000,
+          available: true,
+          menuCategoryId: 'sec-drink',
+        ),
+    ],
+  );
+  return base;
+}
+
 FakeRatingRemoteDataSource _ratings() => FakeRatingRemoteDataSource(
   stores: {
     _id: const StoreRating(
@@ -113,14 +141,14 @@ FakeRatingRemoteDataSource _ratings() => FakeRatingRemoteDataSource(
   },
 );
 
-Future<void> _openStore(WidgetTester tester) async {
+Future<void> _openStore(WidgetTester tester, {FakeFoodClient? food}) async {
   tester.view.physicalSize = const Size(1170, 2532);
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
   await pumpSignedIn(
     tester,
     profile: customerProfile,
-    foodClient: _client(),
+    foodClient: food ?? _client(),
     ratings: _ratings(),
   );
   GoRouter.of(tester.element(find.byType(Scaffold).first))
@@ -129,17 +157,19 @@ Future<void> _openStore(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('menu has best sellers, sections and in-store search', (
+  testWidgets('menu has a category rail, every section and in-store search', (
     tester,
   ) async {
     await _openStore(tester);
-    expect(find.text('Cơm (2)'), findsOneWidget);
-    expect(find.text('Đồ uống (1)'), findsOneWidget);
-    expect(find.byKey(const Key('food-menu-best-i1')), findsOneWidget);
+    expect(find.byKey(const Key('food-menu-categories')), findsOneWidget);
+    expect(find.byKey(const Key('food-menu-category-best')), findsOneWidget);
+    expect(find.byKey(const Key('food-menu-category-sec-com')), findsOneWidget);
     expect(
-      find.byKey(const Key('food-menu-section-sec-drink')),
+      find.byKey(const Key('food-menu-category-sec-drink')),
       findsOneWidget,
     );
+    expect(find.byKey(const Key('food-menu-best-i1')), findsOneWidget);
+    expect(find.byKey(const Key('food-menu-sec-com-i1')), findsOneWidget);
 
     await tester.enterText(
       find.byKey(const Key('food-store-search')),
@@ -156,6 +186,115 @@ void main() {
     await tester.tap(find.byKey(const Key('food-store-search-clear')));
     await tester.pumpAndSettle();
     expect(find.text('Cơm sườn bì chả'), findsWidgets);
+  });
+
+  testWidgets('tap opens dish details; only the plus adds to the cart', (
+    tester,
+  ) async {
+    await _openStore(tester);
+    final cart = tester
+        .element(find.byKey(const Key('food-store-cover')))
+        .read<FoodCartCubit>();
+
+    final dish = find.byKey(const Key('food-menu-sec-com-i1'));
+    await tester.ensureVisible(dish);
+    await tester.pumpAndSettle();
+    await tester.tap(dish);
+    await tester.pumpAndSettle();
+    expect(find.text('Chi tiết món'), findsOneWidget);
+    expect(cart.state.lines, isEmpty);
+
+    await tester.tap(find.byKey(const Key('food-item-qty-inc')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('food-options-add')));
+    await tester.pumpAndSettle();
+    expect(cart.state.lines.single.quantity, 2);
+  });
+
+  testWidgets('the category rail follows the scrolled menu', (tester) async {
+    await _openStore(tester, food: _longMenuClient());
+    String? activeId() {
+      final highlighted = [
+        for (final id in ['best', 'sec-com', 'sec-drink'])
+          if (tester
+                  .widget<Text>(find.byKey(Key('food-menu-category-label-$id')))
+                  .style
+                  ?.color ==
+              DealGoColors.primary)
+            id,
+      ];
+      return highlighted.isEmpty ? null : highlighted.single;
+    }
+
+    expect(activeId(), 'best');
+
+    // The first drags collapse the store header, then the menu itself scrolls.
+    for (var i = 0; i < 12 && activeId() != 'sec-com'; i++) {
+      await tester.drag(
+        find.byKey(const Key('food-menu-items')),
+        const Offset(0, -300),
+      );
+      await tester.pumpAndSettle();
+    }
+    expect(activeId(), 'sec-com');
+
+    for (var i = 0; i < 12 && activeId() != 'sec-drink'; i++) {
+      await tester.drag(
+        find.byKey(const Key('food-menu-items')),
+        const Offset(0, -300),
+      );
+      await tester.pumpAndSettle();
+    }
+    expect(activeId(), 'sec-drink');
+  });
+
+  testWidgets('tapping a category scrolls the items to that section', (
+    tester,
+  ) async {
+    await _openStore(tester, food: _longMenuClient());
+    final rail = find.byKey(const Key('food-menu-categories'));
+    final category = find.byKey(const Key('food-menu-category-sec-drink'));
+    for (var i = 0; i < 6 && tester.getCenter(category).dy > 800; i++) {
+      await tester.drag(rail, const Offset(0, -80));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(category);
+    await tester.pumpAndSettle();
+
+    final header = tester.getTopLeft(
+      find.byKey(const Key('food-menu-section-sec-com')),
+    );
+    // The last section cannot always reach the very top (the document ends
+    // before it); it must still land in the upper half of the viewport.
+    expect(header.dy, lessThan(300));
+    expect(
+      tester
+          .widget<Text>(
+            find.byKey(const Key('food-menu-category-label-sec-drink')),
+          )
+          .style
+          ?.color,
+      DealGoColors.primary,
+    );
+  });
+
+  testWidgets('a paused store refuses new lines and explains why', (
+    tester,
+  ) async {
+    final food = _client();
+    food.details[_id] = food.details[_id]!.copyWith(
+      serviceMode: StoreServiceMode.paused,
+    );
+    await _openStore(tester, food: food);
+
+    expect(find.byKey(const Key('food-add-i1')), findsNothing);
+    final dish = find.byKey(const Key('food-menu-sec-com-i1'));
+    await tester.ensureVisible(dish);
+    await tester.pumpAndSettle();
+    await tester.tap(dish);
+    await tester.pumpAndSettle();
+    expect(find.text('Chi tiết món'), findsNothing);
+    expect(find.text('Quán đang tạm ngưng nhận đơn mới.'), findsOneWidget);
   });
 
   testWidgets('store offer "Dùng" applies the code to the cart', (
@@ -341,5 +480,232 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('checkout-voucher-used-BIG')), findsOneWidget);
     expect(find.text('Đã dùng'), findsOneWidget);
+  });
+
+  testWidgets('the map lives on the info tab and opens Google Maps', (
+    tester,
+  ) async {
+    final food = _client();
+    food.details[_id] = food.details[_id]!.copyWith(
+      lat: 16.0544,
+      lng: 108.2022,
+      addressLabel: '12 Lê Lợi, Hải Châu',
+    );
+    final opened = <Uri>[];
+    debugFoodMapOpener = (uri) async {
+      opened.add(uri);
+      return true;
+    };
+    addTearDown(() => debugFoodMapOpener = null);
+
+    await _openStore(tester, food: food);
+
+    expect(find.byKey(const Key('food-store-map')), findsNothing);
+    await tester.tap(find.byKey(const Key('food-store-tab-info')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('food-store-map')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('food-store-map-open')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('food-store-map-open')));
+    await tester.pumpAndSettle();
+
+    expect(opened.single.host, 'www.google.com');
+    expect(opened.single.path, '/maps/search/');
+    expect(opened.single.queryParameters['query'], '16.0544,108.2022');
+  });
+
+  testWidgets('unpinned store still shows an address block that opens Maps', (
+    tester,
+  ) async {
+    final food = _client();
+    food.details[_id] = food.details[_id]!.copyWith(
+      addressLabel: '88 Bạch Đằng, Hải Châu',
+    );
+    final opened = <Uri>[];
+    debugFoodMapOpener = (uri) async {
+      opened.add(uri);
+      return true;
+    };
+    addTearDown(() => debugFoodMapOpener = null);
+
+    await _openStore(tester, food: food);
+
+    await tester.tap(find.byKey(const Key('food-store-tab-info')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('food-store-map')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('food-store-map')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('food-store-map')));
+    await tester.pumpAndSettle();
+
+    expect(opened.single.host, 'www.google.com');
+    expect(
+      opened.single.queryParameters['query'],
+      contains('88 Bạch Đằng, Hải Châu'),
+    );
+  });
+
+  testWidgets('tapping a category lands its heading under the pinned bar', (
+    tester,
+  ) async {
+    await _openStore(tester, food: _longMenuClient());
+    // The rail only shows a couple of rows while the store header is expanded.
+    await tester.drag(
+      find.byKey(const Key('food-menu-categories')),
+      const Offset(0, -120),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('food-menu-category-sec-com')));
+    await tester.pumpAndSettle();
+
+    final barBottom = tester
+        .getBottomLeft(find.byKey(const Key('food-store-search')))
+        .dy;
+    final headingTop = tester
+        .getTopLeft(find.byKey(const Key('food-menu-section-sec-com')))
+        .dy;
+    expect(headingTop, greaterThanOrEqualTo(barBottom));
+    expect(headingTop - barBottom, lessThan(24));
+  });
+
+  testWidgets('the highlighted category stays clear of the pinned bar', (
+    tester,
+  ) async {
+    await _openStore(tester, food: _longMenuClient());
+    for (var i = 0; i < 6; i++) {
+      await tester.drag(
+        find.byKey(const Key('food-menu-items')),
+        const Offset(0, -300),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    String? activeId() {
+      for (final id in ['best', 'sec-com', 'sec-drink']) {
+        final label = find.byKey(Key('food-menu-category-label-$id'));
+        if (label.evaluate().isNotEmpty &&
+            tester.widget<Text>(label).style?.color == DealGoColors.primary) {
+          return id;
+        }
+      }
+      return null;
+    }
+
+    final active = activeId();
+    expect(active, isNotNull);
+    final barBottom = tester
+        .getBottomLeft(find.byKey(const Key('food-store-search')))
+        .dy;
+    final row = find.byKey(Key('food-menu-category-$active'));
+    expect(tester.getTopLeft(row).dy, greaterThanOrEqualTo(barBottom - 1));
+    expect(
+      tester.getBottomLeft(row).dy,
+      lessThanOrEqualTo(tester.view.physicalSize.height / 3),
+    );
+  });
+
+  testWidgets('search and the category rail stay pinned while scrolling', (
+    tester,
+  ) async {
+    await _openStore(tester);
+    for (var i = 0; i < 4; i++) {
+      await tester.drag(
+        find.byKey(const Key('food-menu-items')),
+        const Offset(0, -300),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    expect(find.byKey(const Key('food-store-search')), findsOneWidget);
+    expect(find.byKey(const Key('food-menu-categories')), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.byKey(const Key('food-store-search'))).dy,
+      lessThan(300),
+    );
+  });
+
+  testWidgets('dish photo is a square on the left with a compact add button', (
+    tester,
+  ) async {
+    await _openStore(tester);
+    final card = find.byKey(const Key('food-menu-best-i1'));
+
+    final photo = find.byKey(const Key('food-menu-photo-i1')).first;
+    final photoSize = tester.getSize(photo);
+    expect(photoSize.width, 84);
+    expect(photoSize.height, photoSize.width);
+    expect(
+      tester.getTopLeft(photo).dx,
+      lessThan(
+        tester.getTopLeft(find.byKey(const Key('food-price-i1')).first).dx,
+      ),
+    );
+    expect(tester.getSize(card).height, greaterThan(photoSize.height));
+
+    final add = tester.getSize(find.byKey(const Key('food-add-i1')).first);
+    expect(add.width, add.height);
+    expect(add.width, lessThanOrEqualTo(32));
+    expect(add.height, lessThanOrEqualTo(32));
+  });
+
+  testWidgets('menu headings capitalize the merchant category name', (
+    tester,
+  ) async {
+    final food = FakeFoodClient(
+      stores: const [FoodStoreSummary(id: _id, name: 'Quán Bún')],
+      details: {
+        _id: const FoodStoreDetail(
+          id: _id,
+          name: 'Quán Bún',
+          menuSections: [
+            FoodMenuSection(id: 'sec-bun', name: 'món nước'),
+            FoodMenuSection(id: 'sec-tra', name: 'đồ uống'),
+          ],
+          items: [
+            FoodMenuItem(
+              id: 'b1',
+              name: 'Bún bò',
+              priceVnd: 45000,
+              available: true,
+              menuCategoryId: 'sec-bun',
+            ),
+            FoodMenuItem(
+              id: 'b2',
+              name: 'Bún riêu',
+              priceVnd: 40000,
+              available: true,
+              menuCategoryId: 'sec-bun',
+            ),
+            FoodMenuItem(
+              id: 'b3',
+              name: 'Trà đá',
+              priceVnd: 5000,
+              available: true,
+              menuCategoryId: 'sec-tra',
+            ),
+          ],
+        ),
+      },
+    );
+    await _openStore(tester, food: food);
+
+    expect(find.text('món nước'), findsNothing);
+    expect(find.text('đồ uống'), findsNothing);
+    expect(find.text('Món nước'), findsWidgets);
+    expect(find.text('Đồ uống'), findsWidgets);
+    expect(find.byKey(const Key('food-menu-section-sec-bun')), findsOneWidget);
+  });
+
+  test('map link falls back to the written address without coordinates', () {
+    final uri = foodStoreMapsUri(
+      const FoodStoreDetail(
+        id: 'store',
+        name: 'Trà Sữa',
+        addressLabel: '1 Bạch Đằng',
+        items: [],
+      ),
+    );
+    expect(uri.queryParameters['query'], 'Trà Sữa, 1 Bạch Đằng');
   });
 }

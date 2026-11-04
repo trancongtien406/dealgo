@@ -66,22 +66,22 @@ related:
 | C019 | Đặt xe theo lịch | — | DEFERRED | P2 scheduled booking |
 | C020 | Thêm / đổi điểm dừng | — | DEFERRED | P2 multi-stop |
 | C021 | Chi tiết chuyến đặt trước | — | DEFERRED | P2 with C019 |
-| C022 | Khám phá đồ ăn | `/customer/shop` | LIVE | Image-only categories + stores from Nest; store cards show rating (count), km, ETA, fee or green "Miễn phí giao", offer pill, min order, featured dish with struck-through original price |
-| C023 | Tìm kiếm quán / món | `/customer/food/search` | LIVE | |
-| C024 | Kết quả danh mục | `/customer/food/category?category=<code>` | LIVE | Categories from `GET /v1/public/food-categories` (DEC-PROD-067) |
-| C025 | Chi tiết quán & menu | `/customer/food/stores/:storeId` | LIVE | Open/closed/busy from store settings; hero + logo, address, today's hours, rating/ETA/sold chips, min order, "Khách khen" tags, merchant cover + description, ticket-style offers strip with "Dùng"/"Đã dùng" and "Xem tất cả" sheet, floating cart bar (count, total, shortfall/saving, "Xem giỏ hàng"), pinned tabs, menu section chips, best sellers, "Bán chạy"/"Mới" badges, original price struck through, in-store search (DEC-PROD-068) |
-| C026 | Chi tiết món & tùy chọn | `/customer/food/stores/:storeId/items/:itemId` | LIVE | Real option groups/prices (DEC-PROD-033); cart bar above the add button when the cart has items (DEC-PROD-068) |
-| C027 | Giỏ hàng | `/customer/food/cart` | LIVE | Lines keyed by options; ETA; min-order shortfall blocks checkout (DEC-PROD-068) |
-| C028 | Checkout đơn đồ ăn (Golden) | `/customer/food/checkout` | LIVE | Server pricing, voucher code, COD; offline/repriced/submitting states |
+| C022 | Khám phá đồ ăn | `/customer/shop` | LIVE | Vertical paginated feed (`page`/`limit`, load-more, retry, end label); store cards show rating (count), km, ETA, fee or green "Miễn phí giao", `Mở đến HH:mm` when the server supplies `closesAtToday`, offer pill, min order, up to two signature dishes; voucher wall (up to 3 usable FOOD vouchers, hidden when empty or on error) and "Đặt lại đơn quen" strip (newest completed order) with skeletons matching loaded height; offers strip, deals, new dishes, top-rated |
+| C023 | Tìm kiếm quán / món | `/customer/food/search` | LIVE | Server search over store and dish names; dish section (`Món ăn`) above store section (`Quán`), hidden when no dish hits, dish tap opens the item page; keyword chips from featured dish names when the box is empty, 350 ms debounce; paging stops when a page adds no new rows; sort by gần / mới nhất / đánh giá; plain ILIKE matching — no accent folding yet (`bun bo` does not match `Bún bò`); search store cards show neither rating nor result count (payload carries no ratings) |
+| C024 | Kết quả danh mục | `/customer/food/category?category=<code>` | LIVE | `category` filtered on the server (DEC-PROD-067); paginated with load-more |
+| C025 | Chi tiết quán & menu | `/customer/food/stores/:storeId` | LIVE | Open/closed/busy from store settings; hero + logo, address, today's hours, rating/ETA/sold chips, min order, "Khách khen" tags, merchant cover + description, hero trust strip with `Mở đến` and `Phí giao từ` only when the server supplies them (the fee is omitted when the detail request had no position; the page waits at most 1.5 s for one), ticket-style offers strip with "Dùng"/"Đã dùng" and "Xem tất cả" sheet, floating cart bar, pinned tabs, menu section chips, best sellers, "Bán chạy"/"Mới" badges, original price struck through, in-store search (DEC-PROD-068); rows flag multi-photo dishes; split into `store/` part files (≤ 500 lines each) |
+| C026 | Chi tiết món & tùy chọn | `/customer/food/stores/:storeId/items/:itemId` | LIVE | Real option groups/prices (DEC-PROD-033); dish photo gallery with "Ảnh n/tổng" counter; cart bar above the add button when the cart has items (DEC-PROD-068); `Món ăn kèm` block with up to 6 same-store suggestions from `GET /v1/food/stores/:id/suggestions?exclude=`, hidden below 2 or on error, `+` adds one plain unit |
+| C027 | Giỏ hàng | `/customer/food/cart` | LIVE | Lines keyed by options; ETA; min-order shortfall blocks checkout (DEC-PROD-068); per-line note (≤200) and order note (≤300) with utensils toggle; upsell strip from the loaded menu |
+| C028 | Checkout đơn đồ ăn (Golden) | `/customer/food/checkout` | LIVE | Server pricing, voucher code, COD; offline/repriced/submitting states; note + utensils reviewed before sending; fee block explains `NEGOTIATE` (stepper) vs `FIXED` (no stepper) |
 | C029 | Chọn voucher | `/customer/account/vouchers` + checkout "Ưu đãi của tôi" sheet | LIVE | List from `GET /v1/promotions/available` (FOOD) plus the store's offers; ticket cards with full conditions, best pick, estimated saving and "Dùng"/"Đã dùng"; code field kept |
 | C030 | Đề xuất phí giao hàng | — | DEFERRED | Food delivery fee is server-priced, no fee bidding |
 | C031 | Báo giá giao của tài xế | — | DEFERRED | With C030 |
-| C032 | Đặt hàng thành công | `/customer/food/order-success` | LIVE | |
-| C033 | Theo dõi đơn Food | `/customer/food/orders/:orderId` | LIVE | Reconnect state; driver location; delivery code while on the way (DEC-PROD-036) |
+| C032 | Đặt hàng thành công | `/customer/food/order-success` | LIVE | Sends the note/utensils captured in the cart; screen itself unchanged |
+| C033 | Theo dõi đơn Food | `/customer/food/orders/:orderId` | LIVE | Reconnect state; driver location; delivery code while on the way (DEC-PROD-036); order note line in the summary block |
 | C034 | Xác nhận thay món / giá | `/customer/food/orders/:orderId` | FOLDED | Order-change card on tracking: accept or cancel within `FOOD_ORDER_CHANGE_RESPONSE_MINUTES` |
 | C035 | Hủy đơn & chọn lý do | `/customer/food/orders/:orderId/cancel` | LIVE | |
-| C036 | Chi tiết đơn / hóa đơn Food | `/customer/food/orders/:orderId/invoice` | LIVE | Option lines; rating card |
-| C037 | Đánh giá món / quán / giao | `/customer/food/orders/:orderId/invoice` | LIVE | Store stars + driver stars + comment (`RateServiceCard`); no per-dish score |
+| C036 | Chi tiết đơn / hóa đơn Food | `/customer/food/orders/:orderId/invoice` | LIVE | Option lines; per-line notes; order note + utensils block; rating card |
+| C037 | Đánh giá món / quán / giao | `/customer/food/orders/:orderId/invoice` | LIVE | Store stars + driver stars + comment (`RateServiceCard`); no per-dish score; notes stay visible above the rating card |
 | C038 | Xem đánh giá cửa hàng | `/customer/food/stores/:storeId` (Reviews tab) | LIVE | `GET /v1/ratings/stores/:storeId/reviews` paged, star filter, 1–5 distribution, merchant replies (DEC-PROD-068) |
 | C039 | Quán / món yêu thích | — | DEFERRED | P1 |
 | C040 | Hình thức giao (tiết kiệm/nhanh/hẹn) | — | DEFERRED | Needs delivery-tier policy |
@@ -127,7 +127,7 @@ related:
 | D023 | Nhập OTP hành khách | `/driver/rides/:rideId/otp` | LIVE | Server-verified code |
 | D024 | Bản đồ chuyến đang chạy | `/driver/rides/:rideId/active` | LIVE | MapPort map (13a; was a static box) + nav hand-off to dropoff |
 | D025 | Kết thúc chuyến / thu tiền | `/driver/rides/:rideId/active` | LIVE | COD |
-| D026 | Điều hướng tới quán lấy đơn | `/driver/food/:orderId` | LIVE | Map from the order's pickup snapshot (DEC-PROD-034) with Quán/Giao pins + "Điều hướng" sheet |
+| D026 | Điều hướng tới quán lấy đơn | `/driver/food/:orderId` | LIVE | Map from the order's pickup snapshot (DEC-PROD-034) with Quán/Giao pins + "Điều hướng" sheet; order note + utensils shown on the job card |
 | D027 | Đến quán chờ món | `/driver/food/:orderId` | LIVE | |
 | D028 | Xác nhận lấy món | `/driver/food/:orderId` | LIVE | Server pickup |
 | D029 | Bản đồ giao tới khách | `/driver/food/:orderId` | LIVE | Same map, dropoff focus |
@@ -171,7 +171,7 @@ related:
 | M013 | Dashboard Shop (Golden) | `/merchant` | LIVE | Store logo + rating, queue with item thumbnails, today stats with icons |
 | M014 | Chọn cửa hàng / chi nhánh | — | DEFERRED | P1 multi-branch |
 | M015 | Hàng đợi đơn (Golden) | `/merchant/orders` | LIVE | Empty/error states |
-| M016 | Chi tiết đơn & xác nhận | `/merchant/orders/:orderId` | LIVE | Accept/reject, option lines; conflict state |
+| M016 | Chi tiết đơn & xác nhận | `/merchant/orders/:orderId` | LIVE | Accept/reject, option lines; conflict state; per-line notes and order note + utensils panel while PLACED/PREPARING |
 | M017 | Bếp đang chế biến | `/merchant/orders` | FOLDED | "Preparing" section + kitchen lines; mark ready |
 | M018 | Điều chỉnh món / giá | `/merchant/orders/:orderId` | FOLDED | Order-change sheet (out of stock / quantity), customer confirms (C034) |
 | M019 | Bàn giao & mã tài xế | `/merchant/orders/:orderId` | LIVE | Server **handover code** shown while ASSIGNED; driver enters it at pickup when `FOOD_HANDOVER_CODE_REQUIRED` (default off, DEC-PROD-036) |

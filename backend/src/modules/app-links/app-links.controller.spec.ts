@@ -20,17 +20,17 @@ describe('AppLinksController', () => {
 
   it('serves both association files from env', async () => {
     app = await boot({
-      APP_LINKS_IOS_APP_IDS: 'TEAM1.com.trancongtien.dealgo',
-      APP_LINKS_ANDROID_PACKAGE: 'com.trancongtien.dealgo',
+      APP_LINKS_IOS_APP_IDS: 'TEAM1.dealgo.nguyengoctien.com',
+      APP_LINKS_ANDROID_PACKAGE: 'dealgo.nguyengoctien.com',
       APP_LINKS_ANDROID_CERT_SHA256: Array.from({ length: 32 }, () => 'AB').join(':'),
     });
     const aasa = await request(app.getHttpServer()).get('/.well-known/apple-app-site-association');
     expect(aasa.status).toBe(200);
     expect(aasa.headers['content-type']).toContain('application/json');
-    expect(aasa.body.webcredentials.apps).toEqual(['TEAM1.com.trancongtien.dealgo']);
+    expect(aasa.body.webcredentials.apps).toEqual(['TEAM1.dealgo.nguyengoctien.com']);
     const assetlinks = await request(app.getHttpServer()).get('/.well-known/assetlinks.json');
     expect(assetlinks.status).toBe(200);
-    expect(assetlinks.body[0].target.package_name).toBe('com.trancongtien.dealgo');
+    expect(assetlinks.body[0].target.package_name).toBe('dealgo.nguyengoctien.com');
   });
 
   it('returns 404 when not configured', async () => {

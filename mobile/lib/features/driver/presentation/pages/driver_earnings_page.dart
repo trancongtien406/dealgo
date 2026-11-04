@@ -13,6 +13,7 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../driver_history/domain/driver_history.dart';
 import '../../../driver_history/presentation/driver_history_cubit.dart';
+import '../../../driver_credit/domain/driver_credit.dart';
 import '../../../food/domain/entities/food_money.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
@@ -118,6 +119,7 @@ class _DriverEarningsViewState extends State<_DriverEarningsView> {
           const SizedBox(height: DealGoSpacing.s16),
           _Hero(summary: summary, week: _range == _EarnRange.week),
           const SizedBox(height: DealGoSpacing.s12),
+          const _DriverCreditSection(),
           Row(
             children: [
               Expanded(
@@ -516,3 +518,129 @@ class _HistoryRow extends StatelessWidget {
 /// "12,5" (vi) / "12.5" (en): at most two decimals, no trailing zeros.
 String _percentLabel(double percent, String locale) =>
     NumberFormat('#,##0.##', locale).format(percent);
+
+/// Prepaid fee balance entry plus the debt warning (DEC-PROD-093).
+/// The "Nạp phí" card is hidden until Ops enables top-up (`credit.enabled`), so a
+/// Play reviewer never lands on a screen that only says the feature is unavailable.
+class _DriverCreditSection extends StatefulWidget {
+  const _DriverCreditSection();
+
+  @override
+  State<_DriverCreditSection> createState() => _DriverCreditSectionState();
+}
+
+class _DriverCreditSectionState extends State<_DriverCreditSection> {
+  Future<DriverCredit?>? _credit;
+
+  @override
+  void initState() {
+    super.initState();
+    _credit = _load();
+  }
+
+  Future<DriverCredit?>? _load() {
+    try {
+      final repository = context.read<DriverCreditRepository>();
+      final auth = context.read<AuthCubit>().state;
+      if (auth is! AuthSignedIn) {
+        return null;
+      }
+      return repository.summary(accessToken: auth.tokens.accessToken);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final future = _credit;
+    if (future == null) {
+      return const SizedBox.shrink();
+    }
+    return FutureBuilder<DriverCredit?>(
+      future: future,
+      builder: (context, snapshot) {
+        final credit = snapshot.data;
+        if (credit == null) {
+          return const SizedBox.shrink();
+        }
+        final nearLimit =
+            credit.limitVnd > 0 && credit.owesVnd >= credit.limitVnd * 0.8;
+        final warn = credit.blocked || nearLimit;
+        if (!credit.enabled && !warn) {
+          return const SizedBox.shrink();
+        }
+        final l10n = AppLocalizations.of(context);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: DealGoSpacing.s12),
+          child: Column(
+            children: [
+              if (credit.enabled)
+                DealGoCard(
+                  key: const Key('driver-earnings-credit-card'),
+                  onTap: () => context.push(DriverRoutes.credit),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.account_balance_wallet_outlined,
+                        color: DealGoColors.primary,
+                      ),
+                      const SizedBox(width: DealGoSpacing.s12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.driverCreditCardTitle,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            Text(
+                              l10n.driverCreditCardBody,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right,
+                        color: DealGoColors.textTertiary,
+                      ),
+                    ],
+                  ),
+                ),
+              if (credit.enabled && warn)
+                const SizedBox(height: DealGoSpacing.s12),
+              if (warn)
+                Row(
+                  key: const Key('driver-credit-alert'),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      size: 18,
+                      color: credit.blocked
+                          ? DealGoColors.danger
+                          : DealGoColors.warning,
+                    ),
+                    const SizedBox(width: DealGoSpacing.s8),
+                    Expanded(
+                      child: Text(
+                        credit.blocked
+                            ? l10n.driverCreditBlocked
+                            : l10n.driverCreditNearLimit,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: credit.blocked
+                              ? DealGoColors.danger
+                              : DealGoColors.warning,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}

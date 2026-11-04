@@ -38,12 +38,18 @@ import {
   type StoreAcceptMode,
 } from './store-accept.js';
 import {
+  closesAtToday,
+  formatClock,
   scheduleView,
   storeAvailability,
   vnClock,
   type StoreSchedule,
 } from './store-schedule.js';
-import { pickFeaturedItems, shownOriginalPrice } from './food.repository.js';
+import {
+  likePattern,
+  pickFeaturedItems,
+  shownOriginalPrice,
+} from './food.repository.js';
 import type {
   StoreFeaturedItem,
   CatalogItemInput,
@@ -69,6 +75,10 @@ import type {
   SetItemAvailabilityInput,
   ListFoodStoresQuery,
   StoreBrowsePage,
+  DishSearchPage,
+  DishSearchQuery,
+  ItemSuggestionsQuery,
+  StoreItemSuggestion,
   StoreDetail,
   StoreItemView,
   UpdateCatalogItemInput,
@@ -153,6 +163,8 @@ type OrderRow = {
   cancelReasonCode: string | null;
   cancelNote: string | null;
   cancelledBy?: CancelActorName | null;
+  note: string | null;
+  utensils: boolean;
   prepMinutes: number | null;
   pickedUpAt?: Date | null;
   failReasonCode?: string | null;
@@ -178,6 +190,7 @@ type OrderRow = {
     unitPriceVnd: number;
     quantity: number;
     imageUrl: string | null;
+    note: string | null;
     options: Prisma.JsonValue;
   }[];
 };
@@ -228,6 +241,7 @@ export class PrismaFoodRepository implements FoodRepository {
               name: item.name,
               priceVnd: item.priceVnd,
               available: true,
+              moderationStatus: 'APPROVED',
             })),
           },
         },
@@ -245,13 +259,7 @@ export class PrismaFoodRepository implements FoodRepository {
     const now = new Date();
 
     const distanceSql = hasGeo
-      ? Prisma.sql`(
-      6371 * 2 * ASIN(LEAST(1, SQRT(
-        POWER(SIN(RADIANS(${query.lat!} - s."lat") / 2), 2)
-        + COS(RADIANS(${query.lat!})) * COS(RADIANS(s."lat"))
-          * POWER(SIN(RADIANS(${query.lng!} - s."lng") / 2), 2)
-      )))
-    )`
+      ? distanceKmSql(query.lat!, query.lng!)
       : Prisma.sql`NULL::double precision`;
 
     // A store without coordinates cannot take delivery orders, so it is not listed.
@@ -304,6 +312,7 @@ export class PrismaFoodRepository implements FoodRepository {
         serviceMode: StoreServiceMode;
         serviceModeUntil: Date | null;
         open_now: boolean;
+        closes_minute: number | null;
         distance_km: number | null;
         imageUrl: string | null;
         logoUrl: string | null;
@@ -325,6 +334,7 @@ export class PrismaFoodRepository implements FoodRepository {
         s."serviceMode"::text AS "serviceMode",
         s."serviceModeUntil",
         ${openSql} AS open_now,
+        shift_today.closes_minute,
         ${distanceSql} AS distance_km,
         COALESCE(s."coverUrl", cover."imageUrl") AS "imageUrl",
         s."logoUrl",
@@ -348,6 +358,14 @@ export class PrismaFoodRepository implements FoodRepository {
         ORDER BY i."available" DESC, i."id" ASC
         LIMIT 1
       ) cover ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT h."closesMinute" AS closes_minute
+        FROM "food_store_hours" h
+        WHERE h."storeId" = s."id"
+          AND ${takingOrdersShiftSql(now)}
+        ORDER BY ${shiftCloseOffsetSql(now)} ASC
+        LIMIT 1
+      ) shift_today ON TRUE
       WHERE ${whereSql}
       ORDER BY open_now DESC, ${orderSql}
       LIMIT ${query.limit}
@@ -378,6 +396,10 @@ export class PrismaFoodRepository implements FoodRepository {
             : mode === 'PAUSED'
               ? 'PAUSED'
               : 'CLOSED',
+          closesAtToday:
+            row.open_now && row.closes_minute !== null
+              ? formatClock(row.closes_minute % 1440)
+              : null,
           imageUrl: row.imageUrl,
           logoUrl: row.logoUrl,
           minOrderVnd: Number(row.minOrderVnd ?? 0),
@@ -387,6 +409,112 @@ export class PrismaFoodRepository implements FoodRepository {
           ratingCount: Number(row.rating_count ?? 0),
           ratingAverage:
             row.rating_avg === null ? null : Number(row.rating_avg),
+        };
+      }),
+    };
+  }
+
+  async searchDishes(query: DishSearchQuery): Promise<DishSearchPage> {
+    const hasGeo = query.lat !== undefined && query.lng !== undefined;
+    const skip = (query.page - 1) * query.limit;
+    const now = new Date();
+    const like = likePattern(query.q.trim());
+    const distanceSql = hasGeo
+      ? distanceKmSql(query.lat!, query.lng!)
+      : Prisma.sql`NULL::double precision`;
+    const openSql = openNowSql(now);
+    const filters: Prisma.Sql[] = [
+      Prisma.sql`i."available" = TRUE`,
+      Prisma.sql`i."moderationStatus" = 'APPROVED'`,
+      Prisma.sql`i."name" ILIKE ${like} ESCAPE '\\'`,
+      Prisma.sql`s."lat" IS NOT NULL`,
+      Prisma.sql`s."lng" IS NOT NULL`,
+      openSql,
+    ];
+    if (hasGeo) {
+      filters.push(Prisma.sql`${distanceSql} <= ${query.radiusKm}`);
+    }
+    const whereSql = Prisma.join(filters, ' AND ');
+
+    const countRows = await this.db.$queryRaw<Array<{ total: bigint }>>`
+      SELECT COUNT(*)::bigint AS total
+      FROM "food_items" i
+      JOIN "food_stores" s ON s."id" = i."storeId"
+      WHERE ${whereSql}
+    `;
+    const total = Number(countRows[0]?.total ?? 0);
+
+    const rows = await this.db.$queryRaw<
+      Array<{
+        id: string;
+        name: string;
+        priceVnd: number;
+        originalPriceVnd: number | null;
+        imageUrl: string | null;
+        soldCount: number;
+        prepMinutes: number;
+        storeId: string;
+        storeName: string;
+        serviceMode: StoreServiceMode;
+        serviceModeUntil: Date | null;
+        open_now: boolean;
+        distance_km: number | null;
+      }>
+    >`
+      SELECT
+        i."id",
+        i."name",
+        i."priceVnd",
+        i."originalPriceVnd",
+        i."imageUrl",
+        i."soldCount",
+        COALESCE(i."prepMinutes", s."defaultPrepMinutes") AS "prepMinutes",
+        s."id" AS "storeId",
+        s."name" AS "storeName",
+        s."serviceMode"::text AS "serviceMode",
+        s."serviceModeUntil",
+        ${openSql} AS open_now,
+        ${distanceSql} AS distance_km
+      FROM "food_items" i
+      JOIN "food_stores" s ON s."id" = i."storeId"
+      WHERE ${whereSql}
+      ORDER BY i."soldCount" DESC, i."name" ASC, i."id" ASC
+      LIMIT ${query.limit}
+      OFFSET ${skip}
+    `;
+
+    return {
+      total,
+      items: rows.map((row) => {
+        const mode = effectiveServiceMode(
+          row.serviceMode,
+          row.serviceModeUntil,
+          now,
+        ).serviceMode;
+        return {
+          item: {
+            id: row.id,
+            name: row.name,
+            priceVnd: row.priceVnd,
+            originalPriceVnd: shownOriginalPrice(
+              row.priceVnd,
+              row.originalPriceVnd,
+            ),
+            imageUrl: row.imageUrl,
+            soldCount: row.soldCount,
+            prepMinutes: row.prepMinutes,
+          },
+          store: {
+            id: row.storeId,
+            name: row.storeName,
+            distanceKm: row.distance_km === null ? null : Number(row.distance_km),
+            openNow: row.open_now,
+            closedReason: row.open_now
+              ? null
+              : mode === 'PAUSED'
+                ? 'PAUSED'
+                : 'CLOSED',
+          },
         };
       }),
     };
@@ -1013,8 +1141,7 @@ export class PrismaFoodRepository implements FoodRepository {
           input.originalPriceVnd,
         ),
         available,
-        // FOOD-001: every new dish waits for admin moderation before it can be ordered.
-        moderationStatus: 'PENDING',
+        moderationStatus: input.moderationStatus ?? 'PENDING',
         description: input.description ?? null,
         prepMinutes: input.prepMinutes ?? null,
         imageUrl: input.imageUrl ?? null,
@@ -1140,11 +1267,97 @@ export class PrismaFoodRepository implements FoodRepository {
     return byStore;
   }
 
+  async listItemSuggestions(
+    query: ItemSuggestionsQuery,
+  ): Promise<StoreItemSuggestion[]> {
+    const store = await this.db.foodStore.findUnique({
+      where: { id: query.storeId },
+      select: {
+        serviceMode: true,
+        serviceModeUntil: true,
+        hoursConfigured: true,
+        lastOrderMinutes: true,
+        hours: true,
+        closures: true,
+      },
+    });
+    if (!store) {
+      return [];
+    }
+    const availability = storeAvailability(
+      store.serviceMode,
+      store.serviceModeUntil,
+      scheduleFromRow(store),
+      new Date(),
+    );
+    if (!availability.openNow) {
+      return [];
+    }
+
+    const excludedCategories = query.exclude.length
+      ? (
+          await this.db.foodItem.findMany({
+            where: { storeId: query.storeId, id: { in: query.exclude } },
+            select: { menuCategoryId: true },
+          })
+        )
+          .map((row) => row.menuCategoryId)
+          .filter((categoryId): categoryId is string => categoryId !== null)
+      : [];
+
+    const rows = await this.db.foodItem.findMany({
+      where: {
+        storeId: query.storeId,
+        ...(query.exclude.length ? { id: { notIn: query.exclude } } : {}),
+        available: true,
+        ...(query.moderationRequired ? { moderationStatus: 'APPROVED' } : {}),
+        menuCategoryId: excludedCategories.length
+          ? { not: null, notIn: excludedCategories }
+          : { not: null },
+        // A tile adds one plain unit, so a required group could never be priced.
+        optionGroups: { none: { minSelect: { gt: 0 } } },
+      },
+      orderBy: [{ soldCount: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
+      take: query.limit,
+      select: {
+        id: true,
+        name: true,
+        priceVnd: true,
+        originalPriceVnd: true,
+        imageUrl: true,
+        soldCount: true,
+        createdAt: true,
+        available: true,
+        menuCategoryId: true,
+      },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      priceVnd: row.priceVnd,
+      originalPriceVnd: shownOriginalPrice(
+        row.priceVnd,
+        row.originalPriceVnd,
+      ),
+      imageUrl: row.imageUrl,
+      soldCount: row.soldCount,
+      addedAt: row.createdAt.toISOString(),
+      available: row.available,
+      menuCategoryId: row.menuCategoryId,
+    }));
+  }
+
   async listStoreMenuSections(
     storeId: string,
+    approvedOnly = true,
   ): Promise<import('./food.repository.js').StoreMenuSection[]> {
     return this.db.foodMenuCategory.findMany({
-      where: { storeId, items: { some: {} } },
+      where: {
+        storeId,
+        items: {
+          some: approvedOnly ? { moderationStatus: 'APPROVED' } : {},
+        },
+      },
       orderBy: [{ position: 'asc' }, { name: 'asc' }],
       select: { id: true, name: true },
     });
@@ -1753,6 +1966,7 @@ export class PrismaFoodRepository implements FoodRepository {
             moderationStatus: row.moderationStatus,
           })),
           input.items,
+          input.requireApprovedItems ?? true,
         );
         const subtotalVnd = lines.reduce(
           (sum, line) => sum + line.unitPriceVnd * line.quantity,
@@ -1811,6 +2025,8 @@ export class PrismaFoodRepository implements FoodRepository {
               label: input.dropoff.label,
               fallback: store.serviceRegionCode,
             }),
+            note: input.note ?? null,
+            utensils: input.utensils ?? true,
             idempotencyKey: input.idempotencyKey,
             lines: {
               create: lines.map((line) => ({
@@ -1820,6 +2036,7 @@ export class PrismaFoodRepository implements FoodRepository {
                 unitPriceVnd: line.unitPriceVnd,
                 quantity: line.quantity,
                 imageUrl: line.imageUrl,
+                note: line.note,
                 options: line.options as Prisma.InputJsonValue,
               })),
             },
@@ -3331,6 +3548,7 @@ type ItemRow = {
   originalPriceVnd?: number | null;
   createdAt?: Date;
   available: boolean;
+  moderationStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
   description?: string | null;
   prepMinutes?: number | null;
   imageUrl?: string | null;
@@ -3373,6 +3591,7 @@ function prismaItemView(item: ItemRow): StoreItemView {
     originalPriceVnd: shownOriginalPrice(item.priceVnd, item.originalPriceVnd),
     available: item.available,
     addedAt: item.createdAt ? item.createdAt.toISOString() : null,
+    moderationStatus: item.moderationStatus,
     description: item.description ?? null,
     prepMinutes: item.prepMinutes ?? null,
     imageUrl: item.imageUrl ?? null,
@@ -3424,37 +3643,73 @@ function scheduleFromRow(store: {
   };
 }
 
+/** SQL twin of haversineKm() from a fixed origin; the caller aliases food_stores as `s`. */
+function distanceKmSql(lat: number, lng: number): Prisma.Sql {
+  return Prisma.sql`(
+      6371 * 2 * ASIN(LEAST(1, SQRT(
+        POWER(SIN(RADIANS(${lat} - s."lat") / 2), 2)
+        + COS(RADIANS(${lat})) * COS(RADIANS(s."lat"))
+          * POWER(SIN(RADIANS(${lng} - s."lng") / 2), 2)
+      )))
+    )`;
+}
+
 /** SQL twin of storeAvailability().openNow for list ordering (DEC-PROD-027/029). */
 function openNowSql(now: Date): Prisma.Sql {
   const today = vnClock(now);
-  const yesterday = vnClock(new Date(now.getTime() - 24 * 60 * 60 * 1000));
-  const closedOn = (date: string) => Prisma.sql`EXISTS (
-      SELECT 1 FROM "food_store_closures" c
-      WHERE c."storeId" = s."id" AND c."date" = ${date}::date
-    )`;
   return Prisma.sql`(
     NOT (s."serviceMode" = 'PAUSED' AND (s."serviceModeUntil" IS NULL OR s."serviceModeUntil" > ${now}))
     AND (
-      (NOT s."hoursConfigured" AND NOT ${closedOn(today.date)})
+      (NOT s."hoursConfigured" AND NOT ${storeClosedOn(today.date)})
       OR (s."hoursConfigured" AND EXISTS (
         SELECT 1 FROM "food_store_hours" h
         WHERE h."storeId" = s."id"
-          AND (
-            (
-              h."weekday" = ${today.weekday}
-              AND NOT ${closedOn(today.date)}
-              AND h."opensMinute" <= ${today.minute}
-              AND ${today.minute} < (CASE WHEN h."closesMinute" < h."opensMinute"
-                THEN h."closesMinute" + 1440 ELSE h."closesMinute" END) - s."lastOrderMinutes"
-            )
-            OR (
-              h."weekday" = ${yesterday.weekday}
-              AND h."closesMinute" < h."opensMinute"
-              AND NOT ${closedOn(yesterday.date)}
-              AND ${today.minute + 1440} < h."closesMinute" + 1440 - s."lastOrderMinutes"
-            )
-          )
+          AND ${takingOrdersShiftSql(now)}
       ))
+    )
+  )`;
+}
+
+function storeClosedOn(date: string): Prisma.Sql {
+  return Prisma.sql`EXISTS (
+      SELECT 1 FROM "food_store_closures" c
+      WHERE c."storeId" = s."id" AND c."date" = ${date}::date
+    )`;
+}
+
+/** Minute a shift closes, counted from its start day's midnight (SQL twin of isOvernight). */
+function shiftClosesMinuteSql(): Prisma.Sql {
+  return Prisma.sql`(CASE WHEN h."closesMinute" < h."opensMinute"
+    THEN h."closesMinute" + 1440 ELSE h."closesMinute" END)`;
+}
+
+/**
+ * Minutes from today's midnight at which a matching row stops serving — the SQL twin of
+ * shiftCloseOffset(), used only to break the multi-row tie deterministically.
+ */
+function shiftCloseOffsetSql(now: Date): Prisma.Sql {
+  const today = vnClock(now);
+  return Prisma.sql`(h."closesMinute" + (CASE
+    WHEN h."weekday" = ${today.weekday} AND h."closesMinute" < h."opensMinute"
+    THEN 1440 ELSE 0 END))`;
+}
+
+/** The weekly shift taking orders at `now`; SQL twin of the closesAtToday() lookup. */
+function takingOrdersShiftSql(now: Date): Prisma.Sql {
+  const today = vnClock(now);
+  const yesterday = vnClock(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+  return Prisma.sql`(
+    (
+      h."weekday" = ${today.weekday}
+      AND NOT ${storeClosedOn(today.date)}
+      AND h."opensMinute" <= ${today.minute}
+      AND ${today.minute} < ${shiftClosesMinuteSql()} - s."lastOrderMinutes"
+    )
+    OR (
+      h."weekday" = ${yesterday.weekday}
+      AND h."closesMinute" < h."opensMinute"
+      AND NOT ${storeClosedOn(yesterday.date)}
+      AND ${today.minute + 1440} < ${shiftClosesMinuteSql()} - s."lastOrderMinutes"
     )
   )`;
 }
@@ -3503,10 +3758,18 @@ function toStoreDetail(store: {
   items: ItemRow[];
 }): StoreDetail {
   const schedule = scheduleFromRow(store);
+  const now = new Date();
+  const availability = storeAvailability(
+    store.serviceMode,
+    store.serviceModeUntil,
+    schedule,
+    now,
+  );
   return {
     ...acceptFromRow(store),
     ...effectiveServiceMode(store.serviceMode, store.serviceModeUntil),
-    ...storeAvailability(store.serviceMode, store.serviceModeUntil, schedule),
+    ...availability,
+    closesAtToday: availability.openNow ? closesAtToday(schedule, now) : null,
     schedule: scheduleView(schedule),
     id: store.id,
     name: store.name,
@@ -3626,6 +3889,8 @@ function toView(order: OrderRow): FoodOrderView {
     assignedDriverId: order.assignedDriverId,
     cancelReason: toCancelReason(order.cancelReasonCode, order.cancelNote),
     cancelledBy: order.cancelledBy ?? null,
+    note: order.note ?? null,
+    utensils: order.utensils ?? true,
     lines: order.lines.map((line) => ({
       id: line.id,
       itemId: line.itemId,
@@ -3633,6 +3898,7 @@ function toView(order: OrderRow): FoodOrderView {
       unitPriceVnd: line.unitPriceVnd,
       quantity: line.quantity,
       imageUrl: line.imageUrl ?? null,
+      note: line.note ?? null,
       options: parseLineOptions(line.options),
     })),
     prepMinutes: order.prepMinutes ?? null,

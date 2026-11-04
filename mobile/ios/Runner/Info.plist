@@ -28,7 +28,7 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.trancongtien.dealgo</string>
+			<string>dealgo.nguyengoctien.com</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>dealgo</string>

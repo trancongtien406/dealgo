@@ -17,7 +17,7 @@
 |---|---|---|
 | `FOOD_FARE_FLOOR_PERCENT_OF_SUGGESTED` | 70 | Sàn đề nghị = max(`FOOD_MIN_DELIVERY_VND`, gợi ý × %), làm tròn lên theo bước (không vượt gợi ý) |
 | `FOOD_COUNTER_MAX_PERCENT_OF_OFFER` | 150 | Trần đề xuất của tài xế = giá khách × % |
-| `FOOD_FARE_STEP_VND` | 1000 | Bước giá; mọi số tiền (trừ đúng mức gợi ý) phải là bội số |
+| `FOOD_FARE_STEP_VND` | 1000 | Bước giá; mức gợi ý và mọi số tiền đều là bội số (làm tròn lên theo bước) |
 | `FOOD_MAX_OFFER_EDITS_PER_DRIVER` | 2 | Số lần một tài xế sửa đề xuất |
 | `FOOD_MAX_FARE_RAISES_PER_ORDER` | 3 | Số lần khách nâng giá khi chưa có tài xế |
 | `FOOD_OFFER_TTL_SECONDS` | 120 | Hạn của một đề xuất (kiểm tra lười khi đọc/chọn) |

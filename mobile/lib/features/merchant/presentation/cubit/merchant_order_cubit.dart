@@ -31,10 +31,18 @@ final class MerchantOrderViewReady extends MerchantOrderViewState {
     this.message,
     this.handoverCode,
     this.pendingChange,
+    this.orderNote,
+    this.utensils = true,
   });
 
   /// Edit waiting for the customer; "ready" is blocked meanwhile.
   final FoodOrderChange? pendingChange;
+
+  /// Customer note to the kitchen and courier; null = none.
+  final String? orderNote;
+
+  /// Whether the customer asked for cutlery.
+  final bool utensils;
 
   /// DEC-PROD-036: store-only code the driver enters at pickup (when the setting is on).
   final String? handoverCode;
@@ -60,6 +68,9 @@ final class MerchantOrderViewReady extends MerchantOrderViewState {
     bool clearHandoverCode = false,
     FoodOrderChange? pendingChange,
     bool clearPendingChange = false,
+    String? orderNote,
+    bool clearOrderNote = false,
+    bool? utensils,
   }) {
     return MerchantOrderViewReady(
       order: order ?? this.order,
@@ -75,6 +86,8 @@ final class MerchantOrderViewReady extends MerchantOrderViewState {
       pendingChange: clearPendingChange
           ? null
           : (pendingChange ?? this.pendingChange),
+      orderNote: clearOrderNote ? null : (orderNote ?? this.orderNote),
+      utensils: utensils ?? this.utensils,
     );
   }
 }
@@ -187,6 +200,9 @@ class MerchantOrderCubit extends Cubit<MerchantOrderViewState> {
           clearHandoverCode: detail.handoverCode == null,
           pendingChange: detail.pendingChange,
           clearPendingChange: detail.pendingChange?.pending != true,
+          orderNote: detail.note,
+          clearOrderNote: detail.note == null,
+          utensils: detail.utensils,
           handoffDone:
               latest.handoffDone || handedOverStatuses.contains(detail.status),
         ),

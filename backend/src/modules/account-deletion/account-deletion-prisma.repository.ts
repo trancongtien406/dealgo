@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma, PrismaClient } from '../../generated/prisma/client.js';
-import { driverBalanceOf } from '../earnings/driver-balance.js';
+import { driverBalanceOf, driverObligationOf } from '../earnings/driver-balance.js';
+import { PrismaLedgerRepository } from '../ledger/ledger-prisma.repository.js';
 import {
   DELETED_USER_DISPLAY_NAME,
   type AccountDeletionBlocker,
@@ -25,7 +26,11 @@ const OPEN_FOOD_ORDER = ['PLACED', 'PREPARING', 'READY', 'ASSIGNED', 'PICKED_UP'
 const DRIVER_ACTIVE_FOOD = ['ASSIGNED', 'PICKED_UP'] as const;
 
 export class PrismaAccountDeletionRepository implements AccountDeletionRepository {
-  constructor(private readonly db: PrismaClient) {}
+  private readonly ledger: PrismaLedgerRepository;
+
+  constructor(private readonly db: PrismaClient) {
+    this.ledger = new PrismaLedgerRepository(db);
+  }
 
   findBlockers(userId: string): Promise<AccountDeletionBlocker[]> {
     return blockersOf(this.db, userId);
@@ -224,23 +229,71 @@ export class PrismaAccountDeletionRepository implements AccountDeletionRepositor
     actorUserId: string;
     reason: string;
     at: Date;
-  }): Promise<{ amountVnd: number; settledThrough: Date } | null> {
+  }): Promise<{ amountVnd: number; creditAppliedVnd: number; settledThrough: Date } | null> {
     return this.db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "users" WHERE "id" = ${input.driverId}::uuid FOR UPDATE`;
-      const balance = await feeBalanceOf(tx, input.driverId, input.at);
-      if (balance.amountVnd <= 0) {
+      const obligation = await driverObligationOf(tx, input.driverId, input.at);
+      if (obligation.amountVnd <= 0) {
         return null;
       }
+
+      const topUps = await tx.driverTopUp.findMany({
+        where: { driverId: input.driverId, remainingVnd: { gt: 0 } },
+        orderBy: [{ paidAt: 'asc' }, { createdAt: 'asc' }],
+        select: { id: true, remainingVnd: true },
+      });
+      const availableCreditVnd = topUps.reduce((sum, row) => sum + row.remainingVnd, 0);
+      const creditAppliedVnd = Math.min(availableCreditVnd, obligation.amountVnd);
+      const cashVnd = obligation.amountVnd - creditAppliedVnd;
+
+      const settlementId = randomUUID();
       await tx.driverFeeSettlement.create({
         data: {
-          id: randomUUID(),
+          id: settlementId,
           driverId: input.driverId,
-          amountVnd: balance.amountVnd,
+          amountVnd: cashVnd,
+          creditAppliedVnd,
           settledThrough: input.at,
           actorUserId: input.actorUserId,
           reason: input.reason,
         },
       });
+
+      let creditLeft = creditAppliedVnd;
+      for (const topUp of topUps) {
+        if (creditLeft <= 0) {
+          break;
+        }
+        const appliedVnd = Math.min(topUp.remainingVnd, creditLeft);
+        await tx.driverTopUp.update({
+          where: { id: topUp.id },
+          data: {
+            remainingVnd: { decrement: appliedVnd },
+            consumedVnd: { increment: appliedVnd },
+          },
+        });
+        await tx.driverCreditApplication.create({
+          data: {
+            id: randomUUID(),
+            topUpId: topUp.id,
+            driverId: input.driverId,
+            amountVnd: appliedVnd,
+            refType: 'DRIVER_FEE_SETTLEMENT',
+            refId: settlementId,
+            occurredAt: input.at,
+          },
+        });
+        creditLeft -= appliedVnd;
+      }
+
+      if (creditAppliedVnd > 0) {
+        await this.ledger.postWithin(tx, 'DRIVER_CREDIT_APPLIED_TO_FEE', {
+          entityType: 'DRIVER_FEE_SETTLEMENT',
+          entityId: settlementId,
+          amountVnd: creditAppliedVnd,
+        });
+      }
+
       await tx.opsAuditLog.create({
         data: {
           id: randomUUID(),
@@ -249,10 +302,14 @@ export class PrismaAccountDeletionRepository implements AccountDeletionRepositor
           entityType: 'USER',
           entityId: input.driverId,
           reason: input.reason,
-          metadata: { amountVnd: balance.amountVnd, settledThrough: input.at.toISOString() },
+          metadata: {
+            amountVnd: cashVnd,
+            creditAppliedVnd,
+            settledThrough: input.at.toISOString(),
+          },
         },
       });
-      return { amountVnd: balance.amountVnd, settledThrough: input.at };
+      return { amountVnd: cashVnd, creditAppliedVnd, settledThrough: input.at };
     });
   }
 

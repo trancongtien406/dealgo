@@ -6,6 +6,8 @@ import '../core/app_gate/app_gate_host.dart';
 
 import 'dart:async';
 
+import '../features/activity/data/datasources/history_remote_datasource.dart';
+import '../features/promotion/domain/repositories/promotion_repository.dart';
 import '../features/ride/domain/stops/ride_stops_client.dart';
 import '../features/places/data/place_history_cache.dart';
 import '../features/onboarding/data/datasources/partner_requirements_client.dart';
@@ -32,6 +34,7 @@ import '../core/storage/onboarding_storage.dart';
 import '../features/presence/data/datasources/presence_remote_datasource.dart';
 import '../features/address_book/domain/repositories/address_book_repository.dart';
 import '../features/driver_history/domain/driver_history.dart';
+import '../features/driver_credit/domain/driver_credit.dart';
 import '../features/onboarding/presentation/document_image_source.dart';
 import '../features/support/domain/help_faq.dart';
 import '../features/ride/domain/ride_share.dart';
@@ -80,6 +83,8 @@ class DealGoApp extends StatefulWidget {
     this.tokenStore,
     this.passkeyPlatform,
     this.foodClient,
+    this.promotions,
+    this.historyClient,
     this.merchantOrdersClient,
     this.rideClient,
     this.rideStopsClient,
@@ -91,6 +96,7 @@ class DealGoApp extends StatefulWidget {
     this.ratings,
     this.merchantOffers,
     this.driverHistory,
+    this.driverCredit,
     this.support,
     this.accountDeletion,
     this.accountSettings,
@@ -118,6 +124,8 @@ class DealGoApp extends StatefulWidget {
   final PasskeyPlatform? passkeyPlatform;
   final TokenStore? tokenStore;
   final FoodClient? foodClient;
+  final PromotionRepository? promotions;
+  final HistoryClient? historyClient;
   final MerchantOrdersClient? merchantOrdersClient;
   final RideClient? rideClient;
 
@@ -135,6 +143,7 @@ class DealGoApp extends StatefulWidget {
   final RatingRepository? ratings;
   final MerchantOfferRepository? merchantOffers;
   final DriverHistoryRepository? driverHistory;
+  final DriverCreditRepository? driverCredit;
   final SupportRepository? support;
   final AccountDeletionRepository? accountDeletion;
   final AccountSettingsRepository? accountSettings;
@@ -190,6 +199,8 @@ class _DealGoAppState extends State<DealGoApp> with WidgetsBindingObserver {
       tokenStore: widget.tokenStore,
       passkeyPlatform: widget.passkeyPlatform,
       foodClient: widget.foodClient,
+      promotions: widget.promotions,
+      historyClient: widget.historyClient,
       merchantOrdersClient: widget.merchantOrdersClient,
       rideClient: widget.rideClient,
       rideStopsClient: widget.rideStopsClient,
@@ -201,6 +212,7 @@ class _DealGoAppState extends State<DealGoApp> with WidgetsBindingObserver {
       ratings: widget.ratings,
       merchantOffers: widget.merchantOffers,
       driverHistory: widget.driverHistory,
+      driverCredit: widget.driverCredit,
       support: widget.support,
       accountDeletion: widget.accountDeletion,
       accountSettings: widget.accountSettings,

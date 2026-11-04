@@ -50,11 +50,11 @@ export default function HeroSection({ siteConfig = {} }: { siteConfig?: PublicSi
       id="hero"
       className="relative min-h-screen lg:h-[100vh] lg:max-h-[960px] flex flex-col justify-between overflow-hidden pt-20 pb-3 sm:pb-5 bg-[#F8F7FF]"
     >
-      {/* Background Da Nang Bridge Landscape */}
+      {/* Background city landscape */}
       <div className="absolute inset-0 z-0">
         <Image
           src="/landing/danang_bridge.jpg"
-          alt="Cầu Rồng Đà Nẵng nhìn từ bờ sông Hàn"
+          alt="Cầu Rồng bắc qua sông Hàn về đêm"
           fill
           className="object-cover object-[85%_center] md:object-right"
           priority
@@ -79,29 +79,29 @@ export default function HeroSection({ siteConfig = {} }: { siteConfig?: PublicSi
                 <path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z" />
               </svg>
               <span className="text-xs sm:text-sm font-semibold text-[#6D28D9]">
-                Đặt xe · Đồ ăn · Thương lượng giá
+                Đặt xe · Đồ ăn · Giá do bạn chọn
               </span>
             </div>
 
-            {/* Headline with 4 lines matching exact reference */}
+            {/* Headline: brand slogan split across four lines */}
             <h1 className="space-y-0.5 font-black tracking-tight leading-[1.08] select-none">
               <span className="block text-4xl sm:text-5xl lg:text-[52px] text-[#0F172A]">
-                Đi muôn nơi,
+                Đặt xe, đặt món
               </span>
               <span className="block text-4xl sm:text-5xl lg:text-[52px] text-[#6D28D9]">
-                Mua vạn món
+                Giá do bạn chọn
               </span>
               <span className="block text-4xl sm:text-5xl lg:text-[52px] text-[#0F172A]">
-                Chủ động cùng
+                Trọn gói hành trình
               </span>
               <span className="block text-4xl sm:text-5xl lg:text-[52px] text-[#00D06C]">
-                DealGo
+                cùng DealGo
               </span>
             </h1>
 
             {/* Subtitle / Description */}
             <p className="text-sm sm:text-base text-gray-600 leading-relaxed max-w-xl font-normal">
-              Đặt xe máy hoặc ô tô với mức giá bạn đề xuất và thương lượng trực tiếp với tài xế, đặt món từ quán ăn, cửa hàng gần bạn — tất cả trong một ứng dụng, phục vụ tại Đà Nẵng.
+              Đặt xe máy hoặc ô tô với mức giá bạn đề xuất và thương lượng trực tiếp với tài xế; đặt món từ quán ăn, cửa hàng gần bạn — tất cả trong một ứng dụng, phục vụ trên toàn quốc.
             </p>
 
             {/* CTA Buttons: Màu tím DealGo chuẩn #6D28D9 */}
@@ -147,7 +147,7 @@ export default function HeroSection({ siteConfig = {} }: { siteConfig?: PublicSi
                 transformStyle: "preserve-3d",
               }}
             >
-              {/* Handwritten Calligraphy Accent: "Đà Nẵng gì đâu cũng gần ♡" */}
+              {/* Handwritten calligraphy accent */}
               <div
                 className="absolute -top-10 -right-4 sm:-right-10 z-40 text-[#6D28D9] select-none pointer-events-none transform -rotate-6 hidden sm:block whitespace-nowrap"
                 style={{
@@ -157,7 +157,7 @@ export default function HeroSection({ siteConfig = {} }: { siteConfig?: PublicSi
                   textShadow: "0 2px 10px rgba(109, 40, 217, 0.12)",
                 }}
               >
-                Đà Nẵng đi đâu cũng gần ♡
+                Đi đâu cũng có DealGo ♡
               </div>
               {/* Floating Card 1: "Đặt xe linh hoạt" - Ẩn trên màn hình rất nhỏ, hiện từ sm+ */}
               <div

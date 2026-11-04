@@ -4,7 +4,7 @@ title: "DealGo — Catalog biến môi trường và secret"
 version: "1.0.0"
 status: "ACTIVE"
 owner: "Tech Lead"
-last_updated: "2026-10-26"
+last_updated: "2026-11-04"
 related_decisions:
   - ADR-006
   - OPEN-002
@@ -17,6 +17,7 @@ related_decisions:
   - DEC-PROD-053
   - DEC-PROD-054
   - DEC-PROD-058
+  - DEC-PROD-093
 ---
 
 # Catalog secret và biến môi trường
@@ -42,11 +43,12 @@ Sao chép từ `backend/.env.example`. Cột "Production" nêu điều kiện m�
 | `PORT` | `3001` | — | Cổng HTTP + Socket.IO |
 | `DATABASE_URL` | — | Bắt buộc | Compose local: Postgres port **5433** (`postgresql://dealgo:<mật khẩu>@127.0.0.1:5433/dealgo?schema=public`) |
 | `DATABASE_POOL_MAX` | `10` | — | Kết nối tối đa mỗi process (API, worker); tổng các process phải nhỏ hơn `max_connections` |
+| `DATABASE_CONNECT_TIMEOUT_MS` | `10000` | — | Thời gian chờ tối đa một kết nối từ pool (ms). Đặt quá thấp → query thường xuyên lỗi `timeout exceeded when trying to connect` khi pool tạm thời cạn |
 | `REDIS_URL` | — | Nên có | `/health` ping Redis; BullMQ worker và OTP throttle nhiều instance. Thiếu Redis (ngoài production) → worker chạy theo interval, throttle trong bộ nhớ |
 | `TRUST_PROXY` | tắt | Khi sau load balancer | Số hop (vd `1`) hoặc CSV subnet / `loopback`. Sai giá trị → rate limit và IP trong audit sai |
 | `CORS_ALLOWED_ORIGINS` | — | Đặt origin thật | CSV. Production dùng đúng danh sách này; ngoài production luôn cộng thêm `http://localhost:3000`, `http://localhost:3001`. Áp dụng cho cả HTTP và Socket.IO |
 | `SWAGGER_ENABLED` | bật ngoài production | — | Swagger UI ở `/docs`. Không đặt → tắt ở production; `true`/`false` ghi đè |
-| `PUBLIC_WEB_BASE_URL` | — | Nên có | Origin website cho link chia sẻ chuyến (production `https://dealgo.trancongtien.com`) |
+| `PUBLIC_WEB_BASE_URL` | — | Nên có | Origin website cho link chia sẻ chuyến (production `https://dealgo.laptrinhapp.com`) |
 
 ### Xác thực
 
@@ -179,11 +181,11 @@ Phiên ops lưu trong cookie do BFF `/api/ops/session` đặt; không lưu token
 
 | Biến | Mặc định | Vai trò |
 |---|---|---|
-| `API_BASE_URL` | debug/profile `http://localhost:3001`; release `https://api-dealgo.trancongtien.com` | Origin Nest (REST + Socket.IO cùng host), trùng `PORT` mặc định của backend; `mobile/tool/run_dev.sh` dùng cùng mặc định. Android emulator: `http://10.0.2.2:3001`. Bản release từ chối `http://`; bản debug chỉ cho `http://` với `localhost`, `127.0.0.1`, `10.0.2.2` |
+| `API_BASE_URL` | debug/profile `http://localhost:3001`; release `https://api-dealgo.laptrinhapp.com` | Origin Nest (REST + Socket.IO cùng host), trùng `PORT` mặc định của backend; `mobile/tool/run_dev.sh` dùng cùng mặc định. Android emulator: `http://10.0.2.2:3001`. Bản release từ chối `http://`; bản debug chỉ cho `http://` với `localhost`, `127.0.0.1`, `10.0.2.2` |
 | `USE_MOCK_DATA` | `false` | `true` = dùng client giả và dữ liệu seed, không cần backend |
 | `MAPS_API_KEY` | — | Token Mapbox public `pk.*` dự phòng. App lấy token public lưu trong Admin › Cài đặt › Bản đồ (`GET /v1/public/client-config`), cache trên máy. Lần mở đầu chưa có cache thì splash chờ lấy token tối đa 3 s; có cache thì dùng ngay và làm mới ngầm, token đổi thì mọi bản đồ đang mở dựng lại với token mới, không cần cấu hình gì ở mobile. Chưa có token nào thì dùng key này; tile mặc định Mapbox Streets `streets-v12`. `mobile/tool/run_dev.sh` truyền sẵn từ `MAPBOX_ACCESS_TOKEN`; lệnh `flutter build`/`flutter run` tự gõ phải thêm `--dart-define=MAPS_API_KEY=…` và `MAP_ATTRIBUTION`. Thiếu → bản đồ minh hoạ (`PlaceholderMapPort`): không có tile, nhưng điểm đón/đến và tuyến vẫn vẽ đúng toạ độ thật theo phép chiếu. Tuyến đường luôn lấy từ server (routing) |
 | `MAP_TILE_URL`, `MAP_ATTRIBUTION` | — | Ghi đè nguồn tile (`https://…/{z}/{x}/{y}…{key}`). Không dùng tile OSM công cộng cho production. Bản đồ giữ một tile provider suốt vòng đời màn hình; chỉ lớp tuyến chạy hiệu ứng, nên tile không tải lại theo từng khung hình |
-| `APP_LINK_HOST` | `dealgo.trancongtien.com` | Domain universal link + passkey; phải trùng `dealgoAppLinkHost` (`android/gradle.properties`), `DEALGO_APP_LINK_HOST` (`ios/Flutter/*.xcconfig`) và `WEBAUTHN_RP_ID` |
+| `APP_LINK_HOST` | `dealgo.laptrinhapp.com` | Domain universal link + passkey; phải trùng `dealgoAppLinkHost` (`android/gradle.properties`), `DEALGO_APP_LINK_HOST` (`ios/Flutter/*.xcconfig`) và `WEBAUTHN_RP_ID` |
 | `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE` | build có flavor (`dev`/`prod`, kể cả scheme Xcode) hoặc release: DSN public của project Sentry mobile (`dealGoMobileSentryDsn`); `flutter run`/`flutter test` không flavor: trống. Môi trường `dev`/`prod` theo flavor (release không flavor = `prod`). `0` | Crash reporting (`mobile/lib/core/observability/crash_reporting.dart`). `--dart-define=SENTRY_DSN=` (rỗng) = tắt. DSN client là public (chỉ gửi được sự kiện), không phải secret. Release = `com.trancongtien.dealgo@<version>+<build>`. Chỉ gửi user id; không header/body/query, không breadcrumb từ `print`. Upload debug symbol/obfuscation map: `sentry_dart_plugin` (dev dependency, cấu hình khối `sentry:` trong `pubspec.yaml`: org `tiendev`, project `flutter`, `symbols_path: build/debug-info`). Token org đặt ở `mobile/sentry.properties` (`auth_token=…`, gitignore, chỉ máy chủ dự án) hoặc env `SENTRY_AUTH_TOKEN`. Build release: `flutter build ipa --release --flavor prod --obfuscate --split-debug-info=build/debug-info` (tương tự `appbundle`) rồi `dart run sentry_dart_plugin`; script gộp: `mobile/tool/release_ios.sh` (đọc `SENTRY_AUTH_TOKEN` từ env, không có token thì bỏ qua upload) |
 | `SMOKE_ACCESS_TOKEN`, `SMOKE_REFRESH_TOKEN` | — | Chỉ cho smoke test tự động |
 
@@ -238,4 +240,24 @@ below are set. CASH is always on, so the platform keeps working if every PSP is 
 | `CARD_GATEWAY_MERCHANT_ID`, `CARD_GATEWAY_SECRET` | secret | International card (stub) |
 | `APPLE_PAY_MERCHANT_ID` | no | Apple Pay (stub) |
 
-The DealGo wallet additionally requires the `PAYMENT_WALLET_ENABLED` platform setting (default `false`).
+The DealGo wallet is not offered in the app. Historical `DEALGO_WALLET` payment-intent rows, if any, remain readable but no new intent can be created.
+
+## Driver prepaid platform fees (DEC-PROD-093)
+
+Driver top-ups use payOS by default (`DRIVER_TOP_UP_PROVIDER=payos`) or VNPay
+(`DRIVER_TOP_UP_PROVIDER=vnpay`). payOS creates payment links only: money settles to the
+merchant bank account (A2A); refunds are manual Ops bank transfers with a recorded bank
+reference.
+
+| Key | Secret | Used by |
+| --- | --- | --- |
+| `DRIVER_TOP_UP_PROVIDER` | no | `payos` (default) or `vnpay` |
+| `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY` | yes | payOS payment links + IPN signature |
+| `PAYOS_ENDPOINT` | no | Defaults to `https://api-merchant.payos.vn` |
+| `PAYMENT_PUBLIC_BASE_URL` | no | IPN/return base URL (shared with customer checkout) |
+
+`DRIVER_TOP_UP_ENABLED` and the amount/limit keys (`DRIVER_TOP_UP_MIN_VND`,
+`DRIVER_TOP_UP_MAX_VND`, `DRIVER_TOP_UP_DAILY_LIMIT_VND`, `DRIVER_CREDIT_MAX_VND`,
+`DRIVER_TOP_UP_EXPIRE_MINUTES`) are Admin settings, not env. Keep
+`DRIVER_TOP_UP_ENABLED=false` until Legal signs off and the merchant account + webhook are
+live in production.

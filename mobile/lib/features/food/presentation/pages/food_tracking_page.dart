@@ -563,6 +563,27 @@ class _FoodLive extends StatelessWidget {
             ],
           ),
         ),
+        if ((current.note ?? '').trim().isNotEmpty)
+          TrackingSection(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  DealGoIcons.note,
+                  size: 18,
+                  color: DealGoColors.textSecondary,
+                ),
+                const SizedBox(width: DealGoSpacing.s8),
+                Expanded(
+                  child: Text(
+                    current.note!.trim(),
+                    key: const Key('food-tracking-order-note'),
+                    style: textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+          ),
         TrackingSection(
           child: Column(
             children: [

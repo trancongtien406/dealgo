@@ -3,7 +3,14 @@ export const LEDGER_REPOSITORY = Symbol('LEDGER_REPOSITORY');
 export const LEDGER_CASH_IN_TRANSIT_CODE = 'sandbox.cod.cash_in_transit';
 export const LEDGER_COD_OBLIGATION_CODE = 'sandbox.cod.obligation';
 
-export type LedgerEntityTypeName = 'RIDE' | 'FOOD_ORDER' | 'DISPUTE' | 'PAYMENT_REFUND' | 'PAYMENT_INTENT';
+export type LedgerEntityTypeName =
+  | 'RIDE'
+  | 'FOOD_ORDER'
+  | 'DISPUTE'
+  | 'PAYMENT_REFUND'
+  | 'PAYMENT_INTENT'
+  | 'DRIVER_TOP_UP'
+  | 'DRIVER_FEE_SETTLEMENT';
 export type LedgerJournalEventName =
   | 'COD_OBLIGATION_POSTED'
   | 'SANDBOX_REFUND_RECORDED'
@@ -13,7 +20,10 @@ export type LedgerJournalEventName =
   | 'PSP_PAYMENT_CAPTURED'
   | 'PSP_REFUND_RECORDED'
   | 'PSP_PREPAID_APPLIED'
-  | 'PSP_REFUND_AFTER_SETTLEMENT';
+  | 'PSP_REFUND_AFTER_SETTLEMENT'
+  | 'DRIVER_CREDIT_TOP_UP_CAPTURED'
+  | 'DRIVER_CREDIT_APPLIED_TO_FEE'
+  | 'DRIVER_CREDIT_REFUNDED';
 
 /** DealGo-funded voucher discounts (proposed decision, see decisions-and-assumptions). */
 export const LEDGER_PROMO_EXPENSE_CODE = 'sandbox.promo.discount_expense';
@@ -36,6 +46,9 @@ export const LEDGER_PSP_CUSTOMER_PREPAID_CODE = 'psp.customer_prepaid';
 export const LEDGER_PSP_PAYOUT_PAYABLE_CODE = 'psp.job_payout_payable';
 /** Refunds DealGo absorbs after the driver was already credited. */
 export const LEDGER_PSP_REFUND_EXPENSE_CODE = 'psp.refund_expense';
+
+/** Driver prepayments: DealGo owes the driver future fee offsets (liability, never revenue). */
+export const LEDGER_DRIVER_CREDIT_LIABILITY_CODE = 'driver.credit_liability';
 
 export const LEDGER_REFUND_PAYABLE_CODE = 'sandbox.refund.payable';
 export const LEDGER_REFUND_CLEARING_CODE = 'sandbox.refund.clearing';

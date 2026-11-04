@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/design_system/tokens/dealgo_type_scale.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../pricing/domain/pricing.dart';
 import '../../data/food_fare_negotiation.dart';
 import '../../domain/entities/food_money.dart';
 import '../cubit/food_cart_cubit.dart';
@@ -19,7 +21,8 @@ FoodFareClient? maybeFoodFareClient(BuildContext context) {
   }
 }
 
-/// Checkout: suggested fee + the customer's offer stepper (server fareStep).
+/// Checkout: suggested fee + the customer's offer stepper (server fareStep),
+/// or the read-only fixed fee when the server runs `FIXED` fee mode.
 class FoodFareOfferPanel extends StatelessWidget {
   const FoodFareOfferPanel({super.key});
 
@@ -29,7 +32,30 @@ class FoodFareOfferPanel extends StatelessWidget {
     final cart = context.watch<FoodCartCubit>().state;
     final quote = cart.deliveryQuote;
     final offer = cart.offeredDeliveryFareVnd;
-    if (quote == null || offer == null || !quote.negotiable) {
+    if (quote == null || offer == null) {
+      return const SizedBox.shrink();
+    }
+    if (quote.feeMode == FoodDeliveryFeeMode.fixed) {
+      return FoodPanel(
+        key: const Key('food-fare-fixed-panel'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            FoodMoneyRow(
+              label: l10n.foodFareFixedLabel,
+              amount: formatVnd(quote.suggestedVnd),
+            ),
+            const SizedBox(height: DealGoSpacing.s8),
+            Text(
+              l10n.foodFareFixedHint,
+              style: DealGoType.meta(Theme.of(context).textTheme)
+                  .copyWith(color: DealGoColors.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+    if (!quote.negotiable) {
       return const SizedBox.shrink();
     }
     final cubit = context.read<FoodCartCubit>();
@@ -83,13 +109,12 @@ class FoodFareOfferPanel extends StatelessWidget {
               onPressed: cubit.resetDeliveryOffer,
               child: Text(l10n.foodFareReset),
             ),
+          const SizedBox(height: DealGoSpacing.s4),
           Text(
-            quote.driversCanCounter
-                ? l10n.foodFareHint
-                : l10n.foodFareHintFixed,
-            key: const Key('food-fare-hint'),
-            style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(color: DealGoColors.textSecondary),
+            l10n.foodFareNegotiationHint,
+            key: const Key('food-fare-negotiation-hint'),
+            style: DealGoType.meta(Theme.of(context).textTheme)
+                .copyWith(color: DealGoColors.textSecondary),
           ),
         ],
       ),
@@ -299,9 +324,12 @@ Future<bool> showDriverFareCounterSheet(
     messenger?.showSnackBar(SnackBar(content: Text(l10n.driverFareFixed)));
     return false;
   }
-  final step = bounds?.fareStepVnd ?? 1000;
+  final rawStep = bounds?.fareStepVnd ?? 1000;
+  final step = rawStep < 1 ? 1000 : rawStep;
   final max = bounds?.counterMaxVnd ?? customerOfferVnd;
-  final min = customerOfferVnd + step;
+  // The customer's offer may predate fare-step rounding; the server rejects
+  // counters that are not on the step grid, so start at the next whole step.
+  final min = ((customerOfferVnd ~/ step) + 1) * step;
   if (max < min) return false;
   final amount = await showModalBottomSheet<int>(
     context: context,

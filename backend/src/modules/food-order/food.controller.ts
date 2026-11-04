@@ -27,6 +27,9 @@ import {
   PickupFoodOrderDto,
   PlaceFoodOrderDto,
   QuoteFoodDeliveryDto,
+  SearchFoodDto,
+  StoreDetailQueryDto,
+  SuggestFoodItemsDto,
   ProposeFoodOrderChangeDto,
   RejectFoodOrderDto,
   ReleaseFoodOrderDto,
@@ -52,10 +55,33 @@ export class FoodController {
     return this.food.listStores(actor, query);
   }
 
+  @Get('search')
+  @ApiOperation({ summary: 'Search dishes and stores by dish name (dishes first)' })
+  searchFood(@CurrentActor() actor: RequestActor, @Query() query: SearchFoodDto) {
+    return this.food.searchFood(actor, query);
+  }
+
   @Get('stores/:id')
   @ApiOperation({ summary: 'Get store catalog' })
-  getStore(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string) {
-    return this.food.getStore(actor, id);
+  getStore(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: StoreDetailQueryDto,
+  ) {
+    return this.food.getStore(actor, id, query);
+  }
+
+  @Get('stores/:id/suggestions')
+  @ApiOperation({
+    summary:
+      'Up to 6 in-stock dishes from the same store in another menu category (item page)',
+  })
+  suggestItems(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: SuggestFoodItemsDto,
+  ) {
+    return this.food.suggestItems(actor, id, query.exclude ?? []);
   }
 
   @Post('quote')

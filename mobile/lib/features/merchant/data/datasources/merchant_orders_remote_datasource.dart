@@ -84,6 +84,9 @@ abstract interface class MerchantOrdersRemoteDataSource {
     required String name,
     required int priceVnd,
     bool? available,
+    String? description,
+    int? prepMinutes,
+    String? menuCategoryId,
   });
 
   Future<FoodMenuItem> updateCatalogItem({

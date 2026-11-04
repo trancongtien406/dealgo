@@ -246,7 +246,7 @@ void main() {
       await tester.tap(find.byKey(const Key('avatar-picker')));
       await tester.pumpAndSettle();
 
-      expect(permissions.requested, contains(Permission.photos));
+      expect(permissions.requested, isNot(contains(Permission.photos)));
       expect(avatarSource.pickCount, 1);
       expect(client.avatarUploads, isNotEmpty);
       expect(find.text('Sẽ hỗ trợ tải ảnh trong bản cập nhật'), findsNothing);

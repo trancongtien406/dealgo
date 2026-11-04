@@ -191,6 +191,8 @@ FakeFoodClient _food() =>
             name: 'Bún chả cá Bà Lữ',
             category: 'noodles',
             addressLabel: '319 Hùng Vương, Hải Châu, Đà Nẵng',
+            lat: 16.0601,
+            lng: 108.2137,
             description:
                 'Chả cá thu làm mỗi sáng, nước dùng ngọt xương, '
                 'ăn kèm rau sống Đà Nẵng.',
@@ -1110,14 +1112,21 @@ void main() {
     '96_food_options_cart': (tester) async {
       addStoreItem(tester.element(find.byType(Scaffold).last));
       await tester.pumpAndSettle();
-      await _reveal(tester, find.byKey(const Key('food-add-i1')));
-      final add = find.byKey(const Key('food-add-i1')).last;
-      await tester.ensureVisible(add);
+      await _revealStoreBar(tester);
+      final price = find.byKey(const Key('food-price-i1')).last;
+      await _reveal(tester, price);
+      for (var i = 0; i < 10; i++) {
+        final dy = tester.getCenter(price).dy;
+        if (dy >= 260 && dy <= 600) break;
+        await tester.dragFrom(
+          const Offset(195, 400),
+          Offset(0, dy > 600 ? -160 : 160),
+        );
+        await tester.pumpAndSettle();
+      }
+      await tester.tap(price);
       await tester.pumpAndSettle();
-      await tester.tap(add);
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('food-option-o-large')));
-      await tester.pumpAndSettle();
+      await _tapInList(tester, find.byKey(const Key('food-option-o-large')));
     },
     '97_checkout_voucher_sheet': (tester) async {
       final context = tester.element(find.byType(Scaffold).first);
@@ -1192,9 +1201,11 @@ void main() {
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pumpAndSettle();
     },
+    '30_food_store': (tester) async {
+      await _revealStoreBar(tester);
+    },
     '82_food_store_search': (tester) async {
-      await tester.ensureVisible(find.byKey(const Key('food-store-search')));
-      await tester.pumpAndSettle();
+      await _revealStoreBar(tester);
       await tester.enterText(
         find.byKey(const Key('food-store-search')),
         'chả cá',
@@ -1204,6 +1215,7 @@ void main() {
       await tester.pumpAndSettle();
     },
     '83_food_store_reviews': (tester) async {
+      await _revealStoreBar(tester);
       await tester.tap(find.byKey(const Key('food-store-tab-reviews')));
       await tester.pumpAndSettle();
     },
@@ -1222,6 +1234,7 @@ void main() {
       await tester.pumpAndSettle();
     },
     '31_food_store_reviews': (tester) async {
+      await _revealStoreBar(tester);
       await tester.tap(find.byKey(const Key('food-store-tab-reviews')));
       await tester.pumpAndSettle();
     },
@@ -1277,19 +1290,19 @@ void main() {
       await tester.pumpAndSettle();
     },
     '52_food_item_options': (tester) async {
+      await _revealStoreBar(tester);
       await _reveal(tester, find.byKey(const Key('food-add-i1')));
       final add = find.byKey(const Key('food-add-i1')).last;
-      await tester.ensureVisible(add);
-      await tester.pumpAndSettle();
+      // The pinned tabs/search bar covers the top of the menu viewport, so an
+      // item aligned to its leading edge would be tapped through the bar.
+      for (var i = 0; i < 6 && tester.getCenter(add).dy < 260; i++) {
+        await tester.dragFrom(const Offset(195, 500), const Offset(0, 120));
+        await tester.pumpAndSettle();
+      }
       await tester.tap(add);
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('food-option-o-large')));
-      await tester.pumpAndSettle();
-      final topping = find.byKey(const Key('food-option-o-cha'));
-      await tester.ensureVisible(topping);
-      await tester.pumpAndSettle();
-      await tester.tap(topping);
-      await tester.pumpAndSettle();
+      await _tapInList(tester, find.byKey(const Key('food-option-o-large')));
+      await _tapInList(tester, find.byKey(const Key('food-option-o-cha')));
     },
     '40_driver_home_online': (tester) async {
       await tester.tap(find.byKey(const Key('driver-go-online')));
@@ -1401,6 +1414,28 @@ void main() {
 
 /// Lazy lists on a 320x568 viewport do not build rows below the fold, so
 /// [WidgetTester.ensureVisible] cannot find them. Scroll until built.
+Future<void> _tapInList(WidgetTester tester, Finder target) async {
+  for (var i = 0; i < 8; i++) {
+    final built = target.evaluate().isNotEmpty;
+    if (built && tester.getCenter(target.first).dy < 700) break;
+    await tester.dragFrom(const Offset(195, 480), const Offset(0, -160));
+    await tester.pumpAndSettle();
+  }
+  await tester.tap(target.first);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _revealStoreBar(WidgetTester tester) async {
+  final bar = find.byKey(const Key('food-store-search'));
+  for (var i = 0; i < 10; i++) {
+    if (bar.evaluate().isNotEmpty && tester.getTopLeft(bar.first).dy <= 120) {
+      break;
+    }
+    await tester.dragFrom(const Offset(210, 620), const Offset(0, -220));
+    await tester.pumpAndSettle();
+  }
+}
+
 Future<void> _reveal(WidgetTester tester, Finder target) async {
   for (var i = 0; i < 20 && target.evaluate().isEmpty; i++) {
     final view = tester.view.physicalSize / tester.view.devicePixelRatio;

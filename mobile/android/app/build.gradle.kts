@@ -27,7 +27,7 @@ val debugSignRelease = !hasReleaseKeystore &&
     (project.findProperty("dealgoDebugSignRelease") as String?) == "true"
 
 android {
-    namespace = "com.trancongtien.dealgo"
+    namespace = "dealgo.nguyengoctien.com"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -38,7 +38,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.trancongtien.dealgo"
+        applicationId = "dealgo.nguyengoctien.com"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -51,7 +51,7 @@ android {
         versionName = flutter.versionName
         // Unified app-link / passkey domain (DEC-PROD-058); override with -PdealgoAppLinkHost=…
         manifestPlaceholders["appLinkHost"] =
-            (project.findProperty("dealgoAppLinkHost") as String?) ?: "dealgo.trancongtien.com"
+            (project.findProperty("dealgoAppLinkHost") as String?) ?: "dealgo.laptrinhapp.com"
     }
 
     signingConfigs {

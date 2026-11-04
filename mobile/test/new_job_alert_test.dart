@@ -221,7 +221,7 @@ void main() {
 
   test('native channels, sound files and backend names stay in sync', () {
     final kotlin = File(
-      'android/app/src/main/kotlin/com/trancongtien/dealgo/NewJobChannels.kt',
+      'android/app/src/main/kotlin/dealgo/nguyengoctien/com/NewJobChannels.kt',
     ).readAsStringSync();
     final pbx = File('ios/Runner.xcodeproj/project.pbxproj').readAsStringSync();
     final backend = File('../backend/src/integrations/push/new-job-sound.ts');

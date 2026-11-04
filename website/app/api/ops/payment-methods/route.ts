@@ -28,7 +28,7 @@ export async function PATCH(request: Request) {
       { status: 400 },
     );
   }
-  const { methods, walletEnabled, reason } = body as Record<string, unknown>;
+  const { methods, reason } = body as Record<string, unknown>;
   if (typeof reason !== "string" || reason.trim().length < 3 || reason.length > 500) {
     return NextResponse.json(
       { success: false, message: "Lý do cần 3–500 ký tự." },
@@ -40,7 +40,6 @@ export async function PATCH(request: Request) {
     path: "/v1/ops/payment-methods",
     body: {
       ...(Array.isArray(methods) ? { methods } : {}),
-      ...(typeof walletEnabled === "boolean" ? { walletEnabled } : {}),
       reason: reason.trim(),
     },
   });

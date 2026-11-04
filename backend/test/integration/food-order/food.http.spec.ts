@@ -144,6 +144,64 @@ describe('food order http', () => {
     expect(replay.body.data.subtotalVnd).toBe(145_000);
   });
 
+  it('carries order and line notes through placement', async () => {
+    const customer = await login();
+    const { storeId, itemId } = await oneItem(customer.token);
+    const placed = await request(app.getHttpServer())
+      .post('/v1/food/orders')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .set('Idempotency-Key', 'idem-food-notes-1')
+      .send({
+        storeId,
+        items: [{ itemId, quantity: 1, note: '  Ít cay, không hành  ' }],
+        dropoff,
+        deliveryFareVnd: 15_000,
+        note: '  Gọi trước khi tới  ',
+        utensils: false,
+      })
+      .expect(200);
+    expect(placed.body.data.note).toBe('Gọi trước khi tới');
+    expect(placed.body.data.utensils).toBe(false);
+    expect(placed.body.data.lines[0].note).toBe('Ít cay, không hành');
+
+    const detail = await request(app.getHttpServer())
+      .get(`/v1/food/orders/${placed.body.data.id}`)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    expect(detail.body.data.note).toBe('Gọi trước khi tới');
+    expect(detail.body.data.utensils).toBe(false);
+    expect(detail.body.data.lines[0].note).toBe('Ít cay, không hành');
+
+    const list = await request(app.getHttpServer())
+      .get('/v1/food/orders')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    const row = (
+      list.body.data.items as Array<{ id: string; note: string | null }>
+    ).find((order) => order.id === placed.body.data.id);
+    expect(row?.note).toBe('Gọi trước khi tới');
+  });
+
+  it('stores a whitespace-only note as null and keeps cutlery on by default', async () => {
+    const customer = await login();
+    const { storeId, itemId } = await oneItem(customer.token);
+    const placed = await request(app.getHttpServer())
+      .post('/v1/food/orders')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .set('Idempotency-Key', 'idem-food-notes-2')
+      .send({
+        storeId,
+        items: [{ itemId, quantity: 1, note: '   ' }],
+        dropoff,
+        deliveryFareVnd: 15_000,
+        note: ' \n ',
+      })
+      .expect(200);
+    expect(placed.body.data.note).toBeNull();
+    expect(placed.body.data.utensils).toBe(true);
+    expect(placed.body.data.lines[0].note).toBeNull();
+  });
+
   it('paginates store browse and rejects invalid query params', async () => {
     const customer = await login();
     const page = await request(app.getHttpServer())
@@ -157,6 +215,18 @@ describe('food order http', () => {
       total: expect.any(Number),
     });
     expect(Array.isArray(page.body.data.items)).toBe(true);
+    for (const store of page.body.data.items as {
+      openNow: boolean;
+      closesAtToday: string | null;
+    }[]) {
+      expect(store).toHaveProperty('closesAtToday');
+      if (store.closesAtToday !== null) {
+        expect(store.closesAtToday).toMatch(/^\d{2}:\d{2}$/);
+      }
+      if (!store.openNow) {
+        expect(store.closesAtToday).toBeNull();
+      }
+    }
     expect(page.body.data.items[0]).toMatchObject({
       id: expect.any(String),
       name: 'Bún Bò Huế',
@@ -187,6 +257,563 @@ describe('food order http', () => {
     await request(app.getHttpServer())
       .get('/v1/food/stores')
       .query({ lat: 10.77 })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(400);
+
+    const detail = await request(app.getHttpServer())
+      .get(`/v1/food/stores/${page.body.data.items[0].id}`)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    expect(detail.body.data).toHaveProperty('closesAtToday');
+  });
+
+  it('quotes the store detail delivery fee like the browse card', async () => {
+    const customer = await login();
+    const owner = await login();
+    await repository.insertGrant(owner.userId, 'MERCHANT', 'ACTIVE');
+    const foods = app.get(FOOD_REPOSITORY);
+    if (!(foods instanceof MemoryFoodRepository)) {
+      throw new Error('Expected the in-memory food repository');
+    }
+    const tag = `fee${Date.now().toString().slice(-6)}`;
+    const store = await createPinnedStore(foods, owner.userId, `Quán ${tag}`, [
+      { name: `Cơm gà ${tag}`, priceVnd: 45_000 },
+    ]);
+    const detailUrl = `/v1/food/stores/${store.id}`;
+
+    const withoutPosition = await request(app.getHttpServer())
+      .get(detailUrl)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    expect(withoutPosition.body.data).toHaveProperty('deliveryFeeFromVnd', null);
+
+    await request(app.getHttpServer())
+      .get(detailUrl)
+      .query({ lat: 16.077 })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(400);
+
+    // ~2.5 km north of the store pin: above FOOD_MIN_DELIVERY_VND, inside the browse radius.
+    const at = { lat: 16.077, lng: 108.2022 };
+    const detail = await request(app.getHttpServer())
+      .get(detailUrl)
+      .query(at)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    const fee = detail.body.data.deliveryFeeFromVnd as number;
+    expect(Number.isInteger(fee)).toBe(true);
+    expect(fee).toBeGreaterThan(5_000);
+
+    const browse = await request(app.getHttpServer())
+      .get('/v1/food/stores')
+      .query({ ...at, search: tag, limit: 20 })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    const card = (
+      browse.body.data.items as { id: string; deliveryFeeFromVnd: number | null }[]
+    ).find((entry) => entry.id === store.id);
+    expect(card?.deliveryFeeFromVnd).toBe(fee);
+  });
+
+  it('searches dishes and stores in one call, dishes first (P3)', async () => {
+    const customer = await login();
+    const owner = await login();
+    await repository.insertGrant(owner.userId, 'MERCHANT', 'ACTIVE');
+    const foods = app.get(FOOD_REPOSITORY);
+    if (!(foods instanceof MemoryFoodRepository)) {
+      throw new Error('Expected the in-memory food repository');
+    }
+    const tag = `dish${Date.now().toString().slice(-6)}`;
+    const store = await createPinnedStore(foods, owner.userId, `Quán ${tag}`, [
+      { name: `Bún bò ${tag}`, priceVnd: 55_000 },
+      { name: `Trà đào ${tag}`, priceVnd: 30_000 },
+    ]);
+    const q = `bún bò ${tag}`;
+    const dish = store.items.find((item) => item.name === `Bún bò ${tag}`);
+
+    const res = await request(app.getHttpServer())
+      .get('/v1/food/search')
+      .query({ q, lat: 16.05, lng: 108.2, limit: 5 })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+
+    const dishes = res.body.data.dishes as {
+      page: number;
+      limit: number;
+      total: number;
+      items: {
+        item: {
+          id: string;
+          name: string;
+          priceVnd: number;
+          originalPriceVnd: number | null;
+          imageUrl: string | null;
+          soldCount: number;
+          prepMinutes: number;
+        };
+        store: {
+          id: string;
+          name: string;
+          distanceKm: number | null;
+          etaMinutes: number | null;
+          deliveryFeeFromVnd: number | null;
+          openNow: boolean;
+          closedReason: string | null;
+        };
+      }[];
+    };
+    expect(dishes).toMatchObject({ page: 1, limit: 5, total: 1 });
+    const hit = dishes.items[0]!;
+    expect(hit.item.name.toLowerCase()).toContain('bún');
+    expect(hit.item).toMatchObject({
+      id: dish!.id,
+      priceVnd: 55_000,
+      originalPriceVnd: null,
+      imageUrl: null,
+      soldCount: 0,
+      prepMinutes: 15,
+    });
+    expect(hit.store).toMatchObject({
+      id: store.id,
+      name: `Quán ${tag}`,
+      openNow: true,
+      closedReason: null,
+    });
+    expect(hit.store.distanceKm).toBeGreaterThan(0);
+    expect(hit.store.etaMinutes).toBeGreaterThan(0);
+    expect(hit.store.deliveryFeeFromVnd).toBeGreaterThan(0);
+
+    const stores = res.body.data.stores as {
+      page: number;
+      limit: number;
+      total: number;
+      items: { id: string; name: string; closesAtToday: string | null }[];
+    };
+    expect(stores).toMatchObject({ page: 1, limit: 5 });
+    expect(stores.items.length).toBeLessThanOrEqual(5);
+    expect(stores.items.map((entry) => entry.id)).toContain(store.id);
+    for (const entry of stores.items) {
+      expect(entry).toEqual(
+        expect.objectContaining({ id: expect.any(String), name: expect.any(String) }),
+      );
+      expect(entry).toHaveProperty('closesAtToday');
+    }
+  });
+
+  it('omits paused stores and unavailable or unapproved dishes from dish hits', async () => {
+    const customer = await login();
+    const openOwner = await login();
+    const closedOwner = await login();
+    await repository.insertGrant(openOwner.userId, 'MERCHANT', 'ACTIVE');
+    await repository.insertGrant(closedOwner.userId, 'MERCHANT', 'ACTIVE');
+    const foods = app.get(FOOD_REPOSITORY);
+    if (!(foods instanceof MemoryFoodRepository)) {
+      throw new Error('Expected the in-memory food repository');
+    }
+    const tag = `closed${Date.now().toString().slice(-6)}`;
+    const q = `bún chả ${tag}`;
+    const openStore = await createPinnedStore(
+      foods,
+      openOwner.userId,
+      `Quán Mở ${tag}`,
+      [{ name: `Bún chả ${tag}`, priceVnd: 45_000 }],
+    );
+    await foods.createItem({
+      ownerId: openOwner.userId,
+      name: `Bún chả ${tag} hết hàng`,
+      priceVnd: 45_000,
+      available: false,
+      moderationStatus: 'APPROVED',
+    });
+    await foods.createItem({
+      ownerId: openOwner.userId,
+      name: `Bún chả ${tag} chờ duyệt`,
+      priceVnd: 45_000,
+    });
+    const closedStore = await createPinnedStore(
+      foods,
+      closedOwner.userId,
+      `Quán Đóng ${tag}`,
+      [{ name: `Bún chả ${tag} đặc biệt`, priceVnd: 50_000 }],
+    );
+    await foods.updateStoreServiceMode({
+      ownerId: closedOwner.userId,
+      mode: 'PAUSED',
+      until: null,
+    });
+
+    const res = await request(app.getHttpServer())
+      .get('/v1/food/search')
+      .query({ q, lat: 16.05, lng: 108.2, limit: 5 })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+
+    const hits = res.body.data.dishes.items as {
+      item: { name: string };
+      store: { id: string; openNow: boolean; closedReason: string | null };
+    }[];
+    expect(hits.map((entry) => entry.item.name)).toEqual([`Bún chả ${tag}`]);
+    expect(hits[0]!.store).toMatchObject({ openNow: true, closedReason: null });
+    expect(hits[0]!.store.id).toBe(openStore.id);
+
+    // Browse still lists the paused store with its label; only the dish section hides it.
+    const paused = (
+      res.body.data.stores.items as {
+        id: string;
+        openNow: boolean;
+        closedReason: string | null;
+      }[]
+    ).find((entry) => entry.id === closedStore.id);
+    expect(paused).toMatchObject({ openNow: false, closedReason: 'PAUSED' });
+  });
+
+  it('rejects a missing or blank q, an unauthenticated caller and any limit above 20', async () => {
+    const customer = await login();
+    const keyword = 'bí-mật-khách-hàng';
+
+    await request(app.getHttpServer())
+      .get('/v1/food/search')
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .get('/v1/food/search')
+      .query({ q: '   ' })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .get('/v1/food/search')
+      .query({ q: keyword })
+      .expect(401);
+
+    for (const limit of [21, 999]) {
+      const rejected = await request(app.getHttpServer())
+        .get('/v1/food/search')
+        .query({ q: keyword, limit })
+        .set('Authorization', `Bearer ${customer.token}`)
+        .expect(400);
+      expect(rejected.body).toMatchObject({ success: false, statusCode: 400 });
+      expect(rejected.body.path).toBe('/v1/food/search');
+      expect(JSON.stringify(rejected.body)).not.toContain(keyword);
+    }
+
+    const atCap = await request(app.getHttpServer())
+      .get('/v1/food/search')
+      .query({ q: 'bún', limit: 20 })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    expect(atCap.body.data.dishes).toMatchObject({ page: 1, limit: 20 });
+    expect(atCap.body.data.stores).toMatchObject({ page: 1, limit: 20 });
+  });
+
+  it('reads the browse settings once per search request', async () => {
+    const customer = await login();
+    const spy = vi.spyOn(PlatformSettingsService.prototype, 'getNumber');
+    let keys: string[] = [];
+    try {
+      await request(app.getHttpServer())
+        .get('/v1/food/search')
+        .query({ q: 'bún' })
+        .set('Authorization', `Bearer ${customer.token}`)
+        .expect(200);
+      keys = spy.mock.calls.map(([key]) => key);
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(keys.filter((key) => key === 'RATING_STORE_MIN_COUNT')).toHaveLength(1);
+    expect(keys.filter((key) => key === 'FOOD_MIN_DELIVERY_VND')).toHaveLength(1);
+    expect(keys.filter((key) => key === 'FOOD_FARE_STEP_VND')).toHaveLength(1);
+  });
+
+  it('reports the full dish total even when the page is shorter', async () => {
+    const customer = await login();
+    const owner = await login();
+    await repository.insertGrant(owner.userId, 'MERCHANT', 'ACTIVE');
+    const foods = app.get(FOOD_REPOSITORY);
+    if (!(foods instanceof MemoryFoodRepository)) {
+      throw new Error('Expected the in-memory food repository');
+    }
+    const tag = `paged${Date.now().toString().slice(-6)}`;
+    const names = [`Món ${tag} a`, `Món ${tag} b`, `Món ${tag} c`];
+    await createPinnedStore(
+      foods,
+      owner.userId,
+      `Quán ${tag}`,
+      names.map((name) => ({ name, priceVnd: 30_000 })),
+    );
+
+    const res = await request(app.getHttpServer())
+      .get('/v1/food/search')
+      .query({ q: tag, limit: 1 })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+
+    expect(res.body.data.dishes).toMatchObject({ page: 1, limit: 1, total: 3 });
+    expect(
+      (res.body.data.dishes.items as { item: { name: string } }[]).map(
+        (entry) => entry.item.name,
+      ),
+    ).toEqual([names[0]]);
+  });
+
+  it('suggests other-category dishes for the item page', async () => {
+    const customer = await login();
+    const { storeId, itemId } = await oneItem(customer.token);
+    const menu = await request(app.getHttpServer())
+      .get(`/v1/food/stores/${storeId}`)
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    const item = (
+      menu.body.data.items as Array<{
+        id: string;
+        available: boolean;
+        menuCategoryId: string | null;
+      }>
+    ).find((entry) => entry.id === itemId)!;
+
+    const res = await request(app.getHttpServer())
+      .get(`/v1/food/stores/${storeId}/suggestions`)
+      .query({ exclude: item.id })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    const suggestions = res.body.data as Array<{
+      id: string;
+      available: boolean;
+      menuCategoryId: string | null;
+    }>;
+    expect(suggestions.length).toBeLessThanOrEqual(6);
+    expect(suggestions.length === 0 || suggestions.length >= 2).toBe(true);
+    for (const suggestion of suggestions) {
+      expect(suggestion.id).not.toBe(item.id);
+      expect(suggestion.available).not.toBe(false);
+      expect(suggestion.menuCategoryId).not.toBe(item.menuCategoryId);
+    }
+  });
+
+  it('suggests in-stock other-category dishes only, best sellers capped at six', async () => {
+    const customer = await login();
+    const owner = await login();
+    await repository.insertGrant(owner.userId, 'MERCHANT', 'ACTIVE');
+    const foods = app.get(FOOD_REPOSITORY);
+    if (!(foods instanceof MemoryFoodRepository)) {
+      throw new Error('Expected the in-memory food repository');
+    }
+    const tag = `suggest${Date.now().toString().slice(-6)}`;
+    const store = await createPinnedStore(foods, owner.userId, `Quán ${tag}`, [
+      { name: `Món chính ${tag}`, priceVnd: 50_000 },
+    ]);
+    const viewed = store.items[0]!;
+    const mains = await foods.createMenuCategory({
+      ownerId: owner.userId,
+      name: `Món chính ${tag}`,
+    });
+    const drinks = await foods.createMenuCategory({
+      ownerId: owner.userId,
+      name: `Đồ uống ${tag}`,
+    });
+    await foods.updateItem({
+      ownerId: owner.userId,
+      itemId: viewed.id,
+      menuCategoryId: mains.id,
+    });
+    const sameCategory = await foods.createItem({
+      ownerId: owner.userId,
+      name: `Món chính hai ${tag}`,
+      priceVnd: 45_000,
+      moderationStatus: 'APPROVED',
+      menuCategoryId: mains.id,
+    });
+    await foods.createItem({
+      ownerId: owner.userId,
+      name: `Đồ uống hết hàng ${tag}`,
+      priceVnd: 20_000,
+      available: false,
+      moderationStatus: 'APPROVED',
+      menuCategoryId: drinks.id,
+    });
+    await foods.createItem({
+      ownerId: owner.userId,
+      name: `Đồ uống chờ duyệt ${tag}`,
+      priceVnd: 20_000,
+      moderationStatus: 'PENDING',
+      menuCategoryId: drinks.id,
+    });
+    const suggested: string[] = [];
+    for (let index = 0; index < 7; index += 1) {
+      const created = await foods.createItem({
+        ownerId: owner.userId,
+        name: `Đồ uống ${index} ${tag}`,
+        priceVnd: 20_000,
+        moderationStatus: 'APPROVED',
+        menuCategoryId: drinks.id,
+      });
+      suggested.push(created.id);
+    }
+
+    const res = await request(app.getHttpServer())
+      .get(`/v1/food/stores/${store.id}/suggestions`)
+      .query({ exclude: viewed.id })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    const items = res.body.data as Array<{
+      id: string;
+      available: boolean;
+      menuCategoryId: string | null;
+    }>;
+    expect(items).toHaveLength(6);
+    expect(items.map((entry) => entry.id)).toEqual(
+      suggested.slice(-6).reverse(),
+    );
+    expect(items.map((entry) => entry.id)).not.toContain(viewed.id);
+    expect(items.map((entry) => entry.id)).not.toContain(sameCategory.id);
+    for (const entry of items) {
+      expect(entry.menuCategoryId).toBe(drinks.id);
+      expect(entry.available).toBe(true);
+    }
+  });
+
+  it('hides the suggestion block when fewer than two dishes qualify', async () => {
+    const customer = await login();
+    const owner = await login();
+    await repository.insertGrant(owner.userId, 'MERCHANT', 'ACTIVE');
+    const foods = app.get(FOOD_REPOSITORY);
+    if (!(foods instanceof MemoryFoodRepository)) {
+      throw new Error('Expected the in-memory food repository');
+    }
+    const tag = `lonely${Date.now().toString().slice(-6)}`;
+    const store = await createPinnedStore(foods, owner.userId, `Quán ${tag}`, [
+      { name: `Món chính ${tag}`, priceVnd: 50_000 },
+    ]);
+    const viewed = store.items[0]!;
+    const mains = await foods.createMenuCategory({
+      ownerId: owner.userId,
+      name: `Món chính ${tag}`,
+    });
+    const drinks = await foods.createMenuCategory({
+      ownerId: owner.userId,
+      name: `Đồ uống ${tag}`,
+    });
+    await foods.updateItem({
+      ownerId: owner.userId,
+      itemId: viewed.id,
+      menuCategoryId: mains.id,
+    });
+    await foods.createItem({
+      ownerId: owner.userId,
+      name: `Đồ uống duy nhất ${tag}`,
+      priceVnd: 20_000,
+      moderationStatus: 'APPROVED',
+      menuCategoryId: drinks.id,
+    });
+
+    const res = await request(app.getHttpServer())
+      .get(`/v1/food/stores/${store.id}/suggestions`)
+      .query({ exclude: viewed.id })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    expect(res.body.data).toEqual([]);
+  });
+
+  it('skips dishes that cannot be added plain without choosing options', async () => {
+    const customer = await login();
+    const owner = await login();
+    await repository.insertGrant(owner.userId, 'MERCHANT', 'ACTIVE');
+    const foods = app.get(FOOD_REPOSITORY);
+    if (!(foods instanceof MemoryFoodRepository)) {
+      throw new Error('Expected the in-memory food repository');
+    }
+    const tag = `plain${Date.now().toString().slice(-6)}`;
+    const store = await createPinnedStore(foods, owner.userId, `Quán ${tag}`, [
+      { name: `Món chính ${tag}`, priceVnd: 50_000 },
+    ]);
+    const viewed = store.items[0]!;
+    const mains = await foods.createMenuCategory({
+      ownerId: owner.userId,
+      name: `Món chính ${tag}`,
+    });
+    const drinks = await foods.createMenuCategory({
+      ownerId: owner.userId,
+      name: `Đồ uống ${tag}`,
+    });
+    await foods.updateItem({
+      ownerId: owner.userId,
+      itemId: viewed.id,
+      menuCategoryId: mains.id,
+    });
+    const plain = await foods.createItem({
+      ownerId: owner.userId,
+      name: `Đồ uống thường ${tag}`,
+      priceVnd: 20_000,
+      moderationStatus: 'APPROVED',
+      menuCategoryId: drinks.id,
+    });
+    const optional = await foods.createItem({
+      ownerId: owner.userId,
+      name: `Đồ uống topping ${tag}`,
+      priceVnd: 25_000,
+      moderationStatus: 'APPROVED',
+      menuCategoryId: drinks.id,
+    });
+    await foods.replaceItemOptions({
+      ownerId: owner.userId,
+      itemId: optional.id,
+      groups: [
+        {
+          name: 'Topping',
+          minSelect: 0,
+          maxSelect: 2,
+          options: [{ name: 'Trân châu', priceDeltaVnd: 5_000 }],
+        },
+      ],
+    });
+    const required = await foods.createItem({
+      ownerId: owner.userId,
+      name: `Đồ uống chọn size ${tag}`,
+      priceVnd: 30_000,
+      moderationStatus: 'APPROVED',
+      menuCategoryId: drinks.id,
+    });
+    await foods.replaceItemOptions({
+      ownerId: owner.userId,
+      itemId: required.id,
+      groups: [
+        {
+          name: 'Kích cỡ',
+          minSelect: 1,
+          maxSelect: 1,
+          options: [{ name: 'M', priceDeltaVnd: 0 }],
+        },
+      ],
+    });
+
+    const res = await request(app.getHttpServer())
+      .get(`/v1/food/stores/${store.id}/suggestions`)
+      .query({ exclude: viewed.id })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    const items = res.body.data as Array<{ id: string; name: string }>;
+    expect(items.map((entry) => entry.id)).not.toContain(required.id);
+    expect(items.map((entry) => entry.name)).not.toContain(
+      `Đồ uống chọn size ${tag}`,
+    );
+    expect(items.map((entry) => entry.id)).toEqual(
+      expect.arrayContaining([plain.id, optional.id]),
+    );
+  });
+
+  it('requires a customer session and uuid item ids to exclude', async () => {
+    const customer = await login();
+    const { storeId } = await oneItem(customer.token);
+
+    await request(app.getHttpServer())
+      .get(`/v1/food/stores/${storeId}/suggestions`)
+      .expect(401);
+
+    await request(app.getHttpServer())
+      .get(`/v1/food/stores/${storeId}/suggestions`)
+      .query({ exclude: 'not-an-item-id' })
       .set('Authorization', `Bearer ${customer.token}`)
       .expect(400);
   });
@@ -1037,7 +1664,7 @@ describe('food order http', () => {
 
     const listed = await request(app.getHttpServer())
       .get('/v1/ops/catalog/moderation')
-      .query({ status: 'APPROVED' })
+      .query({ status: 'APPROVED', q: 'Chè đậu' })
       .set('Authorization', `Bearer ${ops.body.data.accessToken}`)
       .expect(200);
     expect(
@@ -1721,6 +2348,7 @@ describe('food order http', () => {
     expect(listed[index]).toMatchObject({
       openNow: false,
       closedReason: 'CLOSED',
+      closesAtToday: null,
     });
     // Sorted by name it would be first; closed stores go after every open one.
     expect(listed.slice(0, index).every((entry) => entry.openNow)).toBe(true);
@@ -1743,6 +2371,7 @@ describe('food order http', () => {
       lastOrderMinutes: 0,
     }).expect(200);
     expect(holiday.body.data.openNow).toBe(false);
+    expect(holiday.body.data.closesAtToday).toBeNull();
 
     const open = await hours({
       weekly: allDays.map((weekday) => ({
@@ -1754,6 +2383,17 @@ describe('food order http', () => {
       lastOrderMinutes: 0,
     }).expect(200);
     expect(open.body.data).toMatchObject({ openNow: true, closedReason: null });
+    expect(open.body.data.closesAtToday).toBe('00:00');
+    const openList = await request(app.getHttpServer())
+      .get('/v1/food/stores')
+      .query({ search: 'Aaa Giờ Mở Cửa', limit: 5 })
+      .set('Authorization', `Bearer ${customer.token}`)
+      .expect(200);
+    expect(openList.body.data.items[0]).toMatchObject({
+      id: store.id,
+      openNow: true,
+      closesAtToday: '00:00',
+    });
     const accepted = await place(
       customer.token,
       'idem-food-hours-2',

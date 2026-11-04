@@ -31,6 +31,7 @@ import {
 } from './identity.repository.js';
 import { normalizeEmail } from './phone-number.js';
 import { MailDeliveryError } from '../../integrations/email/mail-sender.js';
+import { mailSenderStatus } from '../../integrations/email/dynamic-mail-sender.js';
 import { captureServerError } from '../../platform/observability/sentry.js';
 import { SessionService, type SessionResult } from './session.service.js';
 import { PlatformSettingsService } from '../../platform/settings/platform-settings.service.js';
@@ -67,6 +68,8 @@ const HOUR_MS = 60 * 60 * 1000;
  * sign-up existed: login with the right password mails a code instead of a session.
  * Wrong attempts count per challenge (resends do not reset them); a locked challenge
  * cannot be resent, so the user starts a new one, which counts toward the hourly cap.
+ *
+ * The code is mailed after the challenge is returned, never awaited on the request path.
  */
 @Injectable()
 export class EmailPasswordAuthService {
@@ -104,6 +107,9 @@ export class EmailPasswordAuthService {
       return this.registerWithoutVerification(email, passwordHash, input.displayName, now);
     }
     const reviewCode = existing ? null : await this.reviewCode(email);
+    if (!reviewCode) {
+      await this.assertMailTransport();
+    }
     const code = reviewCode ?? randomOtpCode();
     const expiresAt = new Date(now.getTime() + EMAIL_SIGNUP_TTL_MS);
     const challenge = await this.repository.createEmailSignupChallenge({
@@ -116,7 +122,7 @@ export class EmailPasswordAuthService {
     });
 
     if (!reviewCode) {
-      await this.deliver(() =>
+      this.sendLater(() =>
         existing
           ? this.mail.sendSignupAccountExists({ email })
           : this.mail.sendSignupCode({ email, code, expiresAt }),
@@ -257,6 +263,9 @@ export class EmailPasswordAuthService {
     const activation = challenge.purpose === 'ACTIVATE_EXISTING';
     const pending = activation || challenge.passwordHash !== null;
     const reviewCode = pending ? await this.reviewCode(challenge.email) : null;
+    if (pending && !reviewCode) {
+      await this.assertMailTransport();
+    }
     const code = reviewCode ?? randomOtpCode();
     const expiresAt = new Date(now.getTime() + EMAIL_SIGNUP_TTL_MS);
     const reissued = await this.repository.reissueEmailSignupCode(challenge.id, {
@@ -277,7 +286,7 @@ export class EmailPasswordAuthService {
     }
     // The account-exists notice is sent once; repeating it would only help someone spam the owner.
     if (pending && !reviewCode) {
-      await this.deliver(() =>
+      this.sendLater(() =>
         this.mail.sendSignupCode({
           email: challenge.email,
           code,
@@ -339,6 +348,9 @@ export class EmailPasswordAuthService {
     await this.assertHourlyCap(email, now);
 
     const reviewCode = await this.reviewCode(email);
+    if (!reviewCode) {
+      await this.assertMailTransport();
+    }
     const code = reviewCode ?? randomOtpCode();
     const expiresAt = new Date(now.getTime() + EMAIL_SIGNUP_TTL_MS);
     const challenge = await this.repository.createEmailSignupChallenge({
@@ -352,7 +364,7 @@ export class EmailPasswordAuthService {
       sentAt: now,
     });
     if (!reviewCode) {
-      await this.deliver(() =>
+      this.sendLater(() =>
         this.mail.sendSignupCode({ email, code, expiresAt, purpose: 'activation' }),
       );
     }
@@ -394,30 +406,46 @@ export class EmailPasswordAuthService {
     return (await this.review?.fixedCodeFor('email', email)) ?? null;
   }
 
-  private async deliver(send: () => Promise<void>): Promise<void> {
-    try {
-      await send();
-    } catch (error) {
-      const reason = error instanceof MailDeliveryError ? error.reason : 'unknown';
-      const provider = error instanceof MailDeliveryError ? error.provider : 'unknown';
-      const providerCode = error instanceof MailDeliveryError ? error.providerCode : undefined;
-      this.logger.warn(
-        `Sign-up email not sent: ${error instanceof Error ? error.message : 'unknown error'}`,
-      );
-      // A 5xx "rejected" reply means the mailbox/address itself was refused (e.g. SMTP 555 for a
-      // non-ASCII local part): a client input problem, not an outage, so no Sentry event.
-      if (reason === 'rejected') {
-        throw authError(400, 'EMAIL_ADDRESS_REJECTED', 'This email address cannot receive mail');
-      }
-      // Transient failures were already retried by the sender; report the original cause.
-      captureServerError(error, {
-        component: 'email_signup',
-        mail_provider: provider,
-        mail_reason: reason,
-        mail_code: providerCode,
-      });
+  /** Reads the configured provider only, so a missing transport still fails before any mail. */
+  private async assertMailTransport(): Promise<void> {
+    const configured = await mailSenderStatus(this.mail)
+      .then((status) => status.configured)
+      // Settings unreadable: let the send itself report the failure after the response.
+      .catch(() => true);
+    if (!configured) {
       throw authError(503, 'EMAIL_DELIVERY_FAILED', 'Could not send the verification email');
     }
+  }
+
+  /**
+   * Mails after the challenge is already on its way to the client: an SMTP round trip takes
+   * seconds, and the app only needs the challenge to show the code screen. A failure is
+   * logged (and captured to Sentry) instead of turning the response into an error; the user
+   * can request another code once the resend cooldown passes.
+   */
+  private sendLater(send: () => Promise<void>): void {
+    void send().catch((error: unknown) => this.reportMailFailure(error));
+  }
+
+  private reportMailFailure(error: unknown): void {
+    const reason = error instanceof MailDeliveryError ? error.reason : 'unknown';
+    const provider = error instanceof MailDeliveryError ? error.provider : 'unknown';
+    const providerCode = error instanceof MailDeliveryError ? error.providerCode : undefined;
+    this.logger.warn(
+      `Sign-up email not sent: ${error instanceof Error ? error.message : 'unknown error'}`,
+    );
+    // A 5xx "rejected" reply means the mailbox/address itself was refused (e.g. SMTP 555 for a
+    // non-ASCII local part): a client input problem, not an outage, so no Sentry event.
+    if (reason === 'rejected') {
+      return;
+    }
+    // Transient failures were already retried by the sender; report the original cause.
+    captureServerError(error, {
+      component: 'email_signup',
+      mail_provider: provider,
+      mail_reason: reason,
+      mail_code: providerCode,
+    });
   }
 
   private hashCode(code: string): string {

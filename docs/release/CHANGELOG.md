@@ -2,6 +2,26 @@
 
 Thay đổi đáng chú ý cho người vận hành, mới nhất ở trên.
 
+## 2026-11-04
+
+### Thêm
+- **Bộ hồ sơ Google Play.** `docs/release/play-store/` gồm khai báo Tính năng tài chính, metadata vi/en, App content,
+  Data safety, review notes và checklist compliance. Khai báo tài chính chọn `Other` cho khoản trả trước phí nền tảng
+  của tài xế (closed-loop, không phải ví), kèm câu trả lời dán sẵn và template nếu Google hỏi lại.
+- **Chặn nộp đã ghi nhận.** Thiếu URL xoá tài khoản công khai, `READ_MEDIA_IMAGES` chưa bỏ/khai báo, và thẻ nạp phí
+  vẫn hiện khi `DRIVER_TOP_UP_ENABLED=false`.
+- **Env payOS.** `backend/.env.example` có `DRIVER_TOP_UP_PROVIDER` và `PAYOS_*`; catalog secret ghi rõ chúng và
+  các khóa `DRIVER_TOP_UP_*` là cài đặt Admin.
+
+### Sửa
+- **Trang xoá tài khoản công khai `/account-deletion`.** Trang web mới (vi + `?lang=en`, không cần đăng nhập) mô tả
+  cách xoá trong app, dữ liệu bị xoá/giữ lại, thời hạn 7 ngày (cấu hình 0–90) và điều kiện chặn; form gửi yêu cầu
+  thành phiếu hỗ trợ (`category=ACCOUNT`) để người đã gỡ app vẫn xoá được. Dùng làm URL **Data deletion** của Google Play.
+- **Bỏ quyền ảnh khỏi Android.** Manifest không còn `READ_MEDIA_IMAGES`/`READ_EXTERNAL_STORAGE`; luồng chọn avatar
+  không xin quyền thư viện ảnh nữa (picker hệ thống chỉ cấp file được chọn). Merged release manifest đã kiểm tra.
+- **Thẻ nạp phí chỉ hiện khi bật.** Màn Thu nhập tài xế ẩn thẻ "Phí nền tảng" khi `DRIVER_TOP_UP_ENABLED=false`
+  thay vì dẫn vào màn hình chưa khả dụng.
+
 ## 2026-10-28
 
 ### Thêm
@@ -110,7 +130,7 @@ Thay đổi đáng chú ý cho người vận hành, mới nhất ở trên.
   - web upload source map lúc build (Docker secret, map bị xoá sau upload);
   - mobile: `sentry_dart_plugin` upload debug symbol/obfuscation map sau build release.
 - **Tài khoản cho App Review.** `npm run seed:app-review` (backend, chạy lại an toàn) tạo/cập nhật tài khoản
-  `appreview@dealgo.trancongtien.com`:
+  `appreview@dealgo.laptrinhapp.com`:
   - đủ 3 vai trò: khách, tài xế xe máy ở Đà Nẵng, cửa hàng;
   - KYC/KYB giả đã duyệt;
   - quán "DealGo Demo Đà Nẵng" mở 24h, 2 nhóm món, 6 món có ảnh;
@@ -130,7 +150,7 @@ Thay đổi đáng chú ý cho người vận hành, mới nhất ở trên.
 - **Chia sẻ chuyến đi qua Zalo, Messenger, SMS…** Nút "Chia sẻ liên kết" ở Trung tâm an toàn mở bảng chia sẻ của hệ thống
   với lời nhắn kèm liên kết theo dõi; máy không có bảng chia sẻ thì tự sao chép. Thêm nút "Sao chép liên kết". Liên kết được
   dùng lại cho các lần chia sẻ sau trong cùng chuyến (đến khi gần hết hạn) thay vì tạo mới mỗi lần. Trang theo dõi
-  `dealgo.trancongtien.com/chia-se-chuyen/…` không cần đăng nhập, không hiện số điện thoại, hết hạn sau 12 giờ hoặc 30 phút
+  `dealgo.laptrinhapp.com/chia-se-chuyen/…` không cần đăng nhập, không hiện số điện thoại, hết hạn sau 12 giờ hoặc 30 phút
   sau khi chuyến kết thúc.
 - **Báo lỗi app về Sentry.** Bản dev/prod (flavor hoặc scheme Xcode) và bản release tự gửi crash Flutter, lỗi nền (async),
   crash native iOS/Android, lỗi server 5xx và phản hồi hỏng về project Sentry mobile, môi trường `dev`/`prod`, release

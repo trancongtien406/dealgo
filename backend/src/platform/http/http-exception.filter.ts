@@ -14,6 +14,7 @@ import {
   REQUEST_ID_HEADER,
 } from './request-id.js';
 import { captureServerError } from '../observability/sentry.js';
+import { pathWithoutQuery, redactUrl } from '../observability/redact-url.js';
 
 type ErrorBody = {
   success: false;
@@ -52,9 +53,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
       readOrCreateRequestId(request.headers?.[REQUEST_ID_HEADER]);
     request.requestId = requestId;
     response.setHeader(REQUEST_ID_HEADER, requestId);
+    const requestUrl = request.originalUrl || request.url || '';
     const body = this.toErrorBody(
       exception,
-      request.originalUrl || request.url || '',
+      pathWithoutQuery(requestUrl),
       requestId,
     );
 
@@ -79,7 +81,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (body.statusCode >= 500) {
       captureServerError(exception, {
         requestId,
-        path: request.originalUrl || request.url,
+        path: redactUrl(requestUrl),
         userId: (request as { actor?: { userId?: string } }).actor?.userId,
       });
     }

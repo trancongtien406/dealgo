@@ -1718,17 +1718,17 @@ abstract class AppLocalizations {
   /// **'bun bo'**
   String get foodSearchHint;
 
-  /// No description provided for @foodSearchFilterAll.
-  ///
-  /// In en, this message translates to:
-  /// **'All'**
-  String get foodSearchFilterAll;
-
   /// No description provided for @foodSearchFilterNear.
   ///
   /// In en, this message translates to:
   /// **'Near me'**
   String get foodSearchFilterNear;
+
+  /// No description provided for @foodSearchSortNewest.
+  ///
+  /// In en, this message translates to:
+  /// **'Newest'**
+  String get foodSearchSortNewest;
 
   /// No description provided for @foodSearchSuggestions.
   ///
@@ -1736,11 +1736,119 @@ abstract class AppLocalizations {
   /// **'Search suggestions'**
   String get foodSearchSuggestions;
 
+  /// No description provided for @foodSearchResults.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} results'**
+  String foodSearchResults(int count);
+
   /// No description provided for @foodSearchEmpty.
   ///
   /// In en, this message translates to:
   /// **'No matching stores yet'**
   String get foodSearchEmpty;
+
+  /// No description provided for @foodSearchDishes.
+  ///
+  /// In en, this message translates to:
+  /// **'Dishes'**
+  String get foodSearchDishes;
+
+  /// No description provided for @foodSearchStores.
+  ///
+  /// In en, this message translates to:
+  /// **'Stores'**
+  String get foodSearchStores;
+
+  /// No description provided for @foodSearchDishUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This dish is no longer sold'**
+  String get foodSearchDishUnavailable;
+
+  /// No description provided for @foodDeliverTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliver to'**
+  String get foodDeliverTo;
+
+  /// No description provided for @foodFilterButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get foodFilterButton;
+
+  /// No description provided for @foodFilterTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter & sort'**
+  String get foodFilterTitle;
+
+  /// No description provided for @foodFilterSort.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by'**
+  String get foodFilterSort;
+
+  /// No description provided for @foodFilterNear.
+  ///
+  /// In en, this message translates to:
+  /// **'Nearest'**
+  String get foodFilterNear;
+
+  /// No description provided for @foodFilterRating.
+  ///
+  /// In en, this message translates to:
+  /// **'Top rated'**
+  String get foodFilterRating;
+
+  /// No description provided for @foodFilterDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance'**
+  String get foodFilterDistance;
+
+  /// No description provided for @foodFilterAnyDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Any distance'**
+  String get foodFilterAnyDistance;
+
+  /// No description provided for @foodFilterKm.
+  ///
+  /// In en, this message translates to:
+  /// **'Within {km} km'**
+  String foodFilterKm(int km);
+
+  /// No description provided for @foodFilterOpenNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Open now'**
+  String get foodFilterOpenNow;
+
+  /// No description provided for @foodFilterOffers.
+  ///
+  /// In en, this message translates to:
+  /// **'Has offers'**
+  String get foodFilterOffers;
+
+  /// No description provided for @foodFilterApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get foodFilterApply;
+
+  /// No description provided for @foodFilterReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get foodFilterReset;
+
+  /// No description provided for @foodFilterClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear filters'**
+  String get foodFilterClear;
 
   /// No description provided for @foodSearchHistory.
   ///
@@ -1790,6 +1898,12 @@ abstract class AppLocalizations {
   /// **'Item options'**
   String get foodItemOptionsTitle;
 
+  /// No description provided for @foodItemAddonsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add-ons'**
+  String get foodItemAddonsTitle;
+
   /// No description provided for @foodItemOptionsNoGroups.
   ///
   /// In en, this message translates to:
@@ -1819,6 +1933,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Optional'**
   String get foodItemOptionsOptional;
+
+  /// No description provided for @foodItemDetailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Item details'**
+  String get foodItemDetailTitle;
+
+  /// No description provided for @foodDishPhotoCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo {index}/{total}'**
+  String foodDishPhotoCount(int index, int total);
+
+  /// No description provided for @foodItemOptionsChoose.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose options'**
+  String get foodItemOptionsChoose;
+
+  /// No description provided for @foodItemOptionsChooseRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose options'**
+  String get foodItemOptionsChooseRequired;
+
+  /// No description provided for @foodItemOptionsMissingRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose {groups}'**
+  String foodItemOptionsMissingRequired(String groups);
+
+  /// No description provided for @foodItemOptionsFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Free'**
+  String get foodItemOptionsFree;
+
+  /// No description provided for @foodItemQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get foodItemQuantity;
+
+  /// No description provided for @foodItemSelectedOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected: {options}'**
+  String foodItemSelectedOptions(String options);
+
+  /// No description provided for @foodItemInfoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Item details'**
+  String get foodItemInfoTitle;
+
+  /// No description provided for @foodItemInStore.
+  ///
+  /// In en, this message translates to:
+  /// **'At {store}'**
+  String foodItemInStore(String store);
+
+  /// No description provided for @foodStoreDirections.
+  ///
+  /// In en, this message translates to:
+  /// **'Directions'**
+  String get foodStoreDirections;
+
+  /// No description provided for @foodStoreOpenInMaps.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in Google Maps'**
+  String get foodStoreOpenInMaps;
+
+  /// No description provided for @foodStoreMapOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open the map.'**
+  String get foodStoreMapOpenFailed;
+
+  /// No description provided for @foodStoreMenuSections.
+  ///
+  /// In en, this message translates to:
+  /// **'Menu categories'**
+  String get foodStoreMenuSections;
+
+  /// No description provided for @foodItemOptionsMaxReached.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum {count} selected'**
+  String foodItemOptionsMaxReached(int count);
 
   /// No description provided for @foodInvoiceTitle.
   ///
@@ -3488,6 +3692,30 @@ abstract class AppLocalizations {
   /// **'Recipient and address'**
   String get checkoutRecipientAddress;
 
+  /// No description provided for @checkoutYourOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Your order'**
+  String get checkoutYourOrder;
+
+  /// No description provided for @checkoutEtaChip.
+  ///
+  /// In en, this message translates to:
+  /// **'~{minutes} min delivery'**
+  String checkoutEtaChip(int minutes);
+
+  /// No description provided for @checkoutItemCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} items'**
+  String checkoutItemCount(int count);
+
+  /// No description provided for @checkoutYouSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save {amount}'**
+  String checkoutYouSave(String amount);
+
   /// No description provided for @checkoutItems.
   ///
   /// In en, this message translates to:
@@ -4892,6 +5120,120 @@ abstract class AppLocalizations {
   /// **'Couldn\'t get the delivery fee. Check your connection and try again.'**
   String get foodFareQuoteError;
 
+  /// No description provided for @foodOrderNoteLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Note for the store / driver'**
+  String get foodOrderNoteLabel;
+
+  /// No description provided for @foodOrderNoteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'E.g. less spicy, no onion, leave at the door…'**
+  String get foodOrderNoteHint;
+
+  /// No description provided for @foodLineNoteLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Note for this dish'**
+  String get foodLineNoteLabel;
+
+  /// No description provided for @foodLineNoteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'E.g. less ice, no sugar…'**
+  String get foodLineNoteHint;
+
+  /// No description provided for @foodUtensilsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cutlery'**
+  String get foodUtensilsLabel;
+
+  /// No description provided for @foodUtensilsYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get foodUtensilsYes;
+
+  /// No description provided for @foodUtensilsNo.
+  ///
+  /// In en, this message translates to:
+  /// **'No'**
+  String get foodUtensilsNo;
+
+  /// No description provided for @foodCartUpsellTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add more to your meal'**
+  String get foodCartUpsellTitle;
+
+  /// No description provided for @foodNoteSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Note saved'**
+  String get foodNoteSaved;
+
+  /// No description provided for @foodNoteCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Note cleared'**
+  String get foodNoteCleared;
+
+  /// No description provided for @foodCheckoutExtrasTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes & cutlery'**
+  String get foodCheckoutExtrasTitle;
+
+  /// No description provided for @foodCheckoutNoteEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No note for the store or driver yet'**
+  String get foodCheckoutNoteEmpty;
+
+  /// No description provided for @foodCheckoutNoteAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get foodCheckoutNoteAdd;
+
+  /// No description provided for @foodCheckoutNoteEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get foodCheckoutNoteEdit;
+
+  /// No description provided for @foodFareFixedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed delivery fee'**
+  String get foodFareFixedLabel;
+
+  /// No description provided for @foodFareFixedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'DealGo sets this fee for the distance; it is not negotiable.'**
+  String get foodFareFixedHint;
+
+  /// No description provided for @foodFareNegotiationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The driver can accept this amount or counter with a higher fee.'**
+  String get foodFareNegotiationHint;
+
+  /// No description provided for @foodLineNoteClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear note'**
+  String get foodLineNoteClear;
+
+  /// No description provided for @foodCartLineRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove item'**
+  String get foodCartLineRemove;
+
   /// No description provided for @driverOtpLocked.
   ///
   /// In en, this message translates to:
@@ -5660,6 +6002,12 @@ abstract class AppLocalizations {
   /// **'Search restaurants, dishes, drinks'**
   String get foodDiscoverySearchHint;
 
+  /// No description provided for @foodFeedEndOfList.
+  ///
+  /// In en, this message translates to:
+  /// **'You have seen every store nearby'**
+  String get foodFeedEndOfList;
+
   /// No description provided for @foodStoreBestsellers.
   ///
   /// In en, this message translates to:
@@ -5671,6 +6019,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'≈{minutes} min'**
   String foodStorePrepChip(int minutes);
+
+  /// No description provided for @foodStorePrepShort.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String foodStorePrepShort(int minutes);
 
   /// No description provided for @foodSearchGroups.
   ///
@@ -5684,11 +6038,17 @@ abstract class AppLocalizations {
   /// **'See all →'**
   String get foodSeeAll;
 
-  /// No description provided for @foodCategoryEmpty.
+  /// No description provided for @foodEmptyNoStoresInCategory.
   ///
   /// In en, this message translates to:
-  /// **'No restaurants in this category yet.'**
-  String get foodCategoryEmpty;
+  /// **'No stores in this category yet'**
+  String get foodEmptyNoStoresInCategory;
+
+  /// No description provided for @foodEmptyOutOfArea.
+  ///
+  /// In en, this message translates to:
+  /// **'DealGo does not deliver here yet'**
+  String get foodEmptyOutOfArea;
 
   /// No description provided for @foodStoreTitle.
   ///
@@ -5809,6 +6169,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Menu · {count} items'**
   String foodStoreMenuCount(int count);
+
+  /// No description provided for @foodStoreSectionCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} items'**
+  String foodStoreSectionCount(int count);
 
   /// No description provided for @foodStoreReviewsHidden.
   ///
@@ -9386,6 +9752,18 @@ abstract class AppLocalizations {
   /// **'Sold out'**
   String get merchantItemSoldOut;
 
+  /// No description provided for @merchantItemPendingReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending review'**
+  String get merchantItemPendingReview;
+
+  /// No description provided for @merchantItemRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected'**
+  String get merchantItemRejected;
+
   /// No description provided for @foodOrderSentTitle.
   ///
   /// In en, this message translates to:
@@ -12482,6 +12860,12 @@ abstract class AppLocalizations {
   /// **'Delivery from {fee}'**
   String foodStoreFeeFrom(String fee);
 
+  /// No description provided for @foodStoreOpenUntil.
+  ///
+  /// In en, this message translates to:
+  /// **'Open until {time}'**
+  String foodStoreOpenUntil(String time);
+
   /// No description provided for @foodOffersNearTitle.
   ///
   /// In en, this message translates to:
@@ -12553,6 +12937,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} sold'**
   String foodItemSold(int count);
+
+  /// No description provided for @foodItemOptionsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} choices'**
+  String foodItemOptionsCount(int count);
 
   /// No description provided for @merchantOffersTitle.
   ///
@@ -14540,18 +14930,6 @@ abstract class AppLocalizations {
   /// **'Your offer'**
   String get foodFareYourOffer;
 
-  /// No description provided for @foodFareHint.
-  ///
-  /// In en, this message translates to:
-  /// **'The delivery fee is only a suggestion. Drivers can accept your offer or propose another one for you to choose; the fee is fixed once a driver takes the order.'**
-  String get foodFareHint;
-
-  /// No description provided for @foodFareHintFixed.
-  ///
-  /// In en, this message translates to:
-  /// **'The delivery fee is only a suggestion; you can raise or lower it. Drivers accept exactly the fee you choose; it is fixed once a driver takes the order.'**
-  String get foodFareHintFixed;
-
   /// No description provided for @foodFareFixedWaiting.
   ///
   /// In en, this message translates to:
@@ -14695,6 +15073,348 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delivery fee (agreed)'**
   String get merchantFareAgreed;
+
+  /// No description provided for @driverCreditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepaid balance'**
+  String get driverCreditTitle;
+
+  /// No description provided for @driverCreditSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Covers platform fees only. It cannot be withdrawn or transferred.'**
+  String get driverCreditSubtitle;
+
+  /// No description provided for @driverCreditBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepaid credit'**
+  String get driverCreditBalance;
+
+  /// No description provided for @driverCreditOwes.
+  ///
+  /// In en, this message translates to:
+  /// **'Fee debt'**
+  String get driverCreditOwes;
+
+  /// No description provided for @driverCreditBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Fee debt is over the limit. You will not receive new jobs until you top up.'**
+  String get driverCreditBlocked;
+
+  /// No description provided for @driverCreditNearLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Fee debt is close to the limit. Top up to keep receiving jobs.'**
+  String get driverCreditNearLimit;
+
+  /// No description provided for @driverCreditDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Top-up is not open yet. Please try again later.'**
+  String get driverCreditDisabled;
+
+  /// No description provided for @driverCreditAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Top-up amount'**
+  String get driverCreditAmount;
+
+  /// No description provided for @driverCreditAmountRange.
+  ///
+  /// In en, this message translates to:
+  /// **'From {min} to {max}'**
+  String driverCreditAmountRange(String min, String max);
+
+  /// No description provided for @driverCreditTopUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Top up'**
+  String get driverCreditTopUp;
+
+  /// No description provided for @driverCreditPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for payment'**
+  String get driverCreditPending;
+
+  /// No description provided for @driverCreditRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} left'**
+  String driverCreditRemaining(String amount);
+
+  /// No description provided for @driverCreditOpenCheckout.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the payment page'**
+  String get driverCreditOpenCheckout;
+
+  /// No description provided for @driverCreditCancelTopUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel this top-up'**
+  String get driverCreditCancelTopUp;
+
+  /// No description provided for @driverCreditChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking payment…'**
+  String get driverCreditChecking;
+
+  /// No description provided for @driverCreditPaidHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid. The amount is now in your prepaid balance.'**
+  String get driverCreditPaidHint;
+
+  /// No description provided for @driverCreditRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent top-ups'**
+  String get driverCreditRecent;
+
+  /// No description provided for @driverCreditEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No top-ups yet.'**
+  String get driverCreditEmpty;
+
+  /// No description provided for @driverCreditLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading balance…'**
+  String get driverCreditLoading;
+
+  /// No description provided for @driverCreditCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Top up fees'**
+  String get driverCreditCardTitle;
+
+  /// No description provided for @driverCreditCardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep your fee debt at zero so you keep receiving jobs.'**
+  String get driverCreditCardBody;
+
+  /// No description provided for @driverCreditStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get driverCreditStatusPending;
+
+  /// No description provided for @driverCreditStatusPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Credited'**
+  String get driverCreditStatusPaid;
+
+  /// No description provided for @driverCreditStatusExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get driverCreditStatusExpired;
+
+  /// No description provided for @driverCreditStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get driverCreditStatusCancelled;
+
+  /// No description provided for @driverCreditStatusRefundPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund pending'**
+  String get driverCreditStatusRefundPending;
+
+  /// No description provided for @driverCreditStatusRefunded.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunded'**
+  String get driverCreditStatusRefunded;
+
+  /// No description provided for @driverCreditStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get driverCreditStatusFailed;
+
+  /// No description provided for @driverCreditErrorGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not top up. Please try again.'**
+  String get driverCreditErrorGeneric;
+
+  /// No description provided for @driverCreditErrorPending.
+  ///
+  /// In en, this message translates to:
+  /// **'You already have a top-up waiting for payment.'**
+  String get driverCreditErrorPending;
+
+  /// No description provided for @driverCreditErrorDailyLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s top-up limit has been reached.'**
+  String get driverCreditErrorDailyLimit;
+
+  /// No description provided for @driverCreditErrorCreditLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepaid balance limit has been reached.'**
+  String get driverCreditErrorCreditLimit;
+
+  /// No description provided for @driverCreditErrorAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'The amount is outside the allowed range.'**
+  String get driverCreditErrorAmount;
+
+  /// No description provided for @driverCreditErrorKyc.
+  ///
+  /// In en, this message translates to:
+  /// **'An approved KYC is required before topping up.'**
+  String get driverCreditErrorKyc;
+
+  /// No description provided for @driverCreditErrorDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Top-up is not open yet.'**
+  String get driverCreditErrorDisabled;
+
+  /// No description provided for @driverCreditErrorProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'The payment provider is not available right now.'**
+  String get driverCreditErrorProvider;
+
+  /// No description provided for @driverCreditScanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Open your banking app and scan this QR code. The amount is filled in for you.'**
+  String get driverCreditScanHint;
+
+  /// No description provided for @driverCreditOrderCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Order code'**
+  String get driverCreditOrderCode;
+
+  /// No description provided for @driverCreditExpiresIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Expires in {time}'**
+  String driverCreditExpiresIn(String time);
+
+  /// No description provided for @driverCreditDetailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Top-up detail'**
+  String get driverCreditDetailTitle;
+
+  /// No description provided for @driverCreditCopyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy order code'**
+  String get driverCreditCopyCode;
+
+  /// No description provided for @driverCreditCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Order code copied.'**
+  String get driverCreditCopied;
+
+  /// No description provided for @driverCreditPaymentReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment received'**
+  String get driverCreditPaymentReceived;
+
+  /// No description provided for @driverCreditPaymentReceivedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} has been added to your prepaid balance.'**
+  String driverCreditPaymentReceivedBody(String amount);
+
+  /// No description provided for @driverCreditLinkExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'This payment link is no longer valid.'**
+  String get driverCreditLinkExpired;
+
+  /// No description provided for @driverCreditCreateNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a new top-up'**
+  String get driverCreditCreateNew;
+
+  /// No description provided for @driverCreditAppliedFees.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied to fees'**
+  String get driverCreditAppliedFees;
+
+  /// No description provided for @driverCreditRefundedAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunded'**
+  String get driverCreditRefundedAmount;
+
+  /// No description provided for @driverCreditMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment method'**
+  String get driverCreditMethod;
+
+  /// No description provided for @driverCreditCreatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Created'**
+  String get driverCreditCreatedAt;
+
+  /// No description provided for @driverCreditPaidAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid at'**
+  String get driverCreditPaidAt;
+
+  /// No description provided for @driverCreditClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get driverCreditClose;
+
+  /// No description provided for @driverCreditWaitingBank.
+  ///
+  /// In en, this message translates to:
+  /// **'The balance updates automatically once your bank confirms.'**
+  String get driverCreditWaitingBank;
+
+  /// No description provided for @foodVoucherWallTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s offers'**
+  String get foodVoucherWallTitle;
+
+  /// No description provided for @foodVoucherWallSeeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'See all'**
+  String get foodVoucherWallSeeAll;
+
+  /// No description provided for @foodReorderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order again'**
+  String get foodReorderTitle;
+
+  /// No description provided for @foodReorderStripItems.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item} other{{count} items}} · {total}'**
+  String foodReorderStripItems(int count, String total);
 }
 
 class _AppLocalizationsDelegate

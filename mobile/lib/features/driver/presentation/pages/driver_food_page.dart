@@ -37,6 +37,7 @@ import '../../../../core/format/short_ref.dart';
 import '../../../../core/l10n/api_error_text.dart';
 import '../widgets/driver_contact_actions.dart';
 import '../widgets/job_customer_name.dart';
+import '../../../food/presentation/widgets/food_order_extras.dart';
 
 /// Poll fallback for the open offer screen (socket hints are primary).
 const driverOfferPollInterval = Duration(seconds: 8);
@@ -73,6 +74,8 @@ ReadyFoodJob withAgreedFare(ReadyFoodJob job, int agreedFareVnd) {
     pickup: job.pickup,
     route: job.route,
     approachRoute: job.approachRoute,
+    note: job.note,
+    utensils: job.utensils,
   );
 }
 
@@ -432,6 +435,15 @@ class _DriverFoodDetailPageState extends State<_DriverFoodDetailView>
                 ],
               ),
             ),
+            if ((job.note ?? '').trim().isNotEmpty || !job.utensils) ...[
+              const SizedBox(height: DealGoSpacing.s12),
+              DriverPanel(
+                child: FoodOrderExtrasBlock(
+                  note: job.note,
+                  utensils: job.utensils,
+                ),
+              ),
+            ],
             const SizedBox(height: DealGoSpacing.s12),
             DriverFoodJobMap(job: job),
             const SizedBox(height: DealGoSpacing.s12),

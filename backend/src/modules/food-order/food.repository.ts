@@ -31,6 +31,7 @@ import {
 } from './store-service-mode.js';
 import {
   ALWAYS_OPEN,
+  closesAtToday,
   scheduleView,
   storeAvailability,
   type StoreAvailability,
@@ -75,6 +76,8 @@ export type FoodLineView = {
   quantity: number;
   /** Cover image snapshotted at placement (DEC-PROD-043). */
   imageUrl: string | null;
+  /** Customer note for the kitchen; null = none. */
+  note: string | null;
   /** Chosen options snapshotted at placement (DEC-PROD-033); [] when none. */
   options: FoodLineOption[];
 };
@@ -103,6 +106,8 @@ export type StoreBrowseItem = StoreListItem &
     createdAt: Date;
     distanceKm: number | null;
     serviceMode: StoreServiceMode;
+    /** Closing time (HH:mm) of the shift taking orders now; null when not open (DEC-PROD-027). */
+    closesAtToday: string | null;
     /** Cover thumb: first available menu item imageUrl (DEC-PROD-041). */
     imageUrl: string | null;
     /** Default prep + BUSY extra right now. */
@@ -116,6 +121,57 @@ export type StoreBrowsePage = {
   items: StoreBrowseItem[];
   total: number;
 };
+
+export type DishSearchQuery = {
+  q: string;
+  page: number;
+  limit: number;
+  lat?: number;
+  lng?: number;
+  /** Only stores within this many km; ignored without lat/lng. */
+  radiusKm: number;
+};
+
+/**
+ * A dish above the store section. Only dishes from stores taking orders now are
+ * surfaced: a dish hit opens the item page, so a closed store would be a dead end.
+ */
+export type DishHit = {
+  item: {
+    id: string;
+    name: string;
+    priceVnd: number;
+    originalPriceVnd: number | null;
+    imageUrl: string | null;
+    soldCount: number;
+    prepMinutes: number;
+  };
+  store: {
+    id: string;
+    name: string;
+    distanceKm: number | null;
+    openNow: boolean;
+    closedReason: 'PAUSED' | 'CLOSED' | null;
+  };
+};
+
+export type DishSearchPage = {
+  items: DishHit[];
+  total: number;
+};
+
+/**
+ * Wraps `text` for a SQL `ILIKE ... ESCAPE '\'` pattern: `%`, `_` and `\` inside the
+ * keyword match literally, as they do for the in-memory repository's `includes`.
+ */
+export function likePattern(text: string): string {
+  return `%${text.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+}
+
+/** Code-point ordering, so the in-memory tie-break matches Postgres `ORDER BY ... ASC`. */
+function compareText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
 
 export type ListFoodStoresQuery = {
   page: number;
@@ -150,6 +206,8 @@ export type StoreItemView = {
   optionGroups: FoodOptionGroupView[];
   /** When the dish was added (ISO); the app marks recent ones as new. */
   addedAt: string | null;
+  /** Merchant/ops views only; customer payloads drop unapproved dishes instead. */
+  moderationStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
 };
 
 /** A dish surfaced on browse cards: the store's best sellers and its newest dish. */
@@ -161,6 +219,26 @@ export type StoreFeaturedItem = {
   imageUrl: string | null;
   soldCount: number;
   addedAt: string;
+};
+
+/**
+ * One "Món ăn kèm" card on the item page: same store, a different menu section.
+ * Uncategorized dishes are skipped because they have no section that can differ
+ * from the viewed dish; dishes with a required option group are skipped because
+ * the tile adds one plain unit that `priceOptionSelection` could never accept.
+ */
+export type StoreItemSuggestion = StoreFeaturedItem & {
+  available: boolean;
+  menuCategoryId: string | null;
+};
+
+export type ItemSuggestionsQuery = {
+  storeId: string;
+  /** Item ids to leave out; their menu categories are skipped too. */
+  exclude: string[];
+  limit: number;
+  /** Drop PENDING/REJECTED dishes while FOOD_ITEM_MODERATION_ENABLED is on. */
+  moderationRequired: boolean;
 };
 
 /** Best sellers (sold > 0) first, then the newest dish when it is not already listed. */
@@ -211,6 +289,8 @@ export type StoreDetail = StoreListItem &
   StoreAvailability & {
     /** M023 weekly hours / closed days / cut-off (DEC-PROD-027). */
     schedule: StoreScheduleView;
+    /** Closing time (HH:mm) of the shift taking orders now; null when not open (DEC-PROD-027). */
+    closesAtToday: string | null;
     /** M022 intake settings (DEC-PROD-028); stripped from the customer payload. */
     acceptSettings: StoreAcceptSettings;
     /** Default prep + BUSY extra right now; what customers see as the kitchen time. */
@@ -377,6 +457,10 @@ export type FoodOrderView = {
   cancelReason: FoodCancelReason | null;
   /** DEC-PROD-035: who cancelled (null unless CANCELLED). */
   cancelledBy: CancelActorName | null;
+  /** Customer note for the store / driver; null = none. */
+  note: string | null;
+  /** Cutlery requested with this order. */
+  utensils: boolean;
   lines: FoodLineView[];
   /** Kitchen estimate snapshotted at placement (DEC-PROD-028); null on legacy orders. */
   prepMinutes: number | null;
@@ -539,6 +623,8 @@ export type CreateCatalogItemInput = {
   priceVnd: number;
   originalPriceVnd?: number | null;
   available?: boolean;
+  /** Set by the service: PENDING unless item moderation is disabled. */
+  moderationStatus?: 'PENDING' | 'APPROVED';
   description?: string | null;
   prepMinutes?: number | null;
   imageUrl?: string | null;
@@ -698,6 +784,8 @@ export type PlaceFoodLineInput = {
   itemId: string;
   quantity: number;
   optionIds?: string[];
+  /** Customer note for this line; blank/whitespace-only is normalized to null upstream. */
+  note?: string | null;
 };
 
 export type PlaceFoodInput = {
@@ -708,6 +796,12 @@ export type PlaceFoodInput = {
   dropoff: { lat: number; lng: number; label: string };
   /** Customer's delivery-fee offer (validated by the service against the suggestion). */
   deliveryFareVnd: number;
+  /** Customer note for the store / driver; null = none. */
+  note?: string | null;
+  /** Cutlery requested with this order; omitted falls back to the column default. */
+  utensils?: boolean;
+  /** When false, items skip the moderation gate (platform setting FOOD_ITEM_MODERATION_ENABLED off). */
+  requireApprovedItems?: boolean;
   /** System suggestion shown at checkout (reference only). */
   suggestedDeliveryFareVnd?: number;
   /** Re-validated and redeemed in the same unit of work as the order. */
@@ -718,6 +812,7 @@ export interface FoodRepository {
   hasStore(): Promise<boolean>;
   createFixtureStore(ownerId: string, items: CatalogItemInput[]): Promise<void>;
   listStores(query: ListFoodStoresQuery): Promise<StoreBrowsePage>;
+  searchDishes(query: DishSearchQuery): Promise<DishSearchPage>;
   listStoresPage(
     page: number,
     limit: number,
@@ -758,11 +853,13 @@ export interface FoodRepository {
   ): Promise<StoreDetail>;
   listMenuCategories(ownerId: string): Promise<MenuCategoryView[]>;
   /** Customer menu sections of a store, in merchant order (empty sections omitted). */
-  listStoreMenuSections(storeId: string): Promise<StoreMenuSection[]>;
+  listStoreMenuSections(storeId: string, approvedOnly?: boolean): Promise<StoreMenuSection[]>;
   /** Approved, available dishes for browse cards, picked per store with pickFeaturedItems. */
   listFeaturedItems(
     storeIds: string[],
   ): Promise<Map<string, StoreFeaturedItem[]>>;
+  /** In-stock dishes in a menu category other than the excluded items' (item page). */
+  listItemSuggestions(query: ItemSuggestionsQuery): Promise<StoreItemSuggestion[]>;
   createMenuCategory(input: {
     ownerId: string;
     name: string;
@@ -1013,6 +1110,16 @@ function memoryAvailability(
     now,
   );
 }
+
+function closesAtTodayWhenOpen(
+  store: StoredStore,
+  availability: StoreAvailability,
+  now: Date,
+): string | null {
+  return availability.openNow
+    ? closesAtToday(store.schedule ?? ALWAYS_OPEN, now)
+    : null;
+}
 type StoredItem = Omit<StoreItemView, 'addedAt' | 'originalPriceVnd'> & {
   originalPriceVnd?: number | null;
   storeId: string;
@@ -1222,22 +1329,85 @@ export class MemoryFoodRepository implements FoodRepository {
 
     const total = filtered.length;
     const start = pageOffset(query.page, query.limit);
-    const items = filtered.slice(start, start + query.limit).map((entry) => ({
-      ...toStoreListItem(entry.store),
-      ...open.get(entry.store.id)!,
-      serviceMode: effectiveServiceMode(
-        entry.store.serviceMode,
-        entry.store.serviceModeUntil,
-      ).serviceMode,
-      createdAt: entry.store.createdAt,
-      distanceKm: entry.distanceKm,
-      imageUrl:
-        entry.store.coverUrl ?? coverImageForStore(this.items, entry.store.id),
-      estimatedPrepMinutes: memoryAccept(entry.store).estimatedPrepMinutes,
-      ratingAverage: null,
-      ratingCount: 0,
-    }));
+    const items = filtered.slice(start, start + query.limit).map((entry) => {
+      const availability = open.get(entry.store.id)!;
+      return {
+        ...toStoreListItem(entry.store),
+        ...availability,
+        closesAtToday: closesAtTodayWhenOpen(entry.store, availability, now),
+        serviceMode: effectiveServiceMode(
+          entry.store.serviceMode,
+          entry.store.serviceModeUntil,
+        ).serviceMode,
+        createdAt: entry.store.createdAt,
+        distanceKm: entry.distanceKm,
+        imageUrl:
+          entry.store.coverUrl ?? coverImageForStore(this.items, entry.store.id),
+        estimatedPrepMinutes: memoryAccept(entry.store).estimatedPrepMinutes,
+        ratingAverage: null,
+        ratingCount: 0,
+      };
+    });
     return { items, total };
+  }
+
+  async searchDishes(query: DishSearchQuery): Promise<DishSearchPage> {
+    const needle = query.q.trim().toLowerCase();
+    const hasGeo = query.lat !== undefined && query.lng !== undefined;
+    const origin = hasGeo ? { lat: query.lat!, lng: query.lng! } : null;
+    const now = new Date();
+    const hits: Array<{
+      item: StoredItem;
+      store: StoredStore;
+      distanceKm: number | null;
+      availability: StoreAvailability;
+    }> = [];
+    for (const item of this.items) {
+      if (!item.available || item.moderationStatus !== 'APPROVED') continue;
+      if (!item.name.toLowerCase().includes(needle)) continue;
+      const store = this.stores.find((entry) => entry.id === item.storeId);
+      if (!store || store.lat === null || store.lng === null) continue;
+      const availability = memoryAvailability(store, now);
+      if (!availability.openNow) continue;
+      const distanceKm = origin
+        ? haversineKm(origin, { lat: store.lat, lng: store.lng })
+        : null;
+      if (distanceKm !== null && distanceKm > query.radiusKm) continue;
+      hits.push({ item, store, distanceKm, availability });
+    }
+    hits.sort(
+      (left, right) =>
+        right.item.soldCount - left.item.soldCount ||
+        compareText(left.item.name, right.item.name) ||
+        compareText(left.item.id, right.item.id),
+    );
+    const start = pageOffset(query.page, query.limit);
+    return {
+      total: hits.length,
+      items: hits.slice(start, start + query.limit).map((hit) => ({
+        item: {
+          id: hit.item.id,
+          name: hit.item.name,
+          priceVnd: hit.item.priceVnd,
+          originalPriceVnd: shownOriginalPrice(
+            hit.item.priceVnd,
+            hit.item.originalPriceVnd,
+          ),
+          imageUrl: hit.item.imageUrl,
+          soldCount: hit.item.soldCount,
+          prepMinutes:
+            hit.item.prepMinutes ??
+            (hit.store.accept ?? acceptSettingsFromRow({})).defaultPrepMinutes,
+        },
+        store: {
+          id: hit.store.id,
+          name: hit.store.name,
+          distanceKm: hit.distanceKm,
+          openNow: hit.availability.openNow,
+          closedReason: hit.availability.closedReason,
+        },
+      })),
+    };
   }
 
   async listStoresPage(
@@ -1324,10 +1494,13 @@ export class MemoryFoodRepository implements FoodRepository {
     if (!store) {
       return null;
     }
+    const now = new Date();
+    const availability = memoryAvailability(store, now);
     return {
       ...toStoreListItem(store),
       ...effectiveServiceMode(store.serviceMode, store.serviceModeUntil),
-      ...memoryAvailability(store),
+      ...availability,
+      closesAtToday: closesAtTodayWhenOpen(store, availability, now),
       schedule: scheduleView(store.schedule ?? ALWAYS_OPEN),
       ...memoryAccept(store),
       addressLabel: store.addressLabel ?? null,
@@ -1387,7 +1560,11 @@ export class MemoryFoodRepository implements FoodRepository {
     if (atCapacity(acceptSettings, active)) {
       throw new FoodRuleError('FOOD_STORE_AT_CAPACITY');
     }
-    const lines = this.snapshotLines(input.storeId, input.items);
+    const lines = this.snapshotLines(
+      input.storeId,
+      input.items,
+      input.requireApprovedItems ?? true,
+    );
     const subtotalVnd = lines.reduce(
       (sum, line) => sum + line.unitPriceVnd * line.quantity,
       0,
@@ -1451,6 +1628,8 @@ export class MemoryFoodRepository implements FoodRepository {
       assignedDriverId: null,
       cancelReason: null,
       cancelledBy: null,
+      note: input.note ?? null,
+      utensils: input.utensils ?? true,
       lines,
       prepMinutes: estimatedPrepMinutes,
       estimatedReadyAt: estimatedReadyAt(placedAt, estimatedPrepMinutes),
@@ -1694,6 +1873,7 @@ export class MemoryFoodRepository implements FoodRepository {
       serviceModeUntil: null,
       openNow: true,
       closedReason: null,
+      closesAtToday: null,
       schedule: scheduleView(ALWAYS_OPEN),
       ...memoryAccept({
         id: storeId,
@@ -1850,8 +2030,7 @@ export class MemoryFoodRepository implements FoodRepository {
       priceVnd: input.priceVnd,
       originalPriceVnd: input.originalPriceVnd ?? null,
       available,
-      // FOOD-001: every new dish waits for admin moderation before it can be ordered.
-      moderationStatus: 'PENDING',
+      moderationStatus: input.moderationStatus ?? 'PENDING',
       createdAt: this.nextItemCreatedAt(),
       description: input.description ?? null,
       prepMinutes: input.prepMinutes ?? null,
@@ -1940,10 +2119,69 @@ export class MemoryFoodRepository implements FoodRepository {
     return byStore;
   }
 
-  async listStoreMenuSections(storeId: string): Promise<StoreMenuSection[]> {
+  async listItemSuggestions(
+    query: ItemSuggestionsQuery,
+  ): Promise<StoreItemSuggestion[]> {
+    const store = this.stores.find((entry) => entry.id === query.storeId);
+    if (!store || !memoryAvailability(store).openNow) {
+      return [];
+    }
+    const excludedIds = new Set(query.exclude);
+    const excludedCategories = new Set(
+      this.items
+        .filter(
+          (item) => item.storeId === store.id && excludedIds.has(item.id),
+        )
+        .map((item) => item.menuCategoryId)
+        .filter((categoryId): categoryId is string => categoryId !== null),
+    );
+    return this.items
+      .filter(
+        (item) =>
+          item.storeId === store.id &&
+          item.available &&
+          (!query.moderationRequired || item.moderationStatus === 'APPROVED') &&
+          !excludedIds.has(item.id) &&
+          item.menuCategoryId !== null &&
+          !excludedCategories.has(item.menuCategoryId) &&
+          // A tile adds one plain unit, so a required group could never be priced.
+          !item.optionGroups.some((group) => group.minSelect > 0),
+      )
+      .sort(
+        (left, right) =>
+          (right.soldCount ?? 0) - (left.soldCount ?? 0) ||
+          (right.createdAt ?? this.seededAt).getTime() -
+            (left.createdAt ?? this.seededAt).getTime() ||
+          left.id.localeCompare(right.id),
+      )
+      .slice(0, query.limit)
+      .map((item) => ({
+        id: item.id,
+        name: item.name,
+        priceVnd: item.priceVnd,
+        originalPriceVnd: shownOriginalPrice(
+          item.priceVnd,
+          item.originalPriceVnd,
+        ),
+        imageUrl: item.imageUrl,
+        soldCount: item.soldCount ?? 0,
+        addedAt: (item.createdAt ?? this.seededAt).toISOString(),
+        available: item.available,
+        menuCategoryId: item.menuCategoryId,
+      }));
+  }
+
+  async listStoreMenuSections(
+    storeId: string,
+    approvedOnly = true,
+  ): Promise<StoreMenuSection[]> {
     const used = new Set(
       this.items
-        .filter((e) => e.storeId === storeId)
+        .filter(
+          (e) =>
+            e.storeId === storeId &&
+            (!approvedOnly || e.moderationStatus === 'APPROVED'),
+        )
         .map((e) => e.menuCategoryId ?? null),
     );
     return (this.menuCategories.get(storeId) ?? [])
@@ -2894,12 +3132,14 @@ export class MemoryFoodRepository implements FoodRepository {
   private snapshotLines(
     storeId: string,
     requested: PlaceFoodLineInput[],
+    requireApprovedItems = true,
   ): FoodLineView[] {
     return snapshotFoodLines(
       this.items
         .filter((entry) => entry.storeId === storeId)
         .map((entry) => ({ ...memoryItemView(entry), moderationStatus: entry.moderationStatus })),
       requested,
+      requireApprovedItems,
     );
   }
 }
@@ -2969,6 +3209,7 @@ function memoryItemView(item: StoredItem): StoreItemView {
     originalPriceVnd: shownOriginalPrice(item.priceVnd, item.originalPriceVnd),
     available: item.available,
     addedAt: item.createdAt ? item.createdAt.toISOString() : null,
+    moderationStatus: item.moderationStatus,
     description: item.description ?? null,
     prepMinutes: item.prepMinutes ?? null,
     imageUrl: item.imageUrl ?? null,
@@ -2998,6 +3239,7 @@ export function snapshotFoodLines(
     > & { moderationStatus: string }
   >,
   requested: PlaceFoodLineInput[],
+  requireApprovedItems = true,
 ): FoodLineView[] {
   const seen = new Set<string>();
   return requested.map((line) => {
@@ -3007,7 +3249,11 @@ export function snapshotFoodLines(
     }
     seen.add(key);
     const item = catalog.find((entry) => entry.id === line.itemId);
-    if (!item || !item.available || item.moderationStatus !== 'APPROVED') {
+    if (
+      !item ||
+      !item.available ||
+      (requireApprovedItems && item.moderationStatus !== 'APPROVED')
+    ) {
       throw new FoodRuleError('FOOD_ITEM_UNAVAILABLE');
     }
     const priced = priceOptionSelection(
@@ -3021,6 +3267,7 @@ export function snapshotFoodLines(
       unitPriceVnd: item.priceVnd + priced.deltaVnd,
       quantity: line.quantity,
       imageUrl: item.imageUrl ?? null,
+      note: line.note ?? null,
       options: priced.options,
     };
   });
@@ -3056,6 +3303,8 @@ function copyOrder(order: StoredOrder): FoodOrderView {
     assignedDriverId: order.assignedDriverId,
     cancelReason: order.cancelReason ? { ...order.cancelReason } : null,
     cancelledBy: order.cancelledBy ?? null,
+    note: order.note ?? null,
+    utensils: order.utensils ?? true,
     lines: order.lines.map((line) => ({
       ...line,
       options: line.options.map((option) => ({ ...option })),

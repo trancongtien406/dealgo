@@ -12,7 +12,7 @@ export default function CtaBanner({
 }) {
   return (
     <div id="tai-ung-dung" className="relative bg-gradient-to-br from-[#6D28D9] via-[#7C3AED] to-[#4F46E5] rounded-[24px] p-6 sm:p-7 text-white overflow-hidden shadow-[0_8px_30px_rgba(109,40,217,0.18)] flex flex-col md:flex-row items-center justify-between gap-6 min-h-[300px]">
-      {/* Background Subtle Gradient Blobs & Da Nang Coast Artwork */}
+      {/* Background gradient blobs and coastline silhouette */}
       <div className="absolute top-0 right-0 w-72 h-72 bg-white/10 rounded-full blur-2xl -translate-y-20 translate-x-20 pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-900/30 rounded-full blur-xl translate-y-20 -translate-x-20 pointer-events-none" />
 

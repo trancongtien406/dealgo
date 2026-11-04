@@ -67,6 +67,7 @@ model User {
   accountDeletionRequests     AccountDeletionRequest[]
   driverFeeSettlements        DriverFeeSettlement[]       @relation("DriverFeeSettlementDriver")
   driverFeeSettlementsActed   DriverFeeSettlement[]       @relation("DriverFeeSettlementActor")
+  driverTopUps                DriverTopUp[]               @relation("DriverTopUpDriver")
   roleGrants                  RoleGrant[]
   phoneChallenges             PhoneChallenge[]
   emailVerifications          EmailVerification[]
@@ -450,6 +451,7 @@ model Ride {
 
   @@unique([customerId, idempotencyKey])
   @@index([customerId, status])
+  @@index([customerId, createdAt(sort: Desc)], map: "rides_customer_createdAt_idx")
   @@index([status, updatedAt])
   @@index([status, updatedAt(sort: Desc)], map: "rides_status_updatedAt_desc_idx")
   @@index([assignedDriverId, updatedAt(sort: Desc)], map: "rides_driver_history_idx")
@@ -885,6 +887,10 @@ model FoodOrder {
   pickupLat                Float?
   pickupLng                Float?
   pickupLabel              String?             @db.VarChar(200)
+  /// Customer note for the store / driver; null = none.
+  note                     String?             @db.VarChar(300)
+  /// Cutlery requested with this order.
+  utensils                 Boolean             @default(true)
   serviceRegionCode        String?             @db.VarChar(8)
   /// Merchant decline reason (FOOD_REJECT_REASONS) and optional note; null unless the store rejected (DEC-PROD-021).
   cancelReasonCode         String?             @db.VarChar(32)
@@ -921,6 +927,7 @@ model FoodOrder {
 
   @@unique([customerId, idempotencyKey])
   @@index([storeId, status])
+  @@index([customerId, createdAt(sort: Desc)], map: "food_orders_customer_createdAt_idx")
   @@index([status, updatedAt])
   @@index([status, updatedAt(sort: Desc)], map: "food_orders_status_updatedAt_desc_idx")
   @@index([assignedDriverId, updatedAt(sort: Desc)], map: "food_orders_driver_history_idx")
@@ -966,6 +973,8 @@ model FoodOrderLine {
   imageUrl     String?   @db.VarChar(400)
   /// Snapshot of chosen options [{optionId, groupName, name, priceDeltaVnd}] (DEC-PROD-033).
   options      Json      @default("[]")
+  /// Customer note for this line ("ít cay, không hành"); null = none.
+  note         String?   @db.VarChar(200)
 
   @@index([orderId])
   @@map("food_order_lines")
@@ -993,6 +1002,10 @@ enum LedgerEntityType {
   PAYMENT_REFUND
   /// One PSP capture journal per payment intent (several online payments per job).
   PAYMENT_INTENT
+  /// One prepayment capture/refund journal per driver top-up.
+  DRIVER_TOP_UP
+  /// One journal per Ops settlement that consumed prepaid credit.
+  DRIVER_FEE_SETTLEMENT
 }
 
 enum LedgerJournalEvent {
@@ -1013,6 +1026,12 @@ enum LedgerJournalEvent {
   PSP_PREPAID_APPLIED
   /// Refund after the job settled: DealGo absorbs it as an expense (driver keeps the payout).
   PSP_REFUND_AFTER_SETTLEMENT
+  /// Verified driver prepayment: money received vs the driver's credit liability.
+  DRIVER_CREDIT_TOP_UP_CAPTURED
+  /// Prepaid credit offset platform fees at Ops settlement.
+  DRIVER_CREDIT_APPLIED_TO_FEE
+  /// Ops refunded unused prepaid credit to the driver's verified account.
+  DRIVER_CREDIT_REFUNDED
 }
 
 enum LedgerJournalStatus {
@@ -1386,6 +1405,7 @@ enum OpsAuditAction {
   CHAT_REVIEW
   PUBLIC_PAGE_PUBLISH
   DRIVER_BALANCE_PAYMENT
+  DRIVER_CREDIT_REFUND
   MERCHANT_PAYOUT_RECORD
   RIDE_VEHICLE_CLASS_UPDATE
   RIDE_ZONE_TARIFF_UPSERT
@@ -2139,17 +2159,19 @@ model AccountDeletionRequest {
   @@map("account_deletion_requests")
 }
 
-/// Ops confirms the driver paid the accrued platform fees (cash) up to settledThrough.
+/// Ops confirms the driver's accrued platform fees up to settledThrough.
+/// amountVnd is the cash Ops collected; creditAppliedVnd was paid from the driver's prepayment.
 model DriverFeeSettlement {
-  id             String   @id @default(uuid()) @db.Uuid
-  driverId       String   @db.Uuid
-  driver         User     @relation("DriverFeeSettlementDriver", fields: [driverId], references: [id], onDelete: Restrict)
-  amountVnd      Int
-  settledThrough DateTime
-  actorUserId    String   @db.Uuid
-  actor          User     @relation("DriverFeeSettlementActor", fields: [actorUserId], references: [id], onDelete: Restrict)
-  reason         String   @db.VarChar(500)
-  createdAt      DateTime @default(now())
+  id               String   @id @default(uuid()) @db.Uuid
+  driverId         String   @db.Uuid
+  driver           User     @relation("DriverFeeSettlementDriver", fields: [driverId], references: [id], onDelete: Restrict)
+  amountVnd        Int
+  creditAppliedVnd Int      @default(0)
+  settledThrough   DateTime
+  actorUserId      String   @db.Uuid
+  actor            User     @relation("DriverFeeSettlementActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  reason           String   @db.VarChar(500)
+  createdAt        DateTime @default(now())
 
   @@index([driverId, settledThrough(sort: Desc)])
   @@map("driver_fee_settlements")
@@ -2276,6 +2298,72 @@ model DriverBalanceAdjustment {
   @@unique([kind, refType, refId, driverId])
   @@index([driverId, occurredAt])
   @@map("driver_balance_adjustments")
+}
+
+/// A prepayment the driver made to cover future platform fees. Not an e-wallet: no withdrawal,
+/// no transfer, no interest; unused credit is refunded only by Ops to the verified source account.
+enum DriverTopUpStatus {
+  PENDING
+  PAID
+  EXPIRED
+  CANCELLED
+  REFUND_PENDING
+  REFUNDED
+  FAILED
+}
+
+model DriverTopUp {
+  id              String                    @id @default(uuid()) @db.Uuid
+  driverId        String                    @db.Uuid
+  driver          User                      @relation("DriverTopUpDriver", fields: [driverId], references: [id], onDelete: Restrict)
+  /// Numeric order code sent to the PSP. Reserved range 1_000_000_000..2_147_483_647.
+  orderCode       Int                       @unique @default(autoincrement())
+  provider        String                    @default("payos") @db.VarChar(32)
+  /// Provider-side reference used by callbacks (payOS order code string, VNPAY vnp_TxnRef).
+  providerRef     String?                   @db.VarChar(120)
+  paymentLinkId   String?                   @db.VarChar(120)
+  amountVnd       Int
+  /// Money still usable to offset fees (amount - consumed - refunded).
+  remainingVnd    Int                       @default(0)
+  consumedVnd     Int                       @default(0)
+  refundedVnd     Int                       @default(0)
+  status          DriverTopUpStatus         @default(PENDING)
+  checkoutUrl     String?                   @db.VarChar(2000)
+  qrCode          String?                   @db.VarChar(2000)
+  providerTransId String?                   @db.VarChar(120)
+  idempotencyKey  String?                   @db.VarChar(120)
+  failureReason   String?                   @db.VarChar(255)
+  expiresAt       DateTime?
+  paidAt          DateTime?
+  refundedAt      DateTime?
+  refundBankRef   String?                   @db.VarChar(120)
+  refundReason    String?                   @db.VarChar(500)
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+  applications    DriverCreditApplication[]
+
+  @@unique([driverId, idempotencyKey])
+  @@unique([provider, providerRef])
+  @@index([driverId, status])
+  @@index([status, updatedAt])
+  @@map("driver_top_ups")
+}
+
+/// Which prepayment paid which fee: FIFO allocation when Ops settles the driver's balance.
+model DriverCreditApplication {
+  id         String      @id @default(uuid()) @db.Uuid
+  topUpId    String      @db.Uuid
+  topUp      DriverTopUp @relation(fields: [topUpId], references: [id], onDelete: Restrict)
+  driverId   String      @db.Uuid
+  amountVnd  Int
+  refType    String      @db.VarChar(32)
+  refId      String      @db.Uuid
+  occurredAt DateTime
+  createdAt  DateTime    @default(now())
+
+  @@unique([refType, refId, topUpId])
+  @@index([driverId, occurredAt])
+  @@map("driver_credit_applications")
 }
 
 /// The driver rates the customer after a completed ride (one per ride).

@@ -282,7 +282,15 @@ async function ensureStoreWithMenu(
   lat: number,
   lng: number,
   category: string,
-  items: ReadonlyArray<{ name: string; priceVnd: number }>,
+  items: ReadonlyArray<{
+    name: string;
+    priceVnd: number;
+    description?: string;
+    prepMinutes?: number;
+    section?: string;
+    soldCount?: number;
+    originalPriceVnd?: number;
+  }>,
   addressLabel: string | null = null,
 ): Promise<{ storeId: string; itemIds: string[]; menuItemsCreated: number }> {
   const existing = await db.foodStore.findFirst({
@@ -304,16 +312,54 @@ async function ensureStoreWithMenu(
     storeId = created.id;
   }
 
+  const sectionNames = [
+    ...new Set(
+      items
+        .map((item) => item.section?.trim())
+        .filter((section): section is string => Boolean(section)),
+    ),
+  ];
+  const categoryIds = new Map<string, string>();
+  for (const [position, sectionName] of sectionNames.entries()) {
+    const found = await db.foodMenuCategory.findFirst({
+      where: { storeId, name: sectionName },
+    });
+    const saved = found
+      ? await db.foodMenuCategory.update({
+          where: { id: found.id },
+          data: { position },
+        })
+      : await db.foodMenuCategory.create({
+          data: { storeId, name: sectionName, position },
+        });
+    categoryIds.set(sectionName, saved.id);
+  }
+
   let menuItemsCreated = 0;
   const itemIds: string[] = [];
   for (const item of items) {
+    const menuCategoryId = item.section
+      ? categoryIds.get(item.section.trim())
+      : undefined;
     const found = await db.foodItem.findFirst({
       where: { storeId, name: item.name },
     });
     if (found) {
       await db.foodItem.update({
         where: { id: found.id },
-        data: { priceVnd: item.priceVnd, available: true },
+        data: {
+          priceVnd: item.priceVnd,
+          available: true,
+          description: found.description ?? item.description,
+          prepMinutes: found.prepMinutes ?? item.prepMinutes,
+          menuCategoryId: found.menuCategoryId ?? menuCategoryId,
+          ...(item.soldCount !== undefined
+            ? { soldCount: item.soldCount }
+            : {}),
+          ...(item.originalPriceVnd !== undefined
+            ? { originalPriceVnd: item.originalPriceVnd }
+            : {}),
+        },
       });
       itemIds.push(found.id);
     } else {
@@ -323,6 +369,11 @@ async function ensureStoreWithMenu(
           name: item.name,
           priceVnd: item.priceVnd,
           available: true,
+          description: item.description,
+          prepMinutes: item.prepMinutes,
+          menuCategoryId,
+          soldCount: item.soldCount ?? 0,
+          originalPriceVnd: item.originalPriceVnd,
         },
       });
       itemIds.push(created.id);
@@ -1082,9 +1133,64 @@ async function main(): Promise<void> {
         lat: HCM.nguyenHue.lat,
         lng: HCM.nguyenHue.lng,
         items: [
-          { name: 'Bún bò đặc biệt', priceVnd: 60_000 },
-          { name: 'Trà tắc mát lạnh', priceVnd: 25_000 },
-          { name: 'Chả cua hấp', priceVnd: 35_000 },
+          {
+            section: 'Bún bò',
+            name: 'Bún bò đặc biệt',
+            priceVnd: 60_000,
+            originalPriceVnd: 70_000,
+            soldCount: 412,
+            description:
+              'Nước dùng hầm xương 12 tiếng, bắp bò, giò heo và chả cua.',
+            prepMinutes: 15,
+          },
+          {
+            section: 'Bún bò',
+            name: 'Bún bò tái chín',
+            priceVnd: 55_000,
+            soldCount: 268,
+            description: 'Thịt bò tái mềm, gân bò giòn sần sật, nước dùng đậm.',
+            prepMinutes: 12,
+          },
+          {
+            section: 'Bún bò',
+            name: 'Bún bò giò heo',
+            priceVnd: 65_000,
+            soldCount: 186,
+            description: 'Giò heo hầm mềm rục, béo ngậy vị sả và mắm ruốc.',
+            prepMinutes: 15,
+          },
+          {
+            section: 'Món thêm',
+            name: 'Chả cua hấp',
+            priceVnd: 35_000,
+            soldCount: 96,
+            description: 'Chả cua hấp chín tới, ăn kèm nước mắm gừng.',
+            prepMinutes: 10,
+          },
+          {
+            section: 'Món thêm',
+            name: 'Chả ram tôm',
+            priceVnd: 30_000,
+            soldCount: 74,
+            description: 'Chả ram chiên giòn, nhân tôm thịt, chấm tương ớt.',
+            prepMinutes: 8,
+          },
+          {
+            section: 'Nước uống',
+            name: 'Trà tắc mát lạnh',
+            priceVnd: 25_000,
+            soldCount: 240,
+            description: 'Trà tắc pha tay, chua ngọt vừa, đá nhiều.',
+            prepMinutes: 4,
+          },
+          {
+            section: 'Nước uống',
+            name: 'Nước mía lau',
+            priceVnd: 20_000,
+            soldCount: 132,
+            description: 'Nước mía ép tay, thêm lá dứa thơm dịu.',
+            prepMinutes: 3,
+          },
         ],
       },
       {
@@ -1098,9 +1204,71 @@ async function main(): Promise<void> {
         lat: HCM.bitexco.lat,
         lng: HCM.bitexco.lng,
         items: [
-          { name: 'Cà phê sữa đá', priceVnd: 35_000 },
-          { name: 'Bạc xỉu ba tầng', priceVnd: 40_000 },
-          { name: 'Bánh mì ốp la xúc xích', priceVnd: 45_000 },
+          {
+            section: 'Cà phê',
+            name: 'Cà phê sữa đá',
+            priceVnd: 35_000,
+            soldCount: 524,
+            description: 'Robusta rang mộc, sữa đặc, đá viên lớn.',
+            prepMinutes: 5,
+          },
+          {
+            section: 'Cà phê',
+            name: 'Cà phê muối',
+            priceVnd: 45_000,
+            soldCount: 318,
+            description: 'Cà phê phin, kem muối béo mặn, lớp cà phê đậm.',
+            prepMinutes: 6,
+          },
+          {
+            section: 'Cà phê',
+            name: 'Bạc xỉu ba tầng',
+            priceVnd: 40_000,
+            originalPriceVnd: 48_000,
+            soldCount: 287,
+            description: 'Ba lớp sữa - cà phê - bọt sữa mịn.',
+            prepMinutes: 6,
+          },
+          {
+            section: 'Cold brew',
+            name: 'Cold brew cam sả',
+            priceVnd: 55_000,
+            soldCount: 148,
+            description: 'Cold brew ủ lạnh 18 giờ, cam vàng và sả tươi.',
+            prepMinutes: 4,
+          },
+          {
+            section: 'Cold brew',
+            name: 'Cold brew nước dừa',
+            priceVnd: 55_000,
+            soldCount: 132,
+            description: 'Cold brew nguyên chất kết hợp nước dừa xiêm.',
+            prepMinutes: 4,
+          },
+          {
+            section: 'Bánh ngọt',
+            name: 'Bánh mì ốp la xúc xích',
+            priceVnd: 45_000,
+            soldCount: 210,
+            description: 'Bánh mì nướng giòn, 2 trứng ốp la và xúc xích.',
+            prepMinutes: 8,
+          },
+          {
+            section: 'Bánh ngọt',
+            name: 'Bánh sừng bò bơ',
+            priceVnd: 35_000,
+            soldCount: 118,
+            description: 'Croissant bơ Pháp, vỏ giòn nhiều lớp.',
+            prepMinutes: 3,
+          },
+          {
+            section: 'Bánh ngọt',
+            name: 'Bánh flan trứng',
+            priceVnd: 25_000,
+            soldCount: 96,
+            description: 'Flan trứng mềm mịn, caramel đắng nhẹ.',
+            prepMinutes: 2,
+          },
         ],
       },
       {
@@ -1114,10 +1282,63 @@ async function main(): Promise<void> {
         lat: HCM.district1.lat,
         lng: HCM.district1.lng,
         items: [
-          { name: 'Cơm sườn bì chả đặc biệt', priceVnd: 65_000 },
-          { name: 'Cơm sườn ốp la', priceVnd: 55_000 },
-          { name: 'Canh rong biển thịt bằm', priceVnd: 20_000 },
-          { name: 'Trà đá giải nhiệt', priceVnd: 5_000 },
+          {
+            section: 'Cơm tấm',
+            name: 'Cơm sườn bì chả đặc biệt',
+            priceVnd: 65_000,
+            originalPriceVnd: 75_000,
+            soldCount: 386,
+            description: 'Sườn nướng than, bì, chả trứng và nước mắm chua ngọt.',
+            prepMinutes: 12,
+          },
+          {
+            section: 'Cơm tấm',
+            name: 'Cơm sườn ốp la',
+            priceVnd: 55_000,
+            soldCount: 242,
+            description: 'Sườn nướng kèm trứng ốp la và đồ chua.',
+            prepMinutes: 10,
+          },
+          {
+            section: 'Cơm tấm',
+            name: 'Cơm tấm chay',
+            priceVnd: 45_000,
+            soldCount: 68,
+            description: 'Sườn chay kho tiêu, bì chay và dưa leo.',
+            prepMinutes: 10,
+          },
+          {
+            section: 'Món thêm',
+            name: 'Trứng ốp la',
+            priceVnd: 10_000,
+            soldCount: 154,
+            description: 'Một trứng gà ốp la lòng đào.',
+            prepMinutes: 3,
+          },
+          {
+            section: 'Món thêm',
+            name: 'Canh rong biển thịt bằm',
+            priceVnd: 20_000,
+            soldCount: 126,
+            description: 'Canh rong biển nấu thịt bằm, vị thanh nhẹ.',
+            prepMinutes: 6,
+          },
+          {
+            section: 'Nước uống',
+            name: 'Trà đá giải nhiệt',
+            priceVnd: 5_000,
+            soldCount: 407,
+            description: 'Ly trà đá mát lạnh.',
+            prepMinutes: 2,
+          },
+          {
+            section: 'Nước uống',
+            name: 'Sữa đậu nành',
+            priceVnd: 15_000,
+            soldCount: 88,
+            description: 'Sữa đậu nành nấu mỗi sáng, ít ngọt.',
+            prepMinutes: 2,
+          },
         ],
       },
       {
@@ -1131,10 +1352,55 @@ async function main(): Promise<void> {
         lat: HCM.thaoDien.lat,
         lng: HCM.thaoDien.lng,
         items: [
-          { name: 'Trà sữa Phúc Long truyền thống', priceVnd: 50_000 },
-          { name: 'Trà đào đá xay', priceVnd: 60_000 },
-          { name: 'Trà lài sen vàng', priceVnd: 55_000 },
-          { name: 'Bánh sừng bò nướng', priceVnd: 35_000 },
+          {
+            section: 'Trà sữa',
+            name: 'Trà sữa Phúc Long truyền thống',
+            priceVnd: 50_000,
+            soldCount: 612,
+            description: 'Trà đen ủ mới, sữa béo, trân châu dai mềm.',
+            prepMinutes: 12,
+          },
+          {
+            section: 'Trà sữa',
+            name: 'Trà sữa ô long',
+            priceVnd: 55_000,
+            soldCount: 324,
+            description: 'Ô long rang nhẹ, sữa tươi, thạch trắng.',
+            prepMinutes: 12,
+          },
+          {
+            section: 'Trà trái cây',
+            name: 'Trà đào đá xay',
+            priceVnd: 60_000,
+            originalPriceVnd: 68_000,
+            soldCount: 286,
+            description: 'Trà đào xay đá, topping miếng đào ngâm.',
+            prepMinutes: 10,
+          },
+          {
+            section: 'Trà trái cây',
+            name: 'Trà lài sen vàng',
+            priceVnd: 55_000,
+            soldCount: 152,
+            description: 'Trà lài ướp sen, hậu vị thanh mát.',
+            prepMinutes: 8,
+          },
+          {
+            section: 'Bánh ngọt',
+            name: 'Bánh sừng bò nướng',
+            priceVnd: 35_000,
+            soldCount: 94,
+            description: 'Bánh sừng bò bơ Pháp, nướng giòn mỗi sáng.',
+            prepMinutes: 5,
+          },
+          {
+            section: 'Bánh ngọt',
+            name: 'Bánh flan phô mai',
+            priceVnd: 30_000,
+            soldCount: 136,
+            description: 'Flan phô mai béo mịn, caramel cháy nhẹ.',
+            prepMinutes: 3,
+          },
         ],
       },
       {
@@ -1148,10 +1414,47 @@ async function main(): Promise<void> {
         lat: DNG.hanMarket.lat,
         lng: DNG.hanMarket.lng,
         items: [
-          { name: 'Mì Quảng gà ta', priceVnd: 50_000 },
-          { name: 'Mì Quảng tôm thịt', priceVnd: 55_000 },
-          { name: 'Mì Quảng ếch đồng', priceVnd: 60_000 },
-          { name: 'Nước mía sầu riêng', priceVnd: 20_000 },
+          {
+            section: 'Mì Quảng',
+            name: 'Mì Quảng gà ta',
+            priceVnd: 50_000,
+            soldCount: 264,
+            description: 'Mì Quảng gà ta xé, nước dùng nghệ và đậu phộng rang.',
+            prepMinutes: 14,
+          },
+          {
+            section: 'Mì Quảng',
+            name: 'Mì Quảng tôm thịt',
+            priceVnd: 55_000,
+            originalPriceVnd: 62_000,
+            soldCount: 308,
+            description: 'Tôm đất, thịt ba chỉ, bánh tráng nướng giòn.',
+            prepMinutes: 14,
+          },
+          {
+            section: 'Mì Quảng',
+            name: 'Mì Quảng ếch đồng',
+            priceVnd: 60_000,
+            soldCount: 128,
+            description: 'Ếch đồng xào sả, nước dùng đậm vị miền Trung.',
+            prepMinutes: 18,
+          },
+          {
+            section: 'Món ăn kèm',
+            name: 'Bánh tráng nướng mè',
+            priceVnd: 15_000,
+            soldCount: 182,
+            description: 'Bánh tráng nướng giòn rụm, rắc mè và hành phi.',
+            prepMinutes: 4,
+          },
+          {
+            section: 'Nước uống',
+            name: 'Nước mía sầu riêng',
+            priceVnd: 20_000,
+            soldCount: 146,
+            description: 'Nước mía ép tay kèm sầu riêng.',
+            prepMinutes: 4,
+          },
         ],
       },
     ] as const;

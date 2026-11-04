@@ -102,6 +102,13 @@ export class FoodLineDto {
   @ArrayMaxSize(50)
   @IsUUID('all', { each: true })
   optionIds?: string[];
+
+  /** Customer note for this line ("ít cay, không hành"); blank = none. */
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MaxLength(200)
+  note?: string;
 }
 
 export class FoodOptionDto {
@@ -215,6 +222,18 @@ export class PlaceFoodOrderDto {
   @IsOptional()
   @IsIn(PAYMENT_METHOD_CODES as unknown as string[])
   paymentMethod?: (typeof PAYMENT_METHOD_CODES)[number];
+
+  /** Customer note for the store / driver; blank = none. */
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MaxLength(300)
+  note?: string;
+
+  /** Cutlery requested with this order (server default true). */
+  @IsOptional()
+  @IsBoolean()
+  utensils?: boolean;
 }
 
 export class CreateFoodItemDto {
@@ -638,6 +657,72 @@ export class ListFoodStoresQueryDto {
   @Min(0.5)
   @Max(50)
   max_km?: number;
+}
+
+/**
+ * Optional customer position on the store detail, so the hero's "from" fee is
+ * quoted the same way as the browse card (same lat/lng pair rules).
+ */
+export class StoreDetailQueryDto {
+  @ValidateIf(
+    (query: StoreDetailQueryDto) =>
+      query.lng !== undefined || query.lat !== undefined,
+  )
+  @Type(() => Number)
+  @IsNumber({ allowInfinity: false, allowNaN: false })
+  @Min(-90)
+  @Max(90)
+  lat?: number;
+
+  @ValidateIf(
+    (query: StoreDetailQueryDto) =>
+      query.lat !== undefined || query.lng !== undefined,
+  )
+  @Type(() => Number)
+  @IsNumber({ allowInfinity: false, allowNaN: false })
+  @Min(-180)
+  @Max(180)
+  lng?: number;
+}
+
+export const FOOD_SEARCH_MAX_LIMIT = 20;
+
+/** Dish search keeps the browse filters; the dish keyword is `q` (the browse keyword stays `search`). */
+export class SearchFoodDto extends ListFoodStoresQueryDto {
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  q!: string;
+
+  /** Search pages cap at 20 rather than the browse cap; the initializer lets TS accept the narrower redeclaration. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(FOOD_SEARCH_MAX_LIMIT)
+  limit?: number = undefined;
+}
+
+export class SuggestFoodItemsDto {
+  /** Item ids to leave out, comma-separated in the query string; their categories are skipped too. */
+  @IsOptional()
+  @Transform(({ value }) => {
+    const list: unknown = Array.isArray(value)
+      ? value
+      : typeof value === 'string'
+        ? value.split(',')
+        : value;
+    return Array.isArray(list)
+      ? list
+          .map((entry) => (typeof entry === 'string' ? entry.trim() : entry))
+          .filter(Boolean)
+      : list;
+  })
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsUUID('all', { each: true })
+  exclude?: string[];
 }
 
 export class OpsPageQueryDto extends OpsDateRangeQueryDto {

@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../../../core/network/api_envelope.dart';
 import '../../../core/network/dio_mapper.dart';
 import '../domain/payment_models.dart';
+import 'payment_methods_cache.dart';
 
 /// Customer checkout endpoints. Amounts are always computed by the server.
 abstract interface class PaymentApi {
@@ -33,15 +34,34 @@ String paymentPathFor(String entityType, String entityId) {
 }
 
 class DioPaymentApi implements PaymentApi {
-  DioPaymentApi(this.dio);
+  DioPaymentApi(this.dio, {PaymentMethodsCache? methodsCache})
+    : _methodsCache = methodsCache ?? sharedMethodsCache;
+
+  /// Shared by every `DioPaymentApi` the UI creates on demand, so a tile that
+  /// is rebuilt after scrolling does not hit the network again.
+  static final PaymentMethodsCache sharedMethodsCache = PaymentMethodsCache();
 
   final Dio dio;
+  final PaymentMethodsCache _methodsCache;
 
   Options _bearer(String token) =>
       Options(headers: {'Authorization': 'Bearer $token'});
 
   @override
   Future<List<PaymentMethodOption>> listMethods({
+    required String accessToken,
+    required String service,
+  }) {
+    return _methodsCache.read(
+      service,
+      () => _fetchMethods(accessToken: accessToken, service: service),
+    );
+  }
+
+  void invalidateMethods([String? service]) =>
+      _methodsCache.invalidate(service);
+
+  Future<List<PaymentMethodOption>> _fetchMethods({
     required String accessToken,
     required String service,
   }) async {

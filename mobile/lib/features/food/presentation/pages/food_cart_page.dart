@@ -12,6 +12,8 @@ import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/food_money.dart';
 import '../cubit/food_cart_cubit.dart';
 import '../utils/food_routes.dart';
+import '../widgets/food_cart_notes.dart';
+import '../widgets/food_cart_upsell.dart';
 import '../widgets/food_dropoff_tile.dart';
 import '../widgets/food_widgets.dart';
 import '../widgets/food_badges.dart';
@@ -91,12 +93,16 @@ class FoodCartPage extends StatelessWidget {
                             ),
                             const SizedBox(height: DealGoSpacing.s8),
                             for (final line in cart.lines)
-                              FoodLineSummary(
-                                imageUrl: line.imageUrl,
-                                name: line.name,
-                                quantity: line.quantity,
-                                unitPriceVnd: line.unitPriceVnd,
-                                lineTotalVnd: line.lineTotalVnd,
+                              FoodCartLineTile(
+                                line: line,
+                                onEditNote: () =>
+                                    editFoodCartLineNote(context, line),
+                                onQuantity: (quantity) => context
+                                    .read<FoodCartCubit>()
+                                    .setQuantity(line.itemId, quantity),
+                                onRemove: () => context
+                                    .read<FoodCartCubit>()
+                                    .setQuantity(line.itemId, 0),
                               ),
                             if (cart.minOrderShortVnd > 0) ...[
                               const SizedBox(height: DealGoSpacing.s8),
@@ -115,6 +121,10 @@ class FoodCartPage extends StatelessWidget {
                       const SizedBox(height: DealGoSpacing.s12),
                       FoodEtaLine(minutes: cart.etaMinutes!),
                     ],
+                    if (cart.lines.isNotEmpty) ...[
+                      const SizedBox(height: DealGoSpacing.s12),
+                      const FoodCartUpsellStrip(),
+                    ],
                     const SizedBox(height: DealGoSpacing.s16),
                     FoodPanel(
                       elevated: true,
@@ -130,6 +140,22 @@ class FoodCartPage extends StatelessWidget {
                         ],
                       ),
                     ),
+                    if (cart.lines.isNotEmpty) ...[
+                      const SizedBox(height: DealGoSpacing.s16),
+                      const FoodPanel(
+                        elevated: true,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            FoodOrderNoteField(),
+                            SizedBox(height: DealGoSpacing.s16),
+                            Divider(height: 1),
+                            SizedBox(height: DealGoSpacing.s16),
+                            FoodUtensilsField(),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: DealGoSpacing.s16),
                     FoodPanel(
                       elevated: true,

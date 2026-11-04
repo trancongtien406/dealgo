@@ -8,18 +8,68 @@ class FoodRepositoryImpl implements FoodRepository {
   final FoodRemoteDataSource _remote;
 
   @override
-  Future<List<FoodStoreSummary>> listStores(
+  Future<FoodStorePageResult> listStores(
     String accessToken, {
     double? lat,
     double? lng,
     String? search,
+    String? sortBy,
+    int? maxKm,
+    String? category,
+    int page = 1,
+    int limit = 20,
   }) {
-    return _remote.listStores(accessToken, lat: lat, lng: lng, search: search);
+    return _remote.listStores(
+      accessToken,
+      lat: lat,
+      lng: lng,
+      search: search,
+      sortBy: sortBy,
+      maxKm: maxKm,
+      category: category,
+      page: page,
+      limit: limit,
+    );
   }
 
   @override
-  Future<FoodStoreDetail> getStore(String accessToken, String storeId) {
-    return _remote.getStore(accessToken, storeId);
+  Future<FoodSearchResult> searchFood(
+    String accessToken, {
+    required String q,
+    double? lat,
+    double? lng,
+    String? sortBy,
+    int page = 1,
+    int limit = 20,
+  }) {
+    return _remote.searchFood(
+      accessToken,
+      q: q,
+      lat: lat,
+      lng: lng,
+      sortBy: sortBy,
+      page: page,
+      limit: limit,
+    );
+  }
+
+  @override
+  Future<List<FoodFeaturedItem>> listStoreSuggestions(
+    String accessToken,
+    String storeId, {
+    List<String> exclude = const [],
+  }) {
+    return _remote.listStoreSuggestions(accessToken, storeId, exclude: exclude);
+  }
+
+  @override
+  Future<FoodStoreDetail> getStore(
+    String accessToken,
+    String storeId, {
+    double? lat,
+    double? lng,
+  }) {
+    return _remote.getStore(accessToken, storeId, lat: lat, lng: lng);
   }
 
   @override

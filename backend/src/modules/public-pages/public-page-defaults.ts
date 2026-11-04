@@ -452,11 +452,11 @@ const REGULATIONS_EN: LegalContent = {
 export const REGULATIONS_META = {
   "vi": {
     "title": "Quy chế sử dụng dành cho tài xế và cửa hàng",
-    "summary": "Quy định áp dụng cho quán ăn/cửa hàng (đối tác bán hàng) và tài xế (Bike, Car 4 chỗ, Car 7 chỗ) hoạt động trên DealGo tại Đà Nẵng. Khách hàng, đối tác và tài xế dùng chung một ứng dụng DealGo."
+    "summary": "Quy định áp dụng cho quán ăn/cửa hàng (đối tác bán hàng) và tài xế (Bike, Car 4 chỗ, Car 7 chỗ) hoạt động trên DealGo trên toàn quốc. Khách hàng, đối tác và tài xế dùng chung một ứng dụng DealGo."
   },
   "en": {
     "title": "Driver and store regulations",
-    "summary": "Rules for restaurants/stores (merchants) and drivers (Bike, Car 4-seat, Car 7-seat) on DealGo in Da Nang. Customers, merchants and drivers use the same DealGo app."
+    "summary": "Rules for restaurants/stores (merchants) and drivers (Bike, Car 4-seat, Car 7-seat) on DealGo nationwide in Vietnam. Customers, merchants and drivers use the same DealGo app."
   }
 };
 

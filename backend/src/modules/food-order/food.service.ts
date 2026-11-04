@@ -62,8 +62,11 @@ import {
   type FoodRejectReason,
 } from './food.constants.js';
 import {
+  FOOD_SEARCH_MAX_LIMIT,
   FOOD_STORE_BROWSE_MAX_LIMIT,
   type ListFoodStoresQueryDto,
+  type SearchFoodDto,
+  type StoreDetailQueryDto,
   type CreateFoodItemDto,
   type ReplaceFoodItemOptionsDto,
   type OpsCatalogModerationQueryDto,
@@ -106,6 +109,7 @@ import type {
   FoodDriverHistoryWindow,
   FoodOrderView,
   FoodRepository,
+  DishHit,
   OpsCatalogModerationPage,
   OpsFoodInterveneResult,
   OpsStoreDetail,
@@ -121,6 +125,7 @@ import type {
   StoreItemView,
   StoreMenuSection,
   StoreFeaturedItem,
+  StoreItemSuggestion,
   FoodOrderChangeView,
   FoodDeliveryOfferView,
 } from './food.repository.js';
@@ -146,6 +151,14 @@ export type PublicStoreBrowseItem = Omit<
   featuredItems: StoreFeaturedItem[];
 };
 
+/** A dish hit as sent to clients: the store carries the same estimated fee/ETA as a browse card. */
+export type PublicDishHit = Omit<DishHit, 'store'> & {
+  store: DishHit['store'] & {
+    etaMinutes: number | null;
+    deliveryFeeFromVnd: number | null;
+  };
+};
+
 /** A list price must sit above the selling price to be shown struck through. */
 function checkedOriginalPrice(
   priceVnd: number,
@@ -163,6 +176,9 @@ function checkedOriginalPrice(
 
 /** City ride speed used for the browse ETA (min per km ≈ 20 km/h). */
 const BROWSE_MINUTES_PER_KM = 3;
+
+const FOOD_ITEM_SUGGESTION_LIMIT = 6;
+const FOOD_ITEM_SUGGESTION_MIN = 2;
 
 export type OpsStoreListItem = {
   id: string;
@@ -310,6 +326,23 @@ type StatsDay = {
   salesVnd: number;
 };
 
+type FoodFareSettings = {
+  minVnd: number;
+  maxVnd: number;
+  perKm: number;
+  stepVnd: number;
+};
+
+/** Browse inputs resolved once per request: paging window, sort/radius and fare settings. */
+type StoreBrowseContext = {
+  page: number;
+  limit: number;
+  sortBy: 'name' | 'createdAt' | 'distance' | 'rating';
+  radiusKm: number;
+  minRatingCount: number;
+  fare: FoodFareSettings;
+};
+
 export type MerchantStatsView = {
   timezone: 'Asia/Ho_Chi_Minh';
   days: number;
@@ -335,6 +368,11 @@ export type MerchantQueueOrder = Omit<
 };
 
 export type PublicStoreDetail = Omit<StoreDetail, 'acceptSettings'> & {
+  /**
+   * Straight-line "from" fare to this store, quoted exactly like the browse card at the
+   * request's lat/lng; null without a customer position or store coordinates.
+   */
+  deliveryFeeFromVnd: number | null;
   /** Live store offers (applies only at this store), best first. */
   offers: StoreOffer[];
   /** Named menu sections in merchant order; items point at them via menuCategoryId. */
@@ -450,26 +488,55 @@ export class FoodService {
   ): Promise<PageResult<PublicStoreBrowseItem>> {
     await this.requireActiveCustomer(actor.userId);
     await this.ensureSandboxFixtureCatalog();
-    const page = normalizePage(query.page);
-    const limit = normalizeLimit(query.limit, FOOD_STORE_BROWSE_MAX_LIMIT);
+    return this.buildStorePage(
+      query,
+      await this.browseContext(query, FOOD_STORE_BROWSE_MAX_LIMIT),
+    );
+  }
+
+  /**
+   * Page/sort/radius plus the platform settings both browse and search price cards with,
+   * computed once per request so search does not re-read the same keys for the store list.
+   */
+  private async browseContext(
+    query: ListFoodStoresQueryDto,
+    maxLimit: number,
+  ): Promise<StoreBrowseContext> {
     const hasGeo = query.lat !== undefined && query.lng !== undefined;
     const sortBy =
       query.sort_by === 'distance' && !hasGeo
         ? 'createdAt'
         : (query.sort_by ?? 'createdAt');
-    const settingRadiusKm = hasGeo
-      ? await this.settings.getNumber('DRIVER_SEARCH_RADIUS_KM')
-      : 0;
-    const radiusKm =
-      query.max_km !== undefined
-        ? Math.min(query.max_km, settingRadiusKm)
-        : settingRadiusKm;
-    const [minRatingCount, feeMin, feeMax, feePerKm] = await Promise.all([
+    const [radiusKm, minRatingCount, fare] = await Promise.all([
+      this.browseRadiusKm(query),
       this.settings.getNumber('RATING_STORE_MIN_COUNT'),
+      this.foodFare(),
+    ]);
+    return {
+      page: normalizePage(query.page),
+      limit: normalizeLimit(query.limit, maxLimit),
+      sortBy,
+      radiusKm,
+      minRatingCount,
+      fare,
+    };
+  }
+
+  private async foodFare(): Promise<FoodFareSettings> {
+    const [minVnd, maxVnd, perKm, stepVnd] = await Promise.all([
       this.settings.getNumber('FOOD_MIN_DELIVERY_VND'),
       this.settings.getNumber('FOOD_MAX_DELIVERY_VND'),
       this.settings.getNumber('FOOD_DELIVERY_VND_PER_KM'),
+      this.settings.getNumber('FOOD_FARE_STEP_VND'),
     ]);
+    return { minVnd, maxVnd, perKm, stepVnd };
+  }
+
+  private async buildStorePage(
+    query: ListFoodStoresQueryDto,
+    context: StoreBrowseContext,
+  ): Promise<PageResult<PublicStoreBrowseItem>> {
+    const { page, limit, sortBy, radiusKm, minRatingCount, fare } = context;
     const result = await this.food.listStores({
       page,
       limit,
@@ -501,6 +568,7 @@ export class FoodService {
         serviceMode: store.serviceMode,
         openNow: store.openNow,
         closedReason: store.closedReason,
+        closesAtToday: store.closesAtToday,
         imageUrl: store.imageUrl,
         logoUrl: store.logoUrl ?? null,
         rating: {
@@ -516,16 +584,7 @@ export class FoodService {
             ? null
             : store.estimatedPrepMinutes +
               Math.ceil(store.distanceKm * BROWSE_MINUTES_PER_KM),
-        deliveryFeeFromVnd:
-          store.distanceKm === null
-            ? null
-            : Math.min(
-                feeMax,
-                Math.max(
-                  feeMin,
-                  quoteReferenceFareVnd(store.distanceKm, feePerKm, feeMin),
-                ),
-              ),
+        deliveryFeeFromVnd: storeDeliveryFeeFromVnd(store.distanceKm, fare),
         offers: offers.get(store.id) ?? [],
         minOrderVnd: store.minOrderVnd ?? 0,
         featuredItems: featured.get(store.id) ?? [],
@@ -536,9 +595,84 @@ export class FoodService {
     };
   }
 
+  /**
+   * One round trip for the search screen: dishes whose name matches `q` above the
+   * stores matching the same keyword (store name or any of its dish names).
+   */
+  async searchFood(
+    actor: RequestActor,
+    query: SearchFoodDto,
+  ): Promise<{
+    dishes: PageResult<PublicDishHit>;
+    stores: PageResult<PublicStoreBrowseItem>;
+  }> {
+    await this.requireActiveCustomer(actor.userId);
+    await this.ensureSandboxFixtureCatalog();
+    const context = await this.browseContext(query, FOOD_SEARCH_MAX_LIMIT);
+    const { page, limit, radiusKm, fare } = context;
+    const [dishes, stores] = await Promise.all([
+      this.food.searchDishes({
+        q: query.q,
+        page,
+        limit,
+        lat: query.lat,
+        lng: query.lng,
+        radiusKm,
+      }),
+      this.buildStorePage(
+        {
+          search: query.q,
+          category: query.category,
+          lat: query.lat,
+          lng: query.lng,
+          sort_by: query.sort_by,
+          max_km: query.max_km,
+        },
+        context,
+      ),
+    ]);
+    return {
+      dishes: {
+        page,
+        limit,
+        total: dishes.total,
+        items: dishes.items.map((hit) => ({
+          item: hit.item,
+          store: {
+            ...hit.store,
+            etaMinutes:
+              hit.store.distanceKm === null
+                ? null
+                : hit.item.prepMinutes +
+                  Math.ceil(hit.store.distanceKm * BROWSE_MINUTES_PER_KM),
+            deliveryFeeFromVnd: storeDeliveryFeeFromVnd(
+              hit.store.distanceKm,
+              fare,
+            ),
+          },
+        })),
+      },
+      stores,
+    };
+  }
+
+  /** Browse/search radius: the platform limit, optionally narrowed by max_km. */
+  private async browseRadiusKm(query: ListFoodStoresQueryDto): Promise<number> {
+    if (query.lat === undefined || query.lng === undefined) {
+      return 0;
+    }
+    const settingRadiusKm = await this.settings.getNumber(
+      'DRIVER_SEARCH_RADIUS_KM',
+    );
+    return query.max_km !== undefined
+      ? Math.min(query.max_km, settingRadiusKm)
+      : settingRadiusKm;
+  }
+
   async getStore(
     actor: RequestActor,
     storeId: string,
+    query: StoreDetailQueryDto = {},
   ): Promise<PublicStoreDetail> {
     await this.requireActiveCustomer(actor.userId);
     await this.ensureSandboxFixtureCatalog();
@@ -546,14 +680,71 @@ export class FoodService {
     if (!store) {
       throw foodError(404, 'FOOD_STORE_NOT_FOUND', 'Store not found');
     }
+    const deliveryFeeFromVnd = await this.detailDeliveryFeeFromVnd(
+      store,
+      query,
+    );
     // Capacity and accept mode are the merchant's business; customers only see the prep estimate.
     const { acceptSettings: _acceptSettings, ...publicStore } = store;
     const offers = this.promotions
       ? ((await this.promotions.storeOffers([store.id], 10)).get(store.id) ??
         [])
       : [];
-    const menuSections = await this.food.listStoreMenuSections(store.id);
-    return { ...publicStore, offers, menuSections };
+    const moderationRequired = await this.itemModerationRequired();
+    const items = store.items
+      .filter(
+        (item) => !moderationRequired || item.moderationStatus === 'APPROVED',
+      )
+      .map((item) => {
+        const copy = { ...item };
+        delete copy.moderationStatus;
+        return copy;
+      });
+    const menuSections = await this.food.listStoreMenuSections(
+      store.id,
+      moderationRequired,
+    );
+    return { ...publicStore, deliveryFeeFromVnd, items, offers, menuSections };
+  }
+
+  /**
+   * The hero's "from" fee is the browse card's quote at the same position: same
+   * straight-line distance and fare settings, so both reads of one store agree.
+   */
+  private async detailDeliveryFeeFromVnd(
+    store: StoreDetail,
+    query: StoreDetailQueryDto,
+  ): Promise<number | null> {
+    if (
+      query.lat === undefined ||
+      query.lng === undefined ||
+      store.lat === null ||
+      store.lng === null
+    ) {
+      return null;
+    }
+    const distanceKm = haversineKm(
+      { lat: query.lat, lng: query.lng },
+      { lat: store.lat, lng: store.lng },
+    );
+    return storeDeliveryFeeFromVnd(distanceKm, await this.foodFare());
+  }
+
+  /** Dishes beside the viewed one; one suggestion alone reads as noise, so it is hidden. */
+  async suggestItems(
+    actor: RequestActor,
+    storeId: string,
+    exclude: string[],
+  ): Promise<StoreItemSuggestion[]> {
+    await this.requireActiveCustomer(actor.userId);
+    const moderationRequired = await this.itemModerationRequired();
+    const items = await this.food.listItemSuggestions({
+      storeId,
+      exclude,
+      limit: FOOD_ITEM_SUGGESTION_LIMIT,
+      moderationRequired,
+    });
+    return items.length < FOOD_ITEM_SUGGESTION_MIN ? [] : items;
   }
 
   /** The signed-in merchant's store id (store offers, review replies). */
@@ -589,6 +780,7 @@ export class FoodService {
   ): Promise<StoreItemView> {
     await this.requireActiveRole(actor.userId, 'MERCHANT');
     await this.ownedStore(actor.userId);
+    const moderationRequired = await this.itemModerationRequired();
     return this.unwrapCatalog(() =>
       this.food.createItem({
         ownerId: actor.userId,
@@ -599,6 +791,7 @@ export class FoodService {
           dto.originalPriceVnd,
         ),
         available: dto.available,
+        moderationStatus: moderationRequired ? 'PENDING' : 'APPROVED',
         description: dto.description,
         prepMinutes: dto.prepMinutes,
         imageUrl: dto.imageUrl,
@@ -950,16 +1143,25 @@ export class FoodService {
             dto.deliveryOfferVnd,
             suggestedDeliveryFareVnd,
           );
+    const requireApprovedItems = await this.itemModerationRequired();
     const order = await this.unwrap(() =>
       this.food.place({
         suggestedDeliveryFareVnd,
         customerId: actor.userId,
         storeId: dto.storeId,
         idempotencyKey,
-        items: dto.items,
+        items: dto.items.map((line) => ({
+          itemId: line.itemId,
+          quantity: line.quantity,
+          optionIds: line.optionIds,
+          note: optionalFoodNote(line.note),
+        })),
         dropoff: dto.dropoff,
         deliveryFareVnd,
         voucherCode: dto.voucherCode?.trim() || undefined,
+        note: optionalFoodNote(dto.note),
+        utensils: dto.utensils ?? true,
+        requireApprovedItems,
       }),
     );
     if (this.checkout && paymentMethod !== 'CASH') {
@@ -2650,6 +2852,10 @@ export class FoodService {
     return false;
   }
 
+  private async itemModerationRequired(): Promise<boolean> {
+    return this.settings.getBoolean('FOOD_ITEM_MODERATION_ENABLED');
+  }
+
   /**
    * Sandbox-only demo seed when the catalog DB is empty.
    * Production never auto-creates stores or merchants.
@@ -2851,12 +3057,15 @@ export class FoodService {
     storeId: string,
     dropoff: { lat: number; lng: number },
   ): Promise<number> {
-    const minimum = await this.settings.getNumber('FOOD_MIN_DELIVERY_VND');
-    const maximum = await this.settings.getNumber('FOOD_MAX_DELIVERY_VND');
-    const perKm = await this.settings.getNumber('FOOD_DELIVERY_VND_PER_KM');
+    const [minimum, maximum, perKm, step] = await Promise.all([
+      this.settings.getNumber('FOOD_MIN_DELIVERY_VND'),
+      this.settings.getNumber('FOOD_MAX_DELIVERY_VND'),
+      this.settings.getNumber('FOOD_DELIVERY_VND_PER_KM'),
+      this.settings.getNumber('FOOD_FARE_STEP_VND'),
+    ]);
     const store = await this.food.findStore(storeId);
     if (!store || store.lat == null || store.lng == null) {
-      return minimum;
+      return clampToFoodFareSteps(minimum, minimum, maximum, step);
     }
     const distanceKm = await resolveRouteDistanceKm(
       this.maps,
@@ -2864,7 +3073,7 @@ export class FoodService {
       { lat: dropoff.lat, lng: dropoff.lng },
     );
     const quoted = quoteReferenceFareVnd(distanceKm, perKm, minimum);
-    return Math.min(maximum, Math.max(minimum, quoted));
+    return clampToFoodFareSteps(quoted, minimum, maximum, step);
   }
 
   /** Soft MapsPort probe at place; failures do not block checkout. */
@@ -2945,6 +3154,42 @@ export class FoodService {
   }
 }
 
+/**
+ * Food delivery fares are shown and settled in whole FOOD_FARE_STEP_VND
+ * multiples, so customers and drivers never see amounts like 12.340đ.
+ * Mirrors the ride fare rounding (`roundUpToFareStep`).
+ */
+export function clampToFoodFareSteps(
+  amountVnd: number,
+  minVnd: number,
+  maxVnd: number,
+  stepVnd: number,
+): number {
+  const step = Math.max(1, stepVnd);
+  const lo = Math.min(maxVnd, Math.ceil(minVnd / step) * step);
+  const hi = Math.max(lo, Math.floor(maxVnd / step) * step);
+  const stepped = Math.ceil(Math.max(amountVnd, minVnd) / step) * step;
+  return Math.min(hi, Math.max(lo, stepped));
+}
+
+/**
+ * Browse card and store detail both quote the "from" fee through this function:
+ * straight-line reference fare first, then the platform fare steps.
+ */
+function storeDeliveryFeeFromVnd(
+  distanceKm: number | null,
+  fare: FoodFareSettings,
+): number | null {
+  return distanceKm === null
+    ? null
+    : clampToFoodFareSteps(
+        quoteReferenceFareVnd(distanceKm, fare.perKm, fare.minVnd),
+        fare.minVnd,
+        fare.maxVnd,
+        fare.stepVnd,
+      );
+}
+
 /** Commission in whole VND (rounded half up), never above the subtotal. */
 export function merchantCommissionVnd(
   subtotalVnd: number,
@@ -3008,6 +3253,12 @@ export function publishOffer(
     createdAt: offer.createdAt.toISOString(),
     updatedAt: offer.updatedAt.toISOString(),
   };
+}
+
+/** Whitespace-only customer notes carry no meaning and are stored as null. */
+function optionalFoodNote(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 }
 
 function publish(order: FoodOrderView): PublicFoodOrder {

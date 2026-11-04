@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AccessAuthGuard, CurrentActor, type RequestActor } from '../identity/access-auth.guard.js';
 import { UploadAvatarDto } from '../identity/me.dto.js';
 import { SkipResponseEnvelope } from '../../platform/http/skip-response-envelope.js';
@@ -47,6 +47,7 @@ export class PublicAvatarController {
 
   @Get(':userId/:file')
   @SkipResponseEnvelope()
+  @Throttle({ default: { limit: 600, ttl: 60_000 } })
   @Header('Cache-Control', 'public, max-age=86400, immutable')
   @Header('X-Content-Type-Options', 'nosniff')
   @ApiOperation({ summary: "A user's current avatar image (404 for replaced or unknown files)" })

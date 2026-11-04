@@ -49,7 +49,6 @@ export const PLATFORM_SETTING_SEED_DEFAULTS: Readonly<Partial<Record<PlatformSet
     // DEC-PROD-036 rev 2026-10-29: delivery and handover codes are both opt-in.
     FOOD_DELIVERY_CODE_REQUIRED: 'false',
     PAYMENT_METHOD_REGISTRY: '{"methods":{}}',
-    PAYMENT_WALLET_ENABLED: 'false',
     // Website links: all empty until an admin sets real ones (no placeholder links).
     PUBLIC_SITE_CONFIG: '{}',
     // t82u: no build is blocked or nagged until an admin sets min/latest builds.
@@ -98,8 +97,16 @@ export const PLATFORM_SETTING_SEED_DEFAULTS: Readonly<Partial<Record<PlatformSet
     FOOD_MAX_FARE_RAISES_PER_ORDER: '3',
     FOOD_OFFER_TTL_SECONDS: '120',
     FOOD_DELIVERY_FEE_MODE: 'NEGOTIATE',
+    FOOD_ITEM_MODERATION_ENABLED: 'true',
     SERVICE_ZONE_ENFORCED: 'true',
     DRIVER_DEBT_LIMIT_VND: '200000',
+    // DEC-PROD-093: driver prepayment (credit), disabled until Legal signs off.
+    DRIVER_TOP_UP_ENABLED: 'false',
+    DRIVER_TOP_UP_MIN_VND: '10000',
+    DRIVER_TOP_UP_MAX_VND: '2000000',
+    DRIVER_TOP_UP_DAILY_LIMIT_VND: '5000000',
+    DRIVER_CREDIT_MAX_VND: '5000000',
+    DRIVER_TOP_UP_EXPIRE_MINUTES: '15',
     DISPATCH_REQUIRE_FRESH_PRESENCE: 'true',
     // (DEC-PROD-061) Negotiation rounds, cancellations, push, food cash model.
     RIDE_MAX_LIVE_OFFERS_PER_RIDE: '0',

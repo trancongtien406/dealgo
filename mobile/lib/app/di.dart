@@ -82,6 +82,7 @@ import '../features/food/domain/usecases/cancel_food_order.dart';
 import '../features/food/domain/usecases/get_food_order.dart';
 import '../features/promotion/data/datasources/promotion_remote_datasource.dart';
 import '../features/promotion/data/repositories/promotion_repository_impl.dart';
+import '../features/promotion/domain/repositories/promotion_repository.dart';
 import '../features/promotion/domain/usecases/list_available_vouchers.dart';
 import '../features/promotion/domain/usecases/validate_voucher.dart';
 import '../features/support/data/help_faq_remote_datasource.dart';
@@ -118,6 +119,8 @@ import '../features/pricing/data/pricing_remote_datasource.dart';
 import '../features/driver_card/data/driver_card_remote_datasource.dart';
 import '../features/places/domain/place.dart';
 import '../features/driver_history/domain/driver_history.dart';
+import '../features/driver_credit/domain/driver_credit.dart';
+import '../features/driver_credit/data/driver_credit_remote_datasource.dart';
 import '../features/rating/data/rating_remote_datasource.dart';
 import '../features/rating/domain/service_rating.dart';
 import '../features/inbox/data/datasources/inbox_remote_datasource.dart';
@@ -325,6 +328,7 @@ class DealGoDependencies {
     RatingRepository? ratings,
     MerchantOfferRepository? merchantOffers,
     DriverHistoryRepository? driverHistory,
+    DriverCreditRepository? driverCredit,
     SupportRepository? support,
     AccountDeletionRepository? accountDeletion,
     AccountSettingsRepository? accountSettings,
@@ -339,6 +343,7 @@ class DealGoDependencies {
     MerchantStatsRepository? merchantStats,
     DriverLocationRepository? driverLocation,
     AuthMethodsCache? authMethodsCache,
+    PromotionRepository? promotions,
   }) {
     final locator = GetIt.asNewInstance();
     _registerGraph(
@@ -368,6 +373,7 @@ class DealGoDependencies {
       ratings: ratings,
       merchantOffers: merchantOffers,
       driverHistory: driverHistory,
+      driverCredit: driverCredit,
       support: support,
       accountDeletion: accountDeletion,
       accountSettings: accountSettings,
@@ -381,6 +387,7 @@ class DealGoDependencies {
       partnerRequirements: partnerRequirements,
       merchantStats: merchantStats,
       driverLocation: driverLocation,
+      promotions: promotions,
     );
 
     // Process-wide locator for `getIt<T>()` outside the widget tree.
@@ -413,6 +420,7 @@ class DealGoDependencies {
       ratings: ratings,
       merchantOffers: merchantOffers,
       driverHistory: driverHistory,
+      driverCredit: driverCredit,
       support: support,
       accountDeletion: accountDeletion,
       accountSettings: accountSettings,
@@ -426,6 +434,7 @@ class DealGoDependencies {
       partnerRequirements: partnerRequirements,
       merchantStats: merchantStats,
       driverLocation: driverLocation,
+      promotions: promotions,
       skipLeafServices: true,
     );
 
@@ -488,6 +497,7 @@ class DealGoDependencies {
     RatingRepository? ratings,
     MerchantOfferRepository? merchantOffers,
     DriverHistoryRepository? driverHistory,
+    DriverCreditRepository? driverCredit,
     SupportRepository? support,
     AccountDeletionRepository? accountDeletion,
     AccountSettingsRepository? accountSettings,
@@ -501,6 +511,7 @@ class DealGoDependencies {
     PartnerRequirementsSource? partnerRequirements,
     MerchantStatsRepository? merchantStats,
     DriverLocationRepository? driverLocation,
+    PromotionRepository? promotions,
   }) {
     if (locationOverride != null) {
       if (locator.isRegistered<LocationService>()) {
@@ -617,11 +628,13 @@ class DealGoDependencies {
                     : const NoopAnalytics()));
     }
 
-    final promotionRepository = PromotionRepositoryImpl(
-      useOverrides || useMockData
-          ? FakePromotionRemoteDataSource()
-          : DioPromotionRemoteDataSource(dio: dio),
-    );
+    final promotionRepository =
+        promotions ??
+        PromotionRepositoryImpl(
+          useOverrides || useMockData
+              ? FakePromotionRemoteDataSource()
+              : DioPromotionRemoteDataSource(dio: dio),
+        );
     final addressBookRepository =
         addressBook ??
         (useOverrides
@@ -645,6 +658,11 @@ class DealGoDependencies {
                 seed: FakeDriverHistoryRemoteDataSource.sample(DateTime.now()),
               )
             : DioDriverHistoryRemoteDataSource(dio: dio));
+    final driverCreditRepository =
+        driverCredit ??
+        (useOverrides || useMockData
+            ? FakeDriverCreditRemoteDataSource()
+            : DioDriverCreditRemoteDataSource(dio: dio));
     final placesRepository =
         places ??
         (useOverrides
@@ -832,6 +850,7 @@ class DealGoDependencies {
     );
     put<MerchantStatsRepository>(merchantStatsRepository);
     put<DriverHistoryRepository>(driverHistoryRepository);
+    put<DriverCreditRepository>(driverCreditRepository);
     put<PlacesRepository>(placesRepository);
     put<HomeBannerRepository>(homeBannerRepository);
     put<HomeBannerTracker>(
@@ -1060,6 +1079,9 @@ class DealGoDependencies {
         ),
         RepositoryProvider<DriverHistoryRepository>.value(
           value: _locator<DriverHistoryRepository>(),
+        ),
+        RepositoryProvider<DriverCreditRepository>.value(
+          value: _locator<DriverCreditRepository>(),
         ),
         RepositoryProvider<PlacesRepository>.value(
           value: _locator<PlacesRepository>(),

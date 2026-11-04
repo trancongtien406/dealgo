@@ -259,3 +259,16 @@ export type PaymentStatusEventPayload = {
   status: string;
   occurredAt: string;
 };
+
+/**
+ * `driverCreditStatus` hint on a driver's private `user:` room when a prepaid top-up
+ * changes state (IPN, reconcile, cancel, refund). The app re-GETs
+ * `GET /v1/driver/credit`; REST stays the source of truth.
+ */
+export const DRIVER_CREDIT_STATUS_EVENT = 'driverCreditStatus';
+
+export type DriverCreditStatusEventPayload = {
+  topUpId: string;
+  status: string;
+  occurredAt: string;
+};

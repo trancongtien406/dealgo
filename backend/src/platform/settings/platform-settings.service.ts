@@ -63,6 +63,7 @@ const SETTING_CATEGORY_OVERRIDES: Readonly<Record<string, 'FARE' | 'DISPATCH' | 
   FOOD_MAX_FARE_RAISES_PER_ORDER: 'DISPATCH',
   FOOD_OFFER_TTL_SECONDS: 'DISPATCH',
   FOOD_DELIVERY_FEE_MODE: 'DISPATCH',
+  FOOD_ITEM_MODERATION_ENABLED: 'DISPATCH',
   SERVICE_ZONE_ENFORCED: 'ZONE_PAYMENT',
   DRIVER_DEBT_LIMIT_VND: 'ZONE_PAYMENT',
   RIDE_MAX_LIVE_OFFERS_PER_RIDE: 'DISPATCH',
@@ -364,7 +365,6 @@ export class PlatformSettingsService {
       case 'MAX_CONCURRENT_JOBS_PER_DRIVER':
         return String(this.config.get('MAX_CONCURRENT_JOBS_PER_DRIVER', { infer: true }));
       case 'PAYMENT_METHOD_REGISTRY':
-      case 'PAYMENT_WALLET_ENABLED':
       case 'RATING_WINDOW_DAYS':
       case 'RIDE_COMMISSION_BIKE_PERCENT':
       case 'RIDE_COMMISSION_CAR_PERCENT':
@@ -425,6 +425,7 @@ export class PlatformSettingsService {
       case 'FOOD_MAX_FARE_RAISES_PER_ORDER':
       case 'FOOD_OFFER_TTL_SECONDS':
       case 'FOOD_DELIVERY_FEE_MODE':
+      case 'FOOD_ITEM_MODERATION_ENABLED':
       case 'SERVICE_ZONE_ENFORCED':
       case 'DRIVER_DEBT_LIMIT_VND':
       case 'DISPATCH_REQUIRE_FRESH_PRESENCE':
@@ -464,6 +465,12 @@ export class PlatformSettingsService {
       case 'RIDE_STOP_FEE_CAR_VND':
       case 'RIDE_STOP_FREE_WAIT_MINUTES':
       case 'RIDE_STOP_WAIT_FEE_VND_PER_MINUTE':
+      case 'DRIVER_TOP_UP_ENABLED':
+      case 'DRIVER_TOP_UP_MIN_VND':
+      case 'DRIVER_TOP_UP_MAX_VND':
+      case 'DRIVER_TOP_UP_DAILY_LIMIT_VND':
+      case 'DRIVER_CREDIT_MAX_VND':
+      case 'DRIVER_TOP_UP_EXPIRE_MINUTES':
         // Seeded by migration/seed (PLATFORM_SETTING_SEED_DEFAULTS); no env bootstrap.
         return PLATFORM_SETTING_SEED_DEFAULTS[key] ?? '';
       default: {

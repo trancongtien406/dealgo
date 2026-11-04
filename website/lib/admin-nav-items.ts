@@ -15,6 +15,7 @@ export type AdminNavHref =
   | "/transactions"
   | "/settlements"
   | "/refunds"
+  | "/driver-credit"
   | "/online-payments"
   | "/disputes"
   | "/support-tickets"
@@ -174,6 +175,7 @@ export const adminNavSections: readonly AdminNavSection[] = [
           { label: "Giao dịch", href: "/transactions" },
           { label: "Đối soát", href: "/settlements" },
           { label: "Hoàn tiền", href: "/refunds" },
+          { label: "Tạm ứng tài xế", href: "/driver-credit" },
           { label: "Thanh toán online", href: "/online-payments" },
         ],
       },

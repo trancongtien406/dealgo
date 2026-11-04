@@ -125,7 +125,12 @@ class FoodStoreSummary {
     this.offers = const [],
     this.minOrderVnd = 0,
     this.featuredItems = const [],
+    this.closesAtToday,
   });
+
+  /// Closing time (`HH:mm`) of the shift taking orders now; null when closed
+  /// or when the store has no hours (DEC-PROD-027).
+  final String? closesAtToday;
 
   /// Smallest food subtotal the store accepts; 0 = no minimum.
   final int minOrderVnd;
@@ -157,6 +162,8 @@ class FoodStoreSummary {
   /// Non-null when the store is paused or outside its hours; lists sort these last.
   final StoreClosedReason? closedReason;
 
+  bool get openNow => closedReason == null;
+
   /// Catalog category code from the backend (e.g. `pho`, `cafe`); may be null.
   final String? category;
 
@@ -165,6 +172,24 @@ class FoodStoreSummary {
 
   /// Cover thumb from first menu item with a photo (DEC-PROD-041).
   final String? imageUrl;
+}
+
+/// One page of store browse results. [total] is the server count for the
+/// current filter, so [hasMore] stays correct even when rows are de-duplicated.
+class FoodStorePageResult {
+  const FoodStorePageResult({
+    required this.items,
+    required this.total,
+    required this.page,
+    required this.limit,
+  });
+
+  final List<FoodStoreSummary> items;
+  final int total;
+  final int page;
+  final int limit;
+
+  bool get hasMore => page * limit < total;
 }
 
 /// How long a dish counts as "Mới" after the merchant adds it.
@@ -202,12 +227,90 @@ class FoodFeaturedItem {
   bool get isNew => foodItemIsNew(addedAt);
 }
 
+/// A dish hit in search results; only dishes of stores taking orders now are returned.
+class FoodDishHit {
+  const FoodDishHit({required this.item, required this.store});
+
+  final FoodFeaturedItem item;
+  final FoodDishHitStore store;
+}
+
+/// The store a search dish belongs to, with the same fee/ETA estimate as a browse card.
+class FoodDishHitStore {
+  const FoodDishHitStore({
+    required this.id,
+    required this.name,
+    required this.openNow,
+    this.distanceKm,
+    this.etaMinutes,
+    this.deliveryFeeFromVnd,
+    this.closedReason,
+  });
+
+  final String id;
+  final String name;
+
+  /// Straight-line distance from the customer; null without a GPS fix.
+  final double? distanceKm;
+
+  /// Prep + ride estimate; null without a GPS fix.
+  final int? etaMinutes;
+
+  /// Straight-line delivery fee estimate ("từ" price).
+  final int? deliveryFeeFromVnd;
+  final bool openNow;
+
+  /// Non-null when the store is paused or outside its hours.
+  final StoreClosedReason? closedReason;
+}
+
+/// One search response: dish hits first, then the stores matching the same keyword.
+class FoodSearchResult {
+  const FoodSearchResult({
+    required this.dishes,
+    required this.dishTotal,
+    required this.stores,
+    required this.storeTotal,
+  });
+
+  final List<FoodDishHit> dishes;
+
+  /// Server count for the dish section, independent of the page size.
+  final int dishTotal;
+
+  final List<FoodStoreSummary> stores;
+
+  /// Server count for the store section, independent of the page size.
+  final int storeTotal;
+}
+
+/// FOOD-001 — new dishes wait for Ops approval while item moderation is enabled.
+enum FoodItemModeration {
+  pending('PENDING'),
+  approved('APPROVED'),
+  rejected('REJECTED');
+
+  const FoodItemModeration(this.wire);
+
+  final String wire;
+
+  static FoodItemModeration fromWire(Object? raw) {
+    for (final value in values) {
+      if (value.wire == raw) {
+        return value;
+      }
+    }
+    return FoodItemModeration.approved;
+  }
+}
+
 class FoodMenuItem {
   const FoodMenuItem({
     required this.id,
     required this.name,
     required this.priceVnd,
     required this.available,
+    this.moderation = FoodItemModeration.approved,
     this.description,
     this.prepMinutes,
     this.imageUrl,
@@ -223,6 +326,12 @@ class FoodMenuItem {
   final String name;
   final int priceVnd;
   final bool available;
+
+  /// FOOD-001: with item moderation on, a new dish stays PENDING until Ops approves it.
+  final FoodItemModeration moderation;
+
+  /// Customers only see and order APPROVED dishes; a PENDING/REJECTED dish is not on sale.
+  bool get onSale => available && moderation == FoodItemModeration.approved;
 
   /// List price shown struck through; null unless above [priceVnd].
   final int? originalPriceVnd;
@@ -273,6 +382,7 @@ class FoodMenuItem {
       name: name ?? this.name,
       priceVnd: priceVnd ?? this.priceVnd,
       available: available ?? this.available,
+      moderation: moderation,
       description: clearDescription ? null : (description ?? this.description),
       prepMinutes: clearPrepMinutes ? null : (prepMinutes ?? this.prepMinutes),
       imageUrl: clearImageUrl ? null : (imageUrl ?? this.imageUrl),
@@ -380,7 +490,17 @@ class FoodStoreDetail {
     this.offers = const [],
     this.menuSections = const [],
     this.minOrderVnd = 0,
+    this.closesAtToday,
+    this.deliveryFeeFromVnd,
   });
+
+  /// Closing time (`HH:mm`) of the shift taking orders now; null when closed
+  /// or when the store has no hours (DEC-PROD-027).
+  final String? closesAtToday;
+
+  /// Straight-line "from" delivery fee quoted at the request's customer
+  /// position; null without one or without store coordinates.
+  final int? deliveryFeeFromVnd;
 
   /// Smallest food subtotal the store accepts; 0 = no minimum.
   final int minOrderVnd;
@@ -431,6 +551,9 @@ class FoodStoreDetail {
 
   bool get isPaused => serviceMode == StoreServiceMode.paused;
 
+  /// A paused store keeps its menu visible but refuses new lines.
+  bool get canOrder => openNow && !isPaused;
+
   FoodStoreDetail copyWith({
     StoreServiceMode? serviceMode,
     DateTime? serviceModeUntil,
@@ -470,6 +593,8 @@ class FoodStoreDetail {
       offers: offers,
       menuSections: menuSections,
       minOrderVnd: minOrderVnd ?? this.minOrderVnd,
+      closesAtToday: closesAtToday,
+      deliveryFeeFromVnd: deliveryFeeFromVnd,
       serviceMode: serviceMode ?? this.serviceMode,
       serviceModeUntil: clearServiceModeUntil
           ? null
@@ -499,6 +624,7 @@ class FoodOrderLine {
     required this.quantity,
     this.imageUrl,
     this.options = const [],
+    this.note,
   });
 
   /// Server line id (the store edits a line by id); null on old fakes.
@@ -515,6 +641,9 @@ class FoodOrderLine {
 
   /// Options the customer chose, snapshotted at placement.
   final List<FoodLineOption> options;
+
+  /// Customer note for this line ("ít cay, không hành"); null = none.
+  final String? note;
 
   /// "Size: L · Topping: Trân châu" for receipts and kitchen tickets.
   String get optionsSummary => options
@@ -538,10 +667,18 @@ class ReadyFoodJob {
     this.pickup,
     this.route,
     this.approachRoute,
+    this.note,
+    this.utensils = true,
   });
 
   final String id;
   final String storeId;
+
+  /// Customer note for the store and courier; null = none.
+  final String? note;
+
+  /// Whether the customer asked for cutlery.
+  final bool utensils;
 
   /// DEC-PROD-031 rev 3 (DRAFT): driver→store leg snapshot (assigned only).
   final RouteGeometry? approachRoute;
@@ -722,6 +859,8 @@ class FoodOrderDetail {
     this.route,
     this.approachRoute,
     this.pendingChange,
+    this.note,
+    this.utensils = true,
   });
 
   /// Store edit waiting for the customer's answer (customer/store only).
@@ -762,6 +901,12 @@ class FoodOrderDetail {
   /// DEC-PROD-031 rev 3 (DRAFT): driver→store leg while ASSIGNED.
   final RouteGeometry? approachRoute;
 
+  /// Customer note to the store and driver; null = none.
+  final String? note;
+
+  /// Whether cutlery was requested; the server defaults to true.
+  final bool utensils;
+
   FoodTrackingStage get stage => foodTrackingStage(status);
 }
 
@@ -775,6 +920,8 @@ class PlacedFoodOrder {
     required this.lines,
     this.discountVnd = 0,
     this.voucherCode,
+    this.note,
+    this.utensils = true,
   });
 
   final String id;
@@ -787,6 +934,12 @@ class PlacedFoodOrder {
   final String? voucherCode;
   final int totalVnd;
   final List<FoodOrderLine> lines;
+
+  /// Customer note to the store and driver; null = none.
+  final String? note;
+
+  /// Whether cutlery was requested; the server defaults to true.
+  final bool utensils;
 }
 
 /// Why a store edited an order (backend FOOD_ORDER_CHANGE_REASONS).

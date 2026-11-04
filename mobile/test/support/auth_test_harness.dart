@@ -24,6 +24,8 @@ import 'package:dealgo/features/pricing/domain/pricing.dart';
 import 'package:dealgo/features/places/domain/place.dart';
 import 'package:dealgo/features/merchant/domain/merchant_offers.dart';
 import 'package:dealgo/features/rating/domain/service_rating.dart';
+import 'package:dealgo/features/activity/data/datasources/history_remote_datasource.dart';
+import 'package:dealgo/features/promotion/domain/repositories/promotion_repository.dart';
 import 'package:dealgo/features/inbox/data/datasources/inbox_remote_datasource.dart';
 import 'package:dealgo/features/chat/data/datasources/chat_remote_datasource.dart';
 import 'package:dealgo/features/food/data/datasources/food_remote_datasource.dart';
@@ -55,6 +57,8 @@ Future<MemoryTokenStore> pumpDealGo(
   required IdentityClient client,
   TokenStore? tokenStore,
   FoodClient? foodClient,
+  PromotionRepository? promotions,
+  HistoryClient? historyClient,
   MerchantOrdersClient? merchantOrdersClient,
   RideClient? rideClient,
   RideStopsClient? rideStopsClient,
@@ -91,6 +95,8 @@ Future<MemoryTokenStore> pumpDealGo(
       identityClient: client,
       tokenStore: store,
       foodClient: foodClient ?? FakeFoodClient(),
+      promotions: promotions,
+      historyClient: historyClient,
       merchantOrdersClient: merchantOrdersClient,
       rideClient: rideClient ?? FakeRideClient(),
       rideStopsClient: rideStopsClient,
@@ -133,6 +139,8 @@ Future<MemoryTokenStore> pumpSignedIn(
   WidgetTester tester, {
   required UserProfile profile,
   FoodClient? foodClient,
+  PromotionRepository? promotions,
+  HistoryClient? historyClient,
   MerchantOrdersClient? merchantOrdersClient,
   RideClient? rideClient,
   RideStopsClient? rideStopsClient,
@@ -176,6 +184,8 @@ Future<MemoryTokenStore> pumpSignedIn(
       tokenStore: store,
       passkeyPlatform: passkeyPlatform,
       foodClient: foodClient ?? FakeFoodClient(),
+      promotions: promotions,
+      historyClient: historyClient,
       merchantOrdersClient: merchantOrdersClient,
       rideClient: rideClient ?? FakeRideClient(),
       rideStopsClient: rideStopsClient,

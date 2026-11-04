@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../utils/merchant_kitchen_lines.dart';
+import '../widgets/merchant_kitchen_line_row.dart';
 import '../widgets/merchant_order_change_sheet.dart';
 import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
@@ -14,7 +15,7 @@ import '../../domain/usecases/accept_merchant_order.dart';
 import '../../domain/usecases/get_merchant_order.dart';
 import '../../domain/usecases/mark_merchant_order_ready.dart';
 import '../../domain/usecases/reject_merchant_order.dart';
-import '../../../food/presentation/widgets/food_category_tile.dart';
+import '../../../food/presentation/widgets/food_order_extras.dart';
 import '../../../food/presentation/widgets/food_reject_reason.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
 import '../cubit/merchant_order_cubit.dart';
@@ -128,6 +129,8 @@ class _MerchantOrderView extends StatelessWidget {
         handoffDone: view.handoffDone,
         handoverCode: view.handoverCode,
         pendingChange: view.pendingChange,
+        orderNote: view.orderNote,
+        utensils: view.utensils,
         onEditOrder: () async {
           final change = await showMerchantOrderChangeSheet(
             context,
@@ -161,6 +164,8 @@ class _Detail extends StatelessWidget {
     required this.onAccept,
     this.handoverCode,
     this.pendingChange,
+    this.orderNote,
+    this.utensils = true,
     required this.onEditOrder,
     required this.onReject,
     required this.onReady,
@@ -174,6 +179,8 @@ class _Detail extends StatelessWidget {
   final bool handoffDone;
   final String? handoverCode;
   final FoodOrderChange? pendingChange;
+  final String? orderNote;
+  final bool utensils;
   final VoidCallback onEditOrder;
   final VoidCallback onAccept;
   final Future<bool> Function(FoodRejectReason reason, String? note) onReject;
@@ -251,11 +258,14 @@ class _Detail extends StatelessWidget {
                   _ => l10n.merchantOrderTitle,
                 }, style: textTheme.titleMedium),
                 const SizedBox(height: DealGoSpacing.s8),
-                Row(
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: DealGoSpacing.s8,
+                  runSpacing: DealGoSpacing.s8,
                   children: [
                     // QA M5: the badge is the single order ref on this card.
                     HandoverRefBadge(orderId: order.id, dense: true),
-                    const Spacer(),
                     if (placedAt != null)
                       MerchantChip(
                         label: l10n.merchantOrderPlacedAt(
@@ -350,56 +360,17 @@ class _Detail extends StatelessWidget {
                   ),
                   for (final line in lines) ...[
                     const SizedBox(height: DealGoSpacing.s8),
-                    Row(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(
-                            DealGoRadius.small,
-                          ),
-                          child: Image.asset(
-                            foodPlaceholderImage,
-                            width: 44,
-                            height: 44,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        const SizedBox(width: DealGoSpacing.s12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(line.name, style: textTheme.titleMedium),
-                              if (line.options.isNotEmpty)
-                                Text(
-                                  line.options,
-                                  key: const Key('merchant-line-options'),
-                                  style: textTheme.bodySmall?.copyWith(
-                                    color: DealGoColors.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              Text(
-                                l10n.merchantLineQty(
-                                  line.qty,
-                                  formatVnd(line.unitPriceVnd),
-                                ),
-                                style: textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: DealGoSpacing.s8),
-                        Text(
-                          formatVnd(line.unitPriceVnd * line.qty),
-                          style: textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
+                    MerchantKitchenLineRow(line: line),
                   ],
                 ],
               ),
+            ),
+          ],
+          if ((isPlaced || preparing) &&
+              ((orderNote ?? '').trim().isNotEmpty || !utensils)) ...[
+            const SizedBox(height: DealGoSpacing.s12),
+            MerchantPanel(
+              child: FoodOrderExtrasBlock(note: orderNote, utensils: utensils),
             ),
           ],
           if (preparing) ...[
@@ -414,53 +385,7 @@ class _Detail extends StatelessWidget {
                   ),
                   for (final line in lines) ...[
                     const SizedBox(height: DealGoSpacing.s8),
-                    Row(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(
-                            DealGoRadius.small,
-                          ),
-                          child: Image.asset(
-                            foodPlaceholderImage,
-                            width: 44,
-                            height: 44,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        const SizedBox(width: DealGoSpacing.s12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(line.name, style: textTheme.titleMedium),
-                              if (line.options.isNotEmpty)
-                                Text(
-                                  line.options,
-                                  key: const Key('merchant-line-options'),
-                                  style: textTheme.bodySmall?.copyWith(
-                                    color: DealGoColors.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              Text(
-                                l10n.merchantLineQty(
-                                  line.qty,
-                                  formatVnd(line.unitPriceVnd),
-                                ),
-                                style: textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: DealGoSpacing.s8),
-                        Text(
-                          formatVnd(line.unitPriceVnd * line.qty),
-                          style: textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
+                    MerchantKitchenLineRow(line: line),
                   ],
                 ],
               ),

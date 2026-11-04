@@ -202,7 +202,7 @@ void main() {
       );
     });
 
-    testWidgets('checkout hint switches to the fixed wording', (tester) async {
+    testWidgets('FIXED shows the fixed fee and no stepper', (tester) async {
       final cart = FoodCartCubit()
         ..setDeliveryQuote(
           const FoodDeliveryQuote(
@@ -219,9 +219,10 @@ void main() {
           child: _host(const FoodFareOfferPanel()),
         ),
       );
-      final hint = tester.widget<Text>(find.byKey(const Key('food-fare-hint')));
-      expect(hint.data, contains('nhận đúng mức phí'));
-      expect(find.byKey(const Key('food-fare-increase')), findsOneWidget);
+      expect(find.byKey(const Key('food-fare-fixed-panel')), findsOneWidget);
+      expect(find.text('Phí giao cố định'), findsOneWidget);
+      expect(find.byKey(const Key('food-fare-increase')), findsNothing);
+      expect(find.byKey(const Key('food-fare-decrease')), findsNothing);
     });
 
     testWidgets('FIXED tracking card hides counters but keeps raise', (

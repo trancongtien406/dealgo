@@ -1,6 +1,6 @@
 
 # --- DealGo (compose project "dealgo" in /opt/dealgo; containers join vms_edge) ---
-dealgo.trancongtien.com {
+dealgo.laptrinhapp.com {
 	import http01_only
 	encode gzip zstd
 	reverse_proxy dealgo-web:3000
@@ -11,7 +11,7 @@ dealgo.trancongtien.com {
 	}
 }
 
-api-dealgo.trancongtien.com {
+api-dealgo.laptrinhapp.com {
 	import http01_only
 	encode gzip zstd
 	request_body {
@@ -33,7 +33,7 @@ api-dealgo.trancongtien.com {
 }
 
 # LiveKit signalling (wss) -> LiveKit on the host network, reached via the vms_edge gateway.
-livekit-dealgo.trancongtien.com {
+livekit-dealgo.laptrinhapp.com {
 	import http01_only
 	reverse_proxy 172.19.0.1:7880 {
 		flush_interval -1
@@ -49,7 +49,7 @@ livekit-dealgo.trancongtien.com {
 }
 
 # DealGo TURN host (DNS-only). Caddy only obtains/renews the certificate; LiveKit serves TURN/TLS on :5349 with it.
-turn-dealgo.trancongtien.com {
+turn-dealgo.laptrinhapp.com {
 	import http01_only
 	respond "DealGo TURN" 404
 }

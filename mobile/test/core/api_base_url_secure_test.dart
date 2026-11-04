@@ -26,11 +26,11 @@ void main() {
   });
 
   test('production defaults point at the VPS domains', () {
-    expect(prodApiBaseUrl, 'https://api-dealgo.trancongtien.com');
+    expect(prodApiBaseUrl, 'https://api-dealgo.laptrinhapp.com');
     assertSecureApiBaseUrl(prodApiBaseUrl, isRelease: true);
     // Tests run in debug: no API_BASE_URL define → local Nest.
     expect(apiBaseUrl, devApiBaseUrl);
-    expect(appLinkHost, 'dealgo.trancongtien.com');
+    expect(appLinkHost, 'dealgo.laptrinhapp.com');
   });
 
   test('debug log redacts chat message body', () {

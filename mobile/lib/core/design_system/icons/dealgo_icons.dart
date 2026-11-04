@@ -10,6 +10,7 @@ abstract final class DealGoIcons {
   static const IconData add = LucideIcons.plus;
   static const IconData addCircle = LucideIcons.circlePlus;
   static const IconData addPhoto = LucideIcons.imagePlus;
+  static const IconData note = LucideIcons.messageSquareText;
   static const IconData alert = LucideIcons.circleAlert;
   static const IconData arrowLeft = LucideIcons.arrowLeft;
   static const IconData arrowRight = LucideIcons.arrowRight;
@@ -36,6 +37,8 @@ abstract final class DealGoIcons {
   static const IconData city = LucideIcons.building2;
   static const IconData clock = LucideIcons.clock;
   static const IconData close = LucideIcons.x;
+  static const IconData copy = LucideIcons.copy;
+  static const IconData qrCode = LucideIcons.qrCode;
   static const IconData clothes = LucideIcons.shirt;
   static const IconData coffee = LucideIcons.coffee;
   static const IconData delivery = LucideIcons.package;

@@ -15,11 +15,6 @@ const navLinks = [
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [selectedCity, setSelectedCity] = useState("Đà Nẵng");
-  const [cityDropdown, setCityDropdown] = useState(false);
-
-  const cities = ["Đà Nẵng"];
-
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 15);
     window.addEventListener("scroll", handleScroll);
@@ -44,7 +39,7 @@ export default function Navbar() {
               <span className="text-[#00D06C]">Go</span>
             </div>
             <span className="text-[11px] text-gray-500 font-medium tracking-normal mt-0.5">
-              Đi muôn nơi · Mua vạn món
+              Giá do bạn chọn · Trọn gói hành trình
             </span>
           </Link>
 
@@ -61,74 +56,33 @@ export default function Navbar() {
             ))}
           </nav>
 
-          {/* Right Action: Location Selector only (Login/Register removed as requested) */}
+          {/* Right Action: coverage link only (Login/Register removed as requested) */}
           <div className="hidden lg:flex items-center gap-3">
             <ThemeToggle />
-            <div className="relative">
-              <button
-                onClick={() => setCityDropdown(!cityDropdown)}
-                className="flex items-center gap-2 text-sm font-semibold text-gray-800 bg-white/90 hover:bg-white border border-gray-200/90 rounded-xl px-4 py-2 shadow-sm transition-all duration-200 hover:border-purple-300 hover:shadow"
-              >
-                {/* Purple Location Pin */}
-                <svg
-                  className="w-4 h-4 text-[#6D28D9]"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z" />
-                </svg>
-                <span>{selectedCity}</span>
-                <svg
-                  className={`w-3.5 h-3.5 text-gray-500 transition-transform duration-200 ${
-                    cityDropdown ? "rotate-180" : ""
-                  }`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-
-              {/* City Dropdown Menu */}
-              {cityDropdown && (
-                <div className="absolute right-0 mt-2 w-44 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 animate-fadeIn">
-                  {cities.map((city) => (
-                    <button
-                      key={city}
-                      onClick={() => {
-                        setSelectedCity(city);
-                        setCityDropdown(false);
-                      }}
-                      className={`w-full text-left px-4 py-2 text-sm font-medium transition-colors flex items-center justify-between ${
-                        selectedCity === city
-                          ? "text-[#5B21B6] bg-purple-50 font-bold"
-                          : "text-gray-700 hover:bg-gray-50"
-                      }`}
-                    >
-                      {city}
-                      {selectedCity === city && (
-                        <svg className="w-4 h-4 text-[#5B21B6]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <a
+              href="#khu-vuc"
+              className="flex items-center gap-2 text-sm font-semibold text-gray-800 bg-white/90 hover:bg-white border border-gray-200/90 rounded-xl px-4 py-2 shadow-sm transition-all duration-200 hover:border-purple-300 hover:shadow"
+            >
+              <svg className="w-4 h-4 text-[#6D28D9]" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z" />
+              </svg>
+              <span>Toàn quốc</span>
+            </a>
           </div>
 
           {/* Mobile Menu Button */}
           <div className="flex items-center gap-2 lg:hidden">
             <ThemeToggle compact className="size-9" />
-            {/* Mobile Location Badge */}
-            <span className="flex items-center gap-1 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-full px-3 py-1.5 shadow-sm">
+            {/* Mobile coverage link */}
+            <a
+              href="#khu-vuc"
+              className="flex items-center gap-1 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-full px-3 py-1.5 shadow-sm"
+            >
               <svg className="w-3.5 h-3.5 text-[#6D28D9]" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z" />
               </svg>
-              {selectedCity}
-            </span>
+              Toàn quốc
+            </a>
 
             <button
               onClick={() => setMobileOpen(!mobileOpen)}

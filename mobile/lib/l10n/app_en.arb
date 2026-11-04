@@ -284,10 +284,42 @@
   "rideShareTrip": "Share trip",
   "foodSearchTitle": "Find dishes & stores",
   "foodSearchHint": "bun bo",
-  "foodSearchFilterAll": "All",
   "foodSearchFilterNear": "Near me",
+  "foodSearchSortNewest": "Newest",
   "foodSearchSuggestions": "Search suggestions",
+  "foodSearchResults": "{count} results",
+  "@foodSearchResults": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "foodSearchEmpty": "No matching stores yet",
+  "foodSearchDishes": "Dishes",
+  "foodSearchStores": "Stores",
+  "foodSearchDishUnavailable": "This dish is no longer sold",
+  "foodDeliverTo": "Deliver to",
+  "foodFilterButton": "Filters",
+  "foodFilterTitle": "Filter & sort",
+  "foodFilterSort": "Sort by",
+  "foodFilterNear": "Nearest",
+  "foodFilterRating": "Top rated",
+  "foodFilterDistance": "Distance",
+  "foodFilterAnyDistance": "Any distance",
+  "foodFilterKm": "Within {km} km",
+  "@foodFilterKm": {
+    "placeholders": {
+      "km": {
+        "type": "int"
+      }
+    }
+  },
+  "foodFilterOpenNow": "Open now",
+  "foodFilterOffers": "Has offers",
+  "foodFilterApply": "Apply",
+  "foodFilterReset": "Reset",
+  "foodFilterClear": "Clear filters",
   "foodSearchHistory": "Search history",
   "foodSearchClearHistory": "Clear all",
   "foodCategoryTitle": "Restaurants & categories",
@@ -303,11 +335,65 @@
     }
   },
   "foodItemOptionsTitle": "Item options",
+  "foodItemAddonsTitle": "Add-ons",
   "foodItemOptionsNoGroups": "No options for this item.",
   "foodItemOptionsTotal": "Total",
   "foodItemOptionsAdd": "Add to cart",
   "foodItemOptionsRequired": "Required",
   "foodItemOptionsOptional": "Optional",
+  "foodItemDetailTitle": "Item details",
+  "foodDishPhotoCount": "Photo {index}/{total}",
+  "@foodDishPhotoCount": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "foodItemOptionsChoose": "Choose options",
+  "foodItemOptionsChooseRequired": "Choose options",
+  "foodItemOptionsMissingRequired": "Choose {groups}",
+  "@foodItemOptionsMissingRequired": {
+    "placeholders": {
+      "groups": {
+        "type": "String"
+      }
+    }
+  },
+  "foodItemOptionsFree": "Free",
+  "foodItemQuantity": "Quantity",
+  "foodItemSelectedOptions": "Selected: {options}",
+  "@foodItemSelectedOptions": {
+    "placeholders": {
+      "options": {
+        "type": "String"
+      }
+    }
+  },
+  "foodItemInfoTitle": "Item details",
+  "foodItemInStore": "At {store}",
+  "@foodItemInStore": {
+    "placeholders": {
+      "store": {
+        "type": "String"
+      }
+    }
+  },
+  "foodStoreDirections": "Directions",
+  "foodStoreOpenInMaps": "Open in Google Maps",
+  "foodStoreMapOpenFailed": "Couldn't open the map.",
+  "foodStoreMenuSections": "Menu categories",
+  "foodItemOptionsMaxReached": "Maximum {count} selected",
+  "@foodItemOptionsMaxReached": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "foodInvoiceTitle": "Order receipt",
   "foodInvoiceDelivered": "Delivered successfully",
   "foodInvoiceOrderId": "Order",
@@ -634,6 +720,31 @@
   "checkoutBackToCartShort": "Back to cart",
   "checkoutRecipient": "Recipient",
   "checkoutRecipientAddress": "Recipient and address",
+  "checkoutYourOrder": "Your order",
+  "checkoutEtaChip": "~{minutes} min delivery",
+  "@checkoutEtaChip": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "checkoutItemCount": "{count} items",
+  "@checkoutItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "checkoutYouSave": "Save {amount}",
+  "@checkoutYouSave": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "checkoutItems": "Items",
   "checkoutTotalSection": "Payment summary",
   "checkoutSubtotal": "Items",
@@ -1041,6 +1152,25 @@
   "foodFareNeedAddress": "Pick an address first",
   "foodFareQuoting": "Calculating…",
   "foodFareQuoteError": "Couldn't get the delivery fee. Check your connection and try again.",
+  "foodOrderNoteLabel": "Note for the store / driver",
+  "foodOrderNoteHint": "E.g. less spicy, no onion, leave at the door…",
+  "foodLineNoteLabel": "Note for this dish",
+  "foodLineNoteHint": "E.g. less ice, no sugar…",
+  "foodUtensilsLabel": "Cutlery",
+  "foodUtensilsYes": "Yes",
+  "foodUtensilsNo": "No",
+  "foodCartUpsellTitle": "Add more to your meal",
+  "foodNoteSaved": "Note saved",
+  "foodNoteCleared": "Note cleared",
+  "foodCheckoutExtrasTitle": "Notes & cutlery",
+  "foodCheckoutNoteEmpty": "No note for the store or driver yet",
+  "foodCheckoutNoteAdd": "Add",
+  "foodCheckoutNoteEdit": "Edit",
+  "foodFareFixedLabel": "Fixed delivery fee",
+  "foodFareFixedHint": "DealGo sets this fee for the distance; it is not negotiable.",
+  "foodFareNegotiationHint": "The driver can accept this amount or counter with a higher fee.",
+  "foodLineNoteClear": "Clear note",
+  "foodCartLineRemove": "Remove item",
   "driverOtpLocked": "Too many wrong codes. Contact support to continue this ride.",
   "ridePickupCodeUnavailable": "Your pickup code appears once a driver accepts the ride.",
   "driverCardRating": "{rating} · {count} ratings",
@@ -1276,6 +1406,7 @@
     }
   },
   "foodDiscoverySearchHint": "Search restaurants, dishes, drinks",
+  "foodFeedEndOfList": "You have seen every store nearby",
   "foodStoreBestsellers": "Best sellers",
   "foodStorePrepChip": "≈{minutes} min",
   "@foodStorePrepChip": {
@@ -1285,9 +1416,18 @@
       }
     }
   },
+  "foodStorePrepShort": "{minutes} min",
+  "@foodStorePrepShort": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "foodSearchGroups": "Categories",
   "foodSeeAll": "See all →",
-  "foodCategoryEmpty": "No restaurants in this category yet.",
+  "foodEmptyNoStoresInCategory": "No stores in this category yet",
+  "foodEmptyOutOfArea": "DealGo does not deliver here yet",
   "foodStoreTitle": "Store details",
   "foodStoreOpen": "Open",
   "foodStorePaused": "Paused",
@@ -1309,6 +1449,14 @@
   "foodStoreInfoPaymentCod": "Cash on delivery",
   "foodStoreMenuCount": "Menu · {count} items",
   "@foodStoreMenuCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "foodStoreSectionCount": "{count} items",
+  "@foodStoreSectionCount": {
     "placeholders": {
       "count": {
         "type": "int"
@@ -2290,6 +2438,8 @@
   "merchantPriceInvalid": "Invalid price",
   "merchantItemOnSale": "On sale",
   "merchantItemSoldOut": "Sold out",
+  "merchantItemPendingReview": "Pending review",
+  "merchantItemRejected": "Rejected",
   "foodOrderSentTitle": "Order sent",
   "foodOrderPlaced": "Order placed",
   "foodOrderPlacedSub": "Waiting for store",
@@ -3199,6 +3349,14 @@
       }
     }
   },
+  "foodStoreOpenUntil": "Open until {time}",
+  "@foodStoreOpenUntil": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "foodOffersNearTitle": "Deals near you",
   "foodStoreOffersTitle": "Store deals",
   "foodStoreOfferUse": "Use",
@@ -3219,6 +3377,14 @@
   "foodStoreReviewsFilterNone": "No matching reviews",
   "foodItemSold": "{count} sold",
   "@foodItemSold": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "foodItemOptionsCount": "{count} choices",
+  "@foodItemOptionsCount": {
     "placeholders": {
       "count": {
         "type": "int"
@@ -3871,8 +4037,6 @@
   "partnerErrorLegalConsent": "The Terms of use or Privacy policy was just updated. Please review and accept again.",
   "foodFareSuggested": "Suggested delivery fee",
   "foodFareYourOffer": "Your offer",
-  "foodFareHint": "The delivery fee is only a suggestion. Drivers can accept your offer or propose another one for you to choose; the fee is fixed once a driver takes the order.",
-  "foodFareHintFixed": "The delivery fee is only a suggestion; you can raise or lower it. Drivers accept exactly the fee you choose; it is fixed once a driver takes the order.",
   "foodFareFixedWaiting": "Drivers can only accept the fee you offered. If it's taking a while, raise the fee to make the order more attractive.",
   "driverFareFixed": "This order uses a fixed fee: you can only accept the customer's price.",
   "foodFareDecrease": "Lower the fee",
@@ -3938,5 +4102,103 @@
   },
   "driverFareCounterSent": "Offer sent. Waiting for the customer.",
   "driverFareCounterFailed": "Could not send the offer.",
-  "merchantFareAgreed": "Delivery fee (agreed)"
+  "merchantFareAgreed": "Delivery fee (agreed)",
+  "driverCreditTitle": "Prepaid balance",
+  "driverCreditSubtitle": "Covers platform fees only. It cannot be withdrawn or transferred.",
+  "driverCreditBalance": "Prepaid credit",
+  "driverCreditOwes": "Fee debt",
+  "driverCreditBlocked": "Fee debt is over the limit. You will not receive new jobs until you top up.",
+  "driverCreditNearLimit": "Fee debt is close to the limit. Top up to keep receiving jobs.",
+  "driverCreditDisabled": "Top-up is not open yet. Please try again later.",
+  "driverCreditAmount": "Top-up amount",
+  "driverCreditAmountRange": "From {min} to {max}",
+  "@driverCreditAmountRange": {
+    "placeholders": {
+      "min": {
+        "type": "String"
+      },
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "driverCreditTopUp": "Top up",
+  "driverCreditPending": "Waiting for payment",
+  "driverCreditRemaining": "{amount} left",
+  "@driverCreditRemaining": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "driverCreditOpenCheckout": "Open the payment page",
+  "driverCreditCancelTopUp": "Cancel this top-up",
+  "driverCreditChecking": "Checking payment…",
+  "driverCreditPaidHint": "Paid. The amount is now in your prepaid balance.",
+  "driverCreditRecent": "Recent top-ups",
+  "driverCreditEmpty": "No top-ups yet.",
+  "driverCreditLoading": "Loading balance…",
+  "driverCreditCardTitle": "Top up fees",
+  "driverCreditCardBody": "Keep your fee debt at zero so you keep receiving jobs.",
+  "driverCreditStatusPending": "Pending",
+  "driverCreditStatusPaid": "Credited",
+  "driverCreditStatusExpired": "Expired",
+  "driverCreditStatusCancelled": "Cancelled",
+  "driverCreditStatusRefundPending": "Refund pending",
+  "driverCreditStatusRefunded": "Refunded",
+  "driverCreditStatusFailed": "Failed",
+  "driverCreditErrorGeneric": "Could not top up. Please try again.",
+  "driverCreditErrorPending": "You already have a top-up waiting for payment.",
+  "driverCreditErrorDailyLimit": "Today's top-up limit has been reached.",
+  "driverCreditErrorCreditLimit": "Prepaid balance limit has been reached.",
+  "driverCreditErrorAmount": "The amount is outside the allowed range.",
+  "driverCreditErrorKyc": "An approved KYC is required before topping up.",
+  "driverCreditErrorDisabled": "Top-up is not open yet.",
+  "driverCreditErrorProvider": "The payment provider is not available right now.",
+  "driverCreditScanHint": "Open your banking app and scan this QR code. The amount is filled in for you.",
+  "driverCreditOrderCode": "Order code",
+  "driverCreditExpiresIn": "Expires in {time}",
+  "@driverCreditExpiresIn": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "driverCreditDetailTitle": "Top-up detail",
+  "driverCreditCopyCode": "Copy order code",
+  "driverCreditCopied": "Order code copied.",
+  "driverCreditPaymentReceived": "Payment received",
+  "driverCreditPaymentReceivedBody": "{amount} has been added to your prepaid balance.",
+  "@driverCreditPaymentReceivedBody": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "driverCreditLinkExpired": "This payment link is no longer valid.",
+  "driverCreditCreateNew": "Create a new top-up",
+  "driverCreditAppliedFees": "Applied to fees",
+  "driverCreditRefundedAmount": "Refunded",
+  "driverCreditMethod": "Payment method",
+  "driverCreditCreatedAt": "Created",
+  "driverCreditPaidAt": "Paid at",
+  "driverCreditClose": "Close",
+  "driverCreditWaitingBank": "The balance updates automatically once your bank confirms.",
+  "foodVoucherWallTitle": "Today's offers",
+  "foodVoucherWallSeeAll": "See all",
+  "foodReorderTitle": "Order again",
+  "foodReorderStripItems": "{count, plural, =1{1 item} other{{count} items}} · {total}",
+  "@foodReorderStripItems": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  }
 }

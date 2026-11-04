@@ -49,7 +49,13 @@ export class PrismaService implements DatabasePing, OnModuleDestroy {
     const adapter = new PrismaPg(
       {
         connectionString: databaseUrl,
-        connectionTimeoutMillis: PING_TIMEOUT_MS,
+        // Applies to the whole pool, so this is a request budget, not a
+        // health-check budget: the 1 s ping timeout would fail ordinary
+        // queries whenever the pool is briefly saturated.
+        connectionTimeoutMillis: this.config.get(
+          'DATABASE_CONNECT_TIMEOUT_MS',
+          { infer: true },
+        ),
         // Per process: API and worker each open their own pool.
         max: this.config.get('DATABASE_POOL_MAX', { infer: true }),
       },

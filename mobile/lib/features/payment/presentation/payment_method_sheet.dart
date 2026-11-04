@@ -294,9 +294,13 @@ class PaymentMethodTile extends StatefulWidget {
   State<PaymentMethodTile> createState() => _PaymentMethodTileState();
 }
 
-class _PaymentMethodTileState extends State<PaymentMethodTile> {
+class _PaymentMethodTileState extends State<PaymentMethodTile>
+    with AutomaticKeepAliveClientMixin<PaymentMethodTile> {
   List<PaymentMethodOption> _options = const [PaymentMethodOption.cash];
   var _loading = true;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -348,6 +352,7 @@ class _PaymentMethodTileState extends State<PaymentMethodTile> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final current = _find(widget.selected);
     return InkWell(
       key: const Key('payment-method-tile'),

@@ -3,6 +3,7 @@ import {
   MemoryFoodRepository,
   pickFeaturedItems,
   shownOriginalPrice,
+  snapshotFoodLines,
   type StoreFeaturedItem,
 } from './food.repository.js';
 
@@ -71,6 +72,58 @@ describe('food browse extras', () => {
     await expect(place(1, 'k1')).rejects.toMatchObject({ code: 'FOOD_MIN_ORDER_NOT_MET' });
     const order = await place(2, 'k2');
     expect(order.subtotalVnd).toBe(100_000);
+  });
+});
+
+describe('item moderation can be disabled per platform setting', () => {
+  it('creates APPROVED dishes when the service passes the disabled verdict', async () => {
+    const food = new MemoryFoodRepository();
+    await food.createStore('owner-auto', 'Quán Tự Duyệt', []);
+    const item = await food.createItem({
+      ownerId: 'owner-auto',
+      name: 'Phở',
+      priceVnd: 40_000,
+      moderationStatus: 'APPROVED',
+    });
+    expect(item.moderationStatus).toBe('APPROVED');
+    expect(item.available).toBe(true);
+  });
+
+  it('skips the approval gate only when the caller asks for it', async () => {
+    const food = new MemoryFoodRepository();
+    await food.createStore('owner-gate', 'Quán Chờ Duyệt', []);
+    const item = await food.createItem({
+      ownerId: 'owner-gate',
+      name: 'Phở',
+      priceVnd: 40_000,
+    });
+    const view = { ...item, available: true, moderationStatus: 'PENDING' as const };
+    const requested = [{ itemId: item.id, quantity: 1 }];
+    expect(() => snapshotFoodLines([view], requested)).toThrow();
+    expect(snapshotFoodLines([view], requested, false)).toHaveLength(1);
+  });
+
+  it('hides menu sections that only hold unapproved dishes', async () => {
+    const food = new MemoryFoodRepository();
+    const store = await food.createStore('owner-sections', 'Quán Mục Lục', []);
+    const category = await food.createMenuCategory({
+      ownerId: 'owner-sections',
+      name: 'Món chính',
+    });
+    const item = await food.createItem({
+      ownerId: 'owner-sections',
+      name: 'Phở',
+      priceVnd: 40_000,
+      menuCategoryId: category.id,
+    });
+    expect(await food.listStoreMenuSections(store.id)).toEqual([]);
+    expect(
+      (await food.listStoreMenuSections(store.id, false)).map((row) => row.id),
+    ).toEqual([category.id]);
+    await food.setCatalogModeration(item.id, 'APPROVED');
+    expect(
+      (await food.listStoreMenuSections(store.id)).map((row) => row.id),
+    ).toEqual([category.id]);
   });
 });
 

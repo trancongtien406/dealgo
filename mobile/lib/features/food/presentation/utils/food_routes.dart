@@ -21,6 +21,9 @@ abstract final class FoodRoutes {
 
   static const cart = '/customer/food/cart';
   static const checkout = '/customer/food/checkout';
+
+  /// The customer's voucher list (account overlay route).
+  static const vouchers = '/customer/account/vouchers';
   static const orderSuccess = '/customer/food/order-success';
 
   static String order(String orderId) {

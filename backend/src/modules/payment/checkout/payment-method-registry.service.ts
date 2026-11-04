@@ -67,24 +67,16 @@ export class PaymentMethodRegistryService {
     @Inject(PAYMENT_GATEWAY_OPTIONS) private readonly options: PaymentGatewayOptions,
   ) {}
 
-  private async readRegistry(): Promise<{ registry: PaymentMethodRegistryValue; walletEnabled: boolean }> {
-    let registry: PaymentMethodRegistryValue = { methods: {} };
-    let walletEnabled = false;
+  private async readRegistry(): Promise<PaymentMethodRegistryValue> {
     try {
-      registry = normalizePaymentMethodRegistry(await this.settings.getJson('PAYMENT_METHOD_REGISTRY'));
+      return normalizePaymentMethodRegistry(await this.settings.getJson('PAYMENT_METHOD_REGISTRY'));
     } catch {
-      registry = { methods: {} };
+      return { methods: {} };
     }
-    try {
-      walletEnabled = await this.settings.getBoolean('PAYMENT_WALLET_ENABLED');
-    } catch {
-      walletEnabled = false;
-    }
-    return { registry, walletEnabled };
   }
 
-  async listForOps(): Promise<{ walletEnabled: boolean; publicBaseUrlConfigured: boolean; methods: OpsPaymentMethodView[] }> {
-    const { registry, walletEnabled } = await this.readRegistry();
+  async listForOps(): Promise<{ publicBaseUrlConfigured: boolean; methods: OpsPaymentMethodView[] }> {
+    const registry = await this.readRegistry();
     const methods = PAYMENT_METHOD_CATALOG.map((entry): OpsPaymentMethodView => {
       const saved = registry.methods[entry.code];
       const adapter = entry.provider ? this.adapters[entry.provider] : undefined;
@@ -100,9 +92,6 @@ export class PaymentMethodRegistryService {
       const gate = (svc: PaymentServiceCode) => {
         if (entry.code === 'CASH') {
           return true;
-        }
-        if (entry.code === 'DEALGO_WALLET' && !walletEnabled) {
-          return false;
         }
         return services[svc] && adapterKind === 'REAL' && configured;
       };
@@ -121,7 +110,7 @@ export class PaymentMethodRegistryService {
         locked: entry.code === 'CASH',
       };
     }).sort((a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code));
-    return { walletEnabled, publicBaseUrlConfigured: Boolean(this.options.publicBaseUrl), methods };
+    return { publicBaseUrlConfigured: Boolean(this.options.publicBaseUrl), methods };
   }
 
   async list(service: PaymentServiceCode): Promise<PublicPaymentMethodView[]> {
@@ -164,12 +153,12 @@ export class PaymentMethodRegistryService {
   }
 
   async update(
-    input: { methods?: PaymentMethodPatch[]; walletEnabled?: boolean },
+    input: { methods?: PaymentMethodPatch[] },
     reason: string,
     actorUserId: string,
   ) {
     if (input.methods && input.methods.length > 0) {
-      const { registry } = await this.readRegistry();
+      const registry = await this.readRegistry();
       const next: PaymentMethodRegistryValue = { methods: { ...registry.methods } };
       for (const patch of input.methods) {
         if (!(PAYMENT_METHOD_CODES as readonly string[]).includes(patch.code)) {
@@ -195,9 +184,6 @@ export class PaymentMethodRegistryService {
         };
       }
       await this.settings.patch('PAYMENT_METHOD_REGISTRY', JSON.stringify(next), reason, actorUserId);
-    }
-    if (typeof input.walletEnabled === 'boolean') {
-      await this.settings.patch('PAYMENT_WALLET_ENABLED', String(input.walletEnabled), reason, actorUserId);
     }
     return this.listForOps();
   }

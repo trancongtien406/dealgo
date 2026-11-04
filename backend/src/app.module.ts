@@ -51,6 +51,7 @@ import { AvatarModule } from './modules/avatar/index.js';
 import { SupportTicketModule } from './modules/support-ticket/index.js';
 import { CustomerActivityModule } from './modules/customer-activity/index.js';
 import { DriverHistoryModule } from './modules/driver-history/index.js';
+import { DriverCreditModule } from './modules/driver-credit/index.js';
 import { AccountDeletionModule } from './modules/account-deletion/index.js';
 import { AccountSettingsModule } from './modules/account-settings/index.js';
 import { RoutingModule } from './modules/routing/index.js';
@@ -134,6 +135,7 @@ function buildThrottlerOptions(config: ConfigService<AppEnv, true>): ThrottlerMo
     IntegrationsAdminModule,
     SystemErrorsModule,
     OpsEventsModule,
+    DriverCreditModule,
   ],
   controllers: [AppController],
   providers: [

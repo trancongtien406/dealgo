@@ -158,12 +158,37 @@ void main() {
     expect(food.storeListGeo, contains(true));
     await tester.dragUntilVisible(
       find.text('Đánh giá cao'),
-      find.byType(ListView).first,
+      find.byType(CustomScrollView).first,
       const Offset(0, -300),
     );
     expect(find.text('Đánh giá cao'), findsOneWidget);
     expect(find.textContaining('4,5 (4)', findRichText: true), findsWidgets);
     expect(find.textContaining('1,2 km', findRichText: true), findsWidgets);
+  });
+
+  testWidgets('discovery filters reload from the server with the range', (
+    tester,
+  ) async {
+    _tall(tester);
+    final food = _client();
+    await pumpSignedIn(
+      tester,
+      profile: customerProfile,
+      foodClient: food,
+      ratings: _ratings(),
+    );
+    await tester.tap(find.text('Đồ ăn').first);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('food-discovery-filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('food-filter-km-3')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('food-filter-apply')));
+    await tester.pumpAndSettle();
+
+    expect(food.storeMaxKms.last, 3);
+    expect(find.text('Trong 3 km'), findsOneWidget);
   });
 
   testWidgets('category page filters by the real store category', (
@@ -184,6 +209,37 @@ void main() {
 
     await _go(tester, '/customer/food/category?category=cafe');
     expect(find.byKey(const Key('food-category-empty')), findsOneWidget);
+  });
+
+  testWidgets('search shows dishes above stores and sorts on the server', (
+    tester,
+  ) async {
+    _tall(tester);
+    final food = FakeFoodClient()
+      ..searchFoodHandler = (q) => FoodSearchResult(
+        dishes: [dishHit(name: 'Bún bò', storeId: 's1', itemId: 'item-bun')],
+        dishTotal: 1,
+        stores: [
+          for (var i = 1; i <= 5; i++)
+            storeSummary(id: 's$i', name: 'Quán $i', category: 'rice'),
+        ],
+        storeTotal: 5,
+      );
+    await pumpSignedIn(
+      tester,
+      profile: customerProfile,
+      foodClient: food,
+      ratings: _ratings(),
+    );
+    await _go(tester, '/customer/food/search?q=qu%C3%A1n');
+    expect(find.byKey(const Key('food-dish-hits')), findsOneWidget);
+    expect(find.text('Món ăn'), findsOneWidget);
+    expect(find.text('Quán'), findsWidgets);
+    expect(find.text('Quán 5'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('food-search-sort-rating')));
+    await tester.pumpAndSettle();
+    expect(food.searchSorts.last, 'rating');
   });
 
   test('search history keeps the 5 latest unique queries', () async {

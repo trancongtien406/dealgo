@@ -15,6 +15,7 @@ import { ChatRetentionService } from './chat-retention.service.js';
 import { KycMediaRetentionService } from './kyc-media-retention.service.js';
 import { WorkerHeartbeatService } from './worker-heartbeat.service.js';
 import { PaymentGatewayService } from '../modules/payment/checkout/payment-gateway.service.js';
+import { DriverCreditService } from '../modules/driver-credit/driver-credit.service.js';
 
 const RIDE_EXPIRY_JOB = 'ride-expiry';
 const OUTBOX_RELAY_JOB = 'outbox-relay';
@@ -25,6 +26,7 @@ const HEARTBEAT_JOB = 'worker-heartbeat';
 const CHAT_RETENTION_JOB = 'chat-retention';
 const KYC_MEDIA_RETENTION_JOB = 'kyc-media-retention';
 const PAYMENT_RECONCILE_JOB = 'payment-reconcile';
+const DRIVER_TOP_UP_RECONCILE_JOB = 'driver-top-up-reconcile';
 
 /**
  * Starts BullMQ repeatable jobs when REDIS_URL is reachable.
@@ -49,6 +51,7 @@ export class WorkersBootstrap implements OnModuleInit, OnModuleDestroy {
     private readonly chatRetention: ChatRetentionService,
     private readonly kycMediaRetention: KycMediaRetentionService,
     private readonly payments: PaymentGatewayService,
+    private readonly driverCredit: DriverCreditService,
   ) {}
 
   /** Jobs added after the original four (DEC-PROD-053/056): name → interval + handler. */
@@ -73,6 +76,11 @@ export class WorkersBootstrap implements OnModuleInit, OnModuleDestroy {
         name: PAYMENT_RECONCILE_JOB,
         every: this.config.get('PAYMENT_RECONCILE_INTERVAL_MS', { infer: true }),
         run: () => this.payments.reconcilePending(),
+      },
+      {
+        name: DRIVER_TOP_UP_RECONCILE_JOB,
+        every: this.config.get('PAYMENT_RECONCILE_INTERVAL_MS', { infer: true }),
+        run: () => this.driverCredit.reconcilePending(),
       },
     ];
   }
