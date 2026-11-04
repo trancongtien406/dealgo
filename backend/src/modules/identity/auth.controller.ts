@@ -5,7 +5,6 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
-  Ip,
   Param,
   ParseUUIDPipe,
   Post,
@@ -13,8 +12,12 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ThrottlerGuard } from '@nestjs/throttler';
+import { ClientIp } from '../../platform/http/client-ip.decorator.js';
 import { PhoneOtpThrottlerGuard } from './phone-otp-throttler.guard.js';
-import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
+import type {
+  AuthenticationResponseJSON,
+  RegistrationResponseJSON,
+} from '@simplewebauthn/server';
 import {
   AccessAuthGuard,
   CurrentActor,
@@ -35,7 +38,10 @@ import {
   RegistrationVerifyDto,
   VerifyCodeDto,
 } from './auth.dto.js';
-import { AuthMethodEnabledGuard, RequireAuthMethod } from './auth-method-enabled.guard.js';
+import {
+  AuthMethodEnabledGuard,
+  RequireAuthMethod,
+} from './auth-method-enabled.guard.js';
 import { AuthMethodPolicyService } from './auth-method-policy.service.js';
 import { EmailPasswordAuthService } from './email-password-auth.service.js';
 import { EmailVerificationService } from './email-verification.service.js';
@@ -61,7 +67,8 @@ export class AuthController {
   @Get('methods')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Sign-in methods that are currently enabled (disabled ones are omitted)',
+    summary:
+      'Sign-in methods that are currently enabled (disabled ones are omitted)',
   })
   listMethods() {
     return this.authMethods.listPublic();
@@ -73,15 +80,19 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(ThrottlerGuard, PhoneOtpThrottlerGuard)
   @ApiOperation({
-    summary: 'Start phone OTP challenge (rate limited per IP and 5 per phone per 15 min)',
+    summary:
+      'Start phone OTP challenge (rate limited per IP and 5 per phone per 15 min)',
   })
   createPhoneChallenge(
     @Body() body: PhoneChallengeDto,
     @Headers('x-device-id') deviceIdHeader?: string,
-    @Ip() ip?: string,
+    @ClientIp() ip?: string | null,
   ) {
-    const deviceId = (deviceIdHeader?.trim() || body.deviceId?.trim()) || null;
-    return this.phoneAuth.createChallenge(body.phone, { deviceId, ipAddress: ip ?? null });
+    const deviceId = deviceIdHeader?.trim() || body.deviceId?.trim() || null;
+    return this.phoneAuth.createChallenge(body.phone, {
+      deviceId,
+      ipAddress: ip ?? null,
+    });
   }
 
   @Post('phone/challenges/:id/verify')
@@ -96,9 +107,9 @@ export class AuthController {
     @Body() body: VerifyCodeDto,
     @Headers('x-device-id') deviceIdHeader?: string,
     @Headers('user-agent') userAgent?: string,
-    @Ip() ip?: string,
+    @ClientIp() ip?: string | null,
   ) {
-    const deviceId = (deviceIdHeader?.trim() || body.deviceId?.trim()) || null;
+    const deviceId = deviceIdHeader?.trim() || body.deviceId?.trim() || null;
     return this.phoneAuth.verify(id, body.code, {
       deviceId,
       userAgent: userAgent ?? null,
@@ -117,9 +128,9 @@ export class AuthController {
   registerEmail(
     @Body() body: EmailPasswordRegisterDto,
     @Headers('x-device-id') deviceIdHeader?: string,
-    @Ip() ip?: string,
+    @ClientIp() ip?: string | null,
   ) {
-    const deviceId = (deviceIdHeader?.trim() || body.deviceId?.trim()) || null;
+    const deviceId = deviceIdHeader?.trim() || body.deviceId?.trim() || null;
     return this.emailPasswordAuth.register(
       {
         email: body.email,
@@ -143,9 +154,9 @@ export class AuthController {
     @Body() body: VerifyCodeDto,
     @Headers('x-device-id') deviceIdHeader?: string,
     @Headers('user-agent') userAgent?: string,
-    @Ip() ip?: string,
+    @ClientIp() ip?: string | null,
   ) {
-    const deviceId = (deviceIdHeader?.trim() || body.deviceId?.trim()) || null;
+    const deviceId = deviceIdHeader?.trim() || body.deviceId?.trim() || null;
     return this.emailPasswordAuth.verifyRegistration(id, body.code, {
       deviceId,
       userAgent: userAgent ?? null,
@@ -177,9 +188,9 @@ export class AuthController {
     @Body() body: EmailPasswordLoginDto,
     @Headers('x-device-id') deviceIdHeader?: string,
     @Headers('user-agent') userAgent?: string,
-    @Ip() ip?: string,
+    @ClientIp() ip?: string | null,
   ) {
-    const deviceId = (deviceIdHeader?.trim() || body.deviceId?.trim()) || null;
+    const deviceId = deviceIdHeader?.trim() || body.deviceId?.trim() || null;
     return this.emailPasswordAuth.login(
       {
         email: body.email,
@@ -212,7 +223,10 @@ export class AuthController {
   @RequireAuthMethod('EMAIL_LOGIN_IDENTIFIER')
   @HttpCode(HttpStatus.OK)
   @UseGuards(ThrottlerGuard)
-  confirmEmail(@Param('id', ParseUUIDPipe) id: string, @Body() body: ConfirmEmailDto) {
+  confirmEmail(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: ConfirmEmailDto,
+  ) {
     return this.emailVerification.confirm(id, body.code);
   }
 
@@ -266,7 +280,10 @@ export class AuthController {
   @RequireAuthMethod('PASSKEY')
   @HttpCode(HttpStatus.OK)
   @UseGuards(CustomerSessionGuard)
-  verifyRegistration(@CurrentActor() actor: RequestActor, @Body() body: RegistrationVerifyDto) {
+  verifyRegistration(
+    @CurrentActor() actor: RequestActor,
+    @Body() body: RegistrationVerifyDto,
+  ) {
     return this.passkeys.verifyRegistration(
       actor.userId,
       body as unknown as RegistrationResponseJSON,
@@ -289,12 +306,23 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(ThrottlerGuard)
   @ApiOperation({
-    summary: 'Verify passkey assertion and issue customer session (rate limited)',
+    summary:
+      'Verify passkey assertion and issue customer session (rate limited)',
   })
-  verifyAuthentication(@Body() body: AuthenticationVerifyDto) {
+  verifyAuthentication(
+    @Body() body: AuthenticationVerifyDto,
+    @Headers('x-device-id') deviceId?: string,
+    @Headers('user-agent') userAgent?: string,
+    @ClientIp() ip?: string | null,
+  ) {
     return this.passkeys.verifyAuthentication(
       body.ceremonyId,
       body as unknown as AuthenticationResponseJSON,
+      {
+        deviceId: deviceId?.trim() || null,
+        userAgent: userAgent ?? null,
+        ipAddress: ip ?? null,
+      },
     );
   }
 
@@ -314,14 +342,36 @@ export class AuthController {
   @ApiOperation({
     summary: 'Create a customer account from a verified passkey',
   })
-  verifySignup(@Body() body: PasskeySignupVerifyDto) {
-    return this.passkeys.verifySignup(body.ceremonyId, body as unknown as RegistrationResponseJSON);
+  verifySignup(
+    @Body() body: PasskeySignupVerifyDto,
+    @Headers('x-device-id') deviceId?: string,
+    @Headers('user-agent') userAgent?: string,
+    @ClientIp() ip?: string | null,
+  ) {
+    return this.passkeys.verifySignup(
+      body.ceremonyId,
+      body as unknown as RegistrationResponseJSON,
+      {
+        deviceId: deviceId?.trim() || null,
+        userAgent: userAgent ?? null,
+        ipAddress: ip ?? null,
+      },
+    );
   }
 
   @Post('sessions/refresh')
   @HttpCode(HttpStatus.OK)
-  refresh(@Body() body: RefreshSessionDto) {
-    return this.sessions.refresh(body.refreshToken);
+  refresh(
+    @Body() body: RefreshSessionDto,
+    @Headers('user-agent') userAgent?: string,
+    @Headers('x-device-id') deviceId?: string,
+    @ClientIp() ip?: string | null,
+  ) {
+    return this.sessions.refresh(body.refreshToken, {
+      deviceId: deviceId?.trim() || null,
+      userAgent: userAgent ?? null,
+      ipAddress: ip ?? null,
+    });
   }
 
   @Post('sessions/revoke')

@@ -9,6 +9,8 @@ describe('DynamicSmsSender', () => {
     NODE_ENV: 'test',
     SMS_PROVIDER: undefined,
     SMS_OTP_TEMPLATE: 'Code {code}',
+    SMS_HTTP_TIMEOUT_MS: 8_000,
+    SMS_HTTP_MAX_ATTEMPTS: 2,
   };
 
   it('falls back to env sender when settings is undefined or empty', async () => {
@@ -32,9 +34,16 @@ describe('DynamicSmsSender', () => {
       })) as any,
     };
 
-    const dynamic = new DynamicSmsSender(mockEnvSender, env, 5, mockSettings as IntegrationSettingsService);
+    const dynamic = new DynamicSmsSender(
+      mockEnvSender,
+      env,
+      5,
+      mockSettings as IntegrationSettingsService,
+    );
     expect(await dynamic.isConfigured()).toBe(true);
-    await expect(dynamic.sendOtp('+84901234567', '654321')).resolves.toBeUndefined();
+    await expect(
+      dynamic.sendOtp('+84901234567', '654321'),
+    ).resolves.toBeUndefined();
   });
 
   it('resolves esms provider from IntegrationSettings with credentials', async () => {
@@ -48,7 +57,12 @@ describe('DynamicSmsSender', () => {
       })) as any,
     };
 
-    const dynamic = new DynamicSmsSender(mockEnvSender, env, 5, mockSettings as IntegrationSettingsService);
+    const dynamic = new DynamicSmsSender(
+      mockEnvSender,
+      env,
+      5,
+      mockSettings as IntegrationSettingsService,
+    );
     expect(await dynamic.isConfigured()).toBe(true);
   });
 
@@ -63,7 +77,12 @@ describe('DynamicSmsSender', () => {
       })) as any,
     };
 
-    const dynamic = new DynamicSmsSender(mockEnvSender, env, 5, mockSettings as IntegrationSettingsService);
+    const dynamic = new DynamicSmsSender(
+      mockEnvSender,
+      env,
+      5,
+      mockSettings as IntegrationSettingsService,
+    );
     expect(await dynamic.isConfigured()).toBe(true);
   });
 
@@ -78,7 +97,12 @@ describe('DynamicSmsSender', () => {
       })) as any,
     };
 
-    const dynamic = new DynamicSmsSender(mockEnvSender, env, 5, mockSettings as IntegrationSettingsService);
+    const dynamic = new DynamicSmsSender(
+      mockEnvSender,
+      env,
+      5,
+      mockSettings as IntegrationSettingsService,
+    );
     expect(await dynamic.isConfigured()).toBe(false);
   });
 });

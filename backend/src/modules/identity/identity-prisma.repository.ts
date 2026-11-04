@@ -99,7 +99,11 @@ export class PrismaIdentityRepository implements IdentityRepository {
     return mapUser(user);
   }
 
-  async setEmailVerified(userId: string, email: string, at: Date): Promise<UserRecord> {
+  async setEmailVerified(
+    userId: string,
+    email: string,
+    at: Date,
+  ): Promise<UserRecord> {
     try {
       const user = await this.db.user.update({
         where: { id: userId },
@@ -111,7 +115,10 @@ export class PrismaIdentityRepository implements IdentityRepository {
     }
   }
 
-  async updateUserProfile(userId: string, patch: UserProfilePatch): Promise<UserRecord> {
+  async updateUserProfile(
+    userId: string,
+    patch: UserProfilePatch,
+  ): Promise<UserRecord> {
     const data: {
       displayName?: string;
       dateOfBirth?: Date | null;
@@ -160,7 +167,9 @@ export class PrismaIdentityRepository implements IdentityRepository {
   }
 
   async findPhoneChallenge(id: string): Promise<PhoneChallengeRecord | null> {
-    const challenge = await this.db.phoneChallenge.findUnique({ where: { id } });
+    const challenge = await this.db.phoneChallenge.findUnique({
+      where: { id },
+    });
     if (!challenge) {
       return null;
     }
@@ -213,12 +222,18 @@ export class PrismaIdentityRepository implements IdentityRepository {
     return mapEmail(verification);
   }
 
-  async findEmailVerification(id: string): Promise<EmailVerificationRecord | null> {
-    const verification = await this.db.emailVerification.findUnique({ where: { id } });
+  async findEmailVerification(
+    id: string,
+  ): Promise<EmailVerificationRecord | null> {
+    const verification = await this.db.emailVerification.findUnique({
+      where: { id },
+    });
     return verification ? mapEmail(verification) : null;
   }
 
-  async findLatestEmailVerification(userId: string): Promise<EmailVerificationRecord | null> {
+  async findLatestEmailVerification(
+    userId: string,
+  ): Promise<EmailVerificationRecord | null> {
     const verification = await this.db.emailVerification.findFirst({
       where: { userId },
       orderBy: { createdAt: 'desc' },
@@ -226,11 +241,18 @@ export class PrismaIdentityRepository implements IdentityRepository {
     return verification ? mapEmail(verification) : null;
   }
 
-  async countEmailVerificationsSince(userId: string, since: Date): Promise<number> {
-    return this.db.emailVerification.count({ where: { userId, createdAt: { gte: since } } });
+  async countEmailVerificationsSince(
+    userId: string,
+    since: Date,
+  ): Promise<number> {
+    return this.db.emailVerification.count({
+      where: { userId, createdAt: { gte: since } },
+    });
   }
 
-  async recordFailedEmailVerificationAttempt(id: string): Promise<EmailVerificationRecord> {
+  async recordFailedEmailVerificationAttempt(
+    id: string,
+  ): Promise<EmailVerificationRecord> {
     const verification = await this.db.emailVerification.update({
       where: { id },
       data: { attemptCount: { increment: 1 } },
@@ -270,7 +292,9 @@ export class PrismaIdentityRepository implements IdentityRepository {
     });
   }
 
-  async findEmailSignupChallenge(id: string): Promise<EmailSignupChallengeRecord | null> {
+  async findEmailSignupChallenge(
+    id: string,
+  ): Promise<EmailSignupChallengeRecord | null> {
     return this.db.emailSignupChallenge.findUnique({ where: { id } });
   }
 
@@ -283,13 +307,18 @@ export class PrismaIdentityRepository implements IdentityRepository {
     });
   }
 
-  async countEmailSignupChallengesSince(email: string, since: Date): Promise<number> {
+  async countEmailSignupChallengesSince(
+    email: string,
+    since: Date,
+  ): Promise<number> {
     return this.db.emailSignupChallenge.count({
       where: { email, createdAt: { gte: since } },
     });
   }
 
-  async recordFailedEmailSignupAttempt(id: string): Promise<EmailSignupChallengeRecord> {
+  async recordFailedEmailSignupAttempt(
+    id: string,
+  ): Promise<EmailSignupChallengeRecord> {
     return this.db.emailSignupChallenge.update({
       where: { id },
       data: { attemptCount: { increment: 1 } },
@@ -392,10 +421,14 @@ export class PrismaIdentityRepository implements IdentityRepository {
   }
 
   async countPasswordResetsSince(email: string, since: Date): Promise<number> {
-    return this.db.passwordReset.count({ where: { email, createdAt: { gte: since } } });
+    return this.db.passwordReset.count({
+      where: { email, createdAt: { gte: since } },
+    });
   }
 
-  async recordFailedPasswordResetAttempt(id: string): Promise<PasswordResetRecord> {
+  async recordFailedPasswordResetAttempt(
+    id: string,
+  ): Promise<PasswordResetRecord> {
     const reset = await this.db.passwordReset.update({
       where: { id },
       data: { attemptCount: { increment: 1 } },
@@ -431,7 +464,11 @@ export class PrismaIdentityRepository implements IdentityRepository {
     return reset ? mapPasswordReset(reset) : null;
   }
 
-  async consumePasswordReset(id: string, at: Date, maxAttempts: number): Promise<boolean> {
+  async consumePasswordReset(
+    id: string,
+    at: Date,
+    maxAttempts: number,
+  ): Promise<boolean> {
     const updated = await this.db.passwordReset.updateMany({
       where: { id, consumedAt: null, attemptCount: { lt: maxAttempts } },
       data: { consumedAt: at },
@@ -491,7 +528,11 @@ export class PrismaIdentityRepository implements IdentityRepository {
     return rows.map(mapSession);
   }
 
-  async revokeOtherSessions(userId: string, keepSessionId: string, at: Date): Promise<number> {
+  async revokeOtherSessions(
+    userId: string,
+    keepSessionId: string,
+    at: Date,
+  ): Promise<number> {
     const result = await this.db.session.updateMany({
       where: { userId, revokedAt: null, id: { not: keepSessionId } },
       data: { revokedAt: at, revokeReason: 'USER' },
@@ -501,14 +542,22 @@ export class PrismaIdentityRepository implements IdentityRepository {
 
   async touchSessionMeta(
     id: string,
-    meta: { deviceLabel?: string | null; userAgent?: string | null; ipAddress?: string | null },
+    meta: {
+      deviceId?: string | null;
+      deviceLabel?: string | null;
+      userAgent?: string | null;
+      ipAddress?: string | null;
+    },
     at: Date,
   ): Promise<void> {
     await this.db.session.updateMany({
       where: { id, revokedAt: null },
       data: {
         lastSeenAt: at,
-        ...(meta.deviceLabel !== undefined ? { deviceLabel: meta.deviceLabel } : {}),
+        ...(meta.deviceId !== undefined ? { deviceId: meta.deviceId } : {}),
+        ...(meta.deviceLabel !== undefined
+          ? { deviceLabel: meta.deviceLabel }
+          : {}),
         ...(meta.userAgent !== undefined ? { userAgent: meta.userAgent } : {}),
         ...(meta.ipAddress !== undefined ? { ipAddress: meta.ipAddress } : {}),
       },
@@ -520,8 +569,12 @@ export class PrismaIdentityRepository implements IdentityRepository {
     return session ? mapSession(session) : null;
   }
 
-  async findSessionByRefreshTokenHash(refreshTokenHash: string): Promise<SessionRecord | null> {
-    const session = await this.db.session.findUnique({ where: { refreshTokenHash } });
+  async findSessionByRefreshTokenHash(
+    refreshTokenHash: string,
+  ): Promise<SessionRecord | null> {
+    const session = await this.db.session.findUnique({
+      where: { refreshTokenHash },
+    });
     return session ? mapSession(session) : null;
   }
 
@@ -531,12 +584,16 @@ export class PrismaIdentityRepository implements IdentityRepository {
     at: Date,
   ): Promise<RotateResult> {
     return this.db.$transaction(async (tx) => {
-      const current = await tx.session.findUnique({ where: { refreshTokenHash } });
+      const current = await tx.session.findUnique({
+        where: { refreshTokenHash },
+      });
       if (!current) {
         return { status: 'missing' };
       }
       if (current.revokedAt) {
-        return { status: current.revokeReason === 'REUSE' ? 'reuse' : 'revoked' };
+        return {
+          status: current.revokeReason === 'REUSE' ? 'reuse' : 'revoked',
+        };
       }
       if (current.expiresAt <= at) {
         return { status: 'expired' };
@@ -568,6 +625,7 @@ export class PrismaIdentityRepository implements IdentityRepository {
           channel: current.channel,
           refreshTokenHash: next.refreshTokenHash,
           expiresAt: next.expiresAt,
+          deviceId: current.deviceId,
           deviceLabel: current.deviceLabel,
           userAgent: current.userAgent,
           ipAddress: current.ipAddress,
@@ -578,14 +636,22 @@ export class PrismaIdentityRepository implements IdentityRepository {
     });
   }
 
-  async revokeSession(id: string, reason: RevokeReasonName, at: Date): Promise<void> {
+  async revokeSession(
+    id: string,
+    reason: RevokeReasonName,
+    at: Date,
+  ): Promise<void> {
     await this.db.session.updateMany({
       where: { id, revokedAt: null },
       data: { revokedAt: at, revokeReason: reason },
     });
   }
 
-  async revokeUserSessions(userId: string, channel: StoredChannel, at: Date): Promise<void> {
+  async revokeUserSessions(
+    userId: string,
+    channel: StoredChannel,
+    at: Date,
+  ): Promise<void> {
     await this.db.session.updateMany({
       where: { userId, channel, revokedAt: null },
       data: { revokedAt: at, revokeReason: 'USER' },
@@ -694,7 +760,9 @@ export class PrismaIdentityRepository implements IdentityRepository {
             },
             _count: { _all: true },
           })
-        : Promise.resolve([] as Array<{ status: string; _count: { _all: number } }>),
+        : Promise.resolve(
+            [] as Array<{ status: string; _count: { _all: number } }>,
+          ),
     ]);
 
     const counts =
@@ -954,14 +1022,18 @@ export class PrismaIdentityRepository implements IdentityRepository {
     status: GrantStatusName,
   ): Promise<RoleGrantRecord> {
     try {
-      const grant = await this.db.roleGrant.create({ data: { userId, role, status } });
+      const grant = await this.db.roleGrant.create({
+        data: { userId, role, status },
+      });
       return { id: grant.id, role: grant.role, status: grant.status };
     } catch (error) {
       throw mapUnique(error);
     }
   }
 
-  async findGrantById(id: string): Promise<(RoleGrantRecord & { userId: string }) | null> {
+  async findGrantById(
+    id: string,
+  ): Promise<(RoleGrantRecord & { userId: string }) | null> {
     const grant = await this.db.roleGrant.findUnique({ where: { id } });
     if (!grant) {
       return null;
@@ -974,7 +1046,10 @@ export class PrismaIdentityRepository implements IdentityRepository {
     };
   }
 
-  async updateGrantStatus(id: string, status: GrantStatusName): Promise<RoleGrantRecord | null> {
+  async updateGrantStatus(
+    id: string,
+    status: GrantStatusName,
+  ): Promise<RoleGrantRecord | null> {
     try {
       const grant = await this.db.roleGrant.update({
         where: { id },
@@ -982,7 +1057,10 @@ export class PrismaIdentityRepository implements IdentityRepository {
       });
       return { id: grant.id, role: grant.role, status: grant.status };
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2025'
+      ) {
         return null;
       }
       throw error;
@@ -990,7 +1068,9 @@ export class PrismaIdentityRepository implements IdentityRepository {
   }
 
   async findOpsCredential(userId: string): Promise<OpsCredentialRecord | null> {
-    const credential = await this.db.opsCredential.findUnique({ where: { userId } });
+    const credential = await this.db.opsCredential.findUnique({
+      where: { userId },
+    });
     if (!credential?.passwordHash) {
       return null;
     }
@@ -1008,7 +1088,9 @@ export class PrismaIdentityRepository implements IdentityRepository {
     reason: string;
   }): Promise<'ok' | 'unchanged' | 'no_credential'> {
     return this.db.$transaction(async (tx) => {
-      const target = await tx.opsCredential.findUnique({ where: { userId: input.targetUserId } });
+      const target = await tx.opsCredential.findUnique({
+        where: { userId: input.targetUserId },
+      });
       if (!target?.passwordHash) return 'no_credential' as const;
       if (target.staffRole === input.staffRole) return 'unchanged' as const;
       await tx.opsCredential.update({
@@ -1031,7 +1113,10 @@ export class PrismaIdentityRepository implements IdentityRepository {
   }
 
   async setOpsSuperAdmin(userId: string, superAdmin: boolean): Promise<void> {
-    await this.db.opsCredential.updateMany({ where: { userId }, data: { superAdmin } });
+    await this.db.opsCredential.updateMany({
+      where: { userId },
+      data: { superAdmin },
+    });
   }
 
   async resetOpsPassword(input: OpsPasswordResetInput): Promise<void> {
@@ -1062,11 +1147,15 @@ export class PrismaIdentityRepository implements IdentityRepository {
     });
   }
 
-  async changeOpsSuperAdmin(input: OpsSuperAdminChangeInput): Promise<OpsSuperAdminChangeResult> {
+  async changeOpsSuperAdmin(
+    input: OpsSuperAdminChangeInput,
+  ): Promise<OpsSuperAdminChangeResult> {
     return this.db.$transaction(async (tx) => {
       // Serializes concurrent grant/revoke so two admins cannot revoke each other to zero.
       await tx.$queryRaw`SELECT "userId" FROM "ops_credentials" WHERE "superAdmin" = true OR "userId" = ${input.targetUserId}::uuid FOR UPDATE`;
-      const target = await tx.opsCredential.findUnique({ where: { userId: input.targetUserId } });
+      const target = await tx.opsCredential.findUnique({
+        where: { userId: input.targetUserId },
+      });
       if (!target?.passwordHash) {
         return 'no_credential' as const;
       }
@@ -1093,7 +1182,9 @@ export class PrismaIdentityRepository implements IdentityRepository {
         data: {
           id: randomUUID(),
           actorUserId: input.actorUserId,
-          action: input.superAdmin ? 'OPS_SUPER_ADMIN_GRANT' : 'OPS_SUPER_ADMIN_REVOKE',
+          action: input.superAdmin
+            ? 'OPS_SUPER_ADMIN_GRANT'
+            : 'OPS_SUPER_ADMIN_REVOKE',
           entityType: 'OPS_STAFF',
           entityId: input.targetUserId,
           reason: input.reason,
@@ -1112,15 +1203,22 @@ export class PrismaIdentityRepository implements IdentityRepository {
     });
   }
 
-  async findCustomerCredential(userId: string): Promise<{ passwordHash: string } | null> {
-    const credential = await this.db.customerCredential.findUnique({ where: { userId } });
+  async findCustomerCredential(
+    userId: string,
+  ): Promise<{ passwordHash: string } | null> {
+    const credential = await this.db.customerCredential.findUnique({
+      where: { userId },
+    });
     if (!credential?.passwordHash) {
       return null;
     }
     return { passwordHash: credential.passwordHash };
   }
 
-  async saveCustomerCredential(userId: string, passwordHash: string): Promise<void> {
+  async saveCustomerCredential(
+    userId: string,
+    passwordHash: string,
+  ): Promise<void> {
     await this.db.customerCredential.upsert({
       where: { userId },
       create: { userId, passwordHash },
@@ -1133,8 +1231,12 @@ export class PrismaIdentityRepository implements IdentityRepository {
     return passkeys.map(mapPasskey);
   }
 
-  async findPasskeyByCredentialId(credentialId: string): Promise<PasskeyRecord | null> {
-    const passkey = await this.db.passkey.findUnique({ where: { credentialId } });
+  async findPasskeyByCredentialId(
+    credentialId: string,
+  ): Promise<PasskeyRecord | null> {
+    const passkey = await this.db.passkey.findUnique({
+      where: { credentialId },
+    });
     return passkey ? mapPasskey(passkey) : null;
   }
 
@@ -1174,7 +1276,9 @@ export class PrismaIdentityRepository implements IdentityRepository {
   ): Promise<UserRecord> {
     try {
       const user = await this.db.$transaction(async (tx) => {
-        const created = await tx.user.create({ data: { displayName: 'DealGo user' } });
+        const created = await tx.user.create({
+          data: { displayName: 'DealGo user' },
+        });
         await tx.roleGrant.create({
           data: { userId: created.id, role: 'CUSTOMER', status: 'ACTIVE' },
         });
@@ -1222,8 +1326,12 @@ export class PrismaIdentityRepository implements IdentityRepository {
     return challenge ? mapCeremony(challenge) : null;
   }
 
-  async findPasskeyChallenge(id: string): Promise<PasskeyChallengeRecord | null> {
-    const challenge = await this.db.passkeyChallenge.findUnique({ where: { id } });
+  async findPasskeyChallenge(
+    id: string,
+  ): Promise<PasskeyChallengeRecord | null> {
+    const challenge = await this.db.passkeyChallenge.findUnique({
+      where: { id },
+    });
     return challenge ? mapCeremony(challenge) : null;
   }
 
@@ -1375,7 +1483,10 @@ function mapCeremony(challenge: {
 }
 
 function mapUnique(error: unknown): unknown {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002'
+  ) {
     return new UniqueConflictError();
   }
   return error;

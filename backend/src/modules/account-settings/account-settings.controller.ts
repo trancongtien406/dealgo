@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
+import { extractClientIp } from '../../platform/http/client-ip.decorator.js';
 import {
   AccessAuthGuard,
   CurrentActor,
@@ -84,7 +85,7 @@ export class AccountSettingsController {
     return this.settings.touchCurrentDevice(actor.sessionId, {
       deviceLabel: dto.deviceLabel ?? null,
       userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null,
-      ipAddress: typeof req.ip === 'string' ? req.ip : null,
+      ipAddress: extractClientIp(req),
     });
   }
 

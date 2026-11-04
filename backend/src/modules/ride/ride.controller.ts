@@ -1,5 +1,4 @@
 import {
-  Ip,
   Body,
   Controller,
   Delete,
@@ -15,6 +14,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ClientIp } from '../../platform/http/client-ip.decorator.js';
 import { StartPaymentDto } from '../payment/checkout/payment-checkout.dto.js';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DriverLocationQueryDto } from '../dispatch/driver-location-query.dto.js';
@@ -138,7 +138,7 @@ export class RideController {
     @CurrentActor() actor: RequestActor,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: StartPaymentDto,
-    @Ip() ip: string,
+    @ClientIp() ip: string,
   ) {
     return this.rides.startPayment(actor, id, dto.methodCode, ip);
   }

@@ -72,7 +72,8 @@ export type OpsSuperAdminChangeInput = {
 };
 
 /** `last` = revoking would leave no active super-admin; nothing changed. */
-export type OpsSuperAdminChangeResult = 'ok' | 'unchanged' | 'last' | 'no_credential';
+export type OpsSuperAdminChangeResult =
+  'ok' | 'unchanged' | 'last' | 'no_credential';
 
 export type OpsPasswordResetInput = {
   targetUserId: string;
@@ -278,8 +279,15 @@ export interface IdentityRepository {
     contactPhone?: string | null;
   }): Promise<UserRecord>;
   markPhoneVerified(userId: string, at: Date): Promise<UserRecord>;
-  setEmailVerified(userId: string, email: string, at: Date): Promise<UserRecord>;
-  updateUserProfile(userId: string, patch: UserProfilePatch): Promise<UserRecord>;
+  setEmailVerified(
+    userId: string,
+    email: string,
+    at: Date,
+  ): Promise<UserRecord>;
+  updateUserProfile(
+    userId: string,
+    patch: UserProfilePatch,
+  ): Promise<UserRecord>;
 
   createPhoneChallenge(input: {
     userId: string | null;
@@ -299,9 +307,13 @@ export interface IdentityRepository {
     sentAt: Date;
   }): Promise<EmailVerificationRecord>;
   findEmailVerification(id: string): Promise<EmailVerificationRecord | null>;
-  findLatestEmailVerification(userId: string): Promise<EmailVerificationRecord | null>;
+  findLatestEmailVerification(
+    userId: string,
+  ): Promise<EmailVerificationRecord | null>;
   countEmailVerificationsSince(userId: string, since: Date): Promise<number>;
-  recordFailedEmailVerificationAttempt(id: string): Promise<EmailVerificationRecord>;
+  recordFailedEmailVerificationAttempt(
+    id: string,
+  ): Promise<EmailVerificationRecord>;
   consumeEmailVerification(id: string, at: Date): Promise<boolean>;
 
   createEmailSignupChallenge(input: {
@@ -314,11 +326,17 @@ export interface IdentityRepository {
     expiresAt: Date;
     sentAt: Date;
   }): Promise<EmailSignupChallengeRecord>;
-  findEmailSignupChallenge(id: string): Promise<EmailSignupChallengeRecord | null>;
+  findEmailSignupChallenge(
+    id: string,
+  ): Promise<EmailSignupChallengeRecord | null>;
   /** Newest challenge for the address, regardless of state. */
-  findLatestEmailSignupChallenge(email: string): Promise<EmailSignupChallengeRecord | null>;
+  findLatestEmailSignupChallenge(
+    email: string,
+  ): Promise<EmailSignupChallengeRecord | null>;
   countEmailSignupChallengesSince(email: string, since: Date): Promise<number>;
-  recordFailedEmailSignupAttempt(id: string): Promise<EmailSignupChallengeRecord>;
+  recordFailedEmailSignupAttempt(
+    id: string,
+  ): Promise<EmailSignupChallengeRecord>;
   /**
    * Replaces the code only if the challenge is unconsumed, not locked (fewer than
    * `maxAttempts` wrong codes), the last send is at or before `sentBefore` and fewer than
@@ -360,11 +378,17 @@ export interface IdentityRepository {
     input: PasswordResetReissueInput,
   ): Promise<PasswordResetRecord | null>;
   /** Consumes only an unconsumed challenge with fewer than `maxAttempts` wrong codes. */
-  consumePasswordReset(id: string, at: Date, maxAttempts: number): Promise<boolean>;
+  consumePasswordReset(
+    id: string,
+    at: Date,
+    maxAttempts: number,
+  ): Promise<boolean>;
 
   createSession(input: NewSession): Promise<SessionRecord>;
   findSessionById(id: string): Promise<SessionRecord | null>;
-  findSessionByRefreshTokenHash(refreshTokenHash: string): Promise<SessionRecord | null>;
+  findSessionByRefreshTokenHash(
+    refreshTokenHash: string,
+  ): Promise<SessionRecord | null>;
   rotateSession(
     refreshTokenHash: string,
     next: { refreshTokenHash: string; expiresAt: Date },
@@ -372,13 +396,26 @@ export interface IdentityRepository {
   ): Promise<RotateResult>;
   revokeSession(id: string, reason: RevokeReasonName, at: Date): Promise<void>;
   listActiveSessions(userId: string): Promise<SessionRecord[]>;
-  revokeOtherSessions(userId: string, keepSessionId: string, at: Date): Promise<number>;
+  revokeOtherSessions(
+    userId: string,
+    keepSessionId: string,
+    at: Date,
+  ): Promise<number>;
   touchSessionMeta(
     id: string,
-    meta: { deviceLabel?: string | null; userAgent?: string | null; ipAddress?: string | null },
+    meta: {
+      deviceId?: string | null;
+      deviceLabel?: string | null;
+      userAgent?: string | null;
+      ipAddress?: string | null;
+    },
     at: Date,
   ): Promise<void>;
-  revokeUserSessions(userId: string, channel: StoredChannel, at: Date): Promise<void>;
+  revokeUserSessions(
+    userId: string,
+    channel: StoredChannel,
+    at: Date,
+  ): Promise<void>;
   /** Every live session of the user, customer and ops channels (S027 / S028). */
   revokeAllUserSessions(userId: string, at: Date): Promise<void>;
 
@@ -415,8 +452,13 @@ export interface IdentityRepository {
     role: RoleName,
     status: GrantStatusName,
   ): Promise<RoleGrantRecord>;
-  findGrantById(id: string): Promise<(RoleGrantRecord & { userId: string }) | null>;
-  updateGrantStatus(id: string, status: GrantStatusName): Promise<RoleGrantRecord | null>;
+  findGrantById(
+    id: string,
+  ): Promise<(RoleGrantRecord & { userId: string }) | null>;
+  updateGrantStatus(
+    id: string,
+    status: GrantStatusName,
+  ): Promise<RoleGrantRecord | null>;
   findOpsCredential(userId: string): Promise<OpsCredentialRecord | null>;
   saveOpsCredential(userId: string, passwordHash: string): Promise<void>;
   /** DEC-PROD-036: flag the bootstrap operator as super-admin (no-op without a credential). */
@@ -433,12 +475,18 @@ export interface IdentityRepository {
    */
   resetOpsPassword(input: OpsPasswordResetInput): Promise<void>;
   /** Grant/revoke under a lock on the super-admin rows; never removes the last one; audited. */
-  changeOpsSuperAdmin(input: OpsSuperAdminChangeInput): Promise<OpsSuperAdminChangeResult>;
-  findCustomerCredential(userId: string): Promise<{ passwordHash: string } | null>;
+  changeOpsSuperAdmin(
+    input: OpsSuperAdminChangeInput,
+  ): Promise<OpsSuperAdminChangeResult>;
+  findCustomerCredential(
+    userId: string,
+  ): Promise<{ passwordHash: string } | null>;
   saveCustomerCredential(userId: string, passwordHash: string): Promise<void>;
 
   listPasskeys(userId: string): Promise<PasskeyRecord[]>;
-  findPasskeyByCredentialId(credentialId: string): Promise<PasskeyRecord | null>;
+  findPasskeyByCredentialId(
+    credentialId: string,
+  ): Promise<PasskeyRecord | null>;
   savePasskey(input: {
     userId: string;
     credentialId: string;
@@ -449,7 +497,9 @@ export interface IdentityRepository {
     backedUp: boolean;
   }): Promise<PasskeyRecord>;
   /** Creates a contact-less CUSTOMER account and its first passkey atomically. */
-  createPasskeyUser(input: Omit<Parameters<IdentityRepository['savePasskey']>[0], 'userId'>): Promise<UserRecord>;
+  createPasskeyUser(
+    input: Omit<Parameters<IdentityRepository['savePasskey']>[0], 'userId'>,
+  ): Promise<UserRecord>;
   updatePasskeyCounter(id: string, counter: number): Promise<void>;
   replacePasskeyChallenge(input: {
     userId: string | null;
@@ -469,15 +519,24 @@ export class MemoryIdentityRepository implements IdentityRepository {
   private readonly users = new Map<string, UserRecord>();
   private readonly grants = new Map<string, RoleGrantRecord[]>();
   private readonly phoneChallenges = new Map<string, PhoneChallengeRecord>();
-  private readonly emailVerifications = new Map<string, EmailVerificationRecord>();
+  private readonly emailVerifications = new Map<
+    string,
+    EmailVerificationRecord
+  >();
   private readonly passwordResets = new Map<string, PasswordResetRecord>();
   private readonly emailSignups = new Map<string, EmailSignupChallengeRecord>();
   private readonly sessions = new Map<string, SessionRecord>();
   private readonly credentials = new Map<string, OpsCredentialRecord>();
   readonly opsAudits: MemoryOpsAudit[] = [];
-  private readonly customerCredentials = new Map<string, { passwordHash: string }>();
+  private readonly customerCredentials = new Map<
+    string,
+    { passwordHash: string }
+  >();
   private readonly passkeys = new Map<string, PasskeyRecord>();
-  private readonly passkeyChallenges = new Map<string, PasskeyChallengeRecord>();
+  private readonly passkeyChallenges = new Map<
+    string,
+    PasskeyChallengeRecord
+  >();
   private readonly deviceRegistrations: DeviceRegistrationRecord[] = [];
 
   async findUserById(id: string): Promise<UserRecord | null> {
@@ -485,11 +544,15 @@ export class MemoryIdentityRepository implements IdentityRepository {
   }
 
   async findUserByPhone(phone: string): Promise<UserRecord | null> {
-    return [...this.users.values()].find((user) => user.phone === phone) ?? null;
+    return (
+      [...this.users.values()].find((user) => user.phone === phone) ?? null
+    );
   }
 
   async findUserByEmail(email: string): Promise<UserRecord | null> {
-    return [...this.users.values()].find((user) => user.email === email) ?? null;
+    return (
+      [...this.users.values()].find((user) => user.email === email) ?? null
+    );
   }
 
   async createUser(input: {
@@ -530,7 +593,11 @@ export class MemoryIdentityRepository implements IdentityRepository {
     return user;
   }
 
-  async setEmailVerified(userId: string, email: string, at: Date): Promise<UserRecord> {
+  async setEmailVerified(
+    userId: string,
+    email: string,
+    at: Date,
+  ): Promise<UserRecord> {
     const taken = await this.findUserByEmail(email);
     if (taken && taken.id !== userId) {
       throw new UniqueConflictError();
@@ -541,7 +608,10 @@ export class MemoryIdentityRepository implements IdentityRepository {
     return user;
   }
 
-  async updateUserProfile(userId: string, patch: UserProfilePatch): Promise<UserRecord> {
+  async updateUserProfile(
+    userId: string,
+    patch: UserProfilePatch,
+  ): Promise<UserRecord> {
     const user = this.requireUser(userId);
     if (patch.displayName !== undefined) {
       user.displayName = patch.displayName;
@@ -624,25 +694,35 @@ export class MemoryIdentityRepository implements IdentityRepository {
     return { ...verification };
   }
 
-  async findEmailVerification(id: string): Promise<EmailVerificationRecord | null> {
+  async findEmailVerification(
+    id: string,
+  ): Promise<EmailVerificationRecord | null> {
     const verification = this.emailVerifications.get(id);
     return verification ? { ...verification } : null;
   }
 
-  async findLatestEmailVerification(userId: string): Promise<EmailVerificationRecord | null> {
+  async findLatestEmailVerification(
+    userId: string,
+  ): Promise<EmailVerificationRecord | null> {
     const latest = [...this.emailVerifications.values()]
       .filter((verification) => verification.userId === userId)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
     return latest ? { ...latest } : null;
   }
 
-  async countEmailVerificationsSince(userId: string, since: Date): Promise<number> {
+  async countEmailVerificationsSince(
+    userId: string,
+    since: Date,
+  ): Promise<number> {
     return [...this.emailVerifications.values()].filter(
-      (verification) => verification.userId === userId && verification.createdAt >= since,
+      (verification) =>
+        verification.userId === userId && verification.createdAt >= since,
     ).length;
   }
 
-  async recordFailedEmailVerificationAttempt(id: string): Promise<EmailVerificationRecord> {
+  async recordFailedEmailVerificationAttempt(
+    id: string,
+  ): Promise<EmailVerificationRecord> {
     const verification = this.emailVerifications.get(id);
     if (!verification) {
       throw new Error('Email verification not found');
@@ -689,7 +769,9 @@ export class MemoryIdentityRepository implements IdentityRepository {
     return { ...challenge };
   }
 
-  async findEmailSignupChallenge(id: string): Promise<EmailSignupChallengeRecord | null> {
+  async findEmailSignupChallenge(
+    id: string,
+  ): Promise<EmailSignupChallengeRecord | null> {
     const challenge = this.emailSignups.get(id);
     return challenge ? { ...challenge } : null;
   }
@@ -699,20 +781,28 @@ export class MemoryIdentityRepository implements IdentityRepository {
   ): Promise<EmailSignupChallengeRecord | null> {
     let latest: EmailSignupChallengeRecord | null = null;
     for (const challenge of this.emailSignups.values()) {
-      if (challenge.email === email && (!latest || challenge.createdAt >= latest.createdAt)) {
+      if (
+        challenge.email === email &&
+        (!latest || challenge.createdAt >= latest.createdAt)
+      ) {
         latest = challenge;
       }
     }
     return latest ? { ...latest } : null;
   }
 
-  async countEmailSignupChallengesSince(email: string, since: Date): Promise<number> {
+  async countEmailSignupChallengesSince(
+    email: string,
+    since: Date,
+  ): Promise<number> {
     return [...this.emailSignups.values()].filter(
       (challenge) => challenge.email === email && challenge.createdAt >= since,
     ).length;
   }
 
-  async recordFailedEmailSignupAttempt(id: string): Promise<EmailSignupChallengeRecord> {
+  async recordFailedEmailSignupAttempt(
+    id: string,
+  ): Promise<EmailSignupChallengeRecord> {
     const challenge = this.emailSignups.get(id);
     if (!challenge) {
       throw new Error('Email signup challenge not found');
@@ -809,7 +899,9 @@ export class MemoryIdentityRepository implements IdentityRepository {
     ).length;
   }
 
-  async recordFailedPasswordResetAttempt(id: string): Promise<PasswordResetRecord> {
+  async recordFailedPasswordResetAttempt(
+    id: string,
+  ): Promise<PasswordResetRecord> {
     const reset = this.passwordResets.get(id);
     if (!reset) {
       throw new Error('Password reset not found');
@@ -839,7 +931,11 @@ export class MemoryIdentityRepository implements IdentityRepository {
     return { ...reset };
   }
 
-  async consumePasswordReset(id: string, at: Date, maxAttempts: number): Promise<boolean> {
+  async consumePasswordReset(
+    id: string,
+    at: Date,
+    maxAttempts: number,
+  ): Promise<boolean> {
     const reset = this.passwordResets.get(id);
     if (!reset || reset.consumedAt || reset.attemptCount >= maxAttempts) {
       return false;
@@ -872,7 +968,8 @@ export class MemoryIdentityRepository implements IdentityRepository {
   }
 
   async countRegistrationsByDeviceId(deviceId: string): Promise<number> {
-    return this.deviceRegistrations.filter((r) => r.deviceId === deviceId).length;
+    return this.deviceRegistrations.filter((r) => r.deviceId === deviceId)
+      .length;
   }
 
   async recordDeviceRegistration(input: {
@@ -892,13 +989,24 @@ export class MemoryIdentityRepository implements IdentityRepository {
   }
 
   async listActiveSessions(userId: string): Promise<SessionRecord[]> {
-    return [...this.sessions.values()].filter((s) => s.userId === userId && !s.revokedAt);
+    return [...this.sessions.values()].filter(
+      (s) => s.userId === userId && !s.revokedAt,
+    );
   }
 
-  async revokeOtherSessions(userId: string, keepSessionId: string, at: Date): Promise<number> {
+  async revokeOtherSessions(
+    userId: string,
+    keepSessionId: string,
+    at: Date,
+  ): Promise<number> {
     let n = 0;
     for (const session of this.sessions.values()) {
-      if (session.userId !== userId || session.id === keepSessionId || session.revokedAt) continue;
+      if (
+        session.userId !== userId ||
+        session.id === keepSessionId ||
+        session.revokedAt
+      )
+        continue;
       session.revokedAt = at;
       session.revokeReason = 'USER';
       n += 1;
@@ -908,11 +1016,17 @@ export class MemoryIdentityRepository implements IdentityRepository {
 
   async touchSessionMeta(
     id: string,
-    meta: { deviceLabel?: string | null; userAgent?: string | null; ipAddress?: string | null },
+    meta: {
+      deviceId?: string | null;
+      deviceLabel?: string | null;
+      userAgent?: string | null;
+      ipAddress?: string | null;
+    },
     at: Date,
   ): Promise<void> {
     const session = this.sessions.get(id);
     if (!session || session.revokedAt) return;
+    if (meta.deviceId !== undefined) session.deviceId = meta.deviceId;
     if (meta.deviceLabel !== undefined) session.deviceLabel = meta.deviceLabel;
     if (meta.userAgent !== undefined) session.userAgent = meta.userAgent;
     if (meta.ipAddress !== undefined) session.ipAddress = meta.ipAddress;
@@ -923,7 +1037,9 @@ export class MemoryIdentityRepository implements IdentityRepository {
     return this.sessions.get(id) ?? null;
   }
 
-  async findSessionByRefreshTokenHash(refreshTokenHash: string): Promise<SessionRecord | null> {
+  async findSessionByRefreshTokenHash(
+    refreshTokenHash: string,
+  ): Promise<SessionRecord | null> {
     return (
       [...this.sessions.values()].find(
         (session) => session.refreshTokenHash === refreshTokenHash,
@@ -960,6 +1076,7 @@ export class MemoryIdentityRepository implements IdentityRepository {
       channel: current.channel,
       refreshTokenHash: next.refreshTokenHash,
       expiresAt: next.expiresAt,
+      deviceId: current.deviceId,
       deviceLabel: current.deviceLabel,
       userAgent: current.userAgent,
       ipAddress: current.ipAddress,
@@ -967,7 +1084,11 @@ export class MemoryIdentityRepository implements IdentityRepository {
     return { status: 'rotated', session: created };
   }
 
-  async revokeSession(id: string, reason: RevokeReasonName, at: Date): Promise<void> {
+  async revokeSession(
+    id: string,
+    reason: RevokeReasonName,
+    at: Date,
+  ): Promise<void> {
     const session = this.sessions.get(id);
     if (!session || session.revokedAt) {
       return;
@@ -976,9 +1097,17 @@ export class MemoryIdentityRepository implements IdentityRepository {
     session.revokeReason = reason;
   }
 
-  async revokeUserSessions(userId: string, channel: StoredChannel, at: Date): Promise<void> {
+  async revokeUserSessions(
+    userId: string,
+    channel: StoredChannel,
+    at: Date,
+  ): Promise<void> {
     for (const session of this.sessions.values()) {
-      if (session.userId === userId && session.channel === channel && !session.revokedAt) {
+      if (
+        session.userId === userId &&
+        session.channel === channel &&
+        !session.revokedAt
+      ) {
         session.revokedAt = at;
         session.revokeReason = 'USER';
       }
@@ -995,7 +1124,11 @@ export class MemoryIdentityRepository implements IdentityRepository {
   }
 
   /** Memory twin of the Prisma account-deletion transaction (tests / no DATABASE_URL). */
-  async softDeleteUser(userId: string, at: Date, purgeAfter: Date): Promise<void> {
+  async softDeleteUser(
+    userId: string,
+    at: Date,
+    purgeAfter: Date,
+  ): Promise<void> {
     const user = this.users.get(userId);
     if (user) {
       user.deletedAt = at;
@@ -1012,7 +1145,11 @@ export class MemoryIdentityRepository implements IdentityRepository {
     }
   }
 
-  async anonymizeUser(userId: string, displayName: string, at: Date): Promise<void> {
+  async anonymizeUser(
+    userId: string,
+    displayName: string,
+    at: Date,
+  ): Promise<void> {
     const user = this.users.get(userId);
     if (!user) {
       return;
@@ -1145,13 +1282,17 @@ export class MemoryIdentityRepository implements IdentityRepository {
           role === 'OPS'
             ? (this.credentials.get(user.id)?.staffRole ?? 'OPS')
             : undefined,
-        superAdmin: role === 'OPS' ? this.credentials.get(user.id)?.superAdmin === true : undefined,
+        superAdmin:
+          role === 'OPS'
+            ? this.credentials.get(user.id)?.superAdmin === true
+            : undefined,
         scope: role === 'OPS' ? 'NATIONAL' : undefined,
       });
     }
     matched.sort(
       (left, right) =>
-        right.createdAt.getTime() - left.createdAt.getTime() || left.id.localeCompare(right.id),
+        right.createdAt.getTime() - left.createdAt.getTime() ||
+        left.id.localeCompare(right.id),
     );
     const total = matched.length;
     const start = (page - 1) * limit;
@@ -1198,7 +1339,9 @@ export class MemoryIdentityRepository implements IdentityRepository {
     return grant;
   }
 
-  async findGrantById(id: string): Promise<(RoleGrantRecord & { userId: string }) | null> {
+  async findGrantById(
+    id: string,
+  ): Promise<(RoleGrantRecord & { userId: string }) | null> {
     for (const [userId, grants] of this.grants.entries()) {
       const grant = grants.find((entry) => entry.id === id);
       if (grant) {
@@ -1208,7 +1351,10 @@ export class MemoryIdentityRepository implements IdentityRepository {
     return null;
   }
 
-  async updateGrantStatus(id: string, status: GrantStatusName): Promise<RoleGrantRecord | null> {
+  async updateGrantStatus(
+    id: string,
+    status: GrantStatusName,
+  ): Promise<RoleGrantRecord | null> {
     for (const grants of this.grants.values()) {
       const grant = grants.find((entry) => entry.id === id);
       if (grant) {
@@ -1276,7 +1422,9 @@ export class MemoryIdentityRepository implements IdentityRepository {
     });
   }
 
-  async changeOpsSuperAdmin(input: OpsSuperAdminChangeInput): Promise<OpsSuperAdminChangeResult> {
+  async changeOpsSuperAdmin(
+    input: OpsSuperAdminChangeInput,
+  ): Promise<OpsSuperAdminChangeResult> {
     const credential = this.credentials.get(input.targetUserId);
     if (!credential?.passwordHash) {
       return 'no_credential';
@@ -1289,7 +1437,9 @@ export class MemoryIdentityRepository implements IdentityRepository {
         ([userId, entry]) =>
           entry.superAdmin &&
           userId !== input.targetUserId &&
-          (this.grants.get(userId) ?? []).some((g) => g.role === 'OPS' && g.status === 'ACTIVE'),
+          (this.grants.get(userId) ?? []).some(
+            (g) => g.role === 'OPS' && g.status === 'ACTIVE',
+          ),
       );
       if (others.length === 0) {
         return 'last';
@@ -1298,28 +1448,41 @@ export class MemoryIdentityRepository implements IdentityRepository {
     credential.superAdmin = input.superAdmin;
     this.opsAudits.push({
       actorUserId: input.actorUserId,
-      action: input.superAdmin ? 'OPS_SUPER_ADMIN_GRANT' : 'OPS_SUPER_ADMIN_REVOKE',
+      action: input.superAdmin
+        ? 'OPS_SUPER_ADMIN_GRANT'
+        : 'OPS_SUPER_ADMIN_REVOKE',
       entityId: input.targetUserId,
       reason: input.reason,
     });
     return 'ok';
   }
 
-  async findCustomerCredential(userId: string): Promise<{ passwordHash: string } | null> {
+  async findCustomerCredential(
+    userId: string,
+  ): Promise<{ passwordHash: string } | null> {
     return this.customerCredentials.get(userId) ?? null;
   }
 
-  async saveCustomerCredential(userId: string, passwordHash: string): Promise<void> {
+  async saveCustomerCredential(
+    userId: string,
+    passwordHash: string,
+  ): Promise<void> {
     this.customerCredentials.set(userId, { passwordHash });
   }
 
   async listPasskeys(userId: string): Promise<PasskeyRecord[]> {
-    return [...this.passkeys.values()].filter((passkey) => passkey.userId === userId);
+    return [...this.passkeys.values()].filter(
+      (passkey) => passkey.userId === userId,
+    );
   }
 
-  async findPasskeyByCredentialId(credentialId: string): Promise<PasskeyRecord | null> {
+  async findPasskeyByCredentialId(
+    credentialId: string,
+  ): Promise<PasskeyRecord | null> {
     return (
-      [...this.passkeys.values()].find((passkey) => passkey.credentialId === credentialId) ?? null
+      [...this.passkeys.values()].find(
+        (passkey) => passkey.credentialId === credentialId,
+      ) ?? null
     );
   }
 
@@ -1360,7 +1523,11 @@ export class MemoryIdentityRepository implements IdentityRepository {
   async createPasskeyUser(
     input: Omit<Parameters<IdentityRepository['savePasskey']>[0], 'userId'>,
   ): Promise<UserRecord> {
-    const user = await this.createUser({ email: null, phone: null, displayName: 'DealGo user' });
+    const user = await this.createUser({
+      email: null,
+      phone: null,
+      displayName: 'DealGo user',
+    });
     await this.insertGrant(user.id, 'CUSTOMER', 'ACTIVE');
     await this.savePasskey({ ...input, userId: user.id });
     return user;
@@ -1374,7 +1541,12 @@ export class MemoryIdentityRepository implements IdentityRepository {
   }): Promise<PasskeyChallengeRecord> {
     const at = new Date();
     for (const existing of this.passkeyChallenges.values()) {
-      if (input.userId !== null && existing.userId === input.userId && existing.kind === input.kind && !existing.consumedAt) {
+      if (
+        input.userId !== null &&
+        existing.userId === input.userId &&
+        existing.kind === input.kind &&
+        !existing.consumedAt
+      ) {
         existing.consumedAt = at;
       }
     }
@@ -1395,12 +1567,21 @@ export class MemoryIdentityRepository implements IdentityRepository {
     kind: PasskeyCeremonyName,
   ): Promise<PasskeyChallengeRecord | null> {
     const open = [...this.passkeyChallenges.values()]
-      .filter((challenge) => challenge.userId === userId && challenge.kind === kind && !challenge.consumedAt)
-      .sort((left, right) => right.expiresAt.getTime() - left.expiresAt.getTime());
+      .filter(
+        (challenge) =>
+          challenge.userId === userId &&
+          challenge.kind === kind &&
+          !challenge.consumedAt,
+      )
+      .sort(
+        (left, right) => right.expiresAt.getTime() - left.expiresAt.getTime(),
+      );
     return open[0] ?? null;
   }
 
-  async findPasskeyChallenge(id: string): Promise<PasskeyChallengeRecord | null> {
+  async findPasskeyChallenge(
+    id: string,
+  ): Promise<PasskeyChallengeRecord | null> {
     return this.passkeyChallenges.get(id) ?? null;
   }
 

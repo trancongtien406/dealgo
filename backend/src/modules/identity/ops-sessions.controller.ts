@@ -3,6 +3,7 @@ import { Throttle } from '@nestjs/throttler';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import type { AppEnv } from '../../platform/config/env.js';
+import { ClientIp } from '../../platform/http/client-ip.decorator.js';
 import { OpsLoginDto } from './auth.dto.js';
 import { accessSecret, verifyAccessToken } from '../../platform/security/token-crypto.js';
 import { OpsAuthService } from './ops-auth.service.js';
@@ -23,8 +24,17 @@ export class OpsSessionsController {
   @UseGuards(OpsLoginThrottlerGuard)
   @Throttle({ default: { limit: OPS_LOGIN_LIMIT, ttl: OPS_LOGIN_WINDOW_MS } })
   @ApiOperation({ summary: 'Ops email/password login (5 attempts per email per 5 minutes)' })
-  login(@Body() body: OpsLoginDto) {
-    return this.opsAuth.login(body.email, body.password);
+  login(
+    @Body() body: OpsLoginDto,
+    @ClientIp() ip?: string | null,
+    @Headers('user-agent') userAgent?: string,
+    @Headers('x-device-id') deviceId?: string,
+  ) {
+    return this.opsAuth.login(body.email, body.password, {
+      deviceId: deviceId?.trim() || null,
+      userAgent: userAgent ?? null,
+      ipAddress: ip ?? null,
+    });
   }
 
   @Delete('sessions')

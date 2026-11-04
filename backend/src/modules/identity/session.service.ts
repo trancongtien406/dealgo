@@ -30,22 +30,25 @@ export type SessionResult = {
   };
 };
 
+export type SessionClientContext = {
+  deviceId?: string | null;
+  deviceLabel?: string | null;
+  userAgent?: string | null;
+  ipAddress?: string | null;
+};
+
 @Injectable()
 export class SessionService {
   constructor(
-    @Inject(IDENTITY_REPOSITORY) private readonly repository: IdentityRepository,
+    @Inject(IDENTITY_REPOSITORY)
+    private readonly repository: IdentityRepository,
     private readonly config: ConfigService<AppEnv, true>,
   ) {}
 
   async issue(
     user: UserRecord,
     channel: SessionChannelName,
-    device?: {
-      deviceId?: string | null;
-      deviceLabel?: string | null;
-      userAgent?: string | null;
-      ipAddress?: string | null;
-    },
+    device?: SessionClientContext,
   ): Promise<SessionResult> {
     if (user.deletedAt) {
       // S027 (DEC-PROD-037): a deleted account never gets a session again; during the grace
@@ -54,7 +57,9 @@ export class SessionService {
     }
     const refreshToken = randomSecret();
     const now = new Date();
-    const refreshTtl = this.config.get('JWT_REFRESH_TTL_SECONDS', { infer: true });
+    const refreshTtl = this.config.get('JWT_REFRESH_TTL_SECONDS', {
+      infer: true,
+    });
     const session = await this.repository.createSession({
       userId: user.id,
       familyId: randomUUID(),
@@ -70,7 +75,9 @@ export class SessionService {
     // all older active sessions for this account are revoked so only 1 device stays active.
     const grants = await this.repository.listGrants(user.id);
     const isDriver = grants.some(
-      (grant) => grant.role === 'DRIVER' && (grant.status === 'ACTIVE' || grant.status === 'PENDING'),
+      (grant) =>
+        grant.role === 'DRIVER' &&
+        (grant.status === 'ACTIVE' || grant.status === 'PENDING'),
     );
     if (isDriver) {
       await this.repository.revokeOtherSessions(user.id, session.id, now);
@@ -78,9 +85,14 @@ export class SessionService {
     return this.toResult(user, session.id, channel, refreshToken, now);
   }
 
-  async refresh(refreshToken: string): Promise<SessionResult> {
+  async refresh(
+    refreshToken: string,
+    clientContext?: SessionClientContext,
+  ): Promise<SessionResult> {
     const now = new Date();
-    const refreshTtl = this.config.get('JWT_REFRESH_TTL_SECONDS', { infer: true });
+    const refreshTtl = this.config.get('JWT_REFRESH_TTL_SECONDS', {
+      infer: true,
+    });
     const nextRefreshToken = randomSecret();
     const result = await this.repository.rotateSession(
       hashRefreshToken(refreshToken),
@@ -94,7 +106,11 @@ export class SessionService {
     if (result.status === 'reuse') {
       // The token was already rotated. Reuse means it leaked or a client retried
       // after the successor was issued, so the whole family is revoked.
-      throw authError(401, 'AUTH_REFRESH_REUSED', 'Refresh token reuse detected');
+      throw authError(
+        401,
+        'AUTH_REFRESH_REUSED',
+        'Refresh token reuse detected',
+      );
     }
     if (result.status !== 'rotated') {
       throw authError(401, 'AUTH_REFRESH_INVALID', 'Refresh token is invalid');
@@ -104,7 +120,24 @@ export class SessionService {
     if (!user || user.deletedAt) {
       throw authError(401, 'AUTH_REFRESH_INVALID', 'Refresh token is invalid');
     }
-    await this.repository.touchSessionMeta(result.session.id, {}, now);
+    await this.repository.touchSessionMeta(
+      result.session.id,
+      {
+        ...(clientContext?.deviceId !== undefined
+          ? { deviceId: clientContext.deviceId }
+          : {}),
+        ...(clientContext?.deviceLabel !== undefined
+          ? { deviceLabel: clientContext.deviceLabel }
+          : {}),
+        ...(clientContext?.userAgent !== undefined
+          ? { userAgent: clientContext.userAgent }
+          : {}),
+        ...(clientContext?.ipAddress !== undefined
+          ? { ipAddress: clientContext.ipAddress }
+          : {}),
+      },
+      now,
+    );
     return this.toResult(
       user,
       result.session.id,
@@ -119,7 +152,9 @@ export class SessionService {
     return { revoked: true };
   }
 
-  async revokeByRefreshToken(refreshToken: string): Promise<{ revoked: boolean }> {
+  async revokeByRefreshToken(
+    refreshToken: string,
+  ): Promise<{ revoked: boolean }> {
     const hash = hashRefreshToken(refreshToken);
     const session = await this.repository.findSessionByRefreshTokenHash(hash);
     if (!session || session.revokedAt) {
@@ -136,7 +171,9 @@ export class SessionService {
     refreshToken: string,
     now: Date,
   ): SessionResult {
-    const expiresIn = this.config.get('JWT_ACCESS_TTL_SECONDS', { infer: true });
+    const expiresIn = this.config.get('JWT_ACCESS_TTL_SECONDS', {
+      infer: true,
+    });
     const issuedAt = unixSeconds(now);
     const secret = accessSecret({
       JWT_ACCESS_SECRET: this.config.get('JWT_ACCESS_SECRET', { infer: true }),

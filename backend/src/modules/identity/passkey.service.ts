@@ -15,28 +15,45 @@ import type { AppEnv } from '../../platform/config/env.js';
 import { PlatformSettingsService } from '../../platform/settings/platform-settings.service.js';
 import { authError } from './auth-error.js';
 import { AuthMethodPolicyService } from './auth-method-policy.service.js';
-import { IDENTITY_REPOSITORY, PASSKEY_CHALLENGE_TTL_MS } from './identity.constants.js';
-import { UniqueConflictError, type IdentityRepository } from './identity.repository.js';
-import { SessionService, type SessionResult } from './session.service.js';
+import {
+  IDENTITY_REPOSITORY,
+  MAX_ACCOUNTS_PER_DEVICE,
+  PASSKEY_CHALLENGE_TTL_MS,
+} from './identity.constants.js';
+import {
+  UniqueConflictError,
+  type IdentityRepository,
+} from './identity.repository.js';
+import {
+  SessionService,
+  type SessionClientContext,
+  type SessionResult,
+} from './session.service.js';
 import { webauthnExpectedOrigins } from '../app-links/app-links.js';
 
 @Injectable()
 export class PasskeyService {
   constructor(
-    @Inject(IDENTITY_REPOSITORY) private readonly repository: IdentityRepository,
+    @Inject(IDENTITY_REPOSITORY)
+    private readonly repository: IdentityRepository,
     private readonly sessions: SessionService,
     private readonly config: ConfigService<AppEnv, true>,
     private readonly authMethods: AuthMethodPolicyService,
     @Optional() private readonly platformSettings?: PlatformSettingsService,
   ) {}
 
-  async registrationOptions(userId: string): Promise<Awaited<ReturnType<typeof generateRegistrationOptions>>> {
+  async registrationOptions(
+    userId: string,
+  ): Promise<Awaited<ReturnType<typeof generateRegistrationOptions>>> {
     await this.authMethods.assertEnabled('PASSKEY');
     const user = await this.requireVerifiedUser(userId);
     const existing = await this.repository.listPasskeys(user.id);
     const options = await generateRegistrationOptions({
       ...(await this.relyingParty()),
-      userName: (user.phoneVerifiedAt ? user.phone : null) ?? (user.emailVerifiedAt ? user.email : null) ?? user.id,
+      userName:
+        (user.phoneVerifiedAt ? user.phone : null) ??
+        (user.emailVerifiedAt ? user.email : null) ??
+        user.id,
       userDisplayName: user.displayName,
       userID: Buffer.from(user.id),
       attestationType: 'none',
@@ -64,9 +81,16 @@ export class PasskeyService {
   ): Promise<{ credentialId: string }> {
     await this.authMethods.assertEnabled('PASSKEY');
     const user = await this.requireVerifiedUser(userId);
-    const ceremony = await this.repository.findOpenPasskeyChallenge(user.id, 'REGISTRATION');
+    const ceremony = await this.repository.findOpenPasskeyChallenge(
+      user.id,
+      'REGISTRATION',
+    );
     if (!ceremony || ceremony.expiresAt <= new Date()) {
-      throw authError(401, 'AUTH_PASSKEY_INVALID', 'Passkey verification failed');
+      throw authError(
+        401,
+        'AUTH_PASSKEY_INVALID',
+        'Passkey verification failed',
+      );
     }
 
     const relyingParty = await this.relyingParty();
@@ -80,15 +104,30 @@ export class PasskeyService {
         requireUserVerification: true,
       });
     } catch {
-      throw authError(401, 'AUTH_PASSKEY_INVALID', 'Passkey verification failed');
+      throw authError(
+        401,
+        'AUTH_PASSKEY_INVALID',
+        'Passkey verification failed',
+      );
     }
     if (!verification.verified) {
-      throw authError(401, 'AUTH_PASSKEY_INVALID', 'Passkey verification failed');
+      throw authError(
+        401,
+        'AUTH_PASSKEY_INVALID',
+        'Passkey verification failed',
+      );
     }
 
-    const consumed = await this.repository.consumePasskeyChallenge(ceremony.id, new Date());
+    const consumed = await this.repository.consumePasskeyChallenge(
+      ceremony.id,
+      new Date(),
+    );
     if (!consumed) {
-      throw authError(401, 'AUTH_PASSKEY_INVALID', 'Passkey verification failed');
+      throw authError(
+        401,
+        'AUTH_PASSKEY_INVALID',
+        'Passkey verification failed',
+      );
     }
 
     const credential = verification.registrationInfo.credential;
@@ -104,14 +143,22 @@ export class PasskeyService {
       });
     } catch (error) {
       if (error instanceof UniqueConflictError) {
-        throw authError(409, 'AUTH_PASSKEY_EXISTS', 'Passkey is already registered');
+        throw authError(
+          409,
+          'AUTH_PASSKEY_EXISTS',
+          'Passkey is already registered',
+        );
       }
       throw error;
     }
     return { credentialId: credential.id };
   }
 
-  async authenticationOptions(): Promise<Awaited<ReturnType<typeof generateAuthenticationOptions>> & { ceremonyId: string }> {
+  async authenticationOptions(): Promise<
+    Awaited<ReturnType<typeof generateAuthenticationOptions>> & {
+      ceremonyId: string;
+    }
+  > {
     await this.authMethods.assertEnabled('PASSKEY');
     const rp = await this.relyingParty();
     const options = await generateAuthenticationOptions({
@@ -127,16 +174,35 @@ export class PasskeyService {
     return { ...options, ceremonyId: ceremony.id };
   }
 
-  async verifyAuthentication(ceremonyId: string, response: AuthenticationResponseJSON): Promise<SessionResult> {
+  async verifyAuthentication(
+    ceremonyId: string,
+    response: AuthenticationResponseJSON,
+    clientContext?: SessionClientContext,
+  ): Promise<SessionResult> {
     await this.authMethods.assertEnabled('PASSKEY');
-    const passkey = await this.repository.findPasskeyByCredentialId(response.id);
+    const passkey = await this.repository.findPasskeyByCredentialId(
+      response.id,
+    );
     if (!passkey) {
-      throw authError(401, 'AUTH_PASSKEY_INVALID', 'Passkey verification failed');
+      throw authError(
+        401,
+        'AUTH_PASSKEY_INVALID',
+        'Passkey verification failed',
+      );
     }
     const ceremony = await this.repository.findPasskeyChallenge(ceremonyId);
-    if (!ceremony || ceremony.kind !== 'AUTHENTICATION' || ceremony.consumedAt ||
-        ceremony.expiresAt <= new Date() || (ceremony.userId !== null && ceremony.userId !== passkey.userId)) {
-      throw authError(401, 'AUTH_PASSKEY_INVALID', 'Passkey verification failed');
+    if (
+      !ceremony ||
+      ceremony.kind !== 'AUTHENTICATION' ||
+      ceremony.consumedAt ||
+      ceremony.expiresAt <= new Date() ||
+      (ceremony.userId !== null && ceremony.userId !== passkey.userId)
+    ) {
+      throw authError(
+        401,
+        'AUTH_PASSKEY_INVALID',
+        'Passkey verification failed',
+      );
     }
 
     const relyingParty = await this.relyingParty();
@@ -156,24 +222,46 @@ export class PasskeyService {
         },
       });
     } catch {
-      throw authError(401, 'AUTH_PASSKEY_INVALID', 'Passkey verification failed');
+      throw authError(
+        401,
+        'AUTH_PASSKEY_INVALID',
+        'Passkey verification failed',
+      );
     }
     if (!verification.verified) {
-      throw authError(401, 'AUTH_PASSKEY_INVALID', 'Passkey verification failed');
+      throw authError(
+        401,
+        'AUTH_PASSKEY_INVALID',
+        'Passkey verification failed',
+      );
     }
 
     const user = await this.repository.findUserById(passkey.userId);
     if (!user) {
-      throw authError(401, 'AUTH_PASSKEY_INVALID', 'Passkey verification failed');
+      throw authError(
+        401,
+        'AUTH_PASSKEY_INVALID',
+        'Passkey verification failed',
+      );
     }
 
-    const consumed = await this.repository.consumePasskeyChallenge(ceremony.id, new Date());
+    const consumed = await this.repository.consumePasskeyChallenge(
+      ceremony.id,
+      new Date(),
+    );
     if (!consumed) {
-      throw authError(401, 'AUTH_PASSKEY_INVALID', 'Passkey verification failed');
+      throw authError(
+        401,
+        'AUTH_PASSKEY_INVALID',
+        'Passkey verification failed',
+      );
     }
-    await this.repository.updatePasskeyCounter(passkey.id, verification.authenticationInfo.newCounter);
+    await this.repository.updatePasskeyCounter(
+      passkey.id,
+      verification.authenticationInfo.newCounter,
+    );
 
-    return this.sessions.issue(user, 'customer');
+    return this.sessions.issue(user, 'customer', clientContext);
   }
 
   /**
@@ -181,7 +269,9 @@ export class PasskeyService {
    * to the user's own passkeys. The caller stores the challenge (bound to its own purpose and TTL)
    * and passes a matcher to [verifyReauthentication].
    */
-  async reauthenticationOptions(userId: string): Promise<PublicKeyCredentialRequestOptionsJSON> {
+  async reauthenticationOptions(
+    userId: string,
+  ): Promise<PublicKeyCredentialRequestOptionsJSON> {
     const passkeys = await this.repository.listPasskeys(userId);
     const rp = await this.relyingParty();
     return generateAuthenticationOptions({
@@ -200,7 +290,9 @@ export class PasskeyService {
     expectedChallenge: (challenge: string) => boolean,
     response: AuthenticationResponseJSON,
   ): Promise<boolean> {
-    const passkey = await this.repository.findPasskeyByCredentialId(response.id);
+    const passkey = await this.repository.findPasskeyByCredentialId(
+      response.id,
+    );
     if (!passkey || passkey.userId !== userId) {
       return false;
     }
@@ -222,21 +314,31 @@ export class PasskeyService {
       if (!verification.verified) {
         return false;
       }
-      await this.repository.updatePasskeyCounter(passkey.id, verification.authenticationInfo.newCounter);
+      await this.repository.updatePasskeyCounter(
+        passkey.id,
+        verification.authenticationInfo.newCounter,
+      );
       return true;
     } catch {
       return false;
     }
   }
 
-  async signupOptions(): Promise<Awaited<ReturnType<typeof generateRegistrationOptions>> & { ceremonyId: string }> {
+  async signupOptions(): Promise<
+    Awaited<ReturnType<typeof generateRegistrationOptions>> & {
+      ceremonyId: string;
+    }
+  > {
     await this.authMethods.assertEnabled('PASSKEY');
     const options = await generateRegistrationOptions({
       ...(await this.relyingParty()),
       userName: 'New DealGo account',
       userDisplayName: 'DealGo user',
       attestationType: 'none',
-      authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
+      authenticatorSelection: {
+        residentKey: 'required',
+        userVerification: 'required',
+      },
     });
     const ceremony = await this.repository.replacePasskeyChallenge({
       userId: null,
@@ -247,12 +349,25 @@ export class PasskeyService {
     return { ...options, ceremonyId: ceremony.id };
   }
 
-  async verifySignup(ceremonyId: string, response: RegistrationResponseJSON): Promise<SessionResult> {
+  async verifySignup(
+    ceremonyId: string,
+    response: RegistrationResponseJSON,
+    clientContext?: SessionClientContext,
+  ): Promise<SessionResult> {
     await this.authMethods.assertEnabled('PASSKEY');
     const ceremony = await this.repository.findPasskeyChallenge(ceremonyId);
-    if (!ceremony || ceremony.kind !== 'REGISTRATION' || ceremony.userId !== null ||
-        ceremony.consumedAt || ceremony.expiresAt <= new Date()) {
-      throw authError(401, 'AUTH_PASSKEY_INVALID', 'Passkey verification failed');
+    if (
+      !ceremony ||
+      ceremony.kind !== 'REGISTRATION' ||
+      ceremony.userId !== null ||
+      ceremony.consumedAt ||
+      ceremony.expiresAt <= new Date()
+    ) {
+      throw authError(
+        401,
+        'AUTH_PASSKEY_INVALID',
+        'Passkey verification failed',
+      );
     }
     let verification: Awaited<ReturnType<typeof verifyRegistrationResponse>>;
     try {
@@ -265,16 +380,46 @@ export class PasskeyService {
         requireUserVerification: true,
       });
     } catch {
-      throw authError(401, 'AUTH_PASSKEY_INVALID', 'Passkey verification failed');
+      throw authError(
+        401,
+        'AUTH_PASSKEY_INVALID',
+        'Passkey verification failed',
+      );
     }
     if (!verification.verified) {
-      throw authError(401, 'AUTH_PASSKEY_INVALID', 'Passkey verification failed');
+      throw authError(
+        401,
+        'AUTH_PASSKEY_INVALID',
+        'Passkey verification failed',
+      );
     }
-    const consumed = await this.repository.consumePasskeyChallenge(ceremony.id, new Date());
+    const consumed = await this.repository.consumePasskeyChallenge(
+      ceremony.id,
+      new Date(),
+    );
     if (!consumed) {
-      throw authError(401, 'AUTH_PASSKEY_INVALID', 'Passkey verification failed');
+      throw authError(
+        401,
+        'AUTH_PASSKEY_INVALID',
+        'Passkey verification failed',
+      );
     }
     const credential = verification.registrationInfo.credential;
+    if (clientContext?.deviceId) {
+      const maxLimit =
+        (await this.platformSettings?.getNumber('MAX_ACCOUNTS_PER_DEVICE')) ??
+        MAX_ACCOUNTS_PER_DEVICE;
+      const regCount = await this.repository.countRegistrationsByDeviceId(
+        clientContext.deviceId,
+      );
+      if (regCount >= maxLimit) {
+        throw authError(
+          429,
+          'AUTH_DEVICE_REGISTRATION_LIMIT',
+          'Thiết bị này đã vượt quá số lượng tài khoản được phép đăng ký',
+        );
+      }
+    }
     try {
       const user = await this.repository.createPasskeyUser({
         credentialId: credential.id,
@@ -284,10 +429,21 @@ export class PasskeyService {
         deviceType: verification.registrationInfo.credentialDeviceType,
         backedUp: verification.registrationInfo.credentialBackedUp,
       });
-      return this.sessions.issue(user, 'customer');
+      if (clientContext?.deviceId) {
+        await this.repository.recordDeviceRegistration({
+          deviceId: clientContext.deviceId,
+          userId: user.id,
+          ipAddress: clientContext.ipAddress ?? null,
+        });
+      }
+      return this.sessions.issue(user, 'customer', clientContext);
     } catch (error) {
       if (error instanceof UniqueConflictError) {
-        throw authError(409, 'AUTH_PASSKEY_EXISTS', 'Passkey is already registered');
+        throw authError(
+          409,
+          'AUTH_PASSKEY_EXISTS',
+          'Passkey is already registered',
+        );
       }
       throw error;
     }
@@ -308,24 +464,40 @@ export class PasskeyService {
     return user;
   }
 
-  private async relyingParty(): Promise<{ rpID: string; rpName: string; origins: string[] }> {
+  private async relyingParty(): Promise<{
+    rpID: string;
+    rpName: string;
+    origins: string[];
+  }> {
     let rpID = this.config.get('WEBAUTHN_RP_ID', { infer: true });
     let rpName = this.config.get('WEBAUTHN_RP_NAME', { infer: true });
     let originsStr = this.config.get('WEBAUTHN_ORIGIN', { infer: true });
-    let androidCert = this.config.get('APP_LINKS_ANDROID_CERT_SHA256', { infer: true });
+    let androidCert = this.config.get('APP_LINKS_ANDROID_CERT_SHA256', {
+      infer: true,
+    });
 
     if (this.platformSettings) {
       rpID = (await this.platformSettings.getString('WEBAUTHN_RP_ID')) || rpID;
-      rpName = (await this.platformSettings.getString('WEBAUTHN_RP_NAME')) || rpName;
-      originsStr = (await this.platformSettings.getString('WEBAUTHN_ORIGIN')) || originsStr;
-      androidCert = (await this.platformSettings.getString('APP_LINKS_ANDROID_CERT_SHA256')) || androidCert;
+      rpName =
+        (await this.platformSettings.getString('WEBAUTHN_RP_NAME')) || rpName;
+      originsStr =
+        (await this.platformSettings.getString('WEBAUTHN_ORIGIN')) ||
+        originsStr;
+      androidCert =
+        (await this.platformSettings.getString(
+          'APP_LINKS_ANDROID_CERT_SHA256',
+        )) || androidCert;
     }
 
     const origins = webauthnExpectedOrigins(originsStr, {
       APP_LINKS_ANDROID_CERT_SHA256: androidCert,
     });
     if (!rpID || !rpName || origins.length === 0) {
-      throw authError(500, 'WEBAUTHN_NOT_CONFIGURED', 'Passkey is not configured');
+      throw authError(
+        500,
+        'WEBAUTHN_NOT_CONFIGURED',
+        'Passkey is not configured',
+      );
     }
     return { rpID, rpName, origins };
   }

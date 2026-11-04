@@ -161,8 +161,9 @@ export class EmailPasswordAuthService {
     clientContext?: { deviceId?: string | null; ipAddress?: string | null },
   ): Promise<EmailSignupInstantView> {
     if (clientContext?.deviceId) {
+      const maxLimit = (await this.settings?.getNumber('MAX_ACCOUNTS_PER_DEVICE')) ?? MAX_ACCOUNTS_PER_DEVICE;
       const regCount = await this.repository.countRegistrationsByDeviceId(clientContext.deviceId);
-      if (regCount >= MAX_ACCOUNTS_PER_DEVICE) {
+      if (regCount >= maxLimit) {
         throw authError(
           429,
           'AUTH_DEVICE_REGISTRATION_LIMIT',
@@ -274,8 +275,9 @@ export class EmailPasswordAuthService {
     }
 
     if (clientContext?.deviceId) {
+      const maxLimit = (await this.settings?.getNumber('MAX_ACCOUNTS_PER_DEVICE')) ?? MAX_ACCOUNTS_PER_DEVICE;
       const regCount = await this.repository.countRegistrationsByDeviceId(clientContext.deviceId);
-      if (regCount >= MAX_ACCOUNTS_PER_DEVICE) {
+      if (regCount >= maxLimit) {
         throw authError(
           429,
           'AUTH_DEVICE_REGISTRATION_LIMIT',

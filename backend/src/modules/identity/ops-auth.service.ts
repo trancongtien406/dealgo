@@ -6,7 +6,7 @@ import { IDENTITY_REPOSITORY } from './identity.constants.js';
 import { UniqueConflictError, type IdentityRepository, type UserRecord } from './identity.repository.js';
 import { normalizeEmail } from './phone-number.js';
 import { PasswordHasher } from '../../platform/security/password-hasher.js';
-import { SessionService, type SessionResult } from './session.service.js';
+import { SessionService, type SessionClientContext, type SessionResult } from './session.service.js';
 
 @Injectable()
 export class OpsAuthService implements OnModuleInit {
@@ -77,7 +77,11 @@ export class OpsAuthService implements OnModuleInit {
     return existing;
   }
 
-  async login(rawEmail: string, password: string): Promise<SessionResult> {
+  async login(
+    rawEmail: string,
+    password: string,
+    clientContext?: SessionClientContext,
+  ): Promise<SessionResult> {
     const email = normalizeEmail(rawEmail);
     const user = await this.repository.findUserByEmail(email);
     const credential = user ? await this.repository.findOpsCredential(user.id) : null;
@@ -87,7 +91,7 @@ export class OpsAuthService implements OnModuleInit {
     if (!user || !opsActive || !passwordMatches) {
       throw authError(401, 'AUTH_INVALID_CREDENTIALS', 'Invalid email or password');
     }
-    return this.sessions.issue(user, 'ops');
+    return this.sessions.issue(user, 'ops', clientContext);
   }
 
   private async ensureActiveOpsGrant(userId: string): Promise<void> {

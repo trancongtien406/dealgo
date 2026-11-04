@@ -8,18 +8,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Manages a unique, persistent device identifier across app launches and sessions.
 class DeviceIdService {
   DeviceIdService({
-    FlutterSecureStorage? secureStorage,
-    SharedPreferences? sharedPreferences,
+    this.secureStorage,
+    this.sharedPreferences,
     String? initialDeviceId,
-  })  : _secureStorage = secureStorage,
-        _cachedDeviceId = initialDeviceId {
-    _sharedPreferences = sharedPreferences;
-  }
+  }) : _cachedDeviceId = initialDeviceId;
 
   static const String storageKey = 'dealgo.device_id';
 
-  final FlutterSecureStorage? _secureStorage;
-  SharedPreferences? _sharedPreferences;
+  final FlutterSecureStorage? secureStorage;
+  SharedPreferences? sharedPreferences;
   String? _cachedDeviceId;
 
   static bool get _isTesting {
@@ -31,7 +28,7 @@ class DeviceIdService {
   }
 
   FlutterSecureStorage? get _effectiveSecureStorage =>
-      _secureStorage ?? (_isTesting ? null : const FlutterSecureStorage());
+      secureStorage ?? (_isTesting ? null : const FlutterSecureStorage());
 
   /// Returns the cached device ID synchronously if already loaded.
   String? get currentDeviceId => _cachedDeviceId;
@@ -42,7 +39,7 @@ class DeviceIdService {
       return _cachedDeviceId!;
     }
 
-    if (_isTesting && _secureStorage == null && _sharedPreferences == null) {
+    if (_isTesting && secureStorage == null && sharedPreferences == null) {
       final newId = _generateUuidV4();
       _cachedDeviceId = newId;
       return newId;
@@ -64,8 +61,8 @@ class DeviceIdService {
     }
 
     try {
-      _sharedPreferences ??= await SharedPreferences.getInstance();
-      final prefId = _sharedPreferences?.getString(storageKey);
+      sharedPreferences ??= await SharedPreferences.getInstance();
+      final prefId = sharedPreferences?.getString(storageKey);
       if (prefId != null && prefId.trim().isNotEmpty) {
         _cachedDeviceId = prefId.trim();
         // Sync to secure storage in background
@@ -95,8 +92,8 @@ class DeviceIdService {
     }
 
     try {
-      _sharedPreferences ??= await SharedPreferences.getInstance();
-      await _sharedPreferences?.setString(storageKey, id);
+      sharedPreferences ??= await SharedPreferences.getInstance();
+      await sharedPreferences?.setString(storageKey, id);
     } catch (_) {}
   }
 

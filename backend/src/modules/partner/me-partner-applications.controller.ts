@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
+import { extractClientIp } from '../../platform/http/client-ip.decorator.js';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CurrentActor,
@@ -49,7 +50,7 @@ export class MePartnerApplicationsController {
   @ApiOperation({ summary: 'Submit KYC (DRIVER) or KYB (MERCHANT) application' })
   submit(@CurrentActor() actor: RequestActor, @Body() body: SubmitPartnerApplicationDto, @Req() req: Request) {
     return this.partners.submit(actor.userId, body, {
-      ip: typeof req.ip === 'string' ? req.ip : null,
+      ip: extractClientIp(req),
       userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null,
     });
   }

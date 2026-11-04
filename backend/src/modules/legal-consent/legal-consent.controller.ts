@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import type { Request } from 'express';
+import { extractClientIp } from '../../platform/http/client-ip.decorator.js';
 import { AccessAuthGuard, CurrentActor, type RequestActor } from '../identity/access-auth.guard.js';
 import { RequireOpsPermission } from '../identity/ops-rbac/ops-permission.decorator.js';
 import { OpsPermissionGuard } from '../identity/ops-rbac/ops-permission.guard.js';
@@ -40,7 +41,7 @@ export class LegalConsentController {
   @ApiOperation({ summary: 'Accept one version (audited with time, IP, user agent)' })
   accept(@CurrentActor() actor: RequestActor, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     return this.legal.accept(actor.userId, id, {
-      ip: typeof req.ip === 'string' ? req.ip : null,
+      ip: extractClientIp(req),
       userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null,
     });
   }

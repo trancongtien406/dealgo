@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { SessionService } from './session.service.js';
 import { MemoryIdentityRepository } from './identity.repository.js';
 import type { AppEnv } from '../../platform/config/env.js';
+import { hashRefreshToken } from '../../platform/security/token-crypto.js';
 
 describe('SessionService', () => {
   const createService = () => {
@@ -54,6 +55,59 @@ describe('SessionService', () => {
     expect(rotated.refreshToken).not.toBe(initial.refreshToken);
   });
 
+  it('keeps the device id and updates request metadata when refreshing', async () => {
+    const { service, repository } = createService();
+    const user = await repository.createUser({
+      email: 'metadata@dealgo.vn',
+      phone: '+84901234569',
+      displayName: 'Metadata User',
+    });
+    const initial = await service.issue(user, 'customer', {
+      deviceId: 'device-1',
+      userAgent: 'DealGo/old',
+      ipAddress: '192.0.2.1',
+    });
+
+    const rotated = await service.refresh(initial.refreshToken, {
+      userAgent: 'DealGo/new',
+      ipAddress: '198.51.100.8',
+    });
+    const stored = await repository.findSessionByRefreshTokenHash(
+      hashRefreshToken(rotated.refreshToken),
+    );
+
+    expect(stored).toMatchObject({
+      deviceId: 'device-1',
+      userAgent: 'DealGo/new',
+      ipAddress: '198.51.100.8',
+    });
+  });
+
+  it('updates the device id if provided when refreshing an older session', async () => {
+    const { service, repository } = createService();
+    const user = await repository.createUser({
+      email: 'device-refresh@dealgo.vn',
+      phone: '+84901234568',
+      displayName: 'Device User',
+    });
+    const initial = await service.issue(user, 'customer');
+
+    const rotated = await service.refresh(initial.refreshToken, {
+      deviceId: 'device-new-uuid',
+      userAgent: 'DealGo/1.0',
+      ipAddress: '118.69.182.10',
+    });
+    const stored = await repository.findSessionByRefreshTokenHash(
+      hashRefreshToken(rotated.refreshToken),
+    );
+
+    expect(stored).toMatchObject({
+      deviceId: 'device-new-uuid',
+      userAgent: 'DealGo/1.0',
+      ipAddress: '118.69.182.10',
+    });
+  });
+
   it('detects refresh token reuse and throws AUTH_REFRESH_REUSED', async () => {
     const { service, repository } = createService();
     const user = await repository.createUser({
@@ -77,7 +131,9 @@ describe('SessionService', () => {
 
   it('rejects unknown refresh token with AUTH_REFRESH_INVALID', async () => {
     const { service } = createService();
-    await expect(service.refresh('completely-invalid-secret')).rejects.toMatchObject({
+    await expect(
+      service.refresh('completely-invalid-secret'),
+    ).rejects.toMatchObject({
       response: {
         errorCode: 'AUTH_REFRESH_INVALID',
       },
@@ -112,7 +168,9 @@ describe('SessionService', () => {
     });
 
     const session = await service.issue(user, 'ops');
-    const revokeResult = await service.revokeByRefreshToken(session.refreshToken);
+    const revokeResult = await service.revokeByRefreshToken(
+      session.refreshToken,
+    );
     expect(revokeResult.revoked).toBe(true);
 
     // Refreshing the revoked token must fail with AUTH_REFRESH_INVALID
@@ -134,10 +192,14 @@ describe('SessionService', () => {
     await repository.insertGrant(user.id, 'DRIVER', 'ACTIVE');
 
     // Device A signs in
-    const sessionA = await service.issue(user, 'customer', { deviceLabel: 'Device A' });
+    const sessionA = await service.issue(user, 'customer', {
+      deviceLabel: 'Device A',
+    });
 
     // Device B signs in with same account
-    const sessionB = await service.issue(user, 'customer', { deviceLabel: 'Device B' });
+    const sessionB = await service.issue(user, 'customer', {
+      deviceLabel: 'Device B',
+    });
 
     // Session B is valid and can refresh
     const refreshedB = await service.refresh(sessionB.refreshToken);

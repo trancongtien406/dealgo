@@ -61,3 +61,4 @@ describe('DynamicObjectStorage', () => {
     expect(mockSettings.values).toHaveBeenCalledWith('STORAGE');
   });
 });
+
