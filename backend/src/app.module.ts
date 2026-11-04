@@ -30,6 +30,7 @@ import { PublicPagesModule } from './modules/public-pages/index.js';
 import { AppLinksModule } from './modules/app-links/index.js';
 import { SiteConfigModule } from './modules/site-config/index.js';
 import { AppVersionModule } from './modules/app-version/index.js';
+import { AppCheckModule } from './modules/app-check/app-check.module.js';
 import { LegalConsentModule } from './modules/legal-consent/index.js';
 import { SettlementModule } from './modules/settlement/index.js';
 import { NotificationModule } from './modules/communication/notifications/index.js';
@@ -108,6 +109,7 @@ function buildThrottlerOptions(config: ConfigService<AppEnv, true>): ThrottlerMo
     AppLinksModule,
     SiteConfigModule,
     AppVersionModule,
+    AppCheckModule,
     LegalConsentModule,
     SettlementModule,
     NotificationModule,

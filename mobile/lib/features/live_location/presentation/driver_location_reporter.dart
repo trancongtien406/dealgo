@@ -25,6 +25,7 @@ class DriverLocationReporter {
     DriverLocationPolicy? initialPolicy,
     Duration? interval,
     DateTime Function()? clock,
+    this.onMockLocationDetected,
   }) : _policy = interval == null
            ? (initialPolicy ?? DriverLocationPolicy.idle)
            : DriverLocationPolicy(
@@ -41,6 +42,7 @@ class DriverLocationReporter {
   final LocationService location;
   final String? Function() accessToken;
   final DateTime Function() _clock;
+  final void Function()? onMockLocationDetected;
 
   DriverLocationPolicy _policy;
   Timer? _timer;
@@ -100,6 +102,9 @@ class DriverLocationReporter {
         return;
       }
       final result = await repository.report(accessToken: token, fix: fix);
+      if (fix.isMocked == true || result.reason == 'MOCK_LOCATION') {
+        onMockLocationDetected?.call();
+      }
       // Count rejected fixes as sent too: retrying the same fix won't help.
       _lastSent = fix;
       _lastSentAt = _clock();
@@ -151,6 +156,7 @@ class DriverLocationReporter {
       speedMps: speed,
       accuracyM: valid(position.accuracy, allowZero: false),
       recordedAt: position.timestamp,
+      isMocked: position.isMocked,
     );
   }
 }

@@ -16,8 +16,9 @@ describe('driver location policy', () => {
     expect(rejectReason({ lat: 10.77, lng: 106.7, at: now }, null, now, fresh)).toBeNull();
   });
 
-  it('rejects future, stale, inaccurate, out-of-order and teleport fixes', () => {
+  it('rejects future, stale, inaccurate, out-of-order, mock and teleport fixes', () => {
     const prev = { lat: 10.77, lng: 106.7, at: new Date(now.getTime() - 5000) };
+    expect(rejectReason({ lat: 10.77, lng: 106.7, at: now, isMocked: true }, null, now, fresh)).toBe('MOCK_LOCATION');
     expect(rejectReason({ lat: 10.77, lng: 106.7, at: new Date(now.getTime() + 60_000) }, null, now, fresh)).toBe('FUTURE');
     expect(rejectReason({ lat: 10.77, lng: 106.7, at: new Date(now.getTime() - 200_000) }, null, now, fresh)).toBe('STALE');
     expect(rejectReason({ lat: 10.77, lng: 106.7, at: now, accuracyM: 500 }, null, now, fresh)).toBe('LOW_ACCURACY');

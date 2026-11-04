@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kReleaseMode;
 
+import '../app_check/app_check_service.dart';
 import '../app_gate/app_build_info.dart';
 import '../auth/token_store.dart';
 import '../config/api_base_url.dart';
@@ -58,6 +59,7 @@ Dio createDealGoDio({
   AppBuildInfo? appBuild,
   void Function()? onAppUpdateRequired,
   DeviceIdService? deviceIdService,
+  AppCheckService? appCheckService,
 }) {
   final resolvedBase = normalizeBaseUrl(baseUrl ?? apiBaseUrl);
   assertSecureApiBaseUrl(resolvedBase, isRelease: kReleaseMode);
@@ -65,6 +67,12 @@ Dio createDealGoDio({
   // Refresh/retry uses a clean client without the auth interceptor so refresh
   // and retried requests never re-enter onError.
   final refreshDio = Dio(_dealGoBaseOptions(resolvedBase));
+
+  if (appCheckService != null) {
+    final appCheckInterceptor = AppCheckInterceptor(appCheckService);
+    dio.interceptors.add(appCheckInterceptor);
+    refreshDio.interceptors.add(appCheckInterceptor);
+  }
 
   final deviceService = deviceIdService ?? DeviceIdService();
   final deviceInterceptor = DeviceIdInterceptor(deviceService);
@@ -353,6 +361,25 @@ class DeviceIdInterceptor extends Interceptor {
     final deviceId = await deviceIdService.getDeviceId();
     if (deviceId.isNotEmpty) {
       options.headers['x-device-id'] = deviceId;
+    }
+    handler.next(options);
+  }
+}
+
+/// Automatically appends Firebase App Check token to headers when available.
+class AppCheckInterceptor extends Interceptor {
+  AppCheckInterceptor(this.appCheckService);
+
+  final AppCheckService appCheckService;
+
+  @override
+  Future<void> onRequest(
+    RequestOptions options,
+    RequestInterceptorHandler handler,
+  ) async {
+    final token = await appCheckService.getToken();
+    if (token != null && token.isNotEmpty) {
+      options.headers['x-firebase-appcheck'] = token;
     }
     handler.next(options);
   }

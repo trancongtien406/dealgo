@@ -49,6 +49,7 @@ class DriverLocationFix {
     this.speedMps,
     this.accuracyM,
     this.recordedAt,
+    this.isMocked,
   });
 
   final double lat;
@@ -57,6 +58,7 @@ class DriverLocationFix {
   final double? speedMps;
   final double? accuracyM;
   final DateTime? recordedAt;
+  final bool? isMocked;
 
   /// Body for the POST; optional fields only when valid for the DTO bounds.
   Map<String, Object?> toJson() => {
@@ -68,6 +70,7 @@ class DriverLocationFix {
     if (accuracyM != null && accuracyM! >= 0 && accuracyM! <= 10000)
       'accuracyM': accuracyM,
     if (recordedAt != null) 'recordedAt': recordedAt!.toUtc().toIso8601String(),
+    if (isMocked != null) 'isMocked': isMocked,
   };
 }
 

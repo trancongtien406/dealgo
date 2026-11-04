@@ -1,4 +1,4 @@
-import { HttpException, Inject, Injectable, Optional } from '@nestjs/common';
+import { HttpException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ModuleRef } from '@nestjs/core';
 import type { AppEnv } from '../../platform/config/env.js';
@@ -29,6 +29,8 @@ export const DRIVER_REACH_TOLERANCE = 1.5;
 
 @Injectable()
 export class DriverPresenceService {
+  private readonly logger = new Logger(DriverPresenceService.name);
+
   constructor(
     @Inject(DRIVER_PRESENCE_REPOSITORY)
     private readonly presence: DriverPresenceRepository,
@@ -88,7 +90,15 @@ export class DriverPresenceService {
    */
   async reportLocation(
     userId: string,
-    position: { lat: number; lng: number; heading?: number; speedMps?: number; accuracyM?: number; recordedAt?: Date },
+    position: {
+      lat: number;
+      lng: number;
+      heading?: number;
+      speedMps?: number;
+      accuracyM?: number;
+      recordedAt?: Date;
+      isMocked?: boolean;
+    },
     now: Date = new Date(),
   ): Promise<ReportLocationResult> {
     await this.requireActiveDriver(userId);
@@ -114,12 +124,21 @@ export class DriverPresenceService {
         ? { lat: row.lat, lng: row.lng, at: row.locationAt }
         : null;
     const reason = rejectReason(
-      { lat: position.lat, lng: position.lng, at, ...(position.accuracyM !== undefined ? { accuracyM: position.accuracyM } : {}) },
+      {
+        lat: position.lat,
+        lng: position.lng,
+        at,
+        ...(position.accuracyM !== undefined ? { accuracyM: position.accuracyM } : {}),
+        ...(position.isMocked !== undefined ? { isMocked: position.isMocked } : {}),
+      },
       previous && now.getTime() - previous.at.getTime() <= DRIVER_LOCATION_FRESH_MS ? previous : null,
       now,
       DRIVER_LOCATION_FRESH_MS,
     );
     if (reason) {
+      if (reason === 'MOCK_LOCATION') {
+        this.logger.warn(`Driver ${userId} submitted mock GPS position; rejected.`);
+      }
       return reply(false, reason);
     }
     this.lastAcceptedAt.set(userId, now.getTime());

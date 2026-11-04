@@ -475,6 +475,9 @@ export class PlatformSettingsService {
       case 'DRIVER_CREDIT_MAX_VND':
       case 'DRIVER_TOP_UP_EXPIRE_MINUTES':
       case 'MAX_ACCOUNTS_PER_DEVICE':
+      case 'APP_CHECK_MODE':
+      case 'APP_CHECK_PROJECT_NUMBER':
+      case 'APP_CHECK_DEBUG_TOKENS':
         // Seeded by migration/seed (PLATFORM_SETTING_SEED_DEFAULTS); no env bootstrap.
         return PLATFORM_SETTING_SEED_DEFAULTS[key] ?? '';
       case 'APP_LINKS_IOS_APP_IDS':

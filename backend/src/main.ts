@@ -24,6 +24,10 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: createAppLogger(),
   });
+  app.useSecurityHeaders({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  });
   // Before any middleware reads req.ip (throttling, audit): DEC-PROD-053.
   applyTrustProxy(app, process.env.TRUST_PROXY);
   app.use(requestIdMiddleware);

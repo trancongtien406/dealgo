@@ -48,9 +48,16 @@ export function policyFor(mode: DriverLocationMode, cfg: DriverLocationPolicyCon
     : { mode, intervalMs: cfg.idleIntervalMs, minDistanceM: cfg.idleMinDistanceM, maxSilenceMs: cfg.maxSilenceMs * 2 };
 }
 
-export type LocationRejectReason = 'RATE_LIMITED' | 'STALE' | 'FUTURE' | 'OUT_OF_ORDER' | 'LOW_ACCURACY' | 'IMPLAUSIBLE_JUMP';
+export type LocationRejectReason =
+  | 'RATE_LIMITED'
+  | 'STALE'
+  | 'FUTURE'
+  | 'OUT_OF_ORDER'
+  | 'LOW_ACCURACY'
+  | 'IMPLAUSIBLE_JUMP'
+  | 'MOCK_LOCATION';
 
-export type IncomingFix = { lat: number; lng: number; at: Date; accuracyM?: number };
+export type IncomingFix = { lat: number; lng: number; at: Date; accuracyM?: number; isMocked?: boolean };
 export type PreviousFix = { lat: number; lng: number; at: Date } | null;
 
 /** Pure validation; returns null when the fix should be stored and fanned out. */
@@ -60,6 +67,9 @@ export function rejectReason(
   now: Date,
   freshMs: number,
 ): LocationRejectReason | null {
+  if (fix.isMocked) {
+    return 'MOCK_LOCATION';
+  }
   if (fix.at.getTime() - now.getTime() > MAX_FUTURE_SKEW_MS) {
     return 'FUTURE';
   }

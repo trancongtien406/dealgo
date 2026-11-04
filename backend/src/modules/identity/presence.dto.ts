@@ -42,6 +42,11 @@ export class ReportLocationDto {
   @IsOptional()
   @IsISO8601()
   recordedAt?: string;
+
+  /** Flag indicating fake/mock location detected on the client device. */
+  @IsOptional()
+  @IsBoolean()
+  isMocked?: boolean;
 }
 
 export class UpsertPresenceDto {

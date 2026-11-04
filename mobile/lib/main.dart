@@ -17,6 +17,7 @@ import 'core/mock/mock_seed.dart';
 import 'core/observability/crash_reporting.dart';
 import 'core/push/fcm_push.dart';
 import 'core/appearance/app_appearance.dart';
+import 'core/app_check/app_check_service.dart';
 import 'core/storage/customer_booking_prefs.dart';
 import 'firebase_options.dart';
 
@@ -93,6 +94,11 @@ Future<void> _initFirebaseSafely() async {
     unawaited(
       configureFcmMessaging().catchError((Object error) {
         if (kDebugMode) debugPrint('FCM configure skipped: $error');
+      }),
+    );
+    unawaited(
+      AppCheckService().activate().catchError((Object error) {
+        if (kDebugMode) debugPrint('App Check activate skipped: $error');
       }),
     );
   } catch (error, stack) {

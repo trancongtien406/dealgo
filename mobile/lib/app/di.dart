@@ -1,4 +1,5 @@
 import '../core/mock/fake_ride_client.dart';
+import '../core/app_check/app_check_service.dart';
 import '../core/app_gate/app_build_info.dart';
 import '../core/app_gate/app_gate_client.dart';
 import '../core/app_gate/app_gate_cubit.dart';
@@ -532,11 +533,13 @@ class DealGoDependencies {
     late final AppGateCubit appGate;
     final sessionRefresher = SessionRefresher();
     final appBuild = AppBuildInfo();
+    final appCheck = AppCheckService();
     final dio = createDealGoDio(
       tokenStore: tokens,
       sessionRefresher: sessionRefresher,
       appBuild: appBuild,
       deviceIdService: deviceService,
+      appCheckService: appCheck,
       onAppUpdateRequired: () => appGate.forceRequired(),
       onSessionRefreshed: (next) => auth.applyRefreshedTokens(next),
       onUnauthorized: () => auth.signOut(revokeRemote: false),

@@ -125,7 +125,10 @@ export type PlatformSettingKey =
   | 'APP_LINKS_PATHS'
   | 'WEBAUTHN_RP_ID'
   | 'WEBAUTHN_RP_NAME'
-  | 'WEBAUTHN_ORIGIN';
+  | 'WEBAUTHN_ORIGIN'
+  | 'APP_CHECK_MODE'
+  | 'APP_CHECK_PROJECT_NUMBER'
+  | 'APP_CHECK_DEBUG_TOKENS';
 
 /** Highest value an admin may set for UPLOAD_MAX_FILE_KB. */
 export const UPLOAD_MAX_FILE_KB_CEILING = 5120;
@@ -1206,6 +1209,26 @@ export const PLATFORM_SETTING_SPECS: readonly PlatformSettingSpec[] = [
     key: 'WEBAUTHN_ORIGIN',
     valueType: 'string',
     openIds: ['DEC-PROD-052'],
+    optional: true,
+    max: 2000,
+  },
+  {
+    key: 'APP_CHECK_MODE',
+    valueType: 'string',
+    openIds: ['DEC-PROD-058'],
+    seeded: true,
+  },
+  {
+    key: 'APP_CHECK_PROJECT_NUMBER',
+    valueType: 'string',
+    openIds: ['DEC-PROD-058'],
+    optional: true,
+    max: 100,
+  },
+  {
+    key: 'APP_CHECK_DEBUG_TOKENS',
+    valueType: 'string',
+    openIds: ['DEC-PROD-058'],
     optional: true,
     max: 2000,
   },

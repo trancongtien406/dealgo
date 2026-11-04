@@ -78,6 +78,7 @@ export class MeController {
       ...(dto.speedMps !== undefined ? { speedMps: dto.speedMps } : {}),
       ...(dto.accuracyM !== undefined ? { accuracyM: dto.accuracyM } : {}),
       ...(dto.recordedAt ? { recordedAt: new Date(dto.recordedAt) } : {}),
+      ...(dto.isMocked !== undefined ? { isMocked: dto.isMocked } : {}),
     });
   }
 

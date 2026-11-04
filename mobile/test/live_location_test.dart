@@ -197,8 +197,35 @@ void main() {
         expect(parked.heading, isNull, reason: 'course is noise when stopped');
         expect(parked.accuracyM, isNull);
         expect(parked.toJson().containsKey('heading'), isFalse);
+
+        final mocked = DriverLocationReporter.fixFromPosition(
+          _position(16, 108, isMocked: true),
+        );
+        expect(mocked.isMocked, isTrue);
+        expect(mocked.toJson()['isMocked'], isTrue);
       },
     );
+
+    test('triggers onMockLocationDetected when mocked position or server reason is received', () async {
+      var mockTriggered = false;
+      final mockReporter = DriverLocationReporter(
+        repository: repo,
+        location: gps,
+        accessToken: () => 'valid_token',
+        clock: () => now,
+        onMockLocationDetected: () {
+          mockTriggered = true;
+        },
+      );
+      repo.reply = decodeDriverLocationReport({
+        'accepted': false,
+        'reason': 'MOCK_LOCATION',
+      });
+      mockReporter.start();
+      await pumpEventQueue();
+      expect(mockTriggered, isTrue);
+      mockReporter.stop();
+    });
 
     test('rejections and old server shapes keep the client policy', () {
       final rejected = decodeDriverLocationReport({
@@ -447,6 +474,7 @@ Position _position(
   double heading = -1,
   double speed = -1,
   double accuracy = 5,
+  bool isMocked = false,
 }) => Position(
   latitude: lat,
   longitude: lng,
@@ -458,6 +486,7 @@ Position _position(
   headingAccuracy: 0,
   speed: speed,
   speedAccuracy: 0,
+  isMocked: isMocked,
 );
 
 /// GPS whose fix the test moves between ticks.
