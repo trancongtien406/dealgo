@@ -32,7 +32,6 @@ import '../cubit/food_store_cubit.dart';
 import '../widgets/food_widgets.dart';
 import '../widgets/food_badges.dart';
 import '../widgets/food_dish_gallery.dart';
-import '../widgets/food_category_tile.dart';
 import '../food_categories_store.dart';
 import '../widgets/food_cart_bar.dart';
 import '../widgets/store_meta.dart';

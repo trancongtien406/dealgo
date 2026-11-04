@@ -32,6 +32,14 @@ export const INTEGRATION_FIELDS = {
     config: ['org', 'region', 'projects'],
     secrets: ['authToken'],
   },
+  STORAGE: {
+    config: ['provider', 'endpoint', 'region', 'bucket', 'localDir', 'accountId'],
+    secrets: ['accessKeyId', 'secretAccessKey'],
+  },
+  SMS: {
+    config: ['provider', 'brandname', 'smsType', 'sandbox', 'template', 'sender', 'baseUrl'],
+    secrets: ['apiKey', 'secretKey', 'accessToken'],
+  },
 } as const satisfies Record<IntegrationKindName, { config: readonly string[]; secrets: readonly string[] }>;
 
 export type EmailConfigField = (typeof INTEGRATION_FIELDS.EMAIL.config)[number];

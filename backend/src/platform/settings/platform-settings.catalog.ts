@@ -117,7 +117,15 @@ export type PlatformSettingKey =
   | 'RIDE_STOP_FEE_BIKE_VND'
   | 'RIDE_STOP_FEE_CAR_VND'
   | 'RIDE_STOP_FREE_WAIT_MINUTES'
-  | 'RIDE_STOP_WAIT_FEE_VND_PER_MINUTE';
+  | 'RIDE_STOP_WAIT_FEE_VND_PER_MINUTE'
+  | 'MAX_ACCOUNTS_PER_DEVICE'
+  | 'APP_LINKS_IOS_APP_IDS'
+  | 'APP_LINKS_ANDROID_PACKAGE'
+  | 'APP_LINKS_ANDROID_CERT_SHA256'
+  | 'APP_LINKS_PATHS'
+  | 'WEBAUTHN_RP_ID'
+  | 'WEBAUTHN_RP_NAME'
+  | 'WEBAUTHN_ORIGIN';
 
 /** Highest value an admin may set for UPLOAD_MAX_FILE_KB. */
 export const UPLOAD_MAX_FILE_KB_CEILING = 5120;
@@ -1143,6 +1151,63 @@ export const PLATFORM_SETTING_SPECS: readonly PlatformSettingSpec[] = [
     valueType: 'json',
     openIds: ['DEC-PROD-089'],
     seeded: true,
+  },
+  {
+    key: 'MAX_ACCOUNTS_PER_DEVICE',
+    valueType: 'number',
+    openIds: [],
+    min: 1,
+    max: 50,
+    seeded: true,
+  },
+  {
+    key: 'APP_LINKS_IOS_APP_IDS',
+    valueType: 'string',
+    openIds: ['DEC-PROD-058'],
+    optional: true,
+    max: 2000,
+  },
+  {
+    key: 'APP_LINKS_ANDROID_PACKAGE',
+    valueType: 'string',
+    openIds: ['DEC-PROD-058'],
+    optional: true,
+    max: 500,
+  },
+  {
+    key: 'APP_LINKS_ANDROID_CERT_SHA256',
+    valueType: 'string',
+    openIds: ['DEC-PROD-058'],
+    optional: true,
+    max: 2000,
+  },
+  {
+    key: 'APP_LINKS_PATHS',
+    valueType: 'string',
+    openIds: ['DEC-PROD-058'],
+    optional: true,
+    max: 1000,
+  },
+  {
+    key: 'WEBAUTHN_RP_ID',
+    valueType: 'string',
+    openIds: ['DEC-PROD-052'],
+    optional: true,
+    max: 500,
+  },
+  {
+    key: 'WEBAUTHN_RP_NAME',
+    valueType: 'string',
+    openIds: ['DEC-PROD-052'],
+    optional: true,
+    max: 500,
+  },
+  {
+    key: 'WEBAUTHN_ORIGIN',
+    valueType: 'string',
+    openIds: ['DEC-PROD-052'],
+    optional: true,
+    max: 2000,
   },
 ] as const;
 

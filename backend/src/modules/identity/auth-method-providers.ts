@@ -1,7 +1,8 @@
-import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional, type OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { mailSenderStatus, type MailSender } from '../../integrations/email/index.js';
-import { isSmsSenderAvailable, type SmsSender } from '../../integrations/sms/index.js';
+import { DynamicSmsSender, isSmsSenderAvailable, type SmsSender } from '../../integrations/sms/index.js';
+import { PlatformSettingsService } from '../../platform/settings/platform-settings.service.js';
 import type { AppEnv } from '../../platform/config/env.js';
 import { AUTH_METHOD_POLICY_REPOSITORY, type AuthMethodName } from './auth-method.constants.js';
 import type { AuthMethodPolicyRepository } from './auth-method.repository.js';
@@ -25,16 +26,27 @@ export class AuthMethodProviderStatus {
     @Inject(SMS_SENDER) private readonly sms: SmsSender,
     @Inject(MAIL_SENDER) private readonly mail: MailSender,
     private readonly config: ConfigService<AppEnv, true>,
+    @Optional() private readonly platformSettings?: PlatformSettingsService,
   ) {}
 
-  isAvailable(method: AuthMethodName, purpose: ProviderCheckPurpose = 'enable'): Promise<boolean> {
+  async isAvailable(method: AuthMethodName, purpose: ProviderCheckPurpose = 'enable'): Promise<boolean> {
+    let rpId = this.config.get('WEBAUTHN_RP_ID', { infer: true });
+    let rpName = this.config.get('WEBAUTHN_RP_NAME', { infer: true });
+    let origin = this.config.get('WEBAUTHN_ORIGIN', { infer: true });
+
+    if (this.platformSettings) {
+      rpId = (await this.platformSettings.getString('WEBAUTHN_RP_ID')) || rpId;
+      rpName = (await this.platformSettings.getString('WEBAUTHN_RP_NAME')) || rpName;
+      origin = (await this.platformSettings.getString('WEBAUTHN_ORIGIN')) || origin;
+    }
+
     return authMethodProviderAvailable(method, purpose, {
       sms: this.sms,
       mail: this.mail,
       env: {
-        WEBAUTHN_RP_ID: this.config.get('WEBAUTHN_RP_ID', { infer: true }),
-        WEBAUTHN_RP_NAME: this.config.get('WEBAUTHN_RP_NAME', { infer: true }),
-        WEBAUTHN_ORIGIN: this.config.get('WEBAUTHN_ORIGIN', { infer: true }),
+        WEBAUTHN_RP_ID: rpId,
+        WEBAUTHN_RP_NAME: rpName,
+        WEBAUTHN_ORIGIN: origin,
       },
     });
   }
@@ -47,6 +59,9 @@ export async function authMethodProviderAvailable(
 ): Promise<boolean> {
   switch (method) {
     case 'PHONE_SMS':
+      if (deps.sms instanceof DynamicSmsSender) {
+        return deps.sms.isConfigured();
+      }
       return isSmsSenderAvailable(deps.sms);
     case 'EMAIL_LOGIN_IDENTIFIER': {
       const status = await mailSenderStatus(deps.mail);

@@ -162,7 +162,6 @@ class _RideVehiclePageState extends State<RideVehiclePage> {
                         selectedLabel: l10n.commonSelected,
                         selected: _index == i,
                         icon: _iconFor(options[i].vehicleClassCode),
-                        showBikeArt: options[i].vehicleClassCode == 'MOTORBIKE',
                         imageUrl: resolveMediaUrl(options[i].imageUrl),
                         fare: l10n.rideVehicleFrom(
                           formatRideVnd(options[i].referenceFareVnd),
@@ -211,7 +210,6 @@ class _VehicleTile extends StatelessWidget {
     required this.selectedLabel,
     required this.selected,
     required this.icon,
-    required this.showBikeArt,
     this.imageUrl,
     required this.fare,
     required this.onTap,
@@ -223,17 +221,17 @@ class _VehicleTile extends StatelessWidget {
   final String selectedLabel;
   final bool selected;
   final IconData icon;
-  final bool showBikeArt;
   final String? imageUrl;
   final String? fare;
   final VoidCallback onTap;
 
   Widget _artwork() {
-    if (showBikeArt) {
-      return Image.asset(
-        'assets/images/vehicle_scooter_white.png',
+    final url = imageUrl;
+    if (url != null && url.isNotEmpty) {
+      return DealGoNetworkImage(
+        url,
         fit: BoxFit.contain,
-        errorBuilder: (_, _, _) => Icon(icon, color: DealGoColors.brandGreen),
+        fallback: Icon(icon, color: DealGoColors.brandGreen),
       );
     }
     return Icon(icon, color: DealGoColors.brandGreen);

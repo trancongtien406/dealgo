@@ -40,7 +40,12 @@ export class SessionService {
   async issue(
     user: UserRecord,
     channel: SessionChannelName,
-    device?: { deviceLabel?: string | null; userAgent?: string | null; ipAddress?: string | null },
+    device?: {
+      deviceId?: string | null;
+      deviceLabel?: string | null;
+      userAgent?: string | null;
+      ipAddress?: string | null;
+    },
   ): Promise<SessionResult> {
     if (user.deletedAt) {
       // S027 (DEC-PROD-037): a deleted account never gets a session again; during the grace
@@ -56,6 +61,7 @@ export class SessionService {
       channel: storedChannel(channel),
       refreshTokenHash: hashRefreshToken(refreshToken),
       expiresAt: new Date(now.getTime() + refreshTtl * 1000),
+      deviceId: device?.deviceId ?? null,
       deviceLabel: device?.deviceLabel ?? null,
       userAgent: device?.userAgent ?? null,
       ipAddress: device?.ipAddress ?? null,

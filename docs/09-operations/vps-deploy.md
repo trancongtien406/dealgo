@@ -217,7 +217,7 @@ Release builds of `mobile/` default to `https://api-dealgo.laptrinhapp.com` (RES
 `LIVEKIT_URL` in `env/backend.env`. Build commands: [`mobile/README.md`](../../mobile/README.md#build-production).
 
 App-link files are served by Nest through the website at `https://dealgo.laptrinhapp.com/.well-known/…`:
-- `apple-app-site-association`: from `APP_LINKS_IOS_APP_IDS` (`6J3522877H.dealgo.nguyengoctien.com`).
+- `apple-app-site-association`: from `APP_LINKS_IOS_APP_IDS` (`6J3522877H.com.nguyenngoctien.dealgo`).
 - `assetlinks.json`: returns 404 until `APP_LINKS_ANDROID_CERT_SHA256` is set. Set it from the release keystore
   or the Play App Signing certificate, then recreate `dealgo-api`. There is no release keystore yet.
 

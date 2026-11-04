@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart' show kReleaseMode;
 import '../app_gate/app_build_info.dart';
 import '../auth/token_store.dart';
 import '../config/api_base_url.dart';
+import '../device/device_id_service.dart';
 import 'api_envelope.dart';
 import 'api_exception.dart';
 import 'api_paths.dart';
@@ -56,6 +57,7 @@ Dio createDealGoDio({
   SessionRefresher? sessionRefresher,
   AppBuildInfo? appBuild,
   void Function()? onAppUpdateRequired,
+  DeviceIdService? deviceIdService,
 }) {
   final resolvedBase = normalizeBaseUrl(baseUrl ?? apiBaseUrl);
   assertSecureApiBaseUrl(resolvedBase, isRelease: kReleaseMode);
@@ -63,6 +65,11 @@ Dio createDealGoDio({
   // Refresh/retry uses a clean client without the auth interceptor so refresh
   // and retried requests never re-enter onError.
   final refreshDio = Dio(_dealGoBaseOptions(resolvedBase));
+
+  final deviceService = deviceIdService ?? DeviceIdService();
+  final deviceInterceptor = DeviceIdInterceptor(deviceService);
+  dio.interceptors.add(deviceInterceptor);
+  refreshDio.interceptors.add(deviceInterceptor);
 
   final logInterceptor = createDealGoLogInterceptor(enabled: enableLogging);
   if (logInterceptor != null) {
@@ -329,5 +336,24 @@ class AppVersionInterceptor extends Interceptor {
       onUpdateRequired?.call();
     }
     handler.next(err);
+  }
+}
+
+/// Automatically appends the unique device identifier header `X-Device-Id` to all outgoing requests.
+class DeviceIdInterceptor extends Interceptor {
+  DeviceIdInterceptor(this.deviceIdService);
+
+  final DeviceIdService deviceIdService;
+
+  @override
+  Future<void> onRequest(
+    RequestOptions options,
+    RequestInterceptorHandler handler,
+  ) async {
+    final deviceId = await deviceIdService.getDeviceId();
+    if (deviceId.isNotEmpty) {
+      options.headers['x-device-id'] = deviceId;
+    }
+    handler.next(options);
   }
 }

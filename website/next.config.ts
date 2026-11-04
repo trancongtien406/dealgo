@@ -120,7 +120,7 @@ const sentryRelease = process.env.NEXT_PUBLIC_SENTRY_RELEASE?.trim();
 
 export default sentryAuthToken
   ? withSentryConfig(nextConfig, {
-    org: "tiendev",
+    org: "nguyen-ngoc-tien",
     project: "dealgo-web",
     authToken: sentryAuthToken,
     silent: !process.env.CI,

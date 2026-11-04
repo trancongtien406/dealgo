@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../../core/config/api_base_url.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
@@ -7,7 +8,6 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../domain/entities/food_category.dart';
 import '../food_categories_store.dart';
 import '../../../../core/design_system/components/dealgo_network_image.dart';
-import '../../../places/domain/place.dart' show foldVietnamese;
 
 /// Tone keys → (foreground, background); same palette as the Admin swatches.
 const Map<String, (Color, Color)> _tones = {
@@ -22,87 +22,28 @@ const Map<String, (Color, Color)> _tones = {
   'brown': (Color(0xFF92400E), Color(0xFFF6EDE4)),
 };
 
-/// Bundled photo when a dish has no picture yet.
-const String foodPlaceholderImage = 'assets/images/food_dish_placeholder.jpg';
-
-/// Bundled cover when a store has no picture yet.
-const String foodStoreCoverImage = 'assets/images/food_store_cover.jpg';
-
-/// Dish without a picture: a bundled photo that suits the dish itself, else its
-/// store's category photo, else the plate. The store category alone is too
-/// coarse — a tea sold by a rice shop must not show fried chicken.
-String foodDishFallbackImage(String? category, {String? dishName}) {
-  final dish = _dishPhotoCode(dishName);
-  if (dish != null) return 'assets/images/food_cat_$dish.jpg';
-  final code = category?.trim() ?? '';
-  return _photoCodes.contains(code)
-      ? 'assets/images/food_cat_$code.jpg'
-      : foodPlaceholderImage;
-}
-
-/// First hint that matches wins, so the more specific words come first.
-const List<(String, List<String>)> _dishPhotoHints = [
-  ('banh_mi', ['banh mi']),
-  ('pho', ['pho', 'canh ']),
-  ('noodles', ['bun', 'mi quang', 'mi ', 'hu tieu', 'mien', 'banh canh']),
-  ('rice', ['com ', 'xoi']),
-  ('cafe', ['ca phe', 'bac xiu', 'cold brew', 'espresso', 'latte']),
-  (
-    'tea',
-    ['tra ', 'nuoc mia', 'sinh to', 'nuoc ep', 'sua chua', 'che ', 'nuoc '],
-  ),
-  ('snack', ['cha ', 'nem', 'banh ', 'flan', 'croissant', 'khoai']),
-  ('fast_food', ['ga ran', 'pizza', 'burger']),
-];
-
-String? _dishPhotoCode(String? dishName) {
-  final text = foldVietnamese(dishName ?? '');
-  if (text.isEmpty) return null;
-  for (final (code, hints) in _dishPhotoHints) {
-    if (hints.any(text.contains)) return code;
-  }
-  return null;
-}
-
-/// Seeded category codes that ship their own photo (same set as Admin).
-const Set<String> _photoCodes = {
-  'pho',
-  'noodles',
-  'rice',
-  'banh_mi',
-  'tea',
-  'cafe',
-  'fast_food',
-  'snack',
-  'mart',
+/// Maps admin-managed category icon keys to Lucide icons.
+IconData foodCategoryIcon(String iconKey) => switch (iconKey) {
+  'soup' => LucideIcons.soup,
+  'cooking-pot' => LucideIcons.cookingPot,
+  'sandwich' || 'croissant' => LucideIcons.sandwich,
+  'cup-soda' || 'cake-slice' || 'ice-cream-cone' => LucideIcons.cupSoda,
+  'coffee' || 'beer' => LucideIcons.coffee,
+  'hamburger' || 'pizza' || 'drumstick' => LucideIcons.hamburger,
+  'popcorn' || 'cookie' || 'salad' => LucideIcons.popcorn,
+  'shopping-cart' || 'apple' || 'wheat' || 'store' => LucideIcons.shoppingCart,
+  _ => LucideIcons.utensils,
 };
 
-/// Admin default-image key → bundled photo, mirroring the Admin picker.
-String _iconPhoto(String key) => switch (key) {
-  'soup' => 'pho',
-  'cooking-pot' => 'noodles',
-  'sandwich' || 'croissant' => 'banh_mi',
-  'cup-soda' || 'cake-slice' || 'ice-cream-cone' => 'tea',
-  'coffee' || 'beer' => 'cafe',
-  'hamburger' || 'pizza' || 'drumstick' => 'fast_food',
-  'popcorn' || 'cookie' || 'salad' => 'snack',
-  'shopping-cart' || 'apple' || 'wheat' || 'store' => 'mart',
-  _ => 'rice',
-};
-
-/// Picture used until the category has its own uploaded image — tiles
-/// always show a photo, never an icon.
-String foodCategoryFallbackImage(String code, String iconKey) {
-  final photo = _photoCodes.contains(code) ? code : _iconPhoto(iconKey);
-  return 'assets/images/food_cat_$photo.jpg';
-}
+/// Fallback for dishes without photos — returns null to let UI render clean placeholders.
+String? foodDishFallbackImage(String? category, {String? dishName}) => null;
 
 Color foodCategoryColor(String tone) => (_tones[tone] ?? _tones['orange']!).$1;
 
 Color foodCategoryBackground(String tone) =>
     (_tones[tone] ?? _tones['orange']!).$2;
 
-/// Round tile: the uploaded image when there is one, else a bundled photo.
+/// Round tile: the uploaded image from server when there is one, else the vector icon.
 class FoodCategoryAvatar extends StatelessWidget {
   const FoodCategoryAvatar({
     required this.category,
@@ -118,11 +59,12 @@ class FoodCategoryAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = foodCategoryColor(category.tone);
-    final fallback = Image.asset(
-      foodCategoryFallbackImage(category.code, category.icon),
-      fit: BoxFit.cover,
-      width: size,
-      height: size,
+    final fallback = Center(
+      child: Icon(
+        foodCategoryIcon(category.icon),
+        color: color,
+        size: size * 0.52,
+      ),
     );
     final image = resolveMediaUrl(category.imageUrl);
     return Container(

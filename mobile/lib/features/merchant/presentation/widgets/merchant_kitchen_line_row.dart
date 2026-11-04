@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_money.dart';
-import '../../../food/presentation/widgets/food_category_tile.dart';
 import '../../../food/presentation/widgets/food_order_extras.dart';
 import '../utils/merchant_kitchen_lines.dart';
 
@@ -20,11 +20,13 @@ class MerchantKitchenLineRow extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(DealGoRadius.small),
-          child: Image.asset(
-            foodPlaceholderImage,
+          child: Container(
             width: 44,
             height: 44,
-            fit: BoxFit.cover,
+            color: DealGoColors.amberSurface,
+            child: Center(
+              child: Icon(DealGoIcons.food, size: 20, color: DealGoColors.amber),
+            ),
           ),
         ),
         const SizedBox(width: DealGoSpacing.s12),

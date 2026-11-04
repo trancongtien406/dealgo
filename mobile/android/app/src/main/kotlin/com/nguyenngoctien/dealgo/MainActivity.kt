@@ -1,4 +1,4 @@
-package dealgo.nguyengoctien.com
+package com.nguyenngoctien.dealgo
 
 import android.os.Bundle
 import io.flutter.embedding.android.FlutterActivity

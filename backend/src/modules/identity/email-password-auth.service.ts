@@ -22,6 +22,7 @@ import {
   EMAIL_SIGNUP_TTL_MS,
   IDENTITY_REPOSITORY,
   MAIL_SENDER,
+  MAX_ACCOUNTS_PER_DEVICE,
 } from './identity.constants.js';
 import {
   UniqueConflictError,
@@ -93,6 +94,7 @@ export class EmailPasswordAuthService {
    */
   async register(
     input: EmailPasswordRegisterInput,
+    clientContext?: { deviceId?: string | null; ipAddress?: string | null },
   ): Promise<EmailSignupChallengeView | EmailSignupInstantView> {
     await this.authMethods.assertEnabled('EMAIL_LOGIN_IDENTIFIER');
     const email = normalizeEmail(input.email);
@@ -103,8 +105,20 @@ export class EmailPasswordAuthService {
     await this.assertHourlyCap(email, now);
 
     const existing = await this.repository.findUserByEmail(email);
+    if (!existing && clientContext?.deviceId) {
+      const maxLimit = (await this.settings?.getNumber('MAX_ACCOUNTS_PER_DEVICE')) ?? MAX_ACCOUNTS_PER_DEVICE;
+      const regCount = await this.repository.countRegistrationsByDeviceId(clientContext.deviceId);
+      if (regCount >= maxLimit) {
+        throw authError(
+          429,
+          'AUTH_DEVICE_REGISTRATION_LIMIT',
+          'Thiết bị này đã vượt quá số lượng tài khoản được phép đăng ký',
+        );
+      }
+    }
+
     if (!existing && !(await this.verificationRequired())) {
-      return this.registerWithoutVerification(email, passwordHash, input.displayName, now);
+      return this.registerWithoutVerification(email, passwordHash, input.displayName, now, clientContext);
     }
     const reviewCode = existing ? null : await this.reviewCode(email);
     if (!reviewCode) {
@@ -144,7 +158,18 @@ export class EmailPasswordAuthService {
     passwordHash: string,
     displayName: string | undefined,
     now: Date,
+    clientContext?: { deviceId?: string | null; ipAddress?: string | null },
   ): Promise<EmailSignupInstantView> {
+    if (clientContext?.deviceId) {
+      const regCount = await this.repository.countRegistrationsByDeviceId(clientContext.deviceId);
+      if (regCount >= MAX_ACCOUNTS_PER_DEVICE) {
+        throw authError(
+          429,
+          'AUTH_DEVICE_REGISTRATION_LIMIT',
+          'Thiết bị này đã vượt quá số lượng tài khoản được phép đăng ký',
+        );
+      }
+    }
     let user;
     try {
       user = await this.repository.createEmailPasswordUser({
@@ -159,6 +184,13 @@ export class EmailPasswordAuthService {
       }
       throw error;
     }
+    if (clientContext?.deviceId) {
+      await this.repository.recordDeviceRegistration({
+        deviceId: clientContext.deviceId,
+        userId: user.id,
+        ipAddress: clientContext.ipAddress ?? null,
+      });
+    }
     const challenge = await this.repository.createEmailSignupChallenge({
       email,
       passwordHash: null,
@@ -168,7 +200,7 @@ export class EmailPasswordAuthService {
       sentAt: now,
     });
     await this.repository.consumeEmailSignupChallenge(challenge.id, now);
-    const session = await this.sessions.issue(user, 'customer');
+    const session = await this.sessions.issue(user, 'customer', clientContext);
     return { ...toView(challenge), verificationRequired: false, session };
   }
 
@@ -182,7 +214,16 @@ export class EmailPasswordAuthService {
     }
   }
 
-  async verifyRegistration(challengeId: string, code: string): Promise<SessionResult> {
+  async verifyRegistration(
+    challengeId: string,
+    code: string,
+    clientContext?: {
+      deviceId?: string | null;
+      deviceLabel?: string | null;
+      userAgent?: string | null;
+      ipAddress?: string | null;
+    },
+  ): Promise<SessionResult> {
     await this.authMethods.assertEnabled('EMAIL_LOGIN_IDENTIFIER');
     const challenge = await this.repository.findEmailSignupChallenge(challengeId);
     if (!challenge || challenge.consumedAt) {
@@ -208,20 +249,39 @@ export class EmailPasswordAuthService {
     }
     if (await this.review?.matches('email', challenge.email)) {
       const session = await (challenge.purpose === 'ACTIVATE_EXISTING'
-        ? this.activateExistingUser(challenge)
-        : this.createRegisteredUser(challenge));
+        ? this.activateExistingUser(challenge, clientContext)
+        : this.createRegisteredUser(challenge, clientContext));
       await this.review?.recordSignIn(session.user.id, 'email');
       return session;
     }
     if (challenge.purpose === 'ACTIVATE_EXISTING') {
-      return this.activateExistingUser(challenge);
+      return this.activateExistingUser(challenge, clientContext);
     }
-    return this.createRegisteredUser(challenge);
+    return this.createRegisteredUser(challenge, clientContext);
   }
 
-  private async createRegisteredUser(challenge: EmailSignupChallengeRecord): Promise<SessionResult> {
+  private async createRegisteredUser(
+    challenge: EmailSignupChallengeRecord,
+    clientContext?: {
+      deviceId?: string | null;
+      deviceLabel?: string | null;
+      userAgent?: string | null;
+      ipAddress?: string | null;
+    },
+  ): Promise<SessionResult> {
     if (!challenge.passwordHash) {
       throw authError(401, 'AUTH_CODE_INVALID', 'Verification code is invalid');
+    }
+
+    if (clientContext?.deviceId) {
+      const regCount = await this.repository.countRegistrationsByDeviceId(clientContext.deviceId);
+      if (regCount >= MAX_ACCOUNTS_PER_DEVICE) {
+        throw authError(
+          429,
+          'AUTH_DEVICE_REGISTRATION_LIMIT',
+          'Thiết bị này đã vượt quá số lượng tài khoản được phép đăng ký',
+        );
+      }
     }
 
     let user;
@@ -240,7 +300,15 @@ export class EmailPasswordAuthService {
       }
       throw error;
     }
-    return this.sessions.issue(user, 'customer');
+
+    if (clientContext?.deviceId) {
+      await this.repository.recordDeviceRegistration({
+        deviceId: clientContext.deviceId,
+        userId: user.id,
+        ipAddress: clientContext.ipAddress ?? null,
+      });
+    }
+    return this.sessions.issue(user, 'customer', clientContext);
   }
 
   async resendRegistration(challengeId: string): Promise<EmailSignupChallengeView> {
@@ -298,7 +366,15 @@ export class EmailPasswordAuthService {
     return toView(reissued);
   }
 
-  async login(input: EmailPasswordLoginInput): Promise<SessionResult> {
+  async login(
+    input: EmailPasswordLoginInput,
+    clientContext?: {
+      deviceId?: string | null;
+      deviceLabel?: string | null;
+      userAgent?: string | null;
+      ipAddress?: string | null;
+    },
+  ): Promise<SessionResult> {
     await this.authMethods.assertEnabled('EMAIL_LOGIN_IDENTIFIER');
     const email = normalizeEmail(input.email);
     const user = await this.repository.findUserByEmail(email);
@@ -321,7 +397,7 @@ export class EmailPasswordAuthService {
         toView(challenge),
       );
     }
-    return this.sessions.issue(user, 'customer');
+    return this.sessions.issue(user, 'customer', clientContext);
   }
 
   /**
@@ -371,7 +447,15 @@ export class EmailPasswordAuthService {
     return challenge;
   }
 
-  private async activateExistingUser(challenge: EmailSignupChallengeRecord): Promise<SessionResult> {
+  private async activateExistingUser(
+    challenge: EmailSignupChallengeRecord,
+    clientContext?: {
+      deviceId?: string | null;
+      deviceLabel?: string | null;
+      userAgent?: string | null;
+      ipAddress?: string | null;
+    },
+  ): Promise<SessionResult> {
     const user = challenge.userId ? await this.repository.findUserById(challenge.userId) : null;
     // The address may have changed since the code was sent; the code only proves the old one.
     if (!user || user.email !== challenge.email) {
@@ -389,7 +473,7 @@ export class EmailPasswordAuthService {
       }
     }
     await ensureActiveCustomerGrant(this.repository, user.id);
-    return this.sessions.issue(verified, 'customer');
+    return this.sessions.issue(verified, 'customer', clientContext);
   }
 
   private async assertHourlyCap(email: string, now: Date): Promise<void> {

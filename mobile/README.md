@@ -50,7 +50,7 @@ open ios/Runner.xcworkspace
 | `prod` | `Debug-prod` / `Profile-prod` / `Release-prod` | luôn `https://api-dealgo.laptrinhapp.com` | Debug: development, còn lại: production | DealGo |
 | `Runner` | `Debug` / `Profile` / `Release` | như `flutter run` / `flutter build ipa` không `--flavor` | như trên | DealGo |
 
-- Cả ba dùng bundle id `dealgo.nguyengoctien.com`, team `6J3522877H`, associated domains `applinks:` + `webcredentials:`
+- Cả ba dùng bundle id `com.nguyenngoctien.dealgo`, team `NN36XDL3V6`, associated domains `applinks:` + `webcredentials:`
   `dealgo.laptrinhapp.com` (`DEALGO_APP_LINK_HOST` trong `ios/Flutter/App.xcconfig`). Cài `dev` sẽ thay bản `prod` trên cùng máy.
 - Scheme chọn flavor qua `FLAVOR` trong `ios/Flutter/Dev.xcconfig` / `Prod.xcconfig`; app đọc bằng `FLUTTER_APP_FLAVOR`
   (`lib/core/config/api_base_url.dart`). `--dart-define=API_BASE_URL=...` vẫn thắng mọi mặc định.
@@ -69,7 +69,7 @@ flutter test
 
 ## Ghi chú
 
-- Package ID: `dealgo.nguyengoctien.com` (Android / iOS).
+- Package ID: `com.nguyenngoctien.dealgo` (Android / iOS).
 - Kiến trúc: `go_router`, `flutter_bloc` (Cubit), `get_it` + `injectable`, một Dio dùng chung; realtime qua Socket.IO; push qua Firebase Cloud Messaging.
 - Hiện trạng và khoảng trống: [`../docs/10-ai-execution/mobile-flutter-gap-matrix.md`](../docs/10-ai-execution/mobile-flutter-gap-matrix.md).
 - Mockup và asset UI ở `../design/`.

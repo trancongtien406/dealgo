@@ -165,7 +165,7 @@ class _PinPickerMapState extends State<PinPickerMap> {
           children: [
             TileLayer(
               urlTemplate: url,
-              userAgentPackageName: 'dealgo.nguyengoctien.com',
+              userAgentPackageName: 'com.nguyenngoctien.dealgo',
               tileProvider: _tiles,
               tileDimension: 256,
               retinaMode: url.contains('@2x'),

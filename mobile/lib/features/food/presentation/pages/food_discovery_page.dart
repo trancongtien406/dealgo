@@ -130,21 +130,6 @@ class _FoodDiscoveryViewState extends State<_FoodDiscoveryView> {
     context.push(FoodRoutes.store(store.id));
   }
 
-  void _scrollToStores() {
-    final target = _storesKey.currentContext;
-    if (target == null) {
-      return;
-    }
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    Scrollable.ensureVisible(
-      target,
-      duration: reduceMotion
-          ? Duration.zero
-          : const Duration(milliseconds: 280),
-      curve: Curves.easeOut,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final discovery = context.watch<FoodDiscoveryCubit>().state;
@@ -234,13 +219,11 @@ class _FoodDiscoveryViewState extends State<_FoodDiscoveryView> {
                           context.push(FoodRoutes.categoryOf(code)),
                     ),
                     const SizedBox(height: DealGoSpacing.s16),
-                    HomeBannerCarousel(
+                    const HomeBannerCarousel(
                       role: AppRole.customer,
                       service: 'FOOD',
-                      gapBelow: 0,
-                      empty: _FoodBanner(onExplore: _scrollToStores),
+                      gapBelow: DealGoSpacing.s16,
                     ),
-                    const SizedBox(height: DealGoSpacing.s16),
                     const FoodVoucherWall(),
                     const FoodReorderStrip(),
                     // Curated collections are bounded (a horizontal strip per
@@ -534,38 +517,6 @@ class _LocationChip extends StatelessWidget {
   }
 }
 
-class _FoodBanner extends StatelessWidget {
-  const _FoodBanner({required this.onExplore});
-
-  final VoidCallback onExplore;
-
-  @override
-  Widget build(BuildContext context) {
-    // Image-only, tappable — same rule as the Admin banners.
-    return DealGoPressScale(
-      child: Material(
-        color: DealGoColors.primaryDeep,
-        borderRadius: BorderRadius.circular(DealGoRadius.button),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          key: const Key('food-banner'),
-          onTap: onExplore,
-          child: SizedBox(
-            height: 168,
-            width: double.infinity,
-            child: Image.asset(
-              foodStoreCoverImage,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) =>
-                  const SizedBox.shrink(),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// "Gần tôi" plus the Admin-managed categories; shimmer tiles while the
 /// list loads, just "Gần tôi" if it failed with nothing cached.
 class _CategoryStrip extends StatelessWidget {
@@ -618,7 +569,6 @@ class _CategoryStrip extends StatelessWidget {
         avatar: Container(
           width: 56,
           height: 56,
-          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: DealGoColors.subtlePurple,
             shape: BoxShape.circle,
@@ -626,10 +576,12 @@ class _CategoryStrip extends StatelessWidget {
                 ? Border.all(color: DealGoColors.primary, width: 1.5)
                 : null,
           ),
-          child: Image.asset(
-            foodStoreCoverImage,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stack) => const SizedBox.shrink(),
+          child: const Center(
+            child: Icon(
+              DealGoIcons.myLocation,
+              color: DealGoColors.primary,
+              size: 26,
+            ),
           ),
         ),
         label: l10n.foodGroupNear,
@@ -852,13 +804,17 @@ class _StoreCover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final resolved = resolveMediaUrl(imageUrl);
-    final placeholder = Image.asset(
-      foodStoreCoverImage,
-      fit: BoxFit.cover,
+    final placeholder = Container(
       width: double.infinity,
       height: double.infinity,
-      errorBuilder: (context, error, stack) =>
-          ColoredBox(color: DealGoColors.amberSurface),
+      color: DealGoColors.subtlePurple,
+      child: Center(
+        child: Icon(
+          DealGoIcons.restaurant,
+          size: 48,
+          color: DealGoColors.primary.withValues(alpha: 0.5),
+        ),
+      ),
     );
     if (resolved == null || resolved.isEmpty) {
       return placeholder;
@@ -978,7 +934,7 @@ class _StoreStrip extends StatelessWidget {
   });
 
   static const _cardWidth = 288.0;
-  static const _railHeight = 96.0;
+  static const _railHeight = 108.0;
 
   final List<FoodStoreSummary> stores;
   final Map<String, StoreRating> ratings;

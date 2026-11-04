@@ -60,8 +60,8 @@ PUBLIC_WEB_BASE_URL=https://${WEB_DOMAIN}
 WEBAUTHN_RP_ID=${WEB_DOMAIN}
 WEBAUTHN_RP_NAME=DealGo
 WEBAUTHN_ORIGIN=https://${WEB_DOMAIN}
-APP_LINKS_IOS_APP_IDS=6J3522877H.dealgo.nguyengoctien.com
-APP_LINKS_ANDROID_PACKAGE=dealgo.nguyengoctien.com
+APP_LINKS_IOS_APP_IDS=6J3522877H.com.nguyenngoctien.dealgo
+APP_LINKS_ANDROID_PACKAGE=com.nguyenngoctien.dealgo
 APP_LINKS_ANDROID_CERT_SHA256=
 
 MAPS_PROVIDER=mapbox
@@ -86,7 +86,7 @@ FCM_SERVICE_ACCOUNT_PATH=$( [[ -f secrets/fcm-service-account.json ]] && echo /r
 APNS_KEY_ID=TL36K38ZKR
 APNS_TEAM_ID=6J3522877H
 APNS_KEY_PATH=$( [[ -f secrets/AuthKey_TL36K38ZKR.p8 ]] && echo /run/dealgo/AuthKey_TL36K38ZKR.p8 )
-APNS_BUNDLE_ID=dealgo.nguyengoctien.com
+APNS_BUNDLE_ID=com.nguyenngoctien.dealgo
 APNS_ENV=production
 
 PAYMENT_PROVIDER=cash-only

@@ -9,7 +9,7 @@ const _flavor = String.fromEnvironment('FLUTTER_APP_FLAVOR');
 /// Public client DSN of the DealGo mobile Sentry project. It can only submit
 /// events, so it ships in the app like any Sentry client key.
 const dealGoMobileSentryDsn =
-    'https://4f6dd88076ff619f69652c97f82c19b9@o4512325670010880.ingest.us.sentry.io/4512325680824320';
+    'https://0908d4b63d3c020d192acffa68c870de@o4512373110603776.ingest.de.sentry.io/4512373234597968';
 
 /// DEC-PROD-054: flavored (`dev`/`prod`) and release builds report to
 /// [dealGoMobileSentryDsn]; un-flavored debug runs and `flutter test` report

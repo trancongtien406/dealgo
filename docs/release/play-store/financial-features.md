@@ -1,7 +1,7 @@
 # Khai báo "Tính năng tài chính" trên Google Play Console
 
 > Trạng thái: **DRAFT — chờ Legal xác nhận** (`ASM` trong `docs/02-domain/driver-credit-topup.md`).
-> Áp dụng cho app `dealgo.nguyengoctien.com` (Flutter, một app ba vai trò).
+> Áp dụng cho app `com.nguyenngoctien.dealgo` (Flutter, một app ba vai trò).
 > Cập nhật: 11/2026.
 
 ## 0. Kết luận (TL;DR)

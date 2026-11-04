@@ -15,7 +15,7 @@ void main() {
   });
 
   test('flavored builds default to the public mobile DSN', () {
-    expect(Uri.parse(dealGoMobileSentryDsn).path, '/4512325680824320');
+    expect(Uri.parse(dealGoMobileSentryDsn).path, '/4512373234597968');
   });
 
   test('runs the app directly when disabled', () async {

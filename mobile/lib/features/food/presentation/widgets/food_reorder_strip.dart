@@ -14,7 +14,6 @@ import '../../domain/entities/food_money.dart';
 import '../../domain/entities/food_models.dart';
 import '../../domain/params/get_food_order_params.dart';
 import '../../domain/usecases/get_food_order.dart';
-import 'food_category_tile.dart';
 import 'food_reorder_button.dart';
 import 'food_widgets.dart';
 
@@ -148,20 +147,16 @@ class _FoodReorderStripState extends State<FoodReorderStrip>
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(DealGoRadius.small),
-                    child: SizedBox(
+                    child: Container(
                       width: _coverSize,
                       height: _coverSize,
-                      child: Image.asset(
-                        foodStoreCoverImage,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            ColoredBox(
-                              color: DealGoColors.amberSurface,
-                              child: Icon(
-                                DealGoIcons.food,
-                                color: DealGoColors.primary,
-                              ),
-                            ),
+                      color: DealGoColors.amberSurface,
+                      child: const Center(
+                        child: Icon(
+                          DealGoIcons.food,
+                          color: DealGoColors.primary,
+                          size: 20,
+                        ),
                       ),
                     ),
                   ),

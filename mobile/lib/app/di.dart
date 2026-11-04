@@ -20,6 +20,7 @@ import '../core/analytics/noop_analytics.dart';
 import '../core/auth/secure_token_store.dart';
 import '../core/auth/token_store.dart';
 import '../core/config/app_env.dart';
+import '../core/device/device_id_service.dart';
 import '../core/di/injection.dart';
 import '../core/location/location_service.dart';
 import '../core/navigation/external_navigator.dart';
@@ -512,6 +513,7 @@ class DealGoDependencies {
     MerchantStatsRepository? merchantStats,
     DriverLocationRepository? driverLocation,
     PromotionRepository? promotions,
+    DeviceIdService? deviceIdService,
   }) {
     if (locationOverride != null) {
       if (locator.isRegistered<LocationService>()) {
@@ -519,6 +521,12 @@ class DealGoDependencies {
       }
       locator.registerSingleton<LocationService>(locationOverride);
     }
+    final deviceService = deviceIdService ?? DeviceIdService();
+    if (locator.isRegistered<DeviceIdService>()) {
+      locator.unregister<DeviceIdService>();
+    }
+    locator.registerSingleton<DeviceIdService>(deviceService);
+
     final tokens = tokenStore ?? SecureTokenStore();
     late final AuthCubit auth;
     late final AppGateCubit appGate;
@@ -528,6 +536,7 @@ class DealGoDependencies {
       tokenStore: tokens,
       sessionRefresher: sessionRefresher,
       appBuild: appBuild,
+      deviceIdService: deviceService,
       onAppUpdateRequired: () => appGate.forceRequired(),
       onSessionRefreshed: (next) => auth.applyRefreshedTokens(next),
       onUnauthorized: () => auth.signOut(revokeRemote: false),
@@ -542,7 +551,8 @@ class DealGoDependencies {
         ? const NoopNativeCallUi()
         : CallkitNativeCallUi();
 
-    final identity = identityClient ?? DioIdentityRemoteDataSource(dio: dio);
+    final identity = identityClient ??
+        DioIdentityRemoteDataSource(dio: dio, deviceIdService: deviceService);
     final food = foodClient ?? DioFoodRemoteDataSource(dio: dio);
     final rides = rideClient ?? DioRideRemoteDataSource(dio: dio);
     final identityRepository = IdentityRepositoryImpl(identity);

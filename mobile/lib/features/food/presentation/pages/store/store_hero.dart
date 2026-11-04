@@ -25,7 +25,6 @@ class _Hero extends StatelessWidget {
               key: const Key('food-store-cover'),
               imageUrl: cover,
               aspectRatio: 2,
-              placeholderAsset: foodStoreCoverImage,
             ),
             if (logo != null && logo.isNotEmpty)
               Positioned(

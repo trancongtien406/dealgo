@@ -16,7 +16,6 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_models.dart';
 import '../../../food/presentation/widgets/food_badges.dart';
-import '../../../food/presentation/widgets/food_category_tile.dart';
 import '../../domain/entities/merchant_menu_models.dart';
 import '../../domain/repositories/merchant_orders_repository.dart';
 import '../../domain/usecases/create_merchant_catalog_item.dart';
@@ -485,13 +484,7 @@ class _ProductRow extends StatelessWidget {
                     fit: BoxFit.cover,
                     fallback: fallback,
                   )
-                : Image.asset(
-                    foodPlaceholderImage,
-                    width: 56,
-                    height: 56,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stack) => fallback,
-                  ),
+                : fallback,
           ),
           const SizedBox(width: DealGoSpacing.s12),
           Expanded(

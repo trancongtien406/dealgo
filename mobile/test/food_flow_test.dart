@@ -21,17 +21,13 @@ const _storeId = 'store-bun-bo';
 const _bunId = 'item-bun';
 
 void main() {
-  testWidgets('the shop banner is tappable as a whole', (tester) async {
+  testWidgets('without server banners, food discovery hides the banner slot entirely', (tester) async {
     await pumpSignedIn(tester, profile: customerProfile);
     await tester.tap(navLabel('Mua'));
     await tester.pumpAndSettle();
 
-    final banner = find.byKey(const Key('food-banner'));
-    expect(banner, findsOneWidget);
-    expect(tester.widget<InkWell>(banner).onTap, isNotNull);
-    await tester.tapAt(tester.getTopLeft(banner) + const Offset(24, 24));
-    await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('food-banner')), findsNothing);
+    expect(find.byKey(const Key('home-banner-carousel')), findsNothing);
   });
 
   test(

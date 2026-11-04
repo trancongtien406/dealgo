@@ -120,22 +120,8 @@ class _RideVehicleClassArt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final vehicleCode = code;
-    if (vehicleCode == null ||
-        vehicleCode.isEmpty ||
-        vehicleCode == 'MOTORBIKE') {
-      return Image.asset(
-        'assets/images/vehicle_scooter_white.png',
-        fit: BoxFit.contain,
-        errorBuilder: (_, _, _) => Icon(
-          rideVehicleClassIcon(vehicleCode),
-          size: size * 0.7,
-          color: DealGoColors.brandGreen,
-        ),
-      );
-    }
     return Icon(
-      rideVehicleClassIcon(vehicleCode),
+      rideVehicleClassIcon(code),
       size: size * 0.7,
       color: DealGoColors.brandGreen,
     );

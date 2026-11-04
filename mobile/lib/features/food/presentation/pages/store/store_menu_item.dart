@@ -186,13 +186,17 @@ class _MenuItem extends StatelessWidget {
       imageUrls: item.imageUrls,
       fallbackImageUrl: item.imageUrl,
     ).length;
-    final placeholder = Image.asset(
-      foodDishFallbackImage(store.category, dishName: item.name),
-      fit: BoxFit.cover,
+    final placeholder = Container(
       width: size,
       height: size,
-      errorBuilder: (context, error, stack) =>
-          ColoredBox(color: DealGoColors.amberSurface),
+      color: DealGoColors.amberSurface,
+      child: Center(
+        child: Icon(
+          DealGoIcons.restaurant,
+          size: size * 0.45,
+          color: DealGoColors.amber,
+        ),
+      ),
     );
     final Widget image = resolved == null || resolved.isEmpty
         ? placeholder

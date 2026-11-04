@@ -1,4 +1,4 @@
-package dealgo.nguyengoctien.com
+package com.nguyenngoctien.dealgo
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -46,4 +46,3 @@ object NewJobChannels {
         }
     }
 }
-

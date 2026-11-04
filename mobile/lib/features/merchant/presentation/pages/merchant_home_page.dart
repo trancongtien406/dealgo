@@ -9,7 +9,6 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_models.dart';
 import '../../../food/domain/entities/food_money.dart';
-import '../../../food/presentation/widgets/food_category_tile.dart';
 import '../../../food/presentation/widgets/food_widgets.dart';
 import '../../../food/presentation/widgets/store_meta.dart';
 import '../../domain/merchant_stats.dart';
@@ -174,9 +173,6 @@ class _Dashboard extends StatelessWidget {
                     key: const Key('merchant-home-logo'),
                     size: 56,
                     imageUrl: store?.logoUrl,
-                    placeholderAsset: store == null
-                        ? foodStoreCoverImage
-                        : foodDishFallbackImage(store.category),
                   ),
                   const SizedBox(width: DealGoSpacing.s12),
                   Expanded(

@@ -186,7 +186,7 @@ Thay đổi đáng chú ý cho người vận hành, mới nhất ở trên.
 - **Banner trang Mua chạm được.** Trang Mua hiện banner Admin nhắm dịch vụ Đồ ăn (chạm mở liên kết của banner); chưa có banner
   thì banner mặc định chạm vào bất kỳ đâu cũng cuộn tới danh sách quán. Thẻ ưu đãi trang chủ chạm cả thẻ để mở Ưu đãi.
 - **iOS có scheme `dev` và `prod`** bên cạnh `Runner`. Mở `ios/Runner.xcworkspace`, chọn scheme rồi Run/Archive: `dev`
-  (tên "DealGo Dev", API local khi Debug), `prod` (API VPS kể cả Debug). Cùng bundle id `dealgo.nguyengoctien.com`; Debug dùng
+  (tên "DealGo Dev", API local khi Debug), `prod` (API VPS kể cả Debug). Cùng bundle id `com.nguyenngoctien.dealgo`; Debug dùng
   APNs development, Profile/Release dùng production. `flutter build ipa` (không `--flavor`) vẫn như cũ. Hướng dẫn ở `mobile/README.md`.
 
 - **Mở app không còn màn trắng.** Từ lúc chạm biểu tượng đến trang đầu tiên chỉ có một màn: nền tím DealGo (máy để chế độ tối thì tím đậm)

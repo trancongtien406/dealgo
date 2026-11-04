@@ -98,6 +98,7 @@ model User {
   opsFaqCreated               OpsFaqEntry[]               @relation("OpsFaqCreatedBy")
   opsFaqUpdated               OpsFaqEntry[]               @relation("OpsFaqUpdatedBy")
   notifications               UserNotification[]
+  deviceRegistrations         DeviceRegistration[]
   notificationPreference      UserNotificationPreference?
 
   savedAddresses     SavedAddress[]
@@ -122,6 +123,20 @@ model PushDeviceToken {
   @@unique([userId, token])
   @@index([userId])
   @@map("push_device_tokens")
+}
+
+// Tracks device-to-account registrations for anti-abuse and multi-account control.
+model DeviceRegistration {
+  id        String   @id @default(uuid()) @db.Uuid
+  deviceId  String   @db.VarChar(128)
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress String?  @db.VarChar(64)
+  createdAt DateTime @default(now())
+
+  @@index([deviceId])
+  @@index([userId])
+  @@map("device_registrations")
 }
 
 enum PartnerApplicationRole {
@@ -298,6 +313,7 @@ model Session {
   rotatedAt        DateTime?
   revokedAt        DateTime?
   revokeReason     SessionRevokeReason?
+  deviceId         String?              @db.VarChar(128)
   /// S028 (DEC-PROD-038): client-reported label, e.g. "iPhone · DealGo".
   deviceLabel      String?              @db.VarChar(120)
   userAgent        String?              @db.VarChar(400)
@@ -307,6 +323,7 @@ model Session {
 
   @@index([familyId])
   @@index([userId])
+  @@index([deviceId])
   @@map("sessions")
 }
 
@@ -1483,6 +1500,8 @@ enum IntegrationKind {
   EMAIL
   MAPS
   SENTRY
+  STORAGE
+  SMS
 }
 
 // Admin-managed integration credentials (Cài đặt › Email, › Bản đồ, › Sentry). Env values are the

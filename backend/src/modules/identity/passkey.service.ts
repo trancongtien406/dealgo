@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   generateAuthenticationOptions,
@@ -12,6 +12,7 @@ import type {
   RegistrationResponseJSON,
 } from '@simplewebauthn/server';
 import type { AppEnv } from '../../platform/config/env.js';
+import { PlatformSettingsService } from '../../platform/settings/platform-settings.service.js';
 import { authError } from './auth-error.js';
 import { AuthMethodPolicyService } from './auth-method-policy.service.js';
 import { IDENTITY_REPOSITORY, PASSKEY_CHALLENGE_TTL_MS } from './identity.constants.js';
@@ -26,6 +27,7 @@ export class PasskeyService {
     private readonly sessions: SessionService,
     private readonly config: ConfigService<AppEnv, true>,
     private readonly authMethods: AuthMethodPolicyService,
+    @Optional() private readonly platformSettings?: PlatformSettingsService,
   ) {}
 
   async registrationOptions(userId: string): Promise<Awaited<ReturnType<typeof generateRegistrationOptions>>> {
@@ -33,7 +35,7 @@ export class PasskeyService {
     const user = await this.requireVerifiedUser(userId);
     const existing = await this.repository.listPasskeys(user.id);
     const options = await generateRegistrationOptions({
-      ...this.relyingParty(),
+      ...(await this.relyingParty()),
       userName: (user.phoneVerifiedAt ? user.phone : null) ?? (user.emailVerifiedAt ? user.email : null) ?? user.id,
       userDisplayName: user.displayName,
       userID: Buffer.from(user.id),
@@ -67,7 +69,7 @@ export class PasskeyService {
       throw authError(401, 'AUTH_PASSKEY_INVALID', 'Passkey verification failed');
     }
 
-    const relyingParty = this.relyingParty();
+    const relyingParty = await this.relyingParty();
     let verification: Awaited<ReturnType<typeof verifyRegistrationResponse>>;
     try {
       verification = await verifyRegistrationResponse({
@@ -111,8 +113,9 @@ export class PasskeyService {
 
   async authenticationOptions(): Promise<Awaited<ReturnType<typeof generateAuthenticationOptions>> & { ceremonyId: string }> {
     await this.authMethods.assertEnabled('PASSKEY');
+    const rp = await this.relyingParty();
     const options = await generateAuthenticationOptions({
-      rpID: this.relyingParty().rpID,
+      rpID: rp.rpID,
       userVerification: 'required',
     });
     const ceremony = await this.repository.replacePasskeyChallenge({
@@ -136,7 +139,7 @@ export class PasskeyService {
       throw authError(401, 'AUTH_PASSKEY_INVALID', 'Passkey verification failed');
     }
 
-    const relyingParty = this.relyingParty();
+    const relyingParty = await this.relyingParty();
     let verification: Awaited<ReturnType<typeof verifyAuthenticationResponse>>;
     try {
       verification = await verifyAuthenticationResponse({
@@ -180,8 +183,9 @@ export class PasskeyService {
    */
   async reauthenticationOptions(userId: string): Promise<PublicKeyCredentialRequestOptionsJSON> {
     const passkeys = await this.repository.listPasskeys(userId);
+    const rp = await this.relyingParty();
     return generateAuthenticationOptions({
-      rpID: this.relyingParty().rpID,
+      rpID: rp.rpID,
       userVerification: 'required',
       allowCredentials: passkeys.map((passkey) => ({
         id: passkey.credentialId,
@@ -200,7 +204,7 @@ export class PasskeyService {
     if (!passkey || passkey.userId !== userId) {
       return false;
     }
-    const relyingParty = this.relyingParty();
+    const relyingParty = await this.relyingParty();
     try {
       const verification = await verifyAuthenticationResponse({
         response,
@@ -228,7 +232,7 @@ export class PasskeyService {
   async signupOptions(): Promise<Awaited<ReturnType<typeof generateRegistrationOptions>> & { ceremonyId: string }> {
     await this.authMethods.assertEnabled('PASSKEY');
     const options = await generateRegistrationOptions({
-      ...this.relyingParty(),
+      ...(await this.relyingParty()),
       userName: 'New DealGo account',
       userDisplayName: 'DealGo user',
       attestationType: 'none',
@@ -252,7 +256,7 @@ export class PasskeyService {
     }
     let verification: Awaited<ReturnType<typeof verifyRegistrationResponse>>;
     try {
-      const rp = this.relyingParty();
+      const rp = await this.relyingParty();
       verification = await verifyRegistrationResponse({
         response,
         expectedChallenge: ceremony.challenge,
@@ -304,11 +308,21 @@ export class PasskeyService {
     return user;
   }
 
-  private relyingParty(): { rpID: string; rpName: string; origins: string[] } {
-    const rpID = this.config.get('WEBAUTHN_RP_ID', { infer: true });
-    const rpName = this.config.get('WEBAUTHN_RP_NAME', { infer: true });
-    const origins = webauthnExpectedOrigins(this.config.get('WEBAUTHN_ORIGIN', { infer: true }), {
-      APP_LINKS_ANDROID_CERT_SHA256: this.config.get('APP_LINKS_ANDROID_CERT_SHA256', { infer: true }),
+  private async relyingParty(): Promise<{ rpID: string; rpName: string; origins: string[] }> {
+    let rpID = this.config.get('WEBAUTHN_RP_ID', { infer: true });
+    let rpName = this.config.get('WEBAUTHN_RP_NAME', { infer: true });
+    let originsStr = this.config.get('WEBAUTHN_ORIGIN', { infer: true });
+    let androidCert = this.config.get('APP_LINKS_ANDROID_CERT_SHA256', { infer: true });
+
+    if (this.platformSettings) {
+      rpID = (await this.platformSettings.getString('WEBAUTHN_RP_ID')) || rpID;
+      rpName = (await this.platformSettings.getString('WEBAUTHN_RP_NAME')) || rpName;
+      originsStr = (await this.platformSettings.getString('WEBAUTHN_ORIGIN')) || originsStr;
+      androidCert = (await this.platformSettings.getString('APP_LINKS_ANDROID_CERT_SHA256')) || androidCert;
+    }
+
+    const origins = webauthnExpectedOrigins(originsStr, {
+      APP_LINKS_ANDROID_CERT_SHA256: androidCert,
     });
     if (!rpID || !rpName || origins.length === 0) {
       throw authError(500, 'WEBAUTHN_NOT_CONFIGURED', 'Passkey is not configured');

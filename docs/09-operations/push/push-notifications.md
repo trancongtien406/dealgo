@@ -101,7 +101,7 @@ APNS_KEY_ID=TL36K38ZKR
 APNS_TEAM_ID=6J3522877H
 APNS_KEY_PATH=                                # ./secrets/AuthKey_TL36K38ZKR.p8; blank = VoIP off
 # or APNS_PRIVATE_KEY=<PEM, \n-escaped>       (APNS_PRIVATE_KEY_PATH is still read as an old name)
-APNS_BUNDLE_ID=dealgo.nguyengoctien.com        # VoIP topic = <bundle id>.voip
+APNS_BUNDLE_ID=com.nguyenngoctien.dealgo        # VoIP topic = <bundle id>.voip
 APNS_ENV=sandbox                              # production for TestFlight / App Store builds
 ```
 `backend/.env.example` (dev) and `backend/.env.production.example` (production) list these. Without `APNS_ENV`, the host follows `APNS_SANDBOX`, else `NODE_ENV` (production → `api.push.apple.com`, otherwise `api.sandbox.push.apple.com`).
@@ -133,14 +133,14 @@ At boot the backend logs one `VoipPush` line: VoIP on (key id, team, topic, host
 - **Owner key setup (the code is ready; only the key is needed):**
   1. Apple Developer → Certificates, IDs & Profiles → Keys: the key `TL36K38ZKR` (APNs, Sandbox & Production, team `6J3522877H`). Download `AuthKey_TL36K38ZKR.p8` once and keep it in a password manager.
   2. Firebase Console → Project settings → Cloud Messaging → Apple app configuration: upload the same `.p8` with Key ID `TL36K38ZKR` and Team ID `6J3522877H` (normal iOS pushes).
-  3. Server: copy the `.p8` next to the backend, outside git (`*.p8` is git-ignored), readable only by the service user (`chmod 600`). Set `APNS_KEY_PATH=<path>` (or `APNS_PRIVATE_KEY`). Leave `APNS_KEY_ID=TL36K38ZKR`, `APNS_TEAM_ID=6J3522877H` and `APNS_BUNDLE_ID=dealgo.nguyengoctien.com`. Set `APNS_ENV=production` for TestFlight/App Store builds, or `sandbox` for Xcode debug installs.
+  3. Server: copy the `.p8` next to the backend, outside git (`*.p8` is git-ignored), readable only by the service user (`chmod 600`). Set `APNS_KEY_PATH=<path>` (or `APNS_PRIVATE_KEY`). Leave `APNS_KEY_ID=TL36K38ZKR`, `APNS_TEAM_ID=6J3522877H` and `APNS_BUNDLE_ID=com.nguyenngoctien.dealgo`. Set `APNS_ENV=production` for TestFlight/App Store builds, or `sandbox` for Xcode debug installs.
   4. Restart and look for the `VoipPush` log line saying `iOS VoIP pushes on` with the expected host.
-  5. Apple Developer → Identifiers → `dealgo.nguyengoctien.com`: Push Notifications on (the entitlements are already in the project). Set up prod LiveKit (`VOICE_PROVIDER=livekit`).
+  5. Apple Developer → Identifiers → `com.nguyenngoctien.dealgo`: Push Notifications on (the entitlements are already in the project). Set up prod LiveKit (`VOICE_PROVIDER=livekit`).
   6. Test on a real iPhone and a real Android phone: locked, in the background and killed. Expect one ring, the native call screen, and no extra tray notification on Android.
 
 ## Local display test (simulator)
 ```
-xcrun simctl push <udid> dealgo.nguyengoctien.com docs/09-operations/push/sample-food-placed.apns
+xcrun simctl push <udid> com.nguyenngoctien.dealgo docs/09-operations/push/sample-food-placed.apns
 ```
 
 ## Tests

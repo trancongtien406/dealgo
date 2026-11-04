@@ -118,7 +118,10 @@ function categorizeSettingKey(key: string): 'FARE' | 'DISPATCH' | 'ZONE_PAYMENT'
     key.startsWith('AUTH_') ||
     key.startsWith('ONBOARDING_') ||
     key.startsWith('VOICE_') ||
-    key.startsWith('MAPS_')
+    key.startsWith('MAPS_') ||
+    key.startsWith('APP_LINKS_') ||
+    key.startsWith('WEBAUTHN_') ||
+    key.startsWith('MAX_ACCOUNTS_')
   ) {
     return 'SUPPORT';
   }
@@ -471,8 +474,23 @@ export class PlatformSettingsService {
       case 'DRIVER_TOP_UP_DAILY_LIMIT_VND':
       case 'DRIVER_CREDIT_MAX_VND':
       case 'DRIVER_TOP_UP_EXPIRE_MINUTES':
+      case 'MAX_ACCOUNTS_PER_DEVICE':
         // Seeded by migration/seed (PLATFORM_SETTING_SEED_DEFAULTS); no env bootstrap.
         return PLATFORM_SETTING_SEED_DEFAULTS[key] ?? '';
+      case 'APP_LINKS_IOS_APP_IDS':
+        return (this.config.get('APP_LINKS_IOS_APP_IDS', { infer: true }) ?? '').trim();
+      case 'APP_LINKS_ANDROID_PACKAGE':
+        return (this.config.get('APP_LINKS_ANDROID_PACKAGE', { infer: true }) ?? '').trim();
+      case 'APP_LINKS_ANDROID_CERT_SHA256':
+        return (this.config.get('APP_LINKS_ANDROID_CERT_SHA256', { infer: true }) ?? '').trim();
+      case 'APP_LINKS_PATHS':
+        return (this.config.get('APP_LINKS_PATHS', { infer: true }) ?? '').trim();
+      case 'WEBAUTHN_RP_ID':
+        return (this.config.get('WEBAUTHN_RP_ID', { infer: true }) ?? '').trim();
+      case 'WEBAUTHN_RP_NAME':
+        return (this.config.get('WEBAUTHN_RP_NAME', { infer: true }) ?? '').trim();
+      case 'WEBAUTHN_ORIGIN':
+        return (this.config.get('WEBAUTHN_ORIGIN', { infer: true }) ?? '').trim();
       default: {
         const _exhaustive: never = key;
         return _exhaustive;
@@ -506,7 +524,8 @@ export class PlatformSettingsService {
       if (!trimmed && !spec.optional) {
         throw settingsError(400, 'PLATFORM_SETTING_INVALID', `${key} must be a non-empty string`);
       }
-      if (trimmed.length > 200) {
+      const maxLen = spec.max ?? 200;
+      if (trimmed.length > maxLen) {
         throw settingsError(400, 'PLATFORM_SETTING_INVALID', `${key} exceeds max length`);
       }
       if ((MAPS_PROVIDER_SETTING_KEYS as readonly string[]).includes(key)) {

@@ -204,10 +204,19 @@ export type SessionRecord = {
   rotatedAt: Date | null;
   revokedAt: Date | null;
   revokeReason: RevokeReasonName | null;
+  deviceId: string | null;
   deviceLabel: string | null;
   userAgent: string | null;
   ipAddress: string | null;
   lastSeenAt: Date;
+  createdAt: Date;
+};
+
+export type DeviceRegistrationRecord = {
+  id: string;
+  deviceId: string;
+  userId: string;
+  ipAddress: string | null;
   createdAt: Date;
 };
 
@@ -244,6 +253,7 @@ export type NewSession = {
   channel: StoredChannel;
   refreshTokenHash: string;
   expiresAt: Date;
+  deviceId?: string | null;
   deviceLabel?: string | null;
   userAgent?: string | null;
   ipAddress?: string | null;
@@ -373,6 +383,12 @@ export interface IdentityRepository {
   revokeAllUserSessions(userId: string, at: Date): Promise<void>;
 
   listGrants(userId: string): Promise<RoleGrantRecord[]>;
+  countRegistrationsByDeviceId(deviceId: string): Promise<number>;
+  recordDeviceRegistration(input: {
+    deviceId: string;
+    userId: string;
+    ipAddress?: string | null;
+  }): Promise<DeviceRegistrationRecord>;
   listGrantsByStatus(
     status: GrantStatusName,
     page: number,
@@ -462,6 +478,7 @@ export class MemoryIdentityRepository implements IdentityRepository {
   private readonly customerCredentials = new Map<string, { passwordHash: string }>();
   private readonly passkeys = new Map<string, PasskeyRecord>();
   private readonly passkeyChallenges = new Map<string, PasskeyChallengeRecord>();
+  private readonly deviceRegistrations: DeviceRegistrationRecord[] = [];
 
   async findUserById(id: string): Promise<UserRecord | null> {
     return this.users.get(id) ?? null;
@@ -843,6 +860,7 @@ export class MemoryIdentityRepository implements IdentityRepository {
       rotatedAt: null,
       revokedAt: null,
       revokeReason: null,
+      deviceId: input.deviceId ?? null,
       deviceLabel: input.deviceLabel ?? null,
       userAgent: input.userAgent ?? null,
       ipAddress: input.ipAddress ?? null,
@@ -851,6 +869,26 @@ export class MemoryIdentityRepository implements IdentityRepository {
     };
     this.sessions.set(session.id, session);
     return session;
+  }
+
+  async countRegistrationsByDeviceId(deviceId: string): Promise<number> {
+    return this.deviceRegistrations.filter((r) => r.deviceId === deviceId).length;
+  }
+
+  async recordDeviceRegistration(input: {
+    deviceId: string;
+    userId: string;
+    ipAddress?: string | null;
+  }): Promise<DeviceRegistrationRecord> {
+    const record: DeviceRegistrationRecord = {
+      id: randomUUID(),
+      deviceId: input.deviceId,
+      userId: input.userId,
+      ipAddress: input.ipAddress ?? null,
+      createdAt: new Date(),
+    };
+    this.deviceRegistrations.push(record);
+    return record;
   }
 
   async listActiveSessions(userId: string): Promise<SessionRecord[]> {

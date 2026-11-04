@@ -359,7 +359,7 @@ class _TileMapViewState extends State<TileMapView>
             final url = styledTileUrl(widget.urlTemplate, style);
             return TileLayer(
               urlTemplate: url,
-              userAgentPackageName: 'dealgo.nguyengoctien.com',
+              userAgentPackageName: 'com.nguyenngoctien.dealgo',
               tileProvider: _tileProvider,
               // Mapbox `@2x` raster tiles are 512px drawn at 256 logical.
               tileDimension: 256,

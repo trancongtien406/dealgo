@@ -2,8 +2,10 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
+  Ip,
   Param,
   ParseUUIDPipe,
   Post,
@@ -73,8 +75,13 @@ export class AuthController {
   @ApiOperation({
     summary: 'Start phone OTP challenge (rate limited per IP and 5 per phone per 15 min)',
   })
-  createPhoneChallenge(@Body() body: PhoneChallengeDto) {
-    return this.phoneAuth.createChallenge(body.phone);
+  createPhoneChallenge(
+    @Body() body: PhoneChallengeDto,
+    @Headers('x-device-id') deviceIdHeader?: string,
+    @Ip() ip?: string,
+  ) {
+    const deviceId = (deviceIdHeader?.trim() || body.deviceId?.trim()) || null;
+    return this.phoneAuth.createChallenge(body.phone, { deviceId, ipAddress: ip ?? null });
   }
 
   @Post('phone/challenges/:id/verify')
@@ -84,8 +91,19 @@ export class AuthController {
   @ApiOperation({
     summary: 'Verify phone OTP and issue customer session (rate limited)',
   })
-  verifyPhoneChallenge(@Param('id', ParseUUIDPipe) id: string, @Body() body: VerifyCodeDto) {
-    return this.phoneAuth.verify(id, body.code);
+  verifyPhoneChallenge(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: VerifyCodeDto,
+    @Headers('x-device-id') deviceIdHeader?: string,
+    @Headers('user-agent') userAgent?: string,
+    @Ip() ip?: string,
+  ) {
+    const deviceId = (deviceIdHeader?.trim() || body.deviceId?.trim()) || null;
+    return this.phoneAuth.verify(id, body.code, {
+      deviceId,
+      userAgent: userAgent ?? null,
+      ipAddress: ip ?? null,
+    });
   }
 
   @Post('email/register')
@@ -96,12 +114,20 @@ export class AuthController {
     summary:
       'Start email+password sign-up: emails a 6-digit code and returns a pending challenge (no account yet; same response for existing emails; rate limited). When AUTH_EMAIL_VERIFICATION_REQUIRED is off, a new address is signed up at once: the response adds verificationRequired=false and session.',
   })
-  registerEmail(@Body() body: EmailPasswordRegisterDto) {
-    return this.emailPasswordAuth.register({
-      email: body.email,
-      password: body.password,
-      displayName: body.displayName,
-    });
+  registerEmail(
+    @Body() body: EmailPasswordRegisterDto,
+    @Headers('x-device-id') deviceIdHeader?: string,
+    @Ip() ip?: string,
+  ) {
+    const deviceId = (deviceIdHeader?.trim() || body.deviceId?.trim()) || null;
+    return this.emailPasswordAuth.register(
+      {
+        email: body.email,
+        password: body.password,
+        displayName: body.displayName,
+      },
+      { deviceId, ipAddress: ip ?? null },
+    );
   }
 
   @Post('email/register/:id/verify')
@@ -112,8 +138,19 @@ export class AuthController {
     summary:
       'Verify an emailed code: a sign-up challenge creates the verified account; an activation challenge (from login) verifies the existing account. Issues a customer session (rate limited)',
   })
-  verifyEmailRegistration(@Param('id', ParseUUIDPipe) id: string, @Body() body: VerifyCodeDto) {
-    return this.emailPasswordAuth.verifyRegistration(id, body.code);
+  verifyEmailRegistration(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: VerifyCodeDto,
+    @Headers('x-device-id') deviceIdHeader?: string,
+    @Headers('user-agent') userAgent?: string,
+    @Ip() ip?: string,
+  ) {
+    const deviceId = (deviceIdHeader?.trim() || body.deviceId?.trim()) || null;
+    return this.emailPasswordAuth.verifyRegistration(id, body.code, {
+      deviceId,
+      userAgent: userAgent ?? null,
+      ipAddress: ip ?? null,
+    });
   }
 
   @Post('email/register/:id/resend')
@@ -136,11 +173,24 @@ export class AuthController {
     summary:
       'Login with email and password. Unverified email + right password: 403 AUTH_EMAIL_NOT_VERIFIED with details {challengeId, expiresAt, resendAvailableAt} and an emailed code (rate limited)',
   })
-  loginEmail(@Body() body: EmailPasswordLoginDto) {
-    return this.emailPasswordAuth.login({
-      email: body.email,
-      password: body.password,
-    });
+  loginEmail(
+    @Body() body: EmailPasswordLoginDto,
+    @Headers('x-device-id') deviceIdHeader?: string,
+    @Headers('user-agent') userAgent?: string,
+    @Ip() ip?: string,
+  ) {
+    const deviceId = (deviceIdHeader?.trim() || body.deviceId?.trim()) || null;
+    return this.emailPasswordAuth.login(
+      {
+        email: body.email,
+        password: body.password,
+      },
+      {
+        deviceId,
+        userAgent: userAgent ?? null,
+        ipAddress: ip ?? null,
+      },
+    );
   }
 
   @Post('email/verifications')

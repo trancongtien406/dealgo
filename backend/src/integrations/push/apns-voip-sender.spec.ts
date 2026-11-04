@@ -46,7 +46,7 @@ describe('apnsVoipConfigFrom', () => {
     ).toMatchObject({
       keyId: 'K',
       teamId: 'T',
-      bundleId: 'dealgo.nguyengoctien.com',
+      bundleId: 'com.nguyenngoctien.dealgo',
       sandbox: true,
     });
   });

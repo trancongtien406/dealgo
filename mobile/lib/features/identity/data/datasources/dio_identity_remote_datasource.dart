@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../../../../core/device/device_id_service.dart';
 import '../../../../core/network/api_envelope.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/network/api_paths.dart';
@@ -13,14 +14,23 @@ import '../models/verified_session_model.dart';
 import 'identity_remote_datasource.dart';
 
 class DioIdentityRemoteDataSource implements IdentityRemoteDataSource {
-  DioIdentityRemoteDataSource({required this.dio});
+  DioIdentityRemoteDataSource({
+    required this.dio,
+    DeviceIdService? deviceIdService,
+  }) : _deviceIdService = deviceIdService ?? DeviceIdService();
 
   final Dio dio;
+  final DeviceIdService _deviceIdService;
 
   @override
-  Future<PhoneChallengeModel> createPhoneChallenge(String phone) {
+  Future<PhoneChallengeModel> createPhoneChallenge(String phone) async {
+    final deviceId = await _deviceIdService.getDeviceId();
+    final body = <String, Object?>{'phone': phone};
+    if (deviceId.isNotEmpty) {
+      body['deviceId'] = deviceId;
+    }
     return _request(
-      () => dio.post<Object?>(ApiPaths.phoneChallenges, data: {'phone': phone}),
+      () => dio.post<Object?>(ApiPaths.phoneChallenges, data: body),
       PhoneChallengeModel.fromJson,
     );
   }
@@ -29,11 +39,16 @@ class DioIdentityRemoteDataSource implements IdentityRemoteDataSource {
   Future<VerifiedSessionModel> verifyPhoneChallenge({
     required String challengeId,
     required String code,
-  }) {
+  }) async {
+    final deviceId = await _deviceIdService.getDeviceId();
+    final body = <String, Object?>{'code': code};
+    if (deviceId.isNotEmpty) {
+      body['deviceId'] = deviceId;
+    }
     return _request(
       () => dio.post<Object?>(
         ApiPaths.phoneChallengeVerify(challengeId),
-        data: {'code': code},
+        data: body,
       ),
       VerifiedSessionModel.fromJson,
     );
@@ -44,8 +59,12 @@ class DioIdentityRemoteDataSource implements IdentityRemoteDataSource {
     required String email,
     required String password,
     String? displayName,
-  }) {
+  }) async {
+    final deviceId = await _deviceIdService.getDeviceId();
     final body = <String, Object?>{'email': email, 'password': password};
+    if (deviceId.isNotEmpty) {
+      body['deviceId'] = deviceId;
+    }
     final trimmedName = displayName?.trim();
     if (trimmedName != null && trimmedName.isNotEmpty) {
       body['displayName'] = trimmedName;
@@ -60,11 +79,16 @@ class DioIdentityRemoteDataSource implements IdentityRemoteDataSource {
   Future<VerifiedSessionModel> verifyEmailRegistration({
     required String challengeId,
     required String code,
-  }) {
+  }) async {
+    final deviceId = await _deviceIdService.getDeviceId();
+    final body = <String, Object?>{'code': code};
+    if (deviceId.isNotEmpty) {
+      body['deviceId'] = deviceId;
+    }
     return _request(
       () => dio.post<Object?>(
         ApiPaths.emailRegisterVerify(challengeId),
-        data: {'code': code},
+        data: body,
       ),
       VerifiedSessionModel.fromJson,
     );
@@ -82,11 +106,16 @@ class DioIdentityRemoteDataSource implements IdentityRemoteDataSource {
   Future<VerifiedSessionModel> loginWithEmail({
     required String email,
     required String password,
-  }) {
+  }) async {
+    final deviceId = await _deviceIdService.getDeviceId();
+    final body = <String, Object?>{'email': email, 'password': password};
+    if (deviceId.isNotEmpty) {
+      body['deviceId'] = deviceId;
+    }
     return _request(
       () => dio.post<Object?>(
         ApiPaths.emailLogin,
-        data: {'email': email, 'password': password},
+        data: body,
       ),
       VerifiedSessionModel.fromJson,
     );

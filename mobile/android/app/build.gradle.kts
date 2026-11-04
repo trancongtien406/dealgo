@@ -27,7 +27,7 @@ val debugSignRelease = !hasReleaseKeystore &&
     (project.findProperty("dealgoDebugSignRelease") as String?) == "true"
 
 android {
-    namespace = "dealgo.nguyengoctien.com"
+    namespace = "com.nguyenngoctien.dealgo"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -38,7 +38,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "dealgo.nguyengoctien.com"
+        applicationId = "com.nguyenngoctien.dealgo"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

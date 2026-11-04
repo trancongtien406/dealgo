@@ -13,6 +13,7 @@ import { PARCEL_SIZE_CLASSES_DEFAULT } from './parcel-size-classes.js';
  */
 export const PLATFORM_SETTING_SEED_DEFAULTS: Readonly<Partial<Record<PlatformSettingKey, string>>> =
   {
+    MAX_ACCOUNTS_PER_DEVICE: '3',
     RATING_WINDOW_DAYS: '7',
     // DEC-PROD-062: commission per service (DRAFT; suggestions with sources are on the admin page).
     RIDE_COMMISSION_BIKE_PERCENT: '0',

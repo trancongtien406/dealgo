@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Prisma, PrismaClient } from '../../generated/prisma/client.js';
 
-export type IntegrationKindName = 'EMAIL' | 'MAPS' | 'SENTRY';
+export type IntegrationKindName = 'EMAIL' | 'MAPS' | 'SENTRY' | 'STORAGE' | 'SMS';
 
 /** Non-secret fields as strings; secrets stay in `secretsCiphertext` (see SecretBox). */
 export type IntegrationSettingRecord = {

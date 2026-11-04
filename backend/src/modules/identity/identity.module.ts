@@ -52,11 +52,18 @@ import { PrismaIdentityRepository } from './identity-prisma.repository.js';
 import { RoleGrantsController } from './role-grants.controller.js';
 import { RoleGrantsService } from './role-grants.service.js';
 import { SessionService } from './session.service.js';
-import { createSmsSender, type SmsSender } from '../../integrations/sms/index.js';
+import { DynamicSmsSender, createSmsSender, type SmsSender } from '../../integrations/sms/index.js';
+import { IntegrationSettingsModule } from '../../platform/integration-settings/integration-settings.module.js';
+import { IntegrationSettingsService } from '../../platform/integration-settings/integration-settings.service.js';
 
 @Module({
   // forwardRef: PlatformSettingsModule imports this module for its ops guards.
-  imports: [PrismaModule, EmailDeliveryModule, forwardRef(() => PlatformSettingsModule)],
+  imports: [
+    PrismaModule,
+    EmailDeliveryModule,
+    IntegrationSettingsModule,
+    forwardRef(() => PlatformSettingsModule),
+  ],
   controllers: [
     AuthController,
     OpsSessionsController,
@@ -89,9 +96,16 @@ import { createSmsSender, type SmsSender } from '../../integrations/sms/index.js
     },
     {
       provide: SMS_SENDER,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService<AppEnv, true>): SmsSender =>
-        createSmsSender(appEnvFrom(config), Math.round(PHONE_CHALLENGE_TTL_MS / 60_000)),
+      inject: [ConfigService, { token: IntegrationSettingsService, optional: true }],
+      useFactory: (
+        config: ConfigService<AppEnv, true>,
+        settings?: IntegrationSettingsService,
+      ): SmsSender => {
+        const ttlMinutes = Math.round(PHONE_CHALLENGE_TTL_MS / 60_000);
+        const env = appEnvFrom(config);
+        const rawSender = createSmsSender(env, ttlMinutes);
+        return new DynamicSmsSender(rawSender, env, ttlMinutes, settings);
+      },
     },
     // Transport resolved per send from Admin › Email (DB) over env; tests override this token.
     { provide: MAIL_SENDER, useExisting: DynamicMailSender },

@@ -1,7 +1,9 @@
-import { Logger, Module } from '@nestjs/common';
+import { Logger, Module, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { AppEnv } from '../config/env.js';
 import { PlatformSettingsModule } from '../settings/platform-settings.module.js';
+import { IntegrationSettingsModule } from '../integration-settings/integration-settings.module.js';
+import { IntegrationSettingsService } from '../integration-settings/integration-settings.service.js';
 import {
   LocalDiskObjectStorage,
   MemoryObjectStorage,
@@ -10,6 +12,7 @@ import {
   type ObjectStorage,
 } from '../../integrations/object-storage/index.js';
 import { DocumentStoreService } from './document-store.service.js';
+import { DynamicObjectStorage } from './dynamic-object-storage.js';
 import { OBJECT_STORAGE } from './storage.constants.js';
 
 export const DEFAULT_LOCAL_STORAGE_DIR = './var/object-storage';
@@ -58,12 +61,15 @@ export function createObjectStorage(env: {
 }
 
 @Module({
-  imports: [PlatformSettingsModule],
+  imports: [PlatformSettingsModule, IntegrationSettingsModule],
   providers: [
     {
       provide: OBJECT_STORAGE,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService<AppEnv, true>): ObjectStorage => {
+      inject: [ConfigService, { token: IntegrationSettingsService, optional: true }],
+      useFactory: (
+        config: ConfigService<AppEnv, true>,
+        settings?: IntegrationSettingsService,
+      ): ObjectStorage => {
         const storage = createObjectStorage({
           NODE_ENV: config.get('NODE_ENV', { infer: true }),
           OBJECT_STORAGE_PROVIDER: config.get('OBJECT_STORAGE_PROVIDER', { infer: true }),
@@ -79,7 +85,7 @@ export function createObjectStorage(env: {
         new Logger('StorageModule').log(
           unavailable ? 'Object storage: unavailable (uploads return 503)' : `Object storage: ${storage.provider}`,
         );
-        return storage;
+        return new DynamicObjectStorage(storage, settings);
       },
     },
     DocumentStoreService,

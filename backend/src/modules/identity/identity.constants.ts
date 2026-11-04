@@ -9,6 +9,9 @@ export const EMAIL_SIGNUP_MAX_ATTEMPTS = 5;
 // Caps challenges per address so the endpoint cannot be used to flood someone's inbox.
 export const EMAIL_SIGNUP_MAX_PER_HOUR = 5;
 
+// Anti-abuse: Maximum number of new accounts that can be registered from a single device.
+export const MAX_ACCOUNTS_PER_DEVICE = 3;
+
 export const IDENTITY_REPOSITORY = Symbol('IDENTITY_REPOSITORY');
 export const SMS_SENDER = Symbol('SMS_SENDER');
 export const MAIL_SENDER = Symbol('MAIL_SENDER');

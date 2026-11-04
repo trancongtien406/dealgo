@@ -23,19 +23,19 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDZsjxlx56QeHoRhBr3ocxM7uUeQDN6Xd0',
-    appId: '1:1077959967029:ios:998942c876fbfb8f164c7c',
-    messagingSenderId: '1077959967029',
-    projectId: 'dealgo-81a0d',
-    storageBucket: 'dealgo-81a0d.firebasestorage.app',
-    iosBundleId: 'dealgo.nguyengoctien.com',
+    apiKey: 'AIzaSyAca-_96hvF7wW8z2V7GECqsd9KLBkSS8g',
+    appId: '1:218651434467:ios:3995564aa13482628594d6',
+    messagingSenderId: '218651434467',
+    projectId: 'dealgo-fd862',
+    storageBucket: 'dealgo-fd862.firebasestorage.app',
+    iosBundleId: 'com.nguyenngoctien.dealgo',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDJTa4RLZYfLxvRyvbu06qyPhYpcE6DXSM',
-    appId: '1:1077959967029:android:251a8a164a56fef2164c7c',
-    messagingSenderId: '1077959967029',
-    projectId: 'dealgo-81a0d',
-    storageBucket: 'dealgo-81a0d.firebasestorage.app',
+    apiKey: 'AIzaSyAHSrqKadeXYKJsUWDTi0DdELEnzG2__Ug',
+    appId: '1:218651434467:android:45404496e9d2b49a8594d6',
+    messagingSenderId: '218651434467',
+    projectId: 'dealgo-fd862',
+    storageBucket: 'dealgo-fd862.firebasestorage.app',
   );
 }

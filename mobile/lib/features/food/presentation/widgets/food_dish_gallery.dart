@@ -29,7 +29,7 @@ List<String> foodDishGalleryImages({
 class FoodDishGallery extends StatefulWidget {
   const FoodDishGallery({
     required this.imageUrls,
-    required this.placeholderAsset,
+    this.placeholderAsset,
     this.fallbackImageUrl,
     this.aspectRatio = 4 / 3,
     super.key,
@@ -37,7 +37,7 @@ class FoodDishGallery extends StatefulWidget {
 
   final List<String> imageUrls;
   final String? fallbackImageUrl;
-  final String placeholderAsset;
+  final String? placeholderAsset;
   final double aspectRatio;
 
   @override

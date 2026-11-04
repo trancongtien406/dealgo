@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Prisma, PrismaClient } from '../../generated/prisma/client.js';
 import {
   UniqueConflictError,
+  type DeviceRegistrationRecord,
   type EmailVerificationRecord,
   type GrantStatusName,
   type IdentityRepository,
@@ -446,12 +447,40 @@ export class PrismaIdentityRepository implements IdentityRepository {
         channel: input.channel,
         refreshTokenHash: input.refreshTokenHash,
         expiresAt: input.expiresAt,
+        deviceId: input.deviceId ?? null,
         deviceLabel: input.deviceLabel ?? null,
         userAgent: input.userAgent ?? null,
         ipAddress: input.ipAddress ?? null,
       },
     });
     return mapSession(session);
+  }
+
+  async countRegistrationsByDeviceId(deviceId: string): Promise<number> {
+    return this.db.deviceRegistration.count({
+      where: { deviceId },
+    });
+  }
+
+  async recordDeviceRegistration(input: {
+    deviceId: string;
+    userId: string;
+    ipAddress?: string | null;
+  }): Promise<DeviceRegistrationRecord> {
+    const row = await this.db.deviceRegistration.create({
+      data: {
+        deviceId: input.deviceId,
+        userId: input.userId,
+        ipAddress: input.ipAddress ?? null,
+      },
+    });
+    return {
+      id: row.id,
+      deviceId: row.deviceId,
+      userId: row.userId,
+      ipAddress: row.ipAddress,
+      createdAt: row.createdAt,
+    };
   }
 
   async listActiveSessions(userId: string): Promise<SessionRecord[]> {
@@ -1286,6 +1315,7 @@ function mapSession(session: {
   rotatedAt: Date | null;
   revokedAt: Date | null;
   revokeReason: RevokeReasonName | null;
+  deviceId?: string | null;
   deviceLabel: string | null;
   userAgent: string | null;
   ipAddress: string | null;
@@ -1302,6 +1332,7 @@ function mapSession(session: {
     rotatedAt: session.rotatedAt,
     revokedAt: session.revokedAt,
     revokeReason: session.revokeReason,
+    deviceId: session.deviceId ?? null,
     deviceLabel: session.deviceLabel,
     userAgent: session.userAgent,
     ipAddress: session.ipAddress,

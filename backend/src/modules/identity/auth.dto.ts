@@ -13,12 +13,22 @@ export class PhoneChallengeDto {
   @IsString()
   @Matches(/^[+0-9][0-9\s\-()]{7,19}$/)
   phone!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  deviceId?: string;
 }
 
 export class VerifyCodeDto {
   @IsString()
   @Matches(/^\d{6}$/)
   code!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  deviceId?: string;
 }
 
 export class EmailVerificationDto {
@@ -80,6 +90,11 @@ export class EmailPasswordRegisterDto {
   @MinLength(1)
   @MaxLength(120)
   displayName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  deviceId?: string;
 }
 
 export class EmailPasswordLoginDto {
@@ -90,6 +105,11 @@ export class EmailPasswordLoginDto {
   @MinLength(6)
   @MaxLength(200)
   password!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  deviceId?: string;
 }
 
 export class RegistrationVerifyDto {

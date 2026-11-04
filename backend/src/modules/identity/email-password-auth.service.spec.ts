@@ -620,4 +620,54 @@ describe('EmailPasswordAuthService', () => {
       await expect(withToggle('throws').verificationRequired()).resolves.toBe(true);
     });
   });
+
+  describe('device registration control', () => {
+    it('records device registration on successful verified sign-up', async () => {
+      const challenge = await service.register(
+        { email: 'dev1@dealgo.vn', password: 'password123' },
+        { deviceId: 'device-123' },
+      );
+      const code = mail.signupCodes.find((c) => c.email === 'dev1@dealgo.vn')!.code;
+      await service.verifyRegistration(challenge.challengeId, code, { deviceId: 'device-123' });
+
+      const count = await repository.countRegistrationsByDeviceId('device-123');
+      expect(count).toBe(1);
+    });
+
+    it('rejects registration when max accounts per device limit is reached', async () => {
+      for (let i = 1; i <= 3; i++) {
+        const challenge = await service.register(
+          { email: `user${i}@dealgo.vn`, password: 'password123' },
+          { deviceId: 'device-capped' },
+        );
+        const code = mail.signupCodes.find((c) => c.email === `user${i}@dealgo.vn`)!.code;
+        await service.verifyRegistration(challenge.challengeId, code, { deviceId: 'device-capped' });
+      }
+
+      const error = await errorOf(
+        service.register(
+          { email: 'user4@dealgo.vn', password: 'password123' },
+          { deviceId: 'device-capped' },
+        ),
+      );
+      expectError(error, 429, 'AUTH_DEVICE_REGISTRATION_LIMIT');
+    });
+
+    it('allows existing user to login from capped device', async () => {
+      for (let i = 1; i <= 3; i++) {
+        const challenge = await service.register(
+          { email: `user${i}@dealgo.vn`, password: 'password123' },
+          { deviceId: 'device-full' },
+        );
+        const code = mail.signupCodes.find((c) => c.email === `user${i}@dealgo.vn`)!.code;
+        await service.verifyRegistration(challenge.challengeId, code, { deviceId: 'device-full' });
+      }
+
+      const session = await service.login(
+        { email: 'user1@dealgo.vn', password: 'password123' },
+        { deviceId: 'device-full' },
+      );
+      expect(session.accessToken).toBeTruthy();
+    });
+  });
 });
