@@ -78,7 +78,7 @@ flutter test
 
 `tool/release_ios.sh` builds the IPA with `--obfuscate --split-debug-info=build/debug-info`
 and then runs `dart run sentry_dart_plugin` to upload Dart debug symbols and the iOS
-dSYMs to Sentry (org `tiendev`, project `flutter`, block `sentry:` in `pubspec.yaml`).
+dSYMs to Sentry (org `nguyen-ngoc-tien`, project `flutter`, block `sentry:` in `pubspec.yaml`).
 
 ```bash
 export SENTRY_AUTH_TOKEN=<token org Sentry, scope project:releases + project:write>  # không commit

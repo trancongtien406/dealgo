@@ -111,7 +111,7 @@ const nextConfig: NextConfig = {
 };
 
 /**
- * Source maps go to Sentry (org tiendev, project dealgo-web) only when the build
+ * Source maps go to Sentry (org nguyen-ngoc-tien, project dealgo-web) only when the build
  * has SENTRY_AUTH_TOKEN (VPS: Docker build secret). Maps are deleted after upload
  * so they are never served; builds without the token are left untouched.
  */
@@ -120,7 +120,7 @@ const sentryRelease = process.env.NEXT_PUBLIC_SENTRY_RELEASE?.trim();
 
 export default sentryAuthToken
   ? withSentryConfig(nextConfig, {
-    org: "tiendev",
+    org: "nguyen-ngoc-tien",
     project: "dealgo-web",
     authToken: sentryAuthToken,
     silent: !process.env.CI,

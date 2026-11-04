@@ -157,7 +157,7 @@ async function configured(routes = defaultRoutes()) {
   await h.service.updateSettings(
     {
       reason: 'setup',
-      org: 'tiendev',
+      org: 'nguyen-ngoc-tien',
       region: 'https://us.sentry.io/',
       projects: 'flutter, dealgo-backend,dealgo-web',
       authToken: TOKEN,
@@ -190,7 +190,7 @@ describe('SystemErrorsService settings', () => {
     const { service } = await configured();
     const view = await service.settingsView();
     expect(view).toMatchObject({
-      org: 'tiendev',
+      org: 'nguyen-ngoc-tien',
       region: 'https://us.sentry.io',
       projects: ['flutter', 'dealgo-backend', 'dealgo-web'],
       token: { set: true, hint: '…CRET' },
@@ -252,7 +252,7 @@ describe('SystemErrorsService issues', () => {
       userCount: 2,
       project: 'flutter',
       trend: [0, 3, 4],
-      permalink: 'https://tiendev.sentry.io/issues/9001/',
+      permalink: 'https://nguyen-ngoc-tien.sentry.io/issues/9001/',
     });
     expect(page.canWrite).toBe(false);
     expect(JSON.stringify(page)).not.toContain(TOKEN);

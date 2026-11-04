@@ -160,7 +160,7 @@ function SentryForm({ view }: { view: SentrySettingsView }) {
             <input
               className={inputClass}
               value={draft.org}
-              placeholder="tiendev"
+              placeholder="nguyen-ngoc-tien"
               disabled={busy || locked}
               onChange={(e) => set("org", e.target.value)}
             />
