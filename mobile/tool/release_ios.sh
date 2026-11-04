@@ -10,12 +10,32 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-fvm flutter build ipa --release \
-  --obfuscate --split-debug-info=build/debug-info "$@"
+SYMBOLS_DIR="build/debug-info"
+mkdir -p "$SYMBOLS_DIR"
+
+FLUTTER_BIN="flutter"
+if command -v fvm &>/dev/null && [ -f .fvmrc ]; then
+  FLUTTER_BIN="fvm flutter"
+fi
+
+DART_BIN="dart"
+if command -v fvm &>/dev/null && [ -f .fvmrc ]; then
+  DART_BIN="fvm dart"
+fi
+
+$FLUTTER_BIN build ipa --release \
+  --obfuscate \
+  --split-debug-info="$SYMBOLS_DIR" \
+  --extra-gen-snapshot-options=--save-obfuscation-map="$SYMBOLS_DIR/app.obfuscation-map.json" \
+  "$@"
 
 if [[ -n "${SENTRY_AUTH_TOKEN:-}" || -f sentry.properties ]]; then
   # Uploads build/debug-info (Dart) and the dSYMs under build/ios (native).
-  fvm dart run sentry_dart_plugin
+  SENTRY_ARGS=()
+  if [[ -f "$SYMBOLS_DIR/app.obfuscation-map.json" ]]; then
+    SENTRY_ARGS+=("--sentry-define=dart_symbol_map_path=$SYMBOLS_DIR/app.obfuscation-map.json")
+  fi
+  $DART_BIN run sentry_dart_plugin "${SENTRY_ARGS[@]}"
 else
   echo "WARN: SENTRY_AUTH_TOKEN not set; Sentry symbol upload skipped." >&2
 fi

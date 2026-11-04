@@ -95,3 +95,4 @@ fi
 
 echo "[dSYM Generator] Done."
 exit 0
+

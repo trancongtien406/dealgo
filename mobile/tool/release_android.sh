@@ -16,11 +16,16 @@ flutter build appbundle --release \
   --no-pub \
   --obfuscate \
   --split-debug-info="$SYMBOLS_DIR" \
+  --extra-gen-snapshot-options=--save-obfuscation-map="$SYMBOLS_DIR/app.obfuscation-map.json" \
   "$@"
 
 if [[ -n "${SENTRY_AUTH_TOKEN:-}" || -f sentry.properties ]]; then
   echo "==> Uploading symbols to Sentry..."
-  dart run sentry_dart_plugin || echo "WARN: Sentry symbol upload failed." >&2
+  SENTRY_ARGS=()
+  if [[ -f "$SYMBOLS_DIR/app.obfuscation-map.json" ]]; then
+    SENTRY_ARGS+=("--sentry-define=dart_symbol_map_path=$SYMBOLS_DIR/app.obfuscation-map.json")
+  fi
+  dart run sentry_dart_plugin "${SENTRY_ARGS[@]}" || echo "WARN: Sentry symbol upload failed." >&2
 fi
 
 echo ""

@@ -174,7 +174,7 @@ flutter:
 #   dart run sentry_dart_plugin
 # Auth token comes from SENTRY_AUTH_TOKEN or gitignored sentry.properties (auth_token=...).
 sentry:
-  org: nguyen-ngoc-tien
+  org: tiendev
   project: flutter
   upload_debug_symbols: true
   upload_source_maps: false
