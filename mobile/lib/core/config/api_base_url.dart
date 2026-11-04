@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart' show kReleaseMode;
 
 /// Production API on the VPS (Socket.IO uses the same host over wss).
-const prodApiBaseUrl = 'https://api-dealgo.trancongtien.com';
+const prodApiBaseUrl = 'https://api-dealgo.laptrinhapp.com';
 
 /// Local Nest listens on 3001 (Admin Web takes 3000).
 const devApiBaseUrl = 'http://localhost:3001';

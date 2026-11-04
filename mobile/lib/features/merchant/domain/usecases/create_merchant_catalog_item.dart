@@ -13,6 +13,9 @@ class CreateMerchantCatalogItem {
       name: params.name,
       priceVnd: params.priceVnd,
       available: params.available,
+      description: params.description,
+      prepMinutes: params.prepMinutes,
+      menuCategoryId: params.menuCategoryId,
     );
   }
 }

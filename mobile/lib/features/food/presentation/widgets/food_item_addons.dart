@@ -11,16 +11,17 @@ import '../../domain/entities/food_models.dart';
 import '../../domain/entities/food_money.dart';
 import '../../domain/repositories/food_repository.dart';
 import '../cubit/food_cart_cubit.dart';
+import 'food_category_tile.dart';
 import 'food_widgets.dart';
 
 /// Server cap for `GET /v1/food/stores/:id/suggestions`.
 const int foodItemAddonsMax = 6;
 
-const double _tileHeight = 96;
-const double _tileWidth = 224;
+const double _tileHeight = 92;
+const double _tileWidth = 200;
 const double _tileInset = DealGoSpacing.s8;
-const double _thumbSize = 56;
-const double _addSize = 48;
+const double _thumbSize = 60;
+const double _addSize = 28;
 
 /// "Món ăn kèm": up to six dishes from another menu category of the same
 /// store, one tap each to add a plain unit.
@@ -137,6 +138,7 @@ class _FoodItemAddonsState extends State<FoodItemAddons> {
                 return _AddonTile(
                   key: Key('food-addon-${item.id}'),
                   item: item,
+                  storeCategory: widget.store.category,
                   onAdd: () => _add(item),
                 );
               },
@@ -149,9 +151,15 @@ class _FoodItemAddonsState extends State<FoodItemAddons> {
 }
 
 class _AddonTile extends StatelessWidget {
-  const _AddonTile({required this.item, required this.onAdd, super.key});
+  const _AddonTile({
+    required this.item,
+    required this.storeCategory,
+    required this.onAdd,
+    super.key,
+  });
 
   final FoodFeaturedItem item;
+  final String? storeCategory;
   final VoidCallback onAdd;
 
   @override
@@ -173,7 +181,14 @@ class _AddonTile extends StatelessWidget {
             padding: const EdgeInsets.all(_tileInset),
             child: Row(
               children: [
-                FoodThumb(size: _thumbSize, imageUrl: item.imageUrl),
+                FoodThumb(
+                  size: _thumbSize,
+                  imageUrl: item.imageUrl,
+                  placeholderAsset: foodDishFallbackImage(
+                    storeCategory,
+                    dishName: item.name,
+                  ),
+                ),
                 const SizedBox(width: DealGoSpacing.s8),
                 Expanded(
                   child: Column(
@@ -182,10 +197,11 @@ class _AddonTile extends StatelessWidget {
                     children: [
                       Text(
                         item.name,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: DealGoType.body(textTheme).copyWith(
                           fontWeight: FontWeight.w700,
+                          height: 1.25,
                           color: DealGoColors.text,
                         ),
                       ),
@@ -198,13 +214,15 @@ class _AddonTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: DealGoSpacing.s8),
+                const SizedBox(width: DealGoSpacing.s4),
                 SizedBox(
                   width: _addSize,
                   height: _addSize,
                   child: Material(
                     color: DealGoColors.primary,
-                    shape: const CircleBorder(),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(DealGoRadius.small),
+                    ),
                     clipBehavior: Clip.antiAlias,
                     child: Semantics(
                       button: true,
@@ -218,7 +236,7 @@ class _AddonTile extends StatelessWidget {
                           onTap: onAdd,
                           child: const Icon(
                             DealGoIcons.add,
-                            size: 20,
+                            size: 18,
                             color: Colors.white,
                           ),
                         ),

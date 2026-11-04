@@ -15,19 +15,19 @@ void _showClosedHint(BuildContext context, FoodStoreDetail store) {
     );
 }
 
+/// One dish row: square photo on the left, name/description/specs/price on the
+/// right, with the add control pinned to the price line.
 class _MenuItem extends StatelessWidget {
   const _MenuItem({
     required this.store,
     required this.item,
     this.featured = false,
-    this.bestSeller = false,
     this.compact = false,
     super.key,
   });
 
   final FoodStoreDetail store;
   final FoodMenuItem item;
-  final bool bestSeller;
 
   /// Copy in the best-sellers group: its own add key and no hero flight.
   final bool featured;
@@ -40,201 +40,157 @@ class _MenuItem extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final l10n = AppLocalizations.of(context);
     final description = item.description?.trim();
-    final radius = BorderRadius.circular(DealGoRadius.card);
     final closed = !store.canOrder;
-    final photoWidth = compact ? _menuCompactImageWidth : _menuImageWidth;
+    final photoSize = compact ? _menuCompactImageWidth : _menuImageWidth;
     final inset = compact ? DealGoSpacing.s8 : DealGoSpacing.s12;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: DealGoColors.card,
-        borderRadius: radius,
-        border: Border.all(color: DealGoColors.border),
-        boxShadow: DealGoShadows.card,
+    final prepMinutes = item.prepMinutes ?? store.estimatedPrepMinutes;
+    // One line under the description: what the buyer weighs before tapping.
+    // The best-seller mark lives on the section, repeating it in every row
+    // only eats the width the numbers need.
+    final meta = [
+      if (item.soldCount > 0) l10n.foodItemSold(item.soldCount),
+      if (prepMinutes != null) l10n.foodStorePrepShort(prepMinutes),
+    ];
+    return Material(
+      color: DealGoColors.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(DealGoRadius.button),
+        side: BorderSide(color: DealGoColors.divider),
       ),
-      child: ClipRRect(
-        borderRadius: radius,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            key: Key('food-dish-${item.id}'),
-            onTap: item.available
-                ? () {
-                    if (closed) {
-                      _showClosedHint(context, store);
-                      return;
-                    }
-                    openFoodItemOptions(
-                      context: context,
-                      store: store,
-                      item: item,
-                    );
-                  }
-                : null,
-            child: Stack(
-              children: [
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    inset,
-                    inset,
-                    photoWidth + (compact ? DealGoSpacing.s6 : inset),
-                    inset,
-                  ),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: compact ? 104 : 92),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: Key('food-dish-${item.id}'),
+        onTap: item.available
+            ? () {
+                if (closed) {
+                  _showClosedHint(context, store);
+                  return;
+                }
+                openFoodItemOptions(context: context, store: store, item: item);
+              }
+            : null,
+        child: Padding(
+          padding: EdgeInsets.all(inset),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _photo(context, l10n, photoSize),
+              SizedBox(width: compact ? DealGoSpacing.s8 : DealGoSpacing.s12),
+              Expanded(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: photoSize),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.titleMedium?.copyWith(
+                              fontSize: compact ? 14.5 : 15.5,
+                              height: 1.3,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (description != null &&
+                              description.isNotEmpty) ...[
+                            const SizedBox(height: DealGoSpacing.s2),
                             Text(
-                              item.name,
+                              description,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: textTheme.titleMedium?.copyWith(
-                                fontSize: compact ? 14 : 15,
-                                height: 1.25,
-                                fontWeight: FontWeight.w700,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: DealGoColors.textSecondary,
+                                height: 1.35,
                               ),
                             ),
-                            if (item.isNew || bestSeller) ...[
-                              const SizedBox(height: DealGoSpacing.s4),
-                              FoodItemBadges(
-                                isNew: item.isNew,
-                                bestSeller: bestSeller,
+                          ],
+                          if (meta.isNotEmpty) ...[
+                            const SizedBox(height: DealGoSpacing.s6),
+                            Text(
+                              meta.join(' · '),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.labelSmall?.copyWith(
+                                color: DealGoColors.textTertiary,
                               ),
-                            ],
-                            if (description != null &&
-                                description.isNotEmpty) ...[
-                              const SizedBox(height: DealGoSpacing.s4),
+                            ),
+                          ],
+                        ],
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: DealGoSpacing.s8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: FoodPriceText(
+                                key: Key('food-price-${item.id}'),
+                                priceVnd: item.priceVnd,
+                                originalPriceVnd: item.originalPriceVnd,
+                                showPercent: false,
+                                size: compact ? 16 : 17,
+                              ),
+                            ),
+                            const SizedBox(width: DealGoSpacing.s4),
+                            if (!item.available)
                               Text(
-                                description,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: textTheme.bodySmall?.copyWith(
-                                  color: DealGoColors.textSecondary,
+                                l10n.foodItemSoldOut,
+                                style: textTheme.labelSmall?.copyWith(
+                                  color: DealGoColors.danger,
+                                  fontWeight: FontWeight.w700,
                                 ),
+                              )
+                            else if (closed)
+                              Text(
+                                store.closedReason == StoreClosedReason.closed
+                                    ? l10n.foodStoreClosedLabel
+                                    : l10n.foodStorePaused,
+                                style: textTheme.labelSmall?.copyWith(
+                                  color: DealGoColors.danger,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              )
+                            else
+                              _MenuAddControl(
+                                store: store,
+                                item: item,
+                                compact: compact,
+                                keyPrefix: featured
+                                    ? 'food-best-add'
+                                    : 'food-add',
                               ),
-                            ],
-                            if (item.soldCount > 0 ||
-                                item.prepMinutes != null) ...[
-                              const SizedBox(height: DealGoSpacing.s4),
-                              if (compact)
-                                Text(
-                                  [
-                                    if (item.soldCount > 0)
-                                      l10n.foodItemSold(item.soldCount),
-                                    if (item.prepMinutes != null)
-                                      l10n.foodStorePrepChip(item.prepMinutes!),
-                                  ].join(' · '),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: textTheme.labelSmall?.copyWith(
-                                    color: DealGoColors.textSecondary,
-                                  ),
-                                )
-                              else
-                                Wrap(
-                                  spacing: DealGoSpacing.s8,
-                                  runSpacing: 2,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  children: [
-                                    if (item.soldCount > 0)
-                                      _ItemMeta(
-                                        icon: DealGoIcons.trending,
-                                        label: l10n.foodItemSold(
-                                          item.soldCount,
-                                        ),
-                                      ),
-                                    if (item.prepMinutes != null)
-                                      _ItemMeta(
-                                        icon: DealGoIcons.clock,
-                                        label: l10n.foodStorePrepChip(
-                                          item.prepMinutes!,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                            ],
                           ],
                         ),
-                        Padding(
-                          padding: const EdgeInsets.only(top: DealGoSpacing.s8),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: FoodPriceText(
-                                  key: Key('food-price-${item.id}'),
-                                  priceVnd: item.priceVnd,
-                                  originalPriceVnd: item.originalPriceVnd,
-                                  size: compact ? 14 : 16,
-                                ),
-                              ),
-                              if (!item.available)
-                                Text(
-                                  l10n.foodItemSoldOut,
-                                  style: textTheme.labelSmall?.copyWith(
-                                    color: DealGoColors.danger,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                )
-                              else if (closed)
-                                Text(
-                                  store.closedReason == StoreClosedReason.closed
-                                      ? l10n.foodStoreClosedLabel
-                                      : l10n.foodStorePaused,
-                                  style: textTheme.labelSmall?.copyWith(
-                                    color: DealGoColors.danger,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                )
-                              else
-                                _MenuAddControl(
-                                  store: store,
-                                  item: item,
-                                  compact: compact,
-                                  keyPrefix: featured
-                                      ? 'food-best-add'
-                                      : 'food-add',
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  bottom: 0,
-                  width: photoWidth,
-                  child: KeyedSubtree(
-                    key: Key('food-menu-photo-${item.id}'),
-                    child: _photo(context, l10n),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  /// Full-height dish photo; only items that open the options page fly it.
-  Widget _photo(BuildContext context, AppLocalizations l10n) {
+  /// Square dish photo with the discount sticker, gallery count and the
+  /// sold-out veil; only items that open the options page fly it.
+  Widget _photo(BuildContext context, AppLocalizations l10n, double size) {
     final resolved = resolveMediaUrl(item.imageUrl);
     final photoCount = foodDishGalleryImages(
       imageUrls: item.imageUrls,
       fallbackImageUrl: item.imageUrl,
     ).length;
     final placeholder = Image.asset(
-      foodDishFallbackImage(store.category),
+      foodDishFallbackImage(store.category, dishName: item.name),
       fit: BoxFit.cover,
-      width: double.infinity,
-      height: double.infinity,
+      width: size,
+      height: size,
       errorBuilder: (context, error, stack) =>
           ColoredBox(color: DealGoColors.amberSurface),
     );
@@ -245,89 +201,82 @@ class _MenuItem extends StatelessWidget {
             fit: BoxFit.cover,
             fallback: placeholder,
           );
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        if (item.optionGroups.isEmpty || featured)
-          image
-        else
-          DealGoHero(tag: foodItemHeroTag(item.id), child: image),
-        if (!item.available)
-          ColoredBox(
-            color: Colors.white.withValues(alpha: 0.55),
-            child: Center(
-              child: FoodPill(
-                label: l10n.foodItemSoldOut,
-                foreground: DealGoColors.danger,
-                background: DealGoColors.dangerSurface,
+    final discount = item.discountPercent;
+    return SizedBox(
+      key: Key('food-menu-photo-${item.id}'),
+      width: size,
+      height: size,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(DealGoRadius.input),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (item.optionGroups.isEmpty || featured)
+              image
+            else
+              DealGoHero(tag: foodItemHeroTag(item.id), child: image),
+            if (discount > 0)
+              Positioned(
+                left: DealGoSpacing.s4,
+                bottom: DealGoSpacing.s4,
+                child: FoodDiscountPill(percent: discount),
               ),
-            ),
-          ),
-        if (photoCount > 1)
-          Positioned(
-            top: DealGoSpacing.s6,
-            right: DealGoSpacing.s6,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: DealGoColors.scrim,
-                borderRadius: BorderRadius.circular(DealGoRadius.pill),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: DealGoSpacing.s6,
-                  vertical: DealGoSpacing.s2,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      DealGoIcons.image,
-                      size: 11,
-                      color: Colors.white,
+            if (photoCount > 1)
+              Positioned(
+                top: DealGoSpacing.s4,
+                right: DealGoSpacing.s4,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: DealGoColors.scrim,
+                    borderRadius: BorderRadius.circular(DealGoRadius.pill),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: DealGoSpacing.s6,
+                      vertical: DealGoSpacing.s2,
                     ),
-                    const SizedBox(width: DealGoSpacing.s2),
-                    Text(
-                      '$photoCount',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          DealGoIcons.image,
+                          size: 11,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: DealGoSpacing.s2),
+                        Text(
+                          '$photoCount',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _ItemMeta extends StatelessWidget {
-  const _ItemMeta({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 12, color: DealGoColors.textTertiary),
-        const SizedBox(width: 3),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall
-              ?.copyWith(color: DealGoColors.textSecondary),
+            if (!item.available)
+              ColoredBox(
+                color: Colors.white.withValues(alpha: 0.55),
+                child: Center(
+                  child: FoodPill(
+                    label: l10n.foodItemSoldOut,
+                    foreground: DealGoColors.danger,
+                    background: DealGoColors.dangerSurface,
+                  ),
+                ),
+              ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
 
-/// Compact add / stepper: a 34pt circle instead of the default 48pt button so
-/// the photo and price keep their room.
+/// Compact add / stepper: a 30pt rounded square instead of the default 48pt
+/// button so the photo and the price keep their room.
 class _MenuAddControl extends StatelessWidget {
   const _MenuAddControl({
     required this.store,
@@ -356,11 +305,11 @@ class _MenuAddControl extends StatelessWidget {
       return total;
     });
     final l10n = AppLocalizations.of(context);
-    final addSize = compact ? 30.0 : 34.0;
+    final addSize = compact ? 30.0 : 32.0;
     if (quantity == 0) {
       if (item.optionGroups.isNotEmpty && !compact) {
         return SizedBox(
-          height: 32,
+          height: 30,
           child: TextButton.icon(
             key: Key('$keyPrefix-${item.id}'),
             onPressed: () =>
@@ -369,11 +318,11 @@ class _MenuAddControl extends StatelessWidget {
               foregroundColor: DealGoColors.primary,
               backgroundColor: DealGoColors.subtlePurple,
               padding: const EdgeInsets.symmetric(horizontal: DealGoSpacing.s8),
-              minimumSize: const Size(0, 32),
+              minimumSize: const Size(0, 30),
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               shape: const StadiumBorder(),
             ),
-            icon: const Icon(DealGoIcons.add, size: 15),
+            icon: const Icon(DealGoIcons.add, size: 14),
             label: Text(
               l10n.foodItemOptionsChoose,
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
@@ -390,7 +339,9 @@ class _MenuAddControl extends StatelessWidget {
           height: addSize,
           child: Material(
             color: DealGoColors.primary,
-            shape: const CircleBorder(),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(DealGoRadius.small),
+            ),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               key: Key('$keyPrefix-${item.id}'),
@@ -417,7 +368,7 @@ class _MenuAddControl extends StatelessWidget {
           onPressed: () => cart.adjustCatalogQuantity(item.id, -1),
         ),
         SizedBox(
-          width: compact ? 20 : 24,
+          width: compact ? 22 : 26,
           child: Text(
             '$quantity',
             textAlign: TextAlign.center,
@@ -470,13 +421,15 @@ class _StepButton extends StatelessWidget {
         height: size,
         child: Material(
           color: enabled ? DealGoColors.primary : DealGoColors.divider,
-          shape: const CircleBorder(),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(DealGoRadius.small),
+          ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: onPressed,
             child: Icon(
               icon,
-              size: size < 30 ? 16 : 18,
+              size: size < 28 ? 15 : 17,
               color: enabled ? Colors.white : DealGoColors.textSecondary,
             ),
           ),

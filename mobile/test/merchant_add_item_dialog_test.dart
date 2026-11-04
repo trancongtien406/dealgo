@@ -9,7 +9,14 @@ void main() {
   testWidgets('add-item dialog returns values and closes without errors', (
     tester,
   ) async {
-    ({String name, String price})? result;
+    ({
+      String name,
+      String price,
+      String? description,
+      int? prepMinutes,
+      String? categoryId,
+    })?
+    result;
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('vi'),
@@ -18,7 +25,15 @@ void main() {
         home: Builder(
           builder: (context) => TextButton(
             onPressed: () async {
-              result = await showDialog<({String name, String price})>(
+              result = await showDialog<
+                ({
+                  String name,
+                  String price,
+                  String? description,
+                  int? prepMinutes,
+                  String? categoryId,
+                })
+              >(
                 context: context,
                 builder: (_) => const MerchantAddItemDialog(),
               );
@@ -45,7 +60,16 @@ void main() {
     }
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(result, (name: 'Cơm tấm', price: '45000'));
+    expect(
+      result,
+      (
+        name: 'Cơm tấm',
+        price: '45000',
+        description: null,
+        prepMinutes: null,
+        categoryId: null,
+      ),
+    );
     expect(find.byType(MerchantAddItemDialog), findsNothing);
   });
 }

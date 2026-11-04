@@ -60,7 +60,13 @@ export class MemoryEarningsRepository implements EarningsRepository {
     for (const row of this.adjustments.values()) {
       if (row.driverId === driverId) adjustmentsVnd += row.amountVnd;
     }
-    return { feesVnd, adjustmentsVnd, amountVnd: feesVnd + adjustmentsVnd, settledThrough: null };
+    return {
+      feesVnd,
+      adjustmentsVnd,
+      amountVnd: feesVnd + adjustmentsVnd,
+      creditVnd: 0,
+      settledThrough: null,
+    };
   }
 
   /** Test hook: memory has no cancellation table, so tests seed dropped jobs here. */

@@ -679,6 +679,31 @@
   "checkoutBackToCartShort": "Quay lại giỏ",
   "checkoutRecipient": "Người nhận",
   "checkoutRecipientAddress": "Người nhận và địa chỉ",
+  "checkoutYourOrder": "Đơn của bạn",
+  "checkoutEtaChip": "Giao trong ~{minutes} phút",
+  "@checkoutEtaChip": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "checkoutItemCount": "{count} món",
+  "@checkoutItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "checkoutYouSave": "Tiết kiệm {amount}",
+  "@checkoutYouSave": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "checkoutItems": "Danh sách món",
   "checkoutTotalSection": "Tổng thanh toán",
   "checkoutSubtotal": "Tiền món",
@@ -1092,6 +1117,14 @@
   "foodStoreBestsellers": "Món bán chạy",
   "foodStorePrepChip": "Khoảng {minutes} phút",
   "@foodStorePrepChip": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "foodStorePrepShort": "{minutes} phút",
+  "@foodStorePrepShort": {
     "placeholders": {
       "minutes": {
         "type": "int"
@@ -2320,6 +2353,14 @@
   "foodStoreMerchantReply": "Phản hồi của quán",
   "foodStoreReviewsFilterNone": "Chưa có đánh giá phù hợp",
   "foodItemSold": "Đã bán {count}",
+  "foodItemOptionsCount": "{count} tuỳ chọn",
+  "@foodItemOptionsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "merchantOffersTitle": "Ưu đãi của quán",
   "merchantOffersEmpty": "Chưa có ưu đãi",
   "merchantOffersCreate": "Tạo ưu đãi",

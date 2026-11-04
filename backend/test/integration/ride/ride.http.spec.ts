@@ -6,6 +6,10 @@ import { MemoryRidePickupCodeStore, RIDE_PICKUP_CODE_STORE } from '../../../src/
 import { MemoryRideParcelStore, RIDE_PARCEL_STORE } from '../../../src/modules/ride/ride-parcel.store.js';
 import { INestApplication } from '@nestjs/common';
 import { EARNINGS_REPOSITORY, MemoryEarningsRepository } from '../../../src/modules/earnings/index.js';
+import {
+  DRIVER_CREDIT_REPOSITORY,
+  MemoryDriverCreditRepository,
+} from '../../../src/modules/driver-credit/index.js';
 import { ConfigModule } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -1440,6 +1444,8 @@ describe('ride negotiation in production', () => {
       .useValue(new MemoryIntegrationSettingsRepository())
       .overrideProvider(EMAIL_SUPPRESSION_REPOSITORY)
       .useValue(new MemoryEmailSuppressionRepository())
+      .overrideProvider(DRIVER_CREDIT_REPOSITORY)
+      .useValue(new MemoryDriverCreditRepository())
       .compile();
 
     app = moduleRef.createNestApplication();

@@ -1,9 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
 import type { ReactNode } from "react";
 import { AppProviders } from "@/lib/query/provider";
-import { SITE_NAME, siteUrl } from "@/lib/seo/site";
+import { OG_IMAGE, SITE_DESCRIPTION, SITE_NAME, siteUrl } from "@/lib/seo/site";
 import "./globals.css";
 
 const inter = Inter({
@@ -16,13 +16,46 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: siteUrl(),
   title: { default: "DealGo Quản trị", template: "%s | DealGo" },
-  description: "Kênh vận hành nội bộ DealGo cho Ride và Food.",
+  description: SITE_DESCRIPTION,
   applicationName: SITE_NAME,
+  category: "travel",
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
+  authors: [{ name: SITE_NAME, url: siteUrl().origin }],
   icons: { icon: "/icon.svg", apple: "/apple-icon.png" },
+  appleWebApp: {
+    capable: true,
+    title: SITE_NAME,
+    statusBarStyle: "default",
+  },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    locale: "vi_VN",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    images: [OG_IMAGE],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    images: [OG_IMAGE],
+  },
   robots: {
     index: false,
     follow: false,
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#6D28D9" },
+    { media: "(prefers-color-scheme: dark)", color: "#0F172A" },
+  ],
+  colorScheme: "light dark",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

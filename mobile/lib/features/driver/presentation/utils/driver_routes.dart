@@ -1,5 +1,6 @@
 abstract final class DriverRoutes {
   static const services = '/driver/services';
+  static const credit = '/driver/credit';
 
   static String ride(String rideId) {
     return '/driver/rides/${Uri.encodeComponent(rideId)}';

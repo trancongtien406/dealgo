@@ -23,13 +23,10 @@ import { PaymentMethodRegistryService } from './payment-method-registry.service.
 import { serviceForVehicleClass } from './payment-method.catalog.js';
 
 class FakeSettings {
-  values: Record<string, string> = { PAYMENT_METHOD_REGISTRY: '{"methods":{}}', PAYMENT_WALLET_ENABLED: 'false' };
+  values: Record<string, string> = { PAYMENT_METHOD_REGISTRY: '{"methods":{}}' };
   patches: { key: string; value: string; reason: string }[] = [];
   async getJson(key: string) {
     return JSON.parse(this.values[key]!);
-  }
-  async getBoolean(key: string) {
-    return JSON.parse(this.values[key]!) === true;
   }
   async patch(key: string, value: string, reason: string) {
     if (key === 'PAYMENT_METHOD_REGISTRY') {
@@ -122,21 +119,20 @@ describe('PaymentMethodRegistryService', () => {
     await expect(registry.assertSelectable('BIKE', 'MOMO')).resolves.toBe('MOMO');
   });
 
-  it('never enables stubs, unconfigured providers, or the wallet without its flag', async () => {
+  it('never enables stubs or unconfigured providers', async () => {
     const { registry } = setup({ env: {} });
-    for (const code of ['SHOPEEPAY', 'INTERNATIONAL_CARD', 'APPLE_PAY', 'MOMO', 'DEALGO_WALLET']) {
+    for (const code of ['SHOPEEPAY', 'INTERNATIONAL_CARD', 'APPLE_PAY', 'MOMO']) {
       await enable(registry, code);
     }
     const list = await registry.list('FOOD');
     expect(list.filter((m) => m.available).map((m) => m.code)).toEqual(['CASH']);
+    expect(list.map((m) => m.code)).not.toContain('DEALGO_WALLET');
     const ops = await registry.listForOps();
     const momo = ops.methods.find((m) => m.code === 'MOMO')!;
     expect(momo.configured).toBe(false);
     expect(momo.requiredEnv).toContain('MOMO_SECRET_KEY');
     expect(JSON.stringify(ops)).not.toContain('"sk"');
     expect(ops.methods.find((m) => m.code === 'SHOPEEPAY')!.adapterKind).toBe('STUB');
-    await registry.update({ walletEnabled: true }, 'wallet', 'ops-1');
-    expect((await registry.list('FOOD')).find((m) => m.code === 'DEALGO_WALLET')!.available).toBe(false);
   });
 
   it('online methods need a public base URL for callbacks', async () => {

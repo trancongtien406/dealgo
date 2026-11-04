@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getSupportPage } from "@/features/content-cms/fetch-public-page";
 import { localeFromLang } from "@/features/content-cms/types";
 import { getPublicSiteConfig } from "@/features/site-config/fetch-public";
+import { buildPageMetadata } from "@/lib/seo/site";
 import { SupportClient } from "./support-client";
 
 type Props = { searchParams: Promise<{ lang?: string | string[] }> };
@@ -9,22 +10,16 @@ type Props = { searchParams: Promise<{ lang?: string | string[] }> };
 export async function generateMetadata({
   searchParams,
 }: Props): Promise<Metadata> {
-  const page = await getSupportPage(localeFromLang((await searchParams).lang));
-  return {
+  const locale = localeFromLang((await searchParams).lang);
+  const page = await getSupportPage(locale);
+  return buildPageMetadata({
     title: page.title,
-    description: page.summary ?? undefined,
-    robots: { index: true, follow: true },
-    alternates: {
-      canonical: "/support",
-      languages: { vi: "/support", en: "/support?lang=en" },
-    },
-    openGraph: {
-      title: page.title,
-      url: "/support",
-      siteName: "DealGo",
-      locale: "vi_VN",
-    },
-  };
+    description:
+      page.summary ??
+      "Trung tâm hỗ trợ DealGo: hướng dẫn đặt xe, đặt đồ ăn, thanh toán, huỷ chuyến và liên hệ đội ngũ chăm sóc khách hàng.",
+    path: "/support",
+    locale,
+  });
 }
 
 export default async function SupportPage({ searchParams }: Props) {

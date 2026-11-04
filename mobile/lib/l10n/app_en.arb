@@ -720,6 +720,31 @@
   "checkoutBackToCartShort": "Back to cart",
   "checkoutRecipient": "Recipient",
   "checkoutRecipientAddress": "Recipient and address",
+  "checkoutYourOrder": "Your order",
+  "checkoutEtaChip": "~{minutes} min delivery",
+  "@checkoutEtaChip": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "checkoutItemCount": "{count} items",
+  "@checkoutItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "checkoutYouSave": "Save {amount}",
+  "@checkoutYouSave": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
   "checkoutItems": "Items",
   "checkoutTotalSection": "Payment summary",
   "checkoutSubtotal": "Items",
@@ -1385,6 +1410,14 @@
   "foodStoreBestsellers": "Best sellers",
   "foodStorePrepChip": "≈{minutes} min",
   "@foodStorePrepChip": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "foodStorePrepShort": "{minutes} min",
+  "@foodStorePrepShort": {
     "placeholders": {
       "minutes": {
         "type": "int"
@@ -3344,6 +3377,14 @@
   "foodStoreReviewsFilterNone": "No matching reviews",
   "foodItemSold": "{count} sold",
   "@foodItemSold": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "foodItemOptionsCount": "{count} choices",
+  "@foodItemOptionsCount": {
     "placeholders": {
       "count": {
         "type": "int"

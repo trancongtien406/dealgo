@@ -12,7 +12,6 @@ export async function fetchPaymentMethods(): Promise<OpsPaymentMethodsView> {
 
 export async function patchPaymentMethods(input: {
   methods?: PaymentMethodPatch[];
-  walletEnabled?: boolean;
   reason: string;
 }): Promise<void> {
   await apiFetch<{ success: boolean }>(apiPaths.opsPaymentMethods(), {

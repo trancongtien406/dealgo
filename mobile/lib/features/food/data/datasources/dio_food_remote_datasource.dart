@@ -464,11 +464,21 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
     required String name,
     required int priceVnd,
     bool? available,
+    String? description,
+    int? prepMinutes,
+    String? menuCategoryId,
   }) {
     return _send(
       () => dio.post<Object?>(
         ApiPaths.foodMerchantItems,
-        data: {'name': name, 'priceVnd': priceVnd, 'available': ?available},
+        data: {
+          'name': name,
+          'priceVnd': priceVnd,
+          'available': ?available,
+          'description': ?description,
+          'prepMinutes': ?prepMinutes,
+          'menuCategoryId': ?menuCategoryId,
+        },
         options: _auth(accessToken),
       ),
       decodeFoodMenuItem,

@@ -3,7 +3,7 @@
 # livekit/tls and restarts dealgo-livekit only when it changed (LiveKit reads it at startup).
 # Cron (root): 17 4 * * * /opt/dealgo/livekit/sync-turn-cert.sh >> /var/log/dealgo-turn-cert.log 2>&1
 set -euo pipefail
-DOMAIN=turn-dealgo.trancongtien.com
+DOMAIN=turn-dealgo.laptrinhapp.com
 SRC=/var/lib/docker/volumes/vms_caddy_data/_data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/$DOMAIN
 DST=/opt/dealgo/livekit/tls
 umask 077

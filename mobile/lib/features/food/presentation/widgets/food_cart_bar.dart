@@ -22,12 +22,7 @@ const double kFoodCartBarRoom = 88;
 /// first item and out when the cart empties; sits above the home indicator
 /// or the role tab bar (`MediaQuery.padding.bottom`).
 class FoodCartBar extends StatelessWidget {
-  const FoodCartBar({
-    this.storeId,
-    this.offers = const [],
-    this.inline = false,
-    super.key,
-  });
+  const FoodCartBar({this.storeId, this.offers = const [], super.key});
 
   /// Only show the cart of this store; null = whichever store it holds
   /// (lists and search), with the store name on the bar.
@@ -37,9 +32,6 @@ class FoodCartBar extends StatelessWidget {
   /// before checkout prices it.
   final List<StoreOffer> offers;
 
-  /// Inside another bottom bar (item options): no safe-area padding.
-  final bool inline;
-
   /// Whether the bar is on screen, so a page can leave room under its list.
   static bool showsFor(FoodCartState cart, {String? storeId}) =>
       cart.itemCount > 0 && (storeId == null || cart.storeId == storeId);
@@ -48,16 +40,16 @@ class FoodCartBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final cart = context.watch<FoodCartCubit>().state;
     final show = showsFor(cart, storeId: storeId);
-    final bottom = inline ? 0.0 : MediaQuery.paddingOf(context).bottom;
+    final bottom = MediaQuery.paddingOf(context).bottom;
     return DealGoSlideReveal(
       child: show
           ? Padding(
               key: const ValueKey('food-cart-bar-shown'),
               padding: EdgeInsets.fromLTRB(
-                inline ? 0 : DealGoDimensions.pageGutter,
-                inline ? 0 : DealGoSpacing.s8,
-                inline ? 0 : DealGoDimensions.pageGutter,
-                inline ? DealGoSpacing.s12 : bottom + DealGoSpacing.s12,
+                DealGoDimensions.pageGutter,
+                DealGoSpacing.s8,
+                DealGoDimensions.pageGutter,
+                bottom + DealGoSpacing.s12,
               ),
               child: _Bar(
                 cart: cart,

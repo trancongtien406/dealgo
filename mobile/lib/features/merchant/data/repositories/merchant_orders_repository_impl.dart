@@ -151,12 +151,18 @@ class MerchantOrdersRepositoryImpl implements MerchantOrdersRepository {
     required String name,
     required int priceVnd,
     bool? available,
+    String? description,
+    int? prepMinutes,
+    String? menuCategoryId,
   }) {
     return _remote.createCatalogItem(
       accessToken: accessToken,
       name: name,
       priceVnd: priceVnd,
       available: available,
+      description: description,
+      prepMinutes: prepMinutes,
+      menuCategoryId: menuCategoryId,
     );
   }
 

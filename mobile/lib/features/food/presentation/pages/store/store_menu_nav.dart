@@ -141,11 +141,20 @@ class _CategoryRail extends StatefulWidget {
     required this.sections,
     required this.activeId,
     required this.onSelected,
+    required this.pinnedKey,
+    required this.headerOverlap,
   });
 
   final List<_MenuGroup> sections;
   final String activeId;
   final ValueChanged<String> onSelected;
+
+  /// The pinned tabs/search bar sits on top of this rail's viewport while the
+  /// store header is collapsed; a revealed row must stay below it.
+  final GlobalKey pinnedKey;
+
+  /// Height the pinned bar takes from the rail, so its first row is not hidden.
+  final SliverOverlapAbsorberHandle headerOverlap;
 
   @override
   State<_CategoryRail> createState() => _CategoryRailState();
@@ -177,9 +186,10 @@ class _CategoryRailState extends State<_CategoryRail> {
     final top = row.localToGlobal(Offset.zero, ancestor: viewport).dy;
     final bottom = top + row.size.height;
     const margin = DealGoSpacing.s24;
+    final visibleTop = _hiddenTop(viewport) + margin;
     double? target;
-    if (top < margin) {
-      target = _scroll.offset + top - margin;
+    if (top < visibleTop) {
+      target = _scroll.offset + top - visibleTop;
     } else if (bottom > viewport.size.height - margin) {
       target = _scroll.offset + bottom - viewport.size.height + margin;
     }
@@ -193,6 +203,16 @@ class _CategoryRailState extends State<_CategoryRail> {
     );
   }
 
+  /// Height of this rail's viewport currently covered by the pinned bar.
+  double _hiddenTop(RenderBox viewport) {
+    final pinned = widget.pinnedKey.currentContext?.findRenderObject();
+    if (pinned is! RenderBox || !pinned.attached) return 0;
+    final pinnedBottom =
+        pinned.localToGlobal(Offset.zero).dy + pinned.size.height;
+    final viewportTop = viewport.localToGlobal(Offset.zero).dy;
+    return (pinnedBottom - viewportTop).clamp(0.0, viewport.size.height / 2);
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -204,80 +224,95 @@ class _CategoryRailState extends State<_CategoryRail> {
           color: DealGoColors.canvas,
           border: Border(right: BorderSide(color: DealGoColors.divider)),
         ),
-        child: ListView.builder(
+        child: CustomScrollView(
           key: const Key('food-menu-categories'),
           controller: _scroll,
-          padding: EdgeInsets.only(
-            top: DealGoSpacing.s4,
-            bottom:
-                DealGoSpacing.s24 +
-                kFoodCartBarRoom +
-                MediaQuery.paddingOf(context).bottom,
-          ),
-          itemCount: widget.sections.length,
-          itemBuilder: (context, index) {
-            final section = widget.sections[index];
-            final active = section.id == widget.activeId;
-            return KeyedSubtree(
-              key: _keys.putIfAbsent(section.id, GlobalKey.new),
-              child: Material(
-                color: active ? DealGoColors.card : Colors.transparent,
-                child: InkWell(
-                  key: Key('food-menu-category-${section.id}'),
-                  onTap: () => widget.onSelected(section.id),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border(
-                        left: BorderSide(
-                          color: active
-                              ? DealGoColors.primary
-                              : Colors.transparent,
-                          width: 3,
-                        ),
-                      ),
-                    ),
-                    padding: const EdgeInsets.fromLTRB(
-                      DealGoSpacing.s12,
-                      DealGoSpacing.s12,
-                      DealGoSpacing.s8,
-                      DealGoSpacing.s12,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          section.title!,
-                          key: Key('food-menu-category-label-${section.id}'),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: textTheme.bodySmall?.copyWith(
-                            fontSize: 13,
-                            height: 1.25,
-                            color: active
-                                ? DealGoColors.primary
-                                : DealGoColors.textSecondary,
-                            fontWeight: active
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          l10n.foodStoreSectionCount(section.items.length),
-                          style: textTheme.labelSmall?.copyWith(
-                            fontSize: 11,
-                            color: active
-                                ? DealGoColors.primary
-                                : DealGoColors.textTertiary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+          slivers: [
+            SliverOverlapInjector(handle: widget.headerOverlap),
+            SliverPadding(
+              padding: EdgeInsets.only(
+                top: DealGoSpacing.s8,
+                bottom:
+                    DealGoSpacing.s24 +
+                    kFoodCartBarRoom +
+                    MediaQuery.paddingOf(context).bottom,
+              ),
+              // Every category is built: a tap has to reach one that is still
+              // below the rail's fold.
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  children: [
+                    for (final section in widget.sections)
+                      _railRow(context, l10n, textTheme, section),
+                  ],
                 ),
               ),
-            );
-          },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _railRow(
+    BuildContext context,
+    AppLocalizations l10n,
+    TextTheme textTheme,
+    _MenuGroup section,
+  ) {
+    final active = section.id == widget.activeId;
+    return KeyedSubtree(
+      key: _keys.putIfAbsent(section.id, GlobalKey.new),
+      child: Material(
+        color: active ? DealGoColors.card : Colors.transparent,
+        child: InkWell(
+          key: Key('food-menu-category-${section.id}'),
+          onTap: () => widget.onSelected(section.id),
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border(
+                left: BorderSide(
+                  color: active ? DealGoColors.primary : Colors.transparent,
+                  width: 3,
+                ),
+              ),
+            ),
+            padding: const EdgeInsets.fromLTRB(
+              DealGoSpacing.s12,
+              DealGoSpacing.s12,
+              DealGoSpacing.s8,
+              DealGoSpacing.s12,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  section.title!,
+                  key: Key('food-menu-category-label-${section.id}'),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall?.copyWith(
+                    fontSize: 13,
+                    height: 1.25,
+                    color: active
+                        ? DealGoColors.primary
+                        : DealGoColors.textSecondary,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  l10n.foodStoreSectionCount(section.items.length),
+                  style: textTheme.labelSmall?.copyWith(
+                    fontSize: 11,
+                    color: active
+                        ? DealGoColors.primary
+                        : DealGoColors.textTertiary,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

@@ -21,6 +21,7 @@ export type DriverCancelRate = {
 export type DriverBalance = {
   feesVnd: number;
   adjustmentsVnd: number;
+  creditVnd: number;
   amountVnd: number;
   settledThrough: string | null;
   limitVnd: number;
@@ -72,6 +73,7 @@ export function parseDriverBalance(raw: unknown): DriverBalance {
   return {
     feesVnd: num(d.feesVnd),
     adjustmentsVnd: num(d.adjustmentsVnd),
+    creditVnd: num(d.creditVnd),
     amountVnd: num(d.amountVnd),
     settledThrough:
       typeof d.settledThrough === "string" ? d.settledThrough : null,

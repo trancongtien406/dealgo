@@ -125,7 +125,7 @@ Bộ hồ sơ DealGo phải giúp trả lời được sáu câu hỏi:
 | `01-product/functional-requirements.md` | Functional requirements có mã, điều kiện và tiêu chí nghiệm thu. |
 | `01-product/non-functional-requirements.md` | Performance, reliability, security, availability, accessibility. |
 
-### 02 — Domain (8 tệp)
+### 02 — Domain (9 tệp)
 
 | Tệp | Nhiệm vụ |
 |---|---|
@@ -135,6 +135,7 @@ Bộ hồ sơ DealGo phải giúp trả lời được sáu câu hỏi:
 | `02-domain/merchant-and-catalog-rules.md` | Cửa hàng, giờ mở, menu, availability, giá và tồn món. |
 | `02-domain/pricing-fees-and-promotions.md` | Công thức giá, phí, khuyến mại và nguyên tắc làm tròn. |
 | `02-domain/payments-ledger-settlement.md` | Charge/COD/refund/ledger/payout/reconciliation. |
+| `02-domain/driver-credit-topup.md` | Tài xế nạp trước phí nền tảng, cấn trừ FIFO khi settlement, hoàn tiền thủ công (`DEC-PROD-093`). |
 | `02-domain/cancellation-refund-disputes.md` | Hủy chuyến/đơn, hoàn tiền, tranh chấp và trách nhiệm chi phí. |
 | `02-domain/trust-safety-and-fraud.md` | Chống gian lận, sự cố an toàn, giới hạn và can thiệp. |
 

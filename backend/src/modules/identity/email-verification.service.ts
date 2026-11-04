@@ -17,6 +17,7 @@ import {
   type IdentityRepository,
 } from './identity.repository.js';
 import { MailDeliveryError, type MailSender } from '../../integrations/email/mail-sender.js';
+import { mailSenderStatus } from '../../integrations/email/dynamic-mail-sender.js';
 import { normalizeEmail } from './phone-number.js';
 import { captureServerError } from '../../platform/observability/sentry.js';
 import {
@@ -81,6 +82,7 @@ export class EmailVerificationService {
 
     const code = randomOtpCode();
     const expiresAt = new Date(now.getTime() + EMAIL_SIGNUP_TTL_MS);
+    await this.assertMailTransport();
     const verification = await this.repository.createEmailVerification({
       userId,
       email,
@@ -88,7 +90,7 @@ export class EmailVerificationService {
       expiresAt,
       sentAt: now,
     });
-    await this.deliver(() => this.mail.sendEmailVerification({ email, code, expiresAt }));
+    this.sendLater(() => this.mail.sendEmailVerification({ email, code, expiresAt }));
     return toView(verification);
   }
 
@@ -127,24 +129,38 @@ export class EmailVerificationService {
     return { verified: true };
   }
 
-  private async deliver(send: () => Promise<void>): Promise<void> {
-    try {
-      await send();
-    } catch (error) {
-      const reason = error instanceof MailDeliveryError ? error.reason : 'unknown';
-      this.logger.warn(
-        `Email verification code not sent: ${error instanceof Error ? error.message : 'unknown error'}`,
-      );
-      if (reason === 'rejected') {
-        throw authError(400, 'EMAIL_ADDRESS_REJECTED', 'This email address cannot receive mail');
-      }
+  /** Reads the configured provider only, so a missing transport still fails before any mail. */
+  private async assertMailTransport(): Promise<void> {
+    const configured = await mailSenderStatus(this.mail)
+      .then((status) => status.configured)
+      // Settings unreadable: let the send itself report the failure after the response.
+      .catch(() => true);
+    if (!configured) {
+      throw authError(503, 'EMAIL_DELIVERY_FAILED', 'Could not send the verification email');
+    }
+  }
+
+  /**
+   * Mails after the verification is returned: an SMTP round trip takes seconds, so the code
+   * screen opens at once and a failure is reported instead of failing the response.
+   */
+  private sendLater(send: () => Promise<void>): void {
+    void send().catch((error: unknown) => this.reportMailFailure(error));
+  }
+
+  private reportMailFailure(error: unknown): void {
+    const reason = error instanceof MailDeliveryError ? error.reason : 'unknown';
+    this.logger.warn(
+      `Email verification code not sent: ${error instanceof Error ? error.message : 'unknown error'}`,
+    );
+    // 'rejected' = the mailbox refused the address: a client input problem, not an outage.
+    if (reason !== 'rejected') {
       captureServerError(error, {
         component: 'email_verification',
         mail_provider: error instanceof MailDeliveryError ? error.provider : 'unknown',
         mail_reason: reason,
         mail_code: error instanceof MailDeliveryError ? error.providerCode : undefined,
       });
-      throw authError(503, 'EMAIL_DELIVERY_FAILED', 'Could not send the verification email');
     }
   }
 

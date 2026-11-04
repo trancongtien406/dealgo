@@ -1871,6 +1871,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get checkoutRecipientAddress => 'Recipient and address';
 
   @override
+  String get checkoutYourOrder => 'Your order';
+
+  @override
+  String checkoutEtaChip(int minutes) {
+    return '~$minutes min delivery';
+  }
+
+  @override
+  String checkoutItemCount(int count) {
+    return '$count items';
+  }
+
+  @override
+  String checkoutYouSave(String amount) {
+    return 'Save $amount';
+  }
+
+  @override
   String get checkoutItems => 'Items';
 
   @override
@@ -3141,6 +3159,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String foodStorePrepChip(int minutes) {
     return '≈$minutes min';
+  }
+
+  @override
+  String foodStorePrepShort(int minutes) {
+    return '$minutes min';
   }
 
   @override
@@ -6942,6 +6965,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String foodItemSold(int count) {
     return '$count sold';
+  }
+
+  @override
+  String foodItemOptionsCount(int count) {
+    return '$count choices';
   }
 
   @override

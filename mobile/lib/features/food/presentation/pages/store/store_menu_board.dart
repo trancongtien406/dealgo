@@ -1,10 +1,27 @@
 part of '../food_store_page.dart';
 
 class _MenuBoard extends StatefulWidget {
-  const _MenuBoard({required this.store, required this.sections, super.key});
+  const _MenuBoard({
+    required this.store,
+    required this.sections,
+    required this.outerScroll,
+    required this.pinnedKey,
+    required this.headerOverlap,
+    super.key,
+  });
 
   final FoodStoreDetail store;
   final List<_MenuGroup> sections;
+
+  /// Outer controller of the store's [NestedScrollView]. A rail tap has to
+  /// collapse the store header before the section offset can be measured.
+  final ScrollController outerScroll;
+
+  /// The pinned tabs/search header, used as the target line for a jump.
+  final GlobalKey pinnedKey;
+
+  /// Height the pinned bar takes from both lists, so neither starts behind it.
+  final SliverOverlapAbsorberHandle headerOverlap;
 
   @override
   State<_MenuBoard> createState() => _MenuBoardState();
@@ -35,48 +52,96 @@ class _MenuBoardState extends State<_MenuBoard> {
   }
 
   void _jumpTo(String id) {
-    final scroll = _scroll;
     setState(() {
       _activeId = id;
       _jumping = true;
     });
-    final target = _sectionKeys[id]?.currentContext?.findRenderObject();
-    if (scroll == null || !scroll.hasClients) {
+    final outer = widget.outerScroll;
+    if (!outer.hasClients ||
+        outer.position.pixels >= outer.position.maxScrollExtent - 0.5) {
+      _scrollToSection(id);
+      return;
+    }
+    // While the store header is expanded the menu viewport is only the thin
+    // strip below it, so the measured offset would land the section under the
+    // pinned tabs. Collapse the header first, then measure.
+    outer
+        .animateTo(
+          outer.position.maxScrollExtent,
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+        )
+        .whenComplete(() {
+          if (!mounted) return;
+          // The final animation tick only marks layout dirty; wait for the
+          // collapsed frame before measuring the pinned header position.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _scrollToSection(id);
+          });
+        });
+  }
+
+  void _scrollToSection(String id) {
+    final scroll = _scroll;
+    final sectionContext = _sectionKeys[id]?.currentContext;
+    if (scroll == null || !scroll.hasClients || sectionContext == null) {
       _jumping = false;
       return;
     }
-    final offset = target == null
-        ? scroll.position.maxScrollExtent
-        : RenderAbstractViewport.of(target).getOffsetToReveal(target, 0).offset;
-    final to = offset.clamp(0.0, scroll.position.maxScrollExtent);
-    if (MediaQuery.disableAnimationsOf(context)) {
-      scroll.jumpTo(to);
+    final to = _sectionTopOffset(scroll.position, sectionContext);
+    if (to == null) {
       _jumping = false;
-    } else {
-      scroll
-          .animateTo(
-            to,
-            duration: const Duration(milliseconds: 320),
-            curve: Curves.easeOutCubic,
-          )
-          .whenComplete(() => _jumping = false);
+      return;
     }
+    final target = to.clamp(0.0, scroll.position.maxScrollExtent);
+    if (MediaQuery.disableAnimationsOf(context)) {
+      scroll.jumpTo(target);
+      _jumping = false;
+      return;
+    }
+    scroll
+        .animateTo(
+          target,
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+        )
+        .whenComplete(() => _jumping = false);
+  }
+
+  /// Scroll offset that puts [sectionContext] right below the pinned header.
+  double? _sectionTopOffset(ScrollPosition position, BuildContext section) {
+    final target = section.findRenderObject();
+    if (target is! RenderBox || !target.attached) return null;
+    final pinned = _pinnedBottom;
+    if (pinned == null) {
+      final viewport = RenderAbstractViewport.maybeOf(target);
+      return viewport?.getOffsetToReveal(target, 0).offset;
+    }
+    return position.pixels + target.localToGlobal(Offset.zero).dy - pinned;
+  }
+
+  double? get _pinnedBottom {
+    final pinned = widget.pinnedKey.currentContext?.findRenderObject();
+    if (pinned is! RenderBox || !pinned.attached) return null;
+    return pinned.localToGlobal(Offset.zero).dy + pinned.size.height;
   }
 
   void _syncActiveSection() {
     final scroll = _scroll;
     if (!mounted || _jumping || scroll == null || !scroll.hasClients) return;
     final position = scroll.position;
-    final threshold = position.pixels + 12;
+    final pinned = _pinnedBottom;
+    final threshold = (pinned ?? 0) + 12;
     String? active;
     for (final section in widget.sections) {
       final target = _sectionKeys[section.id]?.currentContext
           ?.findRenderObject();
-      if (target == null) continue;
-      final offset = RenderAbstractViewport.of(target)
-          .getOffsetToReveal(target, 0)
-          .offset;
-      if (offset <= threshold) active = section.id;
+      if (target is! RenderBox || !target.attached) continue;
+      if (target.localToGlobal(Offset.zero).dy <= threshold) {
+        active = section.id;
+      }
     }
     if (position.pixels >= position.maxScrollExtent - 1) {
       active = widget.sections.last.id;
@@ -91,7 +156,6 @@ class _MenuBoardState extends State<_MenuBoard> {
     final store = widget.store;
     final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
-    final best = foodBestSellerIds(store.items);
     final rows = <Widget>[];
     var index = 0;
     for (final section in widget.sections) {
@@ -138,7 +202,6 @@ class _MenuBoardState extends State<_MenuBoard> {
                 store: store,
                 item: item,
                 featured: section.id == 'best',
-                bestSeller: best.contains(item.id),
                 compact: true,
               ),
             ),
@@ -155,27 +218,37 @@ class _MenuBoardState extends State<_MenuBoard> {
             sections: widget.sections,
             activeId: _activeId,
             onSelected: _jumpTo,
+            pinnedKey: widget.pinnedKey,
+            headerOverlap: widget.headerOverlap,
           ),
         ),
         Expanded(
           // Built eagerly so a rail tap can scroll to any section, including
-          // ones still below the fold.
-          child: SingleChildScrollView(
+          // ones still below the fold: a lazy list would not lay out the
+          // section keys the jump measures.
+          child: CustomScrollView(
             key: const Key('food-menu-items'),
             controller: _scroll,
-            padding: dealGoScrollPadding(
-              context,
-              const EdgeInsets.fromLTRB(
-                DealGoSpacing.s8,
-                DealGoSpacing.s12,
-                DealGoDimensions.pageGutter,
-                DealGoSpacing.s24 + kFoodCartBarRoom,
+            slivers: [
+              SliverOverlapInjector(handle: widget.headerOverlap),
+              SliverPadding(
+                padding: dealGoScrollPadding(
+                  context,
+                  const EdgeInsets.fromLTRB(
+                    DealGoSpacing.s8,
+                    DealGoSpacing.s16,
+                    DealGoDimensions.pageGutter,
+                    DealGoSpacing.s24 + kFoodCartBarRoom,
+                  ),
+                ),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: rows,
+                  ),
+                ),
               ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: rows,
-            ),
+            ],
           ),
         ),
       ],
@@ -190,43 +263,52 @@ class _MenuList extends StatelessWidget {
     required this.store,
     required this.groups,
     required this.searching,
+    required this.headerOverlap,
     super.key,
   });
 
   final FoodStoreDetail store;
   final List<_MenuGroup> groups;
   final bool searching;
+  final SliverOverlapAbsorberHandle headerOverlap;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
-    final best = foodBestSellerIds(store.items);
     final padding = dealGoScrollPadding(
       context,
       const EdgeInsets.fromLTRB(
         DealGoDimensions.pageGutter,
-        DealGoSpacing.s12,
+        DealGoSpacing.s16,
         DealGoDimensions.pageGutter,
         DealGoSpacing.s24 + kFoodCartBarRoom,
       ),
     );
+    Widget list(List<Widget> children) => CustomScrollView(
+      slivers: [
+        SliverOverlapInjector(handle: headerOverlap),
+        SliverPadding(
+          padding: padding,
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: children,
+            ),
+          ),
+        ),
+      ],
+    );
     if (store.items.isEmpty) {
-      return ListView(
-        padding: padding,
-        children: [FoodPanel(child: Text(l10n.foodStoreNoItems))],
-      );
+      return list([FoodPanel(child: Text(l10n.foodStoreNoItems))]);
     }
     if (groups.isEmpty) {
-      return ListView(
-        padding: padding,
-        children: [
-          FoodPanel(
-            key: const Key('food-store-search-empty'),
-            child: Text(l10n.foodStoreSearchNone),
-          ),
-        ],
-      );
+      return list([
+        FoodPanel(
+          key: const Key('food-store-search-empty'),
+          child: Text(l10n.foodStoreSearchNone),
+        ),
+      ]);
     }
     final rows = <Widget>[];
     var index = 0;
@@ -260,36 +342,45 @@ class _MenuList extends StatelessWidget {
                 store: store,
                 item: item,
                 featured: group.id == 'best',
-                bestSeller: best.contains(item.id),
               ),
             ),
           )
           ..add(const SizedBox(height: DealGoSpacing.s12));
       }
     }
-    return ListView(padding: padding, children: rows);
+    return list(rows);
   }
 }
 
 /// Scrolling page for the tab bodies that are laid out as one column.
 class _ScrollBody extends StatelessWidget {
-  const _ScrollBody({required this.child, super.key});
+  const _ScrollBody({
+    required this.headerOverlap,
+    required this.child,
+    super.key,
+  });
 
+  final SliverOverlapAbsorberHandle headerOverlap;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: dealGoScrollPadding(
-        context,
-        const EdgeInsets.fromLTRB(
-          DealGoDimensions.pageGutter,
-          DealGoSpacing.s12,
-          DealGoDimensions.pageGutter,
-          DealGoSpacing.s24 + kFoodCartBarRoom,
+    return CustomScrollView(
+      slivers: [
+        SliverOverlapInjector(handle: headerOverlap),
+        SliverPadding(
+          padding: dealGoScrollPadding(
+            context,
+            const EdgeInsets.fromLTRB(
+              DealGoDimensions.pageGutter,
+              DealGoSpacing.s16,
+              DealGoDimensions.pageGutter,
+              DealGoSpacing.s24 + kFoodCartBarRoom,
+            ),
+          ),
+          sliver: SliverToBoxAdapter(child: child),
         ),
-      ),
-      children: [child],
+      ],
     );
   }
 }

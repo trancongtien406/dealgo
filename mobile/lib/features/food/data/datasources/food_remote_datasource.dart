@@ -170,6 +170,9 @@ abstract interface class FoodRemoteDataSource {
     required String name,
     required int priceVnd,
     bool? available,
+    String? description,
+    int? prepMinutes,
+    String? menuCategoryId,
   });
 
   Future<FoodMenuItem> updateMerchantItem({

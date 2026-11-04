@@ -46,9 +46,9 @@ Interceptor? createDealGoLogInterceptor({bool? enabled}) {
     return null;
   }
   return LogInterceptor(
-    request: true,
-    requestHeader: true,
-    requestBody: true,
+    request: false,
+    requestHeader: false,
+    requestBody: false,
     responseHeader: false,
     responseBody: true,
     error: true,

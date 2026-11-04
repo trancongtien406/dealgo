@@ -26,22 +26,22 @@ void main() {
     test('parses https app links under /app on the unified host', () {
       expect(
         parser.parse(
-          Uri.parse('https://dealgo.trancongtien.com/app/driver/jobs?x=1'),
+          Uri.parse('https://dealgo.laptrinhapp.com/app/driver/jobs?x=1'),
         ),
         '/driver/jobs?x=1',
       );
       expect(
         parser.parse(
-          Uri.parse('https://www.dealgo.trancongtien.com/app/customer/home'),
+          Uri.parse('https://www.dealgo.laptrinhapp.com/app/customer/home'),
         ),
         '/customer/home',
       );
       expect(
-        parser.parse(Uri.parse('https://dealgo.trancongtien.com/privacy')),
+        parser.parse(Uri.parse('https://dealgo.laptrinhapp.com/privacy')),
         isNull,
       );
       expect(
-        parser.parse(Uri.parse('http://dealgo.trancongtien.com/app/x')),
+        parser.parse(Uri.parse('http://dealgo.laptrinhapp.com/app/x')),
         isNull,
       );
       expect(

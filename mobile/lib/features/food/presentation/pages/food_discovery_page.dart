@@ -228,6 +228,12 @@ class _FoodDiscoveryViewState extends State<_FoodDiscoveryView> {
                       ),
                     ],
                     const SizedBox(height: DealGoSpacing.s16),
+                    _CategoryStrip(
+                      selected: null,
+                      onSelected: (code) =>
+                          context.push(FoodRoutes.categoryOf(code)),
+                    ),
+                    const SizedBox(height: DealGoSpacing.s16),
                     HomeBannerCarousel(
                       role: AppRole.customer,
                       service: 'FOOD',
@@ -237,13 +243,10 @@ class _FoodDiscoveryViewState extends State<_FoodDiscoveryView> {
                     const SizedBox(height: DealGoSpacing.s16),
                     const FoodVoucherWall(),
                     const FoodReorderStrip(),
-                    _CategoryStrip(
-                      selected: null,
-                      onSelected: (code) =>
-                          context.push(FoodRoutes.categoryOf(code)),
-                    ),
+                    // Curated collections are bounded (a horizontal strip per
+                    // row), so they stay above the endless store list. Below
+                    // it they would be pushed down by every appended page.
                     if (offerStores.isNotEmpty) ...[
-                      const SizedBox(height: DealGoSpacing.s16),
                       _SectionHeader(
                         title: l10n.foodOffersNearTitle,
                         onSeeAll: () =>
@@ -251,8 +254,51 @@ class _FoodDiscoveryViewState extends State<_FoodDiscoveryView> {
                       ),
                       const SizedBox(height: DealGoSpacing.s12),
                       _OfferStrip(stores: offerStores, onOpen: _openStore),
+                      const SizedBox(height: DealGoSpacing.s20),
                     ],
-                    const SizedBox(height: DealGoSpacing.s20),
+                    if (deals.isNotEmpty) ...[
+                      _SectionHeader(
+                        title: l10n.foodCollectionDeals,
+                        onSeeAll: () =>
+                            context.push(FoodRoutes.categoryOf(null)),
+                      ),
+                      const SizedBox(height: DealGoSpacing.s12),
+                      _DishStrip(
+                        key: const Key('food-deals-strip'),
+                        dishes: deals,
+                        onOpen: _openStore,
+                      ),
+                      const SizedBox(height: DealGoSpacing.s20),
+                    ],
+                    if (newDishes.isNotEmpty) ...[
+                      _SectionHeader(
+                        title: l10n.foodCollectionNewDishes,
+                        onSeeAll: () =>
+                            context.push(FoodRoutes.categoryOf(null)),
+                      ),
+                      const SizedBox(height: DealGoSpacing.s12),
+                      _DishStrip(
+                        key: const Key('food-new-strip'),
+                        dishes: newDishes,
+                        onOpen: _openStore,
+                      ),
+                      const SizedBox(height: DealGoSpacing.s20),
+                    ],
+                    if (popular.isNotEmpty) ...[
+                      _SectionHeader(
+                        title: l10n.foodCollectionTopRated,
+                        onSeeAll: () =>
+                            context.push(FoodRoutes.categoryOf(null)),
+                      ),
+                      const SizedBox(height: DealGoSpacing.s12),
+                      _StoreStrip(
+                        key: const Key('food-top-stores-strip'),
+                        stores: popular,
+                        ratings: ratings,
+                        onOpen: _openStore,
+                      ),
+                      const SizedBox(height: DealGoSpacing.s20),
+                    ],
                     KeyedSubtree(
                       key: _storesKey,
                       child: _SectionHeader(
@@ -333,64 +379,13 @@ class _FoodDiscoveryViewState extends State<_FoodDiscoveryView> {
                     ),
                   ),
                 ),
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(
-                  gutter,
-                  DealGoSpacing.s20,
-                  gutter,
-                  DealGoSpacing.s16 + cartRoom + bottomInset,
-                ),
-                sliver: SliverList.list(
-                  children: [
-                    if (deals.isNotEmpty) ...[
-                      _SectionHeader(
-                        title: l10n.foodCollectionDeals,
-                        onSeeAll: () =>
-                            context.push(FoodRoutes.categoryOf(null)),
-                      ),
-                      const SizedBox(height: DealGoSpacing.s12),
-                      _DishStrip(
-                        key: const Key('food-deals-strip'),
-                        dishes: deals,
-                        onOpen: _openStore,
-                      ),
-                      const SizedBox(height: DealGoSpacing.s20),
-                    ],
-                    if (newDishes.isNotEmpty) ...[
-                      _SectionHeader(
-                        title: l10n.foodCollectionNewDishes,
-                        onSeeAll: () =>
-                            context.push(FoodRoutes.categoryOf(null)),
-                      ),
-                      const SizedBox(height: DealGoSpacing.s12),
-                      _DishStrip(
-                        key: const Key('food-new-strip'),
-                        dishes: newDishes,
-                        onOpen: _openStore,
-                      ),
-                      const SizedBox(height: DealGoSpacing.s20),
-                    ],
-                    if (popular.isNotEmpty) ...[
-                      _SectionHeader(
-                        title: l10n.foodCollectionTopRated,
-                        onSeeAll: () =>
-                            context.push(FoodRoutes.categoryOf(null)),
-                      ),
-                      const SizedBox(height: DealGoSpacing.s12),
-                      for (final (index, store) in popular.indexed) ...[
-                        DealGoStaggerIn(
-                          index: index,
-                          child: FoodStoreCard(
-                            store: store,
-                            rating: ratings[store.id],
-                            variant: FoodStoreCardVariant.compact,
-                            onTap: () => _openStore(store),
-                          ),
-                        ),
-                        const SizedBox(height: DealGoSpacing.s12),
-                      ],
-                    ],
-                  ],
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height:
+                      DealGoSpacing.s20 +
+                      DealGoSpacing.s16 +
+                      cartRoom +
+                      bottomInset,
                 ),
               ),
             ],
@@ -972,7 +967,60 @@ class _OfferStrip extends StatelessWidget {
   }
 }
 
+/// "Đánh giá cao": compact store rows in a horizontal rail, so the whole
+/// collection costs one strip of height instead of a stack of cards.
+class _StoreStrip extends StatelessWidget {
+  const _StoreStrip({
+    required this.stores,
+    required this.ratings,
+    required this.onOpen,
+    super.key,
+  });
+
+  static const _cardWidth = 288.0;
+  static const _railHeight = 96.0;
+
+  final List<FoodStoreSummary> stores;
+  final Map<String, StoreRating> ratings;
+  final ValueChanged<FoodStoreSummary> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: _railHeight,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        clipBehavior: Clip.none,
+        itemCount: stores.length,
+        separatorBuilder: (context, index) =>
+            const SizedBox(width: DealGoSpacing.s12),
+        itemBuilder: (context, index) {
+          final store = stores[index];
+          return SizedBox(
+            width: _cardWidth,
+            child: DealGoStaggerIn(
+              index: index,
+              child: FoodStoreCard(
+                key: Key('food-top-store-${store.id}'),
+                store: store,
+                rating: ratings[store.id],
+                variant: FoodStoreCardVariant.compact,
+                onTap: () => onOpen(store),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 typedef _Dish = ({FoodStoreSummary store, FoodFeaturedItem item});
+
+/// Photo band and width shared by the cards of a strip. The body grows to the
+/// tallest card in the row so every card in a strip ends on the same line.
+const double _dishCardWidth = 168;
+const double _dishCardPhotoHeight = 112;
 
 /// Horizontal dish cards ("Đang giảm giá", "Món mới"); a tap opens the store.
 class _DishStrip extends StatelessWidget {
@@ -986,17 +1034,19 @@ class _DishStrip extends StatelessWidget {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       clipBehavior: Clip.none,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (final (index, dish) in dishes.indexed) ...[
-            if (index > 0) const SizedBox(width: DealGoSpacing.s12),
-            DealGoStaggerIn(
-              index: index,
-              child: _DishCard(dish: dish, onTap: () => onOpen(dish.store)),
-            ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final (index, dish) in dishes.indexed) ...[
+              if (index > 0) const SizedBox(width: DealGoSpacing.s12),
+              DealGoStaggerIn(
+                index: index,
+                child: _DishCard(dish: dish, onTap: () => onOpen(dish.store)),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -1013,6 +1063,11 @@ class _DishCard extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
     final item = dish.item;
+    final storeName = dish.store.name;
+    final original = item.originalPriceVnd;
+    final discountPercent = original != null && original > item.priceVnd
+        ? ((original - item.priceVnd) * 100 / original).round()
+        : 0;
     final card = DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(DealGoRadius.button),
@@ -1029,18 +1084,17 @@ class _DishCard extends StatelessWidget {
             onTap();
           },
           child: SizedBox(
-            width: 156,
+            width: _dishCardWidth,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 SizedBox(
-                  height: 112,
-                  width: double.infinity,
+                  height: _dishCardPhotoHeight,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
                       FoodThumb(
-                        size: 156,
+                        size: _dishCardWidth,
                         imageUrl: item.imageUrl,
                         placeholderAsset: foodDishFallbackImage(
                           dish.store.category,
@@ -1052,44 +1106,63 @@ class _DishCard extends StatelessWidget {
                           top: DealGoSpacing.s8,
                           child: FoodNewBadge(),
                         ),
+                      // The saving reads as a badge on the photo, so the price
+                      // block below stays the same height on every card.
+                      if (discountPercent > 0)
+                        Positioned(
+                          right: DealGoSpacing.s8,
+                          top: DealGoSpacing.s8,
+                          child: FoodDiscountPill(percent: discountPercent),
+                        ),
                     ],
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(DealGoSpacing.s8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.name,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: DealGoColors.text,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        dish.store.name,
-                        style: textTheme.labelSmall?.copyWith(
-                          color: DealGoColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: DealGoSpacing.s4),
-                      FoodPriceText(
-                        priceVnd: item.priceVnd,
-                        originalPriceVnd: item.originalPriceVnd,
-                        size: 14,
-                      ),
-                      if (item.soldCount > 0) ...[
-                        const SizedBox(height: 2),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(DealGoSpacing.s8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          l10n.foodItemSold(item.soldCount),
-                          style: textTheme.labelSmall?.copyWith(
-                            color: DealGoColors.textTertiary,
+                          item.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: DealGoColors.text,
+                            fontWeight: FontWeight.w700,
+                            height: 1.3,
                           ),
                         ),
+                        const SizedBox(height: 2),
+                        Text(
+                          storeName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.labelSmall?.copyWith(
+                            color: DealGoColors.textSecondary,
+                          ),
+                        ),
+                        const Spacer(),
+                        const SizedBox(height: DealGoSpacing.s4),
+                        FoodPriceText(
+                          priceVnd: item.priceVnd,
+                          originalPriceVnd: item.originalPriceVnd,
+                          size: 14,
+                          showPercent: false,
+                        ),
+                        if (item.soldCount > 0) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            l10n.foodItemSold(item.soldCount),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.labelSmall?.copyWith(
+                              color: DealGoColors.textTertiary,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ],

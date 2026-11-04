@@ -10,6 +10,8 @@ export type AdapterCreateRequest = {
   orderInfo: string;
   /** Browser/app return after the PSP page. */
   returnUrl: string;
+  /** Where to send the payer when they abandon the PSP page (payOS requires it). */
+  cancelUrl?: string;
   /** Server-to-server IPN/callback. */
   ipnUrl: string;
   clientIp: string;
@@ -23,6 +25,8 @@ export type AdapterCreateResult = {
   providerRef: string;
   paymentUrl: string | null;
   deeplink: string | null;
+  /** VietQR payload when the provider returns one (payOS). */
+  qrCode?: string | null;
 };
 
 export type AdapterCallback = {

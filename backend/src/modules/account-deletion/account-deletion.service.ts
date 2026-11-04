@@ -225,7 +225,7 @@ export class AccountDeletionService {
     actorUserId: string;
     driverId: string;
     reason: string;
-  }): Promise<{ amountVnd: number; settledThrough: string }> {
+  }): Promise<{ amountVnd: number; creditAppliedVnd: number; settledThrough: string }> {
     await this.requireUser(input.driverId);
     const settled = await this.repository.settleDriverFees({
       driverId: input.driverId,
@@ -236,7 +236,11 @@ export class AccountDeletionService {
     if (!settled) {
       throw authError(409, 'DRIVER_FEE_NOTHING_OUTSTANDING', 'No unsettled platform fee');
     }
-    return { amountVnd: settled.amountVnd, settledThrough: settled.settledThrough.toISOString() };
+    return {
+      amountVnd: settled.amountVnd,
+      creditAppliedVnd: settled.creditAppliedVnd,
+      settledThrough: settled.settledThrough.toISOString(),
+    };
   }
 
   async recordDriverPayment(input: {

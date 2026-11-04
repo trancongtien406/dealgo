@@ -61,10 +61,6 @@ export class PatchPaymentMethodsDto {
   @Type(() => PaymentMethodPatchDto)
   methods?: PaymentMethodPatchDto[];
 
-  @IsOptional()
-  @IsBoolean()
-  walletEnabled?: boolean;
-
   @IsString()
   @MinLength(3)
   @MaxLength(500)

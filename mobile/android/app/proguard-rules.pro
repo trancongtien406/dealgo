@@ -20,7 +20,7 @@
 -dontwarn com.google.firebase.**
 
 # DealGo's own native side (MainActivity, NewJobChannels notification channels).
--keep class com.trancongtien.dealgo.** { *; }
+-keep class dealgo.nguyengoctien.com.** { *; }
 
 # Keep annotations / signatures that Gson-style mappers need.
 -keepattributes Signature,*Annotation*,InnerClasses,EnclosingMethod

@@ -56,7 +56,17 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
   final readyCalls = <String>[];
   final orderCalls = <String>[];
   final catalogCalls = <String>[];
-  final createCalls = <({String name, int priceVnd, bool? available})>[];
+  final createCalls =
+      <
+        ({
+          String name,
+          int priceVnd,
+          bool? available,
+          String? description,
+          int? prepMinutes,
+          String? menuCategoryId,
+        })
+      >[];
   final updateCalls = <({String itemId, String? name, int? priceVnd})>[];
   final availabilityCalls = <({String itemId, bool available})>[];
   final optionCalls = <({String itemId, List<FoodOptionGroup> groups})>[];
@@ -351,8 +361,18 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
     required String name,
     required int priceVnd,
     bool? available,
+    String? description,
+    int? prepMinutes,
+    String? menuCategoryId,
   }) async {
-    createCalls.add((name: name, priceVnd: priceVnd, available: available));
+    createCalls.add((
+      name: name,
+      priceVnd: priceVnd,
+      available: available,
+      description: description,
+      prepMinutes: prepMinutes,
+      menuCategoryId: menuCategoryId,
+    ));
     final error = createError;
     if (error != null) {
       throw error;

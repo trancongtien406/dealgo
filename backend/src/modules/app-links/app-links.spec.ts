@@ -11,22 +11,22 @@ const FP = Array.from({ length: 32 }, (_, i) => i.toString(16).padStart(2, '0').
 describe('app links', () => {
   it('builds the AASA with applinks + webcredentials only when app IDs are set', () => {
     expect(appleAppSiteAssociation({})).toBeNull();
-    const aasa = appleAppSiteAssociation({ APP_LINKS_IOS_APP_IDS: 'TEAM1.com.trancongtien.dealgo' });
+    const aasa = appleAppSiteAssociation({ APP_LINKS_IOS_APP_IDS: 'TEAM1.dealgo.nguyengoctien.com' });
     expect(aasa).toEqual({
-      applinks: { details: [{ appIDs: ['TEAM1.com.trancongtien.dealgo'], components: [{ '/': '/app/*' }] }] },
-      webcredentials: { apps: ['TEAM1.com.trancongtien.dealgo'] },
+      applinks: { details: [{ appIDs: ['TEAM1.dealgo.nguyengoctien.com'], components: [{ '/': '/app/*' }] }] },
+      webcredentials: { apps: ['TEAM1.dealgo.nguyengoctien.com'] },
     });
   });
 
   it('builds assetlinks with login-credential delegation and drops malformed fingerprints', () => {
     expect(androidAssetLinks({ APP_LINKS_ANDROID_PACKAGE: 'com.x' })).toBeNull();
     const links = androidAssetLinks({
-      APP_LINKS_ANDROID_PACKAGE: 'com.trancongtien.dealgo',
+      APP_LINKS_ANDROID_PACKAGE: 'dealgo.nguyengoctien.com',
       APP_LINKS_ANDROID_CERT_SHA256: `${FP.toLowerCase()}, nope`,
     });
     expect(links?.[0]).toMatchObject({
       relation: expect.arrayContaining(['delegate_permission/common.get_login_creds']),
-      target: { package_name: 'com.trancongtien.dealgo', sha256_cert_fingerprints: [FP] },
+      target: { package_name: 'dealgo.nguyengoctien.com', sha256_cert_fingerprints: [FP] },
     });
   });
 

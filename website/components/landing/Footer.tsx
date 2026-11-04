@@ -1,9 +1,6 @@
-import { SOCIAL_KEYS, SOCIAL_LABELS, type PublicSiteConfig } from "@/features/site-config/types";
+import type { PublicSiteConfig } from "@/features/site-config/types";
 
 export default function Footer({ siteConfig = {} }: { siteConfig?: PublicSiteConfig }) {
-  const socials = SOCIAL_KEYS.flatMap((k) =>
-    siteConfig.socials?.[k] ? [{ key: k, label: SOCIAL_LABELS[k], href: siteConfig.socials[k]! }] : [],
-  );
   return (
     <footer id="footer" className="bg-white border-t border-gray-100 pt-8 sm:pt-10 pb-6">
       <div className="max-w-[1500px] mx-auto px-4 sm:px-8 lg:px-12">
@@ -23,12 +20,12 @@ export default function Footer({ siteConfig = {} }: { siteConfig?: PublicSiteCon
 
             {/* Slogan */}
             <div className="text-[11px] text-gray-400 font-normal leading-tight">
-              Đi muôn nơi · Mua vạn món
+              Giá do bạn chọn · Trọn gói hành trình
             </div>
 
             {/* Description */}
             <p className="text-[11px] sm:text-xs text-gray-500 leading-relaxed font-normal">
-              Nền tảng đặt xe (Bike, Car) và đặt đồ ăn tại Đà Nẵng, kết nối khách hàng, quán ăn/cửa hàng và tài xế, cho phép thương lượng giá chuyến xe.
+              Nền tảng đặt xe (Bike, Car) và đặt đồ ăn trên toàn quốc, kết nối khách hàng, quán ăn/cửa hàng và tài xế; khách chủ động đề xuất và thương lượng giá chuyến xe.
             </p>
 
             {siteConfig.contactEmail || siteConfig.hotline ? (
@@ -49,24 +46,6 @@ export default function Footer({ siteConfig = {} }: { siteConfig?: PublicSiteCon
                     </a>
                   </li>
                 ) : null}
-              </ul>
-            ) : null}
-
-            {/* Official accounts come from admin Website settings; hidden until set. */}
-            {socials.length > 0 ? (
-              <ul className="flex flex-wrap gap-2 pt-1" aria-label="Mạng xã hội DealGo">
-                {socials.map((s) => (
-                  <li key={s.key}>
-                    <a
-                      href={s.href}
-                      target="_blank"
-                      rel="noopener noreferrer me"
-                      className="inline-flex rounded-full border border-purple-100 bg-[#FAF9FF] px-3 py-1 text-[11px] font-semibold text-[#6D28D9] hover:bg-[#EDE9FE] transition-colors"
-                    >
-                      {s.label}
-                    </a>
-                  </li>
-                ))}
               </ul>
             ) : null}
           </div>
@@ -166,6 +145,11 @@ export default function Footer({ siteConfig = {} }: { siteConfig?: PublicSiteCon
                 <li>
                   <a href="/regulations" className="hover:text-[#6D28D9] transition-colors whitespace-nowrap">
                     Quy chế sử dụng
+                  </a>
+                </li>
+                <li>
+                  <a href="/account-deletion" className="hover:text-[#6D28D9] transition-colors whitespace-nowrap">
+                    Xoá tài khoản
                   </a>
                 </li>
               </ul>

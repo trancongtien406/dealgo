@@ -67,6 +67,10 @@ export function DriverFeeCard({ driverId, name }: { driverId: string; name: stri
             <dd className="text-right text-ink">{vnd(data.feesVnd)}</dd>
             <dt className="text-muted">Điều chỉnh (phí huỷ, voucher…)</dt>
             <dd className="text-right text-ink">{vnd(data.adjustmentsVnd)}</dd>
+            <dt className="text-muted">Tạm ứng còn lại (cấn trừ)</dt>
+            <dd className="text-right text-ink" data-testid="driver-credit-offset">
+              {vnd(data.creditVnd)}
+            </dd>
             <dt className="text-muted">Hạn mức nợ</dt>
             <dd className="text-right text-ink">
               {data.limitVnd > 0

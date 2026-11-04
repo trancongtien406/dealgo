@@ -635,6 +635,9 @@ class FakeFoodClient implements FoodClient {
     required String name,
     required int priceVnd,
     bool? available,
+    String? description,
+    int? prepMinutes,
+    String? menuCategoryId,
   }) async {
     createItemCalls.add((name: name, priceVnd: priceVnd, available: available));
     final error = catalogWriteError;
@@ -647,12 +650,13 @@ class FakeFoodClient implements FoodClient {
       name: name,
       priceVnd: priceVnd,
       available: available ?? true,
+      description: description,
+      prepMinutes: prepMinutes,
+      menuCategoryId: menuCategoryId,
     );
     details = {
       ...details,
-      store.id: FoodStoreDetail(
-        id: store.id,
-        name: store.name,
+      store.id: store.copyWith(
         items: List.unmodifiable([...store.items, item]),
       ),
     };
@@ -828,11 +832,7 @@ class FakeFoodClient implements FoodClient {
     }
     details = {
       ...details,
-      store.id: FoodStoreDetail(
-        id: store.id,
-        name: store.name,
-        items: List.unmodifiable(nextItems),
-      ),
+      store.id: store.copyWith(items: List.unmodifiable(nextItems)),
     };
     return updated;
   }

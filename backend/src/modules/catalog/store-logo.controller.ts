@@ -7,9 +7,15 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { SkipResponseEnvelope } from '../../platform/http/skip-response-envelope.js';
 import { StoreLogoService } from './store-logo.service.js';
+
+/**
+ * Photos are requested in bursts (one per store card) and cached for a day, so
+ * the limiter must absorb a whole screen before the client cache warms up.
+ */
+const IMAGE_LIMIT_PER_MINUTE = 600;
 
 @ApiTags('food')
 @Controller('v1/public/store-logos')
@@ -19,6 +25,7 @@ export class PublicStoreLogoController {
 
   @Get(':storeId/:file')
   @SkipResponseEnvelope()
+  @Throttle({ default: { limit: IMAGE_LIMIT_PER_MINUTE, ttl: 60_000 } })
   @Header('Cache-Control', 'public, max-age=86400, immutable')
   @Header('X-Content-Type-Options', 'nosniff')
   @ApiOperation({
@@ -44,6 +51,7 @@ export class PublicStoreCoverController {
 
   @Get(':storeId/:file')
   @SkipResponseEnvelope()
+  @Throttle({ default: { limit: IMAGE_LIMIT_PER_MINUTE, ttl: 60_000 } })
   @Header('Cache-Control', 'public, max-age=86400, immutable')
   @Header('X-Content-Type-Options', 'nosniff')
   @ApiOperation({

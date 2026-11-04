@@ -63,7 +63,7 @@ export type ApnsVoipEnv = {
   NODE_ENV?: string;
 };
 
-export const APNS_DEFAULT_BUNDLE_ID = 'com.trancongtien.dealgo';
+export const APNS_DEFAULT_BUNDLE_ID = 'dealgo.nguyengoctien.com';
 export const APNS_SANDBOX_ORIGIN = 'https://api.sandbox.push.apple.com';
 export const APNS_PRODUCTION_ORIGIN = 'https://api.push.apple.com';
 

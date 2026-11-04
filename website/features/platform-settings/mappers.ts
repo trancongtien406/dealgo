@@ -161,6 +161,10 @@ const LABELS: Record<string, { label: string; hint: string }> = {
     label: "Chiết khấu quán trả DealGo (% tiền món)",
     hint: "Mặc định 20 — GrabFood/ShopeeFood thu chiết khấu quán; ghi vào bảng đối soát quán (0–50)",
   },
+  FOOD_ITEM_MODERATION_ENABLED: {
+    label: "Kiểm duyệt món mới trước khi bán",
+    hint: "FOOD-001 / ADM-002 — bật: món quán tạo phải chờ Ops duyệt ở Kiểm duyệt món rồi khách mới thấy; tắt: món mới được duyệt tự động",
+  },
   FOOD_ORDER_CHANGE_RESPONSE_MINUTES: {
     label: "Khách phải xác nhận đơn bị sửa / hết món trong (phút)",
     hint: "Mặc định 5 — quá hạn đơn tự hủy, không phí (1–30)",
@@ -492,6 +496,7 @@ export const BOOLEAN_SETTING_KEYS: ReadonlySet<string> = new Set([
   "KYC_AUTO_APPROVE_DRIVER",
   "KYC_AUTO_APPROVE_MERCHANT",
   "SERVICE_ZONE_ENFORCED",
+  "FOOD_ITEM_MODERATION_ENABLED",
   "DISPATCH_REQUIRE_FRESH_PRESENCE",
   "RIDE_REQUEST_PUSH_ENABLED",
   "NEW_JOB_CUSTOM_SOUND_ENABLED",
@@ -611,7 +616,8 @@ export function categorizeSetting(key: string): CategoryKey {
     key === "FOOD_MAX_OFFER_EDITS_PER_DRIVER" ||
     key === "FOOD_MAX_FARE_RAISES_PER_ORDER" ||
     key === "FOOD_OFFER_TTL_SECONDS" ||
-    key === "FOOD_DELIVERY_FEE_MODE"
+    key === "FOOD_DELIVERY_FEE_MODE" ||
+    key === "FOOD_ITEM_MODERATION_ENABLED"
   ) {
     return "DISPATCH";
   }

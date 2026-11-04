@@ -1870,6 +1870,24 @@ class AppLocalizationsVi extends AppLocalizations {
   String get checkoutRecipientAddress => 'Người nhận và địa chỉ';
 
   @override
+  String get checkoutYourOrder => 'Đơn của bạn';
+
+  @override
+  String checkoutEtaChip(int minutes) {
+    return 'Giao trong ~$minutes phút';
+  }
+
+  @override
+  String checkoutItemCount(int count) {
+    return '$count món';
+  }
+
+  @override
+  String checkoutYouSave(String amount) {
+    return 'Tiết kiệm $amount';
+  }
+
+  @override
   String get checkoutItems => 'Danh sách món';
 
   @override
@@ -3119,6 +3137,11 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String foodStorePrepChip(int minutes) {
     return 'Khoảng $minutes phút';
+  }
+
+  @override
+  String foodStorePrepShort(int minutes) {
+    return '$minutes phút';
   }
 
   @override
@@ -6906,6 +6929,11 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String foodItemSold(int count) {
     return 'Đã bán $count';
+  }
+
+  @override
+  String foodItemOptionsCount(int count) {
+    return '$count tuỳ chọn';
   }
 
   @override

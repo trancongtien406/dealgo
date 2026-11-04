@@ -37,6 +37,8 @@ abstract final class DealGoIcons {
   static const IconData city = LucideIcons.building2;
   static const IconData clock = LucideIcons.clock;
   static const IconData close = LucideIcons.x;
+  static const IconData copy = LucideIcons.copy;
+  static const IconData qrCode = LucideIcons.qrCode;
   static const IconData clothes = LucideIcons.shirt;
   static const IconData coffee = LucideIcons.coffee;
   static const IconData delivery = LucideIcons.package;

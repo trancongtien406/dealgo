@@ -19,7 +19,7 @@ const _id = 'store-x';
 
 void main() {
   testWidgets(
-    'checkout: payment tile sits above the bottom bar so taps reach it',
+    'checkout: payment tile scrolls above the bottom bar so taps reach it',
     (tester) async {
       tester.view.physicalSize = const Size(1206, 2622);
       tester.view.devicePixelRatio = 3;
@@ -50,12 +50,25 @@ void main() {
       expect(find.byType(FoodCheckoutPage), findsOneWidget);
 
       final tile = find.byType(PaymentMethodTile);
-      final bar = find.byType(CheckoutActions);
+      final scrollable = find
+          .descendant(
+            of: find.byKey(const Key('food-checkout-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      for (var i = 0; i < 12 && tile.evaluate().isEmpty; i++) {
+        await tester.drag(scrollable, const Offset(0, -300));
+        await tester.pumpAndSettle();
+      }
       expect(tile, findsOneWidget);
+      await tester.ensureVisible(tile);
+      await tester.pumpAndSettle();
+
+      final bar = find.byType(CheckoutActions);
       expect(
         tester.getRect(tile).bottom,
         lessThanOrEqualTo(tester.getRect(bar).top + 0.5),
-        reason: 'extendBody painted the tile under the bottom bar',
+        reason: 'the sticky bar painted over the payment tile',
       );
       // The hit test at the tile centre must land on the tile, not the bar.
       final hit = tester.hitTestOnBinding(tester.getCenter(tile));

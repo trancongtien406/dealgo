@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../../../core/config/api_base_url.dart';
+import '../../../../core/format/text_case.dart';
 import '../../../../core/location/location_service.dart';
 import '../../../../core/maps/map_lat_lng.dart';
 import '../../../../core/maps/map_markers.dart';
@@ -85,12 +86,12 @@ class _FoodStoreView extends StatefulWidget {
 const double _tabsHeight = 46;
 const double _searchHeight = 54;
 
-/// Width of a menu row's photo; it spans the row's full height.
-const double _menuImageWidth = 112;
+/// Side of a menu row's square photo.
+const double _menuImageWidth = 96;
 
-/// Narrower photo inside the category rail layout, where the list shares the
-/// width with the rail.
-const double _menuCompactImageWidth = 88;
+/// Narrower square photo inside the category rail layout, where the list
+/// shares the width with the rail.
+const double _menuCompactImageWidth = 84;
 
 /// Vertical category list beside the menu items.
 const double _menuRailWidth = 108;
@@ -103,6 +104,8 @@ const Duration _locationWait = Duration(seconds: 5);
 
 class _FoodStorePageState extends State<_FoodStoreView> {
   final TextEditingController _query = TextEditingController();
+  final ScrollController _outerScroll = ScrollController();
+  final GlobalKey _pinnedKey = GlobalKey();
   FoodStoreDetail? _store;
   StoreReviews? _reviews;
   StoreReviews? _filtered;
@@ -123,6 +126,7 @@ class _FoodStorePageState extends State<_FoodStoreView> {
   @override
   void dispose() {
     _query.dispose();
+    _outerScroll.dispose();
     super.dispose();
   }
 
@@ -322,7 +326,7 @@ class _FoodStorePageState extends State<_FoodStoreView> {
       for (final section in store.menuSections)
         if (items.where((i) => i.menuCategoryId == section.id).toList()
             case final list when list.isNotEmpty)
-          _MenuGroup(section.id, section.name, list),
+          _MenuGroup(section.id, capitalizeFirstLetter(section.name), list),
       if (items.where((i) => !known.contains(i.menuCategoryId)).toList()
           case final rest when rest.isNotEmpty)
         _MenuGroup(
@@ -394,6 +398,7 @@ class _FoodStorePageState extends State<_FoodStoreView> {
     final pinned = _tabsHeight + (showSearch ? _searchHeight : 0);
     final rating = _reviews?.summary;
     return NestedScrollView(
+      controller: _outerScroll,
       headerSliverBuilder: (context, _) => [
         SliverPadding(
           padding: gutter,
@@ -417,69 +422,101 @@ class _FoodStorePageState extends State<_FoodStoreView> {
             ],
           ),
         ),
-        SliverPersistentHeader(
-          pinned: true,
-          delegate: _PinnedHeader(
-            height: pinned,
-            child: Column(
-              children: [
-                Padding(
-                  padding: gutter,
-                  child: _Tabs(
-                    selected: _tab,
-                    reviewCount: rating?.count,
-                    onSelected: (tab) => setState(() => _tab = tab),
-                  ),
-                ),
-                if (showSearch)
-                  SizedBox(
-                    height: _searchHeight,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        DealGoDimensions.pageGutter,
-                        DealGoSpacing.s4,
-                        DealGoDimensions.pageGutter,
-                        DealGoSpacing.s6,
-                      ),
-                      child: _MenuSearchBar(controller: _query),
+        // The pinned bar stays on screen while the body scrolls. Without the
+        // absorber the body's list starts at the top of the shared viewport,
+        // so its first rows would sit behind the tabs and the search field.
+        // The injector below each body list reserves exactly that height.
+        SliverOverlapAbsorber(
+          handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
+          sliver: SliverPersistentHeader(
+            pinned: true,
+            delegate: _PinnedHeader(
+              height: pinned,
+              child: Column(
+                key: _pinnedKey,
+                children: [
+                  Padding(
+                    padding: gutter,
+                    child: _Tabs(
+                      selected: _tab,
+                      reviewCount: rating?.count,
+                      onSelected: (tab) => setState(() => _tab = tab),
                     ),
                   ),
-              ],
+                  if (showSearch)
+                    SizedBox(
+                      height: _searchHeight,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          DealGoDimensions.pageGutter,
+                          DealGoSpacing.s4,
+                          DealGoDimensions.pageGutter,
+                          DealGoSpacing.s6,
+                        ),
+                        child: _MenuSearchBar(controller: _query),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
       ],
-      body: switch (_tab) {
-        _StoreTab.menu =>
-          showRail
-              ? _MenuBoard(
-                  key: const ValueKey('menu'),
-                  store: store,
-                  sections: sections,
-                )
-              : _MenuList(
-                  key: const ValueKey('menu'),
-                  store: store,
-                  groups: groups,
-                  searching: _query.text.trim().isNotEmpty,
-                ),
-        _StoreTab.reviews => _ScrollBody(
-          key: const ValueKey('reviews'),
-          child: _Reviews(
-            reviews: _reviews,
-            filtered: _reviewStars == null ? _reviews : _filtered,
-            stars: _reviewStars,
-            busy: _reviewsBusy,
-            onFilter: _filterReviews,
-            onMore: _moreReviews,
-          ),
+      body: Builder(
+        builder: (innerContext) => _tabBody(
+          store,
+          groups,
+          sections,
+          showRail,
+          NestedScrollView.sliverOverlapAbsorberHandleFor(innerContext),
         ),
-        _StoreTab.info => _ScrollBody(
-          key: const ValueKey('info'),
-          child: _StoreInfo(store: store, onOpenMaps: () => _openMaps(store)),
-        ),
-      },
+      ),
     );
+  }
+
+  Widget _tabBody(
+    FoodStoreDetail store,
+    List<_MenuGroup> groups,
+    List<_MenuGroup> sections,
+    bool showRail,
+    SliverOverlapAbsorberHandle overlap,
+  ) {
+    return switch (_tab) {
+      _StoreTab.menu =>
+        showRail
+            ? _MenuBoard(
+                key: const ValueKey('menu'),
+                store: store,
+                sections: sections,
+                outerScroll: _outerScroll,
+                pinnedKey: _pinnedKey,
+                headerOverlap: overlap,
+              )
+            : _MenuList(
+                key: const ValueKey('menu'),
+                store: store,
+                groups: groups,
+                searching: _query.text.trim().isNotEmpty,
+                headerOverlap: overlap,
+              ),
+      _StoreTab.reviews => _ScrollBody(
+        key: const ValueKey('reviews'),
+        headerOverlap: overlap,
+        child: _Reviews(
+          reviews: _reviews,
+          filtered: _reviewStars == null ? _reviews : _filtered,
+          stars: _reviewStars,
+          busy: _reviewsBusy,
+          onFilter: _filterReviews,
+          onMore: _moreReviews,
+        ),
+      ),
+      _StoreTab.info => _ScrollBody(
+        key: const ValueKey('info'),
+        headerOverlap: overlap,
+        child: _StoreInfo(store: store, onOpenMaps: () => _openMaps(store)),
+      ),
+    };
   }
 }
 

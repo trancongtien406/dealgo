@@ -12,7 +12,6 @@ export type PlatformSettingKey =
   | 'CONTACT_WINDOW_MINUTES'
   | 'MAX_CONCURRENT_JOBS_PER_DRIVER'
   | 'PAYMENT_METHOD_REGISTRY'
-  | 'PAYMENT_WALLET_ENABLED'
   | 'RATING_WINDOW_DAYS'
   | 'RIDE_COMMISSION_BIKE_PERCENT'
   | 'RIDE_COMMISSION_CAR_PERCENT'
@@ -72,8 +71,15 @@ export type PlatformSettingKey =
   | 'FOOD_MAX_FARE_RAISES_PER_ORDER'
   | 'FOOD_OFFER_TTL_SECONDS'
   | 'FOOD_DELIVERY_FEE_MODE'
+  | 'FOOD_ITEM_MODERATION_ENABLED'
   | 'SERVICE_ZONE_ENFORCED'
   | 'DRIVER_DEBT_LIMIT_VND'
+  | 'DRIVER_TOP_UP_ENABLED'
+  | 'DRIVER_TOP_UP_MIN_VND'
+  | 'DRIVER_TOP_UP_MAX_VND'
+  | 'DRIVER_TOP_UP_DAILY_LIMIT_VND'
+  | 'DRIVER_CREDIT_MAX_VND'
+  | 'DRIVER_TOP_UP_EXPIRE_MINUTES'
   | 'DISPATCH_REQUIRE_FRESH_PRESENCE'
   | 'RIDE_MAX_LIVE_OFFERS_PER_RIDE'
   | 'RIDE_MAX_FARE_RAISES_PER_RIDE'
@@ -222,14 +228,6 @@ export const PLATFORM_SETTING_SPECS: readonly PlatformSettingSpec[] = [
     key: 'PAYMENT_METHOD_REGISTRY',
     valueType: 'json',
     openIds: ['OPEN-002'],
-    seeded: true,
-  },
-  {
-    // Ví DealGo: off until the e-money licence question is settled.
-    key: 'PAYMENT_WALLET_ENABLED',
-    valueType: 'json',
-    openIds: ['OPEN-002'],
-    boolean: true,
     seeded: true,
   },
   {
@@ -759,12 +757,73 @@ export const PLATFORM_SETTING_SPECS: readonly PlatformSettingSpec[] = [
     seeded: true,
   },
   {
+    // JSON boolean; on = a new dish waits for Ops approval before customers can see/order it.
+    key: 'FOOD_ITEM_MODERATION_ENABLED',
+    valueType: 'json',
+    openIds: ['FOOD-001'],
+    boolean: true,
+    seeded: true,
+  },
+  {
     // Unpaid fees above this block new jobs (inDrive blocks on negative balance).
     key: 'DRIVER_DEBT_LIMIT_VND',
     valueType: 'number',
     openIds: ['DEC-PROD-059'],
     min: 0,
     max: 10000000,
+    seeded: true,
+  },
+  {
+    // JSON boolean; off until Legal signs off the prepayment flow (DEC-PROD-093).
+    key: 'DRIVER_TOP_UP_ENABLED',
+    valueType: 'json',
+    openIds: ['DEC-PROD-093'],
+    boolean: true,
+    seeded: true,
+  },
+  {
+    // Smallest prepayment a driver may send.
+    key: 'DRIVER_TOP_UP_MIN_VND',
+    valueType: 'number',
+    openIds: ['DEC-PROD-093'],
+    min: 1000,
+    max: 500000,
+    seeded: true,
+  },
+  {
+    // Largest single prepayment.
+    key: 'DRIVER_TOP_UP_MAX_VND',
+    valueType: 'number',
+    openIds: ['DEC-PROD-093'],
+    min: 10000,
+    max: 50000000,
+    seeded: true,
+  },
+  {
+    // Total paid + pending per Vietnam calendar day.
+    key: 'DRIVER_TOP_UP_DAILY_LIMIT_VND',
+    valueType: 'number',
+    openIds: ['DEC-PROD-093'],
+    min: 10000,
+    max: 100000000,
+    seeded: true,
+  },
+  {
+    // Cap on unused credit so DealGo never holds a large customer float.
+    key: 'DRIVER_CREDIT_MAX_VND',
+    valueType: 'number',
+    openIds: ['DEC-PROD-093'],
+    min: 10000,
+    max: 50000000,
+    seeded: true,
+  },
+  {
+    // Payment link lifetime; unused credit is untouched, only the link expires.
+    key: 'DRIVER_TOP_UP_EXPIRE_MINUTES',
+    valueType: 'number',
+    openIds: ['DEC-PROD-093'],
+    min: 5,
+    max: 60,
     seeded: true,
   },
   {

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Be_Vietnam_Pro, Caveat } from "next/font/google";
 import type { ReactNode } from "react";
-import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo/site";
+import { OG_IMAGE, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo/site";
 import "./landing.css";
 
 const beVietnamPro = Be_Vietnam_Pro({
@@ -17,7 +17,7 @@ const caveat = Caveat({
   variable: "--font-caveat",
 });
 
-const TITLE = "DealGo – Đặt xe thương lượng giá và đặt đồ ăn tại Đà Nẵng";
+const TITLE = "DealGo – Đặt xe thương lượng giá & giao đồ ăn tận nơi";
 
 export const metadata: Metadata = {
   title: { absolute: TITLE },
@@ -25,12 +25,15 @@ export const metadata: Metadata = {
   keywords: [
     "DealGo",
     "đặt xe",
-    "xe máy",
-    "ô tô",
+    "đặt xe máy",
+    "đặt xe ô tô",
+    "đặt xe giá rẻ",
     "thương lượng giá",
+    "giá do bạn chọn",
     "đặt đồ ăn",
     "giao đồ ăn",
-    "Đà Nẵng",
+    "ứng dụng đặt xe",
+    "đặt xe toàn quốc",
   ],
   robots: { index: true, follow: true },
   alternates: { canonical: "/" },
@@ -41,11 +44,13 @@ export const metadata: Metadata = {
     title: TITLE,
     description: SITE_DESCRIPTION,
     locale: "vi_VN",
+    images: [OG_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
     title: TITLE,
     description: SITE_DESCRIPTION,
+    images: [OG_IMAGE],
   },
 };
 

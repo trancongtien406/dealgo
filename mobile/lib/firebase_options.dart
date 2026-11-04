@@ -28,7 +28,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1077959967029',
     projectId: 'dealgo-81a0d',
     storageBucket: 'dealgo-81a0d.firebasestorage.app',
-    iosBundleId: 'com.trancongtien.dealgo',
+    iosBundleId: 'dealgo.nguyengoctien.com',
   );
 
   static const FirebaseOptions android = FirebaseOptions(

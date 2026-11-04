@@ -20,7 +20,7 @@ void main() {
       expect(find.text('Nguyễn Văn A'), findsWidgets);
       expect(find.text('Khách hàng'), findsWidgets);
       expect(find.text('Ưu đãi của tôi'), findsOneWidget);
-      expect(find.text('Trung tâm vai trò'), findsOneWidget);
+      expect(find.text('Cơ hội gia tăng thu nhập'), findsOneWidget);
       expect(find.text('Trần Minh Anh'), findsNothing);
       expect(find.text('Sửa →'), findsNothing);
       expect(find.text('Chuyến đã đi'), findsNothing);

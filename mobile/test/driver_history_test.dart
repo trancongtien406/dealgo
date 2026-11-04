@@ -82,6 +82,11 @@ void main() {
     expect(find.textContaining('Hoa hồng 10% −4.200đ'), findsOneWidget);
     expect(find.text('+37.800đ'), findsOneWidget);
 
+    await Scrollable.ensureVisible(
+      tester.element(find.byKey(const Key('driver-history-filter-food'))),
+      alignment: 0.5,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('driver-history-filter-food')));
     await tester.pumpAndSettle();
     expect(find.textContaining('Sân bay Đà Nẵng'), findsNothing);
@@ -241,6 +246,8 @@ void main() {
     await _openEarnings(tester, history);
     final row = find.byKey(const Key('driver-history-item-job-0'));
     await tester.scrollUntilVisible(row, 300, scrollable: _list);
+    await Scrollable.ensureVisible(tester.element(row), alignment: 0.5);
+    await tester.pumpAndSettle();
     await tester.tap(row);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('driver-completed-ref')), findsOneWidget);

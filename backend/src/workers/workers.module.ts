@@ -19,9 +19,10 @@ import { KycMediaRetentionService } from './kyc-media-retention.service.js';
 import { WorkerHeartbeatService } from './worker-heartbeat.service.js';
 import { PrismaWorkerHeartbeatStore, WORKER_HEARTBEAT_STORE } from '../platform/health/worker-heartbeat.js';
 import { OpsAlertService } from '../platform/observability/ops-alert.js';
+import { DriverCreditModule } from '../modules/driver-credit/driver-credit.module.js';
 
 @Module({
-  imports: [AccountDeletionModule, LegalConsentModule, RealtimeModule, RideModule, PaymentModule, FoodModule, OutboxModule, PrismaModule, PlatformSettingsModule, StorageModule],
+  imports: [AccountDeletionModule, LegalConsentModule, RealtimeModule, RideModule, PaymentModule, FoodModule, OutboxModule, PrismaModule, PlatformSettingsModule, StorageModule, DriverCreditModule],
   providers: [
     RideExpiryService,
     OrphanUploadCleanupService,

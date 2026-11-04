@@ -27,7 +27,6 @@ export function PaymentMethodsBoard() {
   const forbidden = isError && isForbiddenError(error);
   const mutation = usePatchPaymentMethodsMutation();
   const [edits, setEdits] = useState<Record<string, PaymentMethodDraft>>({});
-  const [walletDraft, setWalletDraft] = useState<boolean | null>(null);
   const [confirming, setConfirming] = useState(false);
 
   const methods = useMemo(() => data?.methods ?? [], [data]);
@@ -37,8 +36,7 @@ export function PaymentMethodsBoard() {
     return out;
   }, [methods, edits]);
   const patches = useMemo(() => diffPatches(methods, drafts), [methods, drafts]);
-  const walletChanged = walletDraft !== null && walletDraft !== data?.walletEnabled;
-  const dirty = patches.length > 0 || walletChanged;
+  const dirty = patches.length > 0;
 
   const update = (code: string, next: Partial<PaymentMethodDraft>) =>
     setEdits((prev) => ({ ...prev, [code]: { ...drafts[code]!, ...next } }));
@@ -77,29 +75,11 @@ export function PaymentMethodsBoard() {
         />
       ) : (
         <>
-          <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-ink">Ví DealGo</p>
-              <p className="mt-0.5 text-sm text-muted">
-                Cờ PAYMENT_WALLET_ENABLED (mặc định tắt). Cần giấy phép ví trước khi bật.
-              </p>
-              {!isPending && !data?.publicBaseUrlConfigured ? (
-                <p className="mt-1 text-xs text-danger">
-                  Chưa đặt PAYMENT_PUBLIC_BASE_URL — mọi cổng online đang bị ẩn.
-                </p>
-              ) : null}
-            </div>
-            <label className="inline-flex items-center gap-2 text-sm text-ink">
-              <input
-                type="checkbox"
-                className={`size-4 accent-brand ${focusRing}`}
-                checked={walletDraft ?? data?.walletEnabled ?? false}
-                disabled={isPending || mutation.isPending}
-                onChange={(e) => setWalletDraft(e.target.checked)}
-              />
-              Bật ví DealGo
-            </label>
-          </section>
+          {!isPending && !data?.publicBaseUrlConfigured ? (
+            <p className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
+              Chưa đặt PAYMENT_PUBLIC_BASE_URL — mọi cổng online đang bị ẩn.
+            </p>
+          ) : null}
 
           <section className="min-w-0 overflow-x-auto rounded-2xl border border-border bg-white shadow-sm">
             <table className="w-full min-w-[880px] text-sm">
@@ -145,7 +125,6 @@ export function PaymentMethodsBoard() {
               disabled={!dirty || mutation.isPending}
               onClick={() => {
                 setEdits({});
-                setWalletDraft(null);
               }}
               className={`h-10 rounded-xl border border-border bg-white px-4 text-sm font-medium text-ink disabled:opacity-50 cursor-pointer ${focusRing}`}
             >
@@ -173,17 +152,15 @@ export function PaymentMethodsBoard() {
             success: "Đã cập nhật phương thức thanh toán.",
           }}
           confirmTone="brand"
-          entityLabel={`${patches.length} phương thức${walletChanged ? " + ví DealGo" : ""}`}
+          entityLabel={`${patches.length} phương thức`}
           pending={mutation.isPending}
           onClose={() => setConfirming(false)}
           onConfirm={async (reason) => {
             await mutation.mutateAsync({
               ...(patches.length > 0 ? { methods: patches } : {}),
-              ...(walletChanged && walletDraft !== null ? { walletEnabled: walletDraft } : {}),
               reason,
             });
             setEdits({});
-            setWalletDraft(null);
           }}
         />
       ) : null}

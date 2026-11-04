@@ -148,12 +148,18 @@ class DefaultMerchantOrdersClient implements MerchantOrdersClient {
     required String name,
     required int priceVnd,
     bool? available,
+    String? description,
+    int? prepMinutes,
+    String? menuCategoryId,
   }) {
     return food.createMerchantItem(
       accessToken: accessToken,
       name: name,
       priceVnd: priceVnd,
       available: available,
+      description: description,
+      prepMinutes: prepMinutes,
+      menuCategoryId: menuCategoryId,
     );
   }
 

@@ -1,4 +1,4 @@
-package com.trancongtien.dealgo
+package dealgo.nguyengoctien.com
 
 import android.app.NotificationChannel
 import android.app.NotificationManager

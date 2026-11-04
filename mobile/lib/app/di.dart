@@ -119,6 +119,8 @@ import '../features/pricing/data/pricing_remote_datasource.dart';
 import '../features/driver_card/data/driver_card_remote_datasource.dart';
 import '../features/places/domain/place.dart';
 import '../features/driver_history/domain/driver_history.dart';
+import '../features/driver_credit/domain/driver_credit.dart';
+import '../features/driver_credit/data/driver_credit_remote_datasource.dart';
 import '../features/rating/data/rating_remote_datasource.dart';
 import '../features/rating/domain/service_rating.dart';
 import '../features/inbox/data/datasources/inbox_remote_datasource.dart';
@@ -326,6 +328,7 @@ class DealGoDependencies {
     RatingRepository? ratings,
     MerchantOfferRepository? merchantOffers,
     DriverHistoryRepository? driverHistory,
+    DriverCreditRepository? driverCredit,
     SupportRepository? support,
     AccountDeletionRepository? accountDeletion,
     AccountSettingsRepository? accountSettings,
@@ -370,6 +373,7 @@ class DealGoDependencies {
       ratings: ratings,
       merchantOffers: merchantOffers,
       driverHistory: driverHistory,
+      driverCredit: driverCredit,
       support: support,
       accountDeletion: accountDeletion,
       accountSettings: accountSettings,
@@ -416,6 +420,7 @@ class DealGoDependencies {
       ratings: ratings,
       merchantOffers: merchantOffers,
       driverHistory: driverHistory,
+      driverCredit: driverCredit,
       support: support,
       accountDeletion: accountDeletion,
       accountSettings: accountSettings,
@@ -492,6 +497,7 @@ class DealGoDependencies {
     RatingRepository? ratings,
     MerchantOfferRepository? merchantOffers,
     DriverHistoryRepository? driverHistory,
+    DriverCreditRepository? driverCredit,
     SupportRepository? support,
     AccountDeletionRepository? accountDeletion,
     AccountSettingsRepository? accountSettings,
@@ -652,6 +658,11 @@ class DealGoDependencies {
                 seed: FakeDriverHistoryRemoteDataSource.sample(DateTime.now()),
               )
             : DioDriverHistoryRemoteDataSource(dio: dio));
+    final driverCreditRepository =
+        driverCredit ??
+        (useOverrides || useMockData
+            ? FakeDriverCreditRemoteDataSource()
+            : DioDriverCreditRemoteDataSource(dio: dio));
     final placesRepository =
         places ??
         (useOverrides
@@ -839,6 +850,7 @@ class DealGoDependencies {
     );
     put<MerchantStatsRepository>(merchantStatsRepository);
     put<DriverHistoryRepository>(driverHistoryRepository);
+    put<DriverCreditRepository>(driverCreditRepository);
     put<PlacesRepository>(placesRepository);
     put<HomeBannerRepository>(homeBannerRepository);
     put<HomeBannerTracker>(
@@ -1067,6 +1079,9 @@ class DealGoDependencies {
         ),
         RepositoryProvider<DriverHistoryRepository>.value(
           value: _locator<DriverHistoryRepository>(),
+        ),
+        RepositoryProvider<DriverCreditRepository>.value(
+          value: _locator<DriverCreditRepository>(),
         ),
         RepositoryProvider<PlacesRepository>.value(
           value: _locator<PlacesRepository>(),

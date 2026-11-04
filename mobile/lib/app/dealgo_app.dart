@@ -34,6 +34,7 @@ import '../core/storage/onboarding_storage.dart';
 import '../features/presence/data/datasources/presence_remote_datasource.dart';
 import '../features/address_book/domain/repositories/address_book_repository.dart';
 import '../features/driver_history/domain/driver_history.dart';
+import '../features/driver_credit/domain/driver_credit.dart';
 import '../features/onboarding/presentation/document_image_source.dart';
 import '../features/support/domain/help_faq.dart';
 import '../features/ride/domain/ride_share.dart';
@@ -95,6 +96,7 @@ class DealGoApp extends StatefulWidget {
     this.ratings,
     this.merchantOffers,
     this.driverHistory,
+    this.driverCredit,
     this.support,
     this.accountDeletion,
     this.accountSettings,
@@ -141,6 +143,7 @@ class DealGoApp extends StatefulWidget {
   final RatingRepository? ratings;
   final MerchantOfferRepository? merchantOffers;
   final DriverHistoryRepository? driverHistory;
+  final DriverCreditRepository? driverCredit;
   final SupportRepository? support;
   final AccountDeletionRepository? accountDeletion;
   final AccountSettingsRepository? accountSettings;
@@ -209,6 +212,7 @@ class _DealGoAppState extends State<DealGoApp> with WidgetsBindingObserver {
       ratings: widget.ratings,
       merchantOffers: widget.merchantOffers,
       driverHistory: widget.driverHistory,
+      driverCredit: widget.driverCredit,
       support: widget.support,
       accountDeletion: widget.accountDeletion,
       accountSettings: widget.accountSettings,

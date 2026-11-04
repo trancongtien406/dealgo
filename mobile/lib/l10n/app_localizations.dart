@@ -3692,6 +3692,30 @@ abstract class AppLocalizations {
   /// **'Recipient and address'**
   String get checkoutRecipientAddress;
 
+  /// No description provided for @checkoutYourOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Your order'**
+  String get checkoutYourOrder;
+
+  /// No description provided for @checkoutEtaChip.
+  ///
+  /// In en, this message translates to:
+  /// **'~{minutes} min delivery'**
+  String checkoutEtaChip(int minutes);
+
+  /// No description provided for @checkoutItemCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} items'**
+  String checkoutItemCount(int count);
+
+  /// No description provided for @checkoutYouSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save {amount}'**
+  String checkoutYouSave(String amount);
+
   /// No description provided for @checkoutItems.
   ///
   /// In en, this message translates to:
@@ -5995,6 +6019,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'≈{minutes} min'**
   String foodStorePrepChip(int minutes);
+
+  /// No description provided for @foodStorePrepShort.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String foodStorePrepShort(int minutes);
 
   /// No description provided for @foodSearchGroups.
   ///
@@ -12907,6 +12937,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} sold'**
   String foodItemSold(int count);
+
+  /// No description provided for @foodItemOptionsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} choices'**
+  String foodItemOptionsCount(int count);
 
   /// No description provided for @merchantOffersTitle.
   ///

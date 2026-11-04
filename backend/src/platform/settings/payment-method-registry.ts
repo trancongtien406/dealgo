@@ -11,7 +11,6 @@ export const PAYMENT_METHOD_CODES = [
   'SHOPEEPAY',
   'INTERNATIONAL_CARD',
   'APPLE_PAY',
-  'DEALGO_WALLET',
 ] as const;
 export type PaymentMethodCode = (typeof PAYMENT_METHOD_CODES)[number];
 

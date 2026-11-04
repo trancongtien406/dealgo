@@ -203,6 +203,30 @@ PaymentStatusHint? parsePaymentStatusHint(Object? raw) {
   return PaymentStatusHint(entityType: type, entityId: id, status: status);
 }
 
+/// `driverCreditStatus` push on a driver's private `user:` room when a prepaid
+/// top-up changes state. The credit page re-GETs REST; the push is only a hint.
+class DriverCreditStatusHint {
+  const DriverCreditStatusHint({
+    required this.topUpId,
+    required this.status,
+  });
+
+  final String topUpId;
+  final String status;
+}
+
+DriverCreditStatusHint? parseDriverCreditStatusHint(Object? raw) {
+  if (raw is! Map) {
+    return null;
+  }
+  final id = raw['topUpId'];
+  final status = raw['status'];
+  if (id is! String || status is! String) {
+    return null;
+  }
+  return DriverCreditStatusHint(topUpId: id, status: status);
+}
+
 PartnerStatusHint? parsePartnerStatusHint(Object? raw) {
   if (raw is! Map) {
     return null;
@@ -362,6 +386,9 @@ abstract interface class SnapshotRealtime {
 
   /// Checkout status changes for the signed-in customer (no subscribe needed).
   Stream<PaymentStatusHint> get paymentStatuses;
+
+  /// Driver prepaid top-up changes for the signed-in driver (no subscribe needed).
+  Stream<DriverCreditStatusHint> get driverCreditStatuses;
 
   /// `call` events on the signed-in user's private room (in-app voice calls:
   /// ringing, accepted, declined, missed, ended). Raw payload; the voice

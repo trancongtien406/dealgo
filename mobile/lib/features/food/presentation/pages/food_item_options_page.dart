@@ -213,6 +213,7 @@ class _FoodItemOptionsPageState extends State<FoodItemOptionsPage> {
                       fallbackImageUrl: item.imageUrl,
                       placeholderAsset: foodDishFallbackImage(
                         widget.args.store.category,
+                        dishName: item.name,
                       ),
                     ),
                   ),
@@ -260,11 +261,8 @@ class _FoodItemOptionsPageState extends State<FoodItemOptionsPage> {
                           ),
                         ),
                         const SizedBox(height: DealGoSpacing.s8),
-                        if (item.isNew || bestSeller) ...[
-                          FoodItemBadges(
-                            isNew: item.isNew,
-                            bestSeller: bestSeller,
-                          ),
+                        if (bestSeller) ...[
+                          const FoodBestSellerBadge(),
                           const SizedBox(height: DealGoSpacing.s8),
                         ],
                         Text(item.name, style: textTheme.titleLarge),
@@ -377,12 +375,10 @@ class _FoodItemOptionsPageState extends State<FoodItemOptionsPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // What is already in the cart, one tap from checkout.
-                      FoodCartBar(
-                        storeId: widget.args.store.id,
-                        offers: widget.args.store.offers,
-                        inline: true,
-                      ),
+                      // The cart of this store, one tap from checkout, kept as a
+                      // quiet shortcut so the add button stays the only filled
+                      // call to action on screen.
+                      _CartShortcut(storeId: widget.args.store.id),
                       if (_selection.labels.isNotEmpty) ...[
                         const SizedBox(height: DealGoSpacing.s8),
                         Text(
@@ -461,6 +457,75 @@ String _choicePriceLabel(AppLocalizations l10n, FoodOptionChoice choice) {
   if (!choice.available) return l10n.foodItemOptionsSoldOut;
   if (choice.extraVnd == 0) return l10n.foodItemOptionsFree;
   return '+${formatVnd(choice.extraVnd)}';
+}
+
+/// The store's current cart as a quiet row: the add button below it must be
+/// the only filled control, so a second full-width bar is not an option.
+class _CartShortcut extends StatelessWidget {
+  const _CartShortcut({required this.storeId});
+
+  final String storeId;
+
+  @override
+  Widget build(BuildContext context) {
+    final cart = context.watch<FoodCartCubit>().state;
+    if (!FoodCartBar.showsFor(cart, storeId: storeId)) {
+      return const SizedBox.shrink();
+    }
+    final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    final total = cart.subtotalVnd - cart.voucherDiscountVnd;
+    return InkWell(
+      key: const Key('food-cart-bar'),
+      onTap: () => context.push(FoodRoutes.checkout),
+      borderRadius: BorderRadius.circular(DealGoRadius.input),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: DealGoSpacing.s8),
+        child: Row(
+          children: [
+            Icon(
+              DealGoIcons.shoppingBag,
+              size: 18,
+              color: DealGoColors.primary,
+            ),
+            const SizedBox(width: DealGoSpacing.s8),
+            Text(
+              l10n.foodCartTitle,
+              style: textTheme.labelLarge?.copyWith(
+                color: DealGoColors.primary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(width: DealGoSpacing.s8),
+            Expanded(
+              child: Text(
+                '${l10n.checkoutItemCount(cart.itemCount)}'
+                ' · ${formatVnd(total < 0 ? 0 : total)}',
+                key: const Key('food-cart-bar-total'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.labelMedium?.copyWith(
+                  color: DealGoColors.textSecondary,
+                ),
+              ),
+            ),
+            Text(
+              l10n.foodViewCart,
+              style: textTheme.labelMedium?.copyWith(
+                color: DealGoColors.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const Icon(
+              DealGoIcons.chevronRight,
+              size: 16,
+              color: DealGoColors.primary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ItemMetaChips extends StatelessWidget {

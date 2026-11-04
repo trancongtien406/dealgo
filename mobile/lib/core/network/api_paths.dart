@@ -273,6 +273,14 @@ abstract final class ApiPaths {
   static const driverActiveJob = '/v1/driver/active-job';
   static const customerActiveTrip = '/v1/customer/active-trip';
   static const driverHistorySummary = '/v1/driver/history/summary';
+
+  /// Driver prepaid credit (DEC-PROD-093).
+  static const driverCredit = '/v1/driver/credit';
+  static const driverCreditTopUps = '/v1/driver/credit/top-ups';
+  static String driverCreditTopUp(String id) =>
+      '/v1/driver/credit/top-ups/${Uri.encodeComponent(id)}';
+  static String driverCreditTopUpCancel(String id) =>
+      '/v1/driver/credit/top-ups/${Uri.encodeComponent(id)}/cancel';
   static const meAddresses = '/v1/me/addresses';
 
   /// S027 account deletion (DEC-PROD-037).

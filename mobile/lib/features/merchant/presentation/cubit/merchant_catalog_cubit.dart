@@ -144,6 +144,9 @@ class MerchantCatalogCubit extends Cubit<MerchantCatalogState> {
     required String? accessToken,
     required String name,
     required int priceVnd,
+    String? description,
+    int? prepMinutes,
+    String? menuCategoryId,
   }) async {
     final ready = state;
     if (ready is! MerchantCatalogReady || ready.busyItemId != null) {
@@ -174,6 +177,9 @@ class MerchantCatalogCubit extends Cubit<MerchantCatalogState> {
           accessToken: token,
           name: trimmed,
           priceVnd: priceVnd,
+          description: description,
+          prepMinutes: prepMinutes,
+          menuCategoryId: menuCategoryId,
         ),
       );
       if (isClosed) {

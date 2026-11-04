@@ -9,9 +9,11 @@ import CitiesSection from "@/components/landing/CitiesSection";
 import FaqSection from "@/components/landing/FaqSection";
 import CtaBanner from "@/components/landing/CtaBanner";
 import Footer from "@/components/landing/Footer";
+import SocialFloat from "@/components/landing/SocialFloat";
+import { LANDING_FAQS } from "@/components/landing/faq-content";
 import { getPublicSiteConfig } from "@/features/site-config/fetch-public";
 import { qrSvg } from "@/features/site-config/qr";
-import { landingJsonLd } from "@/lib/seo/site";
+import { faqJsonLd, landingJsonLd } from "@/lib/seo/site";
 
 /** Admin-managed links (store, socials) refresh via ISR. */
 export const revalidate = 60;
@@ -33,6 +35,12 @@ export default async function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(landingJsonLd(siteConfig)).replace(/</g, "\\u003c"),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(faqJsonLd(LANDING_FAQS)).replace(/</g, "\\u003c"),
         }}
       />
       <div className="dg-landing">
@@ -65,6 +73,7 @@ export default async function Home() {
         </section>
       </main>
       <Footer siteConfig={siteConfig} />
+      <SocialFloat siteConfig={siteConfig} />
       </div>
     </>
   );

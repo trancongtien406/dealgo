@@ -62,6 +62,8 @@ dependencies:
   path_provider: ^2.1.5
   pointycastle: ^4.0.0
   image_picker: ^1.2.4
+  # VietQR for driver fee top-up (payOS returns the EMVCo payload).
+  qr_flutter: ^4.1.0
   passkeys: ^2.23.1
 
   provider: any

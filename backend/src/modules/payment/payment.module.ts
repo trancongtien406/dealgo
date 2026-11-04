@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { resolvePersistenceRepository, PrismaModule, PrismaService } from '../../platform/database/index.js';
 import type { AppEnv } from '../../platform/config/index.js';
 import { IdentityModule } from '../identity/index.js';
+import { DriverCreditModule } from '../driver-credit/driver-credit.module.js';
 import { SupportModule } from '../support/index.js';
 import { LedgerModule } from '../ledger/ledger.module.js';
 import { PlatformSettingsModule } from '../../platform/settings/platform-settings.module.js';
@@ -53,7 +54,14 @@ function hasMomoKeys(config: ConfigService<AppEnv, true>): boolean {
 }
 
 @Module({
-  imports: [PrismaModule, IdentityModule, SupportModule, LedgerModule, PlatformSettingsModule],
+  imports: [
+    PrismaModule,
+    IdentityModule,
+    SupportModule,
+    LedgerModule,
+    PlatformSettingsModule,
+    DriverCreditModule,
+  ],
   // MONEY-001: the legacy /v1/payments/webhooks stub controller is intentionally not registered;
   // the only PSP entry point is the signed checkout IPN (/v1/payments/ipn/:provider).
   controllers: [

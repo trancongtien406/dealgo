@@ -8,6 +8,7 @@ import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/drafts/text_draft.dart';
+import '../../../../core/format/text_case.dart';
 import '../../../../core/l10n/api_error_text.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/network/request_failure.dart';
@@ -469,7 +470,10 @@ class _MerchantItemEditPageState extends State<MerchantItemEditPage>
                         child: Text('—'),
                       ),
                       for (final cat in _categories)
-                        DropdownMenuItem(value: cat.id, child: Text(cat.name)),
+                        DropdownMenuItem(
+                          value: cat.id,
+                          child: Text(capitalizeFirstLetter(cat.name)),
+                        ),
                     ],
                     onChanged: (v) => setState(() => _categoryId = v),
                   ),

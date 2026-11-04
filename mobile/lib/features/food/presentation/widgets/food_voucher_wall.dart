@@ -31,10 +31,14 @@ class FoodVoucherWall extends StatefulWidget {
   State<FoodVoucherWall> createState() => _FoodVoucherWallState();
 }
 
-class _FoodVoucherWallState extends State<FoodVoucherWall> {
+class _FoodVoucherWallState extends State<FoodVoucherWall>
+    with AutomaticKeepAliveClientMixin<FoodVoucherWall> {
   static const _maxVouchers = 3;
 
   List<AvailableVoucher>? _vouchers;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -85,6 +89,7 @@ class _FoodVoucherWallState extends State<FoodVoucherWall> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final vouchers = _vouchers;
     if (vouchers != null && vouchers.isEmpty) {
       return const SizedBox.shrink();

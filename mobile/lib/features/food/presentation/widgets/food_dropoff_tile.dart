@@ -5,6 +5,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/l10n/api_error_text.dart';
+import '../../../../core/network/api_exception.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
@@ -27,7 +29,7 @@ class FoodDropoffTile extends StatefulWidget {
 
 class _FoodDropoffTileState extends State<FoodDropoffTile> {
   var _quoting = false;
-  var _failed = false;
+  ApiException? _error;
   String? _quotedFor;
 
   @override
@@ -93,7 +95,7 @@ class _FoodDropoffTileState extends State<FoodDropoffTile> {
     }
     setState(() {
       _quoting = true;
-      _failed = false;
+      _error = null;
     });
     final pricing = context.read<PricingRepository>();
     final cubit = context.read<FoodCartCubit>();
@@ -118,16 +120,33 @@ class _FoodDropoffTileState extends State<FoodDropoffTile> {
         cubit.setDeliveryQuote(quote);
       }
       setState(() => _quoting = false);
-    } catch (_) {
+    } on ApiException catch (error) {
       if (mounted) {
         setState(() {
           _quoting = false;
-          _failed = true;
+          _error = error;
+          _quotedFor = null;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _quoting = false;
+          _error = ApiException(
+            statusCode: 0,
+            message: error.toString(),
+            errorCode: 'NETWORK_ERROR',
+          );
           _quotedFor = null;
         });
       }
     }
   }
+
+  /// The two refusals that depend on where the customer is, not on the network.
+  bool _tooFar(ApiException error) =>
+      error.errorCode == 'FOOD_TOO_FAR' ||
+      error.errorCode == 'FOOD_OUTSIDE_SERVICE_ZONE';
 
   Future<void> _pick() async {
     final cubit = context.read<FoodCartCubit>();
@@ -159,23 +178,55 @@ class _FoodDropoffTileState extends State<FoodDropoffTile> {
                 borderRadius: BorderRadius.circular(DealGoRadius.input),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    vertical: DealGoSpacing.s8,
+                    vertical: DealGoSpacing.s4,
                   ),
                   child: Row(
                     children: [
-                      const Icon(DealGoIcons.pin, color: DealGoColors.primary),
+                      Container(
+                        width: 32,
+                        height: 32,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: DealGoColors.subtlePurple,
+                          borderRadius: BorderRadius.circular(
+                            DealGoRadius.input,
+                          ),
+                        ),
+                        child: const Icon(
+                          DealGoIcons.pin,
+                          size: 17,
+                          color: DealGoColors.primary,
+                        ),
+                      ),
                       const SizedBox(width: DealGoSpacing.s12),
                       Expanded(
-                        child: Text(
-                          chosen ? cart.dropoffLabel : l10n.foodDropoffChoose,
-                          style: textTheme.bodyMedium?.copyWith(
-                            fontWeight: chosen
-                                ? FontWeight.w700
-                                : FontWeight.w400,
-                            color: chosen
-                                ? DealGoColors.text
-                                : DealGoColors.textSecondary,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.foodDropoffTitle,
+                              style: textTheme.labelSmall?.copyWith(
+                                color: DealGoColors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: DealGoSpacing.s2),
+                            Text(
+                              chosen
+                                  ? cart.dropoffLabel
+                                  : l10n.foodDropoffChoose,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: chosen
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: chosen
+                                    ? DealGoColors.text
+                                    : DealGoColors.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       if (widget.enabled && chosen) ...[
@@ -184,12 +235,14 @@ class _FoodDropoffTileState extends State<FoodDropoffTile> {
                           l10n.foodDropoffChange,
                           style: textTheme.labelMedium?.copyWith(
                             color: DealGoColors.primary,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
                       if (widget.enabled && !chosen)
                         Icon(
                           DealGoIcons.chevronRight,
+                          size: 18,
                           color: DealGoColors.textSecondary,
                         ),
                     ],
@@ -198,22 +251,32 @@ class _FoodDropoffTileState extends State<FoodDropoffTile> {
               ),
               if (_quoting)
                 Text(l10n.foodFareQuoting, style: textTheme.bodySmall)
-              else if (_failed)
+              else if (_error case final error?)
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: Text(
-                        l10n.foodFareQuoteError,
+                        apiErrorText(l10n, error, report: false),
                         key: const Key('food-fare-error'),
                         style: textTheme.bodySmall?.copyWith(
                           color: DealGoColors.danger,
                         ),
                       ),
                     ),
-                    TextButton(
-                      onPressed: () => _maybeQuote(cart),
-                      child: Text(l10n.actionRetry),
-                    ),
+                    // Distance refusals only clear with a nearer address, so offer
+                    // that instead of a retry that would fail again.
+                    if (_tooFar(error))
+                      TextButton(
+                        key: const Key('food-fare-change-address'),
+                        onPressed: widget.enabled ? _pick : null,
+                        child: Text(l10n.foodDropoffChange),
+                      )
+                    else
+                      TextButton(
+                        onPressed: () => _maybeQuote(cart),
+                        child: Text(l10n.actionRetry),
+                      ),
                   ],
                 ),
             ],

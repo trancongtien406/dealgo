@@ -1,11 +1,9 @@
 import 'package:dealgo/core/design_system/components/dealgo_network_image.dart';
 import 'package:dealgo/core/design_system/icons/dealgo_icons.dart';
-import 'package:dealgo/core/design_system/theme/dealgo_theme.dart';
 import 'package:dealgo/features/food/domain/entities/food_models.dart';
 import 'package:dealgo/features/food/presentation/cubit/food_cart_cubit.dart';
 import 'package:dealgo/features/pricing/data/pricing_remote_datasource.dart';
 import 'package:dealgo/features/pricing/domain/pricing.dart';
-import 'package:dealgo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,7 +25,10 @@ final _withAvatar = customerProfile.copyWith(
   avatarUrl: '/v1/public/avatars/user-1/portrait.png',
 );
 
-Future<void> _openCheckout(WidgetTester tester, {required bool signedInAvatar}) async {
+Future<void> _openCheckout(
+  WidgetTester tester, {
+  required bool signedInAvatar,
+}) async {
   tester.view.physicalSize = const Size(1206, 3200);
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
@@ -89,15 +90,14 @@ void main() {
       findsNothing,
     );
     expect(
-      find.descendant(
-        of: avatar,
-        matching: find.byIcon(DealGoIcons.user),
-      ),
+      find.descendant(of: avatar, matching: find.byIcon(DealGoIcons.user)),
       findsOneWidget,
     );
   });
 
-  testWidgets('the food feed header shows the signed-in avatar', (tester) async {
+  testWidgets('the food feed header shows the signed-in avatar', (
+    tester,
+  ) async {
     await pumpSignedIn(
       tester,
       profile: _withAvatar,

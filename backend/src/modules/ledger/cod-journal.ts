@@ -12,6 +12,7 @@ import {
   LEDGER_PSP_CUSTOMER_PREPAID_CODE,
   LEDGER_PSP_PAYOUT_PAYABLE_CODE,
   LEDGER_PSP_REFUND_EXPENSE_CODE,
+  LEDGER_DRIVER_CREDIT_LIABILITY_CODE,
   type LedgerEntityTypeName,
   type LedgerEntryDirectionName,
 } from './ledger.constants.js';
@@ -134,6 +135,42 @@ export function buildPspRefundAfterSettlementLines(amountVnd: number): CodJourna
   ];
 }
 
+/**
+ * Verified driver prepayment: the money is an asset of DealGo but owed back to the driver
+ * until it is used, so it credits a liability — never revenue at collection time.
+ */
+export function buildDriverCreditTopUpLines(amountVnd: number): CodJournalLine[] {
+  if (!Number.isSafeInteger(amountVnd) || amountVnd <= 0) {
+    throw new LedgerRuleError('LEDGER_AMOUNT_INVALID');
+  }
+  return [
+    { accountCode: LEDGER_PSP_CLEARING_CODE, direction: 'DEBIT', amountVnd },
+    { accountCode: LEDGER_DRIVER_CREDIT_LIABILITY_CODE, direction: 'CREDIT', amountVnd },
+  ];
+}
+
+/** Prepaid credit pays accrued platform fees: the liability settles the receivable. */
+export function buildDriverCreditAppliedLines(amountVnd: number): CodJournalLine[] {
+  if (!Number.isSafeInteger(amountVnd) || amountVnd <= 0) {
+    throw new LedgerRuleError('LEDGER_AMOUNT_INVALID');
+  }
+  return [
+    { accountCode: LEDGER_DRIVER_CREDIT_LIABILITY_CODE, direction: 'DEBIT', amountVnd },
+    { accountCode: LEDGER_FEE_DRIVER_RECEIVABLE_CODE, direction: 'CREDIT', amountVnd },
+  ];
+}
+
+/** Ops refunds unused credit to the driver's verified bank account. */
+export function buildDriverCreditRefundLines(amountVnd: number): CodJournalLine[] {
+  if (!Number.isSafeInteger(amountVnd) || amountVnd <= 0) {
+    throw new LedgerRuleError('LEDGER_AMOUNT_INVALID');
+  }
+  return [
+    { accountCode: LEDGER_DRIVER_CREDIT_LIABILITY_CODE, direction: 'DEBIT', amountVnd },
+    { accountCode: LEDGER_PSP_CLEARING_CODE, direction: 'CREDIT', amountVnd },
+  ];
+}
+
 /** Ledger events that can be posted for a completed job, with their line builders. */
 export type PostableLedgerEvent =
   | 'COD_OBLIGATION_POSTED'
@@ -143,7 +180,10 @@ export type PostableLedgerEvent =
   | 'PSP_PAYMENT_CAPTURED'
   | 'PSP_REFUND_RECORDED'
   | 'PSP_PREPAID_APPLIED'
-  | 'PSP_REFUND_AFTER_SETTLEMENT';
+  | 'PSP_REFUND_AFTER_SETTLEMENT'
+  | 'DRIVER_CREDIT_TOP_UP_CAPTURED'
+  | 'DRIVER_CREDIT_APPLIED_TO_FEE'
+  | 'DRIVER_CREDIT_REFUNDED';
 
 export type LedgerLineBuilder = (
   amountVnd: number,
@@ -159,6 +199,9 @@ export const LEDGER_LINE_BUILDERS: Readonly<Record<PostableLedgerEvent, LedgerLi
   PSP_REFUND_RECORDED: buildPspRefundLines,
   PSP_PREPAID_APPLIED: buildPspPrepaidAppliedLines,
   PSP_REFUND_AFTER_SETTLEMENT: buildPspRefundAfterSettlementLines,
+  DRIVER_CREDIT_TOP_UP_CAPTURED: buildDriverCreditTopUpLines,
+  DRIVER_CREDIT_APPLIED_TO_FEE: buildDriverCreditAppliedLines,
+  DRIVER_CREDIT_REFUNDED: buildDriverCreditRefundLines,
 };
 
 export function assertBalancedLines(lines: CodJournalLine[]): void {

@@ -3,7 +3,7 @@
 DealGo is one app with three roles: Customer, Merchant (Cửa hàng) and Driver (Tài xế). Users choose a role on the Role Center screen and can switch at any time.
 
 **Demo account** (one review account with Customer, Driver and Merchant roles; switch roles on Role Center):
-- On the sign-in screen choose **Email**, enter `appreview@dealgo.trancongtien.com` and the password given in the App Review Information fields. No email or SMS is needed.
+- On the sign-in screen choose **Email**, enter `appreview@dealgo.laptrinhapp.com` and the password given in the App Review Information fields. No email or SMS is needed.
 - If the app ever asks for an email code for this account, enter the 6-digit review code given in the same fields. It works only for this email.
 - Roles on the account:
   - Customer.

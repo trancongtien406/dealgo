@@ -57,7 +57,7 @@ const securityHeaders = [
       "default-src 'self'",
       isDev
         ? "script-src 'self' 'unsafe-eval' 'unsafe-inline'"
-        : "script-src 'self' 'unsafe-inline'",
+        : "script-src 'self' 'unsafe-inline' 'https://static.cloudflareinsights.com'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
@@ -120,12 +120,12 @@ const sentryRelease = process.env.NEXT_PUBLIC_SENTRY_RELEASE?.trim();
 
 export default sentryAuthToken
   ? withSentryConfig(nextConfig, {
-      org: "tiendev",
-      project: "dealgo-web",
-      authToken: sentryAuthToken,
-      silent: !process.env.CI,
-      telemetry: false,
-      ...(sentryRelease ? { release: { name: sentryRelease } } : {}),
-      sourcemaps: { deleteSourcemapsAfterUpload: true },
-    })
+    org: "tiendev",
+    project: "dealgo-web",
+    authToken: sentryAuthToken,
+    silent: !process.env.CI,
+    telemetry: false,
+    ...(sentryRelease ? { release: { name: sentryRelease } } : {}),
+    sourcemaps: { deleteSourcemapsAfterUpload: true },
+  })
   : nextConfig;

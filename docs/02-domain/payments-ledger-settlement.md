@@ -1,11 +1,11 @@
 ---
 document_id: DOC-DOM-006
 title: "DealGo — Payments, Double-Entry Ledger, Settlement & Payout / Thanh toán, sổ cái kép, đối soát và chi trả"
-version: "0.3.0"
+version: "0.3.1"
 status: DRAFT
 language: vi-VN
 created_at: 2026-10-12
-last_reviewed_at: 2026-10-26
+last_reviewed_at: 2026-11-03
 classification: Internal
 owner: "Product Owner + Finance Lead"
 reviewers: ["Backend Lead", "Ride Operations", "Food Operations", "Merchant Operations", "Driver Operations", "Security", "Legal / Compliance", "QA Lead"]
@@ -354,8 +354,21 @@ stateDiagram-v2
 | `4010` | Platform Service Revenue | Credit | Doanh thu nền tảng theo accounting treatment được duyệt |
 | `5010` | PSP Processing Fee Expense | Debit | Chi phí provider khi nền tảng là bên chịu |
 | `5090` | Promotion Subsidy Expense | Debit | Chi phí khuyến mại do nền tảng tài trợ khi được duyệt |
+| `driver.credit_liability` | Driver Prepaid Credit Liability (thực thi, seed `a0000000-...-016`) | Credit | Tiền tài xế đã nạp trước, chưa cấn trừ hết phí (`DEC-PROD-093`) |
 
 > Bảng trên không khẳng định DealGo có quyền pháp lý thu hộ, giữ tiền cho partner, hoặc bắt buộc ghi doanh thu gross/net theo những code này. Đội Finance phải phê duyệt trước production.
+
+### 16.2. Số dư tạm ứng của tài xế (`DEC-PROD-093`)
+
+Tài xế có thể nộp trước phí nền tảng; khoản đó là **nghĩa vụ** (`driver.credit_liability`), không phải ví. Ba bút toán duy nhất được phép:
+
+| Event | Debit | Credit |
+|---|---|---|
+| `DRIVER_CREDIT_TOP_UP_CAPTURED` (PSP xác nhận) | `psp.clearing_receivable` | `driver.credit_liability` |
+| `DRIVER_CREDIT_APPLIED_TO_FEE` (Ops chốt kỳ) | `driver.credit_liability` | `sandbox.fee.driver_receivable` |
+| `DRIVER_CREDIT_REFUNDED` (Ops chuyển khoản trả lại) | `driver.credit_liability` | `psp.clearing_receivable` |
+
+Số dư ledger của một tài xế phải bằng tổng `driver_top_ups.remainingVnd` của họ. Luồng, API, hạn mức và hoàn tiền: xem `docs/02-domain/driver-credit-topup.md`.
 
 ## 17. Ví dụ bút toán Food online — `TEST_ONLY`
 
@@ -988,6 +1001,7 @@ For any unknown provider outcome:
 | Date | Version | Status | Content |
 |---|---|---|---|
 | 2026-10-12 | 0.1.0 | `DRAFT` | Khởi tạo Payment/Refund/Settlement/Payout lifecycle, double-entry ledger, journal fixtures, reconciliation, CODE/FIN invariants, 58 financial tests, release gates. |
+| 2026-11-03 | 0.3.1 | `DRAFT` | Thêm `driver.credit_liability` + mục 16.2: số dư tạm ứng tài xế (nạp trước, cấn trừ phí, hoàn tiền thủ công) theo `DEC-PROD-093`. |
 
 **Review/approval sign-off:**
 

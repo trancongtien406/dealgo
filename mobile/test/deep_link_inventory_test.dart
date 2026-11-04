@@ -184,7 +184,7 @@ void main() {
       expect(open('dealgo://merchant', merchant), '/merchant');
       expect(open('dealgo://app/driver', driver), '/driver');
       expect(
-        open('https://dealgo.trancongtien.com/app/driver', driver),
+        open('https://dealgo.laptrinhapp.com/app/driver', driver),
         '/driver',
       );
       // Nothing to open → splash, which forwards to the entry page.
@@ -240,7 +240,7 @@ void main() {
       );
       expect(
         open(
-          'https://dealgo.trancongtien.com/app/customer/food/orders/o1',
+          'https://dealgo.laptrinhapp.com/app/customer/food/orders/o1',
           customer,
         ),
         '/customer/food/orders/o1',

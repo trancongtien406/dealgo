@@ -61,9 +61,11 @@ class ActivityHistoryCubit extends Cubit<ActivityHistoryState> {
     }
     emit(ActivityHistoryLoading(rides: state.rides, food: state.food));
     try {
-      final rides = await _listRideHistory(token);
-      final food = await _listFoodHistory(token);
-      emit(ActivityHistoryReady(rides: rides, food: food));
+      final results = await Future.wait([
+        _listRideHistory(token),
+        _listFoodHistory(token),
+      ]);
+      emit(ActivityHistoryReady(rides: results[0], food: results[1]));
     } on ApiException catch (error) {
       emit(
         ActivityHistoryFailure(

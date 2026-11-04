@@ -17,7 +17,7 @@ export const PARTNER_POLICY: Record<PolicyLocale, PartnerPolicy> = {
   vi: {
     title: "Quy định đối tác DealGo",
     summary:
-      "Quy định áp dụng cho quán ăn/cửa hàng (đối tác bán hàng) và tài xế (Bike, Car 4 chỗ, Car 7 chỗ) hoạt động trên DealGo tại Đà Nẵng. Khách hàng, đối tác và tài xế dùng chung một ứng dụng DealGo.",
+      "Quy định áp dụng cho quán ăn/cửa hàng (đối tác bán hàng) và tài xế (Bike, Car 4 chỗ, Car 7 chỗ) hoạt động trên DealGo trên toàn quốc. Khách hàng, đối tác và tài xế dùng chung một ứng dụng DealGo.",
     legalNotice:
       "Bản dự thảo đang được rà soát pháp lý. Nội dung có thể thay đổi trước khi chính thức áp dụng; khi có khác biệt, Điều khoản sử dụng và thông tin hiển thị trong ứng dụng được ưu tiên.",
     sections: [
@@ -95,7 +95,7 @@ export const PARTNER_POLICY: Record<PolicyLocale, PartnerPolicy> = {
   en: {
     title: "DealGo partner policy",
     summary:
-      "Rules for restaurants/stores (merchants) and drivers (Bike, Car 4-seat, Car 7-seat) on DealGo in Da Nang. Customers, merchants and drivers use the same DealGo app.",
+      "Rules for restaurants/stores (merchants) and drivers (Bike, Car 4-seat, Car 7-seat) on DealGo nationwide in Vietnam. Customers, merchants and drivers use the same DealGo app.",
     legalNotice:
       "Draft under legal review. Content may change before it takes effect; where it differs, the Terms of use and the information shown in the app prevail.",
     sections: [

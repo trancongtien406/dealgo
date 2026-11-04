@@ -1,4 +1,4 @@
-import { HttpException } from '@nestjs/common';
+import { HttpException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppEnv } from '../../platform/config/env.js';
@@ -337,7 +337,34 @@ describe('EmailPasswordAuthService', () => {
     expect(await repository.findUserByEmail('nomail@dealgo.vn')).toBeNull();
   });
 
-  it('maps a recipient rejected by SMTP (e.g. 555 non-ASCII local part) to 400, not 503', async () => {
+  it('answers before the code is mailed, so SMTP latency never blocks sign-up', async () => {
+    let release: (() => void) | undefined;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const slow = Object.assign(new MockMailSender('test'), {
+      sendSignupCode: async () => {
+        await pending;
+      },
+    });
+    const service = new EmailPasswordAuthService(
+      repository,
+      sessions,
+      passwords,
+      authMethods,
+      slow,
+      config,
+    );
+
+    const challenge = await service.register({ email: 'fast@dealgo.vn', password: 'password123' });
+
+    expect(challenge.challengeId).toEqual(expect.any(String));
+    expect(await repository.findEmailSignupChallenge(challenge.challengeId)).not.toBeNull();
+    release?.();
+  });
+
+  it('keeps the challenge when the provider refuses the address after the answer', async () => {
+    const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     const rejecting = new EmailPasswordAuthService(
       repository,
       sessions,
@@ -351,11 +378,16 @@ describe('EmailPasswordAuthService', () => {
       config,
     );
 
-    expectError(
-      await errorOf(rejecting.register({ email: 'bad@dealgo.vn', password: 'password123' })),
-      400,
-      'EMAIL_ADDRESS_REJECTED',
-    );
+    const challenge = await rejecting.register({ email: 'bad@dealgo.vn', password: 'password123' });
+
+    expect(challenge).toEqual({
+      challengeId: expect.any(String),
+      expiresAt: expect.any(String),
+      resendAvailableAt: expect.any(String),
+    });
+    await vi.waitFor(() => expect(warn).toHaveBeenCalled());
+    expect(await repository.findUserByEmail('bad@dealgo.vn')).toBeNull();
+    warn.mockRestore();
   });
 
   it('rejects non-ASCII email local parts at validation', async () => {

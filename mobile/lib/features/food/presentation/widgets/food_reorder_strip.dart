@@ -33,12 +33,16 @@ class FoodReorderStrip extends StatefulWidget {
   State<FoodReorderStrip> createState() => _FoodReorderStripState();
 }
 
-class _FoodReorderStripState extends State<FoodReorderStrip> {
+class _FoodReorderStripState extends State<FoodReorderStrip>
+    with AutomaticKeepAliveClientMixin<FoodReorderStrip> {
   static const _finishedStatuses = {'COMPLETED', 'DELIVERED'};
 
   FoodOrderDetail? _order;
   var _loading = true;
   var _busy = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -106,6 +110,7 @@ class _FoodReorderStripState extends State<FoodReorderStrip> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     if (_loading) {
       return const _StripSkeleton();
     }

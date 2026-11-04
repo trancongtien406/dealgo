@@ -15,12 +15,13 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { SkipResponseEnvelope } from '../../../platform/http/skip-response-envelope.js';
 import { CustomerSessionGuard } from '../../identity/access-auth.guard.js';
+import { DriverCreditService } from '../../driver-credit/driver-credit.service.js';
 import type { PaymentEntityTypeName, PaymentProviderName } from '../payment.constants.js';
 import { PaymentMethodsQueryDto } from './payment-checkout.dto.js';
 import { PaymentGatewayService } from './payment-gateway.service.js';
 import { PaymentMethodRegistryService } from './payment-method-registry.service.js';
 
-const IPN_PROVIDERS: readonly PaymentProviderName[] = ['momo', 'zalopay', 'vnpay'];
+const IPN_PROVIDERS: readonly PaymentProviderName[] = ['momo', 'zalopay', 'vnpay', 'payos'];
 
 @ApiTags('payments')
 @ApiBearerAuth()
@@ -40,7 +41,10 @@ export class PaymentMethodsController {
 @ApiTags('payments')
 @Controller('v1/payments')
 export class PaymentCallbacksController {
-  constructor(private readonly gateway: PaymentGatewayService) {}
+  constructor(
+    private readonly gateway: PaymentGatewayService,
+    private readonly driverCredit: DriverCreditService,
+  ) {}
 
   @Post('ipn/:provider')
   @HttpCode(HttpStatus.OK)
@@ -94,6 +98,11 @@ export class PaymentCallbacksController {
     if (!(IPN_PROVIDERS as readonly string[]).includes(provider)) {
       res.status(404);
       return { message: 'Unknown provider' };
+    }
+    if (this.driverCredit.isDriverTopUpCallback(provider, payload)) {
+      const ack = await this.driverCredit.handleProviderCallback(provider, payload);
+      res.status(ack.httpStatus);
+      return ack.body;
     }
     const ack = await this.gateway.handleCallback(provider as PaymentProviderName, payload);
     res.status(ack.httpStatus);

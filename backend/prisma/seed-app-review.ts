@@ -2,7 +2,7 @@
  * App Store / Play review account (DEC-PROD-052). Idempotent: safe to re-run on any database,
  * production included (with SEED_ALLOW_PRODUCTION=true for that one run).
  *
- *  - User appreview@dealgo.trancongtien.com, email verified, CUSTOMER + DRIVER + MERCHANT active.
+ *  - User appreview@dealgo.laptrinhapp.com, email verified, CUSTOMER + DRIVER + MERCHANT active.
  *  - Approved DRIVER (MOTORBIKE) and MERCHANT applications with obviously fake demo KYC data.
  *    One DRIVER application per user, so the account drives a single vehicle class.
  *  - Store "DealGo Demo Đà Nẵng" with logo, cover, description, weekly hours (00:00–24:00 every
@@ -32,7 +32,7 @@ import { storeLogoPath } from '../src/modules/catalog/store-logo.service.js';
 import { assertSeedAllowed } from './seed-guard.js';
 
 export const APP_REVIEW_SEED_TAG = 'app-review';
-export const APP_REVIEW_DEMO_EMAIL = 'appreview@dealgo.trancongtien.com';
+export const APP_REVIEW_DEMO_EMAIL = 'appreview@dealgo.laptrinhapp.com';
 export const APP_REVIEW_DISPLAY_NAME = 'DealGo App Review (demo)';
 export const APP_REVIEW_STORE_NAME = 'DealGo Demo Đà Nẵng';
 export const APP_REVIEW_REGION_CODE = 'DN';
@@ -86,7 +86,7 @@ const OFFERS = [
 const OFFER_DAYS = 170;
 
 export const APP_REVIEW_CUSTOMER_EMAIL_PREFIX = 'appreview-customer-';
-export const APP_REVIEW_CUSTOMER_EMAIL_DOMAIN = '@dealgo.trancongtien.com';
+export const APP_REVIEW_CUSTOMER_EMAIL_DOMAIN = '@dealgo.laptrinhapp.com';
 const DELIVERY_FARE_VND = 15000;
 
 /** Demo customers' delivered orders and the review each left. Tags are RatingTag values. */

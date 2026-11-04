@@ -156,6 +156,37 @@ void main() {
       await cubit.close();
     });
 
+    test('create item forwards the chosen category and details', () async {
+      final orders = FakeMerchantOrdersClient(
+        onGetCatalog: () => const FoodStoreDetail(
+          id: 'store-owned',
+          name: 'My Store',
+          items: [],
+        ),
+        onCreateItem: (name, priceVnd, available) => FoodMenuItem(
+          id: 'item-new',
+          name: name,
+          priceVnd: priceVnd,
+          available: available ?? true,
+        ),
+      );
+      final cubit = _catalogCubit(orders);
+      await cubit.load('access-token');
+      await cubit.createItem(
+        accessToken: 'access-token',
+        name: 'Mì Quảng',
+        priceVnd: 40000,
+        description: 'Mì Quảng gà ta',
+        prepMinutes: 12,
+        menuCategoryId: 'cat-main',
+      );
+      final call = orders.createCalls.single;
+      expect(call.menuCategoryId, 'cat-main');
+      expect(call.description, 'Mì Quảng gà ta');
+      expect(call.prepMinutes, 12);
+      await cubit.close();
+    });
+
     test('putting an unapproved item on sale explains the review', () async {
       final orders = FakeMerchantOrdersClient(
         onGetCatalog: () => const FoodStoreDetail(

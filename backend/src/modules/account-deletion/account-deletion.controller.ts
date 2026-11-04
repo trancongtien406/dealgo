@@ -117,6 +117,7 @@ export class OpsAccountDeletionController {
     return {
       feesVnd: balance.feesVnd,
       adjustmentsVnd: balance.adjustmentsVnd,
+      creditVnd: balance.creditVnd,
       amountVnd: balance.amountVnd,
       settledThrough: balance.settledThrough?.toISOString() ?? null,
       limitVnd,

@@ -18,10 +18,10 @@ mkdir -p env secrets build-secrets
 [[ -e env/backend.env && "${1:-}" != "--force" ]] && { echo "env/backend.env exists; use --force to regenerate" >&2; exit 1; }
 [[ -f livekit/keys.yaml ]] || { echo "Run livekit/gen-keys.sh first" >&2; exit 1; }
 
-API_DOMAIN="${API_DOMAIN:-api-dealgo.trancongtien.com}"
-WEB_DOMAIN="${WEB_DOMAIN:-dealgo.trancongtien.com}"
-LIVEKIT_DOMAIN="${LIVEKIT_DOMAIN:-livekit-dealgo.trancongtien.com}"
-OPS_EMAIL="${OPS_EMAIL:-ops@dealgo.trancongtien.com}"
+API_DOMAIN="${API_DOMAIN:-api-dealgo.laptrinhapp.com}"
+WEB_DOMAIN="${WEB_DOMAIN:-dealgo.laptrinhapp.com}"
+LIVEKIT_DOMAIN="${LIVEKIT_DOMAIN:-livekit-dealgo.laptrinhapp.com}"
+OPS_EMAIL="${OPS_EMAIL:-ops@dealgo.laptrinhapp.com}"
 
 rand() { openssl rand -base64 "$1" | tr -d '\n/+=' | cut -c1-"$2"; }
 pg_pass="$(rand 48 40)"
@@ -60,8 +60,8 @@ PUBLIC_WEB_BASE_URL=https://${WEB_DOMAIN}
 WEBAUTHN_RP_ID=${WEB_DOMAIN}
 WEBAUTHN_RP_NAME=DealGo
 WEBAUTHN_ORIGIN=https://${WEB_DOMAIN}
-APP_LINKS_IOS_APP_IDS=6J3522877H.com.trancongtien.dealgo
-APP_LINKS_ANDROID_PACKAGE=com.trancongtien.dealgo
+APP_LINKS_IOS_APP_IDS=6J3522877H.dealgo.nguyengoctien.com
+APP_LINKS_ANDROID_PACKAGE=dealgo.nguyengoctien.com
 APP_LINKS_ANDROID_CERT_SHA256=
 
 MAPS_PROVIDER=mapbox
@@ -86,7 +86,7 @@ FCM_SERVICE_ACCOUNT_PATH=$( [[ -f secrets/fcm-service-account.json ]] && echo /r
 APNS_KEY_ID=TL36K38ZKR
 APNS_TEAM_ID=6J3522877H
 APNS_KEY_PATH=$( [[ -f secrets/AuthKey_TL36K38ZKR.p8 ]] && echo /run/dealgo/AuthKey_TL36K38ZKR.p8 )
-APNS_BUNDLE_ID=com.trancongtien.dealgo
+APNS_BUNDLE_ID=dealgo.nguyengoctien.com
 APNS_ENV=production
 
 PAYMENT_PROVIDER=cash-only

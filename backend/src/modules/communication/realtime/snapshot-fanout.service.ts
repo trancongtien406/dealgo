@@ -22,6 +22,8 @@ import {
   PARTNER_STATUS_EVENT,
   PAYMENT_STATUS_EVENT,
   type PaymentStatusEventPayload,
+  DRIVER_CREDIT_STATUS_EVENT,
+  type DriverCreditStatusEventPayload,
   CALL_EVENT,
   type CallEventPayload,
   CHAT_MESSAGE_EVENT,
@@ -207,6 +209,13 @@ export class SnapshotFanoutService {
       return;
     }
     this.server.to(roomForUser(userId)).emit(PAYMENT_STATUS_EVENT, payload);
+  }
+
+  emitDriverCreditStatus(userId: string, payload: DriverCreditStatusEventPayload): void {
+    if (!this.server) {
+      return;
+    }
+    this.server.to(roomForUser(userId)).emit(DRIVER_CREDIT_STATUS_EVENT, payload);
   }
 
   emitPartnerStatus(payload: PartnerStatusEventPayload): void {

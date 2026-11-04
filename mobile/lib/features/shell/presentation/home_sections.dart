@@ -184,10 +184,10 @@ class _StoreRowState extends State<StoreRow> {
     final token = homeAccessToken(context);
     if (token == null) return;
     try {
-      final stores = (await context.read<ListFoodStores>()(token, limit: 6))
-          .items
-          .take(6)
-          .toList(growable: false);
+      final stores = (await context.read<ListFoodStores>()(
+        token,
+        limit: 6,
+      )).items.take(6).toList(growable: false);
       if (!mounted || stores.isEmpty) return;
       setState(() => _stores = stores);
       final ratings = await context.read<RatingRepository>().storeRatings(
@@ -431,23 +431,32 @@ class _RecentTripCardState extends State<RecentTripCard> {
 
   Future<void> _load() async {
     final token = homeAccessToken(context);
+    final listRides = context.read<ListRideHistory>();
+    final listFood = context.read<ListFoodHistory>();
     HistoryItem? latest;
     if (token != null) {
-      try {
-        final rides = await context.read<ListRideHistory>()(token);
-        latest = rides.firstOrNull;
-        if (latest == null && mounted) {
-          latest = (await context.read<ListFoodHistory>()(token)).firstOrNull;
-        }
-      } on Object {
-        latest = null;
-      }
+      // Both endpoints are independent: start them together and keep the ride
+      // when it exists so the card is not gated on the slowest one.
+      final ride = _firstOrNull(() => listRides(token));
+      final food = _firstOrNull(() => listFood(token));
+      final latestRide = await ride;
+      latest = latestRide ?? await food;
     }
     if (mounted) {
       setState(() {
         _item = latest;
         _loading = false;
       });
+    }
+  }
+
+  Future<HistoryItem?> _firstOrNull(
+    Future<List<HistoryItem>> Function() list,
+  ) async {
+    try {
+      return (await list()).firstOrNull;
+    } on Object {
+      return null;
     }
   }
 

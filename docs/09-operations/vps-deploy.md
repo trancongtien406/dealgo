@@ -1,7 +1,7 @@
 # VPS deploy (single host, shared with other services)
 
 DealGo production runs on one VPS (`103.116.38.245`, Ubuntu 24.04) that **also hosts other live
-services** (hancity.vn, other *.trancongtien.com sites). Everything DealGo lives in `/opt/dealgo` as
+services** (hancity.vn, other *.laptrinhapp.com sites). Everything DealGo lives in `/opt/dealgo` as
 the Docker Compose project `dealgo`. Never stop, restart or edit other projects' containers.
 
 ## Layout
@@ -42,9 +42,9 @@ Caddyfile is a **single-file bind mount**, so edit it in place (append / `cat >`
 
 | Host | Upstream |
 |---|---|
-| `dealgo.trancongtien.com` | `dealgo-web:3000` |
-| `api-dealgo.trancongtien.com` | `dealgo-api:3001` (REST + Socket.IO, no read timeout, 25 MB body) |
-| `livekit-dealgo.trancongtien.com` | `172.19.0.1:7880` (LiveKit signalling via the vms_edge gateway) |
+| `dealgo.laptrinhapp.com` | `dealgo-web:3000` |
+| `api-dealgo.laptrinhapp.com` | `dealgo-api:3001` (REST + Socket.IO, no read timeout, 25 MB body) |
+| `livekit-dealgo.laptrinhapp.com` | `172.19.0.1:7880` (LiveKit signalling via the vms_edge gateway) |
 
 Change procedure:
 
@@ -72,12 +72,12 @@ Media never goes through Cloudflare: LiveKit advertises the node IP `103.116.38.
 
 ## LiveKit / TURN
 
-- Signalling: `wss://livekit-dealgo.trancongtien.com` (through the shared Caddy).
+- Signalling: `wss://livekit-dealgo.laptrinhapp.com` (through the shared Caddy).
 - Media: UDP 50000-60000 on the node IP; ICE-TCP fallback on 7881.
-- Embedded TURN: UDP 3478 and TURN/TLS on **TCP 5349** (`turn-dealgo.trancongtien.com`), relay ports
+- Embedded TURN: UDP 3478 and TURN/TLS on **TCP 5349** (`turn-dealgo.laptrinhapp.com`), relay ports
   30000-40000/udp. TURN/TLS is not on 443 because the shared Caddy owns 443. Clients on networks that
   block UDP use TURN/TLS 5349 or ICE-TCP 7881.
-- TURN/TLS certificate: the shared Caddy has a `turn-dealgo.trancongtien.com` site block that only
+- TURN/TLS certificate: the shared Caddy has a `turn-dealgo.laptrinhapp.com` site block that only
   obtains and renews the Let's Encrypt certificate (HTTP-01; it answers 404). `livekit/sync-turn-cert.sh`
   copies it to `livekit/tls/turn.{crt,key}` (600, mounted read-only at `/etc/livekit-tls`) and restarts
   `dealgo-livekit` only when the file changed. Root cron runs it daily at 04:17
@@ -212,11 +212,11 @@ tied to its Photon version), restart `dealgo-photon`. Optional cron (1st of mont
 
 ## Mobile app against this VPS
 
-Release builds of `mobile/` default to `https://api-dealgo.trancongtien.com` (REST + Socket.IO) and
-`APP_LINK_HOST=dealgo.trancongtien.com`; LiveKit's `wss://livekit-dealgo.trancongtien.com` comes from
+Release builds of `mobile/` default to `https://api-dealgo.laptrinhapp.com` (REST + Socket.IO) and
+`APP_LINK_HOST=dealgo.laptrinhapp.com`; LiveKit's `wss://livekit-dealgo.laptrinhapp.com` comes from
 `LIVEKIT_URL` in `env/backend.env`. Build commands: [`mobile/README.md`](../../mobile/README.md#build-production).
 
-App-link files are served by Nest through the website at `https://dealgo.trancongtien.com/.well-known/…`:
+App-link files are served by Nest through the website at `https://dealgo.laptrinhapp.com/.well-known/…`:
 - `apple-app-site-association`: from `APP_LINKS_IOS_APP_IDS` (`6J3522877H.com.trancongtien.dealgo`).
 - `assetlinks.json`: returns 404 until `APP_LINKS_ANDROID_CERT_SHA256` is set. Set it from the release keystore
   or the Play App Signing certificate, then recreate `dealgo-api`. There is no release keystore yet.
@@ -224,11 +224,11 @@ App-link files are served by Nest through the website at `https://dealgo.trancon
 ## Verify
 
 ```bash
-curl -s https://api-dealgo.trancongtien.com/health/ready    # database/redis up, worker up
-curl -s https://api-dealgo.trancongtien.com/health/worker
-curl -s 'https://api-dealgo.trancongtien.com/socket.io/?EIO=4&transport=polling'   # 0{"sid":...}
-curl -s https://livekit-dealgo.trancongtien.com/            # OK
-curl -sI https://dealgo.trancongtien.com/login              # 200
+curl -s https://api-dealgo.laptrinhapp.com/health/ready    # database/redis up, worker up
+curl -s https://api-dealgo.laptrinhapp.com/health/worker
+curl -s 'https://api-dealgo.laptrinhapp.com/socket.io/?EIO=4&transport=polling'   # 0{"sid":...}
+curl -s https://livekit-dealgo.laptrinhapp.com/            # OK
+curl -sI https://dealgo.laptrinhapp.com/login              # 200
 docker compose ps                                           # all healthy
 ```
 

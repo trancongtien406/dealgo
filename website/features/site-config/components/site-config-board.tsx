@@ -83,7 +83,7 @@ export function SiteConfigBoard() {
         <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">Website: link ứng dụng & mạng xã hội</h1>
         <p className="mt-1 text-sm text-muted">
           Landing page chỉ hiển thị mục đã điền (để trống = ẩn). Link phải dùng https và đúng tên miền của từng nền tảng.
-          Mã QR được tạo tự động từ link cửa hàng. Thay đổi được ghi nhật ký kiểm toán và hiện trên website sau khoảng 1 phút.
+          Mã QR được tạo tự động từ link cửa hàng. Thay đổi được ghi nhật ký kiểm toán và hiển thị ngay trên trang chủ ở lần tải kế tiếp.
         </p>
       </div>
       {forbidden ? (

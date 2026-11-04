@@ -26,13 +26,9 @@ export class OpsPaymentsController {
   @Patch('payment-methods')
   @RequireOpsPermission('settings.write')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Toggle methods per service, order, reason, wallet flag (audited via platform settings)' })
+  @ApiOperation({ summary: 'Toggle methods per service, order and reason (audited via platform settings)' })
   patch(@CurrentActor() actor: RequestActor, @Body() body: PatchPaymentMethodsDto) {
-    return this.registry.update(
-      { methods: body.methods, walletEnabled: body.walletEnabled },
-      body.reason,
-      actor.userId,
-    );
+    return this.registry.update({ methods: body.methods }, body.reason, actor.userId);
   }
 
   @Get('payment-intents')

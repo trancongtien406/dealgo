@@ -89,7 +89,7 @@ export interface AccountDeletionRepository {
     actorUserId: string;
     reason: string;
     at: Date;
-  }): Promise<{ amountVnd: number; settledThrough: Date } | null>;
+  }): Promise<{ amountVnd: number; creditAppliedVnd: number; settledThrough: Date } | null>;
   /**
    * Ops records a partial cash movement with the driver (audited).
    * DRIVER_PAID lowers what the driver owes (may go below 0 = prepaid credit / top-up);
@@ -275,7 +275,7 @@ export class MemoryAccountDeletionRepository implements AccountDeletionRepositor
     actorUserId: string;
     reason: string;
     at: Date;
-  }): Promise<{ amountVnd: number; settledThrough: Date } | null> {
+  }): Promise<{ amountVnd: number; creditAppliedVnd: number; settledThrough: Date } | null> {
     const amountVnd = this.fees.get(input.driverId) ?? 0;
     if (amountVnd <= 0) {
       return null;
@@ -288,7 +288,7 @@ export class MemoryAccountDeletionRepository implements AccountDeletionRepositor
       entityId: input.driverId,
       reason: input.reason,
     });
-    return { amountVnd, settledThrough: input.at };
+    return { amountVnd, creditAppliedVnd: 0, settledThrough: input.at };
   }
 
   async recordDriverPayment(input: {

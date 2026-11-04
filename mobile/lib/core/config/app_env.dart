@@ -99,7 +99,7 @@ String? resolveTileUrlTemplate(String template, {required String apiKey}) {
 /// intent-filter host (`dealgoAppLinkHost` in android/gradle.properties).
 const appLinkHost = String.fromEnvironment(
   'APP_LINK_HOST',
-  defaultValue: 'dealgo.trancongtien.com',
+  defaultValue: 'dealgo.laptrinhapp.com',
 );
 
 /// Path prefix the app claims on [appLinkHost]; the rest stays on the website.

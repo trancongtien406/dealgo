@@ -32,5 +32,6 @@ export function resolveSeedPassword(
   announce(
     `[seed] No SEED_USER_PASSWORD/OPS_BOOTSTRAP_PASSWORD set. Generated dev password (shown once): ${generated}`,
   );
+  console.log('generated', generated);
   return generated;
 }

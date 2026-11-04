@@ -23,7 +23,6 @@ export const PAYMENT_METHOD_CATALOG: readonly PaymentMethodCatalogEntry[] = [
   { code: 'MOMO', label: 'MoMo', subtitle: null, group: 'WALLET', provider: 'momo', intentMethod: 'MOMO', defaultSortOrder: 20, defaultReason: 'Đang chờ cấp phép' },
   { code: 'VNPAY_ATM', label: 'Thẻ ATM nội địa (Napas)', subtitle: 'Qua VNPAY', group: 'CARD', provider: 'vnpay', intentMethod: 'VNPAY', defaultSortOrder: 30, defaultReason: 'Đang chờ cấp phép' },
   { code: 'CASH', label: 'Tiền mặt', subtitle: 'Hoặc chuyển khoản/QR cho tài xế', group: 'RECOMMENDED', provider: null, intentMethod: 'COD', defaultSortOrder: 40, defaultReason: '' },
-  { code: 'DEALGO_WALLET', label: 'Ví DealGo', subtitle: null, group: 'RECOMMENDED', provider: 'wallet', intentMethod: 'DEALGO_WALLET', defaultSortOrder: 50, defaultReason: 'Sắp ra mắt' },
   { code: 'VNPAY', label: 'VNPAY QR', subtitle: 'Quét mã bằng app ngân hàng', group: 'ADD_MORE', provider: 'vnpay', intentMethod: 'VNPAY', defaultSortOrder: 60, defaultReason: 'Đang chờ cấp phép' },
   { code: 'INTERNATIONAL_CARD', label: 'Thẻ quốc tế', subtitle: 'Visa, Mastercard, JCB', group: 'ADD_MORE', provider: 'card', intentMethod: 'CARD', defaultSortOrder: 70, defaultReason: 'Chưa hỗ trợ' },
   { code: 'SHOPEEPAY', label: 'ShopeePay', subtitle: null, group: 'ADD_MORE', provider: 'shopeepay', intentMethod: 'SHOPEEPAY', defaultSortOrder: 80, defaultReason: 'Chưa hỗ trợ' },

@@ -18,7 +18,6 @@ export type OpsPaymentMethod = {
 };
 
 export type OpsPaymentMethodsView = {
-  walletEnabled: boolean;
   publicBaseUrlConfigured: boolean;
   methods: OpsPaymentMethod[];
 };

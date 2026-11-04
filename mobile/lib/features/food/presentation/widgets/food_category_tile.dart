@@ -7,6 +7,7 @@ import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../domain/entities/food_category.dart';
 import '../food_categories_store.dart';
 import '../../../../core/design_system/components/dealgo_network_image.dart';
+import '../../../places/domain/place.dart' show foldVietnamese;
 
 /// Tone keys → (foreground, background); same palette as the Admin swatches.
 const Map<String, (Color, Color)> _tones = {
@@ -27,12 +28,40 @@ const String foodPlaceholderImage = 'assets/images/food_dish_placeholder.jpg';
 /// Bundled cover when a store has no picture yet.
 const String foodStoreCoverImage = 'assets/images/food_store_cover.jpg';
 
-/// Dish without a picture: its store's category photo, else the plate.
-String foodDishFallbackImage(String? category) {
+/// Dish without a picture: a bundled photo that suits the dish itself, else its
+/// store's category photo, else the plate. The store category alone is too
+/// coarse — a tea sold by a rice shop must not show fried chicken.
+String foodDishFallbackImage(String? category, {String? dishName}) {
+  final dish = _dishPhotoCode(dishName);
+  if (dish != null) return 'assets/images/food_cat_$dish.jpg';
   final code = category?.trim() ?? '';
   return _photoCodes.contains(code)
       ? 'assets/images/food_cat_$code.jpg'
       : foodPlaceholderImage;
+}
+
+/// First hint that matches wins, so the more specific words come first.
+const List<(String, List<String>)> _dishPhotoHints = [
+  ('banh_mi', ['banh mi']),
+  ('pho', ['pho', 'canh ']),
+  ('noodles', ['bun', 'mi quang', 'mi ', 'hu tieu', 'mien', 'banh canh']),
+  ('rice', ['com ', 'xoi']),
+  ('cafe', ['ca phe', 'bac xiu', 'cold brew', 'espresso', 'latte']),
+  (
+    'tea',
+    ['tra ', 'nuoc mia', 'sinh to', 'nuoc ep', 'sua chua', 'che ', 'nuoc '],
+  ),
+  ('snack', ['cha ', 'nem', 'banh ', 'flan', 'croissant', 'khoai']),
+  ('fast_food', ['ga ran', 'pizza', 'burger']),
+];
+
+String? _dishPhotoCode(String? dishName) {
+  final text = foldVietnamese(dishName ?? '');
+  if (text.isEmpty) return null;
+  for (final (code, hints) in _dishPhotoHints) {
+    if (hints.any(text.contains)) return code;
+  }
+  return null;
 }
 
 /// Seeded category codes that ship their own photo (same set as Admin).
