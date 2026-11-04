@@ -12,6 +12,7 @@ import { AdminForbiddenState, AdminListErrorBanner } from "@/components/ui/admin
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { OpsIcon } from "@/components/ui/ops-icons";
 import { ReasonDialog } from "@/components/ui/reason-dialog";
+import { SearchSelect, type SearchSelectOption } from "@/components/ui/search-select";
 import { toast } from "@/components/ui/toast";
 import { isForbiddenError } from "@/lib/api/errors";
 import { formatOpsDate, formatOpsDateTime } from "@/lib/ops-time";
@@ -40,6 +41,10 @@ const ROLE_LABEL: Record<SupportCategory["role"], string> = {
   DRIVER: "Tài xế",
   MERCHANT: "Cửa hàng",
 };
+const SUPPORT_ROLE_OPTIONS: readonly SearchSelectOption[] = Object.entries(ROLE_LABEL).map(([k, v]) => ({
+  value: k,
+  label: v,
+}));
 
 const inputClass =
   "mt-1.5 h-10 w-full rounded-xl border border-border bg-white px-3 text-sm text-ink focus:border-brand focus:outline-none";
@@ -330,13 +335,21 @@ function SupportEditor({ value, onChange }: { value: SupportContent; onChange: (
         <div className="grid gap-4 md:grid-cols-2">
           {value.categories.map((cat, i) => (
             <div key={cat.id} className="space-y-2 rounded-xl border border-border bg-canvas/30 p-4">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <input aria-label="Tên chủ đề" value={cat.title} maxLength={120} onChange={(e) => setCat(i, { title: e.target.value })}
-                  className="w-full border-b border-border/80 bg-transparent text-sm font-semibold text-ink focus:border-brand focus:outline-none" />
-                <select aria-label="Đối tượng" value={cat.role} onChange={(e) => setCat(i, { role: e.target.value as SupportCategory["role"] })}
-                  className="h-8 rounded-lg border border-border bg-white px-2 text-xs">
-                  {Object.entries(ROLE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
+                  className="min-w-[12rem] flex-1 border-b border-border/80 bg-transparent text-sm font-semibold text-ink focus:border-brand focus:outline-none" />
+                <div className="w-36">
+                  <SearchSelect
+                    label="Đối tượng"
+                    icon="users"
+                    value={cat.role}
+                    options={SUPPORT_ROLE_OPTIONS}
+                    placeholder="Đối tượng"
+                    onChange={(val) => {
+                      if (val) setCat(i, { role: val as SupportCategory["role"] });
+                    }}
+                  />
+                </div>
                 <IconButton label="Xoá chủ đề" danger icon="close"
                   onClick={() => onChange({ ...value, categories: value.categories.filter((_, j) => j !== i) })} />
               </div>

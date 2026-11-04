@@ -1,10 +1,26 @@
 import React, { useState } from "react";
 import { OpsIcon } from "@/components/ui/ops-icons";
+import { SearchSelect, type SearchSelectOption } from "@/components/ui/search-select";
 import { focusRing } from "@/lib/admin-format";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api/errors";
 import { createNotificationCampaign } from "../api";
 import { useQueryClient } from "@tanstack/react-query";
+
+const CHANNEL_OPTIONS: readonly SearchSelectOption[] = [
+  { value: "PUSH", label: "Push Notification" },
+  { value: "IN_APP", label: "In-app Notice" },
+  { value: "EMAIL", label: "Email" },
+  { value: "SMS", label: "SMS" },
+];
+
+const AUDIENCE_OPTIONS: readonly SearchSelectOption[] = [
+  { value: "ALL", label: "Tất cả người dùng" },
+  { value: "CUSTOMER", label: "Khách hàng" },
+  { value: "DRIVER", label: "Tài xế" },
+  { value: "MERCHANT", label: "Đối tác quán" },
+  { value: "STAFF", label: "Nhân sự vận hành" },
+];
 
 interface NotificationsCreateModalProps {
   isOpen: boolean;
@@ -124,42 +140,30 @@ export function NotificationsCreateModal({
             />
           </label>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="block text-xs font-medium text-muted">
-              Kênh
-              <select
+            <div>
+              <SearchSelect
+                label="Kênh"
+                icon="bell"
                 value={createChannel}
-                onChange={(event) =>
-                  setCreateChannel(
-                    event.target.value as "PUSH" | "IN_APP" | "EMAIL" | "SMS",
-                  )
-                }
-                className={`mt-1.5 h-10 w-full rounded-xl border border-border bg-white px-3 text-sm text-ink ${focusRing}`}
-              >
-                <option value="PUSH">Push Notification</option>
-                <option value="IN_APP">In-app Notice</option>
-                <option value="EMAIL">Email</option>
-                <option value="SMS">SMS</option>
-              </select>
-            </label>
-            <label className="block text-xs font-medium text-muted">
-              Đối tượng
-              <select
+                options={CHANNEL_OPTIONS}
+                placeholder="Chọn kênh thông báo"
+                onChange={(val) => {
+                  if (val) setCreateChannel(val as "PUSH" | "IN_APP" | "EMAIL" | "SMS");
+                }}
+              />
+            </div>
+            <div>
+              <SearchSelect
+                label="Đối tượng"
+                icon="users"
                 value={createAudience}
-                onChange={(event) =>
-                  setCreateAudience(
-                    event.target.value as
-                      "ALL" | "CUSTOMER" | "DRIVER" | "MERCHANT" | "STAFF",
-                  )
-                }
-                className={`mt-1.5 h-10 w-full rounded-xl border border-border bg-white px-3 text-sm text-ink ${focusRing}`}
-              >
-                <option value="ALL">Tất cả người dùng</option>
-                <option value="CUSTOMER">Khách hàng</option>
-                <option value="DRIVER">Tài xế</option>
-                <option value="MERCHANT">Đối tác quán</option>
-                <option value="STAFF">Nhân sự vận hành</option>
-              </select>
-            </label>
+                options={AUDIENCE_OPTIONS}
+                placeholder="Chọn đối tượng nhận"
+                onChange={(val) => {
+                  if (val) setCreateAudience(val as "ALL" | "CUSTOMER" | "DRIVER" | "MERCHANT" | "STAFF");
+                }}
+              />
+            </div>
           </div>
 
           <label className="block text-xs font-medium text-muted">

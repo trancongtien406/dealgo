@@ -3,6 +3,7 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { toast } from "sonner";
 import { AdminBreadcrumb } from "@/components/ui/admin-list-ui";
+import { SearchSelect, type SearchSelectOption } from "@/components/ui/search-select";
 import {
   AdminEmptyState,
   AdminForbiddenState,
@@ -21,6 +22,11 @@ import { isForbiddenError } from "@/lib/api/errors";
 type Draft = Omit<RideVehicleClassRow, "code" | "sortOrder" | "imageUrl">;
 
 const MAX_IMAGE_BYTES = 1_500_000;
+
+const VEHICLE_KIND_OPTIONS: readonly SearchSelectOption[] = [
+  { value: "BIKE", label: "Xe máy (BIKE)" },
+  { value: "CAR", label: "Ô tô (CAR)" },
+];
 
 function draftFrom(row: RideVehicleClassRow): Draft {
   return {
@@ -297,24 +303,20 @@ export function VehicleClassesBoard() {
                     value={draft.name}
                     onChange={(name) => setDraft(setDrafts, row.code, draft, { name })}
                   />
-                  <label className="block text-sm text-ink">
-                    <span className="mb-1 block text-xs text-muted">
-                      Loại xe (giấy tờ, bằng lái, hoa hồng)
-                    </span>
-                    <select
-                      className="h-10 w-full rounded-xl border border-border bg-white px-3"
-                      value={draft.kind ?? ""}
-                      onChange={(event) =>
+                  <div>
+                    <SearchSelect
+                      label="Loại xe (giấy tờ, bằng lái, hoa hồng)"
+                      icon="car"
+                      value={draft.kind ?? null}
+                      options={VEHICLE_KIND_OPTIONS}
+                      placeholder="Chọn loại xe"
+                      onChange={(val) =>
                         setDraft(setDrafts, row.code, draft, {
-                          kind: event.target.value as "BIKE" | "CAR",
+                          kind: (val as "BIKE" | "CAR" | null) ?? undefined,
                         })
                       }
-                    >
-                      {!draft.kind ? <option value="">—</option> : null}
-                      <option value="BIKE">Xe máy (BIKE)</option>
-                      <option value="CAR">Ô tô (CAR)</option>
-                    </select>
-                  </label>
+                    />
+                  </div>
                   <NumberField
                     label="Số chỗ"
                     value={draft.seats}

@@ -113,3 +113,4 @@ describe('AppCheckGuard', () => {
     await expect(guard.canActivate(ctx)).rejects.toThrow(HttpException);
   });
 });
+

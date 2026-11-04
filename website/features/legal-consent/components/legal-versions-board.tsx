@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { AdminBreadcrumb, focusRing } from "@/components/ui/admin-list-ui";
+import { SearchSelect, type SearchSelectOption } from "@/components/ui/search-select";
 import { AdminForbiddenState, AdminListErrorBanner } from "@/components/ui/admin-state-ui";
 import { toast } from "@/components/ui/toast";
 import { emailStep, publishErrors } from "@/features/legal-consent/email-step";
@@ -24,6 +25,12 @@ import { isForbiddenError } from "@/lib/api/errors";
 
 const inputCls = `mt-1 w-full rounded-xl border border-border bg-white px-3 py-2 text-sm text-ink ${focusRing}`;
 const ROLES: LegalRole[] = ["CUSTOMER", "DRIVER", "MERCHANT"];
+const LEGAL_SLUG_OPTIONS: readonly SearchSelectOption[] = (
+  Object.keys(LEGAL_SLUG_LABELS) as LegalSlug[]
+).map((s) => ({
+  value: s,
+  label: LEGAL_SLUG_LABELS[s],
+}));
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }) : "—");
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : "Có lỗi xảy ra.");
 
@@ -64,14 +71,18 @@ function PublishForm() {
         </p>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="block text-sm font-medium text-ink">
-          Văn bản
-          <select className={inputCls} value={slug} onChange={(e) => setSlug(e.target.value as LegalSlug)}>
-            {(Object.keys(LEGAL_SLUG_LABELS) as LegalSlug[]).map((s) => (
-              <option key={s} value={s}>{LEGAL_SLUG_LABELS[s]}</option>
-            ))}
-          </select>
-        </label>
+        <div>
+          <SearchSelect
+            label="Văn bản"
+            icon="sliders"
+            value={slug}
+            options={LEGAL_SLUG_OPTIONS}
+            placeholder="Chọn văn bản"
+            onChange={(val) => {
+              if (val) setSlug(val as LegalSlug);
+            }}
+          />
+        </div>
         <label className="block text-sm font-medium text-ink">
           Ngày hiệu lực (tuỳ chọn)
           <input type="date" className={inputCls} value={effectiveAt} onChange={(e) => setEffectiveAt(e.target.value)} />

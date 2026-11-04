@@ -17,12 +17,18 @@ import {
   AdminTableHeader,
   AdminTableRow,
 } from "@/components/ui/admin-table";
+import { SearchSelect, type SearchSelectOption } from "@/components/ui/search-select";
 import { useParcelListFilters, useParcelsQuery } from "@/features/parcels/hooks";
 import { parcelOutcomeLabel, parcelOutcomeTone } from "@/features/parcels/mappers";
 import { PARCEL_OUTCOMES } from "@/features/parcels/types";
 import { isForbiddenError } from "@/lib/api/errors";
 
 const COLUMNS = ["Mã", "Tạo lúc", "Tuyến", "Hạng / cân", "Người gửi", "Người nhận", "Giá", "Trạng thái"];
+
+const PARCEL_OUTCOME_OPTIONS: readonly SearchSelectOption[] = PARCEL_OUTCOMES.map((o) => ({
+  value: o,
+  label: parcelOutcomeLabel[o],
+}));
 
 /** DEC-PROD-071: ops list of parcel jobs (rides with serviceKind PARCEL). */
 export function ParcelsList() {
@@ -35,29 +41,28 @@ export function ParcelsList() {
     <div className="space-y-4">
       <AdminBreadcrumb items={[{ label: "Chuyến xe Ride", href: "/rides" }, { label: "Giao hàng" }]} />
       <h1 className="text-2xl font-bold">Đơn giao hàng</h1>
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <input
           aria-label="Tìm đơn hàng"
-          className="rounded-md border px-3 py-2 text-sm"
+          className="rounded-md border border-border bg-white px-3 py-2 text-sm text-ink placeholder:text-muted"
           placeholder="Mã, tên hoặc SĐT"
           defaultValue={filters.q}
           onKeyDown={(e) => {
             if (e.key === "Enter") void setFilters({ q: e.currentTarget.value, page: 1 });
           }}
         />
-        <select
-          aria-label="Lọc trạng thái"
-          className="rounded-md border px-3 py-2 text-sm"
-          value={filters.outcome}
-          onChange={(e) => void setFilters({ outcome: e.target.value as typeof filters.outcome, page: 1 })}
-        >
-          <option value="ALL">Tất cả</option>
-          {PARCEL_OUTCOMES.map((o) => (
-            <option key={o} value={o}>
-              {parcelOutcomeLabel[o]}
-            </option>
-          ))}
-        </select>
+        <div className="min-w-[14rem]">
+          <SearchSelect
+            label="Lọc trạng thái"
+            icon="sliders"
+            value={filters.outcome === "ALL" ? null : filters.outcome}
+            options={PARCEL_OUTCOME_OPTIONS}
+            placeholder="Tất cả trạng thái"
+            emptyLabel="Không tìm thấy trạng thái"
+            clearLabel="Tất cả trạng thái"
+            onChange={(val) => void setFilters({ outcome: (val ?? "ALL") as typeof filters.outcome, page: 1 })}
+          />
+        </div>
       </div>
       {query.isError ? <AdminListErrorBanner message="Không tải được danh sách đơn hàng." onRetry={() => void query.refetch()} /> : null}
       <AdminTableContainer>

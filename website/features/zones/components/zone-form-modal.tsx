@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { OpsIcon } from "@/components/ui/ops-icons";
 import { focusRing } from "@/components/ui/admin-list-ui";
+import { SearchSelect, type SearchSelectOption } from "@/components/ui/search-select";
 import {
   LazyRealMapView,
   type MapMarker,
@@ -31,6 +32,11 @@ import {
 
 const MAP_W = 620;
 const MAP_H = 300;
+
+const ZONE_FORM_STATUS_OPTIONS: readonly SearchSelectOption[] = [
+  { value: "PLANNED", label: "Sắp mở" },
+  { value: "ACTIVE", label: "Đang phục vụ" },
+];
 
 export type ZoneFormSubmit =
   | { kind: "create"; input: CreateZoneInput }
@@ -494,21 +500,19 @@ export function ZoneFormModal({
             </div>
           </div>
 
-          <div className={`grid gap-3 ${editing ? "" : "sm:grid-cols-[9rem_1fr]"}`}>
+          <div className={`grid gap-3 ${editing ? "" : "sm:grid-cols-[12rem_1fr]"}`}>
             {editing ? null : (
               <div>
-                <label htmlFor="zone-status" className="block text-xs font-semibold text-ink">
-                  Trạng thái
-                </label>
-                <select
-                  id="zone-status"
+                <SearchSelect
+                  label="Trạng thái"
+                  icon="sliders"
                   value={status}
-                  onChange={(e) => setStatus(e.target.value as "ACTIVE" | "PLANNED")}
-                  className={inputCls}
-                >
-                  <option value="PLANNED">Sắp mở</option>
-                  <option value="ACTIVE">Đang phục vụ</option>
-                </select>
+                  options={ZONE_FORM_STATUS_OPTIONS}
+                  placeholder="Chọn trạng thái"
+                  onChange={(val) => {
+                    if (val) setStatus(val as "ACTIVE" | "PLANNED");
+                  }}
+                />
               </div>
             )}
             <div>

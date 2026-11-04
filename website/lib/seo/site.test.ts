@@ -75,4 +75,23 @@ describe("seo site", () => {
     expect(json["@type"]).toBe("FAQPage");
     expect(json.mainEntity[0].name).toBe("DealGo là gì?");
   });
+
+  it("declares Trần Công Tiến as the founder and creator in schema graph", () => {
+    const json = landingJsonLd() as {
+      "@graph": Array<{
+        "@type": string;
+        "@id"?: string;
+        name?: string;
+        founder?: { "@id": string };
+        creator?: { "@id": string };
+      }>;
+    };
+    const person = json["@graph"].find((node) => node["@type"] === "Person");
+    expect(person).toBeDefined();
+    expect(person?.name).toBe("Trần Công Tiến");
+
+    const org = json["@graph"].find((node) => node["@type"] === "Organization");
+    expect(org?.founder).toEqual({ "@id": person?.["@id"] });
+    expect(org?.creator).toEqual({ "@id": person?.["@id"] });
+  });
 });

@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { StatusChip, focusRing } from "@/components/ui/admin-list-ui";
 import { BackToList, DetailHeader, DetailSection, FieldList } from "@/components/ui/admin-detail-ui";
+import { SearchSelect } from "@/components/ui/search-select";
 import { ChatReviewButton } from "@/features/chat-review/components/chat-review-button";
 
 import {
@@ -282,44 +283,34 @@ export function SupportTicketDetail({ id }: { id: string }) {
           <DetailSection id="support-status" title="Cập nhật trạng thái">
             <div className="space-y-3">
               <div>
-                <label htmlFor="support-next-status" className="text-xs font-medium text-muted">
-                  Trạng thái mới
-                </label>
-                <select
-                  id="support-next-status"
-                  value={nextStatus}
-                  onChange={(event) => setNextStatus(event.target.value as SupportTicketStatus | "")}
-                  className={`mt-1.5 h-10 ${fieldClass}`}
-                >
-                  <option value="">Giữ nguyên ({supportStatusLabel[ticket.status]})</option>
-                  {nextStatuses(ticket.status).map((value) => (
-                    <option key={value} value={value}>
-                      {supportStatusLabel[value]}
-                    </option>
-                  ))}
-                </select>
+                <SearchSelect
+                  label="Trạng thái mới"
+                  icon="sliders"
+                  value={nextStatus || null}
+                  options={nextStatuses(ticket.status).map((value) => ({
+                    value,
+                    label: supportStatusLabel[value],
+                  }))}
+                  placeholder={`Giữ nguyên (${supportStatusLabel[ticket.status]})`}
+                  clearLabel={`Giữ nguyên (${supportStatusLabel[ticket.status]})`}
+                  onChange={(val) => setNextStatus((val ?? "") as SupportTicketStatus | "")}
+                />
               </div>
               <div>
-                <label htmlFor="support-next-priority" className="text-xs font-medium text-muted">
-                  Mức ưu tiên
-                </label>
-                <select
-                  id="support-next-priority"
-                  value={nextPriority}
-                  onChange={(event) =>
-                    setNextPriority(event.target.value as SupportTicketPriority | "")
-                  }
-                  className={`mt-1.5 h-10 ${fieldClass}`}
-                >
-                  <option value="">Giữ nguyên ({supportPriorityLabel[ticket.priority]})</option>
-                  {(Object.keys(supportPriorityLabel) as SupportTicketPriority[])
+                <SearchSelect
+                  label="Mức ưu tiên"
+                  icon="sliders"
+                  value={nextPriority || null}
+                  options={(Object.keys(supportPriorityLabel) as SupportTicketPriority[])
                     .filter((value) => value !== ticket.priority)
-                    .map((value) => (
-                      <option key={value} value={value}>
-                        {supportPriorityLabel[value]}
-                      </option>
-                    ))}
-                </select>
+                    .map((value) => ({
+                      value,
+                      label: supportPriorityLabel[value],
+                    }))}
+                  placeholder={`Giữ nguyên (${supportPriorityLabel[ticket.priority]})`}
+                  clearLabel={`Giữ nguyên (${supportPriorityLabel[ticket.priority]})`}
+                  onChange={(val) => setNextPriority((val ?? "") as SupportTicketPriority | "")}
+                />
               </div>
               <div>
                 <label htmlFor="support-reason" className="text-xs font-medium text-muted">

@@ -8,6 +8,10 @@ import type { PublicSiteConfig } from "@/features/site-config/types";
  */
 export const SITE_NAME = "DealGo";
 
+/** Founder and lead creator identity for structured data and knowledge graph. */
+export const FOUNDER_NAME = "Trần Công Tiến";
+export const FOUNDER_ROLE = "Founder & Lead Developer";
+
 /** Brand slogan. Keep in sync with the landing hero and footer. */
 export const SITE_SLOGAN = "Giá do bạn chọn, Trọn gói hành trình";
 
@@ -99,6 +103,8 @@ export function buildPageMetadata({
     robots: index
       ? { index: true, follow: true }
       : { index: false, follow: false },
+    creator: FOUNDER_NAME,
+    authors: [{ name: FOUNDER_NAME }, { name: SITE_NAME }],
     openGraph: {
       type: "website",
       url: canonical,
@@ -123,6 +129,7 @@ export function landingJsonLd(config: PublicSiteConfig = {}): Record<string, unk
   const installUrl = [config.appStoreUrl, config.googlePlayUrl].filter((v): v is string => Boolean(v));
   const origin = siteUrl().origin;
   const org = `${origin}/#organization`;
+  const founderId = `${origin}/#founder`;
   const service = (name: string, description: string, category: string) => ({
     "@type": "Service",
     name,
@@ -154,6 +161,8 @@ export function landingJsonLd(config: PublicSiteConfig = {}): Record<string, unk
         },
         slogan: SITE_SLOGAN,
         description: SITE_DESCRIPTION,
+        founder: { "@id": founderId },
+        creator: { "@id": founderId },
         areaServed: { "@type": "Country", name: "Việt Nam" },
         ...(sameAs.length > 0 ? { sameAs } : {}),
         ...(config.contactEmail || config.hotline
@@ -170,6 +179,13 @@ export function landingJsonLd(config: PublicSiteConfig = {}): Record<string, unk
           : {}),
       },
       {
+        "@type": "Person",
+        "@id": founderId,
+        name: FOUNDER_NAME,
+        jobTitle: FOUNDER_ROLE,
+        worksFor: { "@id": org },
+      },
+      {
         "@type": "WebSite",
         "@id": `${origin}/#website`,
         name: SITE_NAME,
@@ -177,6 +193,7 @@ export function landingJsonLd(config: PublicSiteConfig = {}): Record<string, unk
         description: SITE_DESCRIPTION,
         inLanguage: "vi-VN",
         publisher: { "@id": org },
+        creator: { "@id": founderId },
       },
       {
         "@type": "MobileApplication",
@@ -186,6 +203,7 @@ export function landingJsonLd(config: PublicSiteConfig = {}): Record<string, unk
         description: SITE_DESCRIPTION,
         inLanguage: "vi-VN",
         publisher: { "@id": org },
+        author: { "@id": founderId },
         ...(installUrl.length > 0 ? { installUrl, downloadUrl: installUrl } : {}),
       },
       service(

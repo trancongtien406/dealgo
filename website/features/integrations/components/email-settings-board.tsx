@@ -8,6 +8,7 @@ import {
   AdminPageSkeleton,
 } from "@/components/ui/admin-state-ui";
 import { OpsInterveneDialog } from "@/components/ui/ops-intervene-dialog";
+import { SearchSelect, type SearchSelectOption } from "@/components/ui/search-select";
 import { toast } from "@/components/ui/toast";
 import {
   Card,
@@ -41,6 +42,11 @@ import {
 } from "@/features/integrations/types";
 import { isForbiddenError } from "@/lib/api/errors";
 import { formatOpsDateTime } from "@/lib/ops-time";
+
+const SMTP_SECURE_OPTIONS: readonly SearchSelectOption[] = [
+  { value: "false", label: "STARTTLS" },
+  { value: "true", label: "SSL (465)" },
+];
 
 export function EmailSettingsBoard() {
   const { data, isPending, isError, error, refetch } = useEmailSettingsQuery();
@@ -170,10 +176,17 @@ function EmailForm({ view }: { view: EmailSettingsView }) {
               <input inputMode="numeric" className={inputClass} value={draft.smtpPort} disabled={busy} onChange={(e) => set("smtpPort", e.target.value)} />
             </Field>
             <Field label="TLS" source={view.sources.smtpSecure}>
-              <select className={inputClass} value={draft.smtpSecure} disabled={busy} onChange={(e) => set("smtpSecure", e.target.value)}>
-                <option value="false">STARTTLS</option>
-                <option value="true">SSL (465)</option>
-              </select>
+              <SearchSelect
+                label="TLS"
+                icon="sliders"
+                value={draft.smtpSecure}
+                disabled={busy}
+                options={SMTP_SECURE_OPTIONS}
+                placeholder="Chọn TLS"
+                onChange={(val) => {
+                  if (val) set("smtpSecure", val);
+                }}
+              />
             </Field>
           </div>
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">

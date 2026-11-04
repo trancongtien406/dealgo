@@ -7,6 +7,7 @@ import {
   StatusChip,
   focusRing,
 } from "@/components/ui/admin-list-ui";
+import { SearchSelect } from "@/components/ui/search-select";
 import {
   AdminEmptyState,
   AdminForbiddenState,
@@ -464,44 +465,44 @@ function HomeBannerEditor({
             </div>
           </fieldset>
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm font-medium text-ink">
-              Dịch vụ
-              <select
-                className={input}
+            <div>
+              <SearchSelect
+                label="Dịch vụ"
+                icon="sliders"
                 value={draft.service}
-                onChange={(e) =>
-                  set("service", e.target.value as HomeBannerDraft["service"])
-                }
-              >
-                {HOME_BANNER_SERVICES.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-sm font-medium text-ink">
-              Khu vực
-              <select
-                className={input}
-                value={draft.regionCode}
-                onChange={(e) => set("regionCode", e.target.value)}
-              >
-                <option value="">Mọi khu vực</option>
-                {zones.map((z) => (
-                  <option key={z.code} value={z.code}>
-                    {z.label}
-                    {z.status === "ACTIVE" ? "" : " (sắp mở)"}
-                  </option>
-                ))}
-                {draft.regionCode &&
-                !zones.some((z) => z.code === draft.regionCode) ? (
-                  <option value={draft.regionCode}>
-                    {serviceRegionLabel(draft.regionCode)}
-                  </option>
-                ) : null}
-              </select>
-            </label>
+                options={HOME_BANNER_SERVICES}
+                placeholder="Chọn dịch vụ"
+                onChange={(val) => {
+                  if (val) set("service", val as HomeBannerDraft["service"]);
+                }}
+              />
+            </div>
+            <div>
+              <SearchSelect
+                label="Khu vực"
+                icon="pin"
+                value={draft.regionCode || null}
+                options={[
+                  ...zones.map((z) => ({
+                    value: z.code,
+                    label: `${z.label}${z.status === "ACTIVE" ? "" : " (sắp mở)"}`,
+                  })),
+                  ...(draft.regionCode && !zones.some((z) => z.code === draft.regionCode)
+                    ? [
+                        {
+                          value: draft.regionCode,
+                          label:
+                            serviceRegionLabel(draft.regionCode) ??
+                            draft.regionCode,
+                        },
+                      ]
+                    : []),
+                ]}
+                placeholder="Mọi khu vực"
+                clearLabel="Mọi khu vực"
+                onChange={(val) => set("regionCode", val ?? "")}
+              />
+            </div>
             <label className="block text-sm font-medium text-ink">
               Bắt đầu (ICT, tuỳ chọn)
               <input

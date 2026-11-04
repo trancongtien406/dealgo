@@ -3,7 +3,7 @@ import { Inter } from "next/font/google";
 import Script from "next/script";
 import type { ReactNode } from "react";
 import { AppProviders } from "@/lib/query/provider";
-import { OG_IMAGE, SITE_DESCRIPTION, SITE_NAME, siteUrl } from "@/lib/seo/site";
+import { FOUNDER_NAME, OG_IMAGE, SITE_DESCRIPTION, SITE_NAME, siteUrl } from "@/lib/seo/site";
 import "./globals.css";
 
 const inter = Inter({
@@ -19,9 +19,12 @@ export const metadata: Metadata = {
   description: SITE_DESCRIPTION,
   applicationName: SITE_NAME,
   category: "travel",
-  creator: SITE_NAME,
+  creator: FOUNDER_NAME,
   publisher: SITE_NAME,
-  authors: [{ name: SITE_NAME, url: siteUrl().origin }],
+  authors: [
+    { name: FOUNDER_NAME, url: siteUrl().origin },
+    { name: SITE_NAME, url: siteUrl().origin },
+  ],
   icons: { icon: "/icon.svg", apple: "/apple-icon.png" },
   appleWebApp: {
     capable: true,

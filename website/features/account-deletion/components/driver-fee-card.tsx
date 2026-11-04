@@ -4,6 +4,7 @@ import { useState } from "react";
 import { focusRing, StatusChip, vnd } from "@/components/ui/admin-list-ui";
 import { DetailSection } from "@/components/ui/admin-detail-ui";
 import { ReasonDialog } from "@/components/ui/reason-dialog";
+import { SearchSelect, type SearchSelectOption } from "@/components/ui/search-select";
 import { toast } from "@/components/ui/toast";
 import {
   useDriverBalanceQuery,
@@ -18,6 +19,11 @@ import {
 } from "@/lib/driver-balance";
 import { checkOpsReason } from "@/lib/api/ops-reason-body";
 import { formatOpsDate } from "@/lib/ops-time";
+
+const PAYMENT_DIRECTION_OPTIONS: readonly SearchSelectOption[] = [
+  { value: "DRIVER_PAID", label: "Tài xế nộp / nạp trước" },
+  { value: "DEALGO_PAID", label: "DealGo chi trả tài xế" },
+];
 
 /**
  * What the driver owes DealGo since the last settlement = platform fees on cash
@@ -175,16 +181,19 @@ function DriverPaymentForm({ driverId, name }: { driverId: string; name: string 
       }}
     >
       <p className="text-sm font-medium text-ink">Ghi nhận thanh toán từng phần</p>
-      <div className="flex flex-wrap gap-2">
-        <select
-          aria-label="Chiều thanh toán"
-          className={input}
-          value={direction}
-          onChange={(e) => setDirection(e.target.value as DriverPaymentDirection)}
-        >
-          <option value="DRIVER_PAID">Tài xế nộp / nạp trước</option>
-          <option value="DEALGO_PAID">DealGo chi trả tài xế</option>
-        </select>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="w-56">
+          <SearchSelect
+            label="Chiều thanh toán"
+            icon="sliders"
+            value={direction}
+            options={PAYMENT_DIRECTION_OPTIONS}
+            placeholder="Chiều thanh toán"
+            onChange={(val) => {
+              if (val) setDirection(val as DriverPaymentDirection);
+            }}
+          />
+        </div>
         <input
           aria-label="Số tiền (₫)"
           inputMode="numeric"

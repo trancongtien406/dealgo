@@ -7,6 +7,7 @@ import {
   focusRing,
   StatusChip,
 } from "@/components/ui/admin-list-ui";
+import { SearchSelect } from "@/components/ui/search-select";
 import {
   AdminEmptyState,
   AdminForbiddenState,
@@ -260,22 +261,16 @@ export function FaqsBoard() {
             <h2 className="text-lg font-semibold text-ink">
               Sửa câu trả lời gợi ý
             </h2>
-            <label className="block text-sm font-medium text-ink">
-              Hiển thị cho
-              <select
-                value={audience}
-                onChange={(event) =>
-                  setAudience(event.target.value as FaqAudience)
-                }
-                className={`mt-1 block h-10 w-full rounded-xl border border-border bg-white px-3 text-sm ${focusRing}`}
-              >
-                {FAQ_AUDIENCE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <SearchSelect
+              label="Hiển thị cho"
+              icon="users"
+              value={audience}
+              options={FAQ_AUDIENCE_OPTIONS}
+              placeholder="Chọn đối tượng hiển thị"
+              onChange={(val) => {
+                if (val) setAudience(val as FaqAudience);
+              }}
+            />
             <textarea
               value={answer}
               onChange={(event) => setAnswer(event.target.value)}
