@@ -18,7 +18,7 @@ export async function seedDriverClass(
     id: existing?.id ?? randomUUID(),
     userId,
     role: 'DRIVER',
-    metadata: { ...((existing?.metadata as object) ?? {}), vehicleClassCode },
+    metadata: { ...(existing?.metadata as object), vehicleClassCode },
     documents: [],
     now: new Date(),
   });

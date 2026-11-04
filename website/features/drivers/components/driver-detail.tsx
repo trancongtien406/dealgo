@@ -487,7 +487,7 @@ export function DriverDetail({ code }: { code: string }) {
                                   {act.value}
                                 </AdminTableCell>
                                 <AdminTableCell className="whitespace-nowrap">
-                                  <StatusChip tone={act.tone as any}>
+                                  <StatusChip tone={act.tone}>
                                     {act.status}
                                   </StatusChip>
                                 </AdminTableCell>

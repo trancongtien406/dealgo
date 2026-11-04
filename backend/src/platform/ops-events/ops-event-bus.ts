@@ -47,7 +47,7 @@ export class OpsEventBus {
   }
 
   publish(event: OpsEvent): void {
-    for (const listener of [...this.listeners]) {
+    for (const listener of this.listeners) {
       try {
         listener(event);
       } catch (error) {
@@ -57,7 +57,7 @@ export class OpsEventBus {
   }
 
   private notifyCount(): void {
-    for (const listener of [...this.countListeners]) {
+    for (const listener of this.countListeners) {
       try {
         listener(this.listeners.size);
       } catch {

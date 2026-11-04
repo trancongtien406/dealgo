@@ -56,7 +56,7 @@ export class PaymentCallbacksController {
     @Body() body: Record<string, unknown>,
     @Res({ passthrough: true }) res: Response,
   ) {
-    return this.ipn(provider, { ...(query ?? {}), ...(body ?? {}) }, res);
+    return this.ipn(provider, { ...query, ...body }, res);
   }
 
   @Get('ipn/:provider')

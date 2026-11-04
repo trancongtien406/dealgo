@@ -22,14 +22,9 @@ import { MockSmsSender } from '../../src/integrations/sms/sms-sender.js';
 import { PrismaModule } from '../../src/platform/database/prisma.module.js';
 import { RIDE_CLOCK, type RideClock } from '../../src/modules/ride/ride.constants.js';
 import { RideModule } from '../../src/modules/ride/ride.module.js';
-import { EarningsService } from '../../src/modules/earnings/earnings.service.js';
-import { RideService } from '../../src/modules/ride/ride.service.js';
-import { PlatformSettingsService } from '../../src/platform/settings/platform-settings.service.js';
 import { PLATFORM_SETTINGS_REPOSITORY } from '../../src/platform/settings/platform-settings.constants.js';
 import { PrismaService } from '../../src/platform/database/prisma.service.js';
 import { settingsWith } from '../support/settings-fixture.js';
-import { PARTNER_REPOSITORY } from '../../src/modules/partner/partner.constants.js';
-import type { PartnerRepository } from '../../src/modules/partner/partner.repository.js';
 
 const hasDatabase = Boolean(process.env.DATABASE_URL?.trim());
 const describePg = hasDatabase ? describe : describe.skip;
@@ -238,7 +233,7 @@ describePg('ride multi-stop races (postgres)', () => {
         expect(ride.status).toBe('NEGOTIATING');
         expect(ride.routeVersion).toBe(1);
         expect(ride.stopCount).toBe(2);
-        expect(ride.stops.map((s) => s.seq).sort()).toEqual([1, 2]);
+        expect(ride.stops.map((s) => s.seq).sort((x, y) => x - y)).toEqual([1, 2]);
         expect(ride.offers.find((o) => o.id === offerId)?.status).toBe('LOST');
         await post(customer.token, `/v1/rides/${rideId}/cancel`).expect(200);
       }
@@ -253,7 +248,7 @@ describePg('ride multi-stop races (postgres)', () => {
       putStops(customer.token, rideId, { stops: [stopB], routeVersion: 0 }),
       putStops(customer.token, rideId, { stops: [stopA, stopB], routeVersion: 0 }),
     ]);
-    expect([a.status, b.status].sort()).toEqual([200, 409]);
+    expect([a.status, b.status].sort((x, y) => x - y)).toEqual([200, 409]);
     const loser = a.status === 409 ? a : b;
     expect(loser.body.errorCode).toBe('RIDE_ROUTE_CHANGED');
     const ride = await prisma.db()!.ride.findUniqueOrThrow({ where: { id: rideId }, include: { stops: true } });
@@ -282,7 +277,7 @@ describePg('ride multi-stop races (postgres)', () => {
     const hints = await prisma.db()!.outboxMessage.findMany({
       where: { aggregateId: rideId, eventKey: { contains: ':stop-' } },
     });
-    expect(hints.map((h) => h.eventKey.split(':').at(-1)).sort()).toEqual(['stop-1-arrived', 'stop-1-departed']);
+    expect(hints.map((h) => h.eventKey.split(':').at(-1)).sort((x, y) => (x ?? '').localeCompare(y ?? ''))).toEqual(['stop-1-arrived', 'stop-1-departed']);
     await post(d.token, `/v1/rides/${rideId}/complete`).expect(200);
   });
 });

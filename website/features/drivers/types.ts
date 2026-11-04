@@ -1,4 +1,5 @@
 import type { AccountDeletionInfo } from "@/lib/account-deletion";
+import type { StatusTone } from "@/lib/admin-format";
 export const DRIVER_KYC_STATUSES = [
   "VERIFIED",
   "NEEDS_MORE_INFO",
@@ -101,7 +102,7 @@ export type DriverActivityItem = {
   summary: string;
   value: string;
   status: string;
-  tone: string;
+  tone: StatusTone;
 };
 
 export type DriverActivitiesPage = {

@@ -135,7 +135,7 @@ function defaultRoutes(scopes = ['event:read', 'org:read', 'project:read']) {
       return { body: { auth: { scopes } } };
     if (url.includes('/projects/')) return { body: PROJECTS };
     if (url.includes('/events/latest/')) return { body: EVENT };
-    if (/\/issues\/9001\/$/.test(url))
+    if (url.endsWith('/issues/9001/'))
       return { body: method === 'PUT' ? { status: 'resolved' } : ISSUE };
     if (url.includes('/issues/?')) {
       return {
@@ -331,7 +331,7 @@ describe('SystemErrorsService issues', () => {
 
   it('detail of an issue outside the configured projects is 404', async () => {
     const { service } = await configured((url, m) =>
-      /\/issues\/9001\/$/.test(url)
+      url.endsWith('/issues/9001/')
         ? { body: { ...ISSUE, project: { slug: 'other' } } }
         : defaultRoutes()(url, m),
     );

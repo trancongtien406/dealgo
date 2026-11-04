@@ -43,7 +43,7 @@ export const fetchPayosRequest: PayosHttpRequest = async (
     response = await fetch(url, {
       method,
       headers: { ...headers, 'Content-Type': 'application/json; charset=UTF-8' },
-      body: body ? JSON.stringify(body) : undefined,
+      ...(method === 'POST' && body ? { body: JSON.stringify(body) } : {}),
       signal: AbortSignal.timeout(options.timeoutMs),
     });
   } catch (error) {
@@ -67,10 +67,10 @@ function signatureValue(value: unknown): string {
   if (typeof value === 'boolean') {
     return value ? 'true' : 'false';
   }
-  if (typeof value === 'object') {
-    return JSON.stringify(value);
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'bigint') {
+    return String(value);
   }
-  return String(value);
+  return JSON.stringify(value);
 }
 
 /**

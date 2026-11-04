@@ -83,7 +83,10 @@ export function CustomerDetail({ code }: { code: string }) {
     [customer?.name, code],
   );
 
-  const activities = activitiesPage?.items ?? [];
+  const activities = useMemo(
+    () => activitiesPage?.items ?? [],
+    [activitiesPage?.items],
+  );
   const totalItems = activitiesPage?.total ?? activities.length;
   const limit = activitiesPage?.limit ?? 6;
   const totalPages = Math.max(1, Math.ceil(totalItems / limit));

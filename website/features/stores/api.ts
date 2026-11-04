@@ -3,7 +3,6 @@ import {
   mapNestStoreDetailToItem,
 } from "@/features/stores/mappers";
 import type {
-  NestOpsStore,
   NestOpsStoreDetail,
   NestOpsStorePage,
 } from "@/features/stores/nest-types";

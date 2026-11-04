@@ -18,7 +18,6 @@ import { MockSmsSender } from '../../../src/integrations/sms/sms-sender.js';
 import { PLATFORM_SETTINGS_REPOSITORY } from '../../../src/platform/settings/platform-settings.constants.js';
 import { PARTNER_REPOSITORY } from '../../../src/modules/partner/partner.constants.js';
 import { MemoryPartnerRepository } from '../../../src/modules/partner/partner.repository.js';
-import { haversineKm, quoteReferenceFareVnd } from '../../../src/modules/ride/ride-geo.js';
 import {
   rideBidFloorVnd,
   roundDownToFareStep,
@@ -26,8 +25,6 @@ import {
 } from '../../../src/modules/ride-vehicle/ride-vehicle-class.js';
 import { RIDE_CLOCK, type RideClock } from '../../../src/modules/ride/ride.constants.js';
 import { RideModule } from '../../../src/modules/ride/ride.module.js';
-import { EarningsService } from '../../../src/modules/earnings/earnings.service.js';
-import { RideService } from '../../../src/modules/ride/ride.service.js';
 import { settingsWith } from '../../support/settings-fixture.js';
 import { PlatformSettingsService } from '../../../src/platform/settings/platform-settings.service.js';
 import { RideZoneTariffService } from '../../../src/modules/ride-vehicle/ride-zone-tariff.service.js';
@@ -65,7 +62,6 @@ describe('ride zone tariff + locked bid band http', () => {
   let sms: MockSmsSender;
   let clock: ManualClock;
   let phoneSerial = 7000;
-  let reference = 0;
 
   beforeAll(async () => {
     repository = new MemoryIdentityRepository();
@@ -118,7 +114,6 @@ describe('ride zone tariff + locked bid band http', () => {
     app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
     await app.init();
     seedVehicleClassOnDriverGrant(app, repository);
-    reference = roundUpToFareStep(quoteReferenceFareVnd(haversineKm(pickup, dropoff), 5000, 10_000));
   });
 
   afterAll(async () => {
@@ -130,7 +125,6 @@ describe('ride zone tariff + locked bid band http', () => {
   });
 
   const http = () => request(app.getHttpServer());
-  const bid = () => rideBidFloorVnd(reference, 70) + 1000;
 
   async function login(): Promise<Actor> {
     phoneSerial += 1;
@@ -155,9 +149,6 @@ describe('ride zone tariff + locked bid band http', () => {
     return d;
   }
 
-  const stopA = { lat: 10.79, lng: 106.68, label: 'Stop A' };
-  const stopB = { lat: 10.80, lng: 106.66, label: 'Stop B' };
-
   function postRide(token: string, key: string, offeredFareVnd: number, stops: object[] = [], vehicleClassCode = 'MOTORBIKE') {
     return http()
       .post('/v1/rides')
@@ -172,36 +163,6 @@ describe('ride zone tariff + locked bid band http', () => {
 
   function post(token: string, path: string, body: object = {}) {
     return http().post(path).set('Authorization', `Bearer ${token}`).send(body);
-  }
-
-  function get(token: string, path: string) {
-    return http().get(path).set('Authorization', `Bearer ${token}`);
-  }
-
-  async function assigned(customer: Actor, d: Actor, key: string): Promise<string> {
-    const created = await postRide(customer.token, `${key}-c`, bid()).expect(200);
-    const rideId = created.body.data.id as string;
-    const offered = await offer(d.token, rideId, bid()).expect(200);
-    await http()
-      .post(`/v1/rides/${rideId}/selection`)
-      .set('Authorization', `Bearer ${customer.token}`)
-      .set('Idempotency-Key', `${key}-s`)
-      .send({ offerId: offered.body.data.offers[0].id })
-      .expect(200);
-    return rideId;
-  }
-
-  async function arrived(customer: Actor, d: Actor, key: string): Promise<string> {
-    const rideId = await assigned(customer, d, key);
-    await post(d.token, `/v1/rides/${rideId}/en-route`).expect(200);
-    await post(d.token, `/v1/rides/${rideId}/arrived`).expect(200);
-    return rideId;
-  }
-
-  async function complete(customer: Actor, d: Actor, rideId: string) {
-    const code = (await get(customer.token, `/v1/rides/${rideId}`).expect(200)).body.data.pickupCode;
-    await post(d.token, `/v1/rides/${rideId}/start`, { pickupCode: code }).expect(200);
-    return post(d.token, `/v1/rides/${rideId}/complete`).expect(200);
   }
 
 

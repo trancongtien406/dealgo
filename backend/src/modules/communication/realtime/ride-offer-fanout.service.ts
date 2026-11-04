@@ -170,7 +170,8 @@ export class RideOfferFanoutService implements OnModuleInit, OnModuleDestroy {
     const max = await setting('RIDE_REQUEST_REPUSH_MAX', 3);
     const nowMs = now.getTime();
     let sent = 0;
-    for (const [rideId, open] of [...this.openRequests]) {
+    // Snapshot entries because closeRequest() modifies this.openRequests during iteration.
+    for (const [rideId, open] of Array.from(this.openRequests)) {
       try {
         const due = intervalSec > 0 && open.repushes < max && nowMs - open.lastPushMs >= intervalSec * 1000;
         if (!due && open.repushes < max && intervalSec > 0) continue;

@@ -127,7 +127,7 @@ export const fetchHttpPost: HttpPost = async (url, body, options) => {
       },
       body: options.form
         ? new URLSearchParams(
-            Object.entries(body).map(([k, v]) => [k, v === undefined || v === null ? '' : String(v)]),
+            Object.entries(body).map(([k, v]) => [k, str(v)]),
           ).toString()
         : JSON.stringify(body),
       signal: AbortSignal.timeout(options.timeoutMs),
@@ -150,7 +150,13 @@ export function str(value: unknown): string {
   if (value === undefined || value === null) {
     return '';
   }
-  return String(value);
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+  return JSON.stringify(value);
 }
 
 /** yymmdd in GMT+7 (ZaloPay app_trans_id prefix). */
