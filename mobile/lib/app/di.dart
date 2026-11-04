@@ -16,7 +16,7 @@ import 'package:get_it/get_it.dart';
 import 'package:provider/provider.dart' show ChangeNotifierProvider;
 
 import '../core/analytics/analytics_port.dart';
-import '../core/analytics/console_analytics.dart';
+import '../core/analytics/firebase_analytics_service.dart';
 import '../core/analytics/noop_analytics.dart';
 import '../core/auth/secure_token_store.dart';
 import '../core/auth/token_store.dart';
@@ -636,9 +636,7 @@ class DealGoDependencies {
           analytics ??
           (useMockData
               ? const NoopAnalytics()
-              : (kDebugMode
-                    ? const ConsoleAnalytics()
-                    : const NoopAnalytics()));
+              : FirebaseAnalyticsService.instance);
     }
 
     final promotionRepository =

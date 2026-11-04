@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
@@ -71,6 +73,54 @@ Future<void> runWithCrashReporting(Future<void> Function() appRunner) async {
 
 void _reportZoneError(Object error, StackTrace stack) {
   unawaited(Sentry.captureException(error, stackTrace: stack));
+  if (Firebase.apps.isNotEmpty) {
+    unawaited(FirebaseCrashlytics.instance.recordError(error, stack));
+  }
+}
+
+/// Initializes Firebase Crashlytics after Firebase core has initialized.
+Future<void> initFirebaseCrashlytics() async {
+  if (Firebase.apps.isEmpty) {
+    return;
+  }
+  try {
+    final enabled = !kDebugMode || isCrashReportingEnabled();
+    await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(enabled);
+
+    final originalOnError = FlutterError.onError;
+    FlutterError.onError = (FlutterErrorDetails details) {
+      FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+      originalOnError?.call(details);
+    };
+
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
+
+    if (kDebugMode) {
+      debugPrint('[Crashlytics] Firebase Crashlytics initialized (enabled=$enabled)');
+    }
+  } catch (error) {
+    if (kDebugMode) {
+      debugPrint('[Crashlytics] Initialization error: $error');
+    }
+  }
+}
+
+/// Updates user identity across both Sentry and Firebase Crashlytics.
+void setObservabilityUser(String? userId, {String? role}) {
+  if (userId != null && userId.isNotEmpty) {
+    Sentry.configureScope((scope) => scope.setUser(SentryUser(id: userId)));
+    if (Firebase.apps.isNotEmpty) {
+      unawaited(FirebaseCrashlytics.instance.setUserIdentifier(userId));
+      if (role != null) {
+        unawaited(FirebaseCrashlytics.instance.setCustomKey('role', role));
+      }
+    }
+  } else {
+    Sentry.configureScope((scope) => scope.setUser(null));
+  }
 }
 
 /// The realtime WebSocket closing (app backgrounded, network switch) is

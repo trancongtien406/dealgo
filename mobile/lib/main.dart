@@ -17,6 +17,7 @@ import 'core/mock/mock_seed.dart';
 import 'core/observability/crash_reporting.dart';
 import 'core/push/fcm_push.dart';
 import 'core/appearance/app_appearance.dart';
+import 'core/analytics/firebase_analytics_service.dart';
 import 'core/app_check/app_check_service.dart';
 import 'core/storage/customer_booking_prefs.dart';
 import 'firebase_options.dart';
@@ -99,6 +100,16 @@ Future<void> _initFirebaseSafely() async {
     unawaited(
       AppCheckService().activate().catchError((Object error) {
         if (kDebugMode) debugPrint('App Check activate skipped: $error');
+      }),
+    );
+    unawaited(
+      initFirebaseCrashlytics().catchError((Object error) {
+        if (kDebugMode) debugPrint('Crashlytics init skipped: $error');
+      }),
+    );
+    unawaited(
+      FirebaseAnalyticsService.instance.init().catchError((Object error) {
+        if (kDebugMode) debugPrint('Analytics init skipped: $error');
       }),
     );
   } catch (error, stack) {

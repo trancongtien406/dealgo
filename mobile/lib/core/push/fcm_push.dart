@@ -165,6 +165,7 @@ class FcmPush implements PushPort {
       return null;
     }
     try {
+      // ignore: deprecated_member_use
       return await FirebaseMessaging.instance.getToken();
     } catch (error) {
       if (kDebugMode) {
@@ -292,6 +293,7 @@ class FcmPush implements PushPort {
     if (_tokenRefreshSub != null || !_firebaseReady) {
       return;
     }
+    // ignore: deprecated_member_use
     _tokenRefreshSub = FirebaseMessaging.instance.onTokenRefresh.listen(
       (token) async {
         final accessToken = _accessToken;

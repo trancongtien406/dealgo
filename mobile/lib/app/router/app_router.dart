@@ -1,3 +1,4 @@
+import '../../core/analytics/firebase_analytics_service.dart';
 import '../../core/push/new_job_alert.dart';
 import '../../core/realtime/snapshot_realtime.dart';
 
@@ -143,6 +144,10 @@ GoRouter createAppRouter({
         ),
     // Unknown/broken deep links must not show GoRouter's debug page.
     errorBuilder: (context, state) => const DealGoRouteNotFoundPage(),
+    observers: [
+      if (FirebaseAnalyticsService.instance.isReady)
+        FirebaseAnalyticsService.instance.navigationObserver,
+    ],
     routes: [
       GoRoute(
         path: AuthRoutes.splash,
