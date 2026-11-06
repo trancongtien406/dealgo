@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../icons/dealgo_icons.dart';
 import '../tokens/dealgo_tokens.dart';
 import 'dealgo_primary_button.dart';
 import 'dealgo_secondary_button.dart';
@@ -16,6 +17,7 @@ class DealGoDialog extends StatelessWidget {
     this.onSecondary,
     this.primaryTone = DealGoDialogPrimaryTone.brand,
     this.primaryKey,
+    this.icon,
     super.key,
   });
 
@@ -28,14 +30,24 @@ class DealGoDialog extends StatelessWidget {
   final VoidCallback? onSecondary;
   final DealGoDialogPrimaryTone primaryTone;
   final Key? primaryKey;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final isDanger = primaryTone == DealGoDialogPrimaryTone.danger;
+    final effectiveIcon =
+        icon ?? (isDanger ? DealGoIcons.warning : null);
+    final badgeBg = isDanger
+        ? DealGoColors.dangerSurface
+        : DealGoColors.subtlePurple;
+    final badgeFg = isDanger ? DealGoColors.danger : DealGoColors.primary;
+
     return Dialog(
       backgroundColor: DealGoColors.card,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(DealGoRadius.card),
+        side: BorderSide(color: DealGoColors.border),
       ),
       insetPadding: const EdgeInsets.symmetric(
         horizontal: DealGoDimensions.pageGutter * 1.5,
@@ -52,6 +64,25 @@ class DealGoDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (effectiveIcon != null) ...[
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  key: const Key('dealgo-dialog-icon-badge'),
+                  width: DealGoDimensions.iconBadge,
+                  height: DealGoDimensions.iconBadge,
+                  decoration: BoxDecoration(
+                    color: badgeBg,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: badgeFg.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Icon(effectiveIcon, color: badgeFg, size: 22),
+                ),
+              ),
+              const SizedBox(height: DealGoSpacing.s12),
+            ],
             Text(title, style: textTheme.titleLarge),
             if (body != null) ...[
               const SizedBox(height: DealGoSpacing.s12),

@@ -9,6 +9,7 @@ import '../../inbox/presentation/inbox_unread.dart';
 import '../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../core/motion/dealgo_sheet.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../identity/presentation/widgets/auth_widgets.dart';
 import '../../food/presentation/utils/food_routes.dart';
@@ -202,7 +203,7 @@ class _HomeSearchState extends State<HomeSearch> {
       return;
     }
     final l10n = AppLocalizations.of(context);
-    final choice = await showModalBottomSheet<_HomeSearchKind>(
+    final choice = await showDealGoSheet<_HomeSearchKind>(
       context: context,
       useRootNavigator: true,
       builder: (sheetContext) => SafeArea(

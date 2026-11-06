@@ -900,6 +900,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String get foodFilterOffers => 'Has offers';
 
   @override
+  String get foodFilterSortName => 'Name A–Z';
+
+  @override
+  String get foodFilterDistanceHint =>
+      'Drag the slider or tap a quick radius preset';
+
+  @override
+  String get foodFilterMinRatingTitle => 'Minimum rating';
+
+  @override
+  String get foodFilterRatingAny => 'Any rating';
+
+  @override
+  String foodFilterRatingFrom(String stars) {
+    return '$stars+ ★';
+  }
+
+  @override
+  String get foodFilterEtaTitle => 'Estimated delivery time';
+
+  @override
+  String get foodFilterEtaAny => 'Any time';
+
+  @override
+  String foodFilterEtaMax(int minutes) {
+    return '≤ $minutes min';
+  }
+
+  @override
+  String get foodFilterStatusTitle => 'Status & perks';
+
+  @override
+  String get foodFilterNoMinOrder => 'No minimum order';
+
+  @override
   String get foodFilterApply => 'Apply';
 
   @override
@@ -2657,6 +2692,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get foodDropoffChange => 'Change';
+
+  @override
+  String get foodDropoffChangeAddress => 'Change address';
 
   @override
   String get foodFareNeedAddress => 'Pick an address first';
@@ -7162,6 +7200,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get voucherPickerApply => 'Use';
+
+  @override
+  String get voucherApplied => 'Applied';
 
   @override
   String get checkoutErrMinOrder => 'The order is below the store minimum';

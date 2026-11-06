@@ -126,6 +126,25 @@ void main() {
     expect(find.textContaining('Xe 4 chỗ'), findsNothing);
   });
 
+  testWidgets('fare sheet keeps the offer input and CTA on a phone screen', (
+    tester,
+  ) async {
+    final rides = _negotiatingClient();
+    await _openFare(tester, rides);
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    await tester.pumpAndSettle();
+
+    final bar = find.byKey(const Key('ride-quote-bar'));
+    expect(bar, findsOneWidget);
+    expect(tester.getRect(bar).bottom, lessThanOrEqualTo(844));
+    expect(find.byKey(const Key('ride-fare-plus')), findsOneWidget);
+    expect(find.byKey(const Key('ride-submit-fare')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('ride-submit-fare')));
+    await tester.pumpAndSettle();
+    expect(rides.createCalls, hasLength(1));
+  });
+
   testWidgets('a still-open request reopens it instead of a dead end', (
     tester,
   ) async {

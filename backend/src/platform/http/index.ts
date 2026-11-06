@@ -7,3 +7,4 @@ export * from './openapi/build-openapi-document.js';
 export * from './route-body-parsers.js';
 export * from './trust-proxy.js';
 export * from './client-ip.decorator.js';
+export * from './public-image-cache.js';

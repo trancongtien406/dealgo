@@ -14,6 +14,8 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { SkipResponseEnvelope } from '../../platform/http/skip-response-envelope.js';
+import { PUBLIC_IMAGE_CACHE_CONTROL } from '../../platform/http/public-image-cache.js';
+import { resolveImageVariantWidth } from '../../platform/storage/image-variants.js';
 import { HomeBannerEventsDto, ListPublicHomeBannersQuery } from './home-banner.dto.js';
 import { HOME_BANNER_PUBLIC_MAX_AGE_S } from './home-banner.js';
 import { HomeBannerService } from './home-banner.service.js';
@@ -44,11 +46,15 @@ export class PublicHomeBannerController {
 
   @Get('images/:id/:file')
   @SkipResponseEnvelope()
-  @Header('Cache-Control', 'public, max-age=86400, immutable')
+  @Header('Cache-Control', PUBLIC_IMAGE_CACHE_CONTROL)
   @Header('X-Content-Type-Options', 'nosniff')
   @ApiOperation({ summary: 'Current image of a home banner' })
-  async image(@Param('id') id: string, @Param('file') file: string): Promise<StreamableFile> {
-    const found = await this.banners.readImage(id, file);
+  async image(
+    @Param('id') id: string,
+    @Param('file') file: string,
+    @Query('w') w?: string,
+  ): Promise<StreamableFile> {
+    const found = await this.banners.readImage(id, file, resolveImageVariantWidth(w));
     return new StreamableFile(found.body, { type: found.contentType, length: found.body.byteLength });
   }
 }

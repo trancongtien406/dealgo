@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design_system/components/dealgo_dialog.dart';
+import '../../../../core/design_system/components/dealgo_refresh.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/components/dealgo_text_field.dart';
@@ -204,7 +205,12 @@ class _MerchantCategoriesPageState extends State<MerchantCategoriesPage> {
       title: l10n.merchantCategoriesTitle,
       onBack: () => merchantBack(context),
       footer: Padding(
-        padding: merchantPagePadding,
+        padding: const EdgeInsets.fromLTRB(
+          DealGoDimensions.pageGutter,
+          DealGoSpacing.s8,
+          DealGoDimensions.pageGutter,
+          DealGoSpacing.s12,
+        ),
         child: FilledButton(
           key: const Key('merchant-category-add'),
           onPressed: _loading || _reordering ? null : () => _upsert(),
@@ -214,16 +220,19 @@ class _MerchantCategoriesPageState extends State<MerchantCategoriesPage> {
       body: _loading && _items.isEmpty
           ? const DealGoSkeletonList(itemCount: 4)
           : _failure != null && _items.isEmpty
-          ? DealGoStateView.failure(
-              context,
-              onRetry: _load,
-              cause: _failure,
-              message: _failure is ApiException
-                  ? apiErrorText(
-                      AppLocalizations.of(context),
-                      _failure as ApiException,
-                    )
-                  : null,
+          ? DealGoRefresh(
+              onRefresh: _load,
+              child: DealGoStateView.failure(
+                context,
+                onRetry: _load,
+                cause: _failure,
+                message: _failure is ApiException
+                    ? apiErrorText(
+                        AppLocalizations.of(context),
+                        _failure as ApiException,
+                      )
+                    : null,
+              ),
             )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -263,65 +272,72 @@ class _MerchantCategoriesPageState extends State<MerchantCategoriesPage> {
                   ),
                 ),
                 Expanded(
-                  child: _items.isEmpty
-                      ? DealGoStateView(
-                          art: DealGoStateArt.noSearch,
-                          title: l10n.merchantCategoriesEmpty,
-                          compact: true,
-                        )
-                      : ReorderableListView.builder(
-                          key: const Key('merchant-category-reorder'),
-                          padding: merchantPagePadding,
-                          itemCount: _visible.length,
-                          buildDefaultDragHandles: false,
-                          onReorderItem: _search.text.trim().isEmpty
-                              ? _reorder
-                              : (oldIndex, newIndex) {},
-                          itemBuilder: (context, index) {
-                            final cat = _visible[index];
-                            return MerchantPanel(
-                              key: Key('merchant-category-${cat.id}'),
-                              child: Material(
-                                type: MaterialType.transparency,
-                                child: ListTile(
-                                  leading: ReorderableDragStartListener(
-                                    index: index,
-                                    child: const Icon(Icons.drag_handle),
-                                  ),
-                                  title: Text(capitalizeFirstLetter(cat.name)),
-                                  subtitle: Text(
-                                    l10n.merchantCategoriesItemsOnSale(
-                                      '${cat.itemCount}',
+                  child: DealGoRefresh(
+                    onRefresh: _load,
+                    child: _items.isEmpty
+                        ? DealGoStateView(
+                            art: DealGoStateArt.noSearch,
+                            title: l10n.merchantCategoriesEmpty,
+                            compact: true,
+                          )
+                        : ReorderableListView.builder(
+                            key: const Key('merchant-category-reorder'),
+                            padding: merchantPagePadding,
+                            itemCount: _visible.length,
+                            buildDefaultDragHandles: false,
+                            onReorderItem: _search.text.trim().isEmpty
+                                ? _reorder
+                                : (oldIndex, newIndex) {},
+                            itemBuilder: (context, index) {
+                              final cat = _visible[index];
+                              return MerchantPanel(
+                                key: Key('merchant-category-${cat.id}'),
+                                child: Material(
+                                  type: MaterialType.transparency,
+                                  child: ListTile(
+                                    leading: ReorderableDragStartListener(
+                                      index: index,
+                                      child: const Icon(Icons.drag_handle),
+                                    ),
+                                    title: Text(
+                                      capitalizeFirstLetter(cat.name),
+                                    ),
+                                    subtitle: Text(
+                                      l10n.merchantCategoriesItemsOnSale(
+                                        '${cat.itemCount}',
+                                      ),
+                                    ),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          key: Key(
+                                            'merchant-category-edit-${cat.id}',
+                                          ),
+                                          icon: const Icon(Icons.edit_outlined),
+                                          onPressed: _reordering
+                                              ? null
+                                              : () => _upsert(existing: cat),
+                                        ),
+                                        IconButton(
+                                          key: Key(
+                                            'merchant-category-delete-${cat.id}',
+                                          ),
+                                          icon: const Icon(
+                                            Icons.delete_outline,
+                                          ),
+                                          onPressed: _reordering
+                                              ? null
+                                              : () => _delete(cat),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        key: Key(
-                                          'merchant-category-edit-${cat.id}',
-                                        ),
-                                        icon: const Icon(Icons.edit_outlined),
-                                        onPressed: _reordering
-                                            ? null
-                                            : () => _upsert(existing: cat),
-                                      ),
-                                      IconButton(
-                                        key: Key(
-                                          'merchant-category-delete-${cat.id}',
-                                        ),
-                                        icon: const Icon(Icons.delete_outline),
-                                        onPressed: _reordering
-                                            ? null
-                                            : () => _delete(cat),
-                                      ),
-                                    ],
-                                  ),
                                 ),
-                              ),
-                            );
-                          },
-                        ),
+                              );
+                            },
+                          ),
+                  ),
                 ),
               ],
             ),

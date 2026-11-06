@@ -152,16 +152,19 @@ class _DriverCreditViewState extends State<_DriverCreditView>
     final l10n = AppLocalizations.of(context);
     final cubit = context.read<DriverCreditCubit>();
     if (state.status == DriverCreditStatus.failed && state.credit == null) {
-      return ListView(
-        padding: _padding,
-        children: [
-          DealGoStateView.failure(
-            context,
-            onRetry: cubit.load,
-            cause: state.cause,
-            compact: true,
-          ),
-        ],
+      return DealGoRefresh(
+        onRefresh: cubit.load,
+        child: ListView(
+          padding: _padding,
+          children: [
+            DealGoStateView.failure(
+              context,
+              onRetry: cubit.load,
+              cause: state.cause,
+              compact: true,
+            ),
+          ],
+        ),
       );
     }
     final credit = state.credit;

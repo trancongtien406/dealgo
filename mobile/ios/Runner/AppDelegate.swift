@@ -1,12 +1,16 @@
+import AVFAudio
 import CallKit
 import Flutter
 import PushKit
 import UIKit
 import UserNotifications
 import flutter_callkit_incoming
+import livekit_client
 
 @main
-@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, PKPushRegistryDelegate {
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate,
+  PKPushRegistryDelegate, CallkitIncomingAppDelegate
+{
   private var voipRegistry: PKPushRegistry?
   /// Last-resort CallKit reporter when the plugin is not attached yet.
   private lazy var fallbackProvider = CXProvider(configuration: CXProviderConfiguration())
@@ -17,6 +21,12 @@ import flutter_callkit_incoming
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    // Incoming-call audio must stay gated until CallKit activates its session.
+    // Outgoing in-app calls explicitly open the gate from Dart before joining.
+    LiveKitPlugin.setEngineAvailability(
+      isInputAvailable: false,
+      isOutputAvailable: false
+    )
     // Firebase.initializeApp is owned by Dart. Request APNs so FCM can map a
     // device token; FlutterAppDelegate + firebase_messaging method swizzling
     // forwards the token into Messaging (FirebaseMessaging is not a direct
@@ -66,6 +76,43 @@ import flutter_callkit_incoming
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+  }
+
+  // MARK: CallKit audio ownership
+
+  func onAccept(_ call: Call, _ action: CXAnswerCallAction) {
+    action.fulfill()
+  }
+
+  func onDecline(_ call: Call, _ action: CXEndCallAction) {
+    action.fulfill()
+  }
+
+  func onEnd(_ call: Call, _ action: CXEndCallAction) {
+    action.fulfill()
+  }
+
+  func onTimeOut(_ call: Call) {}
+
+  func didActivateAudioSession(_ audioSession: AVAudioSession) {
+    LiveKitPlugin.setEngineAvailability(
+      isInputAvailable: true,
+      isOutputAvailable: true
+    )
+  }
+
+  func didDeactivateAudioSession(_ audioSession: AVAudioSession) {
+    LiveKitPlugin.setEngineAvailability(
+      isInputAvailable: false,
+      isOutputAvailable: false
+    )
+  }
+
+  func providerDidReset() {
+    LiveKitPlugin.setEngineAvailability(
+      isInputAvailable: false,
+      isOutputAvailable: false
+    )
   }
 
   // MARK: PushKit

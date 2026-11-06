@@ -30,6 +30,8 @@ Future<void> _pump(WidgetTester tester, Widget child) {
   );
 }
 
+void _noop() {}
+
 void main() {
   testWidgets('feed card shows the two signature dishes and the meta line', (
     tester,
@@ -77,6 +79,61 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const Key('store-eta-fee-s2')), findsNothing);
+  });
+
+  testWidgets('compact card fits the fixed discovery rail height', (
+    tester,
+  ) async {
+    // Mirrors the "Đánh giá cao" rail height in food_discovery_page.dart.
+    const railHeight = 128.0;
+    for (final scale in [1.0, 1.3, 2.0]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('vi'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(scale)),
+            child: child!,
+          ),
+          home: Scaffold(
+            body: ListView(
+              children: [
+                SizedBox(
+                  height: railHeight * (scale < 1 ? 1 : scale),
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: const [
+                      SizedBox(
+                        width: 288,
+                        child: FoodStoreCard(
+                          store: FoodStoreSummary(
+                            id: 's3',
+                            name: 'Quán Ăn Vặt Sinh Viên Số 1 Sài Gòn',
+                            category: 'dessert',
+                            distanceKm: 12.4,
+                            etaMinutes: 45,
+                            deliveryFeeFromVnd: 25000,
+                            ratingAverage: 4.95,
+                            ratingCount: 128000,
+                            closesAtToday: '23:55',
+                          ),
+                          variant: FoodStoreCardVariant.compact,
+                          onTap: _noop,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull, reason: 'text scale $scale');
+    }
   });
 
   testWidgets('tapping the card calls onTap', (tester) async {

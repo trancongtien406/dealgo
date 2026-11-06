@@ -1,7 +1,6 @@
-import 'dart:typed_data';
-
 import 'package:dealgo/features/onboarding/domain/entities/partner_documents.dart';
 import 'package:dealgo/features/onboarding/presentation/capture/capture_hint.dart';
+import 'package:dealgo/features/onboarding/presentation/capture/camera_orientation.dart';
 import 'package:dealgo/features/onboarding/presentation/capture/capture_quality.dart';
 import 'package:dealgo/features/onboarding/presentation/capture/document_auto_capture_cubit.dart';
 import 'package:dealgo/features/onboarding/presentation/capture/frame_gate.dart';
@@ -13,7 +12,10 @@ import 'package:dealgo/features/onboarding/presentation/document_image_source.da
 import 'package:dealgo/features/onboarding/presentation/widgets/partner_kyc_widgets.dart';
 import 'package:dealgo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:camera/camera.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 import 'package:provider/provider.dart';
 
 const _w = 640;
@@ -57,6 +59,59 @@ const _okReport = CaptureQualityReport(
 );
 
 void main() {
+  group('camera frame orientation', () {
+    const front = CameraDescription(
+      name: 'front',
+      lensDirection: CameraLensDirection.front,
+      sensorOrientation: 90,
+    );
+    const back = CameraDescription(
+      name: 'back',
+      lensDirection: CameraLensDirection.back,
+      sensorOrientation: 90,
+    );
+
+    test('uses lens-aware Android compensation', () {
+      expect(
+        cameraRotationDegrees(
+          camera: front,
+          deviceOrientation: DeviceOrientation.landscapeLeft,
+          isIOS: false,
+        ),
+        180,
+      );
+      expect(
+        cameraRotationDegrees(
+          camera: back,
+          deviceOrientation: DeviceOrientation.landscapeLeft,
+          isIOS: false,
+        ),
+        0,
+      );
+      expect(
+        cameraRotationDegrees(
+          camera: front,
+          deviceOrientation: DeviceOrientation.landscapeRight,
+          isIOS: true,
+        ),
+        90,
+      );
+    });
+
+    test('bakes JPEG EXIF rotation into portrait pixels before upload', () {
+      final source = img.Image(width: 4, height: 2)
+        ..exif.imageIfd.orientation = 6;
+      final prepared = prepareIdPhoto(
+        Uint8List.fromList(img.encodeJpg(source)),
+      );
+      final uploaded = img.decodeJpg(prepared!.jpeg);
+
+      expect(uploaded, isNotNull);
+      expect((uploaded!.width, uploaded.height), (2, 4));
+      expect(uploaded.exif.imageIfd.orientation, isNull);
+    });
+  });
+
   group('frame gate (t53u auto capture)', () {
     test('card fully in frame, sharp, lit → shoot', () {
       expect(evaluateCardFrame(_frame()), CaptureHint.none);

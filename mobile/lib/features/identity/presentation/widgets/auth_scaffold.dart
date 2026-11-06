@@ -20,6 +20,7 @@ class AuthScaffold extends StatelessWidget {
     this.centerLogo = false,
     this.onLogoDoubleTap,
     this.padBody = true,
+    this.headerTrailing,
     super.key,
   });
 
@@ -29,6 +30,7 @@ class AuthScaffold extends StatelessWidget {
   final bool centerLogo;
   final VoidCallback? onLogoDoubleTap;
   final bool padBody;
+  final Widget? headerTrailing;
 
   @override
   Widget build(BuildContext context) {
@@ -36,47 +38,102 @@ class AuthScaffold extends StatelessWidget {
       onDoubleTap: onLogoDoubleTap,
       child: const DealGoLogo.wordmark(size: 24),
     );
-    // Status bar style comes from the app-wide default (DealGoApp builder).
+
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isTablet = screenWidth >= 600;
+
+    Widget buildHeader({EdgeInsets padding = const EdgeInsets.symmetric(horizontal: DealGoSpacing.s4)}) {
+      return SizedBox(
+        height: DealGoDimensions.headerHeight,
+        child: Padding(
+          padding: padding,
+          child: Row(
+            children: [
+              if (onBack != null)
+                AuthBackButton(key: backKey, onPressed: onBack!)
+              else
+                const SizedBox(width: DealGoSpacing.s12),
+              if (centerLogo) const Spacer(),
+              logo,
+              const Spacer(),
+              headerTrailing ?? const AuthHelpButton(),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: DealGoColors.card,
       body: Stack(
         children: [
-          const Positioned.fill(child: _AuthBackdrop()),
+          const Positioned.fill(child: AuthBackdrop()),
           SafeArea(
-            child: Column(
-              children: [
-                SizedBox(
-                  height: DealGoDimensions.headerHeight,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: DealGoSpacing.s4,
+            child: isTablet
+                ? Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: DealGoSpacing.s24,
+                        horizontal: DealGoSpacing.s16,
+                      ),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 480),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: DealGoColors.card,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: DealGoColors.border.withValues(alpha: 0.8),
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x140F172A),
+                                blurRadius: 28,
+                                offset: Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              buildHeader(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: DealGoSpacing.s12,
+                                ),
+                              ),
+                              Padding(
+                                padding: padBody
+                                    ? const EdgeInsets.fromLTRB(
+                                        DealGoSpacing.s24,
+                                        DealGoSpacing.s4,
+                                        DealGoSpacing.s24,
+                                        DealGoSpacing.s24,
+                                      )
+                                    : EdgeInsets.zero,
+                                child: body,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                    child: Row(
-                      children: [
-                        if (onBack != null)
-                          AuthBackButton(key: backKey, onPressed: onBack!)
-                        else
-                          const SizedBox(width: DealGoSpacing.s12),
-                        if (centerLogo) const Spacer(),
-                        logo,
-                        const Spacer(),
-                        const AuthHelpButton(),
-                      ],
-                    ),
+                  )
+                : Column(
+                    children: [
+                      buildHeader(),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: padBody
+                              ? const EdgeInsets.symmetric(
+                                  horizontal: DealGoSpacing.s20,
+                                )
+                              : EdgeInsets.zero,
+                          child: body,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: padBody
-                        ? const EdgeInsets.symmetric(
-                            horizontal: DealGoSpacing.s20,
-                          )
-                        : EdgeInsets.zero,
-                    child: body,
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -84,8 +141,8 @@ class AuthScaffold extends StatelessWidget {
   }
 }
 
-class _AuthBackdrop extends StatelessWidget {
-  const _AuthBackdrop();
+class AuthBackdrop extends StatelessWidget {
+  const AuthBackdrop({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -96,21 +153,35 @@ class _AuthBackdrop extends StatelessWidget {
     );
     return IgnorePointer(
       child: Stack(
+        fit: StackFit.expand,
         children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFFFBFBFE),
+                  Color(0xFFF8F6FD),
+                  Color(0xFFF5FAF7),
+                ],
+              ),
+            ),
+          ),
           Positioned(
             top: -60,
             left: -70,
-            child: blob(DealGoColors.primary.withValues(alpha: 0.06), 260),
+            child: blob(DealGoColors.primary.withValues(alpha: 0.07), 320),
           ),
           Positioned(
-            top: 180,
+            top: 160,
             right: -80,
-            child: blob(DealGoColors.brandGreen.withValues(alpha: 0.05), 230),
+            child: blob(DealGoColors.brandGreen.withValues(alpha: 0.05), 280),
           ),
           Positioned(
             bottom: -60,
             left: -50,
-            child: blob(DealGoColors.primary.withValues(alpha: 0.045), 220),
+            child: blob(DealGoColors.primary.withValues(alpha: 0.05), 260),
           ),
         ],
       ),

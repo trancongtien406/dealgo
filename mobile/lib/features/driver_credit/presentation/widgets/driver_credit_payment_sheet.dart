@@ -12,6 +12,7 @@ import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/motion/dealgo_sheet.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_money.dart';
 import '../../domain/driver_credit.dart';
@@ -35,7 +36,7 @@ Future<void> showDriverTopUpSheet(
   required String topUpId,
   required DriverCreditUrlLauncher launcher,
 }) {
-  return showModalBottomSheet<void>(
+  return showDealGoSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

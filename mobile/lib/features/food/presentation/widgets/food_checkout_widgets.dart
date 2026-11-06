@@ -55,6 +55,23 @@ class CheckoutBody extends StatelessWidget {
   }
 }
 
+/// Whether [phase] renders a sticky action bar. Kept in sync with
+/// [CheckoutActions] so the page can omit the bar entirely instead of
+/// rendering a zero-height one, which would drop the system inset from the
+/// body's scroll padding.
+bool checkoutActionsVisible(
+  CheckoutPhase phase,
+  FoodCartState cart, {
+  required bool busy,
+}) {
+  if (busy && phase is! CheckoutOffline) return false;
+  return switch (phase) {
+    CheckoutEditing() || CheckoutRejected() => cart.lines.isNotEmpty,
+    CheckoutOffline() || CheckoutRepriced() => true,
+    _ => false,
+  };
+}
+
 class CheckoutActions extends StatelessWidget {
   const CheckoutActions({
     required this.phase,
@@ -86,7 +103,7 @@ class CheckoutActions extends StatelessWidget {
       ),
       _ => null,
     };
-    if (child == null || busy && phase is! CheckoutOffline) {
+    if (child == null || !checkoutActionsVisible(phase, cart, busy: busy)) {
       return const SizedBox.shrink();
     }
     return DealGoBottomBar(child: child);
@@ -357,6 +374,10 @@ class _Receipt extends StatelessWidget {
           const SizedBox(height: DealGoSpacing.s12),
           FoodEtaLine(minutes: cart.etaMinutes!),
         ],
+        if (order == null && !placed && cart.deliveryQuote != null) ...[
+          const SizedBox(height: DealGoSpacing.s12),
+          const FoodFareOfferPanel(),
+        ],
         const SizedBox(height: DealGoSpacing.s12),
         FoodPanel(
           child: Column(
@@ -401,10 +422,6 @@ class _Receipt extends StatelessWidget {
             storeId: cart.storeId,
             initialCode: cart.voucherCode,
           ),
-          if (cart.deliveryQuote != null) ...[
-            const SizedBox(height: DealGoSpacing.s12),
-            const FoodFareOfferPanel(),
-          ],
           const SizedBox(height: DealGoSpacing.s12),
           const FoodCheckoutExtrasPanel(),
         ],
@@ -989,8 +1006,12 @@ class _CheckoutVoucherPanel extends StatefulWidget {
 }
 
 class _CheckoutVoucherPanelState extends State<_CheckoutVoucherPanel> {
-  String? _pickedCode;
-  var _pickedVersion = 0;
+  /// Code the field currently has quoted, mirrored from its callback: the
+  /// field owns the truth, so clearing it there also clears the sheet's
+  /// selected ticket on the next open.
+  String? _appliedCode;
+  String? _seededCode;
+  var _seededVersion = 0;
 
   Future<void> _openList() async {
     final vouchers = context.read<ListAvailableVouchers>();
@@ -1001,7 +1022,7 @@ class _CheckoutVoucherPanelState extends State<_CheckoutVoucherPanel> {
       builder: (context) => FoodVoucherPickerSheet(
         orderAmountVnd: widget.subtotal,
         deliveryFeeVnd: widget.delivery,
-        selectedCode: _pickedCode ?? widget.initialCode,
+        selectedCode: _appliedCode ?? widget.initialCode,
         load: () {
           if (token == null || token.isEmpty) {
             throw const ApiException(
@@ -1022,8 +1043,8 @@ class _CheckoutVoucherPanelState extends State<_CheckoutVoucherPanel> {
       return;
     }
     setState(() {
-      _pickedCode = code;
-      _pickedVersion++;
+      _seededCode = code;
+      _seededVersion++;
     });
   }
 
@@ -1078,12 +1099,18 @@ class _CheckoutVoucherPanelState extends State<_CheckoutVoucherPanel> {
             accessToken: () => currentAccessToken(context),
             formatAmount: formatVnd,
             initialCode: widget.initialCode,
-            seededCode: _pickedCode,
-            seededCodeVersion: _pickedVersion,
-            onQuote: (quote) => context.read<FoodCartCubit>().applyVoucher(
-              code: quote != null && quote.valid ? quote.code : null,
-              discountVnd: quote?.discountVnd ?? 0,
-            ),
+            seededCode: _seededCode,
+            seededCodeVersion: _seededVersion,
+            onQuote: (quote) {
+              final applied = quote != null && quote.valid ? quote.code : null;
+              if (applied != _appliedCode) {
+                setState(() => _appliedCode = applied);
+              }
+              context.read<FoodCartCubit>().applyVoucher(
+                code: applied,
+                discountVnd: quote?.discountVnd ?? 0,
+              );
+            },
           ),
         ],
       ),

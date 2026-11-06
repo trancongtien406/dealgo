@@ -437,7 +437,7 @@ class _DriverOfferPageState extends State<_DriverOfferView> {
                   DealGoDimensions.pageGutter,
                   DealGoSpacing.s8,
                   DealGoDimensions.pageGutter,
-                  DealGoSpacing.s16,
+                  DealGoSpacing.s12,
                 ),
                 child: DealGoPrimaryButton(
                   key: const Key('driver-submit-offer'),

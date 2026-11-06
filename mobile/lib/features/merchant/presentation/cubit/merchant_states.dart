@@ -9,6 +9,7 @@ import '../widgets/merchant_widgets.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/format/short_ref.dart';
 import '../../../../core/design_system/components/dealgo_nav_insets.dart';
+import '../../../../core/design_system/components/dealgo_refresh.dart';
 
 class MerchantQueueLoadingView extends StatelessWidget {
   const MerchantQueueLoadingView({required this.title, super.key});
@@ -49,17 +50,20 @@ class MerchantIneligibleView extends StatelessWidget {
         label: AppLocalizations.of(context).actionRetry,
         onPressed: onRetry,
       ),
-      body: ListView(
-        padding: dealGoScrollPadding(context, merchantPagePadding),
-        children: [
-          MerchantHero(
-            icon: DealGoIcons.alert,
-            iconColor: DealGoColors.danger,
-            background: DealGoColors.dangerSurface,
-            title: l10n.merchantIneligibleTitle,
-            message: l10n.merchantIneligibleMessage,
-          ),
-        ],
+      body: DealGoRefresh(
+        onRefresh: () async => onRetry(),
+        child: ListView(
+          padding: dealGoScrollPadding(context, merchantPagePadding),
+          children: [
+            MerchantHero(
+              icon: DealGoIcons.alert,
+              iconColor: DealGoColors.danger,
+              background: DealGoColors.dangerSurface,
+              title: l10n.merchantIneligibleTitle,
+              message: l10n.merchantIneligibleMessage,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -81,17 +85,20 @@ class MerchantQueueEmptyView extends StatelessWidget {
         label: l10n.merchantReloadOrders,
         onPressed: onCheck,
       ),
-      body: ListView(
-        padding: dealGoScrollPadding(context, merchantPagePadding),
-        children: [
-          MerchantHero(
-            icon: DealGoIcons.square,
-            iconColor: DealGoColors.brandGreen,
-            background: DealGoColors.greenSurface,
-            title: l10n.merchantNoNewOrders,
-            message: l10n.merchantNoNewOrdersBody,
-          ),
-        ],
+      body: DealGoRefresh(
+        onRefresh: () async => onCheck(),
+        child: ListView(
+          padding: dealGoScrollPadding(context, merchantPagePadding),
+          children: [
+            MerchantHero(
+              icon: DealGoIcons.square,
+              iconColor: DealGoColors.brandGreen,
+              background: DealGoColors.greenSurface,
+              title: l10n.merchantNoNewOrders,
+              message: l10n.merchantNoNewOrdersBody,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -143,65 +150,68 @@ class _MerchantQueueErrorViewState extends State<MerchantQueueErrorView> {
         onSecondary: () => setState(() => _showSaved = true),
         onPrimary: widget.onRetry,
       ),
-      body: ListView(
-        padding: dealGoScrollPadding(context, merchantPagePadding),
-        children: [
-          MerchantHero(
-            icon: DealGoIcons.alert,
-            iconColor: DealGoColors.danger,
-            background: DealGoColors.dangerSurface,
-            title: title,
-            message: message,
-          ),
-          const SizedBox(height: DealGoSpacing.s24),
-          MerchantPanel(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(l10n.merchantConnection, style: textTheme.titleMedium),
-                const SizedBox(height: DealGoSpacing.s12),
-                MerchantChip(
-                  label: l10n.merchantLoadFailedChip,
-                  tone: MerchantChipTone.warning,
-                ),
-                const SizedBox(height: DealGoSpacing.s16),
-                MerchantMoneyRow(
-                  label: l10n.merchantLastSynced,
-                  value: formatSyncClock(l10n, widget.syncedAt),
-                ),
-              ],
+      body: DealGoRefresh(
+        onRefresh: () async => widget.onRetry(),
+        child: ListView(
+          padding: dealGoScrollPadding(context, merchantPagePadding),
+          children: [
+            MerchantHero(
+              icon: DealGoIcons.alert,
+              iconColor: DealGoColors.danger,
+              background: DealGoColors.dangerSurface,
+              title: title,
+              message: message,
             ),
-          ),
-          if (_showSaved) ...[
-            const SizedBox(height: DealGoSpacing.s16),
-            if (widget.saved.isEmpty)
-              Text(l10n.merchantNoSavedOrders, style: textTheme.bodyMedium)
-            else ...[
-              Text(l10n.merchantSavedOrders, style: textTheme.titleMedium),
-              const SizedBox(height: DealGoSpacing.s8),
-              for (final order in widget.saved) ...[
-                MerchantPanel(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l10n.orderRef(shortRef(order.id)),
-                        style: textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: DealGoSpacing.s4),
-                      Text(
-                        merchantStatusLabel(l10n, order.status),
-                        style: textTheme.bodySmall,
-                      ),
-                      Text(order.dropoff.label, style: textTheme.bodyMedium),
-                    ],
+            const SizedBox(height: DealGoSpacing.s24),
+            MerchantPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.merchantConnection, style: textTheme.titleMedium),
+                  const SizedBox(height: DealGoSpacing.s12),
+                  MerchantChip(
+                    label: l10n.merchantLoadFailedChip,
+                    tone: MerchantChipTone.warning,
                   ),
-                ),
+                  const SizedBox(height: DealGoSpacing.s16),
+                  MerchantMoneyRow(
+                    label: l10n.merchantLastSynced,
+                    value: formatSyncClock(l10n, widget.syncedAt),
+                  ),
+                ],
+              ),
+            ),
+            if (_showSaved) ...[
+              const SizedBox(height: DealGoSpacing.s16),
+              if (widget.saved.isEmpty)
+                Text(l10n.merchantNoSavedOrders, style: textTheme.bodyMedium)
+              else ...[
+                Text(l10n.merchantSavedOrders, style: textTheme.titleMedium),
                 const SizedBox(height: DealGoSpacing.s8),
+                for (final order in widget.saved) ...[
+                  MerchantPanel(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.orderRef(shortRef(order.id)),
+                          style: textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: DealGoSpacing.s4),
+                        Text(
+                          merchantStatusLabel(l10n, order.status),
+                          style: textTheme.bodySmall,
+                        ),
+                        Text(order.dropoff.label, style: textTheme.bodyMedium),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: DealGoSpacing.s8),
+                ],
               ],
             ],
           ],
-        ],
+        ),
       ),
     );
   }

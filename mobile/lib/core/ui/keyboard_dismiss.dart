@@ -55,6 +55,16 @@ class DealGoScrollBehavior extends MaterialScrollBehavior {
   const DealGoScrollBehavior();
 
   @override
+  Set<PointerDeviceKind> get dragDevices => const {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+    PointerDeviceKind.stylus,
+    PointerDeviceKind.invertedStylus,
+    PointerDeviceKind.unknown,
+  };
+
+  @override
   ScrollViewKeyboardDismissBehavior getKeyboardDismissBehavior(
     BuildContext context,
   ) => ScrollViewKeyboardDismissBehavior.onDrag;

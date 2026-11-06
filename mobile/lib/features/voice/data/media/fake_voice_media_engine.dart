@@ -9,10 +9,14 @@ class FakeVoiceMediaEngine implements VoiceMediaEngine {
 
   bool micGranted;
   Object? joinError;
+
+  /// Held open by a test to hang up while the room is still connecting.
+  Completer<void>? joinGate;
   final List<String> log = [];
   bool joined = false;
   bool micOn = false;
   bool speakerOn = false;
+  bool lastSystemCallOwnsAudio = false;
   final _events = StreamController<VoiceMediaEvent>.broadcast();
 
   @override
@@ -24,8 +28,17 @@ class FakeVoiceMediaEngine implements VoiceMediaEngine {
   Future<bool> ensureMicrophonePermission() async => micGranted;
 
   @override
-  Future<void> join({required String url, required String token}) async {
+  Future<void> join({
+    required String url,
+    required String token,
+    bool systemCallOwnsAudio = false,
+  }) async {
+    lastSystemCallOwnsAudio = systemCallOwnsAudio;
     log.add('join:$url');
+    final gate = joinGate;
+    if (gate != null) {
+      await gate.future;
+    }
     final err = joinError;
     if (err != null) {
       throw err;

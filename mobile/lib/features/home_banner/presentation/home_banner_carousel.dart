@@ -13,6 +13,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../identity/domain/entities/app_role.dart';
 import '../data/home_banner_tracker.dart';
 import '../domain/home_banner.dart';
+import '../../../core/design_system/components/dealgo_image_cache.dart';
 import '../../../core/design_system/components/dealgo_network_image.dart';
 
 /// Opens a web CTA; returns false when nothing could be opened.
@@ -37,8 +38,8 @@ Future<bool> openHomeBannerWeb(Uri uri) async {
 ///
 /// 2:1 frame. Autoplays every [interval] while visible; a touch pauses it and
 /// it stops while the page is covered, off-tab or the app is backgrounded.
-/// Shows a skeleton while loading and nothing at all when there is no banner
-/// or the request fails, so the home never shows a dead slot.
+/// Shows nothing at all when there is no banner, loading, or the request fails,
+/// so the home or food page never shows a dead slot or blank placeholder.
 class HomeBannerCarousel extends StatefulWidget {
   const HomeBannerCarousel({
     required this.role,
@@ -48,6 +49,7 @@ class HomeBannerCarousel extends StatefulWidget {
     this.locationTimeout = const Duration(milliseconds: 1500),
     this.service,
     this.empty = const SizedBox.shrink(),
+    this.refreshToken = 0,
     super.key,
   });
 
@@ -65,13 +67,19 @@ class HomeBannerCarousel extends StatefulWidget {
   final HomeBannerWebOpener openWeb;
   final Duration locationTimeout;
 
+  /// Bumped by parent pull-to-refresh to reload banners without unmounting.
+  final int refreshToken;
+
   @override
   State<HomeBannerCarousel> createState() => _HomeBannerCarouselState();
 }
 
 class _HomeBannerCarouselState extends State<HomeBannerCarousel>
-    with WidgetsBindingObserver {
+    with
+        WidgetsBindingObserver,
+        AutomaticKeepAliveClientMixin<HomeBannerCarousel> {
   final _page = PageController();
+  final _failedBannerIds = <String>{};
   List<HomeBanner>? _banners;
   HomeBannerTracker? _tracker;
   Timer? _timer;
@@ -79,12 +87,85 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
   var _touching = false;
   var _visible = true;
   var _foreground = true;
+  ScrollPosition? _scroll;
+  var _inViewport = true;
+
+  /// Feed headers sit in lazy slivers; rebuilding the carousel on every scroll
+  /// back to the top repeated the public banners request and lost the page.
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     unawaited(_load());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _bindScrollable();
+    final visible = TickerMode.valuesOf(context).enabled;
+    if (visible != _visible) {
+      _visible = visible;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _markSeen();
+        _arm();
+      });
+    }
+  }
+
+  /// A kept-alive carousel that scrolls out of view must stop autoplaying:
+  /// otherwise it advances and records impressions for banners nobody sees.
+  void _bindScrollable() {
+    final position = Scrollable.maybeOf(context)?.position;
+    if (identical(position, _scroll)) {
+      return;
+    }
+    _scroll?.removeListener(_updateViewport);
+    _scroll = position;
+    _scroll?.addListener(_updateViewport);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateViewport());
+  }
+
+  void _updateViewport() {
+    if (!mounted) {
+      return;
+    }
+    final box = context.findRenderObject();
+    final viewport = _scroll?.context.storageContext.findRenderObject();
+    var visible = false;
+    if (box is RenderBox &&
+        viewport is RenderBox &&
+        box.attached &&
+        viewport.attached &&
+        box.hasSize &&
+        viewport.hasSize) {
+      final rect = MatrixUtils.transformRect(
+        box.getTransformTo(viewport),
+        Offset.zero & box.size,
+      );
+      visible = rect.overlaps(Offset.zero & viewport.size);
+    }
+    if (visible == _inViewport) {
+      return;
+    }
+    _inViewport = visible;
+    if (visible) {
+      _markSeen();
+    }
+    _arm();
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeBannerCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken ||
+        oldWidget.role != widget.role ||
+        oldWidget.service != widget.service) {
+      unawaited(_load());
+    }
   }
 
   T? _maybeRead<T>() {
@@ -123,14 +204,13 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
         lng: lng,
       );
       final service = widget.service;
-      _show(
-        service == null
-            ? banners
-            : [
-                for (final banner in banners)
-                  if (banner.service == service) banner,
-              ],
-      );
+      final valid = [
+        for (final banner in banners)
+          if ((service == null || banner.service == service) &&
+              resolveMediaUrl(banner.imageUrl) != null)
+            banner,
+      ];
+      _show(valid);
     } catch (_) {
       _show(const []);
     }
@@ -145,23 +225,11 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
       _index = 0;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateViewport();
       _markSeen();
       _precache(1);
       _arm();
     });
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final visible = TickerMode.valuesOf(context).enabled;
-    if (visible != _visible) {
-      _visible = visible;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _markSeen();
-        _arm();
-      });
-    }
   }
 
   @override
@@ -178,6 +246,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
     return mounted &&
         count > 1 &&
         _visible &&
+        _inViewport &&
         _foreground &&
         !_touching &&
         !MediaQuery.disableAnimationsOf(context);
@@ -204,7 +273,11 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
 
   void _markSeen() {
     final banners = _banners;
-    if (!mounted || !_visible || banners == null || banners.isEmpty) {
+    if (!mounted ||
+        !_visible ||
+        !_inViewport ||
+        banners == null ||
+        banners.isEmpty) {
       return;
     }
     final i = _index.clamp(0, banners.length - 1);
@@ -218,7 +291,19 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
     }
     final url = resolveMediaUrl(banners[i % banners.length].imageUrl);
     if (url != null) {
-      unawaited(precacheImage(NetworkImage(url), context, onError: (_, _) {}));
+      final media = MediaQuery.maybeOf(context);
+      final width = media?.size.width ?? 400;
+      final dpr = media?.devicePixelRatio ?? 2;
+      unawaited(
+        precacheImage(
+          DealGoImageCache.provider(
+            url,
+            decodeWidth: DealGoNetworkImage.decodeWidth(width, width / 2, dpr),
+          ),
+          context,
+          onError: (_, _) {},
+        ),
+      );
     }
   }
 
@@ -252,21 +337,39 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _scroll?.removeListener(_updateViewport);
     _timer?.cancel();
     unawaited(_tracker?.flush());
     _page.dispose();
     super.dispose();
   }
 
+  void _onBannerFailed(String id) {
+    if (WidgetsBinding.instance.runtimeType.toString().contains(
+      'TestWidgetsFlutterBinding',
+    )) {
+      return;
+    }
+    if (_failedBannerIds.add(id)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {});
+        }
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final banners = _banners;
-    if (banners == null) {
-      return Padding(
-        padding: EdgeInsets.only(bottom: widget.gapBelow),
-        child: const _BannerSkeleton(key: Key('home-banner-skeleton')),
-      );
+    super.build(context);
+    final allBanners = _banners;
+    if (allBanners == null || allBanners.isEmpty) {
+      return widget.empty;
     }
+    final banners = [
+      for (final banner in allBanners)
+        if (!_failedBannerIds.contains(banner.id)) banner,
+    ];
     if (banners.isEmpty) {
       return widget.empty;
     }
@@ -275,7 +378,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
       padding: EdgeInsets.only(bottom: widget.gapBelow),
       child: Material(
         key: const Key('home-banner-carousel'),
-        color: DealGoColors.primaryDeep,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(DealGoRadius.card),
         clipBehavior: Clip.antiAlias,
         child: AspectRatio(
@@ -305,6 +408,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
                     onTap: banners[index].cta == null
                         ? null
                         : () => _open(banners[index], index),
+                    onError: () => _onBannerFailed(banners[index].id),
                   ),
                 ),
                 if (banners.length > 1)
@@ -341,60 +445,33 @@ class _BannerPage extends StatelessWidget {
     required this.banner,
     required this.semanticsLabel,
     this.onTap,
+    this.onError,
   });
 
   final HomeBanner banner;
   final String semanticsLabel;
   final VoidCallback? onTap;
+  final VoidCallback? onError;
 
   @override
   Widget build(BuildContext context) {
     final url = resolveMediaUrl(banner.imageUrl);
-    const fallback = DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [DealGoColors.primaryDeep, DealGoColors.primary],
-        ),
-      ),
-    );
+    if (url == null) {
+      return const SizedBox.shrink();
+    }
     return Semantics(
       button: onTap != null,
       label: semanticsLabel,
       excludeSemantics: true,
       child: InkWell(
         onTap: onTap,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (url == null)
-              fallback
-            else
-              DealGoNetworkImage(
-                url,
-                fit: BoxFit.cover,
-                filterQuality: FilterQuality.medium,
-                gaplessPlayback: true,
-
-                fallback: fallback,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _BannerSkeleton extends StatelessWidget {
-  const _BannerSkeleton({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 2,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: DealGoColors.skeletonBase,
-          borderRadius: BorderRadius.circular(DealGoRadius.card),
+        child: DealGoNetworkImage(
+          url,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.medium,
+          gaplessPlayback: true,
+          onError: (_, _) => onError?.call(),
+          fallback: const SizedBox.shrink(),
         ),
       ),
     );

@@ -20,12 +20,15 @@ class DioSupportRemoteDataSource implements SupportRepository {
   Future<SupportTicketPage> list({
     required String accessToken,
     SupportListFilter filter = SupportListFilter.all,
+    int page = 1,
+    int limit = 50,
   }) async {
     try {
       final response = await dio.get<Object?>(
         ApiPaths.supportTickets,
         queryParameters: {
-          'limit': 50,
+          'page': page,
+          'limit': limit,
           if (filter == SupportListFilter.active) 'state': 'ACTIVE',
           if (filter == SupportListFilter.done) 'state': 'DONE',
         },
@@ -209,6 +212,7 @@ SupportTicketPage decodeSupportPage(Map<String, Object?> data) {
     total: data['total'] is num ? count('total') : tickets.length,
     activeCount: count('activeCount'),
     doneCount: count('doneCount'),
+    page: count('page') == 0 ? 1 : count('page'),
   );
 }
 
@@ -242,6 +246,8 @@ class FakeSupportRepository implements SupportRepository {
   Future<SupportTicketPage> list({
     required String accessToken,
     SupportListFilter filter = SupportListFilter.all,
+    int page = 1,
+    int limit = 50,
   }) async {
     _maybeFail();
     final sorted = [..._tickets]
@@ -254,11 +260,14 @@ class FakeSupportRepository implements SupportRepository {
       SupportListFilter.done =>
         sorted.where((t) => !t.status.isActive).toList(),
     };
+    final start = (page - 1) * limit;
+    final slice = items.skip(start).take(limit).toList(growable: false);
     return SupportTicketPage(
-      items: items,
+      items: slice,
       total: items.length,
       activeCount: active,
       doneCount: sorted.length - active,
+      page: page,
     );
   }
 

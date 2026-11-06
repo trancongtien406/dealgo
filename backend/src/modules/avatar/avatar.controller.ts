@@ -7,6 +7,7 @@ import {
   Param,
   Header,
   Post,
+  Query,
   StreamableFile,
   UseGuards,
 } from '@nestjs/common';
@@ -15,6 +16,8 @@ import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AccessAuthGuard, CurrentActor, type RequestActor } from '../identity/access-auth.guard.js';
 import { UploadAvatarDto } from '../identity/me.dto.js';
 import { SkipResponseEnvelope } from '../../platform/http/skip-response-envelope.js';
+import { PUBLIC_IMAGE_CACHE_CONTROL } from '../../platform/http/public-image-cache.js';
+import { resolveImageVariantWidth } from '../../platform/storage/image-variants.js';
 import { AvatarService } from './avatar.service.js';
 
 @ApiTags('identity')
@@ -48,11 +51,15 @@ export class PublicAvatarController {
   @Get(':userId/:file')
   @SkipResponseEnvelope()
   @Throttle({ default: { limit: 600, ttl: 60_000 } })
-  @Header('Cache-Control', 'public, max-age=86400, immutable')
+  @Header('Cache-Control', PUBLIC_IMAGE_CACHE_CONTROL)
   @Header('X-Content-Type-Options', 'nosniff')
   @ApiOperation({ summary: "A user's current avatar image (404 for replaced or unknown files)" })
-  async read(@Param('userId') userId: string, @Param('file') file: string): Promise<StreamableFile> {
-    const found = await this.avatars.read(userId, file);
+  async read(
+    @Param('userId') userId: string,
+    @Param('file') file: string,
+    @Query('w') w?: string,
+  ): Promise<StreamableFile> {
+    const found = await this.avatars.read(userId, file, resolveImageVariantWidth(w));
     return new StreamableFile(found.body, { type: found.contentType, length: found.body.byteLength });
   }
 }

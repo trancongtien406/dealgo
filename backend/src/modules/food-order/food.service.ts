@@ -662,7 +662,7 @@ export class FoodService {
       return 0;
     }
     const settingRadiusKm = await this.settings.getNumber(
-      'DRIVER_SEARCH_RADIUS_KM',
+      'FOOD_BROWSE_RADIUS_KM',
     );
     return query.max_km !== undefined
       ? Math.min(query.max_km, settingRadiusKm)

@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../domain/auth_redirect.dart';
 import '../cubit/phone_auth_cubit.dart';
+import '../widgets/auth_scaffold.dart';
 import '../widgets/otp_widgets.dart';
 
 const _resendWait = Duration(seconds: 30);
@@ -216,33 +218,10 @@ class _OtpPageState extends State<OtpPage> {
         final displayError = isOtpCodeFailure(_error) ? null : _error;
 
         return Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: DealGoColors.card,
           body: Stack(
             children: [
-              Positioned(
-                top: -40,
-                left: -50,
-                child: Container(
-                  width: 220,
-                  height: 220,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF6D28D9).withValues(alpha: 0.05),
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: -40,
-                right: -40,
-                child: Container(
-                  width: 200,
-                  height: 200,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF10B981).withValues(alpha: 0.05),
-                  ),
-                ),
-              ),
+              const Positioned.fill(child: AuthBackdrop()),
               SafeArea(
                 child: switch (_pane) {
                   _OtpPane.entry => OtpEntryPane(

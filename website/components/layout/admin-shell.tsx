@@ -174,6 +174,17 @@ export function AdminShell({ children }: { children: ReactNode }) {
           >
             <OpsIcon name="menu" className="size-5" />
           </button>
+          <Link
+            href="/overview"
+            className="flex items-center gap-2 lg:hidden shrink-0"
+            title="DealGo Quản trị"
+          >
+            <BrandMark compact className="size-8" />
+            <span className="hidden sm:inline-flex text-base font-black tracking-tight leading-none">
+              <span className="text-[#6D28D9]">Deal</span>
+              <span className="text-[#16A34A]">Go</span>
+            </span>
+          </Link>
           <div className="relative min-w-0 flex-1">
             <CommandPaletteTrigger onOpen={() => setPaletteOpen(true)} />
           </div>

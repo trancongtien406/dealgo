@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/config/api_base_url.dart';
 import '../../../../core/design_system/components/dealgo_date_time_picker.dart';
+import '../../../../core/design_system/components/dealgo_image_cache.dart';
 import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
@@ -208,6 +209,7 @@ class _ProfileFormState extends State<ProfileForm> {
           DealGoTextField(
             fieldKey: const Key('name-field'),
             label: l10n.profileFullName,
+            hint: 'Nhập họ và tên của bạn',
             controller: _c.name,
             onChanged: (_) => _c.touch(),
             prefixIcon: DealGoIcons.user,
@@ -242,6 +244,7 @@ class _ProfileFormState extends State<ProfileForm> {
             DealGoTextField(
               fieldKey: const Key('email-field'),
               label: 'Email',
+              hint: 'Nhập địa chỉ email của bạn',
               controller: _c.email,
               onChanged: (_) => _c.touch(),
               keyboardType: TextInputType.emailAddress,
@@ -252,6 +255,7 @@ class _ProfileFormState extends State<ProfileForm> {
           const SizedBox(height: 12),
           DealGoDateField(
             label: l10n.profileBirthdayOptional,
+            hint: 'Chọn ngày sinh của bạn',
             value: _c.dateOfBirth,
             firstDate: DateTime(1920),
             lastDate: DateTime.now(),
@@ -284,6 +288,61 @@ class _ProfileFormState extends State<ProfileForm> {
                     ),
                   ),
                 ],
+              ],
+            ),
+          ),
+          const SizedBox(height: DealGoSpacing.s16),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: DealGoSpacing.s16,
+              vertical: DealGoSpacing.s12,
+            ),
+            decoration: BoxDecoration(
+              color: DealGoColors.subtlePurple,
+              borderRadius: BorderRadius.circular(DealGoRadius.input),
+              border: Border.all(
+                color: DealGoColors.border.withValues(alpha: 0.6),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  DealGoIcons.info,
+                  size: 20,
+                  color: DealGoColors.primary,
+                ),
+                const SizedBox(width: DealGoSpacing.s8),
+                Expanded(
+                  child: Text.rich(
+                    TextSpan(
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: DealGoColors.textSecondary,
+                        height: 1.4,
+                      ),
+                      children: const [
+                        TextSpan(
+                          text: 'Thông tin này giúp cá nhân hoá trải nghiệm ',
+                        ),
+                        TextSpan(
+                          text: 'Deal',
+                          style: TextStyle(
+                            color: DealGoColors.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        TextSpan(
+                          text: 'Go',
+                          style: TextStyle(
+                            color: DealGoColors.brandGreen,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        TextSpan(text: '.'),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -332,7 +391,7 @@ class _ProfileFormState extends State<ProfileForm> {
     final ImageProvider? image = _avatarPreview != null
         ? MemoryImage(_avatarPreview!)
         : remote != null
-        ? NetworkImage(remote)
+        ? DealGoImageCache.provider(remote, decodeWidth: 260)
         : null;
     return Semantics(
       button: true,
@@ -517,64 +576,128 @@ class ProfileFormScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: DealGoColors.canvas,
-      body: SafeArea(
-        child: Column(
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isTablet = screenWidth >= 600;
+
+    Widget headerRow = Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: DealGoSpacing.s8,
+        vertical: DealGoSpacing.s4,
+      ),
+      child: SizedBox(
+        height: DealGoDimensions.minTapTarget,
+        child: Row(
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: DealGoSpacing.s8,
-                vertical: DealGoSpacing.s4,
-              ),
-              child: SizedBox(
-                height: DealGoDimensions.minTapTarget,
-                child: Row(
-                  children: [
-                    if (canLeave && Navigator.of(context).canPop())
-                      AuthBackButton(
-                        onPressed: () => Navigator.of(context).maybePop(),
-                      )
-                    else
-                      const SizedBox(width: DealGoSpacing.s8),
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: DealGoColors.text,
-                        ),
-                      ),
-                    ),
-                    ?trailing,
-                  ],
-                ),
-              ),
-            ),
+            if (canLeave && Navigator.of(context).canPop())
+              AuthBackButton(
+                onPressed: () => Navigator.of(context).maybePop(),
+              )
+            else
+              const SizedBox(width: DealGoSpacing.s8),
             Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(
-                  DealGoDimensions.pageGutter,
-                  DealGoSpacing.s8,
-                  DealGoDimensions.pageGutter,
-                  DealGoSpacing.s16,
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: DealGoColors.text,
                 ),
-                child: form,
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                DealGoDimensions.pageGutter,
-                DealGoSpacing.s8,
-                DealGoDimensions.pageGutter,
-                DealGoSpacing.s16,
-              ),
-              child: action,
-            ),
+            ?trailing,
           ],
         ),
+      ),
+    );
+
+    return Scaffold(
+      backgroundColor: DealGoColors.card,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: AuthBackdrop()),
+          SafeArea(
+            child: isTablet
+                ? Center(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: DealGoSpacing.s24,
+                    horizontal: DealGoSpacing.s16,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: DealGoColors.card,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: DealGoColors.border.withValues(alpha: 0.8),
+                        ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x140F172A),
+                            blurRadius: 28,
+                            offset: Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          headerRow,
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              DealGoSpacing.s24,
+                              DealGoSpacing.s8,
+                              DealGoSpacing.s24,
+                              DealGoSpacing.s16,
+                            ),
+                            child: form,
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              DealGoSpacing.s24,
+                              DealGoSpacing.s8,
+                              DealGoSpacing.s24,
+                              DealGoSpacing.s24,
+                            ),
+                            child: action,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            : Column(
+                children: [
+                  headerRow,
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(
+                        DealGoDimensions.pageGutter,
+                        DealGoSpacing.s8,
+                        DealGoDimensions.pageGutter,
+                        DealGoSpacing.s16,
+                      ),
+                      child: form,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      DealGoDimensions.pageGutter,
+                      DealGoSpacing.s8,
+                      DealGoDimensions.pageGutter,
+                      DealGoSpacing.s16,
+                    ),
+                    child: action,
+                  ),
+                ],
+              ),
+          ),
+        ],
       ),
     );
   }

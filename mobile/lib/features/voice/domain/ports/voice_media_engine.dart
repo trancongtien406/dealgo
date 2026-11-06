@@ -4,7 +4,14 @@ abstract interface class VoiceMediaEngine {
   Future<bool> ensureMicrophonePermission();
 
   /// Joins the room with the microphone on and remote audio playing.
-  Future<void> join({required String url, required String token});
+  ///
+  /// [systemCallOwnsAudio] is true when CallKit/Telecom has already accepted
+  /// the call and therefore owns the platform audio-session lifecycle.
+  Future<void> join({
+    required String url,
+    required String token,
+    bool systemCallOwnsAudio = false,
+  });
 
   Future<void> setMicrophoneEnabled(bool enabled);
 

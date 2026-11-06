@@ -238,7 +238,7 @@ class _MenuBoardState extends State<_MenuBoard> {
                     DealGoSpacing.s8,
                     DealGoSpacing.s16,
                     DealGoDimensions.pageGutter,
-                    DealGoSpacing.s24 + kFoodCartBarRoom,
+                    DealGoSpacing.s24,
                   ),
                 ),
                 sliver: SliverToBoxAdapter(
@@ -282,7 +282,7 @@ class _MenuList extends StatelessWidget {
         DealGoDimensions.pageGutter,
         DealGoSpacing.s16,
         DealGoDimensions.pageGutter,
-        DealGoSpacing.s24 + kFoodCartBarRoom,
+        DealGoSpacing.s24,
       ),
     );
     Widget list(List<Widget> children) => CustomScrollView(
@@ -357,15 +357,19 @@ class _ScrollBody extends StatelessWidget {
   const _ScrollBody({
     required this.headerOverlap,
     required this.child,
+    this.onEndReached,
     super.key,
   });
 
   final SliverOverlapAbsorberHandle headerOverlap;
   final Widget child;
 
+  /// Called when the body scrolls within a screenful of the bottom.
+  final VoidCallback? onEndReached;
+
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
+    final view = CustomScrollView(
       slivers: [
         SliverOverlapInjector(handle: headerOverlap),
         SliverPadding(
@@ -375,12 +379,25 @@ class _ScrollBody extends StatelessWidget {
               DealGoDimensions.pageGutter,
               DealGoSpacing.s16,
               DealGoDimensions.pageGutter,
-              DealGoSpacing.s24 + kFoodCartBarRoom,
+              DealGoSpacing.s24,
             ),
           ),
           sliver: SliverToBoxAdapter(child: child),
         ),
       ],
+    );
+    final onEndReached = this.onEndReached;
+    if (onEndReached == null) {
+      return view;
+    }
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (notification.metrics.extentAfter < 400) {
+          onEndReached();
+        }
+        return false;
+      },
+      child: view,
     );
   }
 }

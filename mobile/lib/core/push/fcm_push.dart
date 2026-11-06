@@ -101,6 +101,8 @@ class FcmPush implements PushPort {
   bool _callsPrepared = false;
   String? _accessToken;
   String? _registeredForAccessToken;
+  Future<void>? _registering;
+  String? _registeringForAccessToken;
   StreamSubscription<String>? _tokenRefreshSub;
 
   StreamSubscription<RemoteMessage>? _openedSub;
@@ -176,11 +178,29 @@ class FcmPush implements PushPort {
   }
 
   @override
-  Future<void> ensureRegistered({required String accessToken}) async {
+  Future<void> ensureRegistered({required String accessToken}) {
     if (accessToken.isEmpty || !_firebaseReady) {
-      return;
+      return Future.value();
     }
+    if (_registeredForAccessToken == accessToken) {
+      return Future.value();
+    }
+    // Launch, sign-in and the token-refresh listener can race for the same
+    // account; one registration call covers all of them.
+    final inFlight = _registering;
+    if (inFlight != null && _registeringForAccessToken == accessToken) {
+      return inFlight;
+    }
+    final future = _register(accessToken).whenComplete(() {
+      _registering = null;
+      _registeringForAccessToken = null;
+    });
+    _registering = future;
+    _registeringForAccessToken = accessToken;
+    return future;
+  }
 
+  Future<void> _register(String accessToken) async {
     _accessToken = accessToken;
     await _ensureTokenRefreshListener();
     _voipChangeSub ??= voipTokenChanges?.listen((_) {

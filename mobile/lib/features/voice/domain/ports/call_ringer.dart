@@ -6,6 +6,9 @@ abstract interface class CallRinger {
 
   /// Stops sound and vibration; safe to call when not ringing.
   Future<void> stop();
+
+  /// Releases the audio player (the call screen is gone for good).
+  Future<void> dispose();
 }
 
 typedef CallRingerFactory = CallRinger Function();

@@ -10,6 +10,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../identity/domain/entities/auth_state.dart';
 import '../../identity/presentation/cubit/auth_cubit.dart';
+import '../../identity/presentation/widgets/auth_scaffold.dart';
 import '../domain/account_settings.dart';
 
 class ChangePasswordPage extends StatefulWidget {
@@ -76,47 +77,60 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         title: l10n.changePasswordHeader,
         applySafeArea: true,
       ),
-      body: SafeArea(
-        top: false,
-        child: ListView(
-          padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
-          children: [
-            DealGoTextField(
-              label: l10n.changePasswordCurrent,
-              controller: _current,
-              obscure: true,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: AuthBackdrop()),
+          SafeArea(
+            top: false,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: ListView(
+                  padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
+                  children: [
+                    DealGoTextField(
+                      label: l10n.changePasswordCurrent,
+                      hint: 'Nhập mật khẩu hiện tại',
+                      controller: _current,
+                      obscure: true,
+                    ),
+                    const SizedBox(height: 12),
+                    DealGoTextField(
+                      label: l10n.changePasswordNew,
+                      hint: 'Nhập mật khẩu mới (tối thiểu 6 ký tự)',
+                      controller: _next,
+                      obscure: true,
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    const SizedBox(height: 12),
+                    DealGoTextField(
+                      label: l10n.changePasswordConfirm,
+                      hint: 'Nhập lại mật khẩu mới',
+                      controller: _confirm,
+                      obscure: true,
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 12),
+                      Text(_error!, style: TextStyle(color: DealGoColors.danger)),
+                    ],
+                    if (_ok != null) ...[
+                      const SizedBox(height: 12),
+                      Text(_ok!, style: TextStyle(color: DealGoColors.primary)),
+                    ],
+                    const SizedBox(height: 20),
+                    DealGoPrimaryButton(
+                      label: l10n.changePasswordSave,
+                      isLoading: _busy,
+                      enabled: _current.text.isNotEmpty && _next.text.length >= 6,
+                      onPressed: _save,
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: 12),
-            DealGoTextField(
-              label: l10n.changePasswordNew,
-              controller: _next,
-              obscure: true,
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 12),
-            DealGoTextField(
-              label: l10n.changePasswordConfirm,
-              controller: _confirm,
-              obscure: true,
-              onChanged: (_) => setState(() {}),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Text(_error!, style: TextStyle(color: DealGoColors.danger)),
-            ],
-            if (_ok != null) ...[
-              const SizedBox(height: 12),
-              Text(_ok!, style: TextStyle(color: DealGoColors.primary)),
-            ],
-            const SizedBox(height: 20),
-            DealGoPrimaryButton(
-              label: l10n.changePasswordSave,
-              isLoading: _busy,
-              enabled: _current.text.isNotEmpty && _next.text.length >= 8,
-              onPressed: _save,
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

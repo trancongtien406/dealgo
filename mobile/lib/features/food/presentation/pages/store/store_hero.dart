@@ -14,41 +14,13 @@ class _Hero extends StatelessWidget {
     // Merchant cover photo; without one, the first dish photo, then the logo.
     final cover =
         store.coverUrl ?? (gallery.isNotEmpty ? gallery.first : store.logoUrl);
-    final logo = resolveMediaUrl(store.logoUrl);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            FoodCoverImage(
-              key: const Key('food-store-cover'),
-              imageUrl: cover,
-              aspectRatio: 2,
-            ),
-            if (logo != null && logo.isNotEmpty)
-              Positioned(
-                left: DealGoSpacing.s12,
-                bottom: DealGoSpacing.s12,
-                child: Container(
-                  key: const Key('food-store-logo'),
-                  width: 56,
-                  height: 56,
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(
-                    color: DealGoColors.card,
-                    borderRadius: BorderRadius.circular(DealGoRadius.input),
-                    border: Border.all(color: Colors.white, width: 2),
-                    boxShadow: DealGoShadows.card,
-                  ),
-                  child: DealGoNetworkImage(
-                    logo,
-                    fit: BoxFit.cover,
-                    fallback: const SizedBox.shrink(),
-                  ),
-                ),
-              ),
-          ],
+        FoodCoverImage(
+          key: const Key('food-store-cover'),
+          imageUrl: cover,
+          aspectRatio: 2,
         ),
         StoreTrustStrip(
           closesAtToday: store.closesAtToday,
@@ -96,7 +68,6 @@ class _StoreHeading extends StatelessWidget {
     final ratingText = storeRatingText(context, rating);
     final address = store.addressLabel?.trim() ?? '';
     final sold = store.items.fold<int>(0, (sum, item) => sum + item.soldCount);
-    final tags = _praisedTags(reviews);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -251,9 +222,30 @@ class _StoreHeading extends StatelessWidget {
                 icon: DealGoIcons.trending,
               ),
             if (store.minOrderVnd > 0)
-              FoodMinOrderPill(
+              FoodInfoChip(
                 key: const Key('food-store-min-order'),
-                amountVnd: store.minOrderVnd,
+                label: l10n.foodStoreMinOrder(formatVnd(store.minOrderVnd)),
+                icon: DealGoIcons.shoppingBag,
+              ),
+            if (store.offers.isNotEmpty)
+              InkWell(
+                key: const Key('food-store-offers-chip'),
+                onTap: () => showDealGoSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (_) => BlocProvider.value(
+                    value: context.read<FoodCartCubit>(),
+                    child: _StoreOffersSheet(offers: store.offers),
+                  ),
+                ),
+                borderRadius: BorderRadius.circular(DealGoRadius.pill),
+                child: FoodInfoChip(
+                  key: const Key('food-store-offers-chip-content'),
+                  label:
+                      '${store.offers.length} ${l10n.inboxFilterPromos.toLowerCase()}',
+                  icon: DealGoIcons.voucher,
+                  filled: true,
+                ),
               ),
           ],
         ),
@@ -282,30 +274,6 @@ class _StoreHeading extends StatelessWidget {
                   style: textTheme.bodySmall,
                 ),
               ),
-            ],
-          ),
-        ],
-        if (tags.isNotEmpty) ...[
-          const SizedBox(height: DealGoSpacing.s12),
-          Wrap(
-            key: const Key('food-store-tags'),
-            spacing: DealGoSpacing.s6,
-            runSpacing: DealGoSpacing.s6,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text(
-                l10n.foodStoreTagsTitle,
-                style: textTheme.labelSmall?.copyWith(
-                  color: DealGoColors.textSecondary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              for (final (tag, count) in tags)
-                FoodPill(
-                  label: '${ratingTagLabel(l10n, tag)} · $count',
-                  foreground: DealGoColors.brandGreen,
-                  background: DealGoColors.greenSurface,
-                ),
             ],
           ),
         ],

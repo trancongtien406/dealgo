@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/motion/dealgo_sheet.dart';
 import '../../../../core/l10n/api_error_text.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../l10n/app_localizations.dart';
@@ -40,7 +41,7 @@ Future<T?> showReasonSheet<T>({
   required List<(T, String, String)> reasons,
   String? hint,
 }) {
-  return showModalBottomSheet<T>(
+  return showDealGoSheet<T>(
     context: context,
     builder: (sheetContext) {
       final textTheme = Theme.of(sheetContext).textTheme;
@@ -142,20 +143,23 @@ String customerRatingText(
   );
 }
 
-/// Raises of the current fare. [maxFareVnd] is the server cap; [headroomPercent]
-/// is the configurable max (split in three). Amounts stay inside that cap.
+/// Raises of the current fare. [maxFareVnd] is the server cap; chips are sliced from
+/// [referenceFareVnd], matching the opening suggestions.
 List<({int percent, int amountVnd})> rideRaiseFareOptions(
   int currentFareVnd, {
   int? maxFareVnd,
-  int? headroomPercent,
+  int? referenceFareVnd,
 }) {
+  // Same ladder as the opening suggestions: sliced from the reference fare,
+  // then only the steps above what is already offered.
+  final base = (referenceFareVnd ?? 0) > 0 ? referenceFareVnd! : currentFareVnd;
   return [
     for (final preset in rideFareRaisePresets(
-      suggestedVnd: currentFareVnd,
-      maxBidVnd: maxFareVnd ?? currentFareVnd,
-      maxHeadroomPercent: headroomPercent,
+      suggestedVnd: base,
+      maxBidVnd: maxFareVnd ?? base * 3,
     ))
-      (percent: preset.percent, amountVnd: preset.amountVnd),
+      if (preset.amountVnd > currentFareVnd)
+        (percent: preset.percent, amountVnd: preset.amountVnd),
   ];
 }
 
@@ -165,7 +169,7 @@ Future<int?> showRaiseFareSheet({
   required int currentFareVnd,
   required String Function(int amountVnd) formatVnd,
   int? maxFareVnd,
-  int? headroomPercent,
+  int? referenceFareVnd,
 }) {
   final l10n = AppLocalizations.of(context);
   return showReasonSheet<int>(
@@ -176,7 +180,7 @@ Future<int?> showRaiseFareSheet({
       for (final o in rideRaiseFareOptions(
         currentFareVnd,
         maxFareVnd: maxFareVnd,
-        headroomPercent: headroomPercent,
+        referenceFareVnd: referenceFareVnd,
       ))
         (o.amountVnd, 'raise-${o.percent}', formatVnd(o.amountVnd)),
     ],

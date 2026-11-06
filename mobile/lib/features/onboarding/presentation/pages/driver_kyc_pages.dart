@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../utils/partner_status_listener.dart';
 import '../../../../core/config/api_base_url.dart';
 import '../../../../core/design_system/components/dealgo_card.dart';
+import '../../../../core/design_system/components/dealgo_image_cache.dart';
 import '../../../../core/drafts/draft_resume_prompt.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
@@ -1216,7 +1217,9 @@ class _ReviewStep extends StatelessWidget {
               CircleAvatar(
                 radius: 26,
                 backgroundColor: DealGoColors.subtlePurple,
-                foregroundImage: avatar == null ? null : NetworkImage(avatar),
+                foregroundImage: avatar == null
+                    ? null
+                    : DealGoImageCache.provider(avatar, decodeWidth: 260),
                 child: const Icon(
                   DealGoIcons.user,
                   color: DealGoColors.primary,

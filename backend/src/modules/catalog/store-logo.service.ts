@@ -112,7 +112,7 @@ export class StoreLogoService {
       kind === 'logo' ? store.logoUrl : store.coverUrl,
       kind,
     );
-    const updated = await this.uploads.storeThen(
+    const updated = await this.uploads.storePublicThen(
       `${config.dir}/${store.id}`,
       [
         {
@@ -163,6 +163,7 @@ export class StoreLogoService {
     storeId: string,
     file: string,
     kind: StoreImageKind = 'logo',
+    width: number | null = null,
   ): Promise<{ body: Buffer; contentType: string }> {
     const config = KINDS[kind];
     const missing = () =>
@@ -179,10 +180,8 @@ export class StoreLogoService {
       throw missing();
     }
     const ext = file.slice(file.lastIndexOf('.') + 1);
-    const found = await this.uploads.read({
-      key,
-      contentType: ext === 'jpg' ? 'image/jpeg' : `image/${ext}`,
-    });
+    const contentType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
+    const found = await this.uploads.readDisplayImage({ key, contentType }, width);
     if (!found) {
       throw missing();
     }

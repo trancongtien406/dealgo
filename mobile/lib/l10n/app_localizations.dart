@@ -1832,6 +1832,66 @@ abstract class AppLocalizations {
   /// **'Has offers'**
   String get foodFilterOffers;
 
+  /// No description provided for @foodFilterSortName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name A–Z'**
+  String get foodFilterSortName;
+
+  /// No description provided for @foodFilterDistanceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag the slider or tap a quick radius preset'**
+  String get foodFilterDistanceHint;
+
+  /// No description provided for @foodFilterMinRatingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum rating'**
+  String get foodFilterMinRatingTitle;
+
+  /// No description provided for @foodFilterRatingAny.
+  ///
+  /// In en, this message translates to:
+  /// **'Any rating'**
+  String get foodFilterRatingAny;
+
+  /// No description provided for @foodFilterRatingFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'{stars}+ ★'**
+  String foodFilterRatingFrom(String stars);
+
+  /// No description provided for @foodFilterEtaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated delivery time'**
+  String get foodFilterEtaTitle;
+
+  /// No description provided for @foodFilterEtaAny.
+  ///
+  /// In en, this message translates to:
+  /// **'Any time'**
+  String get foodFilterEtaAny;
+
+  /// No description provided for @foodFilterEtaMax.
+  ///
+  /// In en, this message translates to:
+  /// **'≤ {minutes} min'**
+  String foodFilterEtaMax(int minutes);
+
+  /// No description provided for @foodFilterStatusTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Status & perks'**
+  String get foodFilterStatusTitle;
+
+  /// No description provided for @foodFilterNoMinOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'No minimum order'**
+  String get foodFilterNoMinOrder;
+
   /// No description provided for @foodFilterApply.
   ///
   /// In en, this message translates to:
@@ -5101,6 +5161,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Change'**
   String get foodDropoffChange;
+
+  /// No description provided for @foodDropoffChangeAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Change address'**
+  String get foodDropoffChangeAddress;
 
   /// No description provided for @foodFareNeedAddress.
   ///
@@ -13285,6 +13351,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Use'**
   String get voucherPickerApply;
+
+  /// No description provided for @voucherApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied'**
+  String get voucherApplied;
 
   /// No description provided for @checkoutErrMinOrder.
   ///

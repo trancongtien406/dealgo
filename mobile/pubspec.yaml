@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+26
+version: 1.0.1+28
 
 environment:
   sdk: ^3.13.2
@@ -52,6 +52,7 @@ dependencies:
   firebase_app_check: ^0.5.1
   firebase_analytics: ^13.0.1
   firebase_crashlytics: ^6.0.1
+  firebase_performance: ^0.12.1
   get_it: ^8.2.0
   injectable: ^2.5.1
   equatable: ^2.0.7
@@ -81,10 +82,16 @@ dependencies:
   image: ^4.12.0
   google_mlkit_text_recognition: ^0.17.1
   flutter_native_contact_picker: ^0.0.13
+  cached_network_image: ^4.0.6
+  flutter_cache_manager: ^3.5.0
 dependency_overrides:
   # Patched 0.11.1: corrects preview/photo rotation for the iPhone 17 front camera.
   camera_avfoundation:
     path: packages/camera_avfoundation
+  # Patched 3.1.6: forwards answers/declines made on the OS call UI (car head unit,
+  # watch, lock screen) to Dart, so the app and the server see the same call state.
+  flutter_callkit_incoming:
+    path: packages/flutter_callkit_incoming
 
 dev_dependencies:
   fake_async: ^1.3.1

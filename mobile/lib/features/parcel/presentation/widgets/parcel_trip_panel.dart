@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/motion/dealgo_sheet.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../onboarding/presentation/document_image_source.dart';
 import '../../../ride/domain/entities/ride_models.dart';
@@ -92,7 +93,7 @@ class _ParcelTripBody extends StatelessWidget {
 
   Future<void> _fail(BuildContext context) async {
     final cubit = context.read<ParcelTripCubit>();
-    final reason = await showModalBottomSheet<ParcelFailReason>(
+    final reason = await showDealGoSheet<ParcelFailReason>(
       context: context,
       builder: (sheet) {
         final l10n = AppLocalizations.of(sheet);

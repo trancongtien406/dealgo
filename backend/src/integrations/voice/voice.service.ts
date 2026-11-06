@@ -260,6 +260,15 @@ export class VoiceService implements OnModuleDestroy {
         throw voiceError('VOICE_BUSY');
       }
     }
+    // One phone, one call screen: a callee still ringing (or talking) on another ride/order
+    // would get a second call screen that can neither be answered nor tracked.
+    const calleeBusy = await this.calls.findOpenForCallee(calleeUserId);
+    if (calleeBusy) {
+      const current = await this.expireIfDue(calleeBusy);
+      if (current.status === 'RINGING' || current.status === 'ACCEPTED') {
+        throw voiceError('VOICE_BUSY');
+      }
+    }
 
     const session = await this.issueSession(
       aggregateType,
@@ -462,6 +471,9 @@ export class VoiceService implements OnModuleDestroy {
       eventType: 'Call.incoming',
       callId: call.id,
       role: calleeRole,
+      // The system call screen uses the server's ring window instead of guessing.
+      // FCM data values are strings.
+      ringSeconds: String(VOICE_CALL_RING_SECONDS),
       path:
         pushPathFor({
           aggregateType: call.aggregateType,

@@ -25,6 +25,7 @@ import '../widgets/driver_widgets.dart';
 import '../widgets/driver_duty_map.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/components/dealgo_nav_insets.dart';
+import '../../../../core/design_system/components/dealgo_refresh.dart';
 
 class DriverHomePage extends StatelessWidget {
   const DriverHomePage({super.key});
@@ -46,6 +47,16 @@ class DriverHomePage extends StatelessWidget {
 class DriverOfflineView extends StatelessWidget {
   const DriverOfflineView({super.key});
 
+  Future<void> _refresh(BuildContext context) async {
+    context.read<DriverServicesCubit>().load();
+    context.read<DriverKycCubit>().refresh();
+    context.read<VehicleClassCatalogCubit>().load();
+    await context.read<DriverFeedCubit>().sync(
+      online: context.read<DriverDutyCubit>().state,
+      accessToken: driverAccessToken(context),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -62,46 +73,49 @@ class DriverOfflineView extends StatelessWidget {
         onSecondary: () => context.go(driverEarningsPath),
         onPrimary: () => context.read<DriverDutyCubit>().connect(),
       ),
-      body: ListView(
-        padding: dealGoScrollPadding(
-          context,
-          const EdgeInsets.fromLTRB(
-            DealGoDimensions.pageGutter,
-            DealGoSpacing.s12,
-            DealGoDimensions.pageGutter,
-            DealGoSpacing.s16,
-          ),
-        ),
-        children: [
-          DriverHero(
-            icon: DealGoIcons.bolt,
-            iconColor: DealGoColors.amber,
-            background: DealGoColors.amberSurface,
-            title: l10n.rideYouAreOffline,
-            message: l10n.driverOfflineHeroMessage,
-          ),
-          const SizedBox(height: DealGoSpacing.s24),
-          DriverPanel(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(l10n.driverDutyStatus, style: textTheme.titleMedium),
-                const SizedBox(height: DealGoSpacing.s12),
-                DriverChip(
-                  label: l10n.driverOfflineChip,
-                  tone: DriverChipTone.warning,
-                ),
-                const SizedBox(height: DealGoSpacing.s16),
-                Text(l10n.driverServiceTypes, style: textTheme.titleSmall),
-                const SizedBox(height: DealGoSpacing.s8),
-                DriverServiceStrip(
-                  prefs: prefs,
-                  vehicleClassCode: vehicleClass,
-                ),
-              ],
+      body: DealGoRefresh(
+        onRefresh: () => _refresh(context),
+        child: ListView(
+          padding: dealGoScrollPadding(
+            context,
+            const EdgeInsets.fromLTRB(
+              DealGoDimensions.pageGutter,
+              DealGoSpacing.s12,
+              DealGoDimensions.pageGutter,
+              DealGoSpacing.s16,
             ),
           ),
-        ],
+          children: [
+            DriverHero(
+              icon: DealGoIcons.bolt,
+              iconColor: DealGoColors.amber,
+              background: DealGoColors.amberSurface,
+              title: l10n.rideYouAreOffline,
+              message: l10n.driverOfflineHeroMessage,
+            ),
+            const SizedBox(height: DealGoSpacing.s24),
+            DriverPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.driverDutyStatus, style: textTheme.titleMedium),
+                  const SizedBox(height: DealGoSpacing.s12),
+                  DriverChip(
+                    label: l10n.driverOfflineChip,
+                    tone: DriverChipTone.warning,
+                  ),
+                  const SizedBox(height: DealGoSpacing.s16),
+                  Text(l10n.driverServiceTypes, style: textTheme.titleSmall),
+                  const SizedBox(height: DealGoSpacing.s8),
+                  DriverServiceStrip(
+                    prefs: prefs,
+                    vehicleClassCode: vehicleClass,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -126,46 +140,55 @@ class DriverIneligibleView extends StatelessWidget {
         onSecondary: () => context.push(AccountRoutes.help('/driver/account')),
         onPrimary: () => context.push(DriverKycRoutes.root),
       ),
-      body: ListView(
-        padding: dealGoScrollPadding(
-          context,
-          const EdgeInsets.fromLTRB(
-            DealGoDimensions.pageGutter,
-            DealGoSpacing.s12,
-            DealGoDimensions.pageGutter,
-            DealGoSpacing.s16,
-          ),
-        ),
-        children: [
-          DriverHero(
-            icon: DealGoIcons.alert,
-            iconColor: DealGoColors.danger,
-            background: DealGoColors.dangerSurface,
-            title: l10n.driverIneligibleTitle,
-            message: l10n.driverIneligibleMessage,
-          ),
-          const SizedBox(height: DealGoSpacing.s24),
-          DriverPanel(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(l10n.driverRightsByService, style: textTheme.titleMedium),
-                const SizedBox(height: DealGoSpacing.s12),
-                _RightRow(
-                  label: l10n.driverServicePassenger,
-                  chip: l10n.driverServiceBlocked,
-                  tone: DriverChipTone.danger,
-                ),
-                const SizedBox(height: DealGoSpacing.s12),
-                _RightRow(
-                  label: l10n.driverServicesFoodTitle,
-                  chip: l10n.driverServiceBlocked,
-                  tone: DriverChipTone.danger,
-                ),
-              ],
+      body: DealGoRefresh(
+        onRefresh: () async {
+          context.read<DriverKycCubit>().refresh();
+          await context.read<DriverFeedCubit>().sync(
+            online: context.read<DriverDutyCubit>().state,
+            accessToken: driverAccessToken(context),
+          );
+        },
+        child: ListView(
+          padding: dealGoScrollPadding(
+            context,
+            const EdgeInsets.fromLTRB(
+              DealGoDimensions.pageGutter,
+              DealGoSpacing.s12,
+              DealGoDimensions.pageGutter,
+              DealGoSpacing.s16,
             ),
           ),
-        ],
+          children: [
+            DriverHero(
+              icon: DealGoIcons.alert,
+              iconColor: DealGoColors.danger,
+              background: DealGoColors.dangerSurface,
+              title: l10n.driverIneligibleTitle,
+              message: l10n.driverIneligibleMessage,
+            ),
+            const SizedBox(height: DealGoSpacing.s24),
+            DriverPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.driverRightsByService, style: textTheme.titleMedium),
+                  const SizedBox(height: DealGoSpacing.s12),
+                  _RightRow(
+                    label: l10n.driverServicePassenger,
+                    chip: l10n.driverServiceBlocked,
+                    tone: DriverChipTone.danger,
+                  ),
+                  const SizedBox(height: DealGoSpacing.s12),
+                  _RightRow(
+                    label: l10n.driverServicesFoodTitle,
+                    chip: l10n.driverServiceBlocked,
+                    tone: DriverChipTone.danger,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -239,6 +262,20 @@ class _DriverOnlineViewState extends State<DriverOnlineView> {
     cubit.load();
   }
 
+  Future<void> _refresh() async {
+    context.read<DriverServicesCubit>().load();
+    context.read<DriverKycCubit>().refresh();
+    context.read<VehicleClassCatalogCubit>().load();
+    await Future.wait([
+      _loadSummary(),
+      context.read<DriverFeedCubit>().sync(
+        online: context.read<DriverDutyCubit>().state,
+        accessToken: driverAccessToken(context),
+        quiet: true,
+      ),
+    ]);
+  }
+
   /// Real stats from GET /v1/driver/history/summary; tiles show "—" until
   /// (or unless) it loads.
   Future<void> _loadSummary() async {
@@ -279,17 +316,19 @@ class _DriverOnlineViewState extends State<DriverOnlineView> {
     return DriverPageFrame(
       title: l10n.driverHomeTitle,
       showBack: false,
-      body: ListView(
-        padding: dealGoScrollPadding(
-          context,
-          const EdgeInsets.fromLTRB(
-            DealGoDimensions.pageGutter,
-            DealGoSpacing.s8,
-            DealGoDimensions.pageGutter,
-            DealGoSpacing.s24,
+      body: DealGoRefresh(
+        onRefresh: _refresh,
+        child: ListView(
+          padding: dealGoScrollPadding(
+            context,
+            const EdgeInsets.fromLTRB(
+              DealGoDimensions.pageGutter,
+              DealGoSpacing.s8,
+              DealGoDimensions.pageGutter,
+              DealGoSpacing.s24,
+            ),
           ),
-        ),
-        children: [
+          children: [
           DriverPanel(
             child: Row(
               children: [
@@ -453,6 +492,7 @@ class _DriverOnlineViewState extends State<DriverOnlineView> {
             ),
           ),
         ],
+        ),
       ),
     );
   }

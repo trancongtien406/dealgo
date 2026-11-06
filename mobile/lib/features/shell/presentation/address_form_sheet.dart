@@ -6,6 +6,7 @@ import '../../../core/design_system/components/dealgo_segmented_control.dart';
 import '../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../core/motion/dealgo_sheet.dart';
 import '../../../core/location/location_service.dart';
 import '../../../core/maps/map_lat_lng.dart';
 import '../../../l10n/app_localizations.dart';
@@ -21,7 +22,7 @@ Future<bool?> showAddressFormSheet(
   required Future<String?> Function(SavedAddressDraft draft) onSubmit,
   SavedAddress? editing,
 }) {
-  return showModalBottomSheet<bool>(
+  return showDealGoSheet<bool>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

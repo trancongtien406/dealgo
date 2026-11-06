@@ -6,6 +6,7 @@ import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/motion/dealgo_sheet.dart';
 import '../../../../core/l10n/api_error_text.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_models.dart';
@@ -118,7 +119,7 @@ class _MerchantAcceptSettingsPageState
     required ValueChanged<T> onPicked,
   }) async {
     final l10n = AppLocalizations.of(context);
-    final picked = await showModalBottomSheet<(T,)>(
+    final picked = await showDealGoSheet<(T,)>(
       context: context,
       builder: (sheetContext) => SafeArea(
         child: Padding(

@@ -196,12 +196,20 @@ class StoreTrustStrip extends StatelessWidget {
 
 /// Lines under a store name: closed label · rating · category · distance,
 /// then ETA and the "from" delivery fee — each only when real. Text wraps
-/// instead of truncating.
+/// instead of truncating unless the caller bounds the height with [maxLines].
 class FoodMetaLine extends StatelessWidget {
-  const FoodMetaLine({required this.store, this.rating, super.key});
+  const FoodMetaLine({
+    required this.store,
+    this.rating,
+    this.maxLines,
+    super.key,
+  });
 
   final FoodStoreSummary store;
   final StoreRating? rating;
+
+  /// Applies to each of the two lines; null keeps the natural wrapped height.
+  final int? maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -276,6 +284,8 @@ class FoodMetaLine extends StatelessWidget {
       ),
       key: Key('store-meta-${store.id}'),
       style: style,
+      maxLines: maxLines,
+      overflow: maxLines == null ? null : TextOverflow.ellipsis,
     );
     if (eta == null && fee == null) return first;
     final second = Text.rich(
@@ -319,6 +329,8 @@ class FoodMetaLine extends StatelessWidget {
       ),
       key: Key('store-eta-fee-${store.id}'),
       style: style,
+      maxLines: maxLines,
+      overflow: maxLines == null ? null : TextOverflow.ellipsis,
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

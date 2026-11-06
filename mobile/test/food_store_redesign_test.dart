@@ -141,9 +141,14 @@ FakeRatingRemoteDataSource _ratings() => FakeRatingRemoteDataSource(
   },
 );
 
-Future<void> _openStore(WidgetTester tester, {FakeFoodClient? food}) async {
+Future<void> _openStore(
+  WidgetTester tester, {
+  FakeFoodClient? food,
+  double systemInset = 0,
+}) async {
   tester.view.physicalSize = const Size(1170, 2532);
   tester.view.devicePixelRatio = 3;
+  tester.view.padding = FakeViewPadding(bottom: systemInset * 3);
   addTearDown(tester.view.reset);
   await pumpSignedIn(
     tester,
@@ -301,6 +306,8 @@ void main() {
     tester,
   ) async {
     await _openStore(tester);
+    await tester.tap(find.byKey(const Key('food-store-tab-info')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('food-store-offer-o1')), findsOneWidget);
     await tester.tap(find.byKey(const Key('food-store-offer-use-o1')));
     await tester.pumpAndSettle();
@@ -340,7 +347,7 @@ void main() {
       await _openStore(tester);
       expect(find.byKey(const Key('food-cart-bar')), findsNothing);
       final cart = tester
-          .element(find.byKey(const Key('food-store-offers')))
+          .element(find.byKey(const Key('food-store-tab-menu')))
           .read<FoodCartCubit>();
       const item = FoodMenuItem(
         id: 'i1',
@@ -383,10 +390,74 @@ void main() {
     },
   );
 
+  testWidgets('menu end stops just above the floating cart bar', (
+    tester,
+  ) async {
+    final food = _longMenuClient();
+    await _openStore(tester, food: food);
+    final cart = tester
+        .element(find.byKey(const Key('food-store-tab-menu')))
+        .read<FoodCartCubit>();
+    cart.addItem(
+      storeId: _id,
+      storeName: 'Cơm Tấm Sài Gòn',
+      item: const FoodMenuItem(
+        id: 'i1',
+        name: 'Cơm sườn bì chả',
+        priceVnd: 55000,
+        available: true,
+      ),
+      minOrderVnd: 0,
+    );
+    await tester.pumpAndSettle();
+
+    final menu = find.byKey(const Key('food-menu-items'));
+    final last = find.byKey(const Key('food-menu-sec-drink-d4'));
+    for (var i = 0; i < 12 && last.evaluate().isEmpty; i++) {
+      await tester.drag(menu, const Offset(0, -600));
+      await tester.pumpAndSettle();
+    }
+    await tester.drag(menu, const Offset(0, -4000));
+    await tester.pumpAndSettle();
+
+    // `extendBody` publishes the bottom bar height as `padding.bottom` on the
+    // body, so `dealGoScrollPadding` reserves exactly the bar and no more.
+    final barHeight = tester
+        .getSize(find.byKey(const ValueKey('food-cart-bar-shown')))
+        .height;
+    final padding = tester
+        .widget<CustomScrollView>(menu)
+        .slivers
+        .whereType<SliverPadding>()
+        .first
+        .padding as EdgeInsets;
+    expect(padding.bottom, DealGoSpacing.s24 + barHeight);
+  });
+
+  testWidgets('empty cart keeps the home indicator clear under the menu', (
+    tester,
+  ) async {
+    await _openStore(tester, systemInset: 34);
+    expect(find.byKey(const ValueKey('food-cart-bar-shown')), findsNothing);
+    // The empty slot still has to carry the inset, otherwise Scaffold's
+    // `extendBody` republishes a bottom padding of 0 to the page body.
+    expect(
+      tester.getSize(find.byKey(const ValueKey('food-cart-bar-room'))).height,
+      34,
+    );
+    final menu = tester.widget<CustomScrollView>(
+      find.byKey(const Key('food-menu-items')),
+    );
+    final sliver = menu.slivers.whereType<SliverPadding>().first;
+    expect((sliver.padding as EdgeInsets).bottom, DealGoSpacing.s24 + 34);
+  });
+
   testWidgets('offers: ticket strip, full conditions, "Xem tất cả" sheet', (
     tester,
   ) async {
     await _openStore(tester);
+    await tester.tap(find.byKey(const Key('food-store-tab-info')));
+    await tester.pumpAndSettle();
     expect(find.text('Giảm 20%'), findsWidgets);
     expect(find.text('Giảm 15K'), findsOneWidget);
     expect(find.text('Còn 3 lượt'), findsOneWidget);
@@ -407,7 +478,7 @@ void main() {
     expect(cart.state.voucherCode, 'GIAM15');
   });
 
-  testWidgets('checkout voucher list: tickets, best pick, "Đã dùng"', (
+  testWidgets('checkout voucher list: tickets, best pick, "Đang dùng"', (
     tester,
   ) async {
     String? picked;
@@ -479,7 +550,7 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('checkout-voucher-used-BIG')), findsOneWidget);
-    expect(find.text('Đã dùng'), findsOneWidget);
+    expect(find.text('Đang dùng'), findsOneWidget);
   });
 
   testWidgets('the map lives on the info tab and opens Google Maps', (

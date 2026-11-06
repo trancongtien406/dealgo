@@ -19,9 +19,9 @@ import '../../../core/maps/pin_picker_map.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../identity/domain/entities/auth_state.dart';
 import '../../identity/presentation/cubit/auth_cubit.dart';
-import '../data/place_history_cache.dart';
 import '../data/reverse_geocode_cache.dart';
 import '../domain/place.dart';
+import 'place_lists_store.dart';
 import 'place_picker_page.dart';
 
 /// Opens pick-on-map over everything (root navigator, platform route so iOS
@@ -83,7 +83,6 @@ class _MapPinPickerPageState extends State<MapPinPickerPage> {
   var _searchOpen = false;
   var _searching = false;
   List<PlaceOption> _results = const [];
-  List<PlaceOption> _history = const [];
   Timer? _searchDebounce;
   var _searchSeq = 0;
 
@@ -261,33 +260,15 @@ class _MapPinPickerPageState extends State<MapPinPickerPage> {
   void _openSearch() {
     setState(() => _searchOpen = true);
     _queryFocus.requestFocus();
-    unawaited(_loadHistory());
+    unawaited(context.read<PlaceListsStore>().loadHistory());
   }
 
-  /// Picked-place history for the empty search field (device copy, then
-  /// the server list).
-  Future<void> _loadHistory() async {
-    final cached = await PlaceHistoryCache.load();
-    if (mounted && cached.isNotEmpty) {
-      setState(() => _history = cached);
+  List<PlaceOption> get _shownRows {
+    if (_query.text.trim().isNotEmpty) {
+      return _results;
     }
-    final token = _token;
-    if (token == null || !mounted) {
-      return;
-    }
-    try {
-      final rows = await context.read<PlacesRepository>().history(
-        accessToken: token,
-      );
-      await PlaceHistoryCache.save(rows);
-      if (mounted) {
-        setState(() => _history = rows);
-      }
-    } catch (_) {}
+    return context.watch<PlaceListsStore>().history.take(5).toList();
   }
-
-  List<PlaceOption> get _shownRows =>
-      _query.text.trim().isEmpty ? _history.take(5).toList() : _results;
 
   void _closeSearch() {
     _searchDebounce?.cancel();

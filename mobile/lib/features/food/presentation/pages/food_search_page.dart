@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/components/dealgo_text_field.dart';
@@ -18,10 +17,12 @@ import '../../domain/usecases/get_food_store.dart';
 import '../cubit/food_search_cubit.dart';
 import '../utils/food_routes.dart';
 import '../widgets/food_cart_bar.dart';
+import '../widgets/food_filter_sheet.dart';
 import '../widgets/food_search_sections.dart';
 import '../widgets/food_widgets.dart';
 import '../../data/food_search_history.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
+import '../../../../core/design_system/components/dealgo_refresh.dart';
 import 'food_item_options_page.dart';
 
 const _initialSort = 'distance';
@@ -76,16 +77,14 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
   /// is the server's answer for that keyword.
   late String _serverQuery = widget.initialQuery.trim().toLowerCase();
 
-  void _load(String search) {
+  Future<void> _load(String search) {
     final origin = foodCartOrigin(context);
-    unawaited(
-      context.read<FoodSearchCubit>().load(
-        currentAccessToken(context) ?? '',
-        q: search,
-        lat: origin.lat,
-        lng: origin.lng,
-        sortBy: _sortBy,
-      ),
+    return context.read<FoodSearchCubit>().load(
+      currentAccessToken(context) ?? '',
+      q: search,
+      lat: origin.lat,
+      lng: origin.lng,
+      sortBy: _sortBy,
     );
   }
 
@@ -238,6 +237,7 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
         },
         child: SafeArea(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               DealGoAppHeader(title: l10n.foodSearchTitle),
               Padding(
@@ -267,102 +267,114 @@ class _FoodSearchViewState extends State<_FoodSearchView> {
                 ),
               ),
               const SizedBox(height: DealGoSpacing.s12),
-              SizedBox(
-                height: 40,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: DealGoDimensions.pageGutter,
-                  ),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: DealGoDimensions.pageGutter,
+                ),
+                child: Wrap(
+                  spacing: DealGoSpacing.s8,
+                  runSpacing: DealGoSpacing.s8,
                   children: [
                     for (final entry in [
-                      ('distance', l10n.foodSearchFilterNear),
-                      ('createdAt', l10n.foodSearchSortNewest),
-                      ('rating', l10n.foodCategorySortRating),
-                    ]) ...[
-                      DealGoChip(
+                      (
+                        'distance',
+                        l10n.foodSearchFilterNear,
+                        DealGoIcons.myLocation,
+                      ),
+                      (
+                        'createdAt',
+                        l10n.foodSearchSortNewest,
+                        DealGoIcons.stars,
+                      ),
+                      (
+                        'rating',
+                        l10n.foodCategorySortRating,
+                        DealGoIcons.starFilled,
+                      ),
+                    ])
+                      FoodFilterPill(
                         key: Key('food-search-sort-${entry.$1}'),
                         label: entry.$2,
+                        icon: entry.$3,
                         selected: _sortBy == entry.$1,
-                        tone: DealGoChipTone.brand,
                         onTap: () => _setSort(entry.$1),
                       ),
-                      const SizedBox(width: DealGoSpacing.s8),
-                    ],
                   ],
                 ),
               ),
               Expanded(
-                child: ListView(
-                  controller: _scroll,
-                  padding: const EdgeInsets.fromLTRB(
-                    DealGoDimensions.pageGutter,
-                    DealGoSpacing.s16,
-                    DealGoDimensions.pageGutter,
-                    DealGoSpacing.s24,
+                child: DealGoRefresh(
+                  onRefresh: () => _load(_query.text.trim()),
+                  child: ListView(
+                    controller: _scroll,
+                    padding: const EdgeInsets.fromLTRB(
+                      DealGoDimensions.pageGutter,
+                      DealGoSpacing.s12,
+                      DealGoDimensions.pageGutter,
+                      DealGoSpacing.s24,
+                    ),
+                    children: [
+                      if (refreshing && ready != null)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: DealGoSpacing.s12),
+                          child: LinearProgressIndicator(minHeight: 2),
+                        ),
+                      if (!searching) ...[
+                        if (_keywords.isNotEmpty) ...[
+                          Text(
+                            l10n.foodSearchSuggestions,
+                            key: const Key('food-search-heading'),
+                            style: textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: DealGoSpacing.s8),
+                          Wrap(
+                            spacing: DealGoSpacing.s8,
+                            runSpacing: DealGoSpacing.s4,
+                            children: [
+                              for (final keyword in _keywords)
+                                FoodFilterPill(
+                                  key: Key('food-search-keyword-$keyword'),
+                                  label: keyword,
+                                  onTap: () {
+                                    _query.text = keyword;
+                                    _onQueryChanged();
+                                  },
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: DealGoSpacing.s12),
+                        ],
+                        FoodSearchSuggestions(
+                          history: _history,
+                          onClearHistory: _clearHistory,
+                          onHistoryTap: (item) {
+                            _query.text = item;
+                            _onQueryChanged();
+                          },
+                        ),
+                      ] else if (failure != null)
+                        DealGoStateView.failure(
+                          context,
+                          onRetry: () => _load(q),
+                          cause: failure.error,
+                          message: failure.resolve(l10n),
+                          compact: true,
+                        )
+                      else if (loading)
+                        const DealGoSkeletonList(itemCount: 3)
+                      else if (ready != null)
+                        FoodSearchResults(
+                          ready: ready,
+                          refreshing: refreshing,
+                          onDishTap: _openDish,
+                          onStoreTap: _openStore,
+                          onLoadMore: () =>
+                              context.read<FoodSearchCubit>().loadMore(),
+                        ),
+                      const SizedBox(height: DealGoSpacing.s8),
+                      if (!searching) const FoodSearchCategories(),
+                    ],
                   ),
-                  children: [
-                    if (refreshing && ready != null)
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: DealGoSpacing.s12),
-                        child: LinearProgressIndicator(minHeight: 2),
-                      ),
-                    if (!searching) ...[
-                      if (_keywords.isNotEmpty) ...[
-                        Text(
-                          l10n.foodSearchSuggestions,
-                          key: const Key('food-search-heading'),
-                          style: textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: DealGoSpacing.s8),
-                        Wrap(
-                          spacing: DealGoSpacing.s8,
-                          runSpacing: DealGoSpacing.s8,
-                          children: [
-                            for (final keyword in _keywords)
-                              DealGoChip(
-                                key: Key('food-search-keyword-$keyword'),
-                                label: keyword,
-                                tone: DealGoChipTone.neutral,
-                                onTap: () {
-                                  _query.text = keyword;
-                                  _onQueryChanged();
-                                },
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: DealGoSpacing.s12),
-                      ],
-                      FoodSearchSuggestions(
-                        history: _history,
-                        onClearHistory: _clearHistory,
-                        onHistoryTap: (item) {
-                          _query.text = item;
-                          _onQueryChanged();
-                        },
-                      ),
-                    ] else if (failure != null)
-                      DealGoStateView.failure(
-                        context,
-                        onRetry: () => _load(q),
-                        cause: failure.error,
-                        message: failure.resolve(l10n),
-                        compact: true,
-                      )
-                    else if (loading)
-                      const DealGoSkeletonList(itemCount: 3)
-                    else if (ready != null)
-                      FoodSearchResults(
-                        ready: ready,
-                        refreshing: refreshing,
-                        onDishTap: _openDish,
-                        onStoreTap: _openStore,
-                        onLoadMore: () =>
-                            context.read<FoodSearchCubit>().loadMore(),
-                      ),
-                    const SizedBox(height: DealGoSpacing.s8),
-                    if (!searching) const FoodSearchCategories(),
-                  ],
                 ),
               ),
             ],

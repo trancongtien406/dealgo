@@ -39,21 +39,40 @@ void openFoodItemOptions({
   );
 }
 
-/// The row's plus button: one tap for a plain dish, options for a configured
-/// one. Tapping the row itself always opens the detail page.
+/// The row's plus button: one tap for a plain dish, and for a configured dish
+/// whose required groups already have a default pick. A dish that still needs a
+/// real choice opens the options page, where the add button stays blocked until
+/// the selection is complete. Tapping the row itself always opens the detail.
 void quickAddFoodItem({
   required BuildContext context,
   required FoodStoreDetail store,
   required FoodMenuItem item,
 }) {
-  if (item.optionGroups.isNotEmpty) {
+  final cart = context.read<FoodCartCubit>();
+  if (item.optionGroups.isEmpty) {
+    cart.addItem(
+      storeId: store.id,
+      storeName: store.name,
+      item: item,
+      minOrderVnd: store.minOrderVnd,
+      prepMinutes: store.estimatedPrepMinutes,
+    );
+    return;
+  }
+  final selection = FoodOptionSelection.initial(item.optionGroups);
+  if (!selection.isComplete) {
     openFoodItemOptions(context: context, store: store, item: item);
     return;
   }
-  context.read<FoodCartCubit>().addItem(
+  cart.addConfiguredItem(
     storeId: store.id,
     storeName: store.name,
-    item: item,
+    lineId: selection.lineId(item.id),
+    name: [item.name, ...selection.labels].join(' · '),
+    unitPriceVnd: item.priceVnd + selection.extrasVnd,
+    catalogItemId: item.id,
+    optionIds: selection.optionIds,
+    imageUrl: item.imageUrl,
     minOrderVnd: store.minOrderVnd,
     prepMinutes: store.estimatedPrepMinutes,
   );

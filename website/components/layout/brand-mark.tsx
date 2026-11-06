@@ -25,8 +25,9 @@ export function BrandMark({
         alt="DealGo"
         width={compact ? 512 : 1500}
         height={512}
+        priority
         unoptimized
-        className={compact ? "size-9" : "h-9 w-auto"}
+        className={compact ? "size-9 max-h-full max-w-full" : "h-9 w-auto"}
       />
     </span>
   );

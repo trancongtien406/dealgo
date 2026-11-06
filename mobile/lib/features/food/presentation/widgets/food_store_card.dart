@@ -168,7 +168,7 @@ class _CompactBody extends StatelessWidget {
                 style: DealGoType.subtitle(textTheme),
               ),
               const SizedBox(height: DealGoDensity.metaGap),
-              FoodMetaLine(store: store, rating: rating),
+              FoodMetaLine(store: store, rating: rating, maxLines: 2),
             ],
           ),
         ),

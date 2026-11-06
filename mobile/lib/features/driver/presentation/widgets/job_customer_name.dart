@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/config/api_base_url.dart';
+import '../../../../core/design_system/components/dealgo_image_cache.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/network/api_exception.dart';
@@ -87,7 +88,9 @@ class _JobCustomerTileState extends State<JobCustomerTile> {
           key: const Key('job-customer-avatar'),
           radius: 24,
           backgroundColor: DealGoColors.subtlePurple,
-          foregroundImage: avatar == null ? null : NetworkImage(avatar),
+          foregroundImage: avatar == null
+              ? null
+              : DealGoImageCache.provider(avatar, decodeWidth: 240),
           child: const Icon(DealGoIcons.user, color: DealGoColors.primary),
         ),
         const SizedBox(width: DealGoSpacing.s12),

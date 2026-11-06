@@ -186,14 +186,13 @@ void main() {
     tracker.dispose();
   });
 
-  testWidgets('skeleton while loading, then hidden when empty', (tester) async {
+  testWidgets('hidden while loading, and remains hidden when empty', (tester) async {
     final repo = _SlowRepo();
     await _pump(tester, repo);
     await tester.pump();
-    expect(find.byKey(const Key('home-banner-skeleton')), findsOneWidget);
+    expect(find.byKey(const Key('home-banner-carousel')), findsNothing);
     repo.gate.complete(const []);
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('home-banner-skeleton')), findsNothing);
     expect(find.byKey(const Key('home-banner-carousel')), findsNothing);
     expect(find.text('below'), findsOneWidget);
   });
@@ -202,7 +201,6 @@ void main() {
     await _pump(tester, FakeHomeBannerRepository(error: StateError('down')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('home-banner-carousel')), findsNothing);
-    expect(find.byKey(const Key('home-banner-skeleton')), findsNothing);
   });
 
   testWidgets('one dot per banner, 2:1 frame, autoplay, touch pauses', (

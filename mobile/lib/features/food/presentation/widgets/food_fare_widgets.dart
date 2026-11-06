@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/motion/dealgo_sheet.dart';
 import '../../../../core/design_system/tokens/dealgo_type_scale.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../l10n/app_localizations.dart';
@@ -35,12 +37,15 @@ class FoodFareOfferPanel extends StatelessWidget {
     if (quote == null || offer == null) {
       return const SizedBox.shrink();
     }
-    if (quote.feeMode == FoodDeliveryFeeMode.fixed) {
+    final textTheme = Theme.of(context).textTheme;
+    if (quote.feeMode == FoodDeliveryFeeMode.fixed || !quote.negotiable) {
       return FoodPanel(
         key: const Key('food-fare-fixed-panel'),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(l10n.foodFareNegotiationTitle, style: textTheme.titleMedium),
+            const SizedBox(height: DealGoSpacing.s4),
             FoodMoneyRow(
               label: l10n.foodFareFixedLabel,
               amount: formatVnd(quote.suggestedVnd),
@@ -48,15 +53,12 @@ class FoodFareOfferPanel extends StatelessWidget {
             const SizedBox(height: DealGoSpacing.s8),
             Text(
               l10n.foodFareFixedHint,
-              style: DealGoType.meta(Theme.of(context).textTheme)
+              style: DealGoType.meta(textTheme)
                   .copyWith(color: DealGoColors.textSecondary),
             ),
           ],
         ),
       );
-    }
-    if (!quote.negotiable) {
-      return const SizedBox.shrink();
     }
     final cubit = context.read<FoodCartCubit>();
     return FoodPanel(
@@ -64,59 +66,112 @@ class FoodFareOfferPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(l10n.foodFareNegotiationTitle, style: textTheme.titleMedium),
+          const SizedBox(height: DealGoSpacing.s4),
           FoodMoneyRow(
             label: l10n.foodFareSuggested,
             amount: formatVnd(quote.suggestedVnd),
           ),
           const SizedBox(height: DealGoSpacing.s8),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l10n.foodFareYourOffer,
-                  style: Theme.of(context).textTheme.titleSmall,
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: DealGoSpacing.s8,
+              vertical: DealGoSpacing.s4,
+            ),
+            decoration: BoxDecoration(
+              color: DealGoColors.subtlePurple,
+              borderRadius: BorderRadius.circular(DealGoRadius.input),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l10n.foodFareYourOffer,
+                    style: textTheme.titleSmall,
+                  ),
                 ),
-              ),
-              IconButton(
-                key: const Key('food-fare-decrease'),
-                tooltip: l10n.foodFareDecrease,
-                onPressed: offer > quote.minOfferVnd
-                    ? () => cubit.stepDeliveryOffer(-1)
-                    : null,
-                icon: const Icon(Icons.remove_circle_outline),
-              ),
-              Text(
-                formatVnd(offer),
-                key: const Key('food-fare-offer-amount'),
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: DealGoColors.primary,
+                _StepButton(
+                  buttonKey: const Key('food-fare-decrease'),
+                  icon: DealGoIcons.removeCircle,
+                  tooltip: l10n.foodFareDecrease,
+                  onPressed: offer > quote.minOfferVnd
+                      ? () => cubit.stepDeliveryOffer(-1)
+                      : null,
                 ),
-              ),
-              IconButton(
-                key: const Key('food-fare-increase'),
-                tooltip: l10n.foodFareIncrease,
-                onPressed: offer < quote.maxOfferVnd
-                    ? () => cubit.stepDeliveryOffer(1)
-                    : null,
-                icon: const Icon(Icons.add_circle_outline),
-              ),
-            ],
+                ConstrainedBox(
+                  constraints: const BoxConstraints(minWidth: 84),
+                  child: Text(
+                    formatVnd(offer),
+                    key: const Key('food-fare-offer-amount'),
+                    textAlign: TextAlign.center,
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: DealGoColors.primary,
+                    ),
+                  ),
+                ),
+                _StepButton(
+                  buttonKey: const Key('food-fare-increase'),
+                  icon: DealGoIcons.addCircle,
+                  tooltip: l10n.foodFareIncrease,
+                  onPressed: offer < quote.maxOfferVnd
+                      ? () => cubit.stepDeliveryOffer(1)
+                      : null,
+                ),
+              ],
+            ),
           ),
           if (offer != quote.suggestedVnd)
-            TextButton(
-              key: const Key('food-fare-reset'),
-              onPressed: cubit.resetDeliveryOffer,
-              child: Text(l10n.foodFareReset),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                key: const Key('food-fare-reset'),
+                onPressed: cubit.resetDeliveryOffer,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, DealGoDimensions.minTapTarget),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(l10n.foodFareReset),
+              ),
             ),
           const SizedBox(height: DealGoSpacing.s4),
           Text(
             l10n.foodFareNegotiationHint,
             key: const Key('food-fare-negotiation-hint'),
-            style: DealGoType.meta(Theme.of(context).textTheme)
+            style: DealGoType.meta(textTheme)
                 .copyWith(color: DealGoColors.textSecondary),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _StepButton extends StatelessWidget {
+  const _StepButton({
+    required this.buttonKey,
+    required this.icon,
+    required this.tooltip,
+    this.onPressed,
+  });
+
+  final Key buttonKey;
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      key: buttonKey,
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: Icon(
+        icon,
+        color: onPressed == null
+            ? DealGoColors.textTertiary
+            : DealGoColors.primary,
       ),
     );
   }
@@ -331,7 +386,7 @@ Future<bool> showDriverFareCounterSheet(
   // counters that are not on the step grid, so start at the next whole step.
   final min = ((customerOfferVnd ~/ step) + 1) * step;
   if (max < min) return false;
-  final amount = await showModalBottomSheet<int>(
+  final amount = await showDealGoSheet<int>(
     context: context,
     builder: (sheetContext) {
       var value = min;

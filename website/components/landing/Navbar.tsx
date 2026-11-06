@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 const navLinks = [
@@ -33,14 +34,24 @@ export default function Navbar() {
       <div className="max-w-[1500px] mx-auto px-4 sm:px-8 lg:px-12">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link href="/" className="flex flex-col justify-center select-none group">
-            <div className="flex items-center text-3xl font-black tracking-tight leading-none">
-              <span className="text-[#6D28D9]">Deal</span>
-              <span className="text-[#00D06C]">Go</span>
+          <Link href="/" className="flex items-center gap-2.5 sm:gap-3 select-none group">
+            <Image
+              src="/dealgo-icon.svg"
+              alt="DealGo"
+              width={40}
+              height={40}
+              priority
+              className="size-9 sm:size-10 rounded-2xl shadow-xs transition-transform duration-200 group-hover:scale-105"
+            />
+            <div className="flex flex-col justify-center">
+              <div className="flex items-center text-2xl sm:text-[26px] font-black tracking-tight leading-none">
+                <span className="text-[#6D28D9]">Deal</span>
+                <span className="text-[#16A34A]">Go</span>
+              </div>
+              <span className="text-[10px] sm:text-[11px] text-gray-500 font-medium tracking-normal mt-0.5 sm:mt-1">
+                Giá do bạn chọn · Trọn gói hành trình
+              </span>
             </div>
-            <span className="text-[11px] text-gray-500 font-medium tracking-normal mt-0.5">
-              Giá do bạn chọn · Trọn gói hành trình
-            </span>
           </Link>
 
           {/* Desktop Nav Links */}

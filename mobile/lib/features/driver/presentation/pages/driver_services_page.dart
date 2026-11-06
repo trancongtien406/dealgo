@@ -73,7 +73,7 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
               DealGoDimensions.pageGutter,
               DealGoSpacing.s8,
               DealGoDimensions.pageGutter,
-              DealGoSpacing.s16,
+              DealGoSpacing.s12,
             ),
             child: DealGoPrimaryButton(
               key: const Key('driver-services-save'),

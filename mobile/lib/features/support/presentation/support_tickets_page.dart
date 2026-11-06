@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/design_system/components/dealgo_card.dart';
 import '../../../core/design_system/components/dealgo_chip.dart';
 import '../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../core/design_system/components/dealgo_refresh.dart';
 import '../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../core/network/request_failure.dart';
@@ -30,9 +33,15 @@ class SupportTicketsPage extends StatefulWidget {
 }
 
 class _SupportTicketsPageState extends State<SupportTicketsPage> {
+  static const _pageSize = 20;
+
+  final _scroll = ScrollController();
   SupportListFilter _filter = SupportListFilter.all;
   SupportTicketPage? _page;
   var _loading = true;
+  var _loadingMore = false;
+  var _loadMoreFailed = false;
+  var _generation = 0;
   Object? _failure;
 
   String? get _token {
@@ -43,10 +52,30 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
   @override
   void initState() {
     super.initState();
+    _scroll.addListener(_onScroll);
     _load();
   }
 
+  @override
+  void dispose() {
+    _scroll.removeListener(_onScroll);
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    if (position.maxScrollExtent <= 0) return;
+    if (position.pixels < position.maxScrollExtent - 400) return;
+    final page = _page;
+    if (page == null || _loadingMore || _loadMoreFailed) return;
+    if (page.items.length >= page.total) return;
+    unawaited(_loadMore());
+  }
+
   Future<void> _load() async {
+    final generation = ++_generation;
     final token = _token;
     if (token == null) {
       setState(() {
@@ -57,26 +86,66 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
     }
     setState(() {
       _loading = true;
+      _loadingMore = false;
+      _loadMoreFailed = false;
       _failure = null;
     });
     try {
       final page = await context.read<SupportRepository>().list(
         accessToken: token,
         filter: _filter,
+        page: 1,
+        limit: _pageSize,
       );
-      if (mounted) {
+      if (mounted && generation == _generation) {
         setState(() {
           _page = page;
           _loading = false;
         });
       }
     } on Object catch (error) {
-      if (mounted) {
+      if (mounted && generation == _generation) {
         setState(() {
           _loading = false;
           _failure = error;
         });
       }
+    }
+  }
+
+  Future<void> _loadMore() async {
+    final current = _page;
+    final token = _token;
+    if (current == null || token == null || _loadingMore) return;
+    final generation = _generation;
+    setState(() {
+      _loadingMore = true;
+      _loadMoreFailed = false;
+    });
+    try {
+      final next = await context.read<SupportRepository>().list(
+        accessToken: token,
+        filter: _filter,
+        page: current.page + 1,
+        limit: _pageSize,
+      );
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _page = SupportTicketPage(
+          items: [...current.items, ...next.items],
+          total: next.total,
+          activeCount: next.activeCount,
+          doneCount: next.doneCount,
+          page: next.page,
+        );
+        _loadingMore = false;
+      });
+    } on Object {
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _loadingMore = false;
+        _loadMoreFailed = true;
+      });
     }
   }
 
@@ -121,9 +190,10 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
               ),
             ),
             Expanded(
-              child: RefreshIndicator(
+              child: DealGoRefresh(
                 onRefresh: _load,
                 child: ListView(
+                  controller: _scroll,
                   padding: const EdgeInsets.fromLTRB(
                     DealGoDimensions.pageGutter,
                     DealGoSpacing.s16,
@@ -192,6 +262,27 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                         _TicketCard(ticket: ticket, onTap: () => _open(ticket)),
                         const SizedBox(height: DealGoSpacing.s12),
                       ],
+                    if (_loadingMore)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            vertical: DealGoSpacing.s12,
+                          ),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      )
+                    else if (_loadMoreFailed)
+                      Center(
+                        child: TextButton(
+                          key: const Key('support-more-retry'),
+                          onPressed: _loadMore,
+                          child: Text(l10n.actionRetry),
+                        ),
+                      ),
                   ],
                 ),
               ),

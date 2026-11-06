@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/design_system/components/dealgo_app_header.dart';
 import '../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../core/design_system/components/dealgo_refresh.dart';
 import '../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../core/network/request_failure.dart';
@@ -133,78 +134,87 @@ class _SessionsPageState extends State<SessionsPage> {
         child: _loading
             ? const DealGoSkeletonList(itemCount: 3)
             : _loadFailure != null && _sessions.isEmpty
-            ? DealGoStateView.failure(
-                context,
-                onRetry: _load,
-                cause: _loadFailure,
-                compact: true,
+            ? DealGoRefresh(
+                onRefresh: _load,
+                child: DealGoStateView.failure(
+                  context,
+                  onRetry: _load,
+                  cause: _loadFailure,
+                  compact: true,
+                ),
               )
             : Column(
                 children: [
                   Expanded(
-                    child: ListView(
-                      padding: const EdgeInsets.all(
-                        DealGoDimensions.pageGutter,
-                      ),
-                      children: [
-                        Text(
-                          l10n.sessionsTitle,
-                          style: textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
+                    child: DealGoRefresh(
+                      onRefresh: _load,
+                      child: ListView(
+                        padding: const EdgeInsets.all(
+                          DealGoDimensions.pageGutter,
                         ),
-                        const SizedBox(height: 12),
-                        DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE8F7EE),
-                            borderRadius: BorderRadius.circular(
-                              DealGoRadius.card,
-                            ),
-                          ),
-                          child: ListTile(
-                            leading: const Icon(
-                              DealGoIcons.shield,
-                              color: Color(0xFF1B7A3D),
-                            ),
-                            title: Text(
-                              l10n.sessionsWarn,
-                              style: textTheme.bodySmall,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          l10n.sessionsCurrent,
-                          style: textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 8),
-                        for (final s in current)
-                          _SessionCard(
-                            session: s,
-                            badge: l10n.sessionsThisDevice,
-                            when: fmt.format(s.lastSeenAt.toLocal()),
-                          ),
-                        const SizedBox(height: 20),
-                        Text(l10n.sessionsOthers, style: textTheme.titleMedium),
-                        const SizedBox(height: 8),
-                        if (others.isEmpty)
+                        children: [
                           Text(
-                            l10n.sessionsEmptyOthers,
-                            style: textTheme.bodyMedium,
-                          )
-                        else
-                          for (final s in others)
+                            l10n.sessionsTitle,
+                            style: textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8F7EE),
+                              borderRadius: BorderRadius.circular(
+                                DealGoRadius.card,
+                              ),
+                            ),
+                            child: ListTile(
+                              leading: const Icon(
+                                DealGoIcons.shield,
+                                color: Color(0xFF1B7A3D),
+                              ),
+                              title: Text(
+                                l10n.sessionsWarn,
+                                style: textTheme.bodySmall,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Text(
+                            l10n.sessionsCurrent,
+                            style: textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          for (final s in current)
                             _SessionCard(
                               session: s,
+                              badge: l10n.sessionsThisDevice,
                               when: fmt.format(s.lastSeenAt.toLocal()),
-                              actionLabel: l10n.sessionsLogout,
-                              onAction: () => _revoke(s.id),
                             ),
-                        if (_message != null) ...[
-                          const SizedBox(height: 12),
-                          Text(_message!),
+                          const SizedBox(height: 20),
+                          Text(
+                            l10n.sessionsOthers,
+                            style: textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          if (others.isEmpty)
+                            Text(
+                              l10n.sessionsEmptyOthers,
+                              style: textTheme.bodyMedium,
+                            )
+                          else
+                            for (final s in others)
+                              _SessionCard(
+                                session: s,
+                                when: fmt.format(s.lastSeenAt.toLocal()),
+                                actionLabel: l10n.sessionsLogout,
+                                onAction: () => _revoke(s.id),
+                              ),
+                          if (_message != null) ...[
+                            const SizedBox(height: 12),
+                            Text(_message!),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                   if (others.isNotEmpty)

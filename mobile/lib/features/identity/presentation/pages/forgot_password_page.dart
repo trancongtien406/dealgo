@@ -226,7 +226,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
             header: true,
             child: Text(
               l10n.forgotPasswordTitle,
-              style: textTheme.headlineMedium,
+              style: textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
               textAlign: TextAlign.center,
             ),
           ),
@@ -237,6 +239,16 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
               textAlign: TextAlign.center,
               style: textTheme.bodyMedium?.copyWith(
                 color: DealGoColors.textSecondary,
+                height: 1.4,
+              ),
+            )
+          else if (_step == _Step.code)
+            Text(
+              l10n.forgotPasswordCodeSent(_email.text.trim()),
+              textAlign: TextAlign.center,
+              style: textTheme.bodyMedium?.copyWith(
+                color: DealGoColors.textSecondary,
+                height: 1.4,
               ),
             ),
           const SizedBox(height: DealGoSpacing.s20),
@@ -263,7 +275,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     DealGoTextField(
       fieldKey: const Key('forgot-email-field'),
       label: l10n.authEmailLabel,
-      showLabel: false,
+      hint: 'Nhập địa chỉ email của bạn',
+      showLabel: true,
       controller: _email,
       prefixIcon: DealGoIcons.mail,
       keyboardType: TextInputType.emailAddress,
@@ -285,6 +298,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     DealGoTextField(
       fieldKey: const Key('forgot-code-field'),
       label: l10n.forgotPasswordCodeLabel,
+      hint: 'Nhập mã 6 chữ số',
+      showLabel: true,
       controller: _code,
       prefixIcon: DealGoIcons.shield,
       keyboardType: TextInputType.number,
@@ -301,6 +316,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       fieldKey: const Key('forgot-password-field'),
       obscureToggleKey: const Key('forgot-toggle-password'),
       label: l10n.forgotPasswordNewLabel,
+      hint: 'Nhập mật khẩu mới (tối thiểu 6 ký tự)',
+      showLabel: true,
       controller: _password,
       prefixIcon: DealGoIcons.lock,
       obscure: true,
@@ -313,6 +330,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       fieldKey: const Key('forgot-confirm-field'),
       obscureToggleKey: const Key('forgot-toggle-confirm'),
       label: l10n.forgotPasswordConfirmLabel,
+      hint: 'Nhập lại mật khẩu mới',
+      showLabel: true,
       controller: _confirm,
       prefixIcon: DealGoIcons.lock,
       obscure: true,

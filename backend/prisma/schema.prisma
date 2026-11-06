@@ -1324,8 +1324,9 @@ model VoiceSession {
 }
 
 // In-app voice call between a customer and the assigned driver of a ride / food order
-// (DEC-PROD-007). One open call (RINGING / ACCEPTED) per trip: partial unique index
-// voice_calls_one_open_per_aggregate is defined in SQL. Audio is never recorded.
+// (DEC-PROD-007). One open call (RINGING / ACCEPTED) per trip and per callee: partial unique
+// indexes voice_calls_one_open_per_aggregate / voice_calls_one_open_per_callee are SQL.
+// Audio is never recorded.
 model VoiceCall {
   id            String    @id @default(uuid()) @db.Uuid
   aggregateType String    @db.VarChar(32)

@@ -1,3 +1,7 @@
+// LiveKit marks its CallKit audio-ownership API experimental in 2.13.x even
+// though it is the supported integration path for iOS system calls.
+// ignore_for_file: experimental_member_use
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -5,6 +9,7 @@ import 'package:flutter/widgets.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../../core/observability/performance_monitoring.dart';
 import '../../domain/ports/voice_media_engine.dart';
 import 'livekit_url_policy.dart';
 
@@ -15,14 +20,25 @@ class LiveKitVoiceMediaEngine implements VoiceMediaEngine {
   Room? _room;
   EventsListener<RoomEvent>? _listener;
   bool _leaving = false;
+  bool _microphonePermissionJustGranted = false;
 
   @override
   Stream<VoiceMediaEvent> get events => _events.stream;
 
   @override
   Future<bool> ensureMicrophonePermission() async {
+    // The OS microphone prompt cannot render over another app or the lock
+    // screen: requesting there returns `denied` immediately and the call is
+    // dropped even though the user would have allowed it. Answering from
+    // CallKit/Telecom brings the app forward within a few hundred ms, so wait
+    // for the foreground before asking — but only when still undecided.
+    final wasGranted = await Permission.microphone.isGranted;
+    if (!wasGranted) {
+      await waitForForeground(const Duration(seconds: 3));
+    }
     final status = await Permission.microphone.request();
     final granted = status.isGranted || status.isLimited;
+    _microphonePermissionJustGranted = granted && !wasGranted;
     if (granted) {
       await _ensureBluetoothConnect();
     }
@@ -46,19 +62,62 @@ class LiveKitVoiceMediaEngine implements VoiceMediaEngine {
   }
 
   @override
-  Future<void> join({required String url, required String token}) async {
+  Future<void> join({
+    required String url,
+    required String token,
+    bool systemCallOwnsAudio = false,
+  }) async {
     assertLiveKitUrlAllowed(url, isRelease: kReleaseMode);
-    // AVAudioSession activation from the background fails with -4100
-    // (Sentry). Give the app a moment to come to the foreground first; CallKit
-    // answers from the lock screen still go ahead after the short wait.
-    await waitForForeground(const Duration(seconds: 3));
-    await runWithAudioSessionRetry(
-      () => _joinOnce(url: url, token: token),
-      beforeRetry: () async {
-        await leave();
-        await waitForForeground(const Duration(seconds: 10));
-      },
+    // Audio session setup is the slowest, most failure-prone step of a call;
+    // `audio_session_retried` separates healthy joins from the -4100 retries.
+    final trace = PerformanceMonitoring.instance.startTrace('voice_call_join');
+    try {
+      await _configureAudioOwnership(systemCallOwnsAudio);
+      if (_microphonePermissionJustGranted) {
+        _microphonePermissionJustGranted = false;
+        trace.putAttribute('microphone_permission_just_granted', 'true');
+        await waitForAudioSessionRecovery(
+          foregroundTimeout: const Duration(seconds: 3),
+          settleDelay: const Duration(milliseconds: 350),
+        );
+      }
+      // AVAudioSession activation from the background fails with -4100
+      // (Sentry). Give the app a moment to come to the foreground first; CallKit
+      // answers from the lock screen still go ahead after the short wait.
+      await waitForForeground(const Duration(seconds: 3));
+      await runWithAudioSessionRetry(
+        () => _joinOnce(url: url, token: token),
+        beforeRetry: () async {
+          trace.putAttribute('audio_session_retried', 'true');
+          await leave();
+          await waitForAudioSessionRecovery(
+            foregroundTimeout: const Duration(seconds: 10),
+            settleDelay: const Duration(milliseconds: 500),
+          );
+        },
+      );
+    } catch (_) {
+      trace.putAttribute('outcome', 'failed');
+      rethrow;
+    } finally {
+      await trace.stop();
+    }
+  }
+
+  Future<void> _configureAudioOwnership(bool systemCallOwnsAudio) async {
+    // externalCallSystem currently retains LiveKit's automatic Android audio
+    // focus/routing, while reserving ownership for the self-managed Telecom
+    // connection. On iOS it hands activation to CallKit.
+    await AudioManager.instance.setAudioSessionManagementMode(
+      systemCallOwnsAudio
+          ? AudioSessionManagementMode.externalCallSystem
+          : AudioSessionManagementMode.automatic,
     );
+    if (!systemCallOwnsAudio) {
+      await AudioManager.instance.setEngineAvailability(
+        AudioEngineAvailability.defaultAvailability,
+      );
+    }
   }
 
   Future<void> _joinOnce({required String url, required String token}) async {
@@ -177,4 +236,17 @@ Future<void> waitForForeground(Duration timeout) async {
   } finally {
     listener.dispose();
   }
+}
+
+/// Waits for both foreground delivery and the AVAudioSession transition to
+/// settle. A lifecycle-only retry returns immediately while the app is already
+/// resumed, which repeats error -4100 in the same invalid audio state.
+@visibleForTesting
+Future<void> waitForAudioSessionRecovery({
+  required Duration foregroundTimeout,
+  required Duration settleDelay,
+  Future<void> Function(Duration duration) delay = Future<void>.delayed,
+}) async {
+  await waitForForeground(foregroundTimeout);
+  await delay(settleDelay);
 }

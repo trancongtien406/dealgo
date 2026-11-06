@@ -3,11 +3,16 @@ import 'package:flutter/material.dart';
 import '../../motion/dealgo_motion.dart';
 import '../tokens/dealgo_tokens.dart';
 
-/// Shimmer sweep for loading placeholders. Static under reduced motion.
+/// Diagonal shimmer sweep for loading placeholders. Static under reduced motion.
 class DealGoShimmer extends StatefulWidget {
-  const DealGoShimmer({required this.child, super.key});
+  const DealGoShimmer({
+    required this.child,
+    this.animateInTests = true,
+    super.key,
+  });
 
   final Widget child;
+  final bool animateInTests;
 
   @override
   State<DealGoShimmer> createState() => _DealGoShimmerState();
@@ -17,14 +22,26 @@ class _DealGoShimmerState extends State<DealGoShimmer>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1300),
+    duration: const Duration(milliseconds: 1350),
   );
+
+  bool _shouldAnimate(BuildContext context) {
+    if (DealGoMotion.prefersReducedMotion(context)) return false;
+    if (!widget.animateInTests &&
+        WidgetsBinding.instance.runtimeType.toString().contains(
+          'TestWidgetsFlutterBinding',
+        )) {
+      return false;
+    }
+    return true;
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (DealGoMotion.prefersReducedMotion(context)) {
+    if (!_shouldAnimate(context)) {
       _controller.stop();
+      _controller.value = 0.5;
     } else if (!_controller.isAnimating) {
       _controller.repeat();
     }
@@ -38,14 +55,27 @@ class _DealGoShimmerState extends State<DealGoShimmer>
 
   @override
   Widget build(BuildContext context) {
+    final base = DealGoColors.skeletonBase;
+    final highlight = DealGoColors.skeletonHighlight;
     return ExcludeSemantics(
       child: AnimatedBuilder(
         animation: _controller,
         child: widget.child,
         builder: (context, child) {
           final t = _controller.value;
-          final opacity = 0.55 + 0.45 * (1 - (2 * t - 1).abs());
-          return Opacity(opacity: opacity, child: child);
+          final dx = -1.6 + 3.2 * t;
+          return ShaderMask(
+            blendMode: BlendMode.srcATop,
+            shaderCallback: (bounds) {
+              return LinearGradient(
+                begin: Alignment(dx - 0.85, -0.35),
+                end: Alignment(dx + 0.85, 0.35),
+                colors: [base, highlight, base],
+                stops: const [0.15, 0.5, 0.85],
+              ).createShader(bounds);
+            },
+            child: child,
+          );
         },
       ),
     );
@@ -137,6 +167,184 @@ class DealGoSkeletonList extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Hero banner / carousel shimmer skeleton.
+class DealGoBannerSkeleton extends StatelessWidget {
+  const DealGoBannerSkeleton({
+    this.height = 156,
+    this.padding = const EdgeInsets.symmetric(
+      horizontal: DealGoDimensions.pageGutter,
+    ),
+    super.key,
+  });
+
+  final double height;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: padding,
+      child: DealGoShimmer(
+        child: Container(
+          height: height,
+          padding: const EdgeInsets.all(DealGoSpacing.s16),
+          decoration: BoxDecoration(
+            color: DealGoColors.card,
+            borderRadius: BorderRadius.circular(DealGoRadius.card),
+            border: Border.all(color: DealGoColors.border),
+          ),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              DealGoSkeletonBox(width: 76, height: 18, radius: DealGoRadius.pill),
+              Spacer(),
+              FractionallySizedBox(
+                widthFactor: 0.65,
+                child: DealGoSkeletonBox(height: 18),
+              ),
+              SizedBox(height: DealGoSpacing.s8),
+              FractionallySizedBox(
+                widthFactor: 0.42,
+                child: DealGoSkeletonBox(height: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Featured store / dish card skeleton (16:9 photo header + title + meta + chips).
+class DealGoStoreCardSkeleton extends StatelessWidget {
+  const DealGoStoreCardSkeleton({
+    this.padding = const EdgeInsets.symmetric(
+      horizontal: DealGoDimensions.pageGutter,
+    ),
+    super.key,
+  });
+
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: padding,
+      child: DealGoShimmer(
+        child: Container(
+          decoration: BoxDecoration(
+            color: DealGoColors.card,
+            borderRadius: BorderRadius.circular(DealGoRadius.card),
+            border: Border.all(color: DealGoColors.border),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DealGoSkeletonBox(height: 124, radius: 0),
+              Padding(
+                padding: EdgeInsets.all(DealGoSpacing.s12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    FractionallySizedBox(
+                      widthFactor: 0.62,
+                      child: DealGoSkeletonBox(height: 16),
+                    ),
+                    SizedBox(height: DealGoSpacing.s8),
+                    FractionallySizedBox(
+                      widthFactor: 0.44,
+                      child: DealGoSkeletonBox(height: 12),
+                    ),
+                    SizedBox(height: DealGoSpacing.s12),
+                    Row(
+                      children: [
+                        DealGoSkeletonBox(
+                          width: 68,
+                          height: 22,
+                          radius: DealGoRadius.small,
+                        ),
+                        SizedBox(width: DealGoSpacing.s8),
+                        DealGoSkeletonBox(
+                          width: 84,
+                          height: 22,
+                          radius: DealGoRadius.small,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 2-column grid of card skeletons (for category / product grids).
+class DealGoGridSkeleton extends StatelessWidget {
+  const DealGoGridSkeleton({
+    this.itemCount = 4,
+    this.crossAxisCount = 2,
+    this.padding = const EdgeInsets.all(DealGoDimensions.pageGutter),
+    super.key,
+  });
+
+  final int itemCount;
+  final int crossAxisCount;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return DealGoShimmer(
+      child: GridView.builder(
+        padding: padding,
+        physics: const NeverScrollableScrollPhysics(),
+        shrinkWrap: true,
+        itemCount: itemCount,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          crossAxisSpacing: DealGoSpacing.s12,
+          mainAxisSpacing: DealGoSpacing.s12,
+          childAspectRatio: 0.85,
+        ),
+        itemBuilder: (context, index) => Container(
+          padding: const EdgeInsets.all(DealGoSpacing.s12),
+          decoration: BoxDecoration(
+            color: DealGoColors.card,
+            borderRadius: BorderRadius.circular(DealGoRadius.card),
+            border: Border.all(color: DealGoColors.border),
+          ),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: DealGoSkeletonBox(
+                  width: double.infinity,
+                  radius: DealGoRadius.input,
+                ),
+              ),
+              SizedBox(height: DealGoSpacing.s12),
+              FractionallySizedBox(
+                widthFactor: 0.78,
+                child: DealGoSkeletonBox(height: 14),
+              ),
+              SizedBox(height: DealGoSpacing.s6),
+              FractionallySizedBox(
+                widthFactor: 0.48,
+                child: DealGoSkeletonBox(height: 12),
+              ),
+            ],
           ),
         ),
       ),

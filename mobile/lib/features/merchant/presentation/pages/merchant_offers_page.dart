@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/design_system/components/dealgo_dialog.dart';
+import '../../../../core/design_system/components/dealgo_refresh.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
@@ -118,24 +119,35 @@ class _MerchantOffersPageState extends State<MerchantOffersPage> {
     final full = live >= merchantOfferLiveLimit;
     final Widget body;
     if (_error != null && offers == null) {
-      body = DealGoStateView.failure(
-        context,
-        onRetry: _load,
-        cause: _error,
-        message: apiErrorText(l10n, _error),
+      body = DealGoRefresh(
+        onRefresh: _load,
+        child: DealGoStateView.failure(
+          context,
+          onRetry: _load,
+          cause: _error,
+          message: apiErrorText(l10n, _error),
+        ),
       );
     } else if (offers == null) {
       body = const DealGoSkeletonList(itemCount: 3);
     } else if (offers.isEmpty) {
-      body = Center(
-        child: Text(
-          l10n.merchantOffersEmpty,
-          key: const Key('merchant-offers-empty'),
-          style: Theme.of(context).textTheme.bodyMedium,
+      body = DealGoRefresh(
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
+          children: [
+            Center(
+              child: Text(
+                l10n.merchantOffersEmpty,
+                key: const Key('merchant-offers-empty'),
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+          ],
         ),
       );
     } else {
-      body = RefreshIndicator(
+      body = DealGoRefresh(
         onRefresh: _load,
         child: ListView.separated(
           padding: const EdgeInsets.all(DealGoDimensions.pageGutter),

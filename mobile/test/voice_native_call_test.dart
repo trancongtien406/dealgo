@@ -33,6 +33,10 @@ class FakeNativeCallUi implements NativeCallUi {
   Future<void> dismiss(String callId) async => log.add('dismiss:$callId');
 
   @override
+  Future<void> dismissOthers(String? keepCallId) async =>
+      log.add('dismissOthers:${keepCallId ?? ''}');
+
+  @override
   Future<void> setConnected(String callId) async =>
       log.add('connected:$callId');
 
@@ -77,6 +81,7 @@ class _Harness {
       // ending action and the assertion (real-time 1ms settles).
       endedHold: const Duration(seconds: 1),
       ringGrace: Duration.zero,
+      peerGoneGrace: Duration.zero,
       nativeCallUi: native,
     );
   }
@@ -210,6 +215,7 @@ void main() {
     expect(h.cubit.state.phase, VoiceCallPhase.active);
     expect(h.voice.actions, ['accept:${call.id}']);
     expect(h.native.log, ['connected:${call.id}']);
+    expect(h.media.lastSystemCallOwnsAudio, isTrue);
 
     await h.cubit.hangUp();
     expect(h.native.log.last, 'dismiss:${call.id}');
@@ -318,6 +324,7 @@ void main() {
       expect(h.cubit.state.phase, VoiceCallPhase.active);
       expect(h.voice.actions, ['accept:${call.id}']);
       expect(h.native.log, ['connected:${call.id}']);
+      expect(h.media.lastSystemCallOwnsAudio, isTrue);
       await h.dispose();
     },
   );

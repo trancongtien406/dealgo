@@ -59,6 +59,17 @@ export class PrismaVoiceCallRepository implements VoiceCallRepository {
     return row ? toRecord(row) : null;
   }
 
+  async findOpenForCallee(userId: string): Promise<VoiceCallRecord | null> {
+    const row = await this.db.voiceCall.findFirst({
+      where: {
+        calleeUserId: userId,
+        status: { in: [...OPEN_CALL_STATUSES] },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return row ? toRecord(row) : null;
+  }
+
   async transition(
     id: string,
     from: readonly VoiceCallStatus[],

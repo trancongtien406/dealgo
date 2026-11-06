@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { PublicSiteConfig } from "@/features/site-config/types";
 
 export default function Footer({ siteConfig = {} }: { siteConfig?: PublicSiteConfig }) {
@@ -11,10 +12,17 @@ export default function Footer({ siteConfig = {} }: { siteConfig?: PublicSiteCon
           {/* ============================================================== */}
           <div className="w-full lg:w-[320px] shrink-0 space-y-2.5">
             {/* Logo */}
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2.5">
+              <Image
+                src="/dealgo-icon.svg"
+                alt="DealGo"
+                width={36}
+                height={36}
+                className="size-9 rounded-xl shadow-xs"
+              />
               <span className="text-[26px] font-black tracking-tight leading-none">
                 <span className="text-[#6D28D9]">Deal</span>
-                <span className="text-[#00D06C]">Go</span>
+                <span className="text-[#16A34A]">Go</span>
               </span>
             </div>
 

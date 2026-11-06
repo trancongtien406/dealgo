@@ -49,6 +49,11 @@ export interface VoiceCallRepository {
   findById(id: string): Promise<VoiceCallRecord | null>;
   findOpen(aggregateType: VoiceAggregateType, aggregateId: string): Promise<VoiceCallRecord | null>;
   /**
+   * The call currently ringing / connected *to* this user, on any trip. One phone has one call
+   * screen, so a callee cannot be rung for a second ride/order while the first still rings.
+   */
+  findOpenForCallee(userId: string): Promise<VoiceCallRecord | null>;
+  /**
    * Compare-and-set: applies the patch only while the call is in one of `from`. Returns the
    * updated call, or null when another request (or node) already moved it on.
    */
@@ -92,12 +97,23 @@ export class MemoryVoiceCallRepository implements VoiceCallRepository {
     return null;
   }
 
+  async findOpenForCallee(userId: string): Promise<VoiceCallRecord | null> {
+    for (const call of this.calls.values()) {
+      if (
+        call.calleeUserId === userId &&
+        OPEN_CALL_STATUSES.includes(call.status)
+      ) {
+        return { ...call };
+      }
+    }
+    return null;
+  }
+
   async transition(
     id: string,
     from: readonly VoiceCallStatus[],
     patch: VoiceCallPatch,
-  ): Promise<VoiceCallRecord | null> {
-    const call = this.calls.get(id);
+  ): Promise<VoiceCallRecord | null> {    const call = this.calls.get(id);
     if (!call || !from.includes(call.status)) {
       return null;
     }

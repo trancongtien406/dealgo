@@ -58,7 +58,7 @@ class _MerchantHomePageState extends State<MerchantHomePage> {
     super.dispose();
   }
 
-  void _load() {
+  Future<void> _load({bool silentQueue = false}) async {
     if (!mounted) {
       return;
     }
@@ -68,18 +68,31 @@ class _MerchantHomePageState extends State<MerchantHomePage> {
       return merchantAccessToken(context);
     });
     final token = merchantAccessToken(context);
-    unawaited(queue.load(token));
-    unawaited(_stats.load(token, days: 1));
+    final queueFuture = silentQueue ? queue.refresh() : queue.load(token);
+    final statsFuture = _stats.load(
+      token,
+      days: 1,
+      includeStatement: false,
+    );
     // DEC-PROD-043: subscribe store: even when the queue is empty.
-    unawaited(_bindStoreRoom(token));
+    unawaited(_bindStoreRoom(token, afterStats: statsFuture));
+    await Future.wait([queueFuture, statsFuture]);
   }
 
-  Future<void> _bindStoreRoom(String? token) async {
+  Future<void> _bindStoreRoom(
+    String? token, {
+    required Future<void> afterStats,
+  }) async {
     final access = token?.trim() ?? '';
     if (access.isEmpty || !mounted) return;
     try {
-      final store = await context.read<GetMerchantCatalog>()(access);
+      await afterStats;
       if (!mounted) return;
+      final statsState = _stats.state;
+      final store = statsState is MerchantStatsReady
+          ? statsState.store
+          : await context.read<GetMerchantCatalog>()(access);
+      if (!mounted || store == null) return;
       await context.read<MerchantQueueCubit>().listenStore(
         storeId: store.id,
         tokenSource: () {
@@ -118,18 +131,24 @@ class _MerchantHomePageState extends State<MerchantHomePage> {
       MerchantQueueReady(:final orders) => _Dashboard(
         orders: orders,
         onRefresh: _load,
+        onPullRefresh: () => _load(silentQueue: true),
       ),
     };
   }
 }
 
 class _Dashboard extends StatelessWidget {
-  const _Dashboard({required this.orders, required this.onRefresh});
+  const _Dashboard({
+    required this.orders,
+    required this.onRefresh,
+    required this.onPullRefresh,
+  });
 
   final List<MerchantQueueOrder> orders;
 
   /// Re-reads stats + store after M024 so the mode chip is current.
   final VoidCallback onRefresh;
+  final Future<void> Function() onPullRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -145,10 +164,7 @@ class _Dashboard extends StatelessWidget {
       showBack: false,
       body: DealGoRefresh(
         key: const Key('merchant-home-refresh'),
-        onRefresh: () async {
-          onRefresh();
-          await context.read<MerchantQueueCubit>().refresh();
-        },
+        onRefresh: onPullRefresh,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: dealGoScrollPadding(context, merchantPagePadding),

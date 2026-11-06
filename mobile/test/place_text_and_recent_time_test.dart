@@ -47,6 +47,24 @@ void main() {
       );
     });
 
+    test('shortPlaceLabel keeps the house number and street only', () {
+      expect(
+        shortPlaceLabel('Nhà, 45 Lê Duẩn, Hải Châu, Đà Nẵng'),
+        '45 Lê Duẩn',
+      );
+      expect(
+        shortPlaceLabel('12 Nguyễn Huệ, Quan 1, Ho Chi Minh City, 700000'),
+        '12 Nguyễn Huệ',
+      );
+      expect(shortPlaceLabel('45, Lê Duẩn, Hải Châu'), '45 Lê Duẩn');
+      expect(shortPlaceLabel('Chợ Hàn, Hải Châu, Đà Nẵng'), 'Chợ Hàn');
+      expect(
+        shortPlaceLabel('Vị trí hiện tại, Trần Phú, Hải Châu'),
+        'Trần Phú',
+      );
+      expect(shortPlaceLabel(''), '');
+    });
+
     test('formatPlaceLabel applies the cleanup', () {
       expect(
         formatPlaceLabel(

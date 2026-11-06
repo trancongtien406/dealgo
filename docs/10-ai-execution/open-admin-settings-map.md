@@ -72,7 +72,8 @@ Cột "Tham chiếu" trỏ tới quyết định (`DEC-PROD-*`) hoặc vấn đ�
 
 | Key | Mặc định | Khoảng | Ý nghĩa | Tham chiếu |
 |---|---|---|---|---|
-| `DRIVER_SEARCH_RADIUS_KM` | `5` (env) | 0.1–100 | Bán kính (km) quanh điểm đón / quán để tìm tài xế, lọc danh sách chuyến mở, đơn sẵn sàng và danh sách quán theo vị trí. | OPEN-004 |
+| `DRIVER_SEARCH_RADIUS_KM` | `5` (env) | 0.1–100 | Bán kính (km) quanh điểm đón / quán để tìm tài xế, lọc danh sách chuyến mở, đơn sẵn sàng. Không còn dùng cho danh sách quán của khách (xem `FOOD_BROWSE_RADIUS_KM`). | OPEN-004 |
+| `FOOD_BROWSE_RADIUS_KM` | `15` (seed) | 1–50 | Bán kính (km) khách thấy/tìm quán ăn quanh vị trí của mình; `max_km` chỉ có thể thu hẹp thêm. Tách khỏi bán kính điều phối tài xế. | DEC-PROD-059 |
 | `RIDE_OFFER_TTL_SECONDS` | `20` (env, t71u) | 1–86400 | Hiệu lực mỗi đề nghị giá của tài xế; không vượt quá thời gian mở yêu cầu. | OPEN-004, OPEN-019 |
 | `CONTACT_WINDOW_MINUTES` | `120` (env) | 1–10080 | Chat mở suốt chuyến/đơn và thêm số phút này sau khi chuyến/đơn kết thúc. Gọi thoại chỉ khi chuyến/đơn đang chạy (`DEC-PROD-064`). | OPEN-014, OPEN-021 |
 | `MAX_CONCURRENT_JOBS_PER_DRIVER` | `1` (env) | 1–20 | Số việc đang chạy tối đa của một tài xế; kiểm tra khi khách chọn tài xế và khi tài xế nhận đơn Food. | OPEN-005 |

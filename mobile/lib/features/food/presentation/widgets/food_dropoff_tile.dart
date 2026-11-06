@@ -71,9 +71,11 @@ class _FoodDropoffTileState extends State<FoodDropoffTile> {
 
   String? _quoteKey(FoodCartState cart) {
     final storeId = cart.storeId;
-    if (storeId == null || !cart.hasDropoff || cart.deliveryFareVnd != null) {
+    if (storeId == null || !cart.hasDropoff || cart.deliveryQuote != null) {
       return null;
     }
+    // A restored draft keeps the amount but not the offer bounds; re-quote so
+    // checkout can offer the negotiation range instead of a frozen fee.
     return '$storeId|${cart.dropoffLat}|${cart.dropoffLng}';
   }
 
@@ -166,9 +168,12 @@ class _FoodDropoffTileState extends State<FoodDropoffTile> {
       child: BlocBuilder<FoodCartCubit, FoodCartState>(
         buildWhen: (a, b) =>
             a.dropoffLabel != b.dropoffLabel ||
-            a.deliveryFareVnd != b.deliveryFareVnd,
+            a.deliveryFareVnd != b.deliveryFareVnd ||
+            a.deliveryQuote != b.deliveryQuote,
         builder: (context, cart) {
           final chosen = cart.hasDropoff;
+          final error = _error;
+          final tooFar = error != null && _tooFar(error);
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -229,7 +234,9 @@ class _FoodDropoffTileState extends State<FoodDropoffTile> {
                           ],
                         ),
                       ),
-                      if (widget.enabled && chosen) ...[
+                      // The refusal keeps its own single action below, so the
+                      // row does not repeat a second "Đổi" next to it.
+                      if (widget.enabled && chosen && !tooFar) ...[
                         const SizedBox(width: DealGoSpacing.s8),
                         Text(
                           l10n.foodDropoffChange,
@@ -250,38 +257,105 @@ class _FoodDropoffTileState extends State<FoodDropoffTile> {
                 ),
               ),
               if (_quoting)
-                Text(l10n.foodFareQuoting, style: textTheme.bodySmall)
-              else if (_error case final error?)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        apiErrorText(l10n, error, report: false),
-                        key: const Key('food-fare-error'),
-                        style: textTheme.bodySmall?.copyWith(
-                          color: DealGoColors.danger,
-                        ),
-                      ),
+                Padding(
+                  padding: const EdgeInsets.only(top: DealGoSpacing.s6),
+                  child: Text(
+                    l10n.foodFareQuoting,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: DealGoColors.textSecondary,
                     ),
-                    // Distance refusals only clear with a nearer address, so offer
-                    // that instead of a retry that would fail again.
-                    if (_tooFar(error))
-                      TextButton(
-                        key: const Key('food-fare-change-address'),
-                        onPressed: widget.enabled ? _pick : null,
-                        child: Text(l10n.foodDropoffChange),
-                      )
-                    else
-                      TextButton(
-                        onPressed: () => _maybeQuote(cart),
-                        child: Text(l10n.actionRetry),
-                      ),
-                  ],
+                  ),
+                )
+              else if (error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: DealGoSpacing.s8),
+                  child: _FareProblem(
+                    message: apiErrorText(l10n, error, report: false),
+                    // Distance refusals only clear with a nearer address, so
+                    // the fix is a new address rather than a retry.
+                    actionLabel: tooFar
+                        ? l10n.foodDropoffChangeAddress
+                        : l10n.actionRetry,
+                    actionKey: tooFar
+                        ? const Key('food-fare-change-address')
+                        : const Key('food-fare-retry'),
+                    onAction: !widget.enabled
+                        ? null
+                        : tooFar
+                        ? _pick
+                        : () => _maybeQuote(cart),
+                  ),
                 ),
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _FareProblem extends StatelessWidget {
+  const _FareProblem({
+    required this.message,
+    required this.actionLabel,
+    required this.actionKey,
+    this.onAction,
+  });
+
+  final String message;
+  final String actionLabel;
+  final Key actionKey;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: DealGoColors.dangerSurface,
+        borderRadius: BorderRadius.circular(DealGoRadius.input),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          DealGoSpacing.s12,
+          DealGoSpacing.s8,
+          DealGoSpacing.s4,
+          DealGoSpacing.s8,
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              DealGoIcons.alert,
+              size: 18,
+              color: DealGoColors.danger,
+            ),
+            const SizedBox(width: DealGoSpacing.s8),
+            Expanded(
+              child: Text(
+                message,
+                key: const Key('food-fare-error'),
+                style: textTheme.bodySmall?.copyWith(
+                  color: DealGoColors.danger,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            if (onAction != null)
+              TextButton(
+                key: actionKey,
+                onPressed: onAction,
+                style: TextButton.styleFrom(
+                  foregroundColor: DealGoColors.danger,
+                  minimumSize: const Size(0, DealGoDimensions.minTapTarget),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: DealGoSpacing.s8,
+                  ),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(actionLabel),
+              ),
+          ],
+        ),
       ),
     );
   }

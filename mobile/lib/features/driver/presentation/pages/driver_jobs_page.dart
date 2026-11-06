@@ -36,6 +36,7 @@ import '../../../../core/format/short_ref.dart';
 import '../../../../core/l10n/api_error_text.dart';
 import '../../../../core/network/request_failure.dart';
 import '../../../../core/design_system/components/dealgo_nav_insets.dart';
+import '../../../../core/design_system/components/dealgo_refresh.dart';
 
 class DriverJobsPage extends StatefulWidget {
   const DriverJobsPage({super.key});
@@ -88,16 +89,14 @@ class _DriverJobsPageState extends State<DriverJobsPage> {
     super.dispose();
   }
 
-  void _sync({bool quiet = false}) {
+  Future<void> _sync({bool quiet = false}) async {
     if (!mounted) {
       return;
     }
-    unawaited(
-      context.read<DriverFeedCubit>().sync(
-        online: context.read<DriverDutyCubit>().state,
-        accessToken: driverAccessToken(context),
-        quiet: quiet,
-      ),
+    await context.read<DriverFeedCubit>().sync(
+      online: context.read<DriverDutyCubit>().state,
+      accessToken: driverAccessToken(context),
+      quiet: quiet,
     );
   }
 
@@ -203,7 +202,7 @@ class _JobsOnline extends StatelessWidget {
   const _JobsOnline({required this.feed, required this.onRetry});
 
   final DriverFeedState feed;
-  final VoidCallback onRetry;
+  final Future<void> Function() onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -228,7 +227,7 @@ class _JobsOnline extends StatelessWidget {
                 DealGoDimensions.pageGutter,
                 DealGoSpacing.s8,
                 DealGoDimensions.pageGutter,
-                DealGoSpacing.s16,
+                DealGoSpacing.s12,
               ),
               child: DealGoPrimaryButton(
                 key: const Key('driver-open-first-job'),
@@ -237,17 +236,19 @@ class _JobsOnline extends StatelessWidget {
                 onPressed: () => _openFirst(context, ready),
               ),
             ),
-      body: ListView(
-        padding: dealGoScrollPadding(
-          context,
-          const EdgeInsets.fromLTRB(
-            DealGoDimensions.pageGutter,
-            DealGoSpacing.s8,
-            DealGoDimensions.pageGutter,
-            DealGoSpacing.s16,
+      body: DealGoRefresh(
+        onRefresh: onRetry,
+        child: ListView(
+          padding: dealGoScrollPadding(
+            context,
+            const EdgeInsets.fromLTRB(
+              DealGoDimensions.pageGutter,
+              DealGoSpacing.s8,
+              DealGoDimensions.pageGutter,
+              DealGoSpacing.s16,
+            ),
           ),
-        ),
-        children: [
+          children: [
           DriverPanel(
             elevated: true,
             padding: const EdgeInsets.fromLTRB(
@@ -323,6 +324,7 @@ class _JobsOnline extends StatelessWidget {
             child: Text(AppLocalizations.of(context).driverOpenHistory),
           ),
         ],
+        ),
       ),
     );
   }

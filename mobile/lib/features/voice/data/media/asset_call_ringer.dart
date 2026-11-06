@@ -61,6 +61,12 @@ class AssetCallRinger implements CallRinger {
     }
   }
 
+  @override
+  Future<void> dispose() async {
+    await stop();
+    await _guard(_player.dispose);
+  }
+
   void _vibrate() {
     unawaited(_guard(HapticFeedback.vibrate));
   }

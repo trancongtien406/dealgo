@@ -63,7 +63,7 @@ export class MenuItemImageService {
     if (normalized && !(MENU_ITEM_IMAGE_TYPES as readonly string[]).includes(normalized)) {
       throw imageError(415, 'UPLOAD_TYPE_NOT_ALLOWED', 'Menu photo must be a JPEG, PNG or WebP image');
     }
-    const updated = await this.uploads.storeThen(
+    const updated = await this.uploads.storePublicThen(
       `menu-items/${itemId}`,
       [{ label: 'menu-item', contentType: payload.contentType, contentBase64: payload.base64 }],
       async ([ref]) => {
@@ -109,7 +109,11 @@ export class MenuItemImageService {
   }
 
   /** Serves only the item's current photo; replaced or guessed keys answer 404. */
-  async read(itemId: string, file: string): Promise<{ body: Buffer; contentType: string }> {
+  async read(
+    itemId: string,
+    file: string,
+    width: number | null = null,
+  ): Promise<{ body: Buffer; contentType: string }> {
     if (!UUID_RE.test(itemId) || !FILE_RE.test(file)) {
       throw imageError(404, 'MENU_IMAGE_NOT_FOUND', 'Image not found');
     }
@@ -121,7 +125,7 @@ export class MenuItemImageService {
     }
     const ext = file.slice(file.lastIndexOf('.') + 1);
     const contentType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
-    const found = await this.uploads.read({ key, contentType });
+    const found = await this.uploads.readDisplayImage({ key, contentType }, width);
     if (!found) {
       throw imageError(404, 'MENU_IMAGE_NOT_FOUND', 'Image not found');
     }

@@ -563,7 +563,7 @@ class _RideOffersPageState extends State<_RideOffersView> {
       currentFareVnd: ride.offeredFareVnd,
       formatVnd: formatRideVnd,
       maxFareVnd: ride.maxOfferedFareVnd,
-      headroomPercent: ride.fareHeadroomPercent,
+      referenceFareVnd: ride.referenceFareVnd,
     );
     if (amount == null || !mounted) {
       return;

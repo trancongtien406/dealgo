@@ -179,6 +179,29 @@ describe('VoiceService calls', () => {
     );
   });
 
+  it('refuses to ring a callee who is already on another call', async () => {
+    const { service } = setup();
+    // The customer calls the driver on the ride…
+    await service.startForRide(actor(CUSTOMER), RIDE);
+    // …so the driver cannot also be rung for the food order: one phone, one call screen.
+    await expectCode(
+      service.startForFood(actor(CUSTOMER), ORDER),
+      'VOICE_BUSY',
+    );
+  });
+
+  it('puts the ring window in the push so the native call screen matches the server', async () => {
+    const { service, push } = setup();
+    await service.startForRide(actor(CUSTOMER), RIDE);
+    expect(push.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          ringSeconds: String(VOICE_CALL_RING_SECONDS),
+        }),
+      }),
+    );
+  });
+
   it('fails closed when the admin toggle is off or no provider is configured', async () => {
     await expectCode(
       setup({ enabled: false }).service.startForRide(actor(CUSTOMER), RIDE),

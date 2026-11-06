@@ -113,7 +113,7 @@ class _DriverJobFailedPageState extends State<DriverJobFailedPage> {
           DealGoDimensions.pageGutter,
           DealGoSpacing.s8,
           DealGoDimensions.pageGutter,
-          DealGoSpacing.s16,
+          DealGoSpacing.s12,
         ),
         child: DealGoPrimaryButton(
           key: const Key('driver-job-failed-submit'),

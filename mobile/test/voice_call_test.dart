@@ -41,6 +41,7 @@ class _Harness {
       currentUserId: () => 'me',
       endedHold: const Duration(milliseconds: 5),
       ringGrace: Duration.zero,
+      peerGoneGrace: Duration.zero,
     );
   }
 
@@ -83,6 +84,9 @@ class _FakeRinger implements CallRinger {
 
   @override
   Future<void> stop() async => log.add('stop');
+
+  @override
+  Future<void> dispose() async {}
 }
 
 Future<void> _settle() => Future<void>.delayed(const Duration(milliseconds: 1));
@@ -229,6 +233,90 @@ void main() {
     await _settle();
     expect(h.cubit.state.phase, VoiceCallPhase.ended);
     expect(h.voice.actions.last, 'end:${call.id}');
+    await h.dispose();
+  });
+
+  test('hanging up while the room is still joining releases the mic', () async {
+    final h = _Harness();
+    final call = h.voice.ring();
+    h.push(call);
+    await _settle();
+    final gate = Completer<void>();
+    h.media.joinGate = gate;
+    final accepting = h.cubit.accept();
+    await _settle();
+    expect(h.cubit.state.phase, VoiceCallPhase.connecting);
+    await h.cubit.hangUp();
+    gate.complete();
+    await accepting;
+    await _settle();
+    expect(h.media.joined, isFalse, reason: 'the room must be left');
+    expect(h.media.micOn, isFalse);
+    expect(h.cubit.state.phase, isNot(VoiceCallPhase.active));
+    expect(h.cubit.state.notice, VoiceCallNotice.hungUp);
+    await h.dispose();
+  });
+
+  test(
+    'hanging up while the answer request is in flight ends the call',
+    () async {
+      final h = _Harness();
+      final call = h.voice.ring();
+      h.push(call);
+      await _settle();
+      final gate = Completer<void>();
+      h.voice.acceptGate = gate;
+      final accepting = h.cubit.accept();
+      await _settle();
+      await h.cubit.hangUp();
+      gate.complete();
+      await accepting;
+      await _settle();
+      expect(h.media.joined, isFalse, reason: 'never join a cancelled call');
+      expect(h.voice.actions, ['accept:${call.id}', 'end:${call.id}']);
+      expect(h.cubit.state.notice, VoiceCallNotice.hungUp);
+      await h.dispose();
+    },
+  );
+
+  test(
+    'cancelling while the start request is in flight ends it on the server',
+    () async {
+      final h = _Harness();
+      final gate = Completer<void>();
+      h.voice.startGate = gate;
+      final starting = h.cubit.start(VoiceThreadKind.ride, 'ride-1');
+      await _settle();
+      expect(h.cubit.state.phase, VoiceCallPhase.starting);
+      await h.cubit.hangUp();
+      gate.complete();
+      await starting;
+      await _settle();
+      expect(h.media.joined, isFalse);
+      expect(h.voice.actions, [
+        'start:ride-1',
+        'end:${h.voice.calls.keys.last}',
+      ]);
+      expect(h.cubit.state.notice, VoiceCallNotice.hungUp);
+      await h.dispose();
+    },
+  );
+
+  test('a remote drop during a reconnect does not end the call', () async {
+    final h = _Harness();
+    final call = h.voice.ring();
+    h.push(call);
+    await _settle();
+    await h.cubit.accept();
+    h.media.emit(VoiceMediaEvent.reconnecting);
+    h.media.emit(VoiceMediaEvent.remoteLeft);
+    await _settle();
+    expect(h.cubit.state.phase, VoiceCallPhase.active);
+    h.media.emit(VoiceMediaEvent.reconnected);
+    h.media.emit(VoiceMediaEvent.remoteJoined);
+    await _settle();
+    expect(h.cubit.state.phase, VoiceCallPhase.active);
+    expect(h.voice.actions.where((a) => a.startsWith('end:')), isEmpty);
     await h.dispose();
   });
 
@@ -446,5 +534,17 @@ void main() {
     ]) {
       expect(manifest, contains('android.permission.$permission'));
     }
+    final callkitManifest = File(
+      'packages/flutter_callkit_incoming/android/src/main/AndroidManifest.xml',
+    ).readAsStringSync();
+    for (final permission in [
+      'MANAGE_OWN_CALLS',
+      'FOREGROUND_SERVICE_PHONE_CALL',
+      'FOREGROUND_SERVICE_MICROPHONE',
+      'USE_FULL_SCREEN_INTENT',
+    ]) {
+      expect(callkitManifest, contains('android.permission.$permission'));
+    }
+    expect(callkitManifest, contains('CallkitConnectionService'));
   });
 }

@@ -130,24 +130,26 @@ class _Reviews extends StatelessWidget {
         ),
         if (data.items.isNotEmpty || stars != null) ...[
           const SizedBox(height: DealGoSpacing.s12),
-          Wrap(
-            spacing: DealGoSpacing.s8,
-            runSpacing: DealGoSpacing.s8,
+          Row(
             children: [
-              for (final value in <int?>[null, 5, 4, 3, 2, 1])
-                ChoiceChip(
-                  key: Key('food-review-filter-${value ?? 'all'}'),
-                  label: Text(
-                    value == null
-                        ? l10n.foodStoreReviewsAll
-                        : l10n.rateStarTooltip(value),
+              for (final (index, value) in <int?>[
+                null,
+                5,
+                4,
+                3,
+                2,
+                1,
+              ].indexed) ...[
+                if (index > 0) const SizedBox(width: DealGoSpacing.s6),
+                Expanded(
+                  child: _ReviewStarFilter(
+                    key: Key('food-review-filter-${value ?? 'all'}'),
+                    starCount: value,
+                    selected: stars == value,
+                    onTap: () => onFilter(value),
                   ),
-                  selected: stars == value,
-                  showCheckmark: false,
-                  onSelected: (_) => onFilter(value),
-                  selectedColor: DealGoColors.subtlePurple,
-                  visualDensity: VisualDensity.compact,
                 ),
+              ],
             ],
           ),
         ],
@@ -245,6 +247,89 @@ class _Reviews extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// One star filter in the single-row strip: the equal-width cells keep all six
+/// choices visible, so the row never wraps into a second line.
+class _ReviewStarFilter extends StatelessWidget {
+  const _ReviewStarFilter({
+    required this.starCount,
+    required this.selected,
+    required this.onTap,
+    super.key,
+  });
+
+  /// Null = every rating.
+  final int? starCount;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final radius = BorderRadius.circular(DealGoRadius.pill);
+    final style = (Theme.of(context).textTheme.labelSmall ?? const TextStyle())
+        .copyWith(
+          color: selected ? DealGoColors.primary : DealGoColors.textSecondary,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          fontSize: 12,
+        );
+    final semanticLabel = starCount == null
+        ? l10n.foodStoreReviewsAll
+        : l10n.rateStarTooltip(starCount!);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: semanticLabel,
+      child: Material(
+        color: selected ? DealGoColors.subtlePurple : DealGoColors.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: BorderSide(
+            color: selected ? DealGoColors.primary : DealGoColors.border,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 38),
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: DealGoSpacing.s6,
+                  ),
+                  child: starCount == null
+                      ? Text(
+                          l10n.foodStoreReviewsAll,
+                          maxLines: 1,
+                          softWrap: false,
+                          style: style,
+                        )
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              DealGoIcons.starFilled,
+                              size: 11,
+                              color: selected
+                                  ? DealGoColors.primary
+                                  : DealGoColors.amber,
+                            ),
+                            const SizedBox(width: 2),
+                            Text('$starCount', style: style),
+                          ],
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

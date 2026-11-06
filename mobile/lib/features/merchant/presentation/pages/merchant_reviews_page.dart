@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../../core/design_system/components/dealgo_refresh.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
@@ -29,18 +32,43 @@ class MerchantReviewsPage extends StatefulWidget {
 }
 
 class _MerchantReviewsPageState extends State<MerchantReviewsPage> {
+  final ScrollController _scroll = ScrollController();
   MerchantReviews? _data;
   Object? _error;
   var _loadingMore = false;
+  var _loadMoreFailed = false;
 
   @override
   void initState() {
     super.initState();
+    _scroll.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
+  @override
+  void dispose() {
+    _scroll.removeListener(_onScroll);
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    if (position.maxScrollExtent <= 0) return;
+    if (position.pixels < position.maxScrollExtent - 400) return;
+    final data = _data;
+    if (data == null || !data.hasMore || _loadingMore || _loadMoreFailed) {
+      return;
+    }
+    unawaited(_more());
+  }
+
   Future<void> _load() async {
-    setState(() => _error = null);
+    setState(() {
+      _error = null;
+      _loadMoreFailed = false;
+    });
     try {
       final data = await context.read<RatingRepository>().merchantReviews(
         accessToken: merchantAccessToken(context) ?? '',
@@ -54,7 +82,10 @@ class _MerchantReviewsPageState extends State<MerchantReviewsPage> {
   Future<void> _more() async {
     final data = _data;
     if (data == null || _loadingMore) return;
-    setState(() => _loadingMore = true);
+    setState(() {
+      _loadingMore = true;
+      _loadMoreFailed = false;
+    });
     try {
       final next = await context.read<RatingRepository>().merchantReviews(
         accessToken: merchantAccessToken(context) ?? '',
@@ -70,7 +101,8 @@ class _MerchantReviewsPageState extends State<MerchantReviewsPage> {
         ),
       );
     } catch (_) {
-      // Keep what is shown; the button stays to retry.
+      if (!mounted) return;
+      setState(() => _loadMoreFailed = true);
     } finally {
       if (mounted) setState(() => _loadingMore = false);
     }
@@ -107,19 +139,23 @@ class _MerchantReviewsPageState extends State<MerchantReviewsPage> {
     final data = _data;
     final Widget body;
     if (_error != null && data == null) {
-      body = DealGoStateView.failure(
-        context,
-        onRetry: _load,
-        cause: _error,
-        message: apiErrorText(l10n, _error),
+      body = DealGoRefresh(
+        onRefresh: _load,
+        child: DealGoStateView.failure(
+          context,
+          onRetry: _load,
+          cause: _error,
+          message: apiErrorText(l10n, _error),
+        ),
       );
     } else if (data == null) {
       body = const DealGoSkeletonList(itemCount: 3);
     } else {
       final average = data.summary.average;
-      body = RefreshIndicator(
+      body = DealGoRefresh(
         onRefresh: _load,
         child: ListView(
+          controller: _scroll,
           padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
           children: [
             MerchantPanel(

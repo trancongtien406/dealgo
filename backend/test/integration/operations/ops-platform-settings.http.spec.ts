@@ -174,7 +174,7 @@ describe('ops platform settings + faqs http', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
     const searchKeys = (searchRes.body.data as Array<{ key: string }>).map((r) => r.key);
-    expect(searchKeys).toEqual(['DRIVER_SEARCH_RADIUS_KM']);
+    expect(searchKeys.sort()).toEqual(['DRIVER_SEARCH_RADIUS_KM', 'FOOD_BROWSE_RADIUS_KM']);
   });
 
 

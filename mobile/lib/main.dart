@@ -15,6 +15,7 @@ import 'core/launch/launch_splash.dart';
 import 'core/maps/maps_client_config.dart';
 import 'core/mock/mock_seed.dart';
 import 'core/observability/crash_reporting.dart';
+import 'core/observability/performance_monitoring.dart';
 import 'core/push/fcm_push.dart';
 import 'core/appearance/app_appearance.dart';
 import 'core/analytics/firebase_analytics_service.dart';
@@ -42,7 +43,7 @@ Future<void> _start() async {
       ),
     );
   }
-  await _initFirebaseSafely();
+  final bootTrace = await _initFirebaseSafely();
   await _maybeSeedSmokeSession();
 
   if (useMockData) {
@@ -50,17 +51,30 @@ Future<void> _start() async {
       throw StateError('USE_MOCK_DATA is not allowed in release builds');
     }
     final mocks = createSeededMockClients();
-    runApp(
+    _runApp(
       DealGoApp(
         identityClient: mocks.identity,
         foodClient: mocks.food,
         rideClient: mocks.ride,
         tokenStore: MemoryTokenStore(),
       ),
+      bootTrace,
     );
     return;
   }
-  runApp(const DealGoApp());
+  _runApp(const DealGoApp(), bootTrace);
+}
+
+/// Runs [app] and, when measuring, ends the cold-start trace on the first
+/// rendered frame — the point where the user can actually use the app.
+void _runApp(Widget app, PerfTrace? bootTrace) {
+  runApp(app);
+  if (bootTrace == null) {
+    return;
+  }
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(bootTrace.stop());
+  });
 }
 
 /// Local smoke only: inject seed session via `--dart-define=SMOKE_ACCESS_TOKEN=` /
@@ -80,9 +94,12 @@ Future<void> _maybeSeedSmokeSession() async {
 }
 
 /// Soft-fail Firebase + FCM bootstrap so missing keys never crash cold start.
-Future<void> _initFirebaseSafely() async {
+///
+/// Returns the running cold-start trace (null when Performance is off or
+/// Firebase could not start): the caller stops it on the first frame.
+Future<PerfTrace?> _initFirebaseSafely() async {
   if (useMockData) {
-    return;
+    return null;
   }
   try {
     if (Firebase.apps.isEmpty) {
@@ -90,6 +107,12 @@ Future<void> _initFirebaseSafely() async {
         options: DefaultFirebaseOptions.currentPlatform,
       );
     }
+    // Collection must be on before the trace starts, otherwise the report is
+    // dropped.
+    await PerformanceMonitoring.instance.init();
+    final bootTrace = PerformanceMonitoring.instance.startTrace(
+      'app_bootstrap',
+    );
     // Handler registration + iOS presentation options are not needed for
     // the first frame; do not keep the launch screen waiting on them.
     unawaited(
@@ -112,10 +135,12 @@ Future<void> _initFirebaseSafely() async {
         if (kDebugMode) debugPrint('Analytics init skipped: $error');
       }),
     );
+    return bootTrace;
   } catch (error, stack) {
     if (kDebugMode) {
       debugPrint('Firebase init skipped: $error');
       debugPrint('$stack');
     }
+    return null;
   }
 }

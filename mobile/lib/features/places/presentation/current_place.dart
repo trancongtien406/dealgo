@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/location/location_service.dart';
 import '../../../l10n/app_localizations.dart';
+import '../data/reverse_geocode_cache.dart';
 import '../domain/place.dart';
 
 /// Outcome of asking the device for the customer's position.
@@ -53,10 +54,11 @@ Future<CurrentPlaceResult> locateCurrentPlace(
   PlaceOption? named;
   if (accessToken != null) {
     try {
-      named = await places.reverse(
-        accessToken: accessToken,
+      named = await reverseGeocodeCache.resolve(
         lat: lat,
         lng: lng,
+        lookup: () =>
+            places.reverse(accessToken: accessToken, lat: lat, lng: lng),
       );
     } catch (_) {
       named = null;

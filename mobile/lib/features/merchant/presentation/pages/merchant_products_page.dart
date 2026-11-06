@@ -27,6 +27,7 @@ import '../widgets/merchant_widgets.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 import '../../../../core/design_system/components/dealgo_network_image.dart';
+import '../../../../core/design_system/components/dealgo_refresh.dart';
 
 class MerchantProductsPage extends StatelessWidget {
   const MerchantProductsPage({super.key});
@@ -89,7 +90,7 @@ class _MerchantProductsView extends StatelessWidget {
                       DealGoDimensions.pageGutter,
                       DealGoSpacing.s8,
                       DealGoDimensions.pageGutter,
-                      DealGoSpacing.s16,
+                      DealGoSpacing.s12,
                     ),
                     child: DealGoPrimaryButton(
                       key: const Key('merchant-products-add'),
@@ -105,13 +106,18 @@ class _MerchantProductsView extends StatelessWidget {
               MerchantCatalogLoading() => const DealGoSkeletonList(
                 itemCount: 4,
               ),
-              MerchantCatalogFailed(:final message) => DealGoStateView.failure(
-                context,
-                onRetry: () => context.read<MerchantCatalogCubit>().load(
+              MerchantCatalogFailed(:final message) => DealGoRefresh(
+                onRefresh: () => context.read<MerchantCatalogCubit>().load(
                   merchantAccessToken(context),
                 ),
-                cause: message.error,
-                message: message.resolve(AppLocalizations.of(context)),
+                child: DealGoStateView.failure(
+                  context,
+                  onRetry: () => context.read<MerchantCatalogCubit>().load(
+                    merchantAccessToken(context),
+                  ),
+                  cause: message.error,
+                  message: message.resolve(AppLocalizations.of(context)),
+                ),
               ),
               MerchantCatalogReady(:final store, :final busyItemId) =>
                 _CatalogBody(
@@ -342,9 +348,13 @@ class _CatalogBodyState extends State<_CatalogBody> {
     final l10n = AppLocalizations.of(context);
     final textTheme = widget.textTheme;
     final filtered = _filtered;
-    return ListView(
-      padding: dealGoScrollPadding(context, merchantPagePadding),
-      children: [
+    return DealGoRefresh(
+      onRefresh: () => context.read<MerchantCatalogCubit>().load(
+        merchantAccessToken(context),
+      ),
+      child: ListView(
+        padding: dealGoScrollPadding(context, merchantPagePadding),
+        children: [
         DealGoCard(
           child: Row(
             children: [
@@ -444,6 +454,7 @@ class _CatalogBodyState extends State<_CatalogBody> {
             const SizedBox(height: DealGoSpacing.s12),
           ],
       ],
+      ),
     );
   }
 }

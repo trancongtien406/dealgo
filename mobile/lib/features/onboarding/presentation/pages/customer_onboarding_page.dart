@@ -6,6 +6,7 @@ import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/storage/onboarding_storage.dart';
 import '../../../identity/domain/auth_redirect.dart';
+import '../../../identity/presentation/widgets/auth_scaffold.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../l10n/app_localizations.dart';
 
@@ -158,37 +159,10 @@ class _CustomerOnboardingPageState extends State<CustomerOnboardingPage> {
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      backgroundColor: DealGoColors.canvas,
+      backgroundColor: DealGoColors.card,
       body: Stack(
         children: [
-          Positioned(
-            top: -40,
-            left: -40,
-            child: IgnorePointer(
-              child: Container(
-                width: 180,
-                height: 180,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: DealGoColors.primary.withValues(alpha: 0.05),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 220,
-            right: -60,
-            child: IgnorePointer(
-              child: Container(
-                width: 220,
-                height: 220,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: DealGoColors.brandGreen.withValues(alpha: 0.05),
-                ),
-              ),
-            ),
-          ),
+          const Positioned.fill(child: AuthBackdrop()),
           SafeArea(
             child: Column(
               children: [

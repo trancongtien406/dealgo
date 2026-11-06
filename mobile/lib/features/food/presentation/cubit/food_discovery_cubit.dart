@@ -159,6 +159,7 @@ class FoodDiscoveryCubit extends Cubit<FoodDiscoveryState> {
       emit(
         FoodDiscoveryReady(
           List.unmodifiable(page.items),
+          ratings: _inlineRatings(page.items),
           total: page.total,
           hasMore: page.hasMore,
           hasLocation: fix != null,
@@ -211,7 +212,7 @@ class FoodDiscoveryCubit extends Cubit<FoodDiscoveryState> {
       emit(
         FoodDiscoveryReady(
           List.unmodifiable(merged),
-          ratings: current.ratings,
+          ratings: _inlineRatings(page.items, current.ratings),
           total: page.total,
           hasMore: page.hasMore,
           hasLocation: current.hasLocation,
@@ -264,7 +265,24 @@ class FoodDiscoveryCubit extends Cubit<FoodDiscoveryState> {
     }
   }
 
-  /// Best effort: cards show no rating line when this fails.
+  Map<String, StoreRating> _inlineRatings(
+    Iterable<FoodStoreSummary> stores, [
+    Map<String, StoreRating> base = const {},
+  ]) {
+    return Map.unmodifiable({
+      ...base,
+      for (final store in stores)
+        if (store.ratingCount case final count?)
+          store.id: StoreRating(
+            storeId: store.id,
+            count: count,
+            average: store.ratingAverage,
+          ),
+    });
+  }
+
+  /// Fallback only for test fakes where [FoodStoreSummary.ratingCount] was
+  /// omitted; real `/v1/food/stores` responses already embed `rating` inline.
   Future<void> _loadRatings(String token, int generation) async {
     final ratings = _ratings;
     final current = state;
@@ -273,17 +291,30 @@ class FoodDiscoveryCubit extends Cubit<FoodDiscoveryState> {
         current.stores.isEmpty) {
       return;
     }
+    final missingIds = [
+      for (final store in current.stores)
+        if (store.ratingCount == null &&
+            !current.ratings.containsKey(store.id))
+          store.id,
+    ];
+    if (missingIds.isEmpty) {
+      return;
+    }
     try {
       final byStore = await ratings.storeRatings(
         accessToken: token,
-        storeIds: [for (final store in current.stores.take(50)) store.id],
+        storeIds: missingIds.take(50).toList(growable: false),
       );
       if (isClosed || generation != _generation) {
         return;
       }
       final latest = state;
       if (latest is FoodDiscoveryReady) {
-        emit(latest.copyWith(ratings: Map.unmodifiable(byStore)));
+        emit(
+          latest.copyWith(
+            ratings: Map.unmodifiable({...latest.ratings, ...byStore}),
+          ),
+        );
       }
     } on ApiException {
       return;

@@ -49,7 +49,7 @@ export class FoodController {
   @Get('stores')
   @ApiOperation({
     summary:
-      'Browse food stores with page/search/category/geo/sort (DRIVER_SEARCH_RADIUS_KM when lat+lng set)',
+      'Browse food stores with page/search/category/geo/sort (FOOD_BROWSE_RADIUS_KM when lat+lng set)',
   })
   listStores(@CurrentActor() actor: RequestActor, @Query() query: ListFoodStoresQueryDto) {
     return this.food.listStores(actor, query);

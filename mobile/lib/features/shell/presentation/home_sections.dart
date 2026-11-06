@@ -84,9 +84,14 @@ class SectionTitle extends StatelessWidget {
 
 /// C001 “Mua hàng nổi bật”: section title, round categories, store strip.
 class FeaturedShoppingCard extends StatelessWidget {
-  const FeaturedShoppingCard({required this.onOpen, super.key});
+  const FeaturedShoppingCard({
+    required this.onOpen,
+    this.refreshToken = 0,
+    super.key,
+  });
 
   final VoidCallback onOpen;
+  final int refreshToken;
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +106,7 @@ class FeaturedShoppingCard extends StatelessWidget {
         const SizedBox(height: DealGoSpacing.s12),
         const CategoryRow(),
         const SizedBox(height: DealGoSpacing.s16),
-        StoreRow(onOpen: onOpen),
+        StoreRow(onOpen: onOpen, refreshToken: refreshToken),
       ],
     );
   }
@@ -162,9 +167,10 @@ class CategoryRow extends StatelessWidget {
 /// Real nearby stores (S013 strip). Hidden while loading or when there are none,
 /// so the home screen never shows invented shops.
 class StoreRow extends StatefulWidget {
-  const StoreRow({required this.onOpen, super.key});
+  const StoreRow({required this.onOpen, this.refreshToken = 0, super.key});
 
   final VoidCallback onOpen;
+  final int refreshToken;
 
   @override
   State<StoreRow> createState() => _StoreRowState();
@@ -180,6 +186,14 @@ class _StoreRowState extends State<StoreRow> {
     unawaited(_load());
   }
 
+  @override
+  void didUpdateWidget(covariant StoreRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      unawaited(_load());
+    }
+  }
+
   Future<void> _load() async {
     final token = homeAccessToken(context);
     if (token == null) return;
@@ -189,13 +203,30 @@ class _StoreRowState extends State<StoreRow> {
         limit: 6,
       )).items.take(6).toList(growable: false);
       if (!mounted || stores.isEmpty) return;
-      setState(() => _stores = stores);
+      final inline = <String, StoreRating>{
+        for (final store in stores)
+          if (store.ratingCount case final count?)
+            store.id: StoreRating(
+              storeId: store.id,
+              count: count,
+              average: store.ratingAverage,
+            ),
+      };
+      setState(() {
+        _stores = stores;
+        _ratings = inline;
+      });
+      final missingIds = [
+        for (final store in stores)
+          if (store.ratingCount == null) store.id,
+      ];
+      if (missingIds.isEmpty) return;
       final ratings = await context.read<RatingRepository>().storeRatings(
         accessToken: token,
-        storeIds: [for (final store in stores) store.id],
+        storeIds: missingIds,
       );
       if (mounted) {
-        setState(() => _ratings = ratings);
+        setState(() => _ratings = {...inline, ...ratings});
       }
     } on Object {
       // Optional section: failures leave it hidden.
@@ -413,7 +444,9 @@ class VoucherBanner extends StatelessWidget {
 
 /// Latest ride (or food order) from the real history endpoints.
 class RecentTripCard extends StatefulWidget {
-  const RecentTripCard({super.key});
+  const RecentTripCard({this.refreshToken = 0, super.key});
+
+  final int refreshToken;
 
   @override
   State<RecentTripCard> createState() => _RecentTripCardState();
@@ -429,18 +462,24 @@ class _RecentTripCardState extends State<RecentTripCard> {
     unawaited(_load());
   }
 
+  @override
+  void didUpdateWidget(covariant RecentTripCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      unawaited(_load());
+    }
+  }
+
   Future<void> _load() async {
     final token = homeAccessToken(context);
     final listRides = context.read<ListRideHistory>();
     final listFood = context.read<ListFoodHistory>();
     HistoryItem? latest;
     if (token != null) {
-      // Both endpoints are independent: start them together and keep the ride
-      // when it exists so the card is not gated on the slowest one.
-      final ride = _firstOrNull(() => listRides(token));
-      final food = _firstOrNull(() => listFood(token));
-      final latestRide = await ride;
-      latest = latestRide ?? await food;
+      // Only query food history when no ride history exists so Customer Home
+      // does not fire a wasted /v1/food/orders request when a ride is shown.
+      final latestRide = await _firstOrNull(() => listRides(token));
+      latest = latestRide ?? await _firstOrNull(() => listFood(token));
     }
     if (mounted) {
       setState(() {

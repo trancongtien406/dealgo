@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/config/api_base_url.dart';
+import '../../../../core/design_system/components/dealgo_image_cache.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/motion/dealgo_sheet.dart';
 import '../../../../core/network/api_error_l10n.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/realtime/snapshot_realtime.dart';
@@ -73,7 +75,7 @@ Future<void> showTransactionChatSheet({
   final sendRide = context.read<SendRideChatMessage>();
   final listFood = context.read<ListFoodOrderChatMessages>();
   final sendFood = context.read<SendFoodOrderChatMessage>();
-  return showModalBottomSheet<void>(
+  return showDealGoSheet<void>(
     context: context,
     isScrollControlled: true,
     // The theme adds a drag handle to every sheet; this one draws its own.
@@ -163,6 +165,7 @@ class _TransactionChatSheetState extends State<TransactionChatSheet> {
   void initState() {
     super.initState();
     ChatUnread.instance.markOpen(_unreadKey);
+    _scroll.addListener(_onScroll);
     _counterpart = widget.counterpart ?? _counterpartMemo[_memoKey];
     if (_counterpart == null) {
       unawaited(_loadCounterpart());
@@ -220,10 +223,26 @@ class _TransactionChatSheetState extends State<TransactionChatSheet> {
   @override
   void dispose() {
     ChatUnread.instance.markClosed(_unreadKey);
+    _scroll.removeListener(_onScroll);
     _controller.dispose();
     _scroll.dispose();
     _focus.dispose();
     super.dispose();
+  }
+
+  /// The list is reversed, so the visual top is [maxScrollExtent].
+  void _onScroll() {
+    if (!mounted || !_scroll.hasClients) return;
+    final position = _scroll.position;
+    if (position.maxScrollExtent <= 0) return;
+    if (position.pixels < position.maxScrollExtent - 200) return;
+    final cubit = context.read<ChatCubit>();
+    if (!cubit.state.hasMoreOlder ||
+        cubit.state.loadingOlder ||
+        cubit.state.olderFailed) {
+      return;
+    }
+    unawaited(cubit.loadOlder(accessToken: widget.accessToken));
   }
 
   void _toBottom() {
@@ -382,7 +401,9 @@ class _Header extends StatelessWidget {
           CircleAvatar(
             radius: 20,
             backgroundColor: DealGoColors.subtlePurple,
-            foregroundImage: avatar == null ? null : NetworkImage(avatar),
+            foregroundImage: avatar == null
+                ? null
+                : DealGoImageCache.provider(avatar, decodeWidth: 200),
             child: counterpart == null
                 ? Icon(
                     viewer == ChatViewer.customer &&
@@ -523,7 +544,8 @@ class _Timeline extends StatelessWidget {
       );
     }
     if (!state.loaded && state.loadError != null) {
-      final isWindowClosed = state.loadError is ApiException &&
+      final isWindowClosed =
+          state.loadError is ApiException &&
           (state.loadError as ApiException).errorCode == 'CHAT_WINDOW_CLOSED';
       return Center(
         child: Padding(
@@ -603,6 +625,7 @@ class _Timeline extends StatelessWidget {
       state.lines,
       currentUserId: currentUserId,
     ).reversed.toList();
+    final extra = state.loadingOlder || state.olderFailed ? 1 : 0;
     // Reversed list: offset 0 is the newest message, so new lines land in view
     // and a short thread sits right above the input (no dead gap).
     return ListView.builder(
@@ -615,14 +638,38 @@ class _Timeline extends StatelessWidget {
         DealGoSpacing.s12,
         DealGoSpacing.s8,
       ),
-      itemCount: items.length,
-      itemBuilder: (context, index) => switch (items[index]) {
-        final ChatDaySeparator item => _DayChip(day: item.day),
-        final ChatSystemItem item => _SystemRow(line: item.line),
-        final ChatBubbleItem item => _Bubble(
-          item: item,
-          accessToken: accessToken,
-        ),
+      itemCount: items.length + extra,
+      itemBuilder: (context, index) {
+        if (index >= items.length) {
+          if (state.loadingOlder) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: DealGoSpacing.s8),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+          }
+          return Center(
+            child: TextButton(
+              key: const Key('chat-older-retry'),
+              onPressed: () =>
+                  context.read<ChatCubit>().loadOlder(accessToken: accessToken),
+              child: Text(l10n.actionRetry),
+            ),
+          );
+        }
+        return switch (items[index]) {
+          final ChatDaySeparator item => _DayChip(day: item.day),
+          final ChatSystemItem item => _SystemRow(line: item.line),
+          final ChatBubbleItem item => _Bubble(
+            item: item,
+            accessToken: accessToken,
+          ),
+        };
       },
     );
   }

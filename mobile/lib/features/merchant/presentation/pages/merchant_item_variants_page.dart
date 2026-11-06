@@ -81,7 +81,7 @@ class _VariantsView extends StatelessWidget {
                     DealGoDimensions.pageGutter,
                     DealGoSpacing.s8,
                     DealGoDimensions.pageGutter,
-                    DealGoSpacing.s16,
+                    DealGoSpacing.s12,
                   ),
                   child: DealGoPrimaryButton(
                     key: const Key('merchant-variants-save'),

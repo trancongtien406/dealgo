@@ -650,7 +650,7 @@ export class ListFoodStoresQueryDto {
   @IsIn(FOOD_STORE_SORT_BY)
   sort_by?: FoodStoreSortBy;
 
-  /** Only stores within this many km (needs lat/lng; capped by DRIVER_SEARCH_RADIUS_KM). */
+  /** Only stores within this many km (needs lat/lng; capped by FOOD_BROWSE_RADIUS_KM). */
   @IsOptional()
   @Type(() => Number)
   @IsNumber({ allowInfinity: false, allowNaN: false })

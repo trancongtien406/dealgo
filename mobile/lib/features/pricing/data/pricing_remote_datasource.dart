@@ -19,6 +19,8 @@ class DioPricingRemoteDataSource implements PricingRepository {
   DioPricingRemoteDataSource({required this.dio});
 
   final Dio dio;
+  List<RideVehicleClassOption>? _cachedVehicleClasses;
+  Future<List<RideVehicleClassOption>>? _inFlightVehicleClasses;
 
   Options _auth(String token) =>
       Options(headers: {'Authorization': 'Bearer $token'});
@@ -49,13 +51,32 @@ class DioPricingRemoteDataSource implements PricingRepository {
   @override
   Future<List<RideVehicleClassOption>> listVehicleClasses({
     required String accessToken,
-  }) async {
+  }) {
+    final cached = _cachedVehicleClasses;
+    if (cached != null) {
+      return Future<List<RideVehicleClassOption>>.value(cached);
+    }
+    final existing = _inFlightVehicleClasses;
+    if (existing != null) {
+      return existing;
+    }
+    final future = _fetchVehicleClasses(accessToken);
+    _inFlightVehicleClasses = future;
+    future.whenComplete(() => _inFlightVehicleClasses = null);
+    return future;
+  }
+
+  Future<List<RideVehicleClassOption>> _fetchVehicleClasses(
+    String accessToken,
+  ) async {
     try {
       final response = await dio.get<Object?>(
         ApiPaths.rideVehicleClasses,
         options: _auth(accessToken),
       );
-      return decodeVehicleClasses(requireSuccessData(response.data));
+      final classes = decodeVehicleClasses(requireSuccessData(response.data));
+      _cachedVehicleClasses = classes;
+      return classes;
     } on DioException catch (error) {
       throw apiExceptionFromDio(error);
     }

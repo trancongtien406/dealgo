@@ -36,7 +36,16 @@ ThemeData _dealGoPickerTheme(BuildContext context) {
         }
         return Colors.transparent;
       }),
-      todayForegroundColor: const WidgetStatePropertyAll(DealGoColors.primary),
+      todayForegroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return Colors.white;
+        return DealGoColors.primary;
+      }),
+      todayBackgroundColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return DealGoColors.primary;
+        }
+        return Colors.transparent;
+      }),
       todayBorder: const BorderSide(color: DealGoColors.primary),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(DealGoRadius.card),

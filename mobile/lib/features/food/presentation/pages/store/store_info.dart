@@ -9,7 +9,7 @@ class _StoreStatus extends StatelessWidget {
 
   final bool loading;
   final Object? failure;
-  final VoidCallback onRetry;
+  final Future<void> Function() onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -23,11 +23,14 @@ class _StoreStatus extends StatelessWidget {
     final message = failure is ApiException
         ? apiErrorText(l10n, failure as ApiException)
         : l10n.errorLoadFailed;
-    return DealGoStateView.failure(
-      context,
-      onRetry: onRetry,
-      cause: failure,
-      message: message,
+    return DealGoRefresh(
+      onRefresh: onRetry,
+      child: DealGoStateView.failure(
+        context,
+        onRetry: onRetry,
+        cause: failure,
+        message: message,
+      ),
     );
   }
 }
@@ -58,6 +61,10 @@ class _StoreInfo extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (store.offers.isNotEmpty) ...[
+          _StoreOffers(offers: store.offers, storeId: store.id),
+          const SizedBox(height: DealGoSpacing.s16),
+        ],
         if (store.hasLocation) ...[
           _StoreMapCard(store: store, onOpenMaps: onOpenMaps, height: 200),
           const SizedBox(height: DealGoSpacing.s12),

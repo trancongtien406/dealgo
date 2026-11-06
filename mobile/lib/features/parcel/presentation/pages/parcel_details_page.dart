@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/components/dealgo_chip.dart';
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
@@ -641,8 +642,7 @@ class _ParcelDetailsViewState extends State<_ParcelDetailsView> {
                   DealGoSpacing.s16,
                   DealGoSpacing.s12,
                   DealGoSpacing.s16,
-                  DealGoSpacing.s12 +
-                      (keyboard > 0 ? 0 : MediaQuery.paddingOf(context).bottom),
+                  dealGoStickyFooterBottom(context),
                 ),
                 child: Row(
                   children: [

@@ -1,5 +1,6 @@
 import 'package:dealgo/core/realtime/fake_snapshot_realtime.dart';
 import 'package:dealgo/features/inbox/data/datasources/inbox_remote_datasource.dart';
+import 'package:dealgo/features/inbox/domain/entities/inbox_notification.dart';
 import 'package:dealgo/features/inbox/presentation/inbox_unread.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -95,5 +96,47 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     expect(InboxUnread.instance.count, 5);
     await realtime.dispose();
+  });
+
+  testWidgets('scrolling near the end loads older notifications', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final inbox = FakeInboxRemoteDataSource(
+      now: now,
+      seed: [
+        for (var i = 0; i < 35; i++)
+          InboxNotification(
+            id: 'p$i',
+            category: InboxCategory.system,
+            title: 'Thông báo $i',
+            body: 'Nội dung $i',
+            read: true,
+            createdAt: now.subtract(Duration(minutes: i)),
+          ),
+      ],
+    );
+    await pumpSignedIn(tester, profile: customerProfile, inboxRemote: inbox);
+    await tester.tap(navLabel('Tôi'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Thông báo'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Thông báo 0'), findsOneWidget);
+    expect(find.text('Thông báo 34'), findsNothing);
+
+    await tester.drag(find.byType(ListView).last, const Offset(0, -4000));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Thông báo 34'),
+      400,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView).last,
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(find.text('Thông báo 34'), findsOneWidget);
   });
 }

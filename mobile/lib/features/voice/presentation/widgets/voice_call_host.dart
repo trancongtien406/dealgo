@@ -51,13 +51,14 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
   Timer? _ticker;
   late final CallRinger _ringer = widget.ringer();
   bool _ringing = false;
+  bool _wantRing = false;
+  Timer? _ringDelay;
 
   @override
   void dispose() {
     _ticker?.cancel();
-    if (_ringing) {
-      unawaited(_ringer.stop());
-    }
+    _ringDelay?.cancel();
+    unawaited(_ringer.dispose());
     super.dispose();
   }
 
@@ -69,7 +70,27 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
       return;
     }
     _ringing = ring;
-    unawaited(ring ? _ringer.start() : _ringer.stop());
+    _wantRing = ring;
+    _ringDelay?.cancel();
+    if (!ring) {
+      unawaited(_ringer.stop());
+      return;
+    }
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (lifecycle == null || lifecycle == AppLifecycleState.resumed) {
+      unawaited(_ringer.start());
+      return;
+    }
+    // The socket rings while the app is still in the background. Let the
+    // system call screen take the audio first: a local ringtone started here
+    // fights CallKit's own session (AVAudioSession) and can steal its audio
+    // route, and when the native screen turns out to be ringing it is stopped
+    // again a moment later anyway.
+    _ringDelay = Timer(const Duration(milliseconds: 1200), () {
+      if (mounted && _wantRing) {
+        unawaited(_ringer.start());
+      }
+    });
   }
 
   /// Once a second: redraw the timer while live.
@@ -229,9 +250,9 @@ class _Controls extends StatelessWidget {
               icon: Icons.call_end,
               label: l10n.voiceHangUp,
               color: DealGoColors.danger,
-              onPressed: state.phase == VoiceCallPhase.starting
-                  ? null
-                  : cubit.hangUp,
+              // Cancellable while the server request is in flight too: a slow
+              // network must not trap the user on a dial screen with no exit.
+              onPressed: cubit.hangUp,
             ),
             _RoundButton(
               key: const Key('voice-speaker'),

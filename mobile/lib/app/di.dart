@@ -112,6 +112,7 @@ import '../features/home_banner/data/home_banner_remote_datasource.dart';
 import '../features/home_banner/data/home_banner_tracker.dart';
 import '../features/home_banner/domain/home_banner.dart';
 import '../features/places/data/places_remote_datasource.dart';
+import '../features/places/presentation/place_lists_store.dart';
 import '../features/live_location/data/driver_location_remote_datasource.dart';
 import '../features/live_location/domain/map_routing.dart';
 import '../features/live_location/data/map_routing_remote_datasource.dart';
@@ -203,6 +204,7 @@ import '../features/ride/domain/usecases/select_ride_offer.dart';
 import '../features/ride/domain/usecases/submit_ride_offer.dart';
 import '../features/ride/presentation/cubit/ride_destination.dart';
 import '../features/ride/presentation/cubit/ride_vehicle_pref.dart';
+import '../features/ride/presentation/cubit/ride_stops_config_cubit.dart';
 import '../features/ride/presentation/cubit/vehicle_class_catalog_cubit.dart';
 import '../features/ride/presentation/cubit/ride_session.dart';
 import '../features/voice/data/native/callkit_native_call_ui.dart';
@@ -554,7 +556,8 @@ class DealGoDependencies {
         ? const NoopNativeCallUi()
         : CallkitNativeCallUi();
 
-    final identity = identityClient ??
+    final identity =
+        identityClient ??
         DioIdentityRemoteDataSource(dio: dio, deviceIdService: deviceService);
     final food = foodClient ?? DioFoodRemoteDataSource(dio: dio);
     final rides = rideClient ?? DioRideRemoteDataSource(dio: dio);
@@ -1021,6 +1024,13 @@ class DealGoDependencies {
     put<AnalyticsPort>(analyticsPort);
     put<NotificationRouter>(notifications);
     put<AuthCubit>(auth);
+    put<PlaceListsStore>(
+      PlaceListsStore(
+        places: placesRepository,
+        addresses: addressBookRepository,
+        auth: auth,
+      ),
+    );
 
     if (!skipLeafServices) {
       if (!locator.isRegistered<ConnectivityService>()) {
@@ -1165,6 +1175,9 @@ class DealGoDependencies {
         ChangeNotifierProvider<AuthMethodsStore>.value(value: authMethods),
         ChangeNotifierProvider<FoodCategoriesStore>.value(
           value: foodCategories,
+        ),
+        ChangeNotifierProvider<PlaceListsStore>.value(
+          value: _locator<PlaceListsStore>(),
         ),
         RepositoryProvider<DriverJobsClient>.value(value: driverJobsClient),
         RepositoryProvider<DriverJobsRepository>.value(
@@ -1311,6 +1324,12 @@ class DealGoDependencies {
           BlocProvider(
             create: (_) => VehicleClassCatalogCubit(
               repository: _locator<PricingRepository>(),
+              accessToken: _accessToken,
+            ),
+          ),
+          BlocProvider(
+            create: (_) => RideStopsConfigCubit(
+              client: _locator<RideStopsClient>(),
               accessToken: _accessToken,
             ),
           ),

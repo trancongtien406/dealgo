@@ -317,6 +317,30 @@
   },
   "foodFilterOpenNow": "Open now",
   "foodFilterOffers": "Has offers",
+  "foodFilterSortName": "Name A–Z",
+  "foodFilterDistanceHint": "Drag the slider or tap a quick radius preset",
+  "foodFilterMinRatingTitle": "Minimum rating",
+  "foodFilterRatingAny": "Any rating",
+  "foodFilterRatingFrom": "{stars}+ ★",
+  "@foodFilterRatingFrom": {
+    "placeholders": {
+      "stars": {
+        "type": "String"
+      }
+    }
+  },
+  "foodFilterEtaTitle": "Estimated delivery time",
+  "foodFilterEtaAny": "Any time",
+  "foodFilterEtaMax": "≤ {minutes} min",
+  "@foodFilterEtaMax": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "foodFilterStatusTitle": "Status & perks",
+  "foodFilterNoMinOrder": "No minimum order",
   "foodFilterApply": "Apply",
   "foodFilterReset": "Reset",
   "foodFilterClear": "Clear filters",
@@ -1149,6 +1173,7 @@
   "foodDropoffTitle": "Delivery address",
   "foodDropoffChoose": "Choose a delivery address",
   "foodDropoffChange": "Change",
+  "foodDropoffChangeAddress": "Change address",
   "foodFareNeedAddress": "Pick an address first",
   "foodFareQuoting": "Calculating…",
   "foodFareQuoteError": "Couldn't get the delivery fee. Check your connection and try again.",
@@ -3521,6 +3546,7 @@
     }
   },
   "voucherPickerApply": "Use",
+  "voucherApplied": "Applied",
   "checkoutErrMinOrder": "The order is below the store minimum",
   "merchantItemOriginalPrice": "Original price",
   "merchantItemOriginalPriceInvalid": "Original price must be above the price",

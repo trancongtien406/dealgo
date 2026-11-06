@@ -134,6 +134,28 @@ void main() {
       expect(repo.posted, ['Chờ tôi 2 phút', 'Chờ tôi 2 phút']);
       await cubit.close();
     });
+
+    test('loadOlder prepends the previous REST page once', () async {
+      final repo = FakeChatRepository(
+        messages: [
+          for (var i = 0; i < 60; i++)
+            chatMessage('m$i', 'drv', 'tin $i', t0.add(Duration(minutes: i))),
+        ],
+      );
+      final cubit = _cubit(repo);
+      await cubit.start(accessToken: 'tok');
+      expect(cubit.state.lines, hasLength(50));
+      expect(cubit.state.hasMoreOlder, isTrue);
+
+      await cubit.loadOlder(accessToken: 'tok');
+      expect(cubit.state.lines, hasLength(60));
+      expect(cubit.state.lines.first.key, 'm0');
+      expect(cubit.state.hasMoreOlder, isFalse);
+
+      await cubit.loadOlder(accessToken: 'tok');
+      expect(repo.listCalls, 2);
+      await cubit.close();
+    });
   });
 
   group('buildChatTimeline', () {
@@ -269,7 +291,8 @@ void main() {
       FakeDriverCards? cards,
       FakeChatRepository? repo,
     }) async {
-      final repository = repo ??
+      final repository =
+          repo ??
           FakeChatRepository(
             messages: [
               chatMessage('m1', 'drv', 'Tôi đang tới', DateTime.now().toUtc()),

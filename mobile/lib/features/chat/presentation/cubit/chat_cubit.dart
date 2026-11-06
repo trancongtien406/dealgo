@@ -41,6 +41,9 @@ class ChatState {
     this.loaded = false,
     this.loadError,
     this.sendError,
+    this.loadingOlder = false,
+    this.olderFailed = false,
+    this.hasMoreOlder = false,
   });
 
   /// Ordered oldest → newest, server lines then local pending/failed ones.
@@ -54,6 +57,15 @@ class ChatState {
   /// Only for errors that are not a per-message failure (no session).
   final Object? sendError;
 
+  /// An older page is in flight above the first screen of messages.
+  final bool loadingOlder;
+
+  /// The last older-page request failed; the loaded lines stay usable.
+  final bool olderFailed;
+
+  /// The server holds messages older than the ones loaded.
+  final bool hasMoreOlder;
+
   bool get sending => lines.any((l) => l.delivery == ChatDelivery.sending);
 
   ChatState copyWith({
@@ -62,6 +74,9 @@ class ChatState {
     bool? loaded,
     Object? loadError = _unset,
     Object? sendError = _unset,
+    bool? loadingOlder,
+    bool? olderFailed,
+    bool? hasMoreOlder,
   }) {
     return ChatState(
       lines: lines ?? this.lines,
@@ -69,6 +84,9 @@ class ChatState {
       loaded: loaded ?? this.loaded,
       loadError: identical(loadError, _unset) ? this.loadError : loadError,
       sendError: identical(sendError, _unset) ? this.sendError : sendError,
+      loadingOlder: loadingOlder ?? this.loadingOlder,
+      olderFailed: olderFailed ?? this.olderFailed,
+      hasMoreOlder: hasMoreOlder ?? this.hasMoreOlder,
     );
   }
 }
@@ -116,6 +134,11 @@ class ChatCubit extends Cubit<ChatState> {
   var _loadGeneration = 0;
   var _seq = 0;
 
+  /// Last REST page merged into [_server]; page 1 is the newest window.
+  var _page = 1;
+  var _total = 0;
+  var _loadingOlder = false;
+
   /// Loads the snapshot and follows live messages until [close].
   Future<void> start({required String? accessToken}) {
     final realtime = _realtime;
@@ -136,30 +159,26 @@ class ChatCubit extends Cubit<ChatState> {
       return;
     }
     _token = token;
+    _loadingOlder = false;
     if (!silent) {
       emit(state.copyWith(loading: true, loadError: null));
     }
     try {
-      final page = switch (kind) {
-        ChatThreadKind.ride => await _listRideChatMessages(
-          ListRideChatMessagesParams(accessToken: token, rideId: resourceId),
-        ),
-        ChatThreadKind.foodOrder ||
-        ChatThreadKind.foodOrderShop => await _listFoodOrderChatMessages(
-          ListFoodOrderChatMessagesParams(
-            accessToken: token,
-            orderId: resourceId,
-            shop: kind == ChatThreadKind.foodOrderShop,
-          ),
-        ),
-      };
+      final page = await _fetchPage(token, 1);
       if (isClosed || generation != _loadGeneration) {
         return;
       }
       for (final message in page.items) {
         _server[message.id] = message;
       }
-      _emitLines(loading: false, loaded: true, loadError: null);
+      _total = page.total;
+      _emitLines(
+        loading: false,
+        loaded: true,
+        loadError: null,
+        loadingOlder: false,
+        olderFailed: false,
+      );
     } catch (error) {
       if (isClosed || generation != _loadGeneration) {
         return;
@@ -167,8 +186,63 @@ class ChatCubit extends Cubit<ChatState> {
       if (silent && state.loaded) {
         return;
       }
-      emit(state.copyWith(loading: false, loadError: error));
+      emit(
+        state.copyWith(loading: false, loadError: error, loadingOlder: false),
+      );
     }
+  }
+
+  /// Fetches the next older window and merges it into the timeline.
+  Future<void> loadOlder({required String? accessToken}) async {
+    final token = accessToken?.trim() ?? _token ?? '';
+    if (token.isEmpty || _loadingOlder || _server.length >= _total) {
+      return;
+    }
+    final generation = _loadGeneration;
+    _loadingOlder = true;
+    _emitLines(loadingOlder: true, olderFailed: false);
+    try {
+      final page = await _fetchPage(token, _page + 1);
+      if (isClosed || generation != _loadGeneration) {
+        _loadingOlder = false;
+        return;
+      }
+      for (final message in page.items) {
+        _server[message.id] = message;
+      }
+      _page += 1;
+      _total = page.total;
+      _loadingOlder = false;
+      _emitLines(loadingOlder: false, olderFailed: false);
+    } catch (_) {
+      if (isClosed || generation != _loadGeneration) {
+        _loadingOlder = false;
+        return;
+      }
+      _loadingOlder = false;
+      _emitLines(loadingOlder: false, olderFailed: true);
+    }
+  }
+
+  Future<ChatMessagePage> _fetchPage(String token, int page) {
+    return switch (kind) {
+      ChatThreadKind.ride => _listRideChatMessages(
+        ListRideChatMessagesParams(
+          accessToken: token,
+          rideId: resourceId,
+          page: page,
+        ),
+      ),
+      ChatThreadKind.foodOrder ||
+      ChatThreadKind.foodOrderShop => _listFoodOrderChatMessages(
+        ListFoodOrderChatMessagesParams(
+          accessToken: token,
+          orderId: resourceId,
+          shop: kind == ChatThreadKind.foodOrderShop,
+          page: page,
+        ),
+      ),
+    };
   }
 
   void _onHint(ChatMessageHint hint) {
@@ -310,6 +384,8 @@ class ChatCubit extends Cubit<ChatState> {
     bool? loaded,
     Object? loadError = _unset,
     Object? sendError = _unset,
+    bool? loadingOlder,
+    bool? olderFailed,
   }) {
     final server = _server.values.toList()
       ..sort((a, b) {
@@ -333,6 +409,9 @@ class ChatCubit extends Cubit<ChatState> {
         loaded: loaded,
         loadError: loadError,
         sendError: sendError,
+        loadingOlder: loadingOlder,
+        olderFailed: olderFailed,
+        hasMoreOlder: _server.length < _total,
       ),
     );
   }

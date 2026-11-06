@@ -902,6 +902,41 @@ class AppLocalizationsVi extends AppLocalizations {
   String get foodFilterOffers => 'Có ưu đãi';
 
   @override
+  String get foodFilterSortName => 'Tên A–Z';
+
+  @override
+  String get foodFilterDistanceHint =>
+      'Kéo thanh trượt hoặc chọn nhanh bán kính quanh bạn';
+
+  @override
+  String get foodFilterMinRatingTitle => 'Đánh giá tối thiểu';
+
+  @override
+  String get foodFilterRatingAny => 'Mọi mức sao';
+
+  @override
+  String foodFilterRatingFrom(String stars) {
+    return 'Từ $stars ★';
+  }
+
+  @override
+  String get foodFilterEtaTitle => 'Thời gian giao dự kiến';
+
+  @override
+  String get foodFilterEtaAny => 'Mọi thời gian';
+
+  @override
+  String foodFilterEtaMax(int minutes) {
+    return '≤ $minutes phút';
+  }
+
+  @override
+  String get foodFilterStatusTitle => 'Trạng thái & ưu đãi';
+
+  @override
+  String get foodFilterNoMinOrder => 'Không đơn tối thiểu';
+
+  @override
   String get foodFilterApply => 'Áp dụng';
 
   @override
@@ -2639,6 +2674,9 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get foodDropoffChange => 'Đổi';
+
+  @override
+  String get foodDropoffChangeAddress => 'Đổi địa chỉ';
 
   @override
   String get foodFareNeedAddress => 'Chọn địa chỉ để tính';
@@ -7126,6 +7164,9 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get voucherPickerApply => 'Dùng';
+
+  @override
+  String get voucherApplied => 'Đang dùng';
 
   @override
   String get checkoutErrMinOrder => 'Đơn chưa đạt mức tối thiểu của quán';

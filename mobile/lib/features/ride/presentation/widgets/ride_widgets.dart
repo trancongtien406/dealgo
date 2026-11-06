@@ -3,10 +3,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/config/api_base_url.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/motion/dealgo_sheet.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
@@ -86,6 +88,13 @@ class RideBottomSheet extends StatelessWidget {
   }
 }
 
+/// Bottom padding for a CTA pinned at the foot of a [RideDraggableSheet].
+///
+/// The sheet ends at the screen edge, so the footer clears whatever the screen
+/// bottom reserves (tab bar or system inset) plus the shared 12dp gutter.
+double rideSheetFooterBottom(BuildContext context) =>
+    dealGoStickyFooterBottom(context);
+
 /// inDrive-like persistent sheet: drag + snap sizes over a full-bleed map.
 /// Prefer this over [showModalBottomSheet] for book / fare / waiting (map stays
 /// interactive; sheet is not a dismissible modal).
@@ -130,7 +139,7 @@ Future<T?> showRideModalSheet<T>({
   required WidgetBuilder builder,
   bool isDismissible = true,
 }) {
-  return showModalBottomSheet<T>(
+  return showDealGoSheet<T>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

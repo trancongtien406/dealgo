@@ -3,12 +3,15 @@ import {
   Get,
   Header,
   Param,
+  Query,
   StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { SkipResponseEnvelope } from '../../platform/http/skip-response-envelope.js';
+import { PUBLIC_IMAGE_CACHE_CONTROL } from '../../platform/http/public-image-cache.js';
+import { resolveImageVariantWidth } from '../../platform/storage/image-variants.js';
 import { StoreLogoService } from './store-logo.service.js';
 
 /**
@@ -26,7 +29,7 @@ export class PublicStoreLogoController {
   @Get(':storeId/:file')
   @SkipResponseEnvelope()
   @Throttle({ default: { limit: IMAGE_LIMIT_PER_MINUTE, ttl: 60_000 } })
-  @Header('Cache-Control', 'public, max-age=86400, immutable')
+  @Header('Cache-Control', PUBLIC_IMAGE_CACHE_CONTROL)
   @Header('X-Content-Type-Options', 'nosniff')
   @ApiOperation({
     summary: "A store's current logo (404 for replaced or unknown files)",
@@ -34,8 +37,9 @@ export class PublicStoreLogoController {
   async read(
     @Param('storeId') storeId: string,
     @Param('file') file: string,
+    @Query('w') w?: string,
   ): Promise<StreamableFile> {
-    const found = await this.logos.read(storeId, file);
+    const found = await this.logos.read(storeId, file, 'logo', resolveImageVariantWidth(w));
     return new StreamableFile(found.body, {
       type: found.contentType,
       length: found.body.byteLength,
@@ -52,7 +56,7 @@ export class PublicStoreCoverController {
   @Get(':storeId/:file')
   @SkipResponseEnvelope()
   @Throttle({ default: { limit: IMAGE_LIMIT_PER_MINUTE, ttl: 60_000 } })
-  @Header('Cache-Control', 'public, max-age=86400, immutable')
+  @Header('Cache-Control', PUBLIC_IMAGE_CACHE_CONTROL)
   @Header('X-Content-Type-Options', 'nosniff')
   @ApiOperation({
     summary:
@@ -61,8 +65,9 @@ export class PublicStoreCoverController {
   async read(
     @Param('storeId') storeId: string,
     @Param('file') file: string,
+    @Query('w') w?: string,
   ): Promise<StreamableFile> {
-    const found = await this.logos.read(storeId, file, 'cover');
+    const found = await this.logos.read(storeId, file, 'cover', resolveImageVariantWidth(w));
     return new StreamableFile(found.body, {
       type: found.contentType,
       length: found.body.byteLength,

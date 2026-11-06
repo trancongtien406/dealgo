@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../core/motion/dealgo_sheet.dart';
 import '../../../core/di/injection.dart';
 import '../../identity/domain/entities/auth_state.dart';
 import '../../identity/presentation/cubit/auth_cubit.dart';
@@ -31,7 +32,7 @@ Future<String?> showPaymentMethodSheet(
   required List<PaymentMethodOption> options,
   required String selected,
 }) {
-  return showModalBottomSheet<String>(
+  return showDealGoSheet<String>(
     context: context,
     isScrollControlled: true,
     backgroundColor: DealGoColors.card,

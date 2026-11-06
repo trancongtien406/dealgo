@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../domain/entities/voice_models.dart';
 import 'voice_remote_datasource.dart';
 
@@ -9,6 +11,12 @@ class FakeVoiceClient implements VoiceClient {
   bool enabled;
   String userId;
   Object? error;
+
+  /// Held open by a test to hang up while the answer request is in flight.
+  Completer<void>? acceptGate;
+
+  /// Held open by a test to cancel while the start request is in flight.
+  Completer<void>? startGate;
   final Map<String, VoiceCall> calls = {};
   final List<String> actions = [];
   int _seq = 0;
@@ -75,6 +83,10 @@ class FakeVoiceClient implements VoiceClient {
     required String resourceId,
   }) async {
     actions.add('start:$resourceId');
+    final gate = startGate;
+    if (gate != null) {
+      await gate.future;
+    }
     _throwIfFailing();
     final call = VoiceCall(
       id: 'call-${++_seq}',
@@ -104,7 +116,11 @@ class FakeVoiceClient implements VoiceClient {
     required String accessToken,
     required String callId,
   }) async {
+    final gate = acceptGate;
     actions.add('accept:$callId');
+    if (gate != null) {
+      await gate.future;
+    }
     _throwIfFailing();
     final call = _set(calls[callId]!, VoiceCallStatus.accepted);
     return VoiceCallJoin(call: call, session: _session(call));

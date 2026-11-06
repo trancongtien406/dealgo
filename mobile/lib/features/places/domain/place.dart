@@ -211,6 +211,47 @@ String cleanPlaceText(String text) {
   return out.join(', ');
 }
 
+final _houseNumber = RegExp(r'^\d+[a-zA-Z]?(?:\s*[/-]\s*\d+[a-zA-Z]?)*\s+\S');
+final _bareHouseNumber = RegExp(r'^\d+[a-zA-Z]?(?:\s*[/-]\s*\d+[a-zA-Z]?)*$');
+
+/// Names providers return for a dropped pin instead of a street.
+const _pinPlaceholderNames = {
+  'nhà',
+  'nhà riêng',
+  'nhà ở',
+  'văn phòng',
+  'công ty',
+  'vị trí hiện tại',
+  'điểm đón',
+  'điểm đến',
+  'home',
+  'work',
+  'my location',
+};
+
+/// House number and street only, for the app bar where the ward/district/
+/// province tail would be ellipsised away: `Nhà, 45 Lê Duẩn, Hải Châu, Đà Nẵng`
+/// becomes `45 Lê Duẩn`. Labels without a house number keep their first real
+/// segment (`Chợ Hàn, Hải Châu, Đà Nẵng` → `Chợ Hàn`).
+String shortPlaceLabel(String label) {
+  final parts = cleanPlaceText(label)
+      .split(',')
+      .map((part) => part.trim())
+      .where((part) => part.isNotEmpty)
+      .toList();
+  if (parts.isEmpty) return '';
+  final numbered = parts.indexWhere(_houseNumber.hasMatch);
+  if (numbered >= 0) return parts[numbered];
+  final bare = parts.indexWhere(_bareHouseNumber.hasMatch);
+  if (bare >= 0 && bare + 1 < parts.length) {
+    return '${parts[bare]} ${parts[bare + 1]}';
+  }
+  for (final part in parts) {
+    if (!_pinPlaceholderNames.contains(part.toLowerCase())) return part;
+  }
+  return parts.first;
+}
+
 /// Server limit for stop labels (`label` max 160 on rides and food orders).
 const placeLabelMaxLength = 160;
 

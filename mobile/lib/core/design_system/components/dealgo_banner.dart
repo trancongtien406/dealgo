@@ -50,8 +50,17 @@ class DealGoBanner extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(colors.icon, color: colors.foreground, size: 20),
-                const SizedBox(width: DealGoSpacing.s8),
+                Container(
+                  key: const Key('dealgo-banner-icon-badge'),
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: colors.foreground.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(colors.icon, color: colors.foreground, size: 18),
+                ),
+                const SizedBox(width: DealGoSpacing.s12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

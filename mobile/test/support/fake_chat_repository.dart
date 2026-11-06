@@ -47,12 +47,27 @@ class FakeChatRepository implements ChatRepository {
   DateTime Function() clock = DateTime.now;
   var _seq = 0;
 
-  ChatMessagePage _page() => ChatMessagePage(
-    items: List.of(messages),
-    page: 1,
-    limit: 50,
-    total: messages.length,
-  );
+  ChatMessagePage _page(int page, int limit) {
+    final indexed = messages.indexed.toList()
+      ..sort((a, b) {
+        final byTime = b.$2.createdAt.compareTo(a.$2.createdAt);
+        return byTime != 0 ? byTime : b.$1.compareTo(a.$1);
+      });
+    final start = (page - 1) * limit;
+    final slice = indexed
+        .skip(start)
+        .take(limit)
+        .map((entry) => entry.$2)
+        .toList()
+        .reversed
+        .toList(growable: false);
+    return ChatMessagePage(
+      items: slice,
+      page: page,
+      limit: limit,
+      total: messages.length,
+    );
+  }
 
   Future<ChatMessageView> _post(String body) async {
     posted.add(body);
@@ -77,7 +92,7 @@ class FakeChatRepository implements ChatRepository {
   }) async {
     listCalls += 1;
     if (listError != null) throw listError!;
-    return _page();
+    return _page(page, limit);
   }
 
   @override
@@ -91,7 +106,7 @@ class FakeChatRepository implements ChatRepository {
     foodShopFlags.add(shop);
     listCalls += 1;
     if (listError != null) throw listError!;
-    return _page();
+    return _page(page, limit);
   }
 
   @override

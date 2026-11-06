@@ -10,6 +10,8 @@ class DioDriverCardRemoteDataSource implements DriverCardRepository {
   DioDriverCardRemoteDataSource({required this.dio});
 
   final Dio dio;
+  final Map<String, Future<DriverCard>> _inFlight = {};
+  final Map<String, DriverCard> _offerCache = {};
 
   @override
   Future<DriverCard> fetch({
@@ -17,18 +19,47 @@ class DioDriverCardRemoteDataSource implements DriverCardRepository {
     required DriverCardJob job,
     required String jobId,
     String? offerId,
-  }) async {
+  }) {
     final path = switch (job) {
       DriverCardJob.ride => ApiPaths.rideDriver(jobId),
       DriverCardJob.rideOffer => ApiPaths.rideOfferDriver(jobId, offerId ?? ''),
       DriverCardJob.foodOrder => ApiPaths.foodOrderCourier(jobId),
     };
+    if (job == DriverCardJob.rideOffer) {
+      final cached = _offerCache[path];
+      if (cached != null) {
+        return Future<DriverCard>.value(cached);
+      }
+    }
+    final existing = _inFlight[path];
+    if (existing != null) {
+      return existing;
+    }
+    final future = _fetchRemote(
+      path: path,
+      accessToken: accessToken,
+      cacheOffer: job == DriverCardJob.rideOffer,
+    );
+    _inFlight[path] = future;
+    future.whenComplete(() => _inFlight.remove(path));
+    return future;
+  }
+
+  Future<DriverCard> _fetchRemote({
+    required String path,
+    required String accessToken,
+    required bool cacheOffer,
+  }) async {
     try {
       final response = await dio.get<Object?>(
         path,
         options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       );
-      return decodeDriverCard(requireSuccessData(response.data));
+      final card = decodeDriverCard(requireSuccessData(response.data));
+      if (cacheOffer) {
+        _offerCache[path] = card;
+      }
+      return card;
     } on DioException catch (error) {
       throw apiExceptionFromDio(error);
     }

@@ -57,7 +57,9 @@ const securityHeaders = [
       "default-src 'self'",
       isDev
         ? "script-src 'self' 'unsafe-eval' 'unsafe-inline'"
-        : "script-src 'self' 'unsafe-inline' 'https://static.cloudflareinsights.com'",
+        // Host sources must stay unquoted: a quoted URL is an invalid CSP source
+        // and the browser silently drops it, which blocks Cloudflare's beacon.
+        : "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",

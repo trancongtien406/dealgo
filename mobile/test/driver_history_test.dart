@@ -117,25 +117,21 @@ void main() {
     );
   });
 
-  testWidgets('pages through a long history', (tester) async {
+  testWidgets('loads the next page automatically near the end', (tester) async {
     final history = FakeDriverHistoryRemoteDataSource(
       seed: _many(25, DateTime.now()),
     );
     await _openEarnings(tester, history);
-    final more = find.byKey(const Key('driver-history-more'));
-    await tester.scrollUntilVisible(more, 400, scrollable: _list);
     expect(find.byKey(const Key('driver-history-item-job-24')), findsNothing);
-    // History rows are tappable now: bring the button fully on screen first.
-    await tester.drag(_list, const Offset(0, -200));
-    await tester.pumpAndSettle();
-    await tester.tap(more);
+    // Auto-load fires as the list nears the bottom: no tap on the footer.
+    await tester.drag(_list, const Offset(0, -4000));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.byKey(const Key('driver-history-item-job-24')),
       400,
       scrollable: _list,
     );
-    expect(more, findsNothing);
+    expect(find.byKey(const Key('driver-history-more')), findsNothing);
   });
 
   testWidgets('shows the empty state for a new driver', (tester) async {

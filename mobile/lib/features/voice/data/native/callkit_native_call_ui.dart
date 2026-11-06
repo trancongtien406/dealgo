@@ -29,6 +29,23 @@ class CallkitNativeCallUi implements NativeCallUi {
       _guard(() => FlutterCallkitIncoming.endCall(callId));
 
   @override
+  Future<void> dismissOthers(String? keepCallId) async {
+    if (kIsWeb) {
+      return;
+    }
+    try {
+      final calls = await FlutterCallkitIncoming.activeCalls();
+      for (final call in calls) {
+        if (call.id != keepCallId) {
+          await FlutterCallkitIncoming.endCall(call.id);
+        }
+      }
+    } catch (error) {
+      debugPrint('callkit activeCalls: $error');
+    }
+  }
+
+  @override
   Future<void> setConnected(String callId) =>
       _guard(() => FlutterCallkitIncoming.setCallConnected(callId));
 
@@ -133,6 +150,10 @@ class CallkitNativeCallUi implements NativeCallUi {
     android: const AndroidParams(
       isCustomNotification: true,
       isShowLogo: false,
+      // Without this the receiver only posts a heads-up notification and the
+      // plugin stops the ringtone on ACTION_SCREEN_OFF, so a locked phone
+      // never rings. The activity itself needs USE_FULL_SCREEN_INTENT.
+      isFullScreen: true,
       ringtonePath: 'system_ringtone_default',
       backgroundColor: '#0F766E',
       actionColor: '#16A34A',

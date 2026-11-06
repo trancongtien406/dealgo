@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/motion/dealgo_sheet.dart';
 import '../../../../core/maps/map_lat_lng.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../places/presentation/place_picker_page.dart';
@@ -30,7 +31,7 @@ Future<List<RidePoint>?> showRideEditStopsSheet({
   required int maxStops,
   required RideStopPicker pick,
 }) {
-  return showModalBottomSheet<List<RidePoint>>(
+  return showDealGoSheet<List<RidePoint>>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

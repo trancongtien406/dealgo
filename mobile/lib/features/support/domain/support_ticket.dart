@@ -161,12 +161,14 @@ class SupportTicketPage {
     required this.total,
     required this.activeCount,
     required this.doneCount,
+    this.page = 1,
   });
 
   final List<SupportTicket> items;
   final int total;
   final int activeCount;
   final int doneCount;
+  final int page;
 }
 
 class NewSupportTicket {
@@ -195,6 +197,8 @@ abstract interface class SupportRepository {
   Future<SupportTicketPage> list({
     required String accessToken,
     SupportListFilter filter = SupportListFilter.all,
+    int page = 1,
+    int limit = 50,
   });
 
   Future<SupportTicket> get({required String accessToken, required String id});

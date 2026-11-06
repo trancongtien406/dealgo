@@ -14,6 +14,7 @@ import 'api_paths.dart';
 import 'dio_error_reporter.dart';
 import 'dio_log.dart';
 import 'dio_mapper.dart';
+import 'perf_http_interceptor.dart';
 import 'startup_get_retry.dart';
 
 const skipAuthRefreshExtra = 'dealgo.skipAuthRefresh';
@@ -107,6 +108,12 @@ Dio createDealGoDio({
   // Before the reporter: a launch GET that succeeds on retry is not an error.
   dio.interceptors.add(StartupGetRetryInterceptor(dio));
   dio.interceptors.add(DioErrorReporter());
+  // Last on purpose: response/error callbacks run in reverse order, so the
+  // metric is finished before the retry interceptor replays or swallows the
+  // error. A metric that never stops leaks a platform object.
+  final perf = PerfHttpInterceptor();
+  dio.interceptors.add(perf);
+  refreshDio.interceptors.add(perf);
   sessionRefresher?._impl = auth._refreshSingleFlight;
   return dio;
 }

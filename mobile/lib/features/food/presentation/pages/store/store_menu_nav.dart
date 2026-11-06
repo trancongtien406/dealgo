@@ -230,12 +230,12 @@ class _CategoryRailState extends State<_CategoryRail> {
           slivers: [
             SliverOverlapInjector(handle: widget.headerOverlap),
             SliverPadding(
-              padding: EdgeInsets.only(
-                top: DealGoSpacing.s8,
-                bottom:
-                    DealGoSpacing.s24 +
-                    kFoodCartBarRoom +
-                    MediaQuery.paddingOf(context).bottom,
+              padding: dealGoScrollPadding(
+                context,
+                const EdgeInsets.only(
+                  top: DealGoSpacing.s8,
+                  bottom: DealGoSpacing.s24,
+                ),
               ),
               // Every category is built: a tap has to reach one that is still
               // below the rail's fold.

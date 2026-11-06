@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -600,7 +601,11 @@ class _MatchingWaitState extends State<_MatchingWait> {
         RideDraggableSheet(
           key: const Key('ride-matching-sheet'),
           controller: _sheet,
-          initialChildSize: 0.46,
+          // Owner: searching opens tall (~80%) so offers/raise are in view.
+          initialChildSize: math.min(
+            0.8,
+            rideSheetMaxSize(MediaQuery.of(context)),
+          ),
           minChildSize: 0.4,
           // Max + snaps together keep the sheet under the back button.
           maxChildSize: _max = rideSheetMaxSize(MediaQuery.of(context)),
@@ -608,6 +613,7 @@ class _MatchingWaitState extends State<_MatchingWait> {
             0.4,
             0.46,
             0.72,
+            0.8,
           ], rideSheetMaxSize(MediaQuery.of(context))),
           builder: (context, scrollController) {
             return Column(
@@ -688,17 +694,20 @@ class _MatchingWaitState extends State<_MatchingWait> {
                             // t73u (owner): amount only, one compact row.
                             RideFareRaiseChips(
                               keyPrefix: 'ride-inline-raise',
-                              presets: rideFareRaisePresets(
-                                suggestedVnd: ride.offeredFareVnd,
-                                maxBidVnd:
-                                    ride.maxOfferedFareVnd ??
-                                    ride.offeredFareVnd * 3,
-                                maxHeadroomPercent:
-                                    ride.fareHeadroomPercent ??
-                                    (ride.maxOfferedFareVnd == null
-                                        ? 30
-                                        : null),
-                              ),
+                              presets:
+                                  rideRaiseFareOptions(
+                                        ride.offeredFareVnd,
+                                        maxFareVnd: ride.maxOfferedFareVnd,
+                                        referenceFareVnd: ride.referenceFareVnd,
+                                      )
+                                      .map(
+                                        (o) => RideFarePreset(
+                                          percent: o.percent,
+                                          amountVnd: o.amountVnd,
+                                          enabled: true,
+                                        ),
+                                      )
+                                      .toList(),
                               selectedVnd: null,
                               enabled: actingOn == null,
                               onPick: raise,
@@ -790,8 +799,7 @@ class _MatchingWaitState extends State<_MatchingWait> {
                     DealGoDimensions.pageGutter,
                     DealGoSpacing.s8,
                     DealGoDimensions.pageGutter,
-                    DealGoSpacing.s12 +
-                        MediaQuery.viewPaddingOf(context).bottom,
+                    rideSheetFooterBottom(context),
                   ),
                   child: IntrinsicHeight(
                     child: Row(

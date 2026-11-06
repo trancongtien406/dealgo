@@ -37,8 +37,12 @@ function makeService() {
   const repo = new MemoryHomeBannerRepository();
   const stored = new Map<string, Buffer>();
   let n = 0;
+  const readStored = async ({ key, contentType }: { key: string; contentType: string }) => {
+    const body = stored.get(key);
+    return body ? { body, contentType } : null;
+  };
   const uploads = {
-    storeThen: async (
+    storePublicThen: async (
       prefix: string,
       files: Array<{ contentType?: string; contentBase64: string }>,
       fn: (refs: Array<{ key: string; contentType: string }>) => Promise<unknown>,
@@ -51,10 +55,8 @@ function makeService() {
     discard: async (refs: Array<{ key: string }>) => {
       for (const ref of refs) stored.delete(ref.key);
     },
-    read: async ({ key, contentType }: { key: string; contentType: string }) => {
-      const body = stored.get(key);
-      return body ? { body, contentType } : null;
-    },
+    read: readStored,
+    readDisplayImage: readStored,
   } as never;
   const service = new HomeBannerService(repo, uploads);
   service.clock = () => NOW;

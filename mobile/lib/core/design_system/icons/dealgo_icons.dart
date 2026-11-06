@@ -110,6 +110,7 @@ abstract final class DealGoIcons {
   static const IconData receipt = LucideIcons.receiptText;
   static const IconData refresh = LucideIcons.refreshCw;
   static const IconData remove = LucideIcons.minus;
+  static const IconData removeCircle = LucideIcons.circleMinus;
   static const IconData restaurant = LucideIcons.utensils;
   static const IconData route = LucideIcons.route;
 
@@ -132,7 +133,7 @@ abstract final class DealGoIcons {
 
   /// Solid star for rating displays (Lucide has outline only).
   static const IconData starFilled = Icons.star_rounded;
-  static const IconData stars = LucideIcons.sparkles;
+  static const IconData stars = LucideIcons.star;
   static const IconData store = LucideIcons.store;
   static const IconData success = LucideIcons.circleCheck;
   static const IconData successOutline = LucideIcons.circleCheck;

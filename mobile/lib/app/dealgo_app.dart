@@ -309,6 +309,9 @@ class _DealGoAppState extends State<DealGoApp> with WidgetsBindingObserver {
         unawaited(_driverResume.recheck());
         // t82u: re-check min build + pending terms on every resume.
         unawaited(_deps.appGateCubit.onResume());
+        // The system call screen can be answered or ended while no Dart code
+        // runs (Android kills the process on swipe away; iOS suspends it).
+        unawaited(_deps.voiceCallCubit.onResume());
       },
     );
     _postAuth.addListener(_maybeResumeDriverJob);
@@ -456,8 +459,12 @@ class _DealGoAppState extends State<DealGoApp> with WidgetsBindingObserver {
   /// Android foreground push → in-app banner whose action routes like a
   /// notification tap (chat bursts collapse into the latest one).
   void _showForegroundPush(PushMessage message) {
-    // The socket already rang the call screen; a banner would duplicate it.
+    // Usually the socket already rang the call screen. But a foreground push
+    // also arrives while the socket is reconnecting or just after sign-in, and
+    // then nothing would ever ring: let the cubit open the call if it still
+    // rings (no-op otherwise, so there is still only one ring).
     if (message.data['eventType'] == 'Call.incoming') {
+      unawaited(_deps.voiceCallCubit.openFromPush(message.data));
       return;
     }
     // the socket's rideUnassigned already showed the reason banner.

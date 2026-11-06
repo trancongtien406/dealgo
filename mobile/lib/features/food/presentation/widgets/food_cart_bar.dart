@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/motion/dealgo_motion.dart';
@@ -40,7 +41,6 @@ class FoodCartBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final cart = context.watch<FoodCartCubit>().state;
     final show = showsFor(cart, storeId: storeId);
-    final bottom = MediaQuery.paddingOf(context).bottom;
     return DealGoSlideReveal(
       child: show
           ? Padding(
@@ -49,7 +49,7 @@ class FoodCartBar extends StatelessWidget {
                 DealGoDimensions.pageGutter,
                 DealGoSpacing.s8,
                 DealGoDimensions.pageGutter,
-                bottom + DealGoSpacing.s12,
+                dealGoStickyFooterBottom(context),
               ),
               child: _Bar(
                 cart: cart,
@@ -57,7 +57,14 @@ class FoodCartBar extends StatelessWidget {
                 showStore: storeId == null,
               ),
             )
-          : null,
+          // Empty cart: the slot is still non-null (this widget is the bar), so
+          // Scaffold strips the body's inset and republishes only the bar's
+          // height. A zero-height bar would drop the inset with it.
+          : SizedBox(
+              key: const ValueKey('food-cart-bar-room'),
+              height: MediaQuery.paddingOf(context).bottom,
+              width: double.infinity,
+            ),
     );
   }
 }

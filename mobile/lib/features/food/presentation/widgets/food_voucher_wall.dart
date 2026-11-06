@@ -25,7 +25,9 @@ const _headerHeight = DealGoDimensions.minTapTarget;
 /// Hides on empty and on failure so the feed never waits on promotions; the
 /// loading state is a one-row skeleton of the same height as the cards.
 class FoodVoucherWall extends StatefulWidget {
-  const FoodVoucherWall({super.key});
+  const FoodVoucherWall({this.refreshToken = 0, super.key});
+
+  final int refreshToken;
 
   @override
   State<FoodVoucherWall> createState() => _FoodVoucherWallState();
@@ -44,6 +46,14 @@ class _FoodVoucherWallState extends State<FoodVoucherWall>
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant FoodVoucherWall oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      _load();
+    }
   }
 
   Future<void> _load() async {

@@ -83,12 +83,14 @@ String _maskedPhone(String e164) {
 }
 
 class _OtpHeader extends StatelessWidget {
-  const _OtpHeader({required this.onBack});
+  const _OtpHeader({required this.onBack, this.isEmail = false});
 
   final VoidCallback onBack;
+  final bool isEmail;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return SizedBox(
       height: DealGoDimensions.headerHeight,
       child: Padding(
@@ -99,8 +101,21 @@ class _OtpHeader extends StatelessWidget {
             const Spacer(),
             const DealGoLogo.wordmark(size: 24),
             const Spacer(),
-            // Mirrors the back button so the logo stays centred.
-            const SizedBox(width: DealGoDimensions.minTapTarget),
+            if (!isEmail)
+              TextButton(
+                key: const Key('otp-change-phone'),
+                onPressed: onBack,
+                child: Text(
+                  l10n.otpChangePhone,
+                  style: const TextStyle(
+                    color: DealGoColors.primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              )
+            else
+              const SizedBox(width: DealGoDimensions.minTapTarget),
           ],
         ),
       ),
@@ -155,7 +170,7 @@ class OtpEntryPane extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _OtpHeader(onBack: onBack),
+        _OtpHeader(onBack: onBack, isEmail: isEmail),
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -310,6 +325,48 @@ class OtpEntryPane extends StatelessWidget {
                             ],
                           ),
                         ),
+                        const SizedBox(height: DealGoSpacing.s8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: DealGoSpacing.s16,
+                            vertical: DealGoSpacing.s8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: DealGoColors.subtlePurple,
+                            borderRadius: BorderRadius.circular(DealGoRadius.input),
+                            border: Border.all(
+                              color: DealGoColors.border.withValues(alpha: 0.6),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF8B5CF6),
+                                  shape: BoxShape.circle,
+                                ),
+                                alignment: Alignment.center,
+                                child: const Icon(
+                                  DealGoIcons.shield,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
+                              const SizedBox(width: DealGoSpacing.s8),
+                              Expanded(
+                                child: Text(
+                                  'Mã OTP giúp bảo vệ tài khoản của bạn.',
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: DealGoColors.textSecondary,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                         const SizedBox(height: DealGoSpacing.s12),
                       ],
                     ),
@@ -381,7 +438,7 @@ class OtpInvalidPane extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _OtpHeader(onBack: onBack),
+        _OtpHeader(onBack: onBack, isEmail: isEmail),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
@@ -522,7 +579,7 @@ class OtpCooldownPane extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _OtpHeader(onBack: onBack),
+        _OtpHeader(onBack: onBack, isEmail: isEmail),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(DealGoDimensions.pageGutter),

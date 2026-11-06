@@ -127,6 +127,7 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
     required this._currentUserId,
     this.endedHold = const Duration(seconds: 2),
     this.ringGrace = const Duration(seconds: 3),
+    this.peerGoneGrace = const Duration(seconds: 2),
     NativeCallUi nativeCallUi = const NoopNativeCallUi(),
   }) : _start = startVoiceCall,
        _native = nativeCallUi,
@@ -160,9 +161,19 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
   final String? Function() _currentUserId;
   final Duration endedHold;
   final Duration ringGrace;
+
+  /// How long the peer may stay out of the room before the call ends (a
+  /// reconnect, app resume or network switch drops them for a moment).
+  final Duration peerGoneGrace;
   final List<StreamSubscription<Object?>> _subs = [];
   Timer? _ringTimer;
   Timer? _endedTimer;
+  Timer? _peerGoneTimer;
+
+  /// Bumped whenever the current call stops being ours. Async work started
+  /// under an older epoch (accept, room join, token fetch) must not emit state
+  /// or keep the microphone open after the user already hung up.
+  int _epoch = 0;
 
   String? get _token {
     final t = _accessToken()?.trim();
@@ -172,18 +183,37 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
   /// Reads the admin toggle; call after sign-in. Failures keep the last value.
   Future<void> refreshConfig() async {
     final token = _token;
-    if (token == null) {
-      return;
+    if (token != null) {
+      try {
+        final config = await _config(accessToken: token);
+        if (!isClosed) {
+          emit(state.copyWith(enabled: config.enabled));
+        }
+      } catch (_) {}
     }
-    try {
-      final config = await _config(accessToken: token);
-      if (!isClosed) {
-        emit(state.copyWith(enabled: config.enabled));
-      }
-    } catch (_) {}
+    await _drainPending();
+  }
+
+  /// Back to the foreground: the system call screen may have been answered or
+  /// ended while no Dart code was running (Android kills the process on swipe
+  /// away; iOS suspends it), so the last known state can be stale.
+  Future<void> onResume() async {
+    await _drainPending();
+    await _reconcile();
+    final keep = state.phase == VoiceCallPhase.incoming || _hasCall
+        ? state.call?.id
+        : null;
+    await _native.dismissOthers(keep);
+  }
+
+  /// Applies a push tapped on the lock screen and a call answered on the
+  /// system call screen. A missing access token defers the work instead of
+  /// dropping it: the native ring must still be resolved once the session is
+  /// restored.
+  Future<void> _drainPending() async {
     final pending = _pendingPush;
-    _pendingPush = null;
-    if (pending != null) {
+    if (pending != null && _token != null) {
+      _pendingPush = null;
       await openFromPush(pending);
       if (_nativeAutoAccept) {
         _nativeAutoAccept = false;
@@ -201,13 +231,22 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
     final ringingHere =
         state.phase == VoiceCallPhase.incoming &&
         state.call?.id == action.callId;
+    final liveHere = state.call?.id == action.callId && _hasCall;
     switch (action.type) {
       case NativeCallActionType.accepted:
-        _nativeAnswered.add(action.callId);
         if (ringingHere) {
+          _nativeAnswered.add(action.callId);
           await accept();
           return;
         }
+        if (liveHere) {
+          // Answered again from the car head unit / watch while the call is
+          // already up here: just keep the system call in step.
+          _nativeAnswered.add(action.callId);
+          await _native.setConnected(action.callId);
+          return;
+        }
+        _nativeAnswered.add(action.callId);
         final data = <String, Object?>{
           ...action.data,
           'eventType': 'Call.incoming',
@@ -231,11 +270,20 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
         // Our own dismiss() echoes back as `ended` too, but by then the id has
         // left [_nativeAnswered].
         final answeredNatively = _nativeAnswered.remove(action.callId);
-        if (answeredNatively && state.call?.id == action.callId && _inRoom) {
+        if (answeredNatively && state.call?.id == action.callId && _hasCall) {
           await hangUp();
+        } else if (!answeredNatively && ringingHere) {
+          // Ended from the system ring UI (head unit, watch): the caller is
+          // still waiting and must be told.
+          await decline();
         }
       case NativeCallActionType.timedOut:
-        // The server marks the call missed and pushes "Cuộc gọi nhỡ".
+        // The native timeout fires at the same 36 s as the server window; the
+        // server marks the call missed and pushes "Cuộc gọi nhỡ". Ending the
+        // local screen keeps both sides consistent if that push is lost.
+        if (ringingHere) {
+          _finish(VoiceCallNotice.missed);
+        }
         return;
       case NativeCallActionType.shown:
         _markNativeRinging(action.callId);
@@ -314,11 +362,16 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
       return;
     }
     _endedTimer?.cancel();
+    _peerGoneTimer?.cancel();
+    final epoch = ++_epoch;
     emit(
       const VoiceCallState(phase: VoiceCallPhase.starting)
           .copyWith(enabled: state.enabled),
     );
     if (!await _media.ensureMicrophonePermission()) {
+      if (_epoch != epoch) {
+        return;
+      }
       _finish(VoiceCallNotice.micDenied);
       return;
     }
@@ -330,13 +383,19 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
         resourceId: resourceId,
       );
     } catch (error) {
+      if (_epoch != epoch) {
+        return;
+      }
       if (error is ApiException && error.errorCode == 'VOICE_DISABLED') {
         emit(state.copyWith(enabled: false));
       }
       _finish(VoiceCallNotice.failed, error: error);
       return;
     }
-    if (state.phase != VoiceCallPhase.starting) {
+    if (_epoch != epoch) {
+      // Cancelled while the request was in flight: the callee may already be
+      // ringing, so the call created above has to be ended, not abandoned.
+      await _endOnServer(join.call.id);
       return;
     }
     emit(state.copyWith(phase: VoiceCallPhase.outgoing, call: join.call));
@@ -347,8 +406,18 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
     try {
       await _media.join(url: join.session.url ?? '', token: join.session.token);
     } catch (error) {
+      if (_epoch != epoch) {
+        await _media.leave();
+        return;
+      }
       await _endOnServer(join.call.id);
       _finish(VoiceCallNotice.failed, error: error);
+      return;
+    }
+    if (_epoch != epoch) {
+      // Hung up while the room was connecting; leave() may have run before the
+      // room existed, so release the audio here.
+      await _media.leave();
     }
   }
 
@@ -362,8 +431,20 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
       return;
     }
     _ringTimer?.cancel();
+    _peerGoneTimer?.cancel();
+    if (state.nativeRinging) {
+      // Answered in-app while the system call screen rings this call: keep the
+      // native call alive and let onChange() mark it connected.
+      _nativeAnswered.add(call.id);
+    }
+    final epoch = ++_epoch;
     emit(state.copyWith(phase: VoiceCallPhase.connecting));
     if (!await _media.ensureMicrophonePermission()) {
+      if (_epoch != epoch) {
+        return;
+      }
+      // Decline first: the caller is still hearing the ringback and would
+      // otherwise wait out the full timeout.
       await _declineOnServer(call.id);
       _finish(VoiceCallNotice.micDenied);
       return;
@@ -372,6 +453,9 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
     try {
       join = await _answer.accept(accessToken: token, callId: call.id);
     } catch (error) {
+      if (_epoch != epoch) {
+        return;
+      }
       _finish(
         error is ApiException && error.errorCode == 'VOICE_CALL_NOT_RINGING'
             ? VoiceCallNotice.missed
@@ -380,11 +464,38 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
       );
       return;
     }
+    if (_epoch != epoch) {
+      // Hung up / declined while the answer request was in flight; that path
+      // already ended the call, so only the server-side ACCEPTED state can be
+      // left over. Never join the room.
+      final alreadyClosed =
+          state.phase == VoiceCallPhase.ended ||
+          state.phase == VoiceCallPhase.idle ||
+          state.call?.id != call.id;
+      if (!alreadyClosed) {
+        await _endOnServer(call.id);
+      }
+      return;
+    }
     try {
-      await _media.join(url: join.session.url ?? '', token: join.session.token);
+      await _media.join(
+        url: join.session.url ?? '',
+        token: join.session.token,
+        systemCallOwnsAudio:
+            state.nativeRinging || _nativeAnswered.contains(call.id),
+      );
     } catch (error) {
+      if (_epoch != epoch) {
+        await _media.leave();
+        return;
+      }
       await _endOnServer(call.id);
       _finish(VoiceCallNotice.failed, error: error);
+      return;
+    }
+    if (_epoch != epoch) {
+      // Mic was opened by join() after the user already hung up.
+      await _media.leave();
       return;
     }
     if (state.phase == VoiceCallPhase.connecting) {
@@ -399,21 +510,26 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
     if (state.phase != VoiceCallPhase.incoming || call == null) {
       return;
     }
+    ++_epoch;
     await _declineOnServer(call.id);
     _reset();
   }
 
-  /// Either side: hang up (or cancel while ringing).
+  /// Either side: hang up (or cancel while ringing / while the request is
+  /// still in flight).
   Future<void> hangUp({VoiceCallNotice notice = VoiceCallNotice.hungUp}) async {
     final call = state.call;
-    if (call == null ||
-        !const {
-          VoiceCallPhase.outgoing,
-          VoiceCallPhase.connecting,
-          VoiceCallPhase.active,
-        }.contains(state.phase)) {
+    if (state.phase == VoiceCallPhase.starting) {
+      // Cancel before the server answered: start() ends the call itself if the
+      // request still lands, so nothing to send from here.
+      ++_epoch;
+      _finish(notice);
       return;
     }
+    if (call == null || !_hasCall) {
+      return;
+    }
+    ++_epoch;
     await _media.leave();
     await _endOnServer(call.id);
     _finish(notice);
@@ -487,6 +603,13 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
       state.phase == VoiceCallPhase.outgoing ||
       state.phase == VoiceCallPhase.active;
 
+  /// Phases that own (or are opening) the audio room.
+  bool get _hasCall => const {
+    VoiceCallPhase.outgoing,
+    VoiceCallPhase.connecting,
+    VoiceCallPhase.active,
+  }.contains(state.phase);
+
   void _onCallEvent(Map<String, Object?> raw) {
     final call = VoiceCall.tryParse(raw);
     final me = _currentUserId();
@@ -548,19 +671,34 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
   void _onMedia(VoiceMediaEvent event) {
     switch (event) {
       case VoiceMediaEvent.remoteJoined:
+        _peerGoneTimer?.cancel();
         emit(state.copyWith(remoteConnected: true));
         _startClockIfLive();
       case VoiceMediaEvent.remoteLeft:
         emit(state.copyWith(remoteConnected: false));
-        if (state.phase == VoiceCallPhase.active) {
-          unawaited(hangUp());
+        if (state.phase != VoiceCallPhase.active || state.reconnecting) {
+          // A reconnect drops every participant for a moment; hanging up on
+          // the first `remoteLeft` would end healthy calls on a flaky network.
+          return;
         }
+        // The peer can bounce out for a second (app resume, network switch).
+        // Wait for it to stay gone before treating the call as over.
+        _peerGoneTimer?.cancel();
+        final epoch = _epoch;
+        _peerGoneTimer = Timer(peerGoneGrace, () {
+          if (!isClosed &&
+              _epoch == epoch &&
+              state.phase == VoiceCallPhase.active &&
+              !state.remoteConnected) {
+            unawaited(hangUp());
+          }
+        });
       case VoiceMediaEvent.reconnecting:
         emit(state.copyWith(reconnecting: true));
       case VoiceMediaEvent.reconnected:
         emit(state.copyWith(reconnecting: false));
       case VoiceMediaEvent.disconnected:
-        if (_inRoom) {
+        if (_hasCall) {
           final call = state.call;
           if (call != null) {
             unawaited(_endOnServer(call.id));
@@ -605,6 +743,8 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
 
   void _ring(VoiceCall call) {
     _endedTimer?.cancel();
+    _peerGoneTimer?.cancel();
+    ++_epoch;
     emit(
       VoiceCallState(
         phase: VoiceCallPhase.incoming,
@@ -670,7 +810,9 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
     if (error != null) {
       reportVoiceFailure(error);
     }
+    ++_epoch;
     _ringTimer?.cancel();
+    _peerGoneTimer?.cancel();
     emit(
       VoiceCallState(
         phase: VoiceCallPhase.ended,
@@ -688,8 +830,10 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
     if (isClosed) {
       return;
     }
+    ++_epoch;
     _ringTimer?.cancel();
     _endedTimer?.cancel();
+    _peerGoneTimer?.cancel();
     emit(VoiceCallState(enabled: state.enabled));
   }
 
@@ -697,6 +841,7 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
   Future<void> close() async {
     _ringTimer?.cancel();
     _endedTimer?.cancel();
+    _peerGoneTimer?.cancel();
     for (final sub in _subs) {
       await sub.cancel();
     }

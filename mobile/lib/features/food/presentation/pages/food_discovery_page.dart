@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/config/api_base_url.dart';
 import '../../../../core/design_system/components/dealgo_profile_avatar.dart';
-import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/components/dealgo_haptics.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
@@ -15,6 +14,7 @@ import '../../../home_banner/presentation/home_banner_carousel.dart';
 import '../../../identity/domain/entities/app_role.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
 import '../../../identity/presentation/widgets/auth_widgets.dart';
+import '../../../places/domain/place.dart';
 import '../../../places/presentation/place_picker_page.dart';
 import '../../domain/entities/food_category.dart';
 import '../../domain/entities/food_models.dart';
@@ -40,6 +40,7 @@ import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 import '../../../../core/design_system/components/dealgo_network_image.dart';
+import '../../../../core/design_system/components/dealgo_refresh.dart';
 
 class FoodDiscoveryPage extends StatelessWidget {
   const FoodDiscoveryPage({super.key});
@@ -69,6 +70,7 @@ class _FoodDiscoveryViewState extends State<_FoodDiscoveryView> {
   final ScrollController _scroll = ScrollController();
   final GlobalKey _storesKey = GlobalKey();
   var _filters = const FoodFilters();
+  var _refreshToken = 0;
 
   @override
   void initState() {
@@ -93,15 +95,23 @@ class _FoodDiscoveryViewState extends State<_FoodDiscoveryView> {
     context.read<FoodDiscoveryCubit>().loadMore();
   }
 
-  void _reload() {
+  Future<void> _reload() async {
     final origin = foodCartOrigin(context);
-    context.read<FoodDiscoveryCubit>().load(
-      currentAccessToken(context),
-      lat: origin.lat,
-      lng: origin.lng,
-      sortBy: _filters.sortBy,
-      maxKm: _filters.maxKm,
-    );
+    final categoriesFuture = maybeFoodCategories(
+      context,
+      listen: false,
+    )?.load();
+    setState(() => _refreshToken++);
+    await Future.wait([
+      context.read<FoodDiscoveryCubit>().load(
+        currentAccessToken(context),
+        lat: origin.lat,
+        lng: origin.lng,
+        sortBy: _filters.sortBy,
+        maxKm: _filters.maxKm,
+      ),
+      ?categoriesFuture,
+    ]);
   }
 
   Future<void> _pickAddress() async {
@@ -122,8 +132,12 @@ class _FoodDiscoveryViewState extends State<_FoodDiscoveryView> {
     if (next == null || !mounted || next == _filters) {
       return;
     }
+    final serverChanged =
+        next.sortBy != _filters.sortBy || next.maxKm != _filters.maxKm;
     setState(() => _filters = next);
-    _reload();
+    if (serverChanged) {
+      _reload();
+    }
   }
 
   void _openStore(FoodStoreSummary store) {
@@ -135,13 +149,11 @@ class _FoodDiscoveryViewState extends State<_FoodDiscoveryView> {
     final discovery = context.watch<FoodDiscoveryCubit>().state;
     final ready = discovery is FoodDiscoveryReady ? discovery : null;
     final allStores = ready?.stores ?? const <FoodStoreSummary>[];
+    final fetched = ready?.ratings ?? const <String, StoreRating>{};
     final stores = [
       for (final store in allStores)
-        if ((!_filters.openNow || store.openNow) &&
-            (!_filters.offersOnly || store.offers.isNotEmpty))
-          store,
+        if (_filters.matches(store, rating: fetched[store.id])) store,
     ];
-    final fetched = ready?.ratings ?? const <String, StoreRating>{};
     // Inline list ratings fill in until the summary fetch lands.
     final ratings = <String, StoreRating>{
       for (final store in stores)
@@ -178,200 +190,208 @@ class _FoodDiscoveryViewState extends State<_FoodDiscoveryView> {
       children: [
         SafeArea(
           bottom: false,
-          child: CustomScrollView(
-            controller: _scroll,
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  gutter,
-                  DealGoSpacing.s8,
-                  gutter,
-                  0,
-                ),
-                sliver: SliverList.list(
-                  children: [
-                    _DiscoveryHeader(onPickAddress: _pickAddress),
-                    const SizedBox(height: DealGoSpacing.s16),
-                    _SearchRow(
-                      onOpenSearch: () => context.push(FoodRoutes.search),
-                      onOpenFilters: _openFilters,
-                      filterActive: !_filters.isDefault,
-                    ),
-                    if (refreshing) ...[
-                      const SizedBox(height: DealGoSpacing.s8),
-                      const LinearProgressIndicator(minHeight: 2),
-                    ],
-                    if (!_filters.isDefault) ...[
-                      const SizedBox(height: DealGoSpacing.s8),
-                      _ActiveFilterSummary(
-                        filters: _filters,
-                        onEdit: _openFilters,
-                        onClear: () {
-                          setState(() => _filters = const FoodFilters());
-                          _reload();
-                        },
-                      ),
-                    ],
-                    const SizedBox(height: DealGoSpacing.s16),
-                    _CategoryStrip(
-                      selected: null,
-                      onSelected: (code) =>
-                          context.push(FoodRoutes.categoryOf(code)),
-                    ),
-                    const SizedBox(height: DealGoSpacing.s16),
-                    const HomeBannerCarousel(
-                      role: AppRole.customer,
-                      service: 'FOOD',
-                      gapBelow: DealGoSpacing.s16,
-                    ),
-                    const FoodVoucherWall(),
-                    const FoodReorderStrip(),
-                    // Curated collections are bounded (a horizontal strip per
-                    // row), so they stay above the endless store list. Below
-                    // it they would be pushed down by every appended page.
-                    if (offerStores.isNotEmpty) ...[
-                      _SectionHeader(
-                        title: l10n.foodOffersNearTitle,
-                        onSeeAll: () =>
-                            context.push(FoodRoutes.categoryOf(null)),
-                      ),
-                      const SizedBox(height: DealGoSpacing.s12),
-                      _OfferStrip(stores: offerStores, onOpen: _openStore),
-                      const SizedBox(height: DealGoSpacing.s20),
-                    ],
-                    if (deals.isNotEmpty) ...[
-                      _SectionHeader(
-                        title: l10n.foodCollectionDeals,
-                        onSeeAll: () =>
-                            context.push(FoodRoutes.categoryOf(null)),
-                      ),
-                      const SizedBox(height: DealGoSpacing.s12),
-                      _DishStrip(
-                        key: const Key('food-deals-strip'),
-                        dishes: deals,
-                        onOpen: _openStore,
-                      ),
-                      const SizedBox(height: DealGoSpacing.s20),
-                    ],
-                    if (newDishes.isNotEmpty) ...[
-                      _SectionHeader(
-                        title: l10n.foodCollectionNewDishes,
-                        onSeeAll: () =>
-                            context.push(FoodRoutes.categoryOf(null)),
-                      ),
-                      const SizedBox(height: DealGoSpacing.s12),
-                      _DishStrip(
-                        key: const Key('food-new-strip'),
-                        dishes: newDishes,
-                        onOpen: _openStore,
-                      ),
-                      const SizedBox(height: DealGoSpacing.s20),
-                    ],
-                    if (popular.isNotEmpty) ...[
-                      _SectionHeader(
-                        title: l10n.foodCollectionTopRated,
-                        onSeeAll: () =>
-                            context.push(FoodRoutes.categoryOf(null)),
-                      ),
-                      const SizedBox(height: DealGoSpacing.s12),
-                      _StoreStrip(
-                        key: const Key('food-top-stores-strip'),
-                        stores: popular,
-                        ratings: ratings,
-                        onOpen: _openStore,
-                      ),
-                      const SizedBox(height: DealGoSpacing.s20),
-                    ],
-                    KeyedSubtree(
-                      key: _storesKey,
-                      child: _SectionHeader(
-                        title: l10n.foodCollectionNear,
-                        onSeeAll: () =>
-                            context.push(FoodRoutes.categoryOf(null)),
-                      ),
-                    ),
-                    const SizedBox(height: DealGoSpacing.s12),
-                  ],
-                ),
-              ),
-              if (loading)
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: gutter),
-                  sliver: const SliverToBoxAdapter(
-                    child: DealGoSkeletonList(itemCount: 4),
-                  ),
-                )
-              else if (error != null)
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: gutter),
-                  sliver: SliverToBoxAdapter(
-                    child: DealGoStateView.failure(
-                      context,
-                      onRetry: _reload,
-                      cause: error.error,
-                      message: error.resolve(l10n),
-                    ),
-                  ),
-                )
-              else if (stores.isEmpty)
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: gutter),
-                  sliver: SliverToBoxAdapter(
-                    child: DealGoStateView(
-                      art: DealGoStateArt.noSearch,
-                      title: l10n.emptyStoresNearby,
-                      message: l10n.emptyStoresNearbyBody,
-                      compact: true,
-                    ),
-                  ),
-                )
-              else
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: gutter),
-                  sliver: SliverList.separated(
-                    itemCount: stores.length,
-                    itemBuilder: (context, index) {
-                      final store = stores[index];
-                      return DealGoStaggerIn(
-                        index: index,
-                        child: FoodStoreCard(
-                          key: Key('food-store-card-${store.id}'),
-                          store: store,
-                          rating: ratings[store.id],
-                          onTap: () => _openStore(store),
-                        ),
-                      );
-                    },
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: DealGoSpacing.s12),
-                  ),
-                ),
-              if (stores.isNotEmpty)
+          child: DealGoRefresh(
+            onRefresh: _reload,
+            child: CustomScrollView(
+              controller: _scroll,
+              slivers: [
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(
                     gutter,
-                    DealGoSpacing.s12,
+                    DealGoSpacing.s8,
                     gutter,
                     0,
                   ),
-                  sliver: SliverToBoxAdapter(
-                    child: FoodFeedFooter(
-                      state: ready,
-                      onRetry: () =>
-                          context.read<FoodDiscoveryCubit>().loadMore(),
-                    ),
+                  sliver: SliverList.list(
+                    children: [
+                      _DiscoveryHeader(onPickAddress: _pickAddress),
+                      const SizedBox(height: DealGoSpacing.s16),
+                      _SearchRow(
+                        onOpenSearch: () => context.push(FoodRoutes.search),
+                        onOpenFilters: _openFilters,
+                        activeFilterCount: _filters.activeCount,
+                      ),
+                      _HeaderSlot(
+                        child: refreshing
+                            ? const LinearProgressIndicator(minHeight: 2)
+                            : null,
+                      ),
+                      _HeaderSlot(
+                        child: _filters.isDefault
+                            ? null
+                            : _ActiveFilterSummary(
+                                filters: _filters,
+                                onEdit: _openFilters,
+                                onClear: () {
+                                  setState(
+                                    () => _filters = const FoodFilters(),
+                                  );
+                                  _reload();
+                                },
+                              ),
+                      ),
+                      const SizedBox(height: DealGoSpacing.s12),
+                      _CategoryStrip(
+                        selected: null,
+                        onSelected: (code) =>
+                            context.push(FoodRoutes.categoryOf(code)),
+                      ),
+                      const SizedBox(height: DealGoSpacing.s8),
+                      HomeBannerCarousel(
+                        role: AppRole.customer,
+                        service: 'FOOD',
+                        gapBelow: DealGoSpacing.s16,
+                        refreshToken: _refreshToken,
+                      ),
+                      FoodVoucherWall(refreshToken: _refreshToken),
+                      FoodReorderStrip(refreshToken: _refreshToken),
+                      // Curated collections are bounded (a horizontal strip per
+                      // row), so they stay above the endless store list. Below
+                      // it they would be pushed down by every appended page.
+                      if (offerStores.isNotEmpty) ...[
+                        _SectionHeader(
+                          title: l10n.foodOffersNearTitle,
+                          onSeeAll: () =>
+                              context.push(FoodRoutes.categoryOf(null)),
+                        ),
+                        const SizedBox(height: DealGoSpacing.s12),
+                        _OfferStrip(stores: offerStores, onOpen: _openStore),
+                        const SizedBox(height: DealGoSpacing.s20),
+                      ],
+                      if (deals.isNotEmpty) ...[
+                        _SectionHeader(
+                          title: l10n.foodCollectionDeals,
+                          onSeeAll: () =>
+                              context.push(FoodRoutes.categoryOf(null)),
+                        ),
+                        const SizedBox(height: DealGoSpacing.s12),
+                        _DishStrip(
+                          key: const Key('food-deals-strip'),
+                          dishes: deals,
+                          onOpen: _openStore,
+                        ),
+                        const SizedBox(height: DealGoSpacing.s20),
+                      ],
+                      if (newDishes.isNotEmpty) ...[
+                        _SectionHeader(
+                          title: l10n.foodCollectionNewDishes,
+                          onSeeAll: () =>
+                              context.push(FoodRoutes.categoryOf(null)),
+                        ),
+                        const SizedBox(height: DealGoSpacing.s12),
+                        _DishStrip(
+                          key: const Key('food-new-strip'),
+                          dishes: newDishes,
+                          onOpen: _openStore,
+                        ),
+                        const SizedBox(height: DealGoSpacing.s20),
+                      ],
+                      if (popular.isNotEmpty) ...[
+                        _SectionHeader(
+                          title: l10n.foodCollectionTopRated,
+                          onSeeAll: () =>
+                              context.push(FoodRoutes.categoryOf(null)),
+                        ),
+                        const SizedBox(height: DealGoSpacing.s12),
+                        _StoreStrip(
+                          key: const Key('food-top-stores-strip'),
+                          stores: popular,
+                          ratings: ratings,
+                          onOpen: _openStore,
+                        ),
+                        const SizedBox(height: DealGoSpacing.s20),
+                      ],
+                      KeyedSubtree(
+                        key: _storesKey,
+                        child: _SectionHeader(
+                          title: l10n.foodCollectionNear,
+                          onSeeAll: () =>
+                              context.push(FoodRoutes.categoryOf(null)),
+                        ),
+                      ),
+                      const SizedBox(height: DealGoSpacing.s12),
+                    ],
                   ),
                 ),
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height:
-                      DealGoSpacing.s20 +
-                      DealGoSpacing.s16 +
-                      cartRoom +
-                      bottomInset,
+                if (loading)
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: gutter),
+                    sliver: const SliverToBoxAdapter(
+                      child: DealGoSkeletonList(itemCount: 4),
+                    ),
+                  )
+                else if (error != null)
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: gutter),
+                    sliver: SliverToBoxAdapter(
+                      child: DealGoStateView.failure(
+                        context,
+                        onRetry: _reload,
+                        cause: error.error,
+                        message: error.resolve(l10n),
+                      ),
+                    ),
+                  )
+                else if (stores.isEmpty)
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: gutter),
+                    sliver: SliverToBoxAdapter(
+                      child: DealGoStateView(
+                        art: DealGoStateArt.noSearch,
+                        title: l10n.emptyStoresNearby,
+                        message: l10n.emptyStoresNearbyBody,
+                        compact: true,
+                      ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: gutter),
+                    sliver: SliverList.separated(
+                      itemCount: stores.length,
+                      itemBuilder: (context, index) {
+                        final store = stores[index];
+                        return DealGoStaggerIn(
+                          index: index,
+                          child: FoodStoreCard(
+                            key: Key('food-store-card-${store.id}'),
+                            store: store,
+                            rating: ratings[store.id],
+                            onTap: () => _openStore(store),
+                          ),
+                        );
+                      },
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: DealGoSpacing.s12),
+                    ),
+                  ),
+                if (stores.isNotEmpty)
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(
+                      gutter,
+                      DealGoSpacing.s12,
+                      gutter,
+                      0,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: FoodFeedFooter(
+                        state: ready,
+                        onRetry: () =>
+                            context.read<FoodDiscoveryCubit>().loadMore(),
+                      ),
+                    ),
+                  ),
+                SliverToBoxAdapter(
+                  child: SizedBox(
+                    height:
+                        DealGoSpacing.s20 +
+                        DealGoSpacing.s16 +
+                        cartRoom +
+                        bottomInset,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         // Above the role tab bar while the cart holds something.
@@ -386,11 +406,13 @@ List<FoodStoreSummary> _popularThisWeek(
   List<FoodStoreSummary> stores,
   Map<String, StoreRating> ratings,
 ) {
+  double? scoreOf(FoodStoreSummary store) =>
+      storeRatingOf(store, ratings[store.id])?.average;
+
   final rated = [
     for (final store in stores)
-      if (ratings[store.id]?.average != null && store.closedReason == null)
-        store,
-  ]..sort((a, b) => ratings[b.id]!.average!.compareTo(ratings[a.id]!.average!));
+      if (scoreOf(store) != null && store.closedReason == null) store,
+  ]..sort((a, b) => scoreOf(b)!.compareTo(scoreOf(a)!));
   return rated.take(4).toList(growable: false);
 }
 
@@ -403,8 +425,14 @@ class _DiscoveryHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Expanded(child: DealGoWordmark()),
-        _LocationChip(onTap: onPickAddress),
+        const DealGoWordmark(),
+        const SizedBox(width: DealGoSpacing.s12),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: _LocationChip(onTap: onPickAddress),
+          ),
+        ),
         const SizedBox(width: DealGoSpacing.s8),
         const _DiscoveryAvatar(),
       ],
@@ -455,60 +483,55 @@ class _LocationChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final address = context.select<FoodCartCubit, String>(
-      (cart) => cart.state.dropoffLabel.trim(),
+    final rawAddress = context.select<FoodCartCubit, String>(
+      (cart) => cart.state.dropoffLabel,
     );
-    final chosen = address.isNotEmpty;
-    final label = chosen ? address : l10n.foodDeliverTo;
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 150),
-      child: Material(
-        color: chosen ? DealGoColors.card : DealGoColors.subtlePurple,
-        shape: StadiumBorder(
-          side: BorderSide(
-            color: chosen ? DealGoColors.border : Colors.transparent,
-          ),
+    final chosen = rawAddress.trim().isNotEmpty;
+    final label = chosen ? shortPlaceLabel(rawAddress) : l10n.foodDeliverTo;
+    return Material(
+      color: chosen ? DealGoColors.card : DealGoColors.subtlePurple,
+      shape: StadiumBorder(
+        side: BorderSide(
+          color: chosen ? DealGoColors.border : Colors.transparent,
         ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Semantics(
-            button: true,
-            label: '${l10n.foodDeliverTo} $label',
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: DealGoSpacing.s8,
-                vertical: DealGoSpacing.s8,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    DealGoIcons.pinFilled,
-                    color: DealGoColors.primary,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 4),
-                  Flexible(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: chosen
-                            ? DealGoColors.text
-                            : DealGoColors.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Semantics(
+          button: true,
+          label: '${l10n.foodDeliverTo} $label',
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: DealGoSpacing.s8,
+              vertical: DealGoSpacing.s8,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  DealGoIcons.pinFilled,
+                  color: DealGoColors.primary,
+                  size: 16,
+                ),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: chosen ? DealGoColors.text : DealGoColors.primary,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  Icon(
-                    DealGoIcons.expandMore,
-                    size: 16,
-                    color: DealGoColors.textSecondary,
-                  ),
-                ],
-              ),
+                ),
+                Icon(
+                  DealGoIcons.expandMore,
+                  size: 16,
+                  color: DealGoColors.textSecondary,
+                ),
+              ],
             ),
           ),
         ),
@@ -547,12 +570,15 @@ class _CategoryStrip extends StatelessWidget {
       child: SizedBox(
         width: 64,
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             avatar,
-            const SizedBox(height: DealGoSpacing.s8),
+            const SizedBox(height: DealGoSpacing.s4),
             Text(
               label,
               textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: textStyle?.copyWith(
                 color: DealGoColors.text,
                 fontWeight: active ? FontWeight.w700 : FontWeight.w500,
@@ -603,7 +629,7 @@ class _CategoryStrip extends StatelessWidget {
         ),
     ];
     return SizedBox(
-      height: 112,
+      height: 84,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: children.length,
@@ -619,12 +645,12 @@ class _SearchRow extends StatelessWidget {
   const _SearchRow({
     required this.onOpenSearch,
     required this.onOpenFilters,
-    required this.filterActive,
+    required this.activeFilterCount,
   });
 
   final VoidCallback onOpenSearch;
   final VoidCallback onOpenFilters;
-  final bool filterActive;
+  final int activeFilterCount;
 
   @override
   Widget build(BuildContext context) {
@@ -661,46 +687,33 @@ class _SearchRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: DealGoSpacing.s8),
-        _FilterButton(active: filterActive, onTap: onOpenFilters),
+        FoodFilterIconButton(
+          buttonKey: const Key('food-discovery-filter'),
+          activeCount: activeFilterCount,
+          onTap: onOpenFilters,
+        ),
       ],
     );
   }
 }
 
-class _FilterButton extends StatelessWidget {
-  const _FilterButton({required this.active, required this.onTap});
+/// Reserves its place in the feed header whether or not [child] is present:
+/// optional rows appearing above the banner must not shift the sliver children
+/// below, since a shifted index rebuilds them and re-requests their data.
+class _HeaderSlot extends StatelessWidget {
+  const _HeaderSlot({this.child});
 
-  final bool active;
-  final VoidCallback onTap;
+  final Widget? child;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Material(
-      color: active ? DealGoColors.primary : DealGoColors.card,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(DealGoRadius.button),
-        side: BorderSide(
-          color: active ? DealGoColors.primary : DealGoColors.border,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        key: const Key('food-discovery-filter'),
-        onTap: onTap,
-        child: Semantics(
-          button: true,
-          label: l10n.foodFilterButton,
-          child: SizedBox(
-            width: 52,
-            height: 52,
-            child: Icon(
-              DealGoIcons.filter,
-              color: active ? Colors.white : DealGoColors.primary,
-            ),
-          ),
-        ),
-      ),
+    final value = child;
+    if (value == null) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: DealGoSpacing.s8),
+      child: value,
     );
   }
 }
@@ -720,36 +733,59 @@ class _ActiveFilterSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final km = filters.maxKm;
+    final minRating = filters.minRating;
+    final maxEta = filters.maxEtaMinutes;
     return Wrap(
       spacing: DealGoSpacing.s8,
-      runSpacing: DealGoSpacing.s8,
+      runSpacing: DealGoSpacing.s4,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        if (filters.sortBy == 'rating')
-          DealGoChip(
-            label: l10n.foodFilterRating,
-            tone: DealGoChipTone.brand,
+        if (filters.sortBy != 'distance')
+          FoodFilterPill(
+            label: foodSortLabel(l10n, filters.sortBy),
+            icon: foodSortIcon(filters.sortBy),
             selected: true,
             onTap: onEdit,
           ),
         if (km != null)
-          DealGoChip(
+          FoodFilterPill(
             label: l10n.foodFilterKm(km),
-            tone: DealGoChipTone.brand,
+            icon: DealGoIcons.pin,
+            selected: true,
+            onTap: onEdit,
+          ),
+        if (minRating != null)
+          FoodFilterPill(
+            label: formatMinRatingLabel(l10n, minRating),
+            icon: DealGoIcons.starFilled,
+            selected: true,
+            onTap: onEdit,
+          ),
+        if (maxEta != null)
+          FoodFilterPill(
+            label: l10n.foodFilterEtaMax(maxEta),
+            icon: DealGoIcons.timer,
             selected: true,
             onTap: onEdit,
           ),
         if (filters.openNow)
-          DealGoChip(
+          FoodFilterPill(
             label: l10n.foodFilterOpenNow,
-            tone: DealGoChipTone.success,
+            icon: DealGoIcons.clock,
             selected: true,
             onTap: onEdit,
           ),
         if (filters.offersOnly)
-          DealGoChip(
+          FoodFilterPill(
             label: l10n.foodFilterOffers,
-            tone: DealGoChipTone.promo,
+            icon: DealGoIcons.tag,
+            selected: true,
+            onTap: onEdit,
+          ),
+        if (filters.noMinOrder)
+          FoodFilterPill(
+            label: l10n.foodFilterNoMinOrder,
+            icon: DealGoIcons.successOutline,
             selected: true,
             onTap: onEdit,
           ),
@@ -934,7 +970,10 @@ class _StoreStrip extends StatelessWidget {
   });
 
   static const _cardWidth = 288.0;
-  static const _railHeight = 108.0;
+
+  /// Fits the tallest compact card at the default text scale; the rail grows
+  /// with accessibility text scaling so the bounded meta lines never overflow.
+  static const _railHeight = 128.0;
 
   final List<FoodStoreSummary> stores;
   final Map<String, StoreRating> ratings;
@@ -942,8 +981,11 @@ class _StoreStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final railHeight = MediaQuery.textScalerOf(context)
+        .clamp(minScaleFactor: 1)
+        .scale(_railHeight);
     return SizedBox(
-      height: _railHeight,
+      height: railHeight,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         clipBehavior: Clip.none,

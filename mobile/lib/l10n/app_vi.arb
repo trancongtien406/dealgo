@@ -317,6 +317,30 @@
   },
   "foodFilterOpenNow": "Đang mở cửa",
   "foodFilterOffers": "Có ưu đãi",
+  "foodFilterSortName": "Tên A–Z",
+  "foodFilterDistanceHint": "Kéo thanh trượt hoặc chọn nhanh bán kính quanh bạn",
+  "foodFilterMinRatingTitle": "Đánh giá tối thiểu",
+  "foodFilterRatingAny": "Mọi mức sao",
+  "foodFilterRatingFrom": "Từ {stars} ★",
+  "@foodFilterRatingFrom": {
+    "placeholders": {
+      "stars": {
+        "type": "String"
+      }
+    }
+  },
+  "foodFilterEtaTitle": "Thời gian giao dự kiến",
+  "foodFilterEtaAny": "Mọi thời gian",
+  "foodFilterEtaMax": "≤ {minutes} phút",
+  "@foodFilterEtaMax": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "foodFilterStatusTitle": "Trạng thái & ưu đãi",
+  "foodFilterNoMinOrder": "Không đơn tối thiểu",
   "foodFilterApply": "Áp dụng",
   "foodFilterReset": "Đặt lại",
   "foodFilterClear": "Xóa lọc",
@@ -956,6 +980,7 @@
   "foodDropoffTitle": "Địa chỉ nhận",
   "foodDropoffChoose": "Chọn địa chỉ giao hàng",
   "foodDropoffChange": "Đổi",
+  "foodDropoffChangeAddress": "Đổi địa chỉ",
   "foodFareNeedAddress": "Chọn địa chỉ để tính",
   "foodFareQuoting": "Đang tính…",
   "foodFareQuoteError": "Chưa tính được phí giao. Kiểm tra kết nối và thử lại.",
@@ -2418,6 +2443,7 @@
   "voucherBestPick": "Tốt nhất",
   "voucherNeedMore": "Mua thêm {amount}",
   "voucherPickerApply": "Dùng",
+  "voucherApplied": "Đang dùng",
   "checkoutErrMinOrder": "Đơn chưa đạt mức tối thiểu của quán",
   "merchantItemOriginalPrice": "Giá gốc",
   "merchantItemOriginalPriceInvalid": "Giá gốc phải cao hơn giá bán",

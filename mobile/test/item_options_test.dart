@@ -663,12 +663,12 @@ void main() {
       await tester.tap(card);
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
-        find.byKey(const Key('food-add-item-tea')),
+        find.byKey(const Key('food-dish-item-tea')),
         200,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('food-add-item-tea')));
+      await tester.tap(find.byKey(const Key('food-dish-item-tea')));
       await tester.pumpAndSettle();
 
       await tester.scrollUntilVisible(
@@ -713,6 +713,51 @@ void main() {
       expect(placed.optionIds.toSet(), {'o-l', 'o-tc'});
     },
   );
+
+  testWidgets('row add uses the default picks for a configured dish', (
+    tester,
+  ) async {
+    final food = FakeFoodClient(
+      stores: const [FoodStoreSummary(id: 'store-tea', name: 'Trà Sữa')],
+      details: const {'store-tea': _store},
+    );
+    await pumpSignedIn(
+      tester,
+      profile: customerProfile,
+      foodClient: food,
+      pricing: FakePricingRemoteDataSource(deliveryFareVnd: 15000),
+    );
+    await tester.tap(navLabel('Mua'));
+    await tester.pumpAndSettle();
+    final card = find.byKey(const Key('food-store-card-store-tea'));
+    await tester.scrollUntilVisible(
+      card,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(card);
+    await tester.pumpAndSettle();
+
+    final add = find.byKey(const Key('food-add-item-tea'));
+    await tester.scrollUntilVisible(
+      add,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+
+    final cart = tester
+        .element(find.byKey(const Key('food-add-item-tea')))
+        .read<FoodCartCubit>();
+    final line = cart.state.lines.single;
+    expect(line.name, 'Trà sữa · M');
+    expect(line.optionIds, ['o-m']);
+    expect(line.unitPriceVnd, 45000);
+    expect(line.quantity, 1);
+  });
 
   testWidgets('a missing required group blocks add and is called out', (
     tester,

@@ -27,6 +27,12 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { argon2id, hash as argon2Hash } from 'argon2';
 import { PrismaClient } from '../src/generated/prisma/client.js';
 import { createObjectStorage } from '../src/platform/storage/storage.module.js';
+import {
+  PUBLIC_IMAGE_VARIANT_WIDTHS,
+  imageVariantKey,
+  toPublicWebp,
+  toVariantWebp,
+} from '../src/platform/storage/image-variants.js';
 import { menuItemImagePath } from '../src/modules/catalog/menu-item-image.service.js';
 import { storeLogoPath } from '../src/modules/catalog/store-logo.service.js';
 import { assertSeedAllowed } from './seed-guard.js';
@@ -42,7 +48,7 @@ export const APP_REVIEW_REGION_CODE = 'DN';
 const APP_REVIEW_CONTACT_PHONE = '+84901234567';
 const STORE_PIN = { lat: 16.071, lng: 108.2246, label: 'Đường Bạch Đằng, Hải Châu 1, Hải Châu, Đà Nẵng' };
 
-const STORE_COVER = 'food_store_cover.jpg';
+const STORE_COVER = 'hero_food_clean.png';
 const STORE_DESCRIPTION =
   'Quán demo của DealGo bên bờ sông Hàn: Mì Quảng, bún bò Huế, cơm gà và cà phê phin chuẩn vị Đà Nẵng. ' +
   'Nguyên liệu tươi mỗi sáng, đóng gói cẩn thận, giao nóng hổi quanh Hải Châu.';
@@ -167,19 +173,38 @@ export function appReviewDb(): PrismaClient {
 async function main(): Promise<void> {
   assertSeedAllowed(process.env);
   const password = process.env.APP_REVIEW_PASSWORD?.trim() ?? '';
-  if (password && password.length < 12) throw new Error('APP_REVIEW_PASSWORD must be at least 12 characters');
+  if (password && password.length < 6) throw new Error('APP_REVIEW_PASSWORD must be at least 6 characters');
   const assetDir = resolve(process.cwd(), process.env.SEED_ASSET_DIR?.trim() || '../design/assets/batch02/png');
   const db = appReviewDb();
   const storage = createObjectStorage(process.env);
   const counts = { uploaded: 0, items: 0, offers: 0, customers: 0, orders: 0, reviews: 0 };
 
-  async function put(key: string, file: string): Promise<void> {
-    if (await storage.get(key).catch(() => null)) return;
+  async function put(key: string, file: string): Promise<string> {
+    const webpKey = key.replace(/\.(png|jpe?g)$/i, '.webp');
+    if (await storage.get(webpKey).catch(() => null)) return webpKey;
     // The cover lives with the app's images (mobile/assets/images) unless SEED_ASSET_DIR has it.
     const candidates = [resolve(assetDir, file), resolve(process.cwd(), '../mobile/assets/images', file)];
     const path = candidates.find((c) => existsSync(c)) ?? candidates[0]!;
-    await storage.put(key, readFileSync(path), file.endsWith('.jpg') ? 'image/jpeg' : 'image/png');
+    const source = readFileSync(path);
+    const normalized = await toPublicWebp(source);
+    const storedKey = normalized ? webpKey : key;
+    await storage.put(
+      storedKey,
+      normalized?.body ?? source,
+      normalized ? 'image/webp' : file.endsWith('.jpg') ? 'image/jpeg' : 'image/png',
+    );
+    if (normalized) {
+      for (const width of PUBLIC_IMAGE_VARIANT_WIDTHS) {
+        if (normalized.width <= width) continue;
+        const variantKey = imageVariantKey(storedKey, width);
+        const variant = variantKey ? await toVariantWebp(normalized.body, width) : null;
+        if (variantKey && variant) {
+          await storage.put(variantKey, variant, 'image/webp');
+        }
+      }
+    }
     counts.uploaded += 1;
+    return storedKey;
   }
 
   try {
@@ -241,6 +266,8 @@ async function main(): Promise<void> {
     if (other && other.ownerId !== user.id) throw new Error('demo store id is owned by another user');
     const logoKey = `store-logos/${storeId}/${appReviewId('logo', STORE_LOGO)}.png`;
     const coverKey = `store-covers/${storeId}/${appReviewId('cover', STORE_COVER)}.jpg`;
+    const storedLogoKey = await put(logoKey, STORE_LOGO);
+    const storedCoverKey = await put(coverKey, STORE_COVER);
     const storeData = {
       name: APP_REVIEW_STORE_NAME,
       category: 'noodles',
@@ -248,8 +275,8 @@ async function main(): Promise<void> {
       lng: STORE_PIN.lng,
       serviceRegionCode: region.code,
       addressLabel: STORE_PIN.label,
-      logoUrl: storeLogoPath(storeId, logoKey),
-      coverUrl: storeLogoPath(storeId, coverKey, 'cover'),
+      logoUrl: storeLogoPath(storeId, storedLogoKey),
+      coverUrl: storeLogoPath(storeId, storedCoverKey, 'cover'),
       description: STORE_DESCRIPTION,
       serviceMode: 'OPEN' as const,
       serviceModeUntil: null,
@@ -259,8 +286,6 @@ async function main(): Promise<void> {
       minOrderVnd: 25000,
     };
     await db.foodStore.upsert({ where: { id: storeId }, create: { id: storeId, ownerId: user.id, ...storeData }, update: storeData });
-    await put(logoKey, STORE_LOGO);
-    await put(coverKey, STORE_COVER);
     // Weekly hours 00:00–24:00 Mon..Sun: a real schedule on screen, yet orderable at any hour.
     for (let weekday = 1; weekday <= 7; weekday += 1) {
       await db.foodStoreHour.upsert({
@@ -288,8 +313,8 @@ async function main(): Promise<void> {
       const id = appReviewId('item', it.key);
       itemIds[it.key] = id;
       const key = `menu-items/${id}/${appReviewId('item-image', it.key, it.image)}.png`;
-      await put(key, it.image);
-      const path = menuItemImagePath(id, key);
+      const storedKey = await put(key, it.image);
+      const path = menuItemImagePath(id, storedKey);
       itemPaths[it.key] = path;
       const current = await db.foodItem.findUnique({ where: { id }, select: { soldCount: true } });
       const data = {

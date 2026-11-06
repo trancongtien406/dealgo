@@ -81,6 +81,12 @@ abstract interface class NativeCallUi {
   /// Stops ringing / removes the system call (answered in-app, missed, ended).
   Future<void> dismiss(String callId);
 
+  /// Ends every system call except [keepCallId] (null: none).
+  ///
+  /// A ringing notification outlives the app process, so after a kill or a
+  /// long suspend the OS can still show a call the server already ended.
+  Future<void> dismissOthers(String? keepCallId);
+
   /// Marks a call answered from the system UI as connected (iOS call timer).
   Future<void> setConnected(String callId);
 
@@ -116,6 +122,9 @@ class NoopNativeCallUi implements NativeCallUi {
 
   @override
   Future<void> dismiss(String callId) async {}
+
+  @override
+  Future<void> dismissOthers(String? keepCallId) async {}
 
   @override
   Future<void> setConnected(String callId) async {}

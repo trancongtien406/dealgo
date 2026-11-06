@@ -64,6 +64,7 @@ export type PlatformSettingKey =
   | 'FOOD_UNCLAIMED_READY_TIMEOUT_MINUTES'
   | 'FOOD_EARLY_ASSIGN_LEAD_MINUTES'
   | 'FOOD_MAX_DELIVERY_KM'
+  | 'FOOD_BROWSE_RADIUS_KM'
   | 'FOOD_FARE_FLOOR_PERCENT_OF_SUGGESTED'
   | 'FOOD_COUNTER_MAX_PERCENT_OF_OFFER'
   | 'FOOD_FARE_STEP_VND'
@@ -753,6 +754,15 @@ export const PLATFORM_SETTING_SPECS: readonly PlatformSettingSpec[] = [
   {
     // Max straight-line store->dropoff distance.
     key: 'FOOD_MAX_DELIVERY_KM',
+    valueType: 'number',
+    openIds: ['DEC-PROD-059'],
+    min: 1,
+    max: 50,
+    seeded: true,
+  },
+  {
+    // How far a customer sees/searches stores; independent of the driver dispatch radius.
+    key: 'FOOD_BROWSE_RADIUS_KM',
     valueType: 'number',
     openIds: ['DEC-PROD-059'],
     min: 1,

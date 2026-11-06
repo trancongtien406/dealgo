@@ -13,8 +13,9 @@ SupportTicket _ticket(
   SupportStatus status = SupportStatus.open,
   bool awaitingRequester = false,
   List<SupportMessage>? messages,
+  DateTime? at,
 }) {
-  final created = DateTime.utc(2026, 10, 18, 3);
+  final created = at ?? DateTime.utc(2026, 10, 18, 3);
   return SupportTicket(
     id: id,
     code: 'DG-261018-${id.hashCode.abs() % 9000 + 1000}',
@@ -305,5 +306,37 @@ void main() {
     expect(find.byKey(const Key('support-closed-note')), findsOneWidget);
     expect(find.byKey(const Key('support-reply-field')), findsNothing);
     expect(find.text('Đã đóng'), findsWidgets);
+  });
+
+  testWidgets('scrolling near the end loads the next page of tickets', (
+    tester,
+  ) async {
+    _tallPhone(tester);
+    final newest = DateTime.utc(2026, 10, 18, 3);
+    final support = FakeSupportRepository(
+      seed: [
+        for (var i = 0; i < 25; i++)
+          _ticket('t$i', at: newest.subtract(Duration(minutes: i))),
+      ],
+    );
+    await pumpSignedIn(tester, profile: customerProfile, support: support);
+    await _go(tester, '/customer/account/help/tickets');
+    expect(find.text('Tất cả · 25'), findsOneWidget);
+    expect(find.byKey(const Key('support-ticket-t0')), findsOneWidget);
+    expect(find.byKey(const Key('support-ticket-t24')), findsNothing);
+
+    await tester.drag(find.byType(ListView), const Offset(0, -4000));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('support-ticket-t24')),
+      400,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(find.byKey(const Key('support-ticket-t24')), findsOneWidget);
   });
 }

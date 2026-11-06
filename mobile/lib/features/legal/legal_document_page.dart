@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/design_system/components/dealgo_app_header.dart';
+import '../../core/design_system/components/dealgo_nav_insets.dart';
 import '../../core/design_system/components/dealgo_skeleton.dart';
 import '../../core/design_system/components/dealgo_state_view.dart';
 import '../../core/design_system/tokens/dealgo_tokens.dart';
@@ -48,7 +49,9 @@ class _LegalDocumentPageState extends State<LegalDocumentPage> {
     final source = widget.source ?? const FixedLegalDocumentsSource();
     return source.page(
       widget.slug,
-      locale: Localizations.localeOf(context).languageCode == 'en' ? 'en' : 'vi',
+      locale: Localizations.localeOf(context).languageCode == 'en'
+          ? 'en'
+          : 'vi',
     );
   }
 
@@ -80,11 +83,14 @@ class _LegalDocumentPageState extends State<LegalDocumentPage> {
           }
           return ListView(
             key: Key('legal-doc-${doc.slug}'),
-            padding: EdgeInsets.fromLTRB(
-              DealGoDimensions.pageGutter,
-              DealGoSpacing.s16,
-              DealGoDimensions.pageGutter,
-              DealGoSpacing.s24 + MediaQuery.paddingOf(context).bottom,
+            padding: dealGoScrollPadding(
+              context,
+              const EdgeInsets.fromLTRB(
+                DealGoDimensions.pageGutter,
+                DealGoSpacing.s16,
+                DealGoDimensions.pageGutter,
+                DealGoSpacing.s24,
+              ),
             ),
             children: [
               Text(doc.title, style: text.titleLarge),

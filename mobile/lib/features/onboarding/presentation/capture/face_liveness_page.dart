@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
@@ -15,6 +16,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/partner_documents.dart';
 import '../document_image_source.dart';
 import 'camera_cover_preview.dart';
+import 'camera_orientation.dart';
 import 'capture_hint.dart';
 import 'capture_quality.dart';
 import 'liveness_cubit.dart';
@@ -43,7 +45,8 @@ class _FaceLivenessView extends StatefulWidget {
   State<_FaceLivenessView> createState() => _FaceLivenessViewState();
 }
 
-class _FaceLivenessViewState extends State<_FaceLivenessView> {
+class _FaceLivenessViewState extends State<_FaceLivenessView>
+    with WidgetsBindingObserver {
   static const _timeout = CaptureConfig.livenessTimeout;
   static const _maxClip = CaptureConfig.livenessMaxClip;
 
@@ -59,6 +62,8 @@ class _FaceLivenessViewState extends State<_FaceLivenessView> {
   );
   bool _processing = false;
   bool _failed = false;
+  bool _cameraActive = true;
+  int _cameraGeneration = 0;
   bool _busy = false;
   PickedDocumentImage? _still;
   Timer? _timer;
@@ -67,10 +72,45 @@ class _FaceLivenessViewState extends State<_FaceLivenessView> {
   @override
   void initState() {
     super.initState();
-    _open();
+    WidgetsBinding.instance.addObserver(this);
+    _enterCapture();
+  }
+
+  Future<void> _enterCapture() async {
+    await SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.portraitUp,
+    ]);
+    if (mounted) await _open();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _cameraActive = true;
+      if (_controller == null) {
+        context.read<LivenessCubit>().restart();
+        _still = null;
+        unawaited(_open());
+      }
+      return;
+    }
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _cameraActive = false;
+      _cameraGeneration++;
+      _timer?.cancel();
+      _clipTimer?.cancel();
+      final controller = _controller;
+      _controller = null;
+      _camera = null;
+      if (mounted) setState(() {});
+      if (controller != null) unawaited(controller.dispose());
+    }
   }
 
   Future<void> _open() async {
+    final generation = _cameraGeneration;
     try {
       final cameras = await availableCameras();
       final front = cameras.firstWhere(
@@ -87,16 +127,20 @@ class _FaceLivenessViewState extends State<_FaceLivenessView> {
             : ImageFormatGroup.bgra8888,
       );
       await controller.initialize();
-      if (!mounted) {
+      await controller.lockCaptureOrientation(DeviceOrientation.portraitUp);
+      if (!mounted || !_cameraActive || generation != _cameraGeneration) {
         await controller.dispose();
         return;
       }
+      _failed = false;
       _camera = front;
       setState(() => _controller = controller);
       await controller.startImageStream(_onFrame);
       _armTimer();
     } catch (_) {
-      if (mounted) setState(() => _failed = true);
+      if (mounted && _cameraActive && generation == _cameraGeneration) {
+        setState(() => _failed = true);
+      }
     }
   }
 
@@ -118,7 +162,10 @@ class _FaceLivenessViewState extends State<_FaceLivenessView> {
       final faces = await _detector.processImage(input);
       if (!mounted) return;
       final face = faces.length == 1 ? faces.first : null;
-      final size = _uprightSize(image);
+      final rotation = _frameRotation();
+      if (rotation == null) return;
+      final upright = uprightFrameSize(image, rotation);
+      final size = Size(upright.width, upright.height);
       final box = face?.boundingBox;
       // Only the cover-cropped part of the frame is visible in the oval.
       final crop = coverCrop(size, _ovalAspect);
@@ -147,19 +194,20 @@ class _FaceLivenessViewState extends State<_FaceLivenessView> {
 
   static const double _ovalAspect = 3 / 4;
 
-  Size _uprightSize(CameraImage image) {
-    final turned = (_camera?.sensorOrientation ?? 0) % 180 != 0;
-    return turned
-        ? Size(image.height.toDouble(), image.width.toDouble())
-        : Size(image.width.toDouble(), image.height.toDouble());
+  InputImageRotation? _frameRotation() {
+    final camera = _camera;
+    final controller = _controller;
+    if (camera == null || controller == null) return null;
+    return inputImageRotation(
+      camera: camera,
+      deviceOrientation: controller.value.deviceOrientation,
+    );
   }
 
   InputImage? _toInputImage(CameraImage image) {
     final camera = _camera;
     if (camera == null || image.planes.isEmpty) return null;
-    final rotation = InputImageRotationValue.fromRawValue(
-      camera.sensorOrientation,
-    );
+    final rotation = _frameRotation();
     final format = InputImageFormatValue.fromRawValue(image.format.raw as int);
     if (rotation == null || format == null) return null;
     if (Platform.isAndroid && format != InputImageFormat.nv21) return null;
@@ -286,10 +334,18 @@ class _FaceLivenessViewState extends State<_FaceLivenessView> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _cameraActive = false;
+    _cameraGeneration++;
     _timer?.cancel();
     _clipTimer?.cancel();
     _controller?.dispose();
     _detector.close();
+    SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
     super.dispose();
   }
 

@@ -12,17 +12,15 @@ import '../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../address_book/domain/entities/saved_address.dart';
-import '../../address_book/domain/repositories/address_book_repository.dart';
 import '../../identity/domain/entities/auth_state.dart';
 import '../../identity/presentation/cubit/auth_cubit.dart';
 import '../../shell/presentation/account_routes.dart';
-import '../data/place_history_cache.dart';
 import '../domain/place.dart';
 import '../../../core/location/location_service.dart';
 import '../../../core/maps/map_lat_lng.dart';
 import 'current_place.dart';
 import 'map_pin_picker_page.dart';
+import 'place_lists_store.dart';
 
 /// Why the picker was opened; only changes the title.
 enum PlacePickPurpose { pickup, dropoff, delivery, storeLocation }
@@ -101,13 +99,10 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
   var _googleAttribution = false;
   var _searchSeq = 0;
 
-  var _loadingLists = true;
-  var _saved = const <PlaceOption>[];
-  var _recent = const <PlaceOption>[];
-  var _history = const <PlaceOption>[];
-
   var _locating = false;
   String? _locationError;
+
+  PlaceListsStore get _lists => context.read<PlaceListsStore>();
 
   String? get _token {
     final state = context.read<AuthCubit>().state;
@@ -119,8 +114,8 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
     super.initState();
     _nearLat = widget.near?.lat;
     _nearLng = widget.near?.lng;
-    unawaited(_loadHistory());
-    unawaited(_loadLists());
+    unawaited(_lists.loadHistory());
+    unawaited(_lists.loadLists());
     unawaited(_loadNear());
     final initial = widget.initialQuery.trim();
     if (initial.isNotEmpty) {
@@ -143,87 +138,19 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
     super.dispose();
   }
 
-  Future<void> _loadLists() async {
-    final token = _token;
-    if (token == null) {
-      setState(() => _loadingLists = false);
-      return;
-    }
-    final book = context.read<AddressBookRepository>();
-    final places = context.read<PlacesRepository>();
-    // Each list is optional: one failing must not hide the other.
-    final saved = await book
-        .list(accessToken: token)
-        .then(_savedOptions, onError: (_) => const <PlaceOption>[]);
-    final recent = await places
-        .recentDestinations(accessToken: token)
-        .then((rows) => rows, onError: (_) => const <PlaceOption>[]);
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _saved = saved;
-      _recent = recent;
-      _loadingLists = false;
-    });
-  }
-
-  /// Device copy first (instant), then the server list replaces it.
-  Future<void> _loadHistory() async {
-    final cached = await PlaceHistoryCache.load();
-    if (mounted && cached.isNotEmpty && _history.isEmpty) {
-      setState(() => _history = cached);
-    }
-    if (!mounted) {
-      return;
-    }
-    final token = _token;
-    if (token == null) {
-      return;
-    }
-    try {
-      final rows = await context.read<PlacesRepository>().history(
-        accessToken: token,
-      );
-      await PlaceHistoryCache.save(rows);
-      if (mounted) {
-        setState(() => _history = rows);
-      }
-    } catch (_) {
-      // Offline or older server: keep the device copy.
-    }
-  }
-
   Future<void> _deleteHistory(PlaceOption place) async {
     final id = place.historyId;
-    final token = _token;
-    if (id == null || token == null) {
+    if (id == null) {
       return;
     }
-    final places = context.read<PlacesRepository>();
-    final before = _history;
-    final next = [
-      for (final row in _history)
-        if (row.historyId != id) row,
-    ];
-    setState(() => _history = next);
-    try {
-      await places.deleteHistory(accessToken: token, id: id);
-      await PlaceHistoryCache.save(next);
-    } catch (_) {
-      if (mounted) {
-        setState(() => _history = before);
-      }
-    }
+    await _lists.deleteHistory(id);
   }
 
   Future<void> _clearHistory() async {
-    final token = _token;
-    if (token == null) {
+    if (_token == null) {
       return;
     }
     final l10n = AppLocalizations.of(context);
-    final places = context.read<PlacesRepository>();
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -245,38 +172,18 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
     if (ok != true || !mounted) {
       return;
     }
-    final before = _history;
-    setState(() => _history = const []);
-    try {
-      await places.clearHistory(accessToken: token);
-      await PlaceHistoryCache.clear();
-    } catch (_) {
-      if (mounted) {
-        setState(() => _history = before);
-      }
-    }
+    await _lists.clearHistory();
   }
 
   /// Ride drop-offs not already in the picked-place history.
-  List<PlaceOption> get _recentNotInHistory {
-    final names = {for (final row in _history) foldVietnamese(row.name)};
+  List<PlaceOption> _recentNotInHistory(
+    List<PlaceOption> recent,
+    List<PlaceOption> history,
+  ) {
+    final names = {for (final row in history) foldVietnamese(row.name)};
     return [
-      for (final row in _recent)
+      for (final row in recent)
         if (!names.contains(foldVietnamese(row.name))) row,
-    ];
-  }
-
-  static List<PlaceOption> _savedOptions(List<SavedAddress> rows) {
-    return [
-      for (final row in rows)
-        if (row.lat != null && row.lng != null)
-          PlaceOption(
-            name: row.label,
-            address: row.addressLine,
-            lat: row.lat!,
-            lng: row.lng!,
-            source: PlaceSource.saved,
-          ),
     ];
   }
 
@@ -388,27 +295,10 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
         place.source == PlaceSource.current) {
       return;
     }
-    final token = _token;
-    if (token == null) {
+    if (_token == null) {
       return;
     }
-    final places = context.read<PlacesRepository>();
-    final key = placeDedupeKey(place);
-    final rest = [
-      for (final row in _history)
-        if (placeDedupeKey(row) != key && row.historyId != place.historyId) row,
-    ];
-    unawaited(() async {
-      try {
-        final row = await places.recordHistory(
-          accessToken: token,
-          place: place,
-        );
-        await PlaceHistoryCache.save([?row, ...rest]);
-      } catch (_) {
-        // History is best-effort; the pick itself already succeeded.
-      }
-    }());
+    unawaited(_lists.recordHistory(place));
   }
 
   Future<void> _pickOnMap() async {
@@ -483,6 +373,11 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
 
   Widget _buildHome(AppLocalizations l10n) {
     final textTheme = Theme.of(context).textTheme;
+    final lists = context.watch<PlaceListsStore>();
+    final saved = lists.saved;
+    final recent = lists.recent;
+    final history = lists.history;
+    final recentNotInHistory = _recentNotInHistory(recent, history);
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         DealGoDimensions.pageGutter,
@@ -524,21 +419,21 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
           subtitle: '',
           onTap: _pickOnMap,
         ),
-        if (_loadingLists)
+        if (lists.listsLoading)
           const DealGoSkeletonList(
             itemCount: 3,
             thumbSize: 40,
             padding: EdgeInsets.symmetric(vertical: DealGoSpacing.s12),
           )
         else ...[
-          if (_saved.isNotEmpty) ...[
+          if (saved.isNotEmpty) ...[
             _SectionHeader(
               title: l10n.placeSavedTitle,
               action: l10n.placeSavedManage,
               onAction: () =>
                   context.push(AccountRoutes.addresses('/customer/account')),
             ),
-            for (final place in _saved)
+            for (final place in saved)
               _PlaceTile(
                 icon: DealGoIcons.bookmark,
                 tone: DealGoColors.brandGreen,
@@ -547,14 +442,14 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
                 onTap: () => _choose(place),
               ),
           ],
-          if (_history.isNotEmpty || _recent.isNotEmpty) ...[
+          if (history.isNotEmpty || recent.isNotEmpty) ...[
             _SectionHeader(
               title: l10n.placeHistoryTitle,
-              action: _history.isEmpty ? null : l10n.placeHistoryClear,
+              action: history.isEmpty ? null : l10n.placeHistoryClear,
               actionKey: const Key('place-history-clear'),
               onAction: _clearHistory,
             ),
-            for (final (index, place) in _history.indexed)
+            for (final (index, place) in history.indexed)
               _PlaceTile(
                 key: Key('place-history-$index'),
                 icon: DealGoIcons.history,
@@ -574,7 +469,7 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
                   ),
                 ),
               ),
-            for (final place in _recentNotInHistory)
+            for (final place in recentNotInHistory)
               _PlaceTile(
                 icon: DealGoIcons.history,
                 tone: DealGoColors.textSecondary,
@@ -583,7 +478,7 @@ class _PlacePickerPageState extends State<PlacePickerPage> {
                 onTap: () => _choose(place),
               ),
           ],
-          if (_saved.isEmpty && _recent.isEmpty && _history.isEmpty)
+          if (saved.isEmpty && recent.isEmpty && history.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: DealGoSpacing.s24),
               child: Text(

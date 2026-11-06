@@ -31,6 +31,8 @@ DioException _err(
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('DioErrorReporter', () {
     test('connection / unknown failures are breadcrumbs, not errors', () async {
       for (final type in [
@@ -141,6 +143,19 @@ void main() {
       );
       expect(attempts, 1);
     });
+
+    test(
+      'audio-session recovery always includes a real settle delay',
+      () async {
+        final delays = <Duration>[];
+        await waitForAudioSessionRecovery(
+          foregroundTimeout: Duration.zero,
+          settleDelay: const Duration(milliseconds: 500),
+          delay: (duration) async => delays.add(duration),
+        );
+        expect(delays, [const Duration(milliseconds: 500)]);
+      },
+    );
   });
 
   test('background WebSocket closes are not sent to Sentry', () {

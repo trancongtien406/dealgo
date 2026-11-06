@@ -137,14 +137,19 @@ export class HomeBannerService {
     return { accepted };
   }
 
-  async readImage(id: string, file: string): Promise<{ body: Buffer; contentType: string }> {
+  async readImage(
+    id: string,
+    file: string,
+    width: number | null = null,
+  ): Promise<{ body: Buffer; contentType: string }> {
     const key = homeBannerImageKey(id, file);
     const current = key ? await this.banners.find(id) : null;
     if (!key || !current || current.imageUrl !== homeBannerImagePath(id, key)) {
       throw homeBannerError(404, 'HOME_BANNER_IMAGE_NOT_FOUND', 'Image not found');
     }
     const ext = file.slice(file.lastIndexOf('.') + 1);
-    const found = await this.uploads.read({ key, contentType: ext === 'jpg' ? 'image/jpeg' : `image/${ext}` });
+    const contentType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
+    const found = await this.uploads.readDisplayImage({ key, contentType }, width);
     if (!found) {
       throw homeBannerError(404, 'HOME_BANNER_IMAGE_NOT_FOUND', 'Image not found');
     }
@@ -264,7 +269,7 @@ export class HomeBannerService {
       throw IMAGE_TYPE();
     }
     const previous = keyFromHomeBannerImageUrl(current.imageUrl);
-    const saved = await this.uploads.storeThen(
+    const saved = await this.uploads.storePublicThen(
       `${HOME_BANNER_STORAGE_PREFIX}/${id}`,
       [{ label: 'home-banner', contentType: payload.contentType, contentBase64: payload.base64 }],
       async ([ref]) => {

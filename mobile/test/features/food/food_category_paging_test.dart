@@ -1,4 +1,6 @@
+import 'package:dealgo/core/design_system/tokens/dealgo_tokens.dart';
 import 'package:dealgo/features/food/domain/entities/food_models.dart';
+import 'package:dealgo/features/food/presentation/widgets/food_filter_sheet.dart';
 import 'package:dealgo/features/rating/data/rating_remote_datasource.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -232,5 +234,129 @@ void main() {
 
     expect(find.byKey(const Key('food-feed-end')), findsNothing);
     expect(find.byKey(const Key('food-feed-retry')), findsNothing);
+  });
+
+  testWidgets(
+    'category filter bar uses soft-corner FoodFilterPill buttons and supports quick filters + sheet',
+    (tester) async {
+      _tall(tester);
+      final food = FakeFoodClient(
+        stores: const [
+          FoodStoreSummary(
+            id: 's1',
+            name: 'Bún Bò Mở Cửa',
+            category: 'noodles',
+          ),
+          FoodStoreSummary(
+            id: 's2',
+            name: 'Bún Bò Đóng Cửa',
+            category: 'noodles',
+            closedReason: StoreClosedReason.closed,
+          ),
+        ],
+      );
+
+      await pumpSignedIn(
+        tester,
+        profile: customerProfile,
+        foodClient: food,
+        ratings: FakeRatingRemoteDataSource(),
+        locationOverride: FakeLocationService(),
+      );
+      await _go(tester, '/customer/food/category?category=noodles');
+
+      // Soft-square 8pt radius FoodFilterPill instead of StadiumBorder badge.
+      final nearPill = tester.widget<FoodFilterPill>(
+        find.byKey(const Key('food-sort-near')),
+      );
+      expect(nearPill.selected, isTrue);
+
+      final pillMaterial = tester.widget<Material>(
+        find
+            .descendant(
+              of: find.byKey(const Key('food-sort-near')),
+              matching: find.byType(Material),
+            )
+            .first,
+      );
+      expect(pillMaterial.shape, isA<RoundedRectangleBorder>());
+      final shape = pillMaterial.shape! as RoundedRectangleBorder;
+      expect(
+        shape.borderRadius,
+        BorderRadius.circular(DealGoRadius.small),
+      );
+
+      // Quick filter "Đang mở cửa" hides closed stores immediately.
+      expect(find.text('Bún Bò Mở Cửa'), findsOneWidget);
+      expect(find.text('Bún Bò Đóng Cửa'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('food-category-filter-open')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bún Bò Mở Cửa'), findsOneWidget);
+      expect(find.text('Bún Bò Đóng Cửa'), findsNothing);
+
+      // Filter button opens the full filter sheet and preserves category + maxKm.
+      await tester.tap(find.byKey(const Key('food-category-filter')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('food-filter-km-slider')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('food-filter-km-3')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('food-filter-km-inc')));
+      await tester.pumpAndSettle();
+      expect(find.text('Trong 4 km'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('food-filter-km-dec')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('food-filter-apply')));
+      await tester.pumpAndSettle();
+
+      expect(food.storeCategories.last, 'noodles');
+      expect(food.storeMaxKms.last, 3);
+
+      // Re-open the filter sheet and pull down on its scrollable body (TikTok-style)
+      // to dismiss the sheet directly without tapping close.
+      await tester.tap(find.byKey(const Key('food-category-filter')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('food-filter-sheet')), findsOneWidget);
+
+      await tester.drag(
+        find.byKey(const Key('food-filter-sheet')),
+        const Offset(0, 260),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('food-filter-sheet')), findsNothing);
+    },
+  );
+
+  test('FoodFilters.matches filters by rating, ETA, min order, and distance', () {
+    const fastTopStore = FoodStoreSummary(
+      id: 's1',
+      name: 'Phở Ngon',
+      distanceKm: 1.8,
+      ratingAverage: 4.7,
+      ratingCount: 20,
+      etaMinutes: 18,
+      minOrderVnd: 0,
+    );
+    const slowMinOrderStore = FoodStoreSummary(
+      id: 's2',
+      name: 'Phở Xa',
+      distanceKm: 4.5,
+      ratingAverage: 3.8,
+      ratingCount: 12,
+      etaMinutes: 40,
+      minOrderVnd: 50000,
+    );
+
+    const strict = FoodFilters(
+      maxKm: 2,
+      minRating: 4.5,
+      maxEtaMinutes: 20,
+      noMinOrder: true,
+    );
+
+    expect(strict.matches(fastTopStore), isTrue);
+    expect(strict.matches(slowMinOrderStore), isFalse);
+    expect(strict.activeCount, 4);
   });
 }

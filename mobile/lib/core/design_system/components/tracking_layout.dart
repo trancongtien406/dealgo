@@ -4,6 +4,7 @@ import '../../motion/dealgo_motion.dart';
 import '../../motion/dealgo_motion_widgets.dart';
 import '../icons/dealgo_icons.dart';
 import '../tokens/dealgo_tokens.dart';
+import 'dealgo_nav_insets.dart';
 
 /// Grab/ShopeeFood-style tracking layout: the live map fills the screen and a
 /// draggable bottom sheet carries ETA, timeline, people and money.
@@ -80,15 +81,22 @@ class TrackingScaffold extends StatelessWidget {
                 Expanded(
                   child: ListView(
                     controller: controller,
-                    padding: EdgeInsets.fromLTRB(
-                      DealGoDimensions.pageGutter,
-                      DealGoSpacing.s16,
-                      DealGoDimensions.pageGutter,
-                      DealGoSpacing.s16 +
-                          (footer == null
-                              ? MediaQuery.paddingOf(context).bottom
-                              : 0),
-                    ),
+                    padding: footer == null
+                        ? dealGoScrollPadding(
+                            context,
+                            const EdgeInsets.fromLTRB(
+                              DealGoDimensions.pageGutter,
+                              DealGoSpacing.s16,
+                              DealGoDimensions.pageGutter,
+                              DealGoSpacing.s16,
+                            ),
+                          )
+                        : const EdgeInsets.fromLTRB(
+                            DealGoDimensions.pageGutter,
+                            DealGoSpacing.s16,
+                            DealGoDimensions.pageGutter,
+                            DealGoSpacing.s16,
+                          ),
                     children: sheet,
                   ),
                 ),
@@ -98,9 +106,9 @@ class TrackingScaffold extends StatelessWidget {
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(
                         DealGoDimensions.pageGutter,
-                        DealGoSpacing.s4,
+                        DealGoSpacing.s12,
                         DealGoDimensions.pageGutter,
-                        DealGoSpacing.s8,
+                        DealGoSpacing.s12,
                       ),
                       child: footer,
                     ),

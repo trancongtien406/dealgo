@@ -6,6 +6,7 @@ import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/motion/dealgo_sheet.dart';
 import '../../../../core/l10n/api_error_text.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/data/datasources/food_remote_datasource.dart';
@@ -22,7 +23,7 @@ Future<FoodOrderChange?> showMerchantOrderChangeSheet(
   required String orderId,
   required List<MerchantKitchenLine> lines,
 }) {
-  return showModalBottomSheet<FoodOrderChange>(
+  return showDealGoSheet<FoodOrderChange>(
     context: context,
     isScrollControlled: true,
     builder: (_) => MerchantOrderChangeSheet(

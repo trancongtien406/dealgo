@@ -47,6 +47,7 @@ import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/l10n/api_error_text.dart';
 import '../../../../core/design_system/components/dealgo_app_header.dart';
 import '../../../../core/design_system/components/dealgo_network_image.dart';
+import '../../../../core/design_system/components/dealgo_refresh.dart';
 
 part 'store/store_hero.dart';
 part 'store/store_map.dart';
@@ -110,10 +111,24 @@ class _FoodStorePageState extends State<_FoodStoreView> {
   StoreReviews? _filtered;
   int? _reviewStars;
   var _reviewsBusy = false;
+  var _reviewsMoreFailed = false;
   var _loading = true;
   Object? _failure;
   var _tab = _StoreTab.menu;
   double? _distanceKm;
+
+  void openOffersSheet() {
+    final s = _store;
+    if (s == null) return;
+    showDealGoSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => BlocProvider.value(
+        value: context.read<FoodCartCubit>(),
+        child: _StoreOffersSheet(offers: s.offers),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -142,6 +157,7 @@ class _FoodStorePageState extends State<_FoodStoreView> {
       _loading = true;
       _failure = null;
     });
+    unawaited(_loadReviews(token));
     try {
       // The store read needs the origin for the server-side "from" fee, but a
       // slow fix must not hold the page empty: after this cap the read goes
@@ -163,7 +179,6 @@ class _FoodStorePageState extends State<_FoodStoreView> {
         _store = store;
         _loading = false;
       });
-      unawaited(_loadReviews(token));
       _locate(store, origin);
       if (origin == null) {
         unawaited(_locateAfterLoad(store));
@@ -236,7 +251,12 @@ class _FoodStorePageState extends State<_FoodStoreView> {
         accessToken: token,
         storeId: widget.storeId,
       );
-      if (mounted) setState(() => _reviews = reviews);
+      if (mounted) {
+        setState(() {
+          _reviews = reviews;
+          _reviewsMoreFailed = false;
+        });
+      }
     } on Object {
       // Ratings are optional here; the menu stays usable without them.
       return;
@@ -262,6 +282,7 @@ class _FoodStorePageState extends State<_FoodStoreView> {
         setState(() {
           _filtered = page;
           _reviewsBusy = false;
+          _reviewsMoreFailed = false;
         });
       }
     } on Object {
@@ -269,11 +290,21 @@ class _FoodStorePageState extends State<_FoodStoreView> {
     }
   }
 
+  void _onReviewsEndReached() {
+    if (_tab != _StoreTab.reviews || _reviewsBusy || _reviewsMoreFailed) return;
+    final current = _reviewStars == null ? _reviews : _filtered;
+    if (current == null || !current.hasMore) return;
+    unawaited(_moreReviews());
+  }
+
   Future<void> _moreReviews() async {
     final token = currentAccessToken(context);
     final current = _reviewStars == null ? _reviews : _filtered;
     if (token == null || current == null || _reviewsBusy) return;
-    setState(() => _reviewsBusy = true);
+    setState(() {
+      _reviewsBusy = true;
+      _reviewsMoreFailed = false;
+    });
     try {
       final next = await context.read<RatingRepository>().storeReviews(
         accessToken: token,
@@ -297,7 +328,12 @@ class _FoodStorePageState extends State<_FoodStoreView> {
         _reviewsBusy = false;
       });
     } on Object {
-      if (mounted) setState(() => _reviewsBusy = false);
+      if (mounted) {
+        setState(() {
+          _reviewsBusy = false;
+          _reviewsMoreFailed = true;
+        });
+      }
     }
   }
 
@@ -368,7 +404,10 @@ class _FoodStorePageState extends State<_FoodStoreView> {
                       failure: _failure,
                       onRetry: _load,
                     )
-                  : _storeBody(context, store, l10n),
+                  : DealGoRefresh(
+                      onRefresh: _load,
+                      child: _storeBody(context, store, l10n),
+                    ),
             ),
           ],
         ),
@@ -413,10 +452,6 @@ class _FoodStorePageState extends State<_FoodStoreView> {
                 onRatingTap: _openReviews,
                 onOpenMaps: () => _openMaps(store),
               ),
-              if (store.offers.isNotEmpty) ...[
-                const SizedBox(height: DealGoSpacing.s16),
-                _StoreOffers(offers: store.offers, storeId: store.id),
-              ],
               const SizedBox(height: DealGoSpacing.s12),
             ],
           ),
@@ -501,6 +536,7 @@ class _FoodStorePageState extends State<_FoodStoreView> {
       _StoreTab.reviews => _ScrollBody(
         key: const ValueKey('reviews'),
         headerOverlap: overlap,
+        onEndReached: _onReviewsEndReached,
         child: _Reviews(
           reviews: _reviews,
           filtered: _reviewStars == null ? _reviews : _filtered,

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/components/dealgo_app_header.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
@@ -194,7 +195,7 @@ class MerchantPageFrame extends StatelessWidget {
               Builder(
                 builder: (context) => Padding(
                   padding: EdgeInsets.only(
-                    bottom: MediaQuery.paddingOf(context).bottom,
+                    bottom: dealGoStickyFooterBottom(context, gutter: 0),
                   ),
                   child: MediaQuery.removePadding(
                     context: context,
@@ -469,7 +470,7 @@ class MerchantFooter extends StatelessWidget {
         DealGoDimensions.pageGutter,
         DealGoSpacing.s8,
         DealGoDimensions.pageGutter,
-        DealGoSpacing.s16,
+        DealGoSpacing.s12,
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -523,7 +524,7 @@ class MerchantPrimaryBar extends StatelessWidget {
         DealGoDimensions.pageGutter,
         DealGoSpacing.s8,
         DealGoDimensions.pageGutter,
-        DealGoSpacing.s16,
+        DealGoSpacing.s12,
       ),
       child: DealGoPrimaryButton(
         key: buttonKey,

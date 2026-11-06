@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../observability/crash_reporting.dart';
+import '../observability/path_redaction.dart';
 
 /// A server or client failure worth a crash report, without request data.
 class ApiFailureReport implements Exception {

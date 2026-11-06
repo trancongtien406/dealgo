@@ -67,4 +67,40 @@ void main() {
     expect(find.byKey(const Key('payment-method-tile')), findsOneWidget);
     expect(find.byKey(const Key('checkout-voucher-picker')), findsOneWidget);
   });
+
+  testWidgets('a restored fare without bounds is re-quoted for the stepper', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await pumpSignedIn(
+      tester,
+      profile: customerProfile,
+      foodClient: FakeFoodClient(),
+      pricing: FakePricingRemoteDataSource(deliveryFareVnd: 25000),
+    );
+    final context = tester.element(find.byType(Scaffold).first);
+    final cart = context.read<FoodCartCubit>();
+    cart
+      ..addItem(
+        storeId: _storeId,
+        storeName: 'Bún Bò Huế',
+        item: const FoodMenuItem(
+          id: _bunId,
+          name: 'Bún bò đặc biệt',
+          priceVnd: 60000,
+          available: true,
+        ),
+      )
+      ..setDropoff(label: 'Nhà, 45 Lê Duẩn', lat: 16.0717, lng: 108.2207)
+      // Draft restore keeps the amount but drops the quote bounds.
+      ..setDeliveryFare(25000);
+
+    GoRouter.of(context).push(FoodRoutes.checkout);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('food-fare-offer-panel')), findsOneWidget);
+    expect(find.byKey(const Key('food-fare-increase')), findsOneWidget);
+    expect(find.byKey(const Key('food-fare-offer-amount')), findsOneWidget);
+  });
 }

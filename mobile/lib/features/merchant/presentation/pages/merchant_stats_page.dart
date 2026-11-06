@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/design_system/components/dealgo_card.dart';
+import '../../../../core/design_system/components/dealgo_refresh.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/components/dealgo_segmented_control.dart';
@@ -67,22 +68,28 @@ class _MerchantStatsPageState extends State<MerchantStatsPage> {
           showBack: false,
           body: switch (state) {
             MerchantStatsLoading() => const DealGoSkeletonList(itemCount: 3),
-            MerchantStatsIneligible() => ListView(
-              padding: dealGoScrollPadding(context, merchantPagePadding),
-              children: [
-                MerchantNote(
-                  tone: MerchantNoteTone.warning,
-                  message: l10n.merchantStatsIneligible,
-                ),
-              ],
+            MerchantStatsIneligible() => DealGoRefresh(
+              onRefresh: _load,
+              child: ListView(
+                padding: dealGoScrollPadding(context, merchantPagePadding),
+                children: [
+                  MerchantNote(
+                    tone: MerchantNoteTone.warning,
+                    message: l10n.merchantStatsIneligible,
+                  ),
+                ],
+              ),
             ),
-            MerchantStatsFailed(:final cause) => DealGoStateView.failure(
-              context,
-              onRetry: () => unawaited(_load()),
-              cause: cause,
-              message: l10n.merchantStatsFailed,
+            MerchantStatsFailed(:final cause) => DealGoRefresh(
+              onRefresh: _load,
+              child: DealGoStateView.failure(
+                context,
+                onRetry: () => unawaited(_load()),
+                cause: cause,
+                message: l10n.merchantStatsFailed,
+              ),
             ),
-            MerchantStatsReady() => RefreshIndicator(
+            MerchantStatsReady() => DealGoRefresh(
               onRefresh: _load,
               child: _StatsBody(
                 state: state,

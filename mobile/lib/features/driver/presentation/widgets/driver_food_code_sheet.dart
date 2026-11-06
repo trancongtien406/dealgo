@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/motion/dealgo_sheet.dart';
 import '../../../../l10n/app_localizations.dart';
 
 /// DEC-PROD-036: asks the driver for the 4-digit delivery code (from the customer) or
@@ -12,7 +13,7 @@ Future<String?> showDriverFoodCodeSheet(
   required bool delivery,
   String? error,
 }) {
-  return showModalBottomSheet<String>(
+  return showDealGoSheet<String>(
     context: context,
     isScrollControlled: true,
     builder: (_) => _DriverFoodCodeSheet(delivery: delivery, error: error),

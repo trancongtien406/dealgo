@@ -310,8 +310,13 @@ class _MenuAddControl extends StatelessWidget {
     });
     final l10n = AppLocalizations.of(context);
     final addSize = compact ? 30.0 : 32.0;
+    // Required groups without a default pick cannot be priced by a quick add,
+    // so only those rows still route through the options page.
+    final needsOptions =
+        item.optionGroups.isNotEmpty &&
+        !FoodOptionSelection.initial(item.optionGroups).isComplete;
     if (quantity == 0) {
-      if (item.optionGroups.isNotEmpty && !compact) {
+      if (needsOptions && !compact) {
         return SizedBox(
           height: 30,
           child: TextButton.icon(
@@ -335,9 +340,7 @@ class _MenuAddControl extends StatelessWidget {
         );
       }
       return Tooltip(
-        message: item.optionGroups.isNotEmpty
-            ? l10n.foodItemOptionsChoose
-            : l10n.foodAddToCart,
+        message: needsOptions ? l10n.foodItemOptionsChoose : l10n.foodAddToCart,
         child: SizedBox(
           width: addSize,
           height: addSize,

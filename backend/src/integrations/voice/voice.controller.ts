@@ -9,12 +9,16 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import {
   CurrentActor,
   CustomerSessionGuard,
   type RequestActor,
 } from '../../modules/identity/access-auth.guard.js';
 import { VoiceService } from './voice.service.js';
+
+/** Redialing a few times is normal; more is call spam (each ring rings the other phone). */
+const VOICE_START_LIMIT_PER_MINUTE = 5;
 
 @ApiTags('voice')
 @ApiBearerAuth()
@@ -25,6 +29,8 @@ export class RideVoiceController {
 
   @Post(':rideId/calls')
   @HttpCode(HttpStatus.CREATED)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: VOICE_START_LIMIT_PER_MINUTE, ttl: 60_000 } })
   @ApiOperation({
     summary:
       'Call the other party of an active ride (customer ↔ assigned driver): rings the callee, returns the caller’s audio-only LiveKit join token',
@@ -46,6 +52,8 @@ export class FoodVoiceController {
 
   @Post(':orderId/calls')
   @HttpCode(HttpStatus.CREATED)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: VOICE_START_LIMIT_PER_MINUTE, ttl: 60_000 } })
   @ApiOperation({
     summary:
       'Call the other party of an active food order (customer ↔ assigned driver): rings the callee, returns the caller’s audio-only LiveKit join token',

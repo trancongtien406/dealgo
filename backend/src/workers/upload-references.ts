@@ -8,6 +8,11 @@ import {
 } from '../modules/catalog/store-logo.service.js';
 import { RIDE_VEHICLE_CLASS_IMAGE_PREFIX } from '../modules/ride-vehicle/ride-vehicle-class-image.js';
 import { HOME_BANNER_IMAGE_PREFIX } from '../modules/home-banner/home-banner.js';
+import { FOOD_CATEGORY_IMAGE_PREFIX } from '../modules/food-category/food-category.js';
+import {
+  PUBLIC_IMAGE_VARIANT_WIDTHS,
+  imageVariantKey,
+} from '../platform/storage/image-variants.js';
 
 /** Storage prefixes that hold user uploads; nothing outside them is ever touched by the cleanup. */
 export const UPLOAD_PREFIXES = [
@@ -19,6 +24,7 @@ export const UPLOAD_PREFIXES = [
   'store-covers',
   'ride-vehicle-classes',
   'home-banners',
+  'food-categories',
 ] as const;
 
 export const UPLOAD_REFERENCE_SOURCE = Symbol('UPLOAD_REFERENCE_SOURCE');
@@ -49,6 +55,7 @@ export class PrismaUploadReferences implements UploadReferenceSource {
     const coverPrefix = `${STORE_COVER_PUBLIC_PREFIX}/`;
     const vehiclePrefix = `${RIDE_VEHICLE_CLASS_IMAGE_PREFIX}/`;
     const bannerPrefix = `${HOME_BANNER_IMAGE_PREFIX}/`;
+    const categoryPrefix = `${FOOD_CATEGORY_IMAGE_PREFIX}/`;
     const rows = await db.$queryRaw<{ key: string | null }[]>`
       SELECT d->>'key' AS key
         FROM "partner_applications" p, jsonb_array_elements(
@@ -80,9 +87,24 @@ export class PrismaUploadReferences implements UploadReferenceSource {
       UNION
       SELECT 'home-banners/' || substr(b."imageUrl", ${bannerPrefix.length + 1}::int) AS key
         FROM "home_banners" b
-       WHERE b."imageUrl" LIKE ${`${bannerPrefix}%`}`;
-    return new Set(
+       WHERE b."imageUrl" LIKE ${`${bannerPrefix}%`}
+      UNION
+      SELECT 'food-categories/' || substr(c."imageUrl", ${categoryPrefix.length + 1}::int) AS key
+        FROM "food_categories" c
+       WHERE c."imageUrl" LIKE ${`${categoryPrefix}%`}`;
+    const keys = new Set(
       rows.map((row) => row.key).filter((key): key is string => Boolean(key)),
     );
+    // Snapshot before adding variant keys, otherwise the loop would derive variants of variants.
+    const baseKeys = Array.from(keys);
+    for (const key of baseKeys) {
+      for (const width of PUBLIC_IMAGE_VARIANT_WIDTHS) {
+        const variant = imageVariantKey(key, width);
+        if (variant) {
+          keys.add(variant);
+        }
+      }
+    }
+    return keys;
   }
 }

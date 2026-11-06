@@ -293,7 +293,7 @@ class _CouponCard extends StatelessWidget {
             : selected
             ? DealGoTicketButton(
                 key: Key('checkout-voucher-used-${voucher.code}'),
-                label: l10n.voucherUsed,
+                label: l10n.voucherApplied,
                 accent: accent,
                 done: true,
               )

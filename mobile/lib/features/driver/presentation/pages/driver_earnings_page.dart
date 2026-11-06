@@ -55,7 +55,9 @@ class _DriverEarningsView extends StatefulWidget {
 }
 
 class _DriverEarningsViewState extends State<_DriverEarningsView> {
+  final ScrollController _scroll = ScrollController();
   var _range = _EarnRange.today;
+  var _refreshToken = 0;
 
   static const _padding = EdgeInsets.fromLTRB(
     DealGoDimensions.pageGutter,
@@ -63,6 +65,35 @@ class _DriverEarningsViewState extends State<_DriverEarningsView> {
     DealGoDimensions.pageGutter,
     DealGoSpacing.s16,
   );
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scroll.removeListener(_onScroll);
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    if (position.maxScrollExtent <= 0) return;
+    if (position.pixels < position.maxScrollExtent - 400) return;
+    final cubit = context.read<DriverHistoryCubit>();
+    final state = cubit.state;
+    if (!state.hasMore || state.loadingMore || state.moreFailed) return;
+    cubit.loadMore();
+  }
+
+  Future<void> _refresh(DriverHistoryCubit cubit) async {
+    setState(() => _refreshToken++);
+    await cubit.load();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,16 +111,19 @@ class _DriverEarningsViewState extends State<_DriverEarningsView> {
     final cubit = context.read<DriverHistoryCubit>();
     final summary = state.summary;
     if (state.status == DriverHistoryStatus.failed && summary == null) {
-      return ListView(
-        padding: dealGoScrollPadding(context, _padding),
-        children: [
-          DealGoStateView.failure(
-            context,
-            onRetry: cubit.load,
-            cause: state.cause,
-            compact: true,
-          ),
-        ],
+      return DealGoRefresh(
+        onRefresh: cubit.load,
+        child: ListView(
+          padding: dealGoScrollPadding(context, _padding),
+          children: [
+            DealGoStateView.failure(
+              context,
+              onRetry: cubit.load,
+              cause: state.cause,
+              compact: true,
+            ),
+          ],
+        ),
       );
     }
     if (summary == null) {
@@ -100,9 +134,10 @@ class _DriverEarningsViewState extends State<_DriverEarningsView> {
       );
     }
     return DealGoRefresh(
-      onRefresh: cubit.load,
+      onRefresh: () => _refresh(cubit),
       child: ListView(
         key: const Key('driver-history-list'),
+        controller: _scroll,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: dealGoScrollPadding(context, _padding),
         children: [
@@ -119,7 +154,7 @@ class _DriverEarningsViewState extends State<_DriverEarningsView> {
           const SizedBox(height: DealGoSpacing.s16),
           _Hero(summary: summary, week: _range == _EarnRange.week),
           const SizedBox(height: DealGoSpacing.s12),
-          const _DriverCreditSection(),
+          _DriverCreditSection(refreshToken: _refreshToken),
           Row(
             children: [
               Expanded(
@@ -523,7 +558,9 @@ String _percentLabel(double percent, String locale) =>
 /// The "Nạp phí" card is hidden until Ops enables top-up (`credit.enabled`), so a
 /// Play reviewer never lands on a screen that only says the feature is unavailable.
 class _DriverCreditSection extends StatefulWidget {
-  const _DriverCreditSection();
+  const _DriverCreditSection({this.refreshToken = 0});
+
+  final int refreshToken;
 
   @override
   State<_DriverCreditSection> createState() => _DriverCreditSectionState();
@@ -536,6 +573,14 @@ class _DriverCreditSectionState extends State<_DriverCreditSection> {
   void initState() {
     super.initState();
     _credit = _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _DriverCreditSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      _credit = _load();
+    }
   }
 
   Future<DriverCredit?>? _load() {

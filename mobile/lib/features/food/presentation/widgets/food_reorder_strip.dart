@@ -26,7 +26,9 @@ const _actionPlaceholderHeight = 32.0;
 /// Hides when the customer has no finished order and on any load failure; the
 /// skeleton keeps the strip's height stable while history and detail load.
 class FoodReorderStrip extends StatefulWidget {
-  const FoodReorderStrip({super.key});
+  const FoodReorderStrip({this.refreshToken = 0, super.key});
+
+  final int refreshToken;
 
   @override
   State<FoodReorderStrip> createState() => _FoodReorderStripState();
@@ -47,6 +49,14 @@ class _FoodReorderStripState extends State<FoodReorderStrip>
   void initState() {
     super.initState();
     unawaited(_load());
+  }
+
+  @override
+  void didUpdateWidget(covariant FoodReorderStrip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      unawaited(_load());
+    }
   }
 
   Future<void> _load() async {

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/api_error_l10n.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/design_system/components/dealgo_bottom_bar.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_banner.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
@@ -17,18 +18,18 @@ import '../../../../core/maps/map_lat_lng.dart';
 import '../../../../core/maps/map_port.dart';
 import '../../../../core/maps/route_geometry.dart';
 import '../../../pricing/domain/pricing.dart';
-import '../../domain/ride_fare_presets.dart';
 import '../../domain/entities/ride_money.dart';
 import '../../domain/entities/ride_models.dart';
 import '../../domain/params/create_ride_params.dart';
+import '../../domain/ride_fare_presets.dart';
 import '../../domain/ride_idempotency.dart';
 import '../../domain/usecases/create_ride.dart';
 import '../cubit/ride_fare_cubit.dart';
 import '../utils/ride_routes.dart';
 import '../utils/ride_vehicle_label.dart';
 import '../cubit/ride_session.dart';
-import '../widgets/ride_widgets.dart';
 import '../widgets/ride_fare_raise_chips.dart';
+import '../widgets/ride_widgets.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/l10n/api_error_text.dart';
 import '../utils/ride_quote_error.dart';
@@ -512,79 +513,96 @@ class _RideFarePageState extends State<_RideFareView> {
                                 onTap: () => _selectClass(_options[i]),
                               ),
                             ],
-                          if (quote != null) ...[
-                            const SizedBox(height: DealGoSpacing.s16),
-                            Text(
-                              l10n.rideYourOffer,
-                              style: textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: DealGoSpacing.s4),
-                            Text(
-                              l10n.rideRecommendedFareLabel(
-                                formatRideVnd(quote.referenceFareVnd),
-                              ),
-                              style: textTheme.bodySmall?.copyWith(
-                                color: DealGoColors.textSecondary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: DealGoSpacing.s12),
-                            // C10: one control — the amount itself is editable
-                            // between −/+, with the presets underneath.
-                            _FareControl(
-                              controller: _fare,
-                              presets: rideFareRaisePresets(
-                                suggestedVnd: quote.referenceFareVnd,
-                                minBidVnd: quote.minBidVnd,
-                                maxBidVnd: quote.maxBidVnd,
-                                stepVnd: _fareStepVnd,
-                                maxHeadroomPercent: quote.bidHeadroomPercent,
-                              ),
-                              selectedPreset: amount,
-                              hintText: l10n.rideEnterAmount,
-                              enabled: !_busy,
-                              onMinus: () => _nudgeFare(-_fareStepVnd),
-                              onPlus: () => _nudgeFare(_fareStepVnd),
-                              onPreset: (preset) {
-                                _fare.text = formatRideAmount(preset);
-                                setState(() => _message = null);
-                              },
-                              onChanged: () => setState(() => _message = null),
-                            ),
-                          ],
-                          if (_offline) ...[
-                            const SizedBox(height: DealGoSpacing.s12),
-                            RideOfflineNotice(detail: l10n.rideFareOffline),
-                          ],
-                          if (_message != null) ...[
-                            const SizedBox(height: DealGoSpacing.s12),
-                            RideNote(message: _message!),
-                          ],
                         ],
                       ),
                     ),
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        DealGoDimensions.pageGutter,
-                        DealGoSpacing.s8,
-                        DealGoDimensions.pageGutter,
-                        DealGoSpacing.s12 +
-                            MediaQuery.viewPaddingOf(context).bottom,
-                      ),
-                      child: DealGoPrimaryButton(
-                        key: const Key('ride-submit-fare'),
-                        label: viewExisting
-                            ? l10n.rideSeeDriverOffers
-                            : amount == null
-                            ? l10n.rideFindDriverPlain
-                            : l10n.rideFindDriverCta(formatRideVnd(amount)),
-                        trailingIcon: DealGoIcons.arrowRight,
-                        compact: true,
-                        isLoading: _busy,
-                        enabled: viewExisting || allowed,
-                        onPressed: _submit,
+                    // Pinned so the offer input and "find driver" CTA stay in
+                    // reach; inside the sheet, so the keyboard pushes both up
+                    // instead of covering them.
+                    MediaQuery.removePadding(
+                      context: context,
+                      removeBottom: true,
+                      child: DealGoBottomBar(
+                        key: const Key('ride-quote-bar'),
+                        padding: EdgeInsets.fromLTRB(
+                          DealGoDimensions.pageGutter,
+                          DealGoSpacing.s12,
+                          DealGoDimensions.pageGutter,
+                          rideSheetFooterBottom(context),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (quote != null) ...[
+                              Text(
+                                l10n.rideYourOffer,
+                                style: textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: DealGoSpacing.s4),
+                              Text(
+                                l10n.rideRecommendedFareLabel(
+                                  formatRideVnd(quote.referenceFareVnd),
+                                ),
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: DealGoColors.textSecondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: DealGoSpacing.s8),
+                              // C10: one control — the amount itself is
+                              // editable between −/+, with the presets
+                              // underneath.
+                              _FareControl(
+                                controller: _fare,
+                                presets: rideFareRaisePresets(
+                                  suggestedVnd: quote.referenceFareVnd,
+                                  minBidVnd: quote.minBidVnd,
+                                  maxBidVnd: quote.maxBidVnd,
+                                  stepVnd: _fareStepVnd,
+                                  maxHeadroomPercent: quote.bidHeadroomPercent,
+                                ),
+                                selectedPreset: amount,
+                                hintText: l10n.rideEnterAmount,
+                                enabled: !_busy,
+                                onMinus: () => _nudgeFare(-_fareStepVnd),
+                                onPlus: () => _nudgeFare(_fareStepVnd),
+                                onPreset: (preset) {
+                                  _fare.text = formatRideAmount(preset);
+                                  setState(() => _message = null);
+                                },
+                                onChanged: () =>
+                                    setState(() => _message = null),
+                              ),
+                            ],
+                            if (_offline) ...[
+                              const SizedBox(height: DealGoSpacing.s8),
+                              RideOfflineNotice(detail: l10n.rideFareOffline),
+                            ],
+                            if (_message != null) ...[
+                              const SizedBox(height: DealGoSpacing.s8),
+                              RideNote(message: _message!),
+                            ],
+                            const SizedBox(height: DealGoSpacing.s8),
+                            DealGoPrimaryButton(
+                              key: const Key('ride-submit-fare'),
+                              label: viewExisting
+                                  ? l10n.rideSeeDriverOffers
+                                  : amount == null
+                                  ? l10n.rideFindDriverPlain
+                                  : l10n.rideFindDriverCta(
+                                      formatRideVnd(amount),
+                                    ),
+                              trailingIcon: DealGoIcons.arrowRight,
+                              compact: true,
+                              isLoading: _busy,
+                              enabled: viewExisting || allowed,
+                              onPressed: _submit,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -609,22 +627,22 @@ class _FareControl extends StatelessWidget {
     required this.controller,
     required this.presets,
     required this.selectedPreset,
+    required this.onPreset,
     required this.hintText,
     required this.enabled,
     required this.onMinus,
     required this.onPlus,
-    required this.onPreset,
     required this.onChanged,
   });
 
   final TextEditingController controller;
   final List<RideFarePreset> presets;
   final int? selectedPreset;
+  final ValueChanged<int> onPreset;
   final String hintText;
   final bool enabled;
   final VoidCallback onMinus;
   final VoidCallback onPlus;
-  final ValueChanged<int> onPreset;
   final VoidCallback onChanged;
 
   @override

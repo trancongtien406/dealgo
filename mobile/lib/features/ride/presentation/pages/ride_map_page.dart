@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/components/dealgo_chip.dart';
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
@@ -15,14 +16,14 @@ import '../../../../core/maps/map_port.dart';
 import '../../../../core/maps/route_geometry.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../live_location/domain/map_routing.dart';
-import '../../../address_book/domain/repositories/address_book_repository.dart';
 import '../../../places/domain/place.dart';
 import '../../../places/presentation/current_place.dart';
+import '../../../places/presentation/place_lists_store.dart';
 import '../../../places/presentation/place_picker_page.dart';
 import '../../domain/entities/ride_models.dart';
-import '../../domain/stops/ride_stops_client.dart';
 import '../cubit/ride_destination.dart';
 import '../cubit/ride_session.dart';
+import '../cubit/ride_stops_config_cubit.dart';
 import '../utils/ride_distance.dart';
 import '../utils/ride_routes.dart';
 import '../widgets/ride_widgets.dart';
@@ -50,9 +51,7 @@ class _RideMapPageState extends State<RideMapPage> {
 
   /// Intermediate stops (multi-stop; admin-flagged, hidden when off).
   final _stops = <PlaceOption>[];
-  var _multiStop = MultiStopSettings.disabled;
   var _locating = false;
-  var _suggestions = const <PlaceOption>[];
   var _route = RouteGeometry.unavailable;
   RideDistance? _distance;
   var _routeSeq = 0;
@@ -80,8 +79,8 @@ class _RideMapPageState extends State<RideMapPage> {
         return;
       }
       unawaited(_locatePickup());
-      unawaited(_loadSuggestions());
-      unawaited(_loadMultiStop());
+      unawaited(context.read<PlaceListsStore>().loadLists());
+      unawaited(context.read<RideStopsConfigCubit>().load());
       // Destination-first: open picker immediately when nothing pre-filled.
       if (_dropoff == null) {
         unawaited(_pickDropoff(autoOpen: true));
@@ -113,40 +112,12 @@ class _RideMapPageState extends State<RideMapPage> {
     _tryAutoAdvance();
   }
 
-  /// Admin multi-stop flags; any failure keeps the single-destination UI.
-  Future<void> _loadMultiStop() async {
-    final token = rideAccessToken(context);
-    RideStopsClient? client;
-    try {
-      client = context.read<RideStopsClient>();
-    } on ProviderNotFoundException {
-      client = null;
-    }
-    if (token == null || client == null) {
-      return;
-    }
-    MultiStopSettings settings;
-    try {
-      settings = await client.config(accessToken: token);
-    } catch (_) {
-      settings = MultiStopSettings.disabled;
-    }
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _multiStop = settings;
-      final max = settings.maxStopsAnyService;
-      if (_stops.length > max) {
-        _stops.removeRange(max, _stops.length);
-      }
-    });
-  }
-
-  int get _maxStops => _multiStop.maxStopsAnyService;
-
   Future<void> _addStop() async {
-    if (_stops.length >= _maxStops) {
+    final maxStops = context
+        .read<RideStopsConfigCubit>()
+        .state
+        .maxStopsAnyService;
+    if (_stops.length >= maxStops) {
       return;
     }
     final pickup = _pickup;
@@ -186,40 +157,6 @@ class _RideMapPageState extends State<RideMapPage> {
       _stops.insert(index - 1, stop);
     });
     _tryAutoAdvance();
-  }
-
-  Future<void> _loadSuggestions() async {
-    final token = rideAccessToken(context);
-    if (token == null) {
-      return;
-    }
-    final places = context.read<PlacesRepository>();
-    final book = context.read<AddressBookRepository>();
-    final recent = await places
-        .recentDestinations(accessToken: token)
-        .then((rows) => rows, onError: (_) => const <PlaceOption>[]);
-    final saved = await book
-        .list(accessToken: token)
-        .then(
-          (rows) => [
-            for (final row in rows)
-              if (row.lat != null && row.lng != null)
-                PlaceOption(
-                  name: row.label,
-                  address: row.addressLine,
-                  lat: row.lat!,
-                  lng: row.lng!,
-                  source: PlaceSource.saved,
-                ),
-          ],
-          onError: (_) => const <PlaceOption>[],
-        );
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _suggestions = [...saved, ...recent].take(_suggestionLimit).toList();
-    });
   }
 
   Future<void> _pickDropoff({bool autoOpen = false}) async {
@@ -415,7 +352,7 @@ class _RideMapPageState extends State<RideMapPage> {
       context.pop();
     } else {
       // Leaving the booking tab abandons this draft.
-      _resetDraft();
+      _resetDraft(refreshRecent: false);
       context.go('/customer');
     }
   }
@@ -423,7 +360,10 @@ class _RideMapPageState extends State<RideMapPage> {
   /// The tab stays alive in the shell, so a used or abandoned A/B would
   /// otherwise greet the next booking. Pickup is located again from GPS;
   /// recent places stay suggestions only.
-  void _resetDraft() {
+  ///
+  /// [refreshRecent] only when a ride was created: abandoning a draft cannot
+  /// change the server's recent destinations.
+  void _resetDraft({required bool refreshRecent}) {
     setState(() {
       _pickup = null;
       _dropoff = null;
@@ -435,7 +375,9 @@ class _RideMapPageState extends State<RideMapPage> {
       _parcelSheet = false;
     });
     unawaited(_locatePickup());
-    unawaited(_loadSuggestions());
+    if (refreshRecent) {
+      unawaited(context.read<PlaceListsStore>().refreshRecent());
+    }
   }
 
   bool get _showParcelSheet =>
@@ -446,6 +388,13 @@ class _RideMapPageState extends State<RideMapPage> {
     final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
     final pendingRideId = context.watch<RideSessionCubit>().state;
+    final maxStops = context
+        .watch<RideStopsConfigCubit>()
+        .state
+        .maxStopsAnyService;
+    final suggestions = context.watch<PlaceListsStore>().suggestions(
+      limit: _suggestionLimit,
+    );
     final pickup = _pickup;
     final dropoff = _dropoff;
     final center = pickup != null
@@ -473,7 +422,7 @@ class _RideMapPageState extends State<RideMapPage> {
         // still waiting for offers stays one tap away ("ride-open-pending").
         BlocListener<RideSessionCubit, String?>(
           listenWhen: (previous, next) => next != null && next != previous,
-          listener: (context, _) => _resetDraft(),
+          listener: (context, _) => _resetDraft(refreshRecent: true),
         ),
       ],
       child: PopScope(
@@ -643,9 +592,9 @@ class _RideMapPageState extends State<RideMapPage> {
                               ),
                             ),
                             if (!widget.parcel &&
-                                _maxStops > 0 &&
+                                maxStops > 0 &&
                                 dropoff != null &&
-                                _stops.length < _maxStops) ...[
+                                _stops.length < maxStops) ...[
                               const SizedBox(height: DealGoSpacing.s4),
                               Align(
                                 alignment: Alignment.centerLeft,
@@ -655,7 +604,7 @@ class _RideMapPageState extends State<RideMapPage> {
                                   icon: const Icon(DealGoIcons.add, size: 18),
                                   label: Text(
                                     '${l10n.rideAddStop} · '
-                                    '${l10n.rideStopsMax(_maxStops)}',
+                                    '${l10n.rideStopsMax(maxStops)}',
                                   ),
                                 ),
                               ),
@@ -681,14 +630,14 @@ class _RideMapPageState extends State<RideMapPage> {
                               const SizedBox(height: DealGoSpacing.s8),
                               RideNote(message: l10n.rideSamePlaces),
                             ],
-                            if (_suggestions.isNotEmpty) ...[
+                            if (suggestions.isNotEmpty) ...[
                               const SizedBox(height: DealGoSpacing.s16),
                               Text(
                                 l10n.rideSuggestionsTitle,
                                 style: textTheme.titleSmall,
                               ),
                               const SizedBox(height: DealGoSpacing.s8),
-                              for (final (index, place) in _suggestions.indexed)
+                              for (final (index, place) in suggestions.indexed)
                                 Padding(
                                   padding: const EdgeInsets.only(
                                     bottom: DealGoSpacing.s8,
@@ -768,9 +717,7 @@ class _RideMapPageState extends State<RideMapPage> {
                           DealGoDimensions.pageGutter,
                           DealGoSpacing.s8,
                           DealGoDimensions.pageGutter,
-                          // Shell bar height (or system inset) lives in padding.
-                          DealGoSpacing.s12 +
-                              MediaQuery.paddingOf(context).bottom,
+                          dealGoStickyFooterBottom(context),
                         ),
                         child: IntrinsicHeight(
                           child: Row(

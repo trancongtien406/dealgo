@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -73,8 +75,16 @@ class NotificationsInboxPage extends StatefulWidget {
 }
 
 class _NotificationsInboxPageState extends State<NotificationsInboxPage> {
+  static const _pageSize = 30;
+
+  final _scroll = ScrollController();
   var _filter = _InboxFilter.all;
   _InboxState _state = const _Loading();
+  var _page = 1;
+  var _hasMore = false;
+  var _loadingMore = false;
+  var _loadMoreFailed = false;
+  var _generation = 0;
 
   String? get _token {
     final auth = context.read<AuthCubit>().state;
@@ -84,10 +94,27 @@ class _NotificationsInboxPageState extends State<NotificationsInboxPage> {
   @override
   void initState() {
     super.initState();
+    _scroll.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
+  @override
+  void dispose() {
+    _scroll.removeListener(_onScroll);
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    if (position.maxScrollExtent <= 0) return;
+    if (position.pixels < position.maxScrollExtent - 400) return;
+    _loadMore();
+  }
+
   Future<void> _load() async {
+    final generation = ++_generation;
     final token = _token;
     if (token == null) {
       setState(() => _state = const _Failed(cause: sessionExpiredFailure));
@@ -96,17 +123,70 @@ class _NotificationsInboxPageState extends State<NotificationsInboxPage> {
     try {
       final page = await context.read<ListInboxNotifications>()(
         accessToken: token,
+        page: 1,
+        limit: _pageSize,
       );
-      if (!mounted) {
+      if (!mounted || generation != _generation) {
         return;
       }
-      setState(() => _state = _Loaded(page.items, page.unreadCount));
+      setState(() {
+        _page = 1;
+        _hasMore = page.items.length < page.total;
+        _loadingMore = false;
+        _loadMoreFailed = false;
+        _state = _Loaded(page.items, page.unreadCount);
+      });
       InboxUnread.instance.set(page.unreadCount);
     } catch (error) {
-      if (!mounted) {
+      if (!mounted || generation != _generation) {
         return;
       }
       setState(() => _state = _Failed(cause: error));
+    }
+  }
+
+  Future<void> _loadMore() async {
+    final state = _state;
+    final token = _token;
+    if (state is! _Loaded ||
+        token == null ||
+        !_hasMore ||
+        _loadingMore ||
+        _loadMoreFailed) {
+      return;
+    }
+    final generation = _generation;
+    setState(() => _loadingMore = true);
+    try {
+      final page = await context.read<ListInboxNotifications>()(
+        accessToken: token,
+        page: _page + 1,
+        limit: _pageSize,
+      );
+      if (!mounted || generation != _generation) {
+        return;
+      }
+      final seen = {for (final item in state.items) item.id};
+      final merged = [
+        ...state.items,
+        for (final item in page.items)
+          if (seen.add(item.id)) item,
+      ];
+      setState(() {
+        _page = _page + 1;
+        _hasMore = merged.length < page.total;
+        _loadingMore = false;
+        _state = _Loaded(merged, page.unreadCount);
+      });
+      InboxUnread.instance.set(page.unreadCount);
+    } catch (_) {
+      if (!mounted || generation != _generation) {
+        return;
+      }
+      setState(() {
+        _loadingMore = false;
+        _loadMoreFailed = true;
+      });
     }
   }
 
@@ -279,16 +359,19 @@ class _NotificationsInboxPageState extends State<NotificationsInboxPage> {
           semanticLabel: l10n.inboxLoading,
         );
       case _Failed(:final cause):
-        return ListView(
-          padding: padding,
-          children: [
-            DealGoStateView.failure(
-              context,
-              onRetry: _retry,
-              cause: cause,
-              compact: true,
-            ),
-          ],
+        return DealGoRefresh(
+          onRefresh: _load,
+          child: ListView(
+            padding: padding,
+            children: [
+              DealGoStateView.failure(
+                context,
+                onRetry: _retry,
+                cause: cause,
+                compact: true,
+              ),
+            ],
+          ),
         );
       case _Loaded(:final items):
         final visible = [
@@ -305,6 +388,7 @@ class _NotificationsInboxPageState extends State<NotificationsInboxPage> {
         return DealGoRefresh(
           onRefresh: _load,
           child: ListView(
+            controller: _scroll,
             physics: const AlwaysScrollableScrollPhysics(),
             padding: padding,
             children: [
@@ -329,6 +413,25 @@ class _NotificationsInboxPageState extends State<NotificationsInboxPage> {
                       const SizedBox(height: DealGoSpacing.s12),
                     ],
                   ],
+              if (_loadingMore)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: DealGoSpacing.s12),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                )
+              else if (_loadMoreFailed)
+                Center(
+                  child: TextButton(
+                    key: const Key('inbox-more-retry'),
+                    onPressed: _loadMore,
+                    child: Text(l10n.actionRetry),
+                  ),
+                ),
             ],
           ),
         );

@@ -91,6 +91,7 @@ export const PLATFORM_SETTING_SEED_DEFAULTS: Readonly<Partial<Record<PlatformSet
     FOOD_UNCLAIMED_READY_TIMEOUT_MINUTES: '30',
     FOOD_EARLY_ASSIGN_LEAD_MINUTES: '10',
     FOOD_MAX_DELIVERY_KM: '15',
+    FOOD_BROWSE_RADIUS_KM: '15',
     // Food delivery fee negotiation (suggested fee + customer offer + driver counters).
     FOOD_FARE_FLOOR_PERCENT_OF_SUGGESTED: '70',
     FOOD_COUNTER_MAX_PERCENT_OF_OFFER: '150',

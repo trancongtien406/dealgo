@@ -102,5 +102,19 @@ const appLinkHost = String.fromEnvironment(
   defaultValue: 'dealgo.laptrinhapp.com',
 );
 
+/// Flutter flavor from `--flavor` or the Xcode `dev` / `prod` scheme; empty when
+/// the build has none.
+const flutterAppFlavor = String.fromEnvironment('FLUTTER_APP_FLAVOR');
+
+/// `dev` / `prod` for telemetry: the flavor name, and prod for unflavored
+/// release builds.
+const appEnvironment = String.fromEnvironment(
+  'SENTRY_ENVIRONMENT',
+  defaultValue:
+      flutterAppFlavor == 'prod' || (flutterAppFlavor == '' && kReleaseMode)
+      ? 'prod'
+      : 'dev',
+);
+
 /// Path prefix the app claims on [appLinkHost]; the rest stays on the website.
 const appLinkPathPrefix = '/app';

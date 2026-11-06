@@ -1988,10 +1988,13 @@ describe('food order http', () => {
       .expect(200);
     const logoUrl = uploaded.body.data.logoUrl as string;
     expect(logoUrl).toMatch(
-      /^\/v1\/public\/store-logos\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.png$/,
+      /^\/v1\/public\/store-logos\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.webp$/,
     );
     const served = await request(app.getHttpServer()).get(logoUrl).expect(200);
-    expect(served.headers['content-type']).toContain('image/png');
+    expect(served.headers['content-type']).toContain('image/webp');
+    // No display variant exists for a 1×1 upload, so `?w=` falls back to the original.
+    const thumb = await request(app.getHttpServer()).get(`${logoUrl}?w=128`).expect(200);
+    expect(thumb.headers['content-type']).toContain('image/webp');
     await request(app.getHttpServer())
       .post('/v1/food/merchant/store/logo')
       .set(auth)
@@ -2044,11 +2047,11 @@ describe('food order http', () => {
       .expect(200);
     const coverUrl = uploaded.body.data.coverUrl as string;
     expect(coverUrl).toMatch(
-      /^\/v1\/public\/store-covers\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.png$/,
+      /^\/v1\/public\/store-covers\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.webp$/,
     );
     expect(uploaded.body.data.logoUrl).toBeNull();
     const served = await request(app.getHttpServer()).get(coverUrl).expect(200);
-    expect(served.headers['content-type']).toContain('image/png');
+    expect(served.headers['content-type']).toContain('image/webp');
     // The cover path is not readable through the logo route.
     await request(app.getHttpServer())
       .get(coverUrl.replace('store-covers', 'store-logos'))

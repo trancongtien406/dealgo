@@ -1,17 +1,47 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 512" role="img" aria-labelledby="title desc">
   <title id="title">DealGo</title>
-  <desc id="desc">DealGo primary horizontal logo for light backgrounds.</desc>
+  <desc id="desc">DealGo official primary logo.</desc>
   <defs>
-    <linearGradient id="purple" x1="70" y1="70" x2="430" y2="450" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#5B21B6"/></linearGradient>
-    <linearGradient id="green" x1="235" y1="160" x2="380" y2="365" gradientUnits="userSpaceOnUse"><stop stop-color="#16C85B"/><stop offset="1" stop-color="#08A84B"/></linearGradient>
+    <linearGradient id="dealgo-bg" x1="130" y1="100" x2="900" y2="930" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#5B21B6"/>
+    </linearGradient>
+    <linearGradient id="dealgo-green" x1="390" y1="315" x2="690" y2="725" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#20D86B"/>
+      <stop offset="1" stop-color="#08A84B"/>
+    </linearGradient>
+    <filter id="dealgo-shadow" x="-5%" y="-5%" width="115%" height="115%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#5B21B6" flood-opacity="0.25"/>
+    </filter>
   </defs>
-  <g>
-    <path fill="url(#purple)" d="M155 68h116c116 0 199 76 199 188s-83 188-199 188H155a32 32 0 0 1 0-64h111c76 0 132-47 132-124s-56-124-132-124H155a32 32 0 0 1 0-64Z"/>
-    <rect x="56" y="154" width="176" height="58" rx="29" fill="url(#purple)"/><rect x="25" y="232" width="78" height="58" rx="29" fill="url(#purple)"/><rect x="122" y="232" width="132" height="58" rx="29" fill="url(#purple)"/><rect x="72" y="310" width="174" height="58" rx="29" fill="url(#purple)"/>
-    <path d="M238 178h35c51 0 87 31 87 78s-36 78-87 78h-35" fill="none" stroke="#fff" stroke-width="66" stroke-linecap="round"/>
-    <path d="m240 327 82-70-70-64" fill="none" stroke="#fff" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/><path d="m240 327 82-70-70-64" fill="none" stroke="url(#green)" stroke-width="31" stroke-linecap="round" stroke-linejoin="round"/>
-    <g fill="url(#green)" stroke="#fff" stroke-width="13"><circle cx="240" cy="327" r="35"/><circle cx="322" cy="257" r="35"/><circle cx="252" cy="193" r="35"/></g>
-    <g fill="#fff"><circle cx="240" cy="327" r="10"/><circle cx="322" cy="257" r="10"/><circle cx="252" cy="193" r="10"/></g>
+  
+  <!-- Icon Badge (Squircle) -->
+  <g filter="url(#dealgo-shadow)">
+    <rect x="40" y="40" width="432" height="432" rx="118" fill="url(#dealgo-bg)"/>
+    <g transform="translate(40, 40) scale(0.4909) translate(-72, -72)">
+      <!-- Motion D white outline -->
+      <path d="M320 278h226c171 0 286 96 286 234S717 746 546 746H320" fill="none" stroke="#ffffff" stroke-width="118" stroke-linecap="round"/>
+      <!-- Speed trails -->
+      <path d="M173 364h224M145 512h205M190 660h190" fill="none" stroke="#ffffff" stroke-width="82" stroke-linecap="round"/>
+      <!-- Green route connection -->
+      <path d="m414 662 166-145-144-132" fill="none" stroke="#ffffff" stroke-width="106" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="m414 662 166-145-144-132" fill="none" stroke="url(#dealgo-green)" stroke-width="59" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- Nodes with white border and core -->
+      <g fill="url(#dealgo-green)" stroke="#ffffff" stroke-width="25">
+        <circle cx="414" cy="662" r="70"/>
+        <circle cx="580" cy="517" r="70"/>
+        <circle cx="436" cy="385" r="70"/>
+      </g>
+      <g fill="#ffffff">
+        <circle cx="414" cy="662" r="20"/>
+        <circle cx="580" cy="517" r="20"/>
+        <circle cx="436" cy="385" r="20"/>
+      </g>
+    </g>
   </g>
-  <text x="535" y="362" font-family="'Be Vietnam Pro', Arial, sans-serif" font-size="286" font-weight="800" letter-spacing="-18"><tspan fill="#6D28D9">Deal</tspan><tspan fill="#10B956">Go</tspan></text>
+
+  <!-- Wordmark -->
+  <text x="530" y="356" font-family="'Be Vietnam Pro', 'Inter', system-ui, -apple-system, sans-serif" font-size="270" font-weight="900" letter-spacing="-10">
+    <tspan fill="#6D28D9">Deal</tspan><tspan fill="#16A34A">Go</tspan>
+  </text>
 </svg>

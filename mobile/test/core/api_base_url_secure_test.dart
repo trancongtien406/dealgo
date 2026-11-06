@@ -33,6 +33,41 @@ void main() {
     expect(appLinkHost, 'dealgo.laptrinhapp.com');
   });
 
+  group('withImageWidth', () {
+    test('snaps public photos up to a generated width variant', () {
+      expect(
+        withImageWidth(
+          'https://api-dealgo.laptrinhapp.com/v1/public/avatars/u/a.webp',
+          200,
+        ),
+        endsWith('?w=240'),
+      );
+      expect(
+        withImageWidth(
+          'https://api-dealgo.laptrinhapp.com/v1/public/menu-items/i/m.webp',
+          100,
+        ),
+        endsWith('?w=128'),
+      );
+      expect(
+        withImageWidth(
+          'https://api-dealgo.laptrinhapp.com/v1/public/store-covers/s/c.webp',
+          3000,
+        ),
+        endsWith('?w=1080'),
+      );
+    });
+
+    test('leaves API routes and unknown widths untouched', () {
+      const order = 'https://api-dealgo.laptrinhapp.com/v1/food/orders';
+      expect(withImageWidth(order, 200), order);
+      const avatar =
+          'https://api-dealgo.laptrinhapp.com/v1/public/avatars/u/a.webp';
+      expect(withImageWidth(avatar, null), avatar);
+      expect(withImageWidth(avatar, 0), avatar);
+    });
+  });
+
   test('debug log redacts chat message body', () {
     expect(
       redactForLog('{"body":"anh ơi em ở cổng 2"}'),

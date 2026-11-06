@@ -1,5 +1,6 @@
 import 'package:dealgo/core/network/dio_error_reporter.dart';
 import 'package:dealgo/core/observability/crash_reporting.dart';
+import 'package:dealgo/core/observability/path_redaction.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';

@@ -1738,7 +1738,7 @@ paths:
         "200":
           description: PageResult of stores (items, page, limit, total)
       security: *a13
-      summary: Browse food stores with page/search/category/geo/sort (DRIVER_SEARCH_RADIUS_KM when lat+lng set)
+      summary: Browse food stores with page/search/category/geo/sort (FOOD_BROWSE_RADIUS_KM when lat+lng set)
       tags: *a14
   /v1/food/stores/{id}:
     get:

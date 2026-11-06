@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/design_system/components/dealgo_image_cache.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/network/api_exception.dart';
@@ -186,7 +187,9 @@ class DriverCardRow extends StatelessWidget {
           key: const Key('driver-card-avatar'),
           radius: 26,
           backgroundColor: DealGoColors.subtlePurple,
-          foregroundImage: avatar == null ? null : NetworkImage(avatar),
+          foregroundImage: avatar == null
+              ? null
+              : DealGoImageCache.provider(avatar, decodeWidth: 260),
           child: Text(
             name.characters.first.toUpperCase(),
             style: const TextStyle(

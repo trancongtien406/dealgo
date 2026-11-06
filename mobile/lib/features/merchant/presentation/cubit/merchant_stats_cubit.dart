@@ -63,7 +63,11 @@ class MerchantStatsCubit extends Cubit<MerchantStatsState> {
   final RatingRepository? _ratings;
   var _generation = 0;
 
-  Future<void> load(String? accessToken, {int days = 7}) async {
+  Future<void> load(
+    String? accessToken, {
+    int days = 7,
+    bool includeStatement = true,
+  }) async {
     final generation = ++_generation;
     final token = accessToken?.trim() ?? '';
     if (token.isEmpty) {
@@ -71,34 +75,36 @@ class MerchantStatsCubit extends Cubit<MerchantStatsState> {
       return;
     }
     emit(const MerchantStatsLoading());
+    final statementFuture = includeStatement
+        ? () async {
+            try {
+              final range = statementRange(days, DateTime.now());
+              return await _stats.statement(
+                accessToken: token,
+                from: range.$1,
+                to: range.$2,
+              );
+            } catch (_) {
+              // The statement is an extra card; sales figures still render.
+              return null;
+            }
+          }()
+        : Future<MerchantStatement?>.value(null);
+    final storeFuture = () async {
+      try {
+        return await _catalog?.call(token);
+      } catch (_) {
+        // Name and rating are decoration; the figures still render.
+        return null;
+      }
+    }();
     try {
       final stats = await _stats.stats(accessToken: token, days: days);
-      FoodStoreDetail? store;
+      final statement = await statementFuture;
+      final store = await storeFuture;
       StoreRating? rating;
       StoreReviews? reviews;
       Object? reviewsFailure;
-      MerchantStatement? statement;
-      try {
-        final range = statementRange(days, DateTime.now());
-        statement = await _stats.statement(
-          accessToken: token,
-          from: range.$1,
-          to: range.$2,
-        );
-      } catch (_) {
-        // The statement is an extra card; sales figures still render.
-      }
-      try {
-        store = await _catalog?.call(token);
-        if (store != null) {
-          rating = (await _ratings?.storeRatings(
-            accessToken: token,
-            storeIds: [store.id],
-          ))?[store.id];
-        }
-      } catch (_) {
-        // Name and rating are decoration; the figures still render.
-      }
       final ratings = _ratings;
       final storeId = store?.id;
       if (ratings != null && storeId != null && storeId.isNotEmpty) {
@@ -107,8 +113,17 @@ class MerchantStatsCubit extends Cubit<MerchantStatsState> {
             accessToken: token,
             storeId: storeId,
           );
+          rating = reviews.summary;
         } catch (error) {
           reviewsFailure = error;
+          try {
+            rating = (await ratings.storeRatings(
+              accessToken: token,
+              storeIds: [storeId],
+            ))[storeId];
+          } catch (_) {
+            // Rating summary stays optional when both endpoints fail.
+          }
         }
       }
       if (isClosed || generation != _generation) {

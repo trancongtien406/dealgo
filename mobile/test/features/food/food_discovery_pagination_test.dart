@@ -3,6 +3,7 @@ import 'package:dealgo/features/food/domain/entities/food_models.dart';
 import 'package:dealgo/features/food/domain/repositories/food_repository.dart';
 import 'package:dealgo/features/food/domain/usecases/list_food_stores.dart';
 import 'package:dealgo/features/food/presentation/cubit/food_discovery_cubit.dart';
+import 'package:dealgo/features/rating/domain/service_rating.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 FoodStoreSummary _store(String id) => FoodStoreSummary(id: id, name: 'Quán $id');
@@ -130,4 +131,52 @@ void main() {
     expect([for (final store in state.stores) store.id], ['s1']);
     await cubit.close();
   });
+
+  test('inline store ratings skip the /v1/ratings/stores batch call', () async {
+    final repo = _PagedRepo([
+      const [
+        FoodStoreSummary(
+          id: 's1',
+          name: 'Quán 1',
+          ratingCount: 8,
+          ratingAverage: 4.7,
+        ),
+        FoodStoreSummary(id: 's2', name: 'Quán 2', ratingCount: 0),
+      ],
+    ]);
+    var batchCalls = 0;
+    final ratings = _SpyRatingRepo(onBatch: () => batchCalls += 1);
+    final cubit = FoodDiscoveryCubit(
+      listFoodStores: ListFoodStores(repo),
+      ratings: ratings,
+    );
+
+    await cubit.load('tok');
+
+    final state = cubit.state as FoodDiscoveryReady;
+    expect(batchCalls, 0);
+    expect(state.ratings['s1']?.average, 4.7);
+    expect(state.ratings['s1']?.count, 8);
+    expect(state.ratings['s2']?.average, isNull);
+    expect(state.ratings['s2']?.count, 0);
+    await cubit.close();
+  });
+}
+
+class _SpyRatingRepo implements RatingRepository {
+  _SpyRatingRepo({required this.onBatch});
+
+  final void Function() onBatch;
+
+  @override
+  Future<Map<String, StoreRating>> storeRatings({
+    required String accessToken,
+    required List<String> storeIds,
+  }) async {
+    onBatch();
+    return const {};
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

@@ -1,10 +1,12 @@
 import 'capture_config.dart';
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
@@ -43,20 +45,52 @@ class _DocumentCaptureView extends StatefulWidget {
   State<_DocumentCaptureView> createState() => _DocumentCaptureViewState();
 }
 
-class _DocumentCaptureViewState extends State<_DocumentCaptureView> {
+class _DocumentCaptureViewState extends State<_DocumentCaptureView>
+    with WidgetsBindingObserver {
   static const _frameInterval = CaptureConfig.cardFrameInterval;
   CameraController? _controller;
   bool _failed = false;
+  bool _cameraActive = true;
+  int _cameraGeneration = 0;
   DateTime _lastFrame = DateTime.fromMillisecondsSinceEpoch(0);
   LumaFrame? _previous;
 
   @override
   void initState() {
     super.initState();
-    _open();
+    WidgetsBinding.instance.addObserver(this);
+    _enterCapture();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _cameraActive = true;
+      if (_controller == null) unawaited(_open());
+      return;
+    }
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _cameraActive = false;
+      _cameraGeneration++;
+      final controller = _controller;
+      _controller = null;
+      _previous = null;
+      if (mounted) setState(() {});
+      if (controller != null) unawaited(controller.dispose());
+    }
+  }
+
+  Future<void> _enterCapture() async {
+    await SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.portraitUp,
+    ]);
+    if (mounted) await _open();
   }
 
   Future<void> _open() async {
+    final generation = _cameraGeneration;
     try {
       final cameras = await availableCameras();
       final back = cameras.firstWhere(
@@ -72,14 +106,18 @@ class _DocumentCaptureViewState extends State<_DocumentCaptureView> {
             : ImageFormatGroup.yuv420,
       );
       await controller.initialize();
-      if (!mounted) {
+      await controller.lockCaptureOrientation(DeviceOrientation.portraitUp);
+      if (!mounted || !_cameraActive || generation != _cameraGeneration) {
         await controller.dispose();
         return;
       }
+      _failed = false;
       setState(() => _controller = controller);
       await _startStream();
     } catch (_) {
-      if (mounted) setState(() => _failed = true);
+      if (mounted && _cameraActive && generation == _cameraGeneration) {
+        setState(() => _failed = true);
+      }
     }
   }
 
@@ -140,7 +178,15 @@ class _DocumentCaptureViewState extends State<_DocumentCaptureView> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _cameraActive = false;
+    _cameraGeneration++;
     _controller?.dispose();
+    SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
     super.dispose();
   }
 

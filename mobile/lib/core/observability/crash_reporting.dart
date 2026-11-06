@@ -5,8 +5,8 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
-/// Flutter flavor from `--flavor` or the Xcode `dev` / `prod` scheme.
-const _flavor = String.fromEnvironment('FLUTTER_APP_FLAVOR');
+import '../config/app_env.dart';
+import 'path_redaction.dart';
 
 /// Public client DSN of the DealGo mobile Sentry project. It can only submit
 /// events, so it ships in the app like any Sentry client key.
@@ -18,16 +18,11 @@ const dealGoMobileSentryDsn =
 /// nothing. `--dart-define=SENTRY_DSN=` (empty) turns it off for a build.
 const sentryDsn = String.fromEnvironment(
   'SENTRY_DSN',
-  defaultValue: _flavor != '' || kReleaseMode ? dealGoMobileSentryDsn : '',
+  defaultValue: flutterAppFlavor != '' || kReleaseMode ? dealGoMobileSentryDsn : '',
 );
 
 /// `dev` / `prod`, from the flavor (release builds without one count as prod).
-const sentryEnvironment = String.fromEnvironment(
-  'SENTRY_ENVIRONMENT',
-  defaultValue: _flavor == 'prod' || (_flavor == '' && kReleaseMode)
-      ? 'prod'
-      : 'dev',
-);
+const sentryEnvironment = appEnvironment;
 
 const _sentryTracesSampleRate = String.fromEnvironment(
   'SENTRY_TRACES_SAMPLE_RATE',
@@ -186,18 +181,6 @@ void reportHandledError(
           : (scope) => scope.fingerprint = fingerprint,
     ),
   );
-}
-
-final _idSegment = RegExp(r'^(?:\d+|[0-9a-fA-F-]{16,}|[A-Za-z0-9_-]{20,})$');
-
-/// [path] without its query and with ids/tokens replaced by `:id`, so
-/// breadcrumbs and grouping never carry identifiers or share tokens.
-String redactPath(String path) {
-  final noQuery = path.split('?').first;
-  return noQuery
-      .split('/')
-      .map((part) => _idSegment.hasMatch(part) ? ':id' : part)
-      .join('/');
 }
 
 /// Navigation breadcrumb between two router locations (paths redacted).

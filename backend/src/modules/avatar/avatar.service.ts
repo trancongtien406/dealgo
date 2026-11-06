@@ -53,7 +53,7 @@ export class AvatarService {
     if (declared && !(AVATAR_TYPES as readonly string[]).includes(declared === 'image/jpg' ? 'image/jpeg' : declared)) {
       throw avatarError(415, 'UPLOAD_TYPE_NOT_ALLOWED', 'Avatar must be a JPEG, PNG or WebP image');
     }
-    const avatarUrl = await this.uploads.storeThen(
+    const avatarUrl = await this.uploads.storePublicThen(
       `avatars/${userId}`,
       [{ label: 'avatar', contentType: payload.contentType, contentBase64: payload.base64 }],
       async ([ref]) => {
@@ -72,7 +72,11 @@ export class AvatarService {
   }
 
   /** Serves only a user's current avatar; replaced or guessed keys answer 404. */
-  async read(userId: string, file: string): Promise<{ body: Buffer; contentType: string }> {
+  async read(
+    userId: string,
+    file: string,
+    width: number | null = null,
+  ): Promise<{ body: Buffer; contentType: string }> {
     if (!UUID_RE.test(userId) || !FILE_RE.test(file)) {
       throw avatarError(404, 'AVATAR_NOT_FOUND', 'Avatar not found');
     }
@@ -83,7 +87,7 @@ export class AvatarService {
     }
     const ext = file.slice(file.lastIndexOf('.') + 1);
     const contentType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
-    const found = await this.uploads.read({ key, contentType });
+    const found = await this.uploads.readDisplayImage({ key, contentType }, width);
     if (!found) {
       throw avatarError(404, 'AVATAR_NOT_FOUND', 'Avatar not found');
     }

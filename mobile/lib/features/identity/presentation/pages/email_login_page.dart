@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/components/dealgo_haptics.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../../core/design_system/components/dealgo_segmented_control.dart';
 import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
@@ -224,16 +225,32 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                   ),
                 ),
                 const SizedBox(height: DealGoSpacing.s20),
-                _EmailAuthSegmentedControl(
-                  selected: _tab,
+                DealGoSegmentedControl(
+                  key: const Key('email-auth-tabs'),
+                  value: _tab.name,
                   enabled: !submitting,
-                  onChanged: _selectTab,
+                  onChanged: (id) => _selectTab(
+                    _EmailAuthTab.values.firstWhere((tab) => tab.name == id),
+                  ),
+                  items: [
+                    DealGoSegmentItem(
+                      id: _EmailAuthTab.login.name,
+                      label: l10n.emailTabLogin,
+                      key: const Key('email-tab-login'),
+                    ),
+                    DealGoSegmentItem(
+                      id: _EmailAuthTab.register.name,
+                      label: l10n.emailTabRegister,
+                      key: const Key('email-tab-register'),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: DealGoSpacing.s20),
                 DealGoTextField(
                   fieldKey: const Key('email-field'),
                   label: l10n.authEmailLabel,
-                  showLabel: false,
+                  hint: 'Nhập địa chỉ email của bạn',
+                  showLabel: true,
                   controller: _emailController,
                   prefixIcon: DealGoIcons.mail,
                   keyboardType: TextInputType.emailAddress,
@@ -248,7 +265,8 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                   fieldKey: const Key('password-field'),
                   obscureToggleKey: const Key('toggle-password-visibility'),
                   label: l10n.emailFieldPassword,
-                  showLabel: false,
+                  hint: 'Nhập mật khẩu',
+                  showLabel: true,
                   controller: _passwordController,
                   prefixIcon: DealGoIcons.lock,
                   obscure: true,
@@ -292,7 +310,8 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                                 'toggle-confirm-password-visibility',
                               ),
                               label: l10n.emailFieldConfirmPassword,
-                              showLabel: false,
+                              hint: 'Nhập lại mật khẩu',
+                              showLabel: true,
                               controller: _confirmPasswordController,
                               prefixIcon: DealGoIcons.lock,
                               obscure: true,
@@ -307,7 +326,8 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                             DealGoTextField(
                               fieldKey: const Key('display-name-field'),
                               label: l10n.emailFieldDisplayName,
-                              showLabel: false,
+                              hint: 'Nhập tên hiển thị (tuỳ chọn)',
+                              showLabel: true,
                               controller: _displayNameController,
                               prefixIcon: DealGoIcons.user,
                               autofillHints: const [AutofillHints.name],
@@ -347,123 +367,6 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
           ),
         );
       },
-    );
-  }
-}
-
-class _EmailAuthSegmentedControl extends StatelessWidget {
-  const _EmailAuthSegmentedControl({
-    required this.selected,
-    required this.enabled,
-    required this.onChanged,
-  });
-
-  final _EmailAuthTab selected;
-  final bool enabled;
-  final ValueChanged<_EmailAuthTab> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Container(
-      key: const Key('email-auth-tabs'),
-      padding: const EdgeInsets.all(DealGoSpacing.s4),
-      decoration: BoxDecoration(
-        color: DealGoColors.lavender,
-        borderRadius: BorderRadius.circular(DealGoRadius.button),
-      ),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: AnimatedAlign(
-              duration: DealGoMotion.durationFor(context, DealGoMotion.medium),
-              curve: DealGoMotion.standard,
-              alignment: selected == _EmailAuthTab.login
-                  ? Alignment.centerLeft
-                  : Alignment.centerRight,
-              child: FractionallySizedBox(
-                widthFactor: 0.5,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: DealGoColors.card,
-                    borderRadius: BorderRadius.circular(DealGoRadius.input),
-                    boxShadow: DealGoShadows.card,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: _SegmentTab(
-                  key: const Key('email-tab-login'),
-                  label: l10n.emailTabLogin,
-                  selected: selected == _EmailAuthTab.login,
-                  enabled: enabled,
-                  onTap: () => onChanged(_EmailAuthTab.login),
-                ),
-              ),
-              Expanded(
-                child: _SegmentTab(
-                  key: const Key('email-tab-register'),
-                  label: l10n.emailTabRegister,
-                  selected: selected == _EmailAuthTab.register,
-                  enabled: enabled,
-                  onTap: () => onChanged(_EmailAuthTab.register),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SegmentTab extends StatelessWidget {
-  const _SegmentTab({
-    super.key,
-    required this.label,
-    required this.selected,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: selected,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(DealGoRadius.input),
-          onTap: enabled ? onTap : null,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              minHeight: DealGoDimensions.minTapTarget - 4,
-            ),
-            child: Center(
-              child: AnimatedDefaultTextStyle(
-                duration: DealGoMotion.durationFor(context, DealGoMotion.fast),
-                style: Theme.of(context).textTheme.labelLarge!.copyWith(
-                  fontSize: 14.5,
-                  color: selected
-                      ? DealGoColors.primary
-                      : DealGoColors.textSecondary,
-                ),
-                child: Text(label, textAlign: TextAlign.center),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

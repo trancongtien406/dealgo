@@ -90,7 +90,7 @@ class _DriverJobCompletedPageState extends State<DriverJobCompletedPage> {
           DealGoDimensions.pageGutter,
           DealGoSpacing.s8,
           DealGoDimensions.pageGutter,
-          DealGoSpacing.s16,
+          DealGoSpacing.s12,
         ),
         child: DealGoPrimaryButton(
           key: const Key('driver-completed-back-jobs'),

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/components/dealgo_card.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
+import '../../../../core/design_system/components/dealgo_refresh.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
@@ -37,7 +38,7 @@ class _VouchersPageState extends State<VouchersPage> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool keepItems = false}) async {
     final token = currentAccessToken(context);
     if (token == null) {
       setState(() {
@@ -48,7 +49,9 @@ class _VouchersPageState extends State<VouchersPage> {
     }
     setState(() {
       _failure = null;
-      _items = null;
+      if (!keepItems) {
+        _items = null;
+      }
     });
     try {
       final items = await context.read<ListAvailableVouchers>()(
@@ -101,48 +104,51 @@ class _VouchersPageState extends State<VouchersPage> {
                         key: Key('vouchers-loading'),
                       ),
                     )
-                  : failure != null
-                  ? Padding(
-                      padding: const EdgeInsets.all(DealGoSpacing.s16),
-                      child: DealGoStateView.failure(
-                        context,
-                        key: const Key('vouchers-error'),
-                        onRetry: _load,
-                        cause: failure,
-                      ),
-                    )
-                  : items.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.all(DealGoSpacing.s16),
-                      child: DealGoStateView(
-                        key: const Key('vouchers-empty'),
-                        art: DealGoStateArt.noVouchers,
-                        title: l10n.vouchersEmptyTitle,
-                        message: l10n.vouchersEmptyBody,
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _load,
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(
-                          DealGoDimensions.pageGutter,
-                          DealGoSpacing.s16,
-                          DealGoDimensions.pageGutter,
-                          DealGoSpacing.s24,
-                        ),
-                        itemCount: items.length + 1,
-                        separatorBuilder: (_, _) =>
-                            const SizedBox(height: DealGoSpacing.s12),
-                        itemBuilder: (context, index) => index == items.length
-                            ? Text(
-                                l10n.vouchersFootnote,
-                                style: Theme.of(context).textTheme.bodySmall,
-                              )
-                            : _VoucherCard(
-                                voucher: items[index],
-                                onUse: () => _use(items[index]),
+                  : DealGoRefresh(
+                      onRefresh: () => _load(keepItems: true),
+                      child: failure != null
+                          ? Padding(
+                              padding: const EdgeInsets.all(DealGoSpacing.s16),
+                              child: DealGoStateView.failure(
+                                context,
+                                key: const Key('vouchers-error'),
+                                onRetry: _load,
+                                cause: failure,
                               ),
-                      ),
+                            )
+                          : items.isEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.all(DealGoSpacing.s16),
+                              child: DealGoStateView(
+                                key: const Key('vouchers-empty'),
+                                art: DealGoStateArt.noVouchers,
+                                title: l10n.vouchersEmptyTitle,
+                                message: l10n.vouchersEmptyBody,
+                              ),
+                            )
+                          : ListView.separated(
+                              padding: const EdgeInsets.fromLTRB(
+                                DealGoDimensions.pageGutter,
+                                DealGoSpacing.s16,
+                                DealGoDimensions.pageGutter,
+                                DealGoSpacing.s24,
+                              ),
+                              itemCount: items.length + 1,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(height: DealGoSpacing.s12),
+                              itemBuilder: (context, index) =>
+                                  index == items.length
+                                  ? Text(
+                                      l10n.vouchersFootnote,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
+                                    )
+                                  : _VoucherCard(
+                                      voucher: items[index],
+                                      onUse: () => _use(items[index]),
+                                    ),
+                            ),
                     ),
             ),
           ],

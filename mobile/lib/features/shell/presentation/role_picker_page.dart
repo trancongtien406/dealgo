@@ -7,10 +7,12 @@ import '../../../core/design_system/components/dealgo_dialog.dart';
 import '../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../core/motion/dealgo_sheet.dart';
 import '../../identity/domain/entities/app_role.dart';
 import '../../identity/domain/entities/auth_state.dart';
 import '../../identity/domain/entities/user_profile.dart';
 import '../../identity/presentation/cubit/auth_cubit.dart';
+import '../../identity/presentation/widgets/auth_scaffold.dart';
 import '../../onboarding/presentation/utils/driver_kyc_routes.dart';
 import '../../onboarding/presentation/utils/merchant_kyb_routes.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
@@ -45,36 +47,12 @@ class _RolePickerPageState extends State<RolePickerPage> {
       backgroundColor: DealGoColors.card,
       body: Stack(
         children: [
-          Positioned(
-            top: -60,
-            left: -40,
-            child: IgnorePointer(
-              child: Container(
-                width: 200,
-                height: 200,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: DealGoColors.primary.withValues(alpha: 0.06),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 120,
-            right: -50,
-            child: IgnorePointer(
-              child: Container(
-                width: 220,
-                height: 220,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: DealGoColors.brandGreen.withValues(alpha: 0.05),
-                ),
-              ),
-            ),
-          ),
+          const Positioned.fill(child: AuthBackdrop()),
           SafeArea(
-            child: Column(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 DealGoAppHeader(
@@ -187,9 +165,11 @@ class _RolePickerPageState extends State<RolePickerPage> {
               ],
             ),
           ),
-        ],
+        ),
       ),
-    );
+    ],
+  ),
+);
   }
 
   void _showHelp(BuildContext context) {
@@ -202,7 +182,7 @@ class _RolePickerPageState extends State<RolePickerPage> {
   }
 
   void _showLearnMore(BuildContext context) {
-    showModalBottomSheet<void>(
+    showDealGoSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),

@@ -45,12 +45,6 @@ const double kDealGoNavOverhang = 20;
 /// Horizontal inset of the floating pill from the screen edges.
 const double kDealGoNavSideMargin = 12;
 
-/// iOS: the pill sits 10 above the screen bottom, or just above the home
-/// indicator (inset − 10) on Face ID devices.
-/// Android (edge-to-edge): the pill sits 6 above the system navigation
-/// (`viewPadding.bottom`: ~48dp 3-button, ~16–24dp gesture), or 10 above the
-/// edge without one.
-/// Uses viewPadding (not padding) so the bar does not jump when the keyboard opens.
 DealGoNavBarMetrics dealGoNavBarMetrics(
   TargetPlatform platform,
   double viewPaddingBottom,
@@ -82,6 +76,22 @@ EdgeInsets dealGoScrollPadding(
   BuildContext context, [
   EdgeInsets base = const EdgeInsets.only(bottom: DealGoSpacing.s16),
 ]) => base.copyWith(bottom: base.bottom + MediaQuery.paddingOf(context).bottom);
+
+/// Bottom padding for a CTA pinned at the foot of a sheet, panel or page.
+///
+/// The 12dp gutter of [DealGoBottomBar] above whatever the screen bottom
+/// already reserves: the floating tab bar height (published as
+/// `MediaQuery.padding.bottom` by the role shell) or the system inset. Call it
+/// where that inset is still in `padding` — a Scaffold body, a sheet pinned to
+/// the screen edge — not inside a bottom [SafeArea], which has already
+/// consumed it. With the keyboard open the CTA rests on it, so the gutter is
+/// all that is left.
+double dealGoStickyFooterBottom(
+  BuildContext context, {
+  double gutter = DealGoSpacing.s12,
+}) => MediaQuery.viewInsetsOf(context).bottom > 0
+    ? gutter
+    : gutter + MediaQuery.paddingOf(context).bottom;
 
 DealGoNavBarMetrics dealGoNavBarMetricsOf(BuildContext context) =>
     dealGoNavBarMetrics(

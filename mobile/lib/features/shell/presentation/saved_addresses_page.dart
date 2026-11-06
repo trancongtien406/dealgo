@@ -5,6 +5,7 @@ import '../../../core/design_system/components/dealgo_app_header.dart';
 import '../../../core/design_system/components/dealgo_bottom_bar.dart';
 import '../../../core/design_system/components/dealgo_card.dart';
 import '../../../core/design_system/components/dealgo_dialog.dart';
+import '../../../core/design_system/components/dealgo_nav_insets.dart';
 import '../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../core/design_system/components/dealgo_refresh.dart';
 import '../../../core/design_system/components/dealgo_skeleton.dart';
@@ -17,6 +18,7 @@ import '../../address_book/domain/repositories/address_book_repository.dart';
 import '../../address_book/presentation/cubit/saved_addresses_cubit.dart';
 import '../../identity/domain/entities/auth_state.dart';
 import '../../identity/presentation/cubit/auth_cubit.dart';
+import '../../places/presentation/place_lists_store.dart';
 import 'account_widgets.dart';
 import 'address_form_sheet.dart';
 
@@ -61,6 +63,7 @@ class _SavedAddressesView extends StatelessWidget {
       onSubmit: (draft) => cubit.save(draft, id: editing?.id),
     );
     if (saved == true && context.mounted) {
+      _publishSaved(context, cubit);
       _toast(context, AppLocalizations.of(context).addrBookSaved);
     }
   }
@@ -85,6 +88,9 @@ class _SavedAddressesView extends StatelessWidget {
     }
     final error = await cubit.remove(address.id);
     if (context.mounted) {
+      if (error == null) {
+        _publishSaved(context, cubit);
+      }
       _toast(
         context,
         error == null ? l10n.addrBookDeleted : addressErrorText(l10n, error),
@@ -94,11 +100,21 @@ class _SavedAddressesView extends StatelessWidget {
 
   Future<void> _makeDefault(BuildContext context, SavedAddress address) async {
     final l10n = AppLocalizations.of(context);
-    final error = await context.read<SavedAddressesCubit>().makeDefault(
-      address.id,
-    );
-    if (error != null && context.mounted) {
-      _toast(context, addressErrorText(l10n, error));
+    final cubit = context.read<SavedAddressesCubit>();
+    final error = await cubit.makeDefault(address.id);
+    if (context.mounted) {
+      if (error == null) {
+        _publishSaved(context, cubit);
+      } else {
+        _toast(context, addressErrorText(l10n, error));
+      }
+    }
+  }
+
+  void _publishSaved(BuildContext context, SavedAddressesCubit cubit) {
+    final state = cubit.state;
+    if (state is SavedAddressesLoaded) {
+      context.read<PlaceListsStore>().adoptSavedAddresses(state.items);
     }
   }
 
@@ -122,7 +138,11 @@ class _SavedAddressesView extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             DealGoAppHeader(title: l10n.addrBookTitle),
-            Expanded(child: _body(context, state)),
+            Expanded(
+              child: Builder(
+                builder: (bodyContext) => _body(bodyContext, state),
+              ),
+            ),
           ],
         ),
       ),
@@ -155,11 +175,14 @@ class _SavedAddressesView extends StatelessWidget {
   Widget _body(BuildContext context, SavedAddressesState state) {
     final l10n = AppLocalizations.of(context);
     final cubit = context.read<SavedAddressesCubit>();
-    final padding = EdgeInsets.fromLTRB(
-      DealGoDimensions.pageGutter,
-      DealGoSpacing.s16,
-      DealGoDimensions.pageGutter,
-      DealGoSpacing.s16 + 88 + MediaQuery.viewPaddingOf(context).bottom,
+    final padding = dealGoScrollPadding(
+      context,
+      const EdgeInsets.fromLTRB(
+        DealGoDimensions.pageGutter,
+        DealGoSpacing.s16,
+        DealGoDimensions.pageGutter,
+        DealGoSpacing.s24,
+      ),
     );
     return switch (state) {
       SavedAddressesLoading() => DealGoSkeletonList(
@@ -167,16 +190,19 @@ class _SavedAddressesView extends StatelessWidget {
         thumbSize: 44,
         semanticLabel: l10n.addrBookLoading,
       ),
-      SavedAddressesFailed(:final cause) => ListView(
-        padding: padding,
-        children: [
-          DealGoStateView.failure(
-            context,
-            onRetry: cubit.load,
-            cause: cause,
-            compact: true,
-          ),
-        ],
+      SavedAddressesFailed(:final cause) => DealGoRefresh(
+        onRefresh: cubit.load,
+        child: ListView(
+          padding: padding,
+          children: [
+            DealGoStateView.failure(
+              context,
+              onRetry: cubit.load,
+              cause: cause,
+              compact: true,
+            ),
+          ],
+        ),
       ),
       SavedAddressesLoaded(:final items) => DealGoRefresh(
         onRefresh: cubit.load,

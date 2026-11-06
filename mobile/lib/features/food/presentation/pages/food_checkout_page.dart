@@ -244,6 +244,7 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
   Widget build(BuildContext context) {
     final phase = _phase;
     final submitting = phase is CheckoutSubmitting;
+    final cart = context.watch<FoodCartCubit>().state;
     return PopScope(
       canPop: !submitting,
       child: Scaffold(
@@ -285,17 +286,19 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
             ],
           ),
         ),
-        bottomNavigationBar: CheckoutActions(
-          phase: phase,
-          busy: _busy,
-          onSubmit: _submit,
-          onAccept: () {
-            if (phase is CheckoutRepriced) {
-              _acceptReprice(phase);
-            }
-          },
-          onRetry: () => _submit(retry: true),
-        ),
+        bottomNavigationBar: checkoutActionsVisible(phase, cart, busy: _busy)
+            ? CheckoutActions(
+                phase: phase,
+                busy: _busy,
+                onSubmit: _submit,
+                onAccept: () {
+                  if (phase is CheckoutRepriced) {
+                    _acceptReprice(phase);
+                  }
+                },
+                onRetry: () => _submit(retry: true),
+              )
+            : null,
       ),
     );
   }

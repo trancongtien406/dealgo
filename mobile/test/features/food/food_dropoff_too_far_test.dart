@@ -2,6 +2,7 @@ import 'package:dealgo/core/network/api_exception.dart';
 import 'package:dealgo/features/food/domain/entities/food_models.dart';
 import 'package:dealgo/features/food/presentation/cubit/food_cart_cubit.dart';
 import 'package:dealgo/features/food/presentation/pages/food_checkout_page.dart';
+import 'package:dealgo/features/food/presentation/widgets/food_dropoff_tile.dart';
 import 'package:dealgo/features/pricing/domain/pricing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -88,6 +89,16 @@ void main() {
       find.byKey(const Key('food-fare-change-address')),
       findsOneWidget,
       reason: 'a nearer address is the only way past FOOD_TOO_FAR',
+    );
+    final tile = find.byType(FoodDropoffTile);
+    expect(
+      find.descendant(of: tile, matching: find.text('Đổi')),
+      findsNothing,
+      reason: 'the row must not repeat a second change action above the error',
+    );
+    expect(
+      find.descendant(of: tile, matching: find.text('Đổi địa chỉ')),
+      findsOneWidget,
     );
   });
 }
